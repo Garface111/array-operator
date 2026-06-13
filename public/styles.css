@@ -287,7 +287,9 @@
   .sb-link.v1.ok{background:linear-gradient(var(--good),rgba(63,214,138,.2))}
   .sb-link.v1.warn{background:linear-gradient(var(--warn),rgba(255,180,84,.2))}
   .sb-link.v1.bad{background:linear-gradient(var(--bad),rgba(255,107,107,.2))}
-  .sb-link.v2{height:30px;background:linear-gradient(rgba(94,194,255,.5),rgba(63,214,138,.3))}
+  .sb-link.v2{height:30px;background-repeat:no-repeat;
+    background-image:linear-gradient(to bottom,transparent 0,rgba(214,255,233,.95) 7%,transparent 16%),linear-gradient(rgba(94,194,255,.5),rgba(63,214,138,.3));
+    background-size:100% 240%,100% 100%;animation:sbflowv 1.8s linear infinite}
 
   /* TIER 2: Array */
   .sb-array{border-radius:14px;padding:14px 16px;border:1px solid rgba(94,194,255,.28);
@@ -301,13 +303,20 @@
 
   /* TIER 3: Inverter comb */
   .sb-comb{margin-top:0}
-  .sb-bus{height:2px;background:linear-gradient(90deg,transparent,rgba(63,214,138,.5) 12%,rgba(63,214,138,.5) 88%,transparent);margin:0 6px}
+  .sb-bus{height:2px;margin:0 6px;background-repeat:no-repeat;
+    background-image:linear-gradient(90deg,transparent,rgba(214,255,233,.9) 50%,transparent 58%),linear-gradient(90deg,transparent,rgba(63,214,138,.5) 12%,rgba(63,214,138,.5) 88%,transparent);
+    background-size:55% 100%,100% 100%;animation:sbflowh 2.2s linear infinite}
   .sb-teeth{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding-top:14px;position:relative}
   .sb-inv{flex:0 0 auto;width:92px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
     background:linear-gradient(165deg,var(--card),var(--card2));padding:10px 8px 9px;text-align:center;position:relative;
     transition:transform .12s,border-color .12s,box-shadow .12s}
   /* the prong stem up to the bus */
-  .sb-inv::before{content:"";position:absolute;top:-14px;left:50%;width:2px;height:14px;background:rgba(63,214,138,.4);transform:translateX(-50%)}
+  .sb-inv::before{content:"";position:absolute;top:-14px;left:50%;width:2px;height:14px;transform:translateX(-50%);background-repeat:no-repeat;
+    background-image:linear-gradient(to bottom,transparent,rgba(214,255,233,.95) 45%,transparent),linear-gradient(rgba(63,214,138,.4),rgba(63,214,138,.4));
+    background-size:100% 260%,100% 100%;animation:sbflowv 1.8s linear infinite}
+  @keyframes sbflowv{0%{background-position:0 -130%,0 0}100%{background-position:0 130%,0 0}}
+  @keyframes sbflowh{0%{background-position:-60% 0,0 0}100%{background-position:165% 0,0 0}}
+  @media (prefers-reduced-motion:reduce){.sb-link.v2,.sb-bus,.sb-inv::before{animation:none}}
   .sb-inv:hover,.sb-inv:focus{transform:translateY(-2px);border-color:rgba(63,214,138,.5);outline:none;box-shadow:0 10px 24px -14px rgba(0,0,0,.8)}
   .sb-inv.sel{border-color:var(--good);box-shadow:0 0 0 1px var(--good),0 10px 24px -14px rgba(0,0,0,.8)}
   .sb-inv.warn{border-color:rgba(255,180,84,.4)}
