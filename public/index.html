@@ -45,16 +45,16 @@
     <!-- VOLUME PRICING (moved here — it lives with billing) -->
     <section class="pricing" id="pricing">
       <div class="eyebrow">Pricing</div>
-      <h2>Your first array is on us.</h2>
-      <p class="sub">Start watching for free, forever. Add more arrays only when you want to — billed per array, per month, and it gets cheaper the more you connect. No setup fee. Cancel anytime.</p>
+      <h2>You only pay for what your panels make.</h2>
+      <p class="sub">Billed by the kilowatt-hour your arrays actually generate — a tiny slice of what that energy earns you. Nothing to pay until your trial ends. No per-array fees, no setup fee. Cancel anytime.</p>
 
       <div class="pricecard">
         <div class="pc-main">
           <div class="sun"></div>
-          <span class="pc-free">First array free</span>
-          <div class="pc-price">$9<small> / array / mo</small></div>
+          <span class="pc-free">Billed by generation</span>
+          <div class="pc-price">0.5&cent;<small> / kWh</small></div>
           <div class="pc-tag">14-day free trial · no card to start</div>
-          <div class="pc-sub">Connect, see your whole fleet measured against itself, and decide later. We only charge from the 2nd array — and the per-array price drops as you scale.</div>
+          <div class="pc-sub">About <b>$4.50/mo</b> for a typical home array, scaling naturally with bigger fleets. You're charged on real metered output — when the sun doesn't shine, you don't pay. The rate even drops as you generate more.</div>
           <ul class="pc-list">
             <li><span class="ck">✓</span><span>One credential connects every array on your account</span></li>
             <li><span class="ck">✓</span><span>Ground-truth, per-inverter health vs. its own neighbors</span></li>
@@ -70,14 +70,13 @@
 
         <div class="pc-tiers">
           <h3>Volume pricing</h3>
-          <div class="ph">graduated — each band priced only on the arrays within it</div>
+          <div class="ph">graduated — each band priced only on the kWh within it</div>
           <div style="margin-top:10px">
-            <div class="tier"><div class="tn">1st array<small>get started, stay free</small></div><div class="tp free">FREE</div></div>
-            <div class="tier"><div class="tn">Arrays 2–10<small>homeowners &amp; prosumers</small></div><div class="tp">$9<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
-            <div class="tier"><div class="tn">Arrays 11–50<small>multi-site owners</small></div><div class="tp">$8<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
-            <div class="tier"><div class="tn">Arrays 51+<small>community-solar hosts</small></div><div class="tp">$6.50<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+            <div class="tier"><div class="tn">First 20,000 kWh / mo<small>homeowners &amp; prosumers</small></div><div class="tp">0.5<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
+            <div class="tier"><div class="tn">20k – 200k kWh / mo<small>multi-site owners</small></div><div class="tp">0.45<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
+            <div class="tier"><div class="tn">200,000+ kWh / mo<small>community-solar hosts</small></div><div class="tp">0.4<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
           </div>
-          <div class="pc-foot">Example: 1 array = <b style="color:var(--ink)">free</b> · 7 arrays = <b style="color:var(--ink)">$54/mo</b> · 25 arrays = <b style="color:var(--ink)">$208/mo</b>. No setup fee, ever.</div>
+          <div class="pc-foot">Example: a 8 kW home (~900 kWh/mo) = <b style="color:var(--ink)">~$4.50/mo</b> · a 99 kW commercial array (~10,000 kWh/mo) = <b style="color:var(--ink)">~$50/mo</b>. No setup fee, ever.</div>
         </div>
       </div>
     </section>
@@ -89,7 +88,7 @@
     <!-- (TOP) SANDBOX — live 3-tier fleet tree; drag any inverter to rearrange -->
     <div class="section-h" style="margin-top:18px">
       <h2>Your fleet, your way</h2>
-      <span class="hint">drag any inverter to rearrange — your layout, saved to this browser</span>
+      <span class="hint">drag any inverter to rearrange — saved to your account, regroups how it's measured</span>
     </div>
     <section id="sbWrap"><div id="sandbox"></div></section>
 

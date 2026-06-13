@@ -16,8 +16,7 @@
  * ==========================================================================*/
 (function(){
   const SESSION_KEY = "so_session";
-  const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings)
-  const LAYOUT_KEY = "ao_inverter_layout";   // persisted per-inverter arrangement { arrayId: [invId,...] }
+  const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
@@ -77,73 +76,40 @@
     }).map(x=>x[0]);
   }
 
-  // ---- saved per-inverter layout (localStorage) ----
-  // Stable inverter id: real serial when present, else "<arrayId>:<name>".
-  function invId(arrayId, inv){
-    return inv.sn != null && String(inv.sn).length ? String(inv.sn) : `${arrayId}:${inv.name}`;
+  // ---- backend writes (authed, same-origin relative) ----
+  // Inverter arrangement is now persisted SERVER-SIDE (reassign/reorder/arrays/reset);
+  // there is no browser-local layout. These helpers POST and resolve the JSON body.
+  function apiPost(path, body){
+    const session = getSession();
+    if(!session) return Promise.reject(new Error("no session"));
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer "+session },
+      body: body != null ? JSON.stringify(body) : "{}"
+    }).then(r => { if(!r.ok) throw new Error(path + " " + r.status); return r.json().catch(() => ({})); });
   }
-  function loadLayout(){
-    try { const v = JSON.parse(localStorage.getItem(LAYOUT_KEY)); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; }
-    catch(e){ return {}; }
+
+  // transient bottom-corner toast (errors / confirmations) — no framework needed
+  function toast(msg, kind){
+    let t = document.getElementById("sbToast");
+    if(!t){ t = document.createElement("div"); t.id = "sbToast"; document.body.appendChild(t); }
+    t.className = "sb-toast " + (kind || "") + " show";
+    t.textContent = msg;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove("show"), 3400);
   }
-  // Read the live DOM and persist the current arrangement: arrayId -> ordered inverter ids.
-  function saveLayout(host){
-    const map = {};
-    host.querySelectorAll(".sb-col").forEach(col => {
-      const aid = col.dataset.arrayId;
-      map[aid] = [...col.querySelectorAll(".sb-teeth .sb-inv")].map(n => n.dataset.invId);
-    });
-    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(map)); } catch(e){}
+
+  // dim the canvas + show a "Saving…" note while a backend write is in flight
+  function setSaving(msg){
+    const canvas = document.querySelector("#sandbox .sb-canvas");
+    if(canvas) canvas.classList.add("sb-busy");
+    const foot = document.getElementById("sbFoot");
+    if(foot) foot.innerHTML = `<span class="sb-saving-note">${esc(msg || "Saving…")}</span>`;
   }
-  // After render, re-group/re-order inverter cards to match the saved layout.
-  // Saved ids place under their saved array in saved order; cards not in the saved
-  // layout (or whose saved array is gone) fall back to their ORIGINAL backend array
-  // at the end. A real inverter is never lost.
-  function applyLayout(host){
-    const saved = loadLayout();
-    if(!Object.keys(saved).length) return;          // nothing saved → backend truth stands
-
-    const cols = [...host.querySelectorAll(".sb-col")];
-    const teethByArray = {}, vendorByArray = {}, finalOrder = {};
-    const invById = new Map();                       // invId -> card node
-
-    cols.forEach(col => {
-      const aid = col.dataset.arrayId;
-      teethByArray[aid] = col.querySelector(".sb-teeth");
-      vendorByArray[aid] = col.dataset.vendor || "";
-      finalOrder[aid] = [];
-      col.querySelectorAll(".sb-teeth .sb-inv").forEach(n => invById.set(n.dataset.invId, n));
-    });
-
-    const placed = new Set();
-    // 1) place saved arrangement (only for arrays that still exist + cards that still exist)
-    Object.keys(saved).forEach(aid => {
-      if(!(aid in finalOrder)) return;
-      (saved[aid] || []).forEach(id => {
-        id = String(id);
-        if(invById.has(id) && !placed.has(id)){ finalOrder[aid].push(id); placed.add(id); }
-      });
-    });
-    // 2) anything not placed → its ORIGINAL backend array, appended in original order
-    cols.forEach(col => {
-      const aid = col.dataset.arrayId;
-      col.querySelectorAll(".sb-teeth .sb-inv").forEach(n => {
-        const id = n.dataset.invId;
-        if(!placed.has(id)){ finalOrder[aid].push(id); placed.add(id); }
-      });
-    });
-    // 3) apply to the DOM, re-stamping each card's array + vendor badge
-    cols.forEach(col => {
-      const aid = col.dataset.arrayId, teeth = teethByArray[aid];
-      finalOrder[aid].forEach(id => {
-        const node = invById.get(id);
-        if(!node) return;
-        node.dataset.arrayId = aid;
-        setCardVendor(node, vendorByArray[aid]);
-        teeth.appendChild(node);
-      });
-    });
-    cols.forEach(updateColCount);
+  function clearSaving(){
+    const canvas = document.querySelector("#sandbox .sb-canvas");
+    if(canvas) canvas.classList.remove("sb-busy");
+    setDefaultFoot();
   }
 
   const STATUS_LABEL = {
@@ -171,19 +137,23 @@
     return (vendor && BRAND[vendor])
       ? `<span class="sb-brand sb-inv-brand ${esc(vendor)}">${esc(BRAND[vendor])}</span>` : "";
   }
-  // re-stamp a card's vendor badge (used on cross-array move / layout apply)
-  function setCardVendor(node, vendor){
-    const existing = node.querySelector(".sb-inv-brand");
-    if(existing) existing.remove();
-    node.dataset.vendor = vendor || "";
-    const html = brandHTML(vendor);
-    if(html) node.appendChild(el(html));
-  }
   // refresh the "N inverters" count on a column from its live card count
   function updateColCount(col){
     const n = col.querySelectorAll(".sb-teeth .sb-inv").length;
     const c = col.querySelector(".sb-array-count");
     if(c) c.textContent = `${n} inverter${n===1?'':'s'}`;
+  }
+
+  // Honest footer copy: the arrangement now lives on the SERVER (your account), and a
+  // move genuinely regroups + re-measures an inverter against its new neighbors. It does
+  // NOT change which physical site the telemetry comes from — that source is fixed.
+  const DEFAULT_FOOT_HTML =
+    `Tip: drag any inverter to reorder it or move it to another array; click one for its diagnosis. ` +
+    `<span class="sb-foot-note">Arrangement is saved to your account — moving an inverter regroups it and ` +
+    `re-measures it against its new neighbors. It doesn't re-wire which site the telemetry comes from.</span>`;
+  function setDefaultFoot(){
+    const foot = document.getElementById("sbFoot");
+    if(foot) foot.innerHTML = DEFAULT_FOOT_HTML;
   }
 
   function render(tree){
@@ -196,9 +166,13 @@
            <div class="sb-tiers"><span class="sb-tier-tag b">Your fleet</span></div>
            <div class="sb-sub">Nothing connected yet — add your first array to build your live fleet tree.</div>
          </div>
-         <div class="sb-head-actions"><button class="sb-addbtn" id="sbAddArray">+ Add array</button></div></div>
+         <div class="sb-head-actions"><div class="sb-head-btns">
+           <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
+           <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
+         </div></div></div>
          <div class="sb-empty">No arrays connected yet — hit <b>+ Add array</b> to bring your inverters in.</div>`;
       wireAddButton(host);
+      wireNewArrayButton(host);
       return;
     }
 
@@ -217,7 +191,8 @@
         </div>
         <div class="sb-head-actions">
           <div class="sb-head-btns">
-            <button class="sb-resetbtn" id="sbReset" type="button" title="Discard your saved arrangement and return to the live backend layout">Reset layout</button>
+            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
+            <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
             <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
           </div>
           <div class="sb-legend">
@@ -232,24 +207,34 @@
       const a = col.alert || {level:"ok"};
       const aCls = ALERT_CLASS[a.level] || "ok";
       const invs = col.inverters || [];
-      const srcTag = col.inverter_source === "solaredge"
+      const srcTag = (col.inverter_source === "live" || col.inverter_source === "solaredge")
         ? `<span class="sb-srctag live">live · per-inverter</span>`
         : col.inverter_source === "array"
           ? `<span class="sb-srctag">array-level</span>`
-          : `<span class="sb-srctag off">no data</span>`;
-      const brandChip = col.vendor
-        ? `<span class="sb-brand ${esc(col.vendor)}">${esc(BRAND[col.vendor] || col.vendor)}</span>`
-        : "";
+          : col.inverter_count > 0
+            ? `<span class="sb-srctag live">live · per-inverter</span>`
+            : `<span class="sb-srctag off">empty</span>`;
+      // tier-2 chip: single vendor when uniform, else a "mixed" chip listing the vendors
+      // present (a column can now hold mixed-vendor inverters after owner moves).
+      let brandChip = "";
+      if(col.vendor){
+        brandChip = `<span class="sb-brand ${esc(col.vendor)}">${esc(BRAND[col.vendor] || col.vendor)}</span>`;
+      } else if(Array.isArray(col.vendors) && col.vendors.length){
+        const labels = col.vendors.map(v => BRAND[v] || v).join(" · ");
+        brandChip = `<span class="sb-brand mixed" title="${esc(labels)}">mixed · ${esc(labels)}</span>`;
+      }
 
-      // bottom comb — one prong per inverter (each individually drag-movable)
-      const teeth = invs.map(inv => {
+      // bottom comb — one prong per inverter (each individually drag-movable).
+      // The drag id is the REAL, server-known inv.inverter_id (stable DB id); the
+      // vendor badge is now per-inverter (inv.vendor), since an array can hold a
+      // mixed-vendor cohort after owner moves.
+      const teeth = invs.length ? invs.map(inv => {
         const sCls = STATUS_CLASS[inv.status] || "ok";
         const np = inv.nameplate_kw!=null ? `${inv.nameplate_kw} kW` : "";
         const power = inv.current_power_w!=null ? `${(inv.current_power_w/1000).toFixed(2)} kW now` : "";
-        const id = invId(col.array_id, inv);
         return `
           <div class="sb-inv ${sCls}" tabindex="0" draggable="true"
-               data-inv-id="${esc(id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}"
+               data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
                data-np="${esc(np)}" data-win="${esc(inv.window_kwh!=null?inv.window_kwh+' kWh / 14d':'')}"
@@ -259,9 +244,10 @@
             <div class="sb-inv-meta">${esc(np)}</div>
             ${peerBar(inv.peer_index)}
             <div class="sb-inv-status ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"")}</div>
-            ${brandHTML(col.vendor)}
+            ${brandHTML(inv.vendor)}
           </div>`;
-      }).join("");
+      }).join("")
+        : `<div class="sb-comb-empty">Empty array — drag inverters here</div>`;
 
       return `
         <div class="sb-col" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
@@ -291,10 +277,7 @@
     }).join("");
 
     host.innerHTML = head + `<div class="sb-canvas">${columns}</div>
-      <div class="sb-foot" id="sbFoot">Tip: drag any inverter to reorder it or move it to another array; click one for its diagnosis. <span class="sb-foot-note">Arrangement is saved to this browser — it organizes your view, it doesn't re-wire the actual SolarEdge/vendor mapping.</span></div>`;
-
-    // re-group/re-order inverter cards to the saved browser layout (backend truth if none saved)
-    applyLayout(host);
+      <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
 
     // click/keyboard → detail line
     host.querySelectorAll(".sb-inv").forEach(node => {
@@ -315,9 +298,10 @@
     });
 
     wireAddButton(host);
+    wireNewArrayButton(host);
     wireResetButton(host);
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
-    wireInvDrag(host);    // per-inverter reorder + cross-array move
+    wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
   }
 
   /* ---- '+ Add array' button wiring ---- */
@@ -326,13 +310,46 @@
     if(btn) btn.onclick = openAddArrayModal;
   }
 
-  /* ---- 'Reset layout' — clear saved arrangement + column order, re-render backend truth ---- */
+  /* ---- 'Reset layout' — POST /layout/reset: snap every inverter back to its
+   * discovered (vendor) grouping on the SERVER, then reload the live tree. ---- */
   function wireResetButton(host){
     const btn = host.querySelector("#sbReset");
     if(!btn) return;
-    btn.onclick = () => {
-      try { localStorage.removeItem(LAYOUT_KEY); localStorage.removeItem(ORDER_KEY); } catch(e){}
-      load();
+    btn.onclick = async () => {
+      const session = getSession();
+      if(!session){ load(); return; }   // demo / signed-out — nothing server-side to reset
+      setSaving("Resetting to your discovered grouping…");
+      try {
+        const d = await apiPost("/v1/array-owners/layout/reset");
+        toast(`Snapped ${d && d.reset!=null ? d.reset : "all"} inverters back to their vendor grouping.`, "ok");
+        reload();
+      } catch(e){
+        toast("Couldn't reset the layout — please retry.", "err");
+        reload();
+      }
+    };
+  }
+
+  /* ---- 'New empty array' — POST /arrays {name}: create an empty owner-defined
+   * group to drag inverters into, then reload so the new column appears. ---- */
+  function wireNewArrayButton(host){
+    const btn = host.querySelector("#sbNewArray");
+    if(!btn) return;
+    btn.onclick = async () => {
+      const session = getSession();
+      if(!session){ toast("Sign in first to create an array.", "err"); return; }
+      let name = window.prompt("Name your new array (then drag inverters into it):", "");
+      if(name == null) return;                 // cancelled
+      name = name.trim();
+      if(!name){ toast("Enter a name for the new array.", "err"); return; }
+      setSaving("Creating your new array…");
+      try {
+        await apiPost("/v1/array-owners/arrays", { name });
+        reload();
+      } catch(e){
+        toast("Couldn't create that array — please retry.", "err");
+        reload();
+      }
     };
   }
 
@@ -382,10 +399,12 @@
     canvas.addEventListener("drop", e => { if(dragEl) e.preventDefault(); });
   }
 
-  /* ---- HTML5 drag of individual inverter cards ----
-   * (a) reorder within a comb, (b) move across combs. The dragged card lifts
-   * (opacity) and is moved live into the hovered .sb-teeth at the computed slot.
-   * On drop we re-stamp the card's array + vendor badge and persist the layout. */
+  /* ---- HTML5 drag of individual inverter cards → PERSISTED to the backend ----
+   * (a) reorder within a comb  → POST /inverters/reorder  (peer cohort unchanged → trust optimistic)
+   * (b) move across combs      → POST /inverters/reassign (changes the real peer cohort → reload to
+   *     re-render peer-index / alerts / counts; revert by reloading on failure)
+   * The dragged card lifts (opacity) and is moved live into the hovered .sb-teeth at the
+   * computed slot; vendor badge is per-inverter so it travels with the card unchanged. */
   function getInvAfter(teeth, x, y){
     // 2-D nearest-center, so it works with the flex-wrapped comb
     const els = [...teeth.querySelectorAll(".sb-inv:not(.inv-dragging)")];
@@ -402,12 +421,13 @@
     return (x < bestBox.left + bestBox.width/2) ? bestEl : bestEl.nextElementSibling;
   }
   function wireInvDrag(host){
-    let dragInv = null;
+    let dragInv = null, originArrayId = null;
 
     host.querySelectorAll(".sb-inv").forEach(card => {
       card.addEventListener("dragstart", e => {
         e.stopPropagation();                          // never bubble into a column drag
         dragInv = card;
+        originArrayId = card.dataset.arrayId;         // remember where it started for reassign vs reorder
         host.classList.add("inv-dragging-active");
         requestAnimationFrame(() => card.classList.add("inv-dragging"));
         e.dataTransfer.effectAllowed = "move";
@@ -418,13 +438,23 @@
         host.classList.remove("inv-dragging-active");
         host.querySelectorAll(".sb-teeth.inv-drop").forEach(t => t.classList.remove("inv-drop"));
         const col = card.closest(".sb-col");
-        if(col){
-          card.dataset.arrayId = col.dataset.arrayId;       // its new home array
-          setCardVendor(card, col.dataset.vendor || "");    // badge reflects where it now sits
-          host.querySelectorAll(".sb-col").forEach(updateColCount);
-          saveLayout(host);
+        const from = originArrayId;
+        dragInv = null; originArrayId = null;
+        if(!col) return;
+
+        card.dataset.arrayId = col.dataset.arrayId;          // optimistic: its new home array
+        host.querySelectorAll(".sb-col").forEach(updateColCount);
+
+        const invId = parseInt(card.dataset.invId, 10);
+        const destArrayId = parseInt(col.dataset.arrayId, 10);
+        // No real id / no session (demo tree) → optimistic-only, nothing to persist.
+        if(isNaN(invId) || !getSession()) return;
+
+        if(String(col.dataset.arrayId) !== String(from)){
+          persistReassign(card, invId, destArrayId);
+        } else {
+          persistReorder(col, destArrayId);
         }
-        dragInv = null;
       });
     });
 
@@ -450,6 +480,48 @@
         teeth.classList.remove("inv-drop");
       });
     });
+  }
+
+  // Cross-array move: persist + RELOAD so peer-index / alerts / counts reflect the new
+  // cohort (the whole point of a move). Cached reload is fast; reassign itself is instant.
+  function persistReassign(card, invId, destArrayId){
+    const teeth = card.closest(".sb-teeth");
+    const position = teeth ? [...teeth.querySelectorAll(".sb-inv")].indexOf(card) : 0;
+    setSaving("Moving inverter & re-measuring against new neighbors…");
+    apiPost("/v1/array-owners/inverters/reassign",
+            { inverter_id: invId, target_array_id: destArrayId, position: Math.max(0, position) })
+      .then(() => reload())                               // reconcile with fresh peer math
+      .catch(() => { toast("Couldn't move that inverter — putting it back.", "err"); reload(); });
+  }
+
+  // Within-array reorder: peer cohort is unchanged, so trust the optimistic DOM move and
+  // just persist the new order. Revert by reloading only on failure.
+  function persistReorder(col, arrayId){
+    const teeth = col.querySelector(".sb-teeth");
+    const ordered = teeth
+      ? [...teeth.querySelectorAll(".sb-inv")].map(n => parseInt(n.dataset.invId, 10)).filter(n => !isNaN(n))
+      : [];
+    if(!ordered.length) return;
+    setSaving("Saving order…");
+    apiPost("/v1/array-owners/inverters/reorder", { array_id: arrayId, ordered_inverter_ids: ordered })
+      .then(() => clearSaving())
+      .catch(() => { toast("Couldn't save the new order — reloading.", "err"); reload(); });
+  }
+
+  // Re-fetch the live tree and re-render WITHOUT the full loading-state wipe (smoother than
+  // load() after a write). Dims the canvas while in flight. Falls back to load() if signed out.
+  function reload(opts){
+    const host = document.getElementById("sandbox");
+    if(!host) return;
+    const session = getSession();
+    if(!session){ load(); return; }
+    const canvas = host.querySelector(".sb-canvas");
+    if(canvas) canvas.classList.add("sb-busy");
+    const url = "/v1/array-owners/fleet-tree" + (opts && opts.force ? "?force=1" : "");
+    fetch(url, { headers: { Authorization: "Bearer " + session } })
+      .then(r => { if(!r.ok) throw new Error("fleet-tree " + r.status); return r.json(); })
+      .then(render)                                       // render() rebuilds innerHTML → busy class drops
+      .catch(() => { if(canvas) canvas.classList.remove("sb-busy"); toast("Couldn't refresh the fleet tree — please retry.", "err"); });
   }
 
   function load(){
@@ -757,25 +829,39 @@
     try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); } catch(e){}
 
     const cards = [];
-    const plan       = pick(summary, ["plan","plan_name"], null);
-    const arrayCount = pick(summary, ["array_count","arrays_count","arrays"], null);
-    const tier       = pick(summary, ["per_array_price","price_tier","tier","rate"], null);
-    const monthly    = pick(summary, ["monthly_total","amount_due","total","mrr"], null);
+    const basis = pick(summary, ["billing_basis"], null);
+    // Amounts from billing-summary are in (possibly fractional) CENTS.
+    const usdFromCents = c => (c==null ? "—" : "$" + (Number(c)/100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
 
-    if(plan != null)       cards.push(plainCard("Plan", esc(titleCase(String(plan)))));
-    if(arrayCount != null) cards.push(plainCard("Arrays connected", esc(String(arrayCount))));
-    if(tier != null)       cards.push(plainCard("Price tier", typeof tier === "number" ? `${usdMaybe(tier)} <small>/ array / mo</small>` : esc(String(tier))));
-    if(monthly != null)    cards.push(plainCard("Monthly total", usdMaybe(monthly)));
+    if(basis === "kwh"){
+      // Array Operator — billed by generation.
+      const mtdKwh   = pick(summary, ["mtd_kwh"], null);
+      const rate     = pick(summary, ["rate_cents_per_kwh"], null);   // decimal cents/kWh
+      const totalC   = pick(summary, ["total_cents"], null);          // month-to-date estimate, cents
+      const arrays   = pick(summary, ["billable_arrays"], null);
+      if(rate != null)    cards.push(plainCard("Rate", `${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent; <small>/ kWh · volume discounts</small>`));
+      if(mtdKwh != null)  cards.push(plainCard("Generated this month", `${Number(mtdKwh).toLocaleString(undefined,{maximumFractionDigits:0})} <small>kWh</small>`));
+      if(arrays != null)  cards.push(plainCard("Arrays connected", esc(String(arrays))));
+      if(totalC != null)  cards.push(plainCard("This month so far", `${usdFromCents(totalC)} <small>· est.</small>`));
+    } else {
+      // NEPOOL Operator — billed per array (legacy shape kept for the verifier app).
+      const arrayCount = pick(summary, ["billable_arrays","array_count","arrays_count","arrays"], null);
+      const fullUnit   = pick(summary, ["full_unit_cents"], null);
+      const totalC     = pick(summary, ["total_cents"], null);
+      if(arrayCount != null) cards.push(plainCard("Arrays connected", esc(String(arrayCount))));
+      if(fullUnit != null)   cards.push(plainCard("Price tier", `${usdFromCents(fullUnit)} <small>/ array / mo</small>`));
+      if(totalC != null)     cards.push(plainCard("Monthly total", usdFromCents(totalC)));
+    }
 
-    const invAmt = invoice ? pick(invoice, ["amount_due","total","amount"], null) : null;
+    const invAmt = invoice ? pick(invoice, ["amount_cents","amount_due","total","amount"], null) : null;
     if(invAmt != null){
-      const invDate = pick(invoice, ["due_date","date","next_payment_date","period_end"], null);
-      cards.push(plainCard("Next invoice", `${usdMaybe(invAmt)}${invDate ? ` <small>· ${fmtDate(invDate)}</small>` : ""}`));
+      const invDate = pick(invoice, ["period_end","due_date","date","next_payment_date"], null);
+      cards.push(plainCard("Next invoice", `${usdFromCents(invAmt)}${invDate ? ` <small>· ${fmtDate(invDate)}</small>` : ""}`));
     }
 
     box.innerHTML = cards.length ? cards.join("")
       : `<div class="acct-card"><div class="k">Billing</div><div class="v">You're on a free trial</div>
-           <div class="sub">No invoices yet — your first array is free, and we only bill from the second. Add a card whenever you're ready to scale.</div></div>`;
+           <div class="sub">No invoices yet — you're only billed for the kWh your arrays generate, and never during your trial. Add a card whenever you're ready.</div></div>`;
 
     // Manage-billing button: portal if a card already exists, otherwise add-payment-method.
     const sStatus = String(pick(summary, ["subscription_status","status"], "") || "");
