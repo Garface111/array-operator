@@ -15,6 +15,7 @@
       <span class="live"><span class="dot"></span> live</span>
       <a href="#fleet">Your inverters</a>
       <a href="#pricing">Pricing</a>
+      <button class="sb-togglebtn" id="sbToggle" onclick="location.hash = (location.hash==='#sandbox' ? '' : '#sandbox')">Sandbox view</button>
       <a href="onboarding.html" id="getStarted" style="color:var(--good);font-weight:600">Get started →</a>
     </div>
   </nav>
@@ -101,9 +102,13 @@
     </div>
   </section>
 
+  <!-- SANDBOX VIEW (toggled via #sandbox) -->
+  <section id="sbWrap"><div id="sandbox"></div></section>
+
   <footer id="foot"></footer>
 </div>
 
 <script src="app.js"></script>
+<script src="sandbox.js"></script>
 </body>
 </html>

@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-06-13T12:00:00Z",
+  "tiers": ["alerts", "arrays", "inverters"],
+  "summary": { "arrays_total": 3, "inverters_total": 11, "attention": 2 },
+  "columns": [
+    {
+      "array_id": 1, "array_name": "Londonderry", "vendor": "solaredge",
+      "inverter_source": "solaredge", "inverter_count": 6,
+      "alert": { "level": "ok", "count": 0, "status": "ok", "headline": "All clear" },
+      "inverters": [
+        {"sn":"a1","name":"Inverter 1","model":"RSE33.3K","nameplate_kw":33.3,"peer_index":0.97,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":1295.4,"last_mode":"PRODUCING","current_power_w":21800,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"a2","name":"Inverter 2","model":"SE33.3K","nameplate_kw":33.3,"peer_index":1.02,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":1363.2,"last_mode":"PRODUCING","current_power_w":22400,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"a3","name":"Inverter 3","model":"SE20K","nameplate_kw":20.0,"peer_index":0.98,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":785.5,"last_mode":"PRODUCING","current_power_w":13100,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"a4","name":"Inverter 4","model":"RSE33.3K","nameplate_kw":33.3,"peer_index":1.02,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":1365.5,"last_mode":"PRODUCING","current_power_w":22500,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"a5","name":"Inverter 5","model":"SE20K","nameplate_kw":20.0,"peer_index":1.01,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":806.3,"last_mode":"PRODUCING","current_power_w":13300,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"a6","name":"Inverter 6","model":"SE10K","nameplate_kw":10.0,"peer_index":0.96,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":385.4,"last_mode":"PRODUCING","current_power_w":6400,"last_report":"2026-06-13T11:50:00"}
+      ]
+    },
+    {
+      "array_id": 2, "array_name": "Maple Street", "vendor": "solaredge",
+      "inverter_source": "solaredge", "inverter_count": 4,
+      "alert": { "level": "warn", "count": 1, "status": "underperforming", "headline": "A money leak caught early" },
+      "inverters": [
+        {"sn":"b1","name":"Inverter 1","model":"SE11.4K","nameplate_kw":11.4,"peer_index":1.01,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":420.1,"last_mode":"PRODUCING","current_power_w":7600,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"b2","name":"Inverter 2","model":"SE11.4K","nameplate_kw":11.4,"peer_index":0.99,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":408.7,"last_mode":"PRODUCING","current_power_w":7400,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"b3","name":"Inverter 3","model":"SE11.4K","nameplate_kw":11.4,"peer_index":0.71,"status":"underperforming","diagnosis":"Running ~29% below its neighbors under the same sky — likely shading, soiling, or a tired string. About $260/yr slipping away.","window_kwh":291.3,"last_mode":"PRODUCING","current_power_w":5200,"last_report":"2026-06-13T11:50:00"},
+        {"sn":"b4","name":"Inverter 4","model":"SE11.4K","nameplate_kw":11.4,"peer_index":1.02,"status":"ok","diagnosis":"Pulling its weight.","window_kwh":421.6,"last_mode":"PRODUCING","current_power_w":7700,"last_report":"2026-06-13T11:50:00"}
+      ]
+    },
+    {
+      "array_id": 3, "array_name": "Cover Catamount", "vendor": "solaredge",
+      "inverter_source": "solaredge", "inverter_count": 1,
+      "alert": { "level": "critical", "count": 1, "status": "dead", "headline": "An inverter stopped earning" },
+      "inverters": [
+        {"sn":"c1","name":"Inverter 1","model":"SE10000H","nameplate_kw":10.0,"peer_index":null,"status":"dead","diagnosis":"No output for 3 days while the rest of the fleet produced. Warranty claim drafted with the fault dates and lost-kWh evidence — about $58 gone so far.","window_kwh":0.0,"last_mode":"SHUTDOWN","current_power_w":0,"last_report":"2026-06-10T18:20:00"}
+      ]
+    }
+  ]
+}
