@@ -15,10 +15,15 @@
       <span class="live"><span class="dot"></span> live</span>
       <a href="#fleet">Your inverters</a>
       <a href="#pricing">Pricing</a>
-      <button class="sb-togglebtn" id="sbToggle" onclick="location.hash = (location.hash==='#sandbox' ? '' : '#sandbox')">Sandbox view</button>
       <a href="onboarding.html" id="getStarted" style="color:var(--good);font-weight:600">Get started →</a>
     </div>
   </nav>
+
+  <!-- VIEW TABS — Sandbox is the default/main view; Dashboard is the classic hero+grid. -->
+  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
+    <a class="tab" id="tabSandbox" href="#sandbox" role="tab">Sandbox</a>
+    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Dashboard</a>
+  </div>
 
   <header class="hero">
     <div class="eyebrow">Your array, working for you</div>
