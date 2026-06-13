@@ -462,19 +462,251 @@
   }
 
   /* ===========================================================================
-   * TAB SYSTEM — Sandbox is the DEFAULT view. #dashboard (and the marketing
-   * anchors #fleet / #pricing) show the classic hero + cards + grid dashboard.
-   * Hash-driven so both views are linkable.
+   * MASTER ACCOUNT — profile + plan + billing. Fetches GET /v1/account and the
+   * billing endpoints (which may 404/empty on a trial — handled gracefully).
+   * company-name + email are inline-editable; everything else is display-only.
    * ==========================================================================*/
-  const DASHBOARD_HASHES = ["#dashboard", "#fleet", "#pricing"];
+  let _account = null;                       // last-fetched account (shared with Reports prefill)
+
+  function authHeaders(){ const s = getSession(); return s ? { Authorization: "Bearer " + s } : null; }
+  function titleCase(s){ return String(s==null?"":s).replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()); }
+  function fmtDate(d){ try { return new Date(d).toLocaleDateString([], {month:"short",day:"numeric",year:"numeric"}); } catch(e){ return String(d); } }
+  function usdMaybe(n){
+    if(n==null) return "—";
+    const num = Number(n);
+    if(isNaN(num)) return esc(String(n));
+    return "$" + num.toLocaleString(undefined, {maximumFractionDigits:2});
+  }
+  function pick(obj, keys, dflt){
+    if(!obj) return dflt;
+    for(const k of keys){ if(obj[k]!=null && obj[k]!=="") return obj[k]; }
+    return dflt;
+  }
+  function signInPrompt(){ return `<div class="empty">Sign in to manage your master account. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; }
+  function sessionExpired(){ return `<div class="empty">Your session expired — <a href="onboarding.html" style="color:var(--good)">sign in again →</a></div>`; }
+
+  function plainCard(label, valueHTML, subHTML, cls){
+    return `<div class="acct-card ${cls||""}">
+      <div class="k">${esc(label)}</div>
+      <div class="v">${valueHTML}</div>
+      ${subHTML ? `<div class="sub">${subHTML}</div>` : ""}
+    </div>`;
+  }
+  function editCard(label, field, value, placeholder){
+    return `<div class="acct-card">
+      <div class="k">${esc(label)}</div>
+      <div class="acct-edit" data-field="${esc(field)}">
+        <input type="text" autocomplete="off" spellcheck="false" value="${esc(value||"")}" placeholder="${esc(placeholder||"")}">
+        <button class="acct-btn" type="button">Save</button>
+      </div>
+      <div class="acct-msg"></div>
+    </div>`;
+  }
+
+  function renderAccount(a){
+    const cards = document.getElementById("acctCards");
+    if(!cards) return;
+    const company  = pick(a, ["company_name","company"], "");
+    const operator = pick(a, ["operator_name","name","owner_name"], "");
+    const email    = pick(a, ["email","operator_email"], "");
+    const plan     = pick(a, ["plan","plan_name","tier"], "Free");
+    const status   = pick(a, ["subscription_status","status"], "trial");
+    const trialEnds = pick(a, ["trial_ends_at","trial_end","trial_expires_at"], null);
+    const onTrial  = a.on_trial === true || a.trial === true || /trial/i.test(String(status));
+
+    let subSub = "", subCls = "";
+    if(onTrial){ subCls = "warn"; subSub = trialEnds ? `Free trial — ends ${fmtDate(trialEnds)}` : "Free trial in progress"; }
+    else if(/active|paid/i.test(String(status))){ subCls = "good"; subSub = "Subscription active"; }
+
+    cards.innerHTML = [
+      editCard("Company", "company", company, "Add your company name"),
+      plainCard("Operator", esc(operator || "—")),
+      editCard("Email", "email", email, "you@example.com"),
+      plainCard("Plan", esc(titleCase(plan)), null, /free/i.test(String(plan)) ? "good" : ""),
+      plainCard("Subscription", esc(titleCase(status) || "Active"), subSub, subCls),
+    ].join("");
+    wireAcctEdits();
+  }
+
+  function wireAcctEdits(){
+    document.querySelectorAll("#acctCards .acct-edit").forEach(row => {
+      const inp = row.querySelector("input");
+      const btn = row.querySelector(".acct-btn");
+      const msg = row.parentElement.querySelector(".acct-msg");
+      const field = row.dataset.field;             // "company" | "email"
+      btn.onclick = async () => {
+        const val = inp.value.trim();
+        if(!val){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Enter a value first."; } return; }
+        const h = authHeaders();
+        if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+        const url  = field === "company" ? "/v1/account/company-name" : "/v1/account/email";
+        const body = field === "company" ? { company_name: val } : { email: val };
+        btn.disabled = true;
+        if(msg){ msg.className = "acct-msg"; msg.textContent = "Saving…"; }
+        try{
+          const r = await fetch(url, { method:"POST",
+            headers: Object.assign({ "Content-Type":"application/json" }, h),
+            body: JSON.stringify(body) });
+          if(r.ok){
+            if(msg){ msg.className = "acct-msg ok"; msg.textContent = "Saved."; }
+            if(_account) _account[field === "company" ? "company_name" : "email"] = val;
+          } else {
+            if(msg){ msg.className = "acct-msg err"; msg.textContent = `Couldn't save (HTTP ${r.status}) — try again.`; }
+          }
+        }catch(e){
+          if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't save — check your connection."; }
+        }
+        btn.disabled = false;
+      };
+    });
+  }
+
+  async function renderBilling(h){
+    const box = document.getElementById("billingCards");
+    const actions = document.getElementById("billingActions");
+    if(!box) return;
+    box.innerHTML = `<div class="empty">Loading billing…</div>`;
+
+    let summary = null, invoice = null;
+    try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); } catch(e){}
+    try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); } catch(e){}
+
+    const cards = [];
+    const plan       = pick(summary, ["plan","plan_name"], null);
+    const arrayCount = pick(summary, ["array_count","arrays_count","arrays"], null);
+    const tier       = pick(summary, ["per_array_price","price_tier","tier","rate"], null);
+    const monthly    = pick(summary, ["monthly_total","amount_due","total","mrr"], null);
+
+    if(plan != null)       cards.push(plainCard("Plan", esc(titleCase(String(plan)))));
+    if(arrayCount != null) cards.push(plainCard("Arrays connected", esc(String(arrayCount))));
+    if(tier != null)       cards.push(plainCard("Price tier", typeof tier === "number" ? `${usdMaybe(tier)} <small>/ array / mo</small>` : esc(String(tier))));
+    if(monthly != null)    cards.push(plainCard("Monthly total", usdMaybe(monthly)));
+
+    const invAmt = invoice ? pick(invoice, ["amount_due","total","amount"], null) : null;
+    if(invAmt != null){
+      const invDate = pick(invoice, ["due_date","date","next_payment_date","period_end"], null);
+      cards.push(plainCard("Next invoice", `${usdMaybe(invAmt)}${invDate ? ` <small>· ${fmtDate(invDate)}</small>` : ""}`));
+    }
+
+    box.innerHTML = cards.length ? cards.join("")
+      : `<div class="acct-card"><div class="k">Billing</div><div class="v">You're on a free trial</div>
+           <div class="sub">No invoices yet — your first array is free, and we only bill from the second. Add a card whenever you're ready to scale.</div></div>`;
+
+    // Manage-billing button: portal if a card already exists, otherwise add-payment-method.
+    const sStatus = String(pick(summary, ["subscription_status","status"], "") || "");
+    const hasCard = (summary && (summary.has_payment_method === true || summary.has_card === true))
+      || /active|past_due|paid|trialing/i.test(sStatus);
+    if(actions){
+      actions.innerHTML = `<button class="acct-btn primary" id="billManage" type="button">${hasCard ? "Manage billing / update card" : "Manage billing / add card"}</button>
+        <div class="acct-msg" id="billMsg"></div>`;
+      const btn = document.getElementById("billManage");
+      if(btn) btn.onclick = () => manageBilling(hasCard);
+    }
+  }
+
+  async function manageBilling(hasCard){
+    const h = authHeaders();
+    const msg = document.getElementById("billMsg");
+    const btn = document.getElementById("billManage");
+    if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+    if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening secure billing…"; }
+    if(btn) btn.disabled = true;
+    try{
+      let url = null;
+      if(hasCard){
+        const r = await fetch("/v1/account/billing-portal", { headers: h });
+        const d = await r.json().catch(() => ({}));
+        if(r.ok) url = pick(d, ["url","portal_url","checkout_url"], null);
+      } else {
+        const r = await fetch("/v1/account/add-payment-method", { method:"POST",
+          headers: Object.assign({ "Content-Type":"application/json" }, h), body: "{}" });
+        const d = await r.json().catch(() => ({}));
+        if(r.ok) url = pick(d, ["checkout_url","url"], null);
+      }
+      if(url){ window.location = url; return; }
+      if(msg){ msg.className = "acct-msg err"; msg.textContent = "Billing isn't available just yet — please try again shortly."; }
+    }catch(e){
+      if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't reach billing — check your connection and try again."; }
+    }
+    if(btn) btn.disabled = false;
+  }
+
+  async function loadAccount(){
+    const cards = document.getElementById("acctCards");
+    if(!cards) return;
+    const h = authHeaders();
+    if(!h){
+      cards.innerHTML = signInPrompt();
+      const box = document.getElementById("billingCards"); if(box) box.innerHTML = "";
+      const act = document.getElementById("billingActions"); if(act) act.innerHTML = "";
+      return;
+    }
+    cards.innerHTML = `<div class="empty">Loading your account…</div>`;
+    try{
+      const r = await fetch("/v1/account", { headers: h });
+      if(r.status === 401){ cards.innerHTML = sessionExpired(); return; }
+      if(!r.ok) throw new Error("account " + r.status);
+      _account = await r.json();
+      renderAccount(_account);
+    }catch(e){
+      cards.innerHTML = `<div class="empty">Couldn't load your account right now — please refresh.</div>`;
+    }
+    renderBilling(h);
+  }
+
+  /* ===========================================================================
+   * REPORTS — honest placeholder. Prefills the send-to email from the account.
+   * Nothing is sent; the cadence selector just records intent for later.
+   * ==========================================================================*/
+  function loadReports(){
+    const email = document.getElementById("repEmail");
+    if(!email) return;
+    const apply = a => { if(a && !email.value){ const e = pick(a, ["email","operator_email"], ""); if(e) email.value = e; } };
+    if(_account){ apply(_account); return; }
+    const h = authHeaders();
+    if(!h) return;
+    fetch("/v1/account", { headers: h }).then(r => r.ok ? r.json() : null)
+      .then(a => { if(a){ _account = a; apply(a); } }).catch(() => {});
+  }
+
+  /* ===========================================================================
+   * THREE-TAB SYSTEM — Master Account (#account) · Arrays (#arrays, DEFAULT) ·
+   * Reports (#reports). Anything else (empty hash, old #sandbox / #dashboard /
+   * #fleet / #pricing links) resolves to Arrays for backward compatibility.
+   * ==========================================================================*/
+  const TABS = {
+    account: { panel: "panelAccount", tab: "tabAccount" },
+    arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
+    reports: { panel: "panelReports", tab: "tabReports" },
+  };
+  function tabFromHash(){
+    const h = location.hash;
+    if(h === "#account") return "account";
+    if(h === "#reports") return "reports";
+    return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing
+  }
+
+  let _firstApply = true;
   function applyView(){
-    const sandboxOn = !DASHBOARD_HASHES.includes(location.hash);
-    document.body.classList.toggle("view-sandbox", sandboxOn);
-    const ts = document.getElementById("tabSandbox");
-    const td = document.getElementById("tabDashboard");
-    if(ts) ts.classList.toggle("active", sandboxOn);
-    if(td) td.classList.toggle("active", !sandboxOn);
-    if(sandboxOn) load();
+    const active = tabFromHash();
+    Object.keys(TABS).forEach(name => {
+      const t = TABS[name];
+      const panel = document.getElementById(t.panel);
+      const tab   = document.getElementById(t.tab);
+      if(panel) panel.classList.toggle("active", name === active);
+      if(tab)   tab.classList.toggle("active",   name === active);
+    });
+
+    if(active === "arrays"){
+      load();                                       // sandbox fleet tree
+      // app.js auto-runs loadDashboard() once on parse; only re-run on later switches.
+      if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
+    } else if(active === "account"){
+      loadAccount();
+    } else if(active === "reports"){
+      loadReports();
+    }
+    _firstApply = false;
   }
   window.addEventListener("hashchange", applyView);
   document.addEventListener("DOMContentLoaded", applyView);

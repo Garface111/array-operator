@@ -665,4 +665,8 @@ function loadDashboard(){
   }
 }
 
+// Expose for the tab system (sandbox.js) so switching back to the Arrays tab can
+// refresh the hero+grid. Runs once here on parse so the panel is populated even
+// before any tab interaction.
+window.__aoLoadDashboard = loadDashboard;
 loadDashboard();

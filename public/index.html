@@ -10,107 +10,158 @@
 <body>
 <div class="wrap">
   <nav>
-    <a class="brand" href="#"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></a>
+    <a class="brand" href="#arrays"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></a>
     <div class="navlinks">
       <span class="live"><span class="dot"></span> live</span>
-      <a href="#fleet">Your inverters</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#arrays">Your inverters</a>
+      <a href="#account">Account &amp; billing</a>
       <a href="onboarding.html" id="getStarted" style="color:var(--good);font-weight:600">Get started →</a>
     </div>
   </nav>
 
-  <!-- VIEW TABS — Sandbox is the default/main view; Dashboard is the classic hero+grid. -->
+  <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
-    <a class="tab" id="tabSandbox" href="#sandbox" role="tab">Sandbox</a>
-    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Dashboard</a>
+    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
+    <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
+    <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
   </div>
 
-  <header class="hero">
-    <div class="eyebrow">Your array, working for you</div>
-    <h1 id="title">Welcome home.</h1>
-    <p class="meta" id="meta"></p>
-
-    <div class="heroband">
-      <div class="hcard value">
-        <div class="sun"></div>
-        <div class="lab">Value earned today</div>
-        <div class="big" id="todayValue">—</div>
-        <div class="sub" id="todaySub">energy offset + renewable credits</div>
-      </div>
-      <div class="hcard">
-        <div class="lab">Health right now</div>
-        <div class="verdict" style="margin-top:10px">
-          <div class="vlight" id="vlight"></div>
-          <div><div class="vt" id="vt">—</div><div class="vs" id="vs"></div></div>
-        </div>
-      </div>
-      <div class="hcard">
-        <div class="lab">Lifetime value</div>
-        <div class="big" id="lifeValue">—</div>
-        <div class="sub" id="lifeSub">since your panels switched on</div>
-      </div>
+  <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
+  <section class="panel" id="panelAccount" role="tabpanel" aria-label="Master Account">
+    <div class="section-h" style="margin-top:18px">
+      <h2>Master account</h2>
+      <span class="hint">your operator profile, plan &amp; billing — in one place</span>
     </div>
-  </header>
+    <div class="acct-grid" id="acctCards"><div class="empty">Loading your account…</div></div>
 
-  <!-- WE'RE ON IT -->
-  <div class="ribbon">We're on it — so you don't have to be</div>
-  <div class="section-h" style="margin-top:6px">
-    <h2>What your agent did for you</h2>
-    <span class="hint">no dashboards to read · we bring you the verdict and the paperwork</span>
-  </div>
-  <div class="actions" id="actions"></div>
+    <!-- BILLING -->
+    <div class="section-h" id="billing" style="margin-top:32px">
+      <h2>Billing</h2>
+      <span class="hint">billed by total kWh in your arrays — directly tied to how much they get paid</span>
+    </div>
+    <div class="acct-grid" id="billingCards"><div class="empty">Loading billing…</div></div>
+    <div id="billingActions" style="margin-top:14px"></div>
 
-  <!-- GROUND TRUTH -->
-  <div class="section-h" id="fleet">
-    <h2>Every inverter, measured against its neighbors</h2>
-    <span class="hint">same sky, same weather — so a dead string can't hide behind a cloudy day</span>
-  </div>
-  <div class="grid" id="grid"><div class="empty">Loading your array…</div></div>
+    <!-- VOLUME PRICING (moved here — it lives with billing) -->
+    <section class="pricing" id="pricing">
+      <div class="eyebrow">Pricing</div>
+      <h2>Your first array is on us.</h2>
+      <p class="sub">Start watching for free, forever. Add more arrays only when you want to — billed per array, per month, and it gets cheaper the more you connect. No setup fee. Cancel anytime.</p>
 
-  <!-- PRICING -->
-  <section class="pricing" id="pricing">
-    <div class="eyebrow">Pricing</div>
-    <h2>Your first array is on us.</h2>
-    <p class="sub">Start watching for free, forever. Add more arrays only when you want to — billed per array, per month, and it gets cheaper the more you connect. No setup fee. Cancel anytime.</p>
+      <div class="pricecard">
+        <div class="pc-main">
+          <div class="sun"></div>
+          <span class="pc-free">First array free</span>
+          <div class="pc-price">$9<small> / array / mo</small></div>
+          <div class="pc-tag">14-day free trial · no card to start</div>
+          <div class="pc-sub">Connect, see your whole fleet measured against itself, and decide later. We only charge from the 2nd array — and the per-array price drops as you scale.</div>
+          <ul class="pc-list">
+            <li><span class="ck">✓</span><span>One credential connects every array on your account</span></li>
+            <li><span class="ck">✓</span><span>Ground-truth, per-inverter health vs. its own neighbors</span></li>
+            <li><span class="ck">✓</span><span>Plain-English alerts, always in dollars</span></li>
+            <li><span class="ck">✓</span><span>Warranty &amp; service claims pre-drafted with evidence</span></li>
+            <li><span class="ck">✓</span><span>We surface REC money you may be leaving on the table</span></li>
+          </ul>
+          <div class="pc-cta">
+            <a href="onboarding.html" class="btn-primary-lg">Start free →</a>
+            <span class="note"><b>14 days free.</b> No card required to begin.</span>
+          </div>
+        </div>
 
-    <div class="pricecard">
-      <div class="pc-main">
-        <div class="sun"></div>
-        <span class="pc-free">First array free</span>
-        <div class="pc-price">$9<small> / array / mo</small></div>
-        <div class="pc-tag">14-day free trial · no card to start</div>
-        <div class="pc-sub">Connect, see your whole fleet measured against itself, and decide later. We only charge from the 2nd array — and the per-array price drops as you scale.</div>
-        <ul class="pc-list">
-          <li><span class="ck">✓</span><span>One credential connects every array on your account</span></li>
-          <li><span class="ck">✓</span><span>Ground-truth, per-inverter health vs. its own neighbors</span></li>
-          <li><span class="ck">✓</span><span>Plain-English alerts, always in dollars</span></li>
-          <li><span class="ck">✓</span><span>Warranty &amp; service claims pre-drafted with evidence</span></li>
-          <li><span class="ck">✓</span><span>We surface REC money you may be leaving on the table</span></li>
-        </ul>
-        <div class="pc-cta">
-          <a href="onboarding.html" class="btn-primary-lg">Start free →</a>
-          <span class="note"><b>14 days free.</b> No card required to begin.</span>
+        <div class="pc-tiers">
+          <h3>Volume pricing</h3>
+          <div class="ph">graduated — each band priced only on the arrays within it</div>
+          <div style="margin-top:10px">
+            <div class="tier"><div class="tn">1st array<small>get started, stay free</small></div><div class="tp free">FREE</div></div>
+            <div class="tier"><div class="tn">Arrays 2–10<small>homeowners &amp; prosumers</small></div><div class="tp">$9<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+            <div class="tier"><div class="tn">Arrays 11–50<small>multi-site owners</small></div><div class="tp">$8<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+            <div class="tier"><div class="tn">Arrays 51+<small>community-solar hosts</small></div><div class="tp">$6.50<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+          </div>
+          <div class="pc-foot">Example: 1 array = <b style="color:var(--ink)">free</b> · 7 arrays = <b style="color:var(--ink)">$54/mo</b> · 25 arrays = <b style="color:var(--ink)">$208/mo</b>. No setup fee, ever.</div>
         </div>
       </div>
+    </section>
+  </section>
 
-      <div class="pc-tiers">
-        <h3>Volume pricing</h3>
-        <div class="ph">graduated — each band priced only on the arrays within it</div>
-        <div style="margin-top:10px">
-          <div class="tier"><div class="tn">1st array<small>get started, stay free</small></div><div class="tp free">FREE</div></div>
-          <div class="tier"><div class="tn">Arrays 2–10<small>homeowners &amp; prosumers</small></div><div class="tp">$9<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
-          <div class="tier"><div class="tn">Arrays 11–50<small>multi-site owners</small></div><div class="tp">$8<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
-          <div class="tier"><div class="tn">Arrays 51+<small>community-solar hosts</small></div><div class="tp">$6.50<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+  <!-- ============================ TAB: ARRAYS (default) ============================ -->
+  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Arrays">
+
+    <!-- (a) MAIN LANDING — hero -->
+    <header class="hero">
+      <div class="eyebrow">Your array, working for you</div>
+      <h1 id="title">Welcome home.</h1>
+      <p class="meta" id="meta"></p>
+
+      <div class="heroband">
+        <div class="hcard value">
+          <div class="sun"></div>
+          <div class="lab">Value earned today</div>
+          <div class="big" id="todayValue">—</div>
+          <div class="sub" id="todaySub">energy offset + renewable credits</div>
         </div>
-        <div class="pc-foot">Example: 1 array = <b style="color:var(--ink)">free</b> · 7 arrays = <b style="color:var(--ink)">$54/mo</b> · 25 arrays = <b style="color:var(--ink)">$208/mo</b>. No setup fee, ever.</div>
+        <div class="hcard">
+          <div class="lab">Health right now</div>
+          <div class="verdict" style="margin-top:10px">
+            <div class="vlight" id="vlight"></div>
+            <div><div class="vt" id="vt">—</div><div class="vs" id="vs"></div></div>
+          </div>
+        </div>
+        <div class="hcard">
+          <div class="lab">Lifetime value</div>
+          <div class="big" id="lifeValue">—</div>
+          <div class="sub" id="lifeSub">since your panels switched on</div>
+        </div>
       </div>
+    </header>
+
+    <!-- WE'RE ON IT -->
+    <div class="ribbon">We're on it — so you don't have to be</div>
+    <div class="section-h" style="margin-top:6px">
+      <h2>What your agent did for you</h2>
+      <span class="hint">no dashboards to read · we bring you the verdict and the paperwork</span>
+    </div>
+    <div class="actions" id="actions"></div>
+
+    <!-- (b) SANDBOX — live 3-tier fleet tree (+ Add array, drag-reorder) -->
+    <section id="sbWrap"><div id="sandbox"></div></section>
+
+    <!-- (c) ARRAY HEALTH & DATA — ground-truth per-inverter grid -->
+    <div class="section-h" id="fleet">
+      <h2>Every inverter, measured against its neighbors</h2>
+      <span class="hint">same sky, same weather — so a dead string can't hide behind a cloudy day</span>
+    </div>
+    <div class="grid" id="grid"><div class="empty">Loading your array…</div></div>
+
+    <footer id="foot"></footer>
+  </section>
+
+  <!-- ============================ TAB: REPORTS ============================ -->
+  <section class="panel" id="panelReports" role="tabpanel" aria-label="Reports">
+    <div class="section-h" style="margin-top:18px">
+      <h2>Reports</h2>
+      <span class="hint">quarterly performance for your arrays — delivered however you like</span>
+    </div>
+    <div class="rep-card">
+      <span class="rep-eyebrow">Coming soon</span>
+      <h3>Quarterly performance reports for your arrays</h3>
+      <p>We'll roll up every array's production, peer-measured health, and the dollars earned (and recovered) into one clean report — delivered however you like, by email or PDF. Tell us how often you'd like it and where to send it, and we'll start sending the moment reports go live.</p>
+      <div class="rep-fields">
+        <label class="rep-fld">
+          <span class="rl">Cadence</span>
+          <select id="repCadence">
+            <option value="quarterly">Quarterly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+        <label class="rep-fld">
+          <span class="rl">Send to</span>
+          <input type="email" id="repEmail" autocomplete="email" placeholder="you@example.com">
+        </label>
+      </div>
+      <div class="rep-note" id="repNote">Not sending yet — reports aren't live, so nothing will be delivered. This just remembers how you'd like them once they launch.</div>
     </div>
   </section>
 
-  <!-- SANDBOX VIEW (toggled via #sandbox) -->
-  <section id="sbWrap"><div id="sandbox"></div></section>
-
-  <footer id="foot"></footer>
 </div>
 
 <script src="app.js"></script>
