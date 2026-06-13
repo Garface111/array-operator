@@ -79,6 +79,10 @@ let CURRENT = null;
 
 function render(data){
   CURRENT = data;
+  // The below-sandbox UI (hero, value cards, agent actions, inverter grid, footer)
+  // was removed — the sandbox (sandbox.js) now owns the fleet view. No-op safely
+  // when those elements are absent so this never throws.
+  if(!document.getElementById("grid")) return;
   const s=data.summary, a=data.array, invs=data.inverters;
   const totalNameplate = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
 
@@ -639,7 +643,7 @@ function loadDashboard(){
     }
   } catch(e){}
   try { session = localStorage.getItem("so_session"); } catch(e){}
-  const empty = () => { document.getElementById("grid").innerHTML =
+  const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
     `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
 
   if(session){
