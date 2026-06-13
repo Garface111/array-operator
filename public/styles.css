@@ -347,7 +347,7 @@
   }
 
   /* ===== VIEW TABS (NEPOOL-style pill/underline, dark skin) ===== */
-  .tabbar{display:flex;gap:4px;align-items:center;margin:2px 0 4px;padding:4px;
+  .tabbar{display:flex;gap:4px;align-items:center;margin:16px 0 4px;padding:4px;
     border-bottom:1px solid var(--line);position:relative}
   .tab{appearance:none;text-decoration:none;cursor:pointer;font-size:14px;font-weight:650;flex:1;text-align:center;
     color:var(--muted);padding:9px 16px 11px;border-radius:10px 10px 0 0;position:relative;
