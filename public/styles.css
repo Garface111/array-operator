@@ -265,7 +265,9 @@
   .sw.ok{background:var(--good)} .sw.warn{background:var(--warn)} .sw.bad{background:var(--bad)}
 
   /* canvas: horizontal scroll of columns */
-  .sb-canvas{display:flex;gap:26px;align-items:flex-start;overflow-x:auto;padding:6px 2px 18px;scrollbar-width:thin}
+  .sb-viewport{position:relative;overflow:hidden;height:min(64vh,560px);border-radius:14px;cursor:grab;touch-action:none;background:rgba(255,255,255,.012)}
+  .sb-viewport.panning{cursor:grabbing}
+  .sb-canvas{display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0;will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
 
   /* TIER 1: Alert */

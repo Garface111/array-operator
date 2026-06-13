@@ -273,7 +273,7 @@
         </div>`;
     }).join("");
 
-    host.innerHTML = head + `<div class="sb-canvas">${columns}</div>
+    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
 
     // click/keyboard → detail line
@@ -300,6 +300,7 @@
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
     startLiveTicker();    // keep each card's "kW now" reading live
+    wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
   }
 
   // ---- live output ticker: updates each card's "kW now" in place. With live
@@ -319,6 +320,48 @@
         v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
       });
     }, 2600);
+  }
+
+  // ---- pan + zoom the fleet canvas. Drag empty space to pan, wheel to zoom
+  // (toward the cursor), double-click empty space to reset. View state persists
+  // across re-renders. Inverters/arrays/buttons are excluded so the existing
+  // HTML5 drag-to-rearrange and clicks keep working untouched.
+  let _view = { x:0, y:0, z:1 };
+  function applyCanvasView(host){
+    const c = (host||document).querySelector("#sandbox .sb-canvas");
+    if(c) c.style.transform = `translate(${_view.x}px,${_view.y}px) scale(${_view.z})`;
+  }
+  function wirePanZoom(host){
+    const vp = host.querySelector(".sb-viewport");
+    if(!vp) return;
+    applyCanvasView(host);
+    vp.addEventListener("wheel", e => {
+      e.preventDefault();
+      const r = vp.getBoundingClientRect();
+      const cx = e.clientX - r.left, cy = e.clientY - r.top, prev = _view.z;
+      const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+      _view.x = cx - (cx - _view.x) * (next/prev);
+      _view.y = cy - (cy - _view.y) * (next/prev);
+      _view.z = next; applyCanvasView(host);
+    }, { passive:false });
+    let panning=false, sx=0, sy=0;
+    vp.addEventListener("pointerdown", e => {
+      if(e.button!==0 || e.target.closest(".sb-inv,.sb-array,button,a,input,.sb-comb-empty")) return;
+      panning=true; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
+      vp.classList.add("panning");
+      try{ vp.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    vp.addEventListener("pointermove", e => {
+      if(!panning) return;
+      _view.x = e.clientX - sx; _view.y = e.clientY - sy; applyCanvasView(host);
+    });
+    const end = () => { panning=false; vp.classList.remove("panning"); };
+    vp.addEventListener("pointerup", end);
+    vp.addEventListener("pointercancel", end);
+    vp.addEventListener("dblclick", e => {
+      if(e.target.closest(".sb-inv,.sb-array,button,a")) return;
+      _view = { x:0, y:0, z:1 }; applyCanvasView(host);
+    });
   }
 
   /* ---- '+ Add array' button wiring ---- */
