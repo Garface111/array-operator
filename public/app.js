@@ -626,6 +626,18 @@ function adaptOverview(o){
 
 function loadDashboard(){
   let session = null;
+  // Accept a session handed in via the URL (?token= from the magic-link email or
+  // a post-onboarding hand-off), persist it under the key the dashboard reads,
+  // then scrub it from the address bar so it doesn't linger in history.
+  try {
+    const u = new URL(window.location.href);
+    const urlTok = u.searchParams.get("token");
+    if(urlTok){
+      localStorage.setItem("so_session", urlTok);
+      u.searchParams.delete("token");
+      window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
+    }
+  } catch(e){}
   try { session = localStorage.getItem("so_session"); } catch(e){}
   const empty = () => { document.getElementById("grid").innerHTML =
     `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
