@@ -129,7 +129,7 @@
     if(pi==null) return `<div class="sb-pi none">solo · no peers</div>`;
     const pct = Math.max(4, Math.min(100, Math.round(pi*100)));
     const cls = pi>=0.85 ? "ok" : pi>=0.6 ? "warn" : "bad";
-    return `<div class="sb-pi"><div class="sb-pi-bar ${cls}" style="width:${pct}%"></div><span>${pi.toFixed(2)}</span></div>`;
+    return `<div class="sb-pi"><div class="sb-pi-bar ${cls}" style="width:${pct}%"></div><span class="${cls}">${pi.toFixed(2)}</span></div>`;
   }
 
   // per-inverter vendor badge (smaller variant of the array brand chip) — empty if unknown
