@@ -353,12 +353,22 @@ async function discover(){
     const data = await res.json().catch(()=>({}));
     if(res.ok && Array.isArray(data.sites) && data.sites.length){
       sites = data.sites;
-    } else if(res.status===401 || res.status===400){
-      scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.detail||data.message||"That key didn't work — make sure it's an account-level API key."}</div>`;
-      btn.disabled=false; return;
     } else {
-      // backend reachable but no sites, or unexpected — fall to demo so the
-      // sublime moment still lands during early access
+      const msg = String(data.detail || data.message || "").toLowerCase();
+      // The discover endpoint is auth-gated (it's built for signed-in dashboard
+      // users). During onboarding the owner has no account yet, so a 401 about a
+      // missing bearer/token/tenant is EXPECTED — not a bad key. In that case we
+      // proceed with the demo cascade and connect the real key after sign-in.
+      const authGate = res.status === 401 &&
+        /bearer|token|tenant|unauthor|sign|session/.test(msg);
+      const badKey = (res.status === 400 || res.status === 403) ||
+        (res.status === 401 && !authGate);
+      if(badKey){
+        scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.detail||data.message||"That key didn't work — make sure it's an account-level API key."}</div>`;
+        btn.disabled=false; return;
+      }
+      // auth-gate, no sites, or unexpected — fall to demo so the flow continues
+      // to account creation; the key is attached for real after sign-in.
       sites = demoSites();
     }
   }catch(e){
