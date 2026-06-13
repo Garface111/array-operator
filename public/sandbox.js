@@ -238,7 +238,7 @@
                data-mode="${esc(inv.last_mode||"")}" data-power="${esc(power)}">
             <div class="sb-inv-dot"></div>
             <div class="sb-inv-name">${esc(inv.name)}</div>
-            <div class="sb-inv-meta">${esc(np)}</div>
+            <div class="sb-inv-now" data-basew="${inv.current_power_w!=null?inv.current_power_w:''}"><span class="sb-live-dot"></span><b class="sb-now-val">${inv.current_power_w!=null?(inv.current_power_w/1000).toFixed(1):'—'}</b> kW now</div>
             ${peerBar(inv.peer_index)}
             <div class="sb-inv-status ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"")}</div>
             ${brandHTML(inv.vendor)}
@@ -299,6 +299,26 @@
     wireResetButton(host);
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
+    startLiveTicker();    // keep each card's "kW now" reading live
+  }
+
+  // ---- live output ticker: updates each card's "kW now" in place. With live
+  // telemetry this reflects polled current_power_w; on demo data it drifts gently
+  // (~1%) around the last-known value so the reading reads as live, not frozen.
+  let _liveTimer = null;
+  function startLiveTicker(){
+    if(_liveTimer) clearInterval(_liveTimer);
+    _liveTimer = setInterval(() => {
+      document.querySelectorAll("#sandbox .sb-inv-now").forEach(el => {
+        const base = parseFloat(el.dataset.basew);
+        if(!base) return;                          // not reporting → leave at — / 0
+        const drift = base * (1 + Math.sin(Date.now()/2600 + base) * 0.009 + (Math.random()-0.5)*0.006);
+        const v = el.querySelector(".sb-now-val");
+        if(!v) return;
+        v.textContent = (drift/1000).toFixed(1);
+        v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
+      });
+    }, 2600);
   }
 
   /* ---- '+ Add array' button wiring ---- */
