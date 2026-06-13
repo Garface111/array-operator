@@ -490,10 +490,10 @@ function doneScreen(){
     // Same-origin session is stashed — go straight in (no new tab, no magic link).
     cardCta = `<button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
        <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
-       <div class="helper" id="cardNote" style="text-align:center">Optional now — your first array is always free, and you won't be charged until the trial ends.</div>`;
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — you're only billed for the kWh your arrays generate, and never until the trial ends.</div>`;
   } else {
     cardCta = `<button class="btn btn-primary btn-lg" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial →</button>
-       <div class="helper" id="cardNote" style="text-align:center">Optional now — your first array is always free, and you won't be charged until the trial ends.</div>`;
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — you're only billed for the kWh your arrays generate, and never until the trial ends.</div>`;
   }
   return `<div class="card animate"><div class="center">
     <div class="seal">🌿</div>
