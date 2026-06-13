@@ -395,7 +395,7 @@ function arraysScreen(){
   const real = state.realSites;
   const h1 = real ? "There they are — your arrays." : "Here's what we'll watch.";
   const lede = real
-    ? `Pulled straight from your SolarEdge account. One key, ${n} ${n===1?"array":"arrays"} — already watched, already valued. Nothing's been saved yet; this is just a preview.`
+    ? `Pulled straight from your ${v.label} account. ${n===1?"1 array":n+" arrays"} — already watched, already valued. Nothing's been saved yet; this is just a preview.`
     : (v.discover
         ? `Here's a preview of how your fleet will appear. Connect on the next step and your real sites take their place — already watched, already valued.`
         : `Your ${v.label} ${n===1?"array is":"arrays are"} ready to connect — already watched, already valued. Add more brands or sites anytime from your dashboard.`);
