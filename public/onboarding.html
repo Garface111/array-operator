@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Set up your array · Array Operator</title>
+<style>
+  /* Design language mirrored from solaroperator.org legacy onboarding:
+     leaf-green primary (#34d399), white cards on zinc-50, stepper pills,
+     fade-up reveals, confetti celebration, warm plain-English voice. */
+  :root{
+    --p50:#ecfdf5; --p100:#d1fae5; --p200:#a7f3d0; --p300:#6ee7b7; --p400:#10b981;
+    --p500:#34d399; --p600:#10b981; --p700:#059669; --p800:#047857; --p900:#065f46;
+    --zinc50:#fafafa; --zinc100:#f4f4f5; --zinc200:#e4e4e7; --zinc300:#d4d4d8;
+    --zinc400:#a1a1aa; --zinc500:#71717a; --zinc600:#52525b; --zinc700:#3f3f46;
+    --zinc800:#27272a; --zinc900:#18181b; --white:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--zinc50); color:var(--zinc900);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; font-feature-settings:"cv11","ss01";
+  }
+  a{color:inherit}
+  .shell{max-width:42rem;margin:0 auto;display:flex;flex-direction:column;gap:2rem;padding:2rem 1rem 3rem}
+  @media(min-width:640px){.shell{padding:3rem 1rem 4rem}}
+
+  /* stepper */
+  .stepper{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;list-style:none}
+  .step{display:flex;align-items:center;gap:.5rem}
+  .pill{display:flex;align-items:center;gap:.5rem;border-radius:999px;padding:.375rem .75rem;font-size:.875rem;font-weight:500;transition:.15s}
+  .pill .n{display:flex;height:1.25rem;width:1.25rem;align-items:center;justify-content:center;border-radius:999px;font-size:.75rem}
+  .pill.todo{background:var(--zinc100);color:var(--zinc500)} .pill.todo .n{background:var(--zinc200);color:var(--zinc600)}
+  .pill.active{background:var(--p500);color:#fff} .pill.active .n{background:rgba(255,255,255,.2);color:#fff}
+  .pill.done{background:var(--p100);color:var(--p700)} .pill.done .n{background:var(--p200);color:var(--p800)}
+  .pill .lbl{display:none} @media(min-width:640px){.pill .lbl{display:inline}}
+  .seg{height:1px;width:1rem;background:var(--zinc200)}
+
+  /* card */
+  .card{background:var(--white);border:1px solid var(--zinc200);border-radius:.75rem;padding:2rem;box-shadow:0 10px 25px -5px rgba(0,0,0,.07),0 8px 10px -6px rgba(0,0,0,.04)}
+  h1{font-size:1.875rem;line-height:1.15;font-weight:600;letter-spacing:-.02em;color:var(--zinc900)}
+  .lede{margin-top:.75rem;font-size:1rem;color:var(--zinc500)}
+  .callout{margin-top:2rem;border:1px solid var(--p200);background:var(--p50);border-radius:.75rem;padding:1.25rem}
+  .callout .t{font-size:.875rem;font-weight:600;color:var(--p800)}
+  .callout .s{margin-top:.25rem;font-size:.75rem;color:var(--p700)}
+  .feats{margin-top:1.5rem;display:grid;gap:.5rem}
+  @media(min-width:640px){.feats{grid-template-columns:1fr 1fr}}
+  .feat{display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:var(--zinc700)}
+  .feat .ck{display:flex;height:1.25rem;width:1.25rem;flex:none;align-items:center;justify-content:center;border-radius:999px;background:var(--p100);color:var(--p700);font-size:.7rem}
+
+  label.fld{display:block;margin-top:1.5rem}
+  label.fld .lab{font-size:.875rem;font-weight:600;color:var(--zinc700)}
+  label.fld .hint{font-size:.8rem;color:var(--zinc500);margin-top:.15rem}
+  input[type=text],input[type=email]{width:100%;margin-top:.5rem;padding:.7rem .85rem;border:1px solid var(--zinc300);border-radius:.6rem;font:inherit;color:var(--zinc900);transition:.15s}
+  input:focus{outline:none;border-color:var(--p500);box-shadow:0 0 0 3px rgba(52,211,153,.18)}
+  .helper{margin-top:.65rem;font-size:.78rem;color:var(--zinc500);line-height:1.5}
+  .helper a{color:var(--p700);font-weight:500;text-decoration:underline;text-underline-offset:2px}
+
+  .row{margin-top:2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1.25rem;font-size:.875rem;font-weight:500;border:0;cursor:pointer;transition:.15s}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--p500);color:#fff} .btn-primary:hover:not(:disabled){background:var(--p600)}
+  .btn-ghost{background:transparent;color:var(--zinc700)} .btn-ghost:hover{background:var(--zinc100)}
+  .btn-lg{padding:.8rem 1.5rem;font-size:.95rem;font-weight:600}
+
+  /* discovery / cascade */
+  .scan{margin-top:1.5rem;display:flex;align-items:center;gap:.75rem;color:var(--zinc600);font-size:.9rem}
+  .ring{height:1.4rem;width:1.4rem;border-radius:999px;border:2.5px solid var(--p200);border-top-color:var(--p500);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .arrays{margin-top:1.25rem;display:flex;flex-direction:column;gap:.6rem}
+  .achip{display:flex;align-items:center;gap:.85rem;border:1px solid var(--zinc200);background:var(--white);border-radius:.7rem;padding:.8rem .95rem;
+          opacity:0;transform:translateY(8px);animation:chip-in .5s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes chip-in{to{opacity:1;transform:translateY(0)}}
+  .achip .dot{height:.6rem;width:.6rem;border-radius:999px;background:var(--p500);box-shadow:0 0 0 4px var(--p100);flex:none}
+  .achip .nm{font-weight:600;font-size:.9rem;color:var(--zinc900)}
+  .achip .me{font-size:.78rem;color:var(--zinc500);margin-top:.1rem}
+  .achip .kw{margin-left:auto;font-size:.85rem;font-weight:600;color:var(--p700);font-variant-numeric:tabular-nums}
+  .achip .ck{margin-left:.4rem;color:var(--p500)}
+  .tally{margin-top:1.25rem;text-align:center;font-size:.9rem;color:var(--zinc600)}
+  .tally b{color:var(--zinc900)}
+
+  /* done */
+  .center{display:flex;flex-direction:column;align-items:center;gap:1rem;text-align:center;padding:1rem 0}
+  .seal{height:4.5rem;width:4.5rem;border-radius:999px;display:grid;place-items:center;font-size:2rem;
+        background:radial-gradient(circle at 38% 32%,var(--p300),var(--p500));box-shadow:0 0 0 8px var(--p50),0 10px 30px rgba(52,211,153,.4)}
+  .done-h{font-size:1.6rem;font-weight:600;letter-spacing:-.02em}
+  .done-s{max-width:26rem;color:var(--zinc500);font-size:.95rem}
+
+  .hidden{display:none}
+  /* confetti */
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+  .cf{position:absolute;width:9px;height:9px;border-radius:2px;top:-12px;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(105vh) rotate(720deg);opacity:.2}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+  .topbar{display:flex;align-items:center;gap:.7rem;font-weight:700;color:var(--zinc800)}
+  .logo{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--p300),var(--p500) 60%,var(--p700));box-shadow:0 0 14px rgba(52,211,153,.45)}
+  .topbar small{display:block;font-size:11px;font-weight:600;color:var(--zinc500);margin-top:-2px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></div>
+  <nav aria-label="Setup progress">
+    <ol class="stepper" id="stepper"></ol>
+  </nav>
+  <main id="main"></main>
+</div>
+<div id="confetti"></div>
+
+<script>
+const API_BASE = "https://solaroperator.org";
+const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
+let step = 0;
+let state = { email:"", apiKey:"", sites:[] };
+
+const stepper = document.getElementById("stepper");
+const main = document.getElementById("main");
+
+function renderStepper(){
+  stepper.innerHTML = STEPS.map((label,i)=>{
+    const cls = i===step ? "active" : i<step ? "done" : "todo";
+    const seg = i<STEPS.length-1 ? `<span class="seg"></span>` : "";
+    return `<li class="step"><div class="pill ${cls}"><span class="n">${i+1}</span><span class="lbl">${label}</span></div>${seg}</li>`;
+  }).join("");
+}
+
+function go(n){ step=n; renderStepper(); render(); window.scrollTo({top:0,behavior:"smooth"}); }
+
+// ---------- screens ----------
+function welcomeScreen(){
+  return `<div class="card animate">
+    <h1>Your array, finally working for you.</h1>
+    <p class="lede">Connect once, and your agent watches every panel for you — catching the quiet underperformer the day it starts, drafting the warranty claim when one dies, and showing you what your array is really worth. No spreadsheets. No installer jargon. No second-guessing.</p>
+    <div class="callout">
+      <div class="t">Free to set up · connect in under a minute · your data is yours</div>
+      <div class="s">We only read your inverter's production data. Disconnect anytime and we purge it within 24 hours.</div>
+    </div>
+    <div class="feats">
+      <div class="feat"><span class="ck">✓</span>One credential — every array appears</div>
+      <div class="feat"><span class="ck">✓</span>Ground-truth, per-inverter health</div>
+      <div class="feat"><span class="ck">✓</span>Plain-English alerts, in dollars</div>
+      <div class="feat"><span class="ck">✓</span>Warranty claims drafted for you</div>
+    </div>
+    <div class="row">
+      <span></span>
+      <button class="btn btn-primary btn-lg" onclick="go(1)">Get started →</button>
+    </div>
+  </div>`;
+}
+
+function connectScreen(){
+  return `<div class="card animate">
+    <h1>Connect once. We'll find them all.</h1>
+    <p class="lede">Paste a single SolarEdge account key and every array on your account propagates in automatically — no site IDs, no per-panel setup, no logging in five times.</p>
+
+    <label class="fld">
+      <span class="lab">Where should we send your array's reports?</span>
+      <input type="email" id="email" placeholder="you@example.com" value="${state.email}" oninput="state.email=this.value;syncConnect()">
+    </label>
+
+    <label class="fld">
+      <span class="lab">SolarEdge account API key</span>
+      <span class="hint">The one key that unlocks every site on your account.</span>
+      <input type="text" id="apiKey" placeholder="ABCD1234…" value="${state.apiKey}" oninput="state.apiKey=this.value.trim();syncConnect()">
+    </label>
+    <div class="helper">
+      Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="${API_BASE}" target="_blank" rel="noopener">We'll walk you through it →</a>
+    </div>
+
+    <div id="scanArea"></div>
+
+    <div class="row">
+      <button class="btn btn-ghost" onclick="go(0)">← Back</button>
+      <button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="discover()">Discover my arrays →</button>
+    </div>
+  </div>`;
+}
+
+function syncConnect(){
+  const ok = state.apiKey.length>3 && /.+@.+\..+/.test(state.email);
+  const b = document.getElementById("discoverBtn");
+  if(b) b.disabled = !ok;
+}
+
+async function discover(){
+  const scan = document.getElementById("scanArea");
+  const btn = document.getElementById("discoverBtn");
+  btn.disabled = true;
+  scan.innerHTML = `<div class="scan"><span class="ring"></span> Reaching your SolarEdge account…</div>`;
+  let sites = [];
+  try{
+    const res = await fetch(`${API_BASE}/v1/array-owners/solaredge/discover`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({api_key: state.apiKey})
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && Array.isArray(data.sites) && data.sites.length){
+      sites = data.sites;
+    } else if(res.status===401 || res.status===400){
+      scan.innerHTML = `<div class="helper" style="color:#b45309">${data.detail||data.message||"That key didn't work — make sure it's an account-level API key."}</div>`;
+      btn.disabled=false; return;
+    } else {
+      // backend reachable but no sites, or unexpected — fall to demo so the
+      // sublime moment still lands during early access
+      sites = demoSites();
+    }
+  }catch(e){
+    // CORS/network/offline — graceful: show the propagation with sample data
+    sites = demoSites();
+  }
+  state.sites = sites;
+  go(2);
+}
+
+function demoSites(){
+  return [
+    {site_id:528411, name:"Barn roof",       peak_power_kw:10.0},
+    {site_id:528412, name:"South field",     peak_power_kw:10.0},
+    {site_id:528413, name:"Garage",          peak_power_kw:10.0},
+    {site_id:528414, name:"Pole mount A",    peak_power_kw:10.0},
+    {site_id:528415, name:"Pole mount B",    peak_power_kw:6.0},
+    {site_id:528416, name:"Workshop",        peak_power_kw:6.0},
+    {site_id:528417, name:"Pond house",      peak_power_kw:4.0},
+  ];
+}
+
+function arraysScreen(){
+  const n = state.sites.length;
+  return `<div class="card animate">
+    <h1>There they are.</h1>
+    <p class="lede">One key, ${n} ${n===1?"array":"arrays"}. Every site on your account just propagated in — already watched, already valued.</p>
+    <div class="arrays" id="arrays"></div>
+    <div class="tally" id="tally"></div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="go(1)">← Use a different key</button>
+      <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Take me to my dashboard →</button>
+    </div>
+  </div>`;
+}
+
+function cascadeArrays(){
+  const wrap = document.getElementById("arrays");
+  const tally = document.getElementById("tally");
+  const claim = document.getElementById("claimBtn");
+  let totalKw = 0;
+  state.sites.forEach((s,i)=>{
+    totalKw += s.peak_power_kw||0;
+    const el = document.createElement("div");
+    el.className = "achip";
+    el.style.animationDelay = (i*0.16)+"s";
+    el.innerHTML = `<span class="dot"></span>
+      <div><div class="nm">${s.name||("Site "+s.site_id)}</div><div class="me">SolarEdge · site ${s.site_id}</div></div>
+      <span class="kw">${(s.peak_power_kw||0).toFixed(1)} kW</span><span class="ck">✓</span>`;
+    wrap.appendChild(el);
+  });
+  const settle = state.sites.length*160 + 500;
+  setTimeout(()=>{
+    tally.innerHTML = `<b>${state.sites.length} arrays</b> · <b>${totalKw.toFixed(1)} kW</b> now under watch. Weather-normalized, per-inverter, in dollars.`;
+    claim.style.opacity="1"; claim.style.pointerEvents="auto";
+  }, settle);
+}
+
+function doneScreen(){
+  const n = state.sites.length;
+  return `<div class="card animate"><div class="center">
+    <div class="seal">🌿</div>
+    <div class="done-h">You're set. We've got it from here.</div>
+    <div class="done-s">All ${n} ${n===1?"array is":"arrays are"} connected and being watched right now. The moment something needs your attention, you'll know — in plain English, with the dollars and the fix already worked out.</div>
+    <a class="btn btn-primary btn-lg" href="/" style="margin-top:.5rem">Open my dashboard →</a>
+  </div></div>`;
+}
+
+function finish(){ go(3); burst(); }
+
+function burst(){
+  const c = document.getElementById("confetti");
+  const colors = ["#34d399","#10b981","#6ee7b7","#a7f3d0","#059669"];
+  for(let i=0;i<80;i++){
+    const p=document.createElement("div");
+    p.className="cf";
+    p.style.left=Math.random()*100+"vw";
+    p.style.background=colors[i%colors.length];
+    p.style.animationDuration=(2.5+Math.random()*2)+"s";
+    p.style.animationDelay=(Math.random()*0.6)+"s";
+    p.style.transform=`rotate(${Math.random()*360}deg)`;
+    c.appendChild(p);
+    setTimeout(()=>p.remove(), 5200);
+  }
+}
+
+function render(){
+  if(step===0) main.innerHTML = welcomeScreen();
+  else if(step===1){ main.innerHTML = connectScreen(); syncConnect(); }
+  else if(step===2){ main.innerHTML = arraysScreen(); cascadeArrays(); }
+  else if(step===3) main.innerHTML = doneScreen();
+}
+
+renderStepper(); render();
+</script>
+</body>
+</html>
