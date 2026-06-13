@@ -1,0 +1,25 @@
+# Array Operator — arrayoperator.com (Netlify static + Railway API proxy)
+# Mirrors the NEPOOL Operator (nepooloperator.com) proxy pattern so the whole
+# owner flow is SAME-ORIGIN and branded: the static marketing/onboarding pages
+# are served by Netlify, while /v1/* (API), /accounts (dashboard SPA), and the
+# onboarding SPA proxy through to the shared FastAPI backend on Railway.
+
+# ── Backend API (Railway) ──────────────────────────────────────────────
+# onboarding.html + app.js call the API at the same origin via /v1/* once
+# API_BASE = "" (relative). Proxy them to Railway so they work from
+# arrayoperator.com. (Stripe webhooks + the Chrome extension hit Railway directly.)
+/v1/*                 https://web-production-49c83.up.railway.app/v1/:splat   200
+
+# ── Account dashboard SPA (served at /app/* on Railway) ─────────────────
+# Status-200 proxy so the address bar shows arrayoperator.com/accounts.
+# The SPA is built with base/basename = /accounts so assets + routing resolve.
+/accounts             https://web-production-49c83.up.railway.app/app/   200
+/accounts/*           https://web-production-49c83.up.railway.app/app/:splat   200
+
+# ── Pretty onboarding URL ───────────────────────────────────────────────
+# The landing-page Array door links to arrayoperator.com/onboarding (no .html).
+# Serve the static onboarding wizard from the clean URL. The wizard calls the
+# API via the same-origin /v1/* proxy above, so no extra API rule is needed.
+/onboarding           /onboarding.html   200
+/signup               /onboarding.html   301
+/get-started          /onboarding.html   301

@@ -151,7 +151,9 @@
 <div id="confetti"></div>
 
 <script>
-const API_BASE = "https://solaroperator.org";
+// Same-origin: arrayoperator.com proxies /v1/* and /accounts to the shared
+// Railway backend via _redirects, so the whole flow stays on the brand domain.
+const API_BASE = "";
 const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
 let step = 0;
 let state = { name:"", email:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"" };
@@ -166,7 +168,7 @@ const VENDORS = [
   { code:"solaredge", label:"SolarEdge", meta:"One account key", available:true, discover:true,
     fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
              hint:"The one key that unlocks every site on your account.",
-             ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="${API_BASE}" target="_blank" rel="noopener">We'll walk you through it →</a>`}] },
+             ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="https://monitoring.solaredge.com" target="_blank" rel="noopener">Open the SolarEdge portal →</a>`}] },
   { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
     note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
     fields:[
