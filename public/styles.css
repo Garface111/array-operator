@@ -18,7 +18,7 @@
   .tnum{font-variant-numeric:tabular-nums}
 
   /* nav */
-  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;position:sticky;top:0;z-index:50;
+  nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0 4px;position:sticky;top:0;z-index:50;
       background:linear-gradient(180deg,var(--bg) 64%,transparent);backdrop-filter:blur(8px)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;color:var(--ink);font-size:16px}
   .logo{width:30px;height:30px;border-radius:50%;

@@ -176,16 +176,7 @@
     const summary = tree.summary || {};
     const head = `
       <div class="sb-head">
-        <div>
-          <div class="sb-tiers">
-            <span class="sb-tier-tag a">Alerts</span>
-            <span class="sb-arrow">→ control →</span>
-            <span class="sb-tier-tag b">Arrays</span>
-            <span class="sb-arrow">→ control →</span>
-            <span class="sb-tier-tag c">Inverters</span>
-          </div>
-          <div class="sb-sub">${summary.arrays_total||0} arrays · ${summary.inverters_total||0} inverters · ${summary.attention||0} need a look — this layout is your live system, top controls bottom</div>
-        </div>
+        <div></div>
         <div class="sb-head-actions">
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
