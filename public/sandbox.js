@@ -17,6 +17,7 @@
 (function(){
   const SESSION_KEY = "so_session";
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings)
+  const LAYOUT_KEY = "ao_inverter_layout";   // persisted per-inverter arrangement { arrayId: [invId,...] }
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
@@ -76,6 +77,75 @@
     }).map(x=>x[0]);
   }
 
+  // ---- saved per-inverter layout (localStorage) ----
+  // Stable inverter id: real serial when present, else "<arrayId>:<name>".
+  function invId(arrayId, inv){
+    return inv.sn != null && String(inv.sn).length ? String(inv.sn) : `${arrayId}:${inv.name}`;
+  }
+  function loadLayout(){
+    try { const v = JSON.parse(localStorage.getItem(LAYOUT_KEY)); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; }
+    catch(e){ return {}; }
+  }
+  // Read the live DOM and persist the current arrangement: arrayId -> ordered inverter ids.
+  function saveLayout(host){
+    const map = {};
+    host.querySelectorAll(".sb-col").forEach(col => {
+      const aid = col.dataset.arrayId;
+      map[aid] = [...col.querySelectorAll(".sb-teeth .sb-inv")].map(n => n.dataset.invId);
+    });
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(map)); } catch(e){}
+  }
+  // After render, re-group/re-order inverter cards to match the saved layout.
+  // Saved ids place under their saved array in saved order; cards not in the saved
+  // layout (or whose saved array is gone) fall back to their ORIGINAL backend array
+  // at the end. A real inverter is never lost.
+  function applyLayout(host){
+    const saved = loadLayout();
+    if(!Object.keys(saved).length) return;          // nothing saved → backend truth stands
+
+    const cols = [...host.querySelectorAll(".sb-col")];
+    const teethByArray = {}, vendorByArray = {}, finalOrder = {};
+    const invById = new Map();                       // invId -> card node
+
+    cols.forEach(col => {
+      const aid = col.dataset.arrayId;
+      teethByArray[aid] = col.querySelector(".sb-teeth");
+      vendorByArray[aid] = col.dataset.vendor || "";
+      finalOrder[aid] = [];
+      col.querySelectorAll(".sb-teeth .sb-inv").forEach(n => invById.set(n.dataset.invId, n));
+    });
+
+    const placed = new Set();
+    // 1) place saved arrangement (only for arrays that still exist + cards that still exist)
+    Object.keys(saved).forEach(aid => {
+      if(!(aid in finalOrder)) return;
+      (saved[aid] || []).forEach(id => {
+        id = String(id);
+        if(invById.has(id) && !placed.has(id)){ finalOrder[aid].push(id); placed.add(id); }
+      });
+    });
+    // 2) anything not placed → its ORIGINAL backend array, appended in original order
+    cols.forEach(col => {
+      const aid = col.dataset.arrayId;
+      col.querySelectorAll(".sb-teeth .sb-inv").forEach(n => {
+        const id = n.dataset.invId;
+        if(!placed.has(id)){ finalOrder[aid].push(id); placed.add(id); }
+      });
+    });
+    // 3) apply to the DOM, re-stamping each card's array + vendor badge
+    cols.forEach(col => {
+      const aid = col.dataset.arrayId, teeth = teethByArray[aid];
+      finalOrder[aid].forEach(id => {
+        const node = invById.get(id);
+        if(!node) return;
+        node.dataset.arrayId = aid;
+        setCardVendor(node, vendorByArray[aid]);
+        teeth.appendChild(node);
+      });
+    });
+    cols.forEach(updateColCount);
+  }
+
   const STATUS_LABEL = {
     ok: "Pulling its weight", underperforming: "Below its neighbors",
     comm_gap: "Gone quiet", dead: "Not coming home", fault: "Fault"
@@ -94,6 +164,26 @@
     const pct = Math.max(4, Math.min(100, Math.round(pi*100)));
     const cls = pi>=0.85 ? "ok" : pi>=0.6 ? "warn" : "bad";
     return `<div class="sb-pi"><div class="sb-pi-bar ${cls}" style="width:${pct}%"></div><span>${pi.toFixed(2)}</span></div>`;
+  }
+
+  // per-inverter vendor badge (smaller variant of the array brand chip) — empty if unknown
+  function brandHTML(vendor){
+    return (vendor && BRAND[vendor])
+      ? `<span class="sb-brand sb-inv-brand ${esc(vendor)}">${esc(BRAND[vendor])}</span>` : "";
+  }
+  // re-stamp a card's vendor badge (used on cross-array move / layout apply)
+  function setCardVendor(node, vendor){
+    const existing = node.querySelector(".sb-inv-brand");
+    if(existing) existing.remove();
+    node.dataset.vendor = vendor || "";
+    const html = brandHTML(vendor);
+    if(html) node.appendChild(el(html));
+  }
+  // refresh the "N inverters" count on a column from its live card count
+  function updateColCount(col){
+    const n = col.querySelectorAll(".sb-teeth .sb-inv").length;
+    const c = col.querySelector(".sb-array-count");
+    if(c) c.textContent = `${n} inverter${n===1?'':'s'}`;
   }
 
   function render(tree){
@@ -126,7 +216,10 @@
           <div class="sb-sub">${summary.arrays_total||0} arrays · ${summary.inverters_total||0} inverters · ${summary.attention||0} need a look — this layout is your live system, top controls bottom</div>
         </div>
         <div class="sb-head-actions">
-          <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
+          <div class="sb-head-btns">
+            <button class="sb-resetbtn" id="sbReset" type="button" title="Discard your saved arrangement and return to the live backend layout">Reset layout</button>
+            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
+          </div>
           <div class="sb-legend">
             <span><i class="sw ok"></i>healthy</span>
             <span><i class="sw warn"></i>watch</span>
@@ -148,13 +241,15 @@
         ? `<span class="sb-brand ${esc(col.vendor)}">${esc(BRAND[col.vendor] || col.vendor)}</span>`
         : "";
 
-      // bottom comb — one prong per inverter
+      // bottom comb — one prong per inverter (each individually drag-movable)
       const teeth = invs.map(inv => {
         const sCls = STATUS_CLASS[inv.status] || "ok";
         const np = inv.nameplate_kw!=null ? `${inv.nameplate_kw} kW` : "";
         const power = inv.current_power_w!=null ? `${(inv.current_power_w/1000).toFixed(2)} kW now` : "";
+        const id = invId(col.array_id, inv);
         return `
-          <div class="sb-inv ${sCls}" tabindex="0"
+          <div class="sb-inv ${sCls}" tabindex="0" draggable="true"
+               data-inv-id="${esc(id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
                data-np="${esc(np)}" data-win="${esc(inv.window_kwh!=null?inv.window_kwh+' kWh / 14d':'')}"
@@ -164,11 +259,12 @@
             <div class="sb-inv-meta">${esc(np)}</div>
             ${peerBar(inv.peer_index)}
             <div class="sb-inv-status ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"")}</div>
+            ${brandHTML(col.vendor)}
           </div>`;
       }).join("");
 
       return `
-        <div class="sb-col" draggable="true" data-array-id="${esc(col.array_id)}">
+        <div class="sb-col" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
           <!-- TIER 1: Alert -->
           <div class="sb-alert ${aCls}">
             <div class="sb-alert-k">Alerts</div>
@@ -177,12 +273,12 @@
           </div>
           <div class="sb-link v1 ${aCls}"></div>
 
-          <!-- TIER 2: Array -->
-          <div class="sb-array">
-            <span class="sb-drag" title="Drag to reorder" aria-hidden="true">⠿</span>
+          <!-- TIER 2: Array (this node is the column drag handle) -->
+          <div class="sb-array" draggable="true">
+            <span class="sb-drag" title="Drag to reorder arrays" aria-hidden="true">⠿</span>
             <div class="sb-array-k">Array</div>
             <div class="sb-array-name">${esc(col.array_name)}</div>
-            <div class="sb-array-meta">${col.inverter_count} inverter${col.inverter_count===1?'':'s'} ${srcTag} ${brandChip}</div>
+            <div class="sb-array-meta"><span class="sb-array-count">${col.inverter_count} inverter${col.inverter_count===1?'':'s'}</span> ${srcTag} ${brandChip}</div>
           </div>
           <div class="sb-link v2"></div>
 
@@ -195,7 +291,10 @@
     }).join("");
 
     host.innerHTML = head + `<div class="sb-canvas">${columns}</div>
-      <div class="sb-foot" id="sbFoot">Tip: click any inverter for its diagnosis. The three rows are the three layers of our backend — Alert → Array → Inverter.</div>`;
+      <div class="sb-foot" id="sbFoot">Tip: drag any inverter to reorder it or move it to another array; click one for its diagnosis. <span class="sb-foot-note">Arrangement is saved to this browser — it organizes your view, it doesn't re-wire the actual SolarEdge/vendor mapping.</span></div>`;
+
+    // re-group/re-order inverter cards to the saved browser layout (backend truth if none saved)
+    applyLayout(host);
 
     // click/keyboard → detail line
     host.querySelectorAll(".sb-inv").forEach(node => {
@@ -216,7 +315,9 @@
     });
 
     wireAddButton(host);
-    wireDrag(host);
+    wireResetButton(host);
+    wireDrag(host);       // whole-column reorder (drag the .sb-array node)
+    wireInvDrag(host);    // per-inverter reorder + cross-array move
   }
 
   /* ---- '+ Add array' button wiring ---- */
@@ -225,7 +326,19 @@
     if(btn) btn.onclick = openAddArrayModal;
   }
 
-  /* ---- HTML5 drag-to-reorder of array columns (whole column moves) ---- */
+  /* ---- 'Reset layout' — clear saved arrangement + column order, re-render backend truth ---- */
+  function wireResetButton(host){
+    const btn = host.querySelector("#sbReset");
+    if(!btn) return;
+    btn.onclick = () => {
+      try { localStorage.removeItem(LAYOUT_KEY); localStorage.removeItem(ORDER_KEY); } catch(e){}
+      load();
+    };
+  }
+
+  /* ---- HTML5 drag-to-reorder of array columns (drag the .sb-array node) ----
+   * Scoped to the .sb-array node (not the whole column) so it never competes
+   * with the per-inverter drag, whose source is the .sb-inv card. */
   function getDragAfter(canvas, x){
     const els = [...canvas.querySelectorAll(".sb-col:not(.dragging)")];
     let best = { dist: -Infinity, el: null };
@@ -240,8 +353,10 @@
     const canvas = host.querySelector(".sb-canvas");
     if(!canvas) return;
     let dragEl = null;
-    canvas.querySelectorAll(".sb-col").forEach(col => {
-      col.addEventListener("dragstart", e => {
+    canvas.querySelectorAll(".sb-array").forEach(arr => {
+      arr.addEventListener("dragstart", e => {
+        const col = arr.closest(".sb-col");
+        if(!col) return;
         dragEl = col;
         canvas.classList.add("dragging-active");
         // let the lift styling paint before the drag image snapshots
@@ -249,22 +364,92 @@
         e.dataTransfer.effectAllowed = "move";
         try { e.dataTransfer.setData("text/plain", col.dataset.arrayId || ""); } catch(_){}
       });
-      col.addEventListener("dragend", () => {
-        col.classList.remove("dragging");
+      arr.addEventListener("dragend", () => {
+        if(dragEl) dragEl.classList.remove("dragging");
         canvas.classList.remove("dragging-active");
         dragEl = null;
         saveOrder(canvas);
       });
     });
     canvas.addEventListener("dragover", e => {
-      if(!dragEl) return;
+      if(!dragEl) return;                            // only columns handled here
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       const after = getDragAfter(canvas, e.clientX);
       if(after == null) canvas.appendChild(dragEl);
       else if(after !== dragEl) canvas.insertBefore(dragEl, after);
     });
-    canvas.addEventListener("drop", e => e.preventDefault());
+    canvas.addEventListener("drop", e => { if(dragEl) e.preventDefault(); });
+  }
+
+  /* ---- HTML5 drag of individual inverter cards ----
+   * (a) reorder within a comb, (b) move across combs. The dragged card lifts
+   * (opacity) and is moved live into the hovered .sb-teeth at the computed slot.
+   * On drop we re-stamp the card's array + vendor badge and persist the layout. */
+  function getInvAfter(teeth, x, y){
+    // 2-D nearest-center, so it works with the flex-wrapped comb
+    const els = [...teeth.querySelectorAll(".sb-inv:not(.inv-dragging)")];
+    if(!els.length) return null;
+    let bestEl = null, bestBox = null, bestDist = Infinity;
+    els.forEach(el => {
+      const box = el.getBoundingClientRect();
+      const dx = x - (box.left + box.width/2), dy = y - (box.top + box.height/2);
+      const dist = dx*dx + dy*dy;
+      if(dist < bestDist){ bestDist = dist; bestEl = el; bestBox = box; }
+    });
+    if(!bestEl) return null;
+    // before this card if the pointer is left of its center, else after it
+    return (x < bestBox.left + bestBox.width/2) ? bestEl : bestEl.nextElementSibling;
+  }
+  function wireInvDrag(host){
+    let dragInv = null;
+
+    host.querySelectorAll(".sb-inv").forEach(card => {
+      card.addEventListener("dragstart", e => {
+        e.stopPropagation();                          // never bubble into a column drag
+        dragInv = card;
+        host.classList.add("inv-dragging-active");
+        requestAnimationFrame(() => card.classList.add("inv-dragging"));
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", card.dataset.invId || ""); } catch(_){}
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("inv-dragging");
+        host.classList.remove("inv-dragging-active");
+        host.querySelectorAll(".sb-teeth.inv-drop").forEach(t => t.classList.remove("inv-drop"));
+        const col = card.closest(".sb-col");
+        if(col){
+          card.dataset.arrayId = col.dataset.arrayId;       // its new home array
+          setCardVendor(card, col.dataset.vendor || "");    // badge reflects where it now sits
+          host.querySelectorAll(".sb-col").forEach(updateColCount);
+          saveLayout(host);
+        }
+        dragInv = null;
+      });
+    });
+
+    host.querySelectorAll(".sb-teeth").forEach(teeth => {
+      teeth.addEventListener("dragover", e => {
+        if(!dragInv) return;                          // not an inverter drag → let columns handle it
+        e.preventDefault();
+        e.stopPropagation();                          // keep the canvas column handler out of it
+        e.dataTransfer.dropEffect = "move";
+        teeth.classList.add("inv-drop");
+        const after = getInvAfter(teeth, e.clientX, e.clientY);
+        if(after == null) teeth.appendChild(dragInv);
+        else if(after !== dragInv) teeth.insertBefore(dragInv, after);
+      });
+      teeth.addEventListener("dragleave", e => {
+        if(!dragInv) return;
+        if(!teeth.contains(e.relatedTarget)) teeth.classList.remove("inv-drop");
+      });
+      teeth.addEventListener("drop", e => {
+        if(!dragInv) return;
+        e.preventDefault();
+        e.stopPropagation();
+        teeth.classList.remove("inv-drop");
+      });
+    });
   }
 
   function load(){

@@ -375,6 +375,31 @@
   .sb-col.dragging{opacity:.55;transform:scale(.98);cursor:grabbing}
   .sb-col.dragging .sb-array{box-shadow:0 18px 44px -18px rgba(0,0,0,.8),0 0 0 1px var(--sky)}
   .sb-canvas.dragging-active .sb-col:not(.dragging){transition:transform .18s ease}
+  .sb-array[draggable="true"]{cursor:grab}
+  .sb-array[draggable="true"]:active{cursor:grabbing}
+
+  /* ===== Per-inverter vendor badge (smaller variant of the array brand chip) ===== */
+  .sb-inv-brand{display:inline-block;margin-top:7px;font-size:8.5px;padding:1px 6px;line-height:1.5}
+  .sb-brand.chint{background:rgba(255,255,255,.06);color:var(--muted);border-color:var(--line)}
+
+  /* ===== Drag individual inverter cards (reorder + move across arrays) ===== */
+  .sb-inv{cursor:grab}
+  .sb-inv:active{cursor:grabbing}
+  .sb-inv.inv-dragging{opacity:.45;transform:scale(.96);cursor:grabbing;
+    box-shadow:0 18px 44px -18px rgba(0,0,0,.85),0 0 0 1px var(--good)}
+  .inv-dragging-active .sb-inv:not(.inv-dragging){transition:transform .16s ease}
+  /* drop-target comb: clear slot indicator while an inverter hovers over it */
+  .sb-teeth{min-height:42px;border-radius:12px;transition:background .15s,box-shadow .15s}
+  .sb-teeth.inv-drop{background:rgba(63,214,138,.06);box-shadow:inset 0 0 0 1px rgba(63,214,138,.35)}
+
+  /* ===== 'Reset layout' text button (sandbox header) ===== */
+  .sb-head-btns{display:flex;align-items:center;gap:10px}
+  .sb-resetbtn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);
+    font-size:12.5px;font-weight:650;padding:8px 13px;border-radius:11px;cursor:pointer;white-space:nowrap;
+    transition:border-color .15s,color .15s,background .15s}
+  .sb-resetbtn:hover{border-color:rgba(94,194,255,.5);color:var(--sky);background:rgba(94,194,255,.07)}
+  .sb-resetbtn:active{transform:translateY(1px)}
+  .sb-foot-note{display:block;margin-top:5px;color:var(--faint);font-size:11.5px}
 
   /* ===== Add-array modal (dark skin) ===== */
   .sb-ov{position:fixed;inset:0;z-index:9999;display:none;overflow:auto;padding:6vh 16px;
