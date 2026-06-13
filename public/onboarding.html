@@ -322,47 +322,33 @@ function syncConnect(){
   b.disabled = !(emailOk && nameOk && credsOk);
 }
 
-// Vendor-aware connect. SolarEdge uses the account-level discovery cascade;
-// other vendors validate their per-array credentials, then we surface the one
-// site they connected (the dashboard handles adding more after setup).
+// Vendor-aware pre-signup preview. EVERY available vendor now hits the public
+// /preview endpoint so the owner sees their REAL site(s) + value before signup:
+//  - SolarEdge / Locus(+partner) → list the whole account/partner
+//  - Locus(no partner) / Fronius / SMA → preview the one named system
+// Falls back to the demo cascade only when the backend is unreachable.
 async function connectVendor(){
   const v = vendorByCode(state.vendor);
-  if(v.discover) return discover();
-  return connectSingle(v);
-}
-
-async function connectSingle(v){
   const scan = document.getElementById("scanArea");
   const btn = document.getElementById("discoverBtn");
   btn.disabled = true;
-  scan.innerHTML = `<div class="scan"><span class="ring"></span> Connecting to ${v.label}…</div>`;
-  // The per-array connect endpoint needs an array id (created after signup), so
-  // during onboarding we validate the shape and confirm the brand is wired,
-  // then carry the operator into the dashboard where the array is created and
-  // these credentials are attached. We still try a soft reachability ping.
-  try{
-    const res = await fetch(`${API_BASE}/v1/array-owners/inverter-vendors`,{method:"GET"});
-    await res.json().catch(()=>({}));
-  }catch(e){ /* CORS/offline — fine, we proceed to the confirming screen */ }
-  // Show a single confirmed connection card for this vendor.
-  state.sites = [{ site_id: state.fields.system_id || state.fields.pv_system_id || state.fields.site_id || v.label, name: `${v.label} array`, peak_power_kw: 0, vendor: v.label }];
-  go(2);
-}
+  const verb = v.discover ? `Reaching your ${v.label} account…` : `Checking your ${v.label} system…`;
+  scan.innerHTML = `<div class="scan"><span class="ring"></span> ${verb}</div>`;
 
-async function discover(){
-  const scan = document.getElementById("scanArea");
-  const btn = document.getElementById("discoverBtn");
-  btn.disabled = true;
-  scan.innerHTML = `<div class="scan"><span class="ring"></span> Reaching your SolarEdge account…</div>`;
+  // Build the per-vendor config from the fields the connect form collected.
+  const config = {};
+  (v.fields||[]).forEach(f=>{
+    const val = (f.name==="apiKey") ? state.apiKey : (state.fields[f.name]||"");
+    if(val) config[f.name==="apiKey" ? "api_key" : f.name] = val.trim();
+  });
+
   let sites = [];
   state.realSites = false;
   state.totals = null;
   try{
-    // Public, unauthenticated pre-signup preview: shows the owner their REAL
-    // sites + estimated value before they create an account. Saves nothing.
     const res = await fetch(`${API_BASE}/v1/array-owners/public/preview`,{
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({api_key: state.apiKey})
+      body: JSON.stringify({ vendor: state.vendor, config })
     });
     const data = await res.json().catch(()=>({}));
     if(res.status===429){
@@ -370,17 +356,17 @@ async function discover(){
       btn.disabled=false; return;
     }
     if(res.ok && data.ok && Array.isArray(data.sites) && data.sites.length){
-      // Their actual arrays — the sublime moment.
-      sites = data.sites;
+      // Their actual array(s) — the sublime moment.
+      sites = data.sites.map(s=>({...s, vendor: v.label}));
       state.realSites = true;
       state.totals = data.totals || null;
     } else if(res.ok && data.ok===false && data.message){
-      // Friendly, actionable rejection (bad key, site-level key, empty account).
+      // Friendly, actionable rejection (bad creds, scope, empty account).
       scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.message}</div>`;
       btn.disabled=false; return;
     } else {
       // Unexpected/empty — fall through to the demo cascade so the flow still
-      // reaches account creation; the real key is attached after sign-in.
+      // reaches account creation; the real creds are attached after sign-in.
       sites = demoSites();
     }
   }catch(e){
