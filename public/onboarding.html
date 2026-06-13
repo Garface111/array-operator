@@ -127,6 +127,16 @@
   .vend .vrad{position:absolute;top:.55rem;right:.6rem;color:var(--faint);font-size:.85rem}
   .vendnote{margin-top:1.1rem;border:1px solid rgba(255,180,84,.3);background:rgba(255,180,84,.08);border-radius:12px;padding:.85rem 1rem;font-size:.78rem;color:var(--gold2);line-height:1.5}
   .vendnote b{color:#ffe7b8}
+
+  /* value-reveal hero on the "your arrays" step (real-key path) */
+  .valuehero{margin-top:1.4rem;border:1px solid rgba(63,214,138,.3);border-radius:18px;padding:1.2rem 1.4rem;
+    background:linear-gradient(150deg,rgba(63,214,138,.14),rgba(63,214,138,.03));position:relative;overflow:hidden}
+  .valuehero::after{content:"";position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;
+    background:radial-gradient(circle at 40% 40%,rgba(63,214,138,.4),rgba(63,214,138,.06) 60%,transparent 72%);pointer-events:none}
+  .vh-lab{color:var(--muted);font-size:.8rem;font-weight:600;letter-spacing:.01em}
+  .vh-big{font-size:2.7rem;font-weight:780;letter-spacing:-.02em;color:var(--good2);line-height:1.05;margin-top:.3rem;
+    text-shadow:0 0 24px rgba(63,214,138,.3);font-variant-numeric:tabular-nums}
+  .vh-sub{color:var(--muted);font-size:.78rem;margin-top:.45rem;line-height:1.5}
 </style>
 </head>
 <body>
@@ -345,34 +355,36 @@ async function discover(){
   btn.disabled = true;
   scan.innerHTML = `<div class="scan"><span class="ring"></span> Reaching your SolarEdge account…</div>`;
   let sites = [];
+  state.realSites = false;
+  state.totals = null;
   try{
-    const res = await fetch(`${API_BASE}/v1/array-owners/solaredge/discover`,{
+    // Public, unauthenticated pre-signup preview: shows the owner their REAL
+    // sites + estimated value before they create an account. Saves nothing.
+    const res = await fetch(`${API_BASE}/v1/array-owners/public/preview`,{
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({api_key: state.apiKey})
     });
     const data = await res.json().catch(()=>({}));
-    if(res.ok && Array.isArray(data.sites) && data.sites.length){
+    if(res.status===429){
+      scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.detail||"Too many attempts — give it a minute and try again."}</div>`;
+      btn.disabled=false; return;
+    }
+    if(res.ok && data.ok && Array.isArray(data.sites) && data.sites.length){
+      // Their actual arrays — the sublime moment.
       sites = data.sites;
+      state.realSites = true;
+      state.totals = data.totals || null;
+    } else if(res.ok && data.ok===false && data.message){
+      // Friendly, actionable rejection (bad key, site-level key, empty account).
+      scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.message}</div>`;
+      btn.disabled=false; return;
     } else {
-      const msg = String(data.detail || data.message || "").toLowerCase();
-      // The discover endpoint is auth-gated (it's built for signed-in dashboard
-      // users). During onboarding the owner has no account yet, so a 401 about a
-      // missing bearer/token/tenant is EXPECTED — not a bad key. In that case we
-      // proceed with the demo cascade and connect the real key after sign-in.
-      const authGate = res.status === 401 &&
-        /bearer|token|tenant|unauthor|sign|session/.test(msg);
-      const badKey = (res.status === 400 || res.status === 403) ||
-        (res.status === 401 && !authGate);
-      if(badKey){
-        scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.detail||data.message||"That key didn't work — make sure it's an account-level API key."}</div>`;
-        btn.disabled=false; return;
-      }
-      // auth-gate, no sites, or unexpected — fall to demo so the flow continues
-      // to account creation; the key is attached for real after sign-in.
+      // Unexpected/empty — fall through to the demo cascade so the flow still
+      // reaches account creation; the real key is attached after sign-in.
       sites = demoSites();
     }
   }catch(e){
-    // CORS/network/offline — graceful: show the propagation with sample data
+    // CORS/network/offline — graceful: show the propagation with sample data.
     sites = demoSites();
   }
   state.sites = sites;
@@ -394,17 +406,29 @@ function demoSites(){
 function arraysScreen(){
   const n = state.sites.length;
   const v = vendorByCode(state.vendor);
-  const lede = v.discover
-    ? `One key, ${n} ${n===1?"array":"arrays"}. Every site on your account just propagated in — already watched, already valued.`
-    : `Your ${v.label} ${n===1?"array is":"arrays are"} connected — already watched, already valued. You can add more brands or sites anytime from your dashboard.`;
+  const real = state.realSites;
+  const h1 = real ? "There they are — your arrays." : "Here's what we'll watch.";
+  const lede = real
+    ? `Pulled straight from your SolarEdge account. One key, ${n} ${n===1?"array":"arrays"} — already watched, already valued. Nothing's been saved yet; this is just a preview.`
+    : (v.discover
+        ? `Here's a preview of how your fleet will appear. Connect on the next step and your real sites take their place — already watched, already valued.`
+        : `Your ${v.label} ${n===1?"array is":"arrays are"} ready to connect — already watched, already valued. Add more brands or sites anytime from your dashboard.`);
+  const valueHero = real && state.totals && state.totals.annual_value_usd>0
+    ? `<div class="valuehero" id="valuehero">
+         <div class="vh-lab">Estimated value your ${n===1?"array generates":"arrays generate"} a year</div>
+         <div class="vh-big" id="vhBig">$0</div>
+         <div class="vh-sub">${state.totals.peak_power_kw} kW across ${n} ${n===1?"site":"sites"} · energy offset + renewable credits · we pin the exact figure once you're live</div>
+       </div>`
+    : "";
   return `<div class="card animate">
-    <h1>There they are.</h1>
+    <h1>${h1}</h1>
     <p class="lede">${lede}</p>
+    ${valueHero}
     <div class="arrays" id="arrays"></div>
     <div class="tally" id="tally"></div>
     <div class="row">
       <button class="btn btn-ghost" onclick="go(1)">← Connect a different brand</button>
-      <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Take me to my dashboard →</button>
+      <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">${real?"Start my free trial →":"Take me to my dashboard →"}</button>
     </div>
   </div>`;
 }
@@ -414,6 +438,7 @@ function cascadeArrays(){
   const tally = document.getElementById("tally");
   const claim = document.getElementById("claimBtn");
   const vlabel = vendorByCode(state.vendor).label;
+  const real = state.realSites;
   let totalKw = 0;
   state.sites.forEach((s,i)=>{
     totalKw += s.peak_power_kw||0;
@@ -421,18 +446,42 @@ function cascadeArrays(){
     const el = document.createElement("div");
     el.className = "achip";
     el.style.animationDelay = (i*0.16)+"s";
-    const kw = (s.peak_power_kw||0) > 0 ? `<span class="kw">${(s.peak_power_kw||0).toFixed(1)} kW</span>` : "";
+    const kw = (s.peak_power_kw||0) > 0 ? `${(s.peak_power_kw||0).toFixed(1)} kW` : "";
+    // Real previews carry a per-array annual $ estimate from the backend.
+    const val = (real && s.annual_value_usd>0)
+      ? `<span class="kw">~$${Number(s.annual_value_usd).toLocaleString()}/yr</span>`
+      : (kw ? `<span class="kw">${kw}</span>` : "");
+    const meta = [brand, kw && real ? kw : (real?"":""), "site "+s.site_id].filter(Boolean).join(" · ");
     el.innerHTML = `<span class="dot"></span>
-      <div><div class="nm">${s.name||("Site "+s.site_id)}</div><div class="me">${brand} · site ${s.site_id}</div></div>
-      ${kw}<span class="ck">✓</span>`;
+      <div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>
+      ${val}<span class="ck">✓</span>`;
     wrap.appendChild(el);
   });
   const settle = state.sites.length*160 + 500;
   setTimeout(()=>{
     const kwTxt = totalKw>0 ? ` · <b>${totalKw.toFixed(1)} kW</b>` : "";
-    tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kwTxt} now under watch. Weather-normalized, per-inverter, in dollars.`;
+    tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kwTxt} ${real?"ready":"in preview"}. Weather-normalized, per-inverter, in dollars.`;
     claim.style.opacity="1"; claim.style.pointerEvents="auto";
+    // Count the annual-value hero up to the real total for the sublime reveal.
+    if(real && state.totals && state.totals.annual_value_usd>0){
+      countUp(document.getElementById("vhBig"), state.totals.annual_value_usd, 1100);
+    }
   }, settle);
+}
+
+// Animate a dollar figure from 0 → target over `ms` (eased), tabular $.
+function countUp(el, target, ms){
+  if(!el) return;
+  const start = performance.now();
+  const fmt = n => "$"+Math.round(n).toLocaleString();
+  function tick(now){
+    const t = Math.min((now-start)/ms, 1);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = fmt(target*eased);
+    if(t<1) requestAnimationFrame(tick);
+    else el.textContent = fmt(target);
+  }
+  requestAnimationFrame(tick);
 }
 
 function doneScreen(){
@@ -449,7 +498,9 @@ function doneScreen(){
     <div class="seal">🌿</div>
     <div class="done-h">${created ? "You're set. We've got it from here." : "Almost there."}</div>
     <div class="done-s">${trialLine}</div>
-    <div class="done-s">All ${n} ${n===1?"array is":"arrays are"} queued for watching — weather-normalized, per-inverter, in dollars.</div>
+    <div class="done-s">${state.arraysConnected
+      ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — weather-normalized, per-inverter, in dollars.`
+      : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — weather-normalized, per-inverter, in dollars.`}</div>
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
       ${created ? `<a class="btn btn-ghost" href="${API_BASE}/accounts/" target="_blank" rel="noopener">Open dashboard</a>` : ""}
@@ -486,6 +537,20 @@ async function finish(){
         const compData = await compRes.json().catch(()=>({}));
         if(compRes.ok && compData.session_token) state.sessionToken = compData.session_token;
       }catch(e){ /* session is a bonus; magic-link email is the fallback */ }
+      // If they pasted a real SolarEdge account key, attach every site now using
+      // the freshly-minted session — so their dashboard is populated the instant
+      // they sign in (no re-pasting). Best-effort: never blocks the trial.
+      if(state.sessionToken && state.realSites && state.vendor==="solaredge" && state.apiKey){
+        try{
+          const conn = await fetch(`${API_BASE}/v1/array-owners/solaredge/connect-account`, {
+            method:"POST",
+            headers:{"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`},
+            body: JSON.stringify({api_key: state.apiKey})
+          });
+          const cd = await conn.json().catch(()=>({}));
+          state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
+        }catch(e){ /* will connect from dashboard if this didn't land */ }
+      }
     } else if(startRes.status === 409){
       // Account already exists — that's fine, send them to sign in.
       state.onboardingToken = "exists";
