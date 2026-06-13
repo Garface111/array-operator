@@ -250,7 +250,7 @@
     transition:border-color .15s,background .15s}
   .sb-togglebtn:hover{border-color:rgba(63,214,138,.5);background:rgba(63,214,138,.08)}
 
-  #sbWrap{padding:18px 0 60px}
+  #sbWrap{margin-top:10px;padding:22px 24px 24px;background:var(--card2);border:1px solid var(--line);border-radius:22px}
   .sb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:22px}
   .sb-tiers{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .sb-tier-tag{font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px;letter-spacing:.02em}
@@ -326,6 +326,7 @@
   .sb-pi.none{height:auto;background:none;font-size:9px;color:var(--faint);text-align:center;margin-top:7px}
 
   .sb-foot{margin-top:22px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px;line-height:1.5}
+  .sb-foot:empty{display:none;margin:0;padding:0;border:0}
   .sb-foot-status.ok{color:var(--good)} .sb-foot-status.warn{color:var(--warn)} .sb-foot-status.bad{color:var(--bad)}
   .sb-foot b{color:var(--ink)}
   .sb-empty{color:var(--muted);text-align:center;padding:60px 20px;font-size:14px;border:1px dashed var(--line);border-radius:16px}

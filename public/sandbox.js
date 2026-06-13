@@ -144,13 +144,10 @@
     if(c) c.textContent = `${n} inverter${n===1?'':'s'}`;
   }
 
-  // Honest footer copy: the arrangement now lives on the SERVER (your account), and a
-  // move genuinely regroups + re-measures an inverter against its new neighbors. It does
-  // NOT change which physical site the telemetry comes from — that source is fixed.
-  const DEFAULT_FOOT_HTML =
-    `Tip: drag any inverter to reorder it or move it to another array; click one for its diagnosis. ` +
-    `<span class="sb-foot-note">Arrangement is saved to your account — moving an inverter regroups it and ` +
-    `re-measures it against its new neighbors. It doesn't re-wire which site the telemetry comes from.</span>`;
+  // Footer is empty by default (tip removed — the section subtitle already explains dragging).
+  // The #sbFoot element is reused to show a clicked inverter's diagnosis and the "Saving…" note;
+  // when empty it collapses via `.sb-foot:empty { display:none }`.
+  const DEFAULT_FOOT_HTML = "";
   function setDefaultFoot(){
     const foot = document.getElementById("sbFoot");
     if(foot) foot.innerHTML = DEFAULT_FOOT_HTML;
