@@ -296,7 +296,7 @@
 
   // ---- live output ticker: updates each card's "kW now" in place. With live
   // telemetry this reflects polled current_power_w; on demo data it drifts gently
-  // (~1%) around the last-known value so the reading reads as live, not frozen.
+  // (~1%) around the last-known value. Each tick also runs the peer-drop alert.
   let _liveTimer = null;
   function startLiveTicker(){
     if(_liveTimer) clearInterval(_liveTimer);
@@ -310,8 +310,90 @@
         v.textContent = (drift/1000).toFixed(1);
         v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
       });
+      checkPeerDrops();
     }, 2600);
   }
+
+  // ---- auto-alert: flag an inverter that drops beneath its array peers by a
+  // significant margin. Specific output (live kW / nameplate kW) is compared to
+  // the array's peer median; more than PEER_DROP_MARGIN below it -> alarm. Driven
+  // by live telemetry in production, by the demo ticker here. State-tracked so it
+  // fires once per drop event (never spams) and clears on recovery.
+  const PEER_DROP_MARGIN = 0.25;
+  const _dismissed = new Set();        // alert keys the user dismissed (re-armed on recovery)
+  let _dropInit = false;               // first pass seeds the baseline silently
+  function _liveKW(el){ const v = el.querySelector(".sb-now-val"); return v ? parseFloat(v.textContent) : NaN; }
+  function _nameplateKW(el){ const m = (el.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : NaN; }
+  function checkPeerDrops(){
+    const dropped = [];                            // {key,name,arrayName,pct}
+    document.querySelectorAll("#sandbox .sb-col").forEach(col => {
+      const rows = [...col.querySelectorAll(".sb-inv")].map(el => {
+        const np = _nameplateKW(el), kw = _liveKW(el);
+        const nowEl = el.querySelector(".sb-inv-now");
+        const baseW = nowEl ? parseFloat(nowEl.dataset.basew) : NaN;
+        return { el, name: el.dataset.name || "An inverter",
+                 liveSO: (np > 0 && isFinite(kw))    ? kw / np           : null,
+                 baseSO: (np > 0 && isFinite(baseW)) ? (baseW/1000) / np : null };
+      }).filter(r => r.liveSO != null && r.baseSO != null);
+      if(rows.length < 2) return;                  // need peers ("friends") to compare against
+      // Stable baseline: peer median of NORMAL (base) output, so jitter and one
+      // dipping inverter never drag the bar and trip false alarms.
+      const baseline = rows.map(r => r.baseSO).sort((a,b) => a-b)[Math.floor(rows.length/2)];
+      if(baseline <= 0) return;
+      const arrName = (col.querySelector(".sb-array-name") || {}).textContent || "";
+      rows.forEach(r => {
+        const below = (baseline - r.liveSO) / baseline;   // how far live output is below the peer norm
+        if(below >= PEER_DROP_MARGIN){
+          r.el.classList.add("sb-inv-alarm");
+          dropped.push({ key: arrName + "|" + r.name, name: r.name, arrayName: arrName, pct: Math.round(below*100) });
+        } else {
+          r.el.classList.remove("sb-inv-alarm");
+        }
+      });
+    });
+    reconcileAlertCards(dropped);
+  }
+  // Persistent alerts host: lives on #sbWrap (which render() never rebuilds), so
+  // cards survive fleet re-renders.
+  function alertHost(){
+    let h = document.getElementById("sbAlerts");
+    if(!h){
+      h = document.createElement("div");
+      h.id = "sbAlerts"; h.className = "sb-alerts"; h.setAttribute("aria-live", "polite");
+      (document.getElementById("sbWrap") || document.body).appendChild(h);
+    }
+    return h;
+  }
+  // Declarative reconcile: #sbAlerts holds exactly one card per currently-dropped
+  // inverter (keyed array|name). Idempotent — no duplicates, recovered drops clear,
+  // a dismissed one stays gone until that inverter recovers and drops again.
+  function reconcileAlertCards(dropped){
+    const host = alertHost();
+    const want = new Set(dropped.map(d => d.key));
+    [...host.children].forEach(card => { if(!want.has(card.dataset.key)) card.remove(); });
+    _dismissed.forEach(k => { if(!want.has(k)) _dismissed.delete(k); });   // recovered → re-arm
+    const have = new Set([...host.children].map(c => c.dataset.key));
+    dropped.forEach(d => {
+      if(have.has(d.key) || _dismissed.has(d.key)) return;
+      host.prepend(makeAlertCard(d));
+      if(_dropInit) toast(`⚠️ ${d.name} dropped ${d.pct}% below its array peers`, "alert");
+    });
+    while(host.children.length > 4) host.lastElementChild.remove();
+    _dropInit = true;
+  }
+  function makeAlertCard(d){
+    const card = document.createElement("div");
+    card.className = "sb-alert-card";
+    card.dataset.key = d.key;
+    card.innerHTML =
+      `<span class="sb-ac-ic">⚠️</span>` +
+      `<div class="sb-ac-body"><div class="sb-ac-h">${esc(d.name)} dropped <b>${d.pct}%</b> below its peers</div>` +
+      `<div class="sb-ac-sub">${esc(d.arrayName)} · live telemetry</div></div>` +
+      `<button class="sb-ac-x" type="button" title="Dismiss" aria-label="Dismiss alert">×</button>`;
+    card.querySelector(".sb-ac-x").onclick = () => { _dismissed.add(d.key); card.remove(); };
+    return card;
+  }
+
 
   // ---- pan + zoom the fleet canvas. Drag empty space to pan, wheel to zoom
   // (toward the cursor), double-click empty space to reset. View state persists
