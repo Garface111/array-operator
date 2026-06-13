@@ -504,15 +504,17 @@ function doneScreen(){
       : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — weather-normalized, per-inverter, in dollars.`}</div>
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
-      ${created && !signedIn ? `<a class="btn btn-ghost" href="${API_BASE}/accounts/" target="_blank" rel="noopener">Open dashboard</a>` : ""}
+      ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard</a>` : ""}
     </div>
   </div></div>`;
 }
 
-// Go straight to the dashboard, signed in via the same-origin so_session we
-// stashed at completion. Same-tab navigation so the session is guaranteed live.
+// Go straight to the Array Operator owner dashboard (the site root index.html,
+// rendered by app.js). Same-origin: the so_session we stashed at completion is
+// read by app.js → live /v1/array-owners/overview. NOT /accounts (that proxies
+// to the NEPOOL verifier SPA — wrong product for an array owner).
 function goDashboard(){
-  window.location.assign(`${API_BASE}/accounts/?fresh=1&t=${Date.now()}`);
+  window.location.assign(`/?fresh=1&t=${Date.now()}`);
 }
 
 // Create the trialing Array Operator account, then mint a session so we can

@@ -554,6 +554,103 @@ document.addEventListener("click", e => {
 const _addArray = document.getElementById("addArray");
 if(_addArray) _addArray.onclick = e => { e.preventDefault(); openAddArrayModal(); };
 
-fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render)
-  .catch(()=>{document.getElementById("grid").innerHTML=
-    `<div class="empty">No array data yet. Warm it up:<br><code>python3 capture/inverters.py --demo</code></div>`});
+// ============================================================================
+// DATA LOADING
+// If the owner is signed in (same-origin so_session, shared with the onboarding
+// wizard + dashboard on arrayoperator.com), pull their LIVE per-array data from
+// /v1/array-owners/overview and adapt it to render()'s shape. Otherwise fall
+// back to the static demo file (the marketing/preview experience).
+// ============================================================================
+
+// Map a peer-status + health block from /overview onto the dashboard's inverter
+// status vocabulary (ok | underperforming | comm_gap | dead | fault).
+function _statusFromOverview(a){
+  const peer = a.peer || {};
+  if(peer.status === "dead") return "dead";
+  if(peer.status === "underperforming") return "underperforming";
+  const h = (a.health && (a.health.state || a.health.status)) || "";
+  if(h === "stale" || h === "comm_gap") return "comm_gap";
+  if(h === "no_source") return "comm_gap";
+  return "ok";
+}
+
+// Adapt /v1/array-owners/overview → the {summary, array, inverters, thresholds}
+// object render() consumes. Each array becomes one "inverter" card (per-array is
+// the live resolution today; per-inverter capture lights up later).
+function adaptOverview(o){
+  const arrays = o.arrays || [];
+  const t = o.totals || {};
+  const ps = o.peer_summary || {};
+  const inverters = arrays.map(a => {
+    const peer = a.peer || {};
+    const daily = (a._daily || []).map(d => ({kwh: d.kwh}));
+    return {
+      serial: a.name || ("Array " + a.array_id),
+      model: a.client_name ? a.client_name : (a.fuel_type || "solar"),
+      vendor: (a.live && a.live.source) ? a.live.source : "",
+      nameplate_kw: null,
+      ac_power_w: a.live ? a.live.current_power_w : null,
+      status: _statusFromOverview(a),
+      peer_index: peer.peer_index != null ? peer.peer_index : null,
+      panel_resolution: "string",
+      daily: daily,
+      diagnosis: peer.diagnosis || (a.health && a.health.message) || "",
+      stale_hours: (a.health && a.health.stale_hours != null) ? a.health.stale_hours : null,
+      window_kwh: peer.window_kwh != null ? peer.window_kwh : null,
+    };
+  });
+  const windowDays = ps.window_days || 14;
+  // window_kwh for the value blurbs: prefer the summed peer window, else month.
+  const windowKwh = inverters.reduce((s,i)=>s+(i.window_kwh||0),0) || (t.month_kwh || 0);
+  const anyLive = arrays.some(a => a.live && a.live.source);
+  return {
+    source: anyLive ? "live" : "demo",
+    generated_at: o.generated_at || new Date().toISOString(),
+    array: {
+      name: arrays.length === 1 ? arrays[0].name : "Your fleet",
+      capacity_kw: null,
+      vendor_mix: [...new Set(arrays.map(a => a.live && a.live.source).filter(Boolean))].join(" + "),
+      module_count: null,
+    },
+    summary: {
+      today_kwh: t.today_kwh || 0,
+      window_kwh: windowKwh,
+      window_days: windowDays,
+      inverters_total: inverters.length,
+      inverters_attention: ps.arrays_attention || 0,
+    },
+    inverters: inverters,
+    thresholds: { underperform_peer_index: 0.85, dead_days: 3, comm_gap_hours: 36 },
+  };
+}
+
+function loadDashboard(){
+  let session = null;
+  try { session = localStorage.getItem("so_session"); } catch(e){}
+  const empty = () => { document.getElementById("grid").innerHTML =
+    `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
+
+  if(session){
+    fetch("/v1/array-owners/overview", { headers: { Authorization: "Bearer " + session } })
+      .then(r => { if(!r.ok) throw new Error("overview " + r.status); return r.json(); })
+      .then(o => {
+        const arrays = o.arrays || [];
+        if(!arrays.length){
+          // Signed in but nothing connected yet — fall back to demo so the page
+          // still tells the story, with a clear "demo" label via render().
+          return fetch("inverter-truth.json").then(r=>r.json()).then(render);
+        }
+        render(adaptOverview(o));
+      })
+      .catch(() => {
+        // Live fetch failed (expired session / network) — show the demo rather
+        // than a blank page; the marketing narrative still lands.
+        fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
+      });
+  } else {
+    // Anonymous visitor (marketing view) — static demo data.
+    fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
+  }
+}
+
+loadDashboard();
