@@ -349,11 +349,12 @@
   /* ===== VIEW TABS (NEPOOL-style pill/underline, dark skin) ===== */
   .tabbar{display:flex;gap:4px;align-items:center;margin:2px 0 4px;padding:4px;
     border-bottom:1px solid var(--line);position:relative}
-  .tab{appearance:none;text-decoration:none;cursor:pointer;font-size:14px;font-weight:650;
+  .tab{appearance:none;text-decoration:none;cursor:pointer;font-size:14px;font-weight:650;flex:1;text-align:center;
     color:var(--muted);padding:9px 16px 11px;border-radius:10px 10px 0 0;position:relative;
     transition:color .15s,background .15s;letter-spacing:-.01em}
+  .tab + .tab{border-left:1px solid var(--line)}
   .tab:hover{color:var(--ink);background:rgba(255,255,255,.03)}
-  .tab::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;border-radius:2px;
+  .tab::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:64px;bottom:-1px;height:2px;border-radius:2px;
     background:transparent;transition:background .18s,box-shadow .18s}
   .tab.active{color:var(--good)}
   .tab.active::after{background:linear-gradient(90deg,var(--good),var(--good2));
