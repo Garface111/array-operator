@@ -477,13 +477,24 @@ function countUp(el, target, ms){
 function doneScreen(){
   const n = state.sites.length;
   const created = !!state.onboardingToken;
-  const trialLine = created
-    ? `Your <b>14-day free trial</b> is live — no card needed. We just emailed <b>${state.email}</b> a secure sign-in link to open your dashboard.`
-    : `We couldn't reach our servers just now, so your account isn't created yet. No problem — your details and key were not stored. Try again in a moment.`;
-  const cardCta = created
-    ? `<button class="btn btn-primary btn-lg" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial →</button>
-       <div class="helper" id="cardNote" style="text-align:center">Optional now — your first array is always free, and you won't be charged until the trial ends.</div>`
-    : `<button class="btn btn-primary btn-lg" onclick="finish()">Try again →</button>`;
+  const signedIn = created && !!state.sessionToken;
+  const trialLine = !created
+    ? `We couldn't reach our servers just now, so your account isn't created yet. No problem — your details and key were not stored. Try again in a moment.`
+    : (signedIn
+        ? `Your <b>14-day free trial</b> is live — no card needed. You're already signed in; open your dashboard below.`
+        : `Your <b>14-day free trial</b> is live — no card needed. We just emailed <b>${state.email}</b> a secure sign-in link to open your dashboard.`);
+  let cardCta;
+  if(!created){
+    cardCta = `<button class="btn btn-primary btn-lg" onclick="finish()">Try again →</button>`;
+  } else if(signedIn){
+    // Same-origin session is stashed — go straight in (no new tab, no magic link).
+    cardCta = `<button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
+       <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — your first array is always free, and you won't be charged until the trial ends.</div>`;
+  } else {
+    cardCta = `<button class="btn btn-primary btn-lg" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial →</button>
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — your first array is always free, and you won't be charged until the trial ends.</div>`;
+  }
   return `<div class="card animate"><div class="center">
     <div class="seal">🌿</div>
     <div class="done-h">${created ? "You're set. We've got it from here." : "Almost there."}</div>
@@ -493,9 +504,15 @@ function doneScreen(){
       : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — weather-normalized, per-inverter, in dollars.`}</div>
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
-      ${created ? `<a class="btn btn-ghost" href="${API_BASE}/accounts/" target="_blank" rel="noopener">Open dashboard</a>` : ""}
+      ${created && !signedIn ? `<a class="btn btn-ghost" href="${API_BASE}/accounts/" target="_blank" rel="noopener">Open dashboard</a>` : ""}
     </div>
   </div></div>`;
+}
+
+// Go straight to the dashboard, signed in via the same-origin so_session we
+// stashed at completion. Same-tab navigation so the session is guaranteed live.
+function goDashboard(){
+  window.location.assign(`${API_BASE}/accounts/?fresh=1&t=${Date.now()}`);
 }
 
 // Create the trialing Array Operator account, then mint a session so we can
@@ -525,7 +542,14 @@ async function finish(){
           method:"POST", headers:{"Content-Type":"application/json"}, body: "{}"
         });
         const compData = await compRes.json().catch(()=>({}));
-        if(compRes.ok && compData.session_token) state.sessionToken = compData.session_token;
+        if(compRes.ok && compData.session_token){
+          state.sessionToken = compData.session_token;
+          // Same-origin with the dashboard (/accounts on arrayoperator.com), so
+          // stash the freshly-minted session under the key the dashboard SPA
+          // reads (so_session). The "Open my dashboard" CTA then lands them
+          // already signed in — no email magic-link detour.
+          try{ localStorage.setItem("so_session", compData.session_token); }catch(e){}
+        }
       }catch(e){ /* session is a bonus; magic-link email is the fallback */ }
       // Attach the real credential now using the freshly-minted session — so
       // their dashboard is populated the instant they sign in (no re-pasting).
