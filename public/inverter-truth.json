@@ -1,0 +1,507 @@
+{
+  "source": "demo",
+  "array": {
+    "name": "Catamount Community Solar",
+    "capacity_kw": 56.0,
+    "vendor_mix": "SolarEdge + Fronius",
+    "module_count": 132
+  },
+  "inverters": [
+    {
+      "serial": "SE10K-7301294A",
+      "vendor": "solaredge",
+      "model": "SE10000H-US",
+      "nameplate_kw": 10.0,
+      "mode": "MPPT",
+      "error_code": null,
+      "last_report": "2026-06-13T02:10:43.748306+00:00",
+      "ac_power_w": 5839.0,
+      "dc_voltage": 381.3,
+      "temp_c": 42.1,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 43.53
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 46.47
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 39.16
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 29.95
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 37.64
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 42.89
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 40.85
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 42.79
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 33.87
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 32.36
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 35.82
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 32.49
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 30.03
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 40.54
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 41.86
+        }
+      ],
+      "panel_resolution": "module",
+      "peer_index": 1.1,
+      "window_kwh": 570.2,
+      "stale_hours": 0.1,
+      "status": "ok",
+      "diagnosis": "Pulling its weight relative to fleet nameplate."
+    },
+    {
+      "serial": "SE10K-7301311F",
+      "vendor": "solaredge",
+      "model": "SE10000H-US",
+      "nameplate_kw": 10.0,
+      "mode": "MPPT",
+      "error_code": null,
+      "last_report": "2026-06-13T02:10:43.748306+00:00",
+      "ac_power_w": 5839.0,
+      "dc_voltage": 371.8,
+      "temp_c": 39.9,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 43.98
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 44.66
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 40.67
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 28.81
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 38.24
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 44.32
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 42.06
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 44.64
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 33.69
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 31.97
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 36.69
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 31.97
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 30.12
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 40.77
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 41.98
+        }
+      ],
+      "panel_resolution": "module",
+      "peer_index": 1.11,
+      "window_kwh": 574.6,
+      "stale_hours": 0.1,
+      "status": "ok",
+      "diagnosis": "Pulling its weight relative to fleet nameplate."
+    },
+    {
+      "serial": "SE10K-7301320C",
+      "vendor": "solaredge",
+      "model": "SE10000H-US",
+      "nameplate_kw": 10.0,
+      "mode": "MPPT",
+      "error_code": null,
+      "last_report": "2026-06-13T02:10:43.748306+00:00",
+      "ac_power_w": 5839.0,
+      "dc_voltage": 386.9,
+      "temp_c": 41.3,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 44.37
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 45.21
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 39.65
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 29.57
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 38.52
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 43.15
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 40.21
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 44.34
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 32.91
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 32.6
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 36.25
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 32.77
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 30.43
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 40.01
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 40.18
+        }
+      ],
+      "panel_resolution": "module",
+      "peer_index": 1.1,
+      "window_kwh": 570.2,
+      "stale_hours": 0.1,
+      "status": "ok",
+      "diagnosis": "Pulling its weight relative to fleet nameplate."
+    },
+    {
+      "serial": "SE10K-7299841B",
+      "vendor": "solaredge",
+      "model": "SE10000H-US",
+      "nameplate_kw": 10.0,
+      "mode": "FAULT",
+      "error_code": "18xC4 \u2014 AC relay open",
+      "last_report": "2026-06-13T02:04:43.748306+00:00",
+      "ac_power_w": 0.0,
+      "dc_voltage": 0.0,
+      "temp_c": null,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 45.46
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 45.27
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 39.88
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 29.58
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 37.32
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 44.52
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 40.15
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 44.76
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 33.98
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 32.62
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 0.0
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 0.0
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 0.0
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 0.0
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 0.0
+        }
+      ],
+      "panel_resolution": "module",
+      "peer_index": 0.76,
+      "window_kwh": 393.5,
+      "stale_hours": 0.2,
+      "status": "fault",
+      "diagnosis": "Vendor fault 18xC4 \u2014 AC relay open \u2014 inverter reports mode FAULT. Dispatch-worthy."
+    },
+    {
+      "serial": "FRO-29401557",
+      "vendor": "fronius",
+      "model": "Symo 10.0-3-M",
+      "nameplate_kw": 10.0,
+      "mode": "running",
+      "error_code": null,
+      "last_report": "2026-06-11T20:14:43.748306+00:00",
+      "ac_power_w": 0.0,
+      "dc_voltage": null,
+      "temp_c": null,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 45.87
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 47.0
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 39.94
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 29.46
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 37.37
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 43.5
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 40.41
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 42.25
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 32.5
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 32.23
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 36.26
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 32.5
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 31.82
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 41.21
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 41.99
+        }
+      ],
+      "panel_resolution": "string",
+      "peer_index": 1.11,
+      "window_kwh": 574.3,
+      "stale_hours": 30.0,
+      "status": "comm_gap",
+      "diagnosis": "No telemetry for 30h. Production unknown \u2014 likely gateway/Wi-Fi dropout, not necessarily a power fault."
+    },
+    {
+      "serial": "FRO-29401602",
+      "vendor": "fronius",
+      "model": "Symo 6.0-3-M",
+      "nameplate_kw": 6.0,
+      "mode": "MPPT",
+      "error_code": null,
+      "last_report": "2026-06-13T02:07:43.748306+00:00",
+      "ac_power_w": 2172.0,
+      "dc_voltage": 378.6,
+      "temp_c": 43.7,
+      "daily": [
+        {
+          "date": "2026-05-29",
+          "kwh": 16.5
+        },
+        {
+          "date": "2026-05-30",
+          "kwh": 17.12
+        },
+        {
+          "date": "2026-05-31",
+          "kwh": 14.69
+        },
+        {
+          "date": "2026-06-01",
+          "kwh": 11.09
+        },
+        {
+          "date": "2026-06-02",
+          "kwh": 14.01
+        },
+        {
+          "date": "2026-06-03",
+          "kwh": 16.22
+        },
+        {
+          "date": "2026-06-04",
+          "kwh": 15.16
+        },
+        {
+          "date": "2026-06-05",
+          "kwh": 16.43
+        },
+        {
+          "date": "2026-06-06",
+          "kwh": 12.38
+        },
+        {
+          "date": "2026-06-07",
+          "kwh": 12.16
+        },
+        {
+          "date": "2026-06-08",
+          "kwh": 13.78
+        },
+        {
+          "date": "2026-06-09",
+          "kwh": 11.86
+        },
+        {
+          "date": "2026-06-10",
+          "kwh": 11.35
+        },
+        {
+          "date": "2026-06-11",
+          "kwh": 15.26
+        },
+        {
+          "date": "2026-06-12",
+          "kwh": 15.1
+        }
+      ],
+      "panel_resolution": "string",
+      "peer_index": 0.69,
+      "window_kwh": 213.1,
+      "stale_hours": 0.1,
+      "status": "underperforming",
+      "diagnosis": "Producing 31% below its nameplate share vs peers over 14d under identical weather. Pattern suggests shading, soiling, or a failed string/module."
+    }
+  ],
+  "summary": {
+    "today_kwh": 181.1,
+    "window_days": 14,
+    "window_kwh": 2895.9,
+    "inverters_total": 6,
+    "inverters_ok": 3,
+    "inverters_attention": 3,
+    "fleet_performance_index": 0.88,
+    "estimated_loss_kwh_window": 523.5
+  },
+  "generated_at": "2026-06-13T02:14:43.748723+00:00",
+  "thresholds": {
+    "underperform_peer_index": 0.85,
+    "dead_days": 2,
+    "comm_gap_hours": 24
+  }
+}

@@ -1,0 +1,6 @@
+# build artifacts / local
+__pycache__/
+*.pyc
+.DS_Store
+.netlify/
+node_modules/

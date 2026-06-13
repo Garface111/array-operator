@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Array Operator — your array, working for you</title>
+<style>
+  :root{
+    --bg:#f4ede0; --bg2:#ede3d2; --ink:#2d2419; --muted:#7a6c58; --faint:#9b8d77;
+    --gold:#e0a740; --gold2:#f2c468; --sky:#5b8aa8; --good:#5fa35f; --good2:#79c079;
+    --warn:#e0a740; --bad:#d4694a; --line:rgba(93,70,42,.16);
+    --card:#faf5ea; --card2:#f3ebdb; --wood:#c9a876; --green-deep:#3d7a3d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      repeating-linear-gradient(92deg, rgba(150,115,70,.022) 0px, rgba(150,115,70,0) 3px, rgba(150,115,70,.028) 7px, rgba(150,115,70,0) 11px),
+      radial-gradient(1300px 760px at 78% -12%, #fbf2df 0%, var(--bg) 55%);
+    color:var(--ink); font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; min-height:100%;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+  a{color:inherit;text-decoration:none}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;position:sticky;top:0;z-index:50;
+      background:linear-gradient(180deg,var(--bg) 64%,transparent);backdrop-filter:blur(7px)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;color:#4a3a24;font-size:16px}
+  .logo{width:30px;height:30px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--gold2),var(--gold) 55%,#a87a28 100%);
+    box-shadow:0 0 18px rgba(224,167,64,.4),inset 0 0 8px rgba(255,250,235,.6);position:relative;flex:none}
+  .logo::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1px solid rgba(224,167,64,.35)}
+  .brand small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-top:-2px}
+  .navlinks{display:flex;gap:24px;color:var(--muted);font-size:14px;align-items:center}
+  .navlinks a:hover{color:var(--ink)}
+  .navlinks .live{display:inline-flex;align-items:center;gap:6px;color:var(--green-deep);font-weight:600;font-size:13px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--good2);box-shadow:0 0 0 0 rgba(121,192,121,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(121,192,121,.55)}70%{box-shadow:0 0 0 9px rgba(121,192,121,0)}100%{box-shadow:0 0 0 0 rgba(121,192,121,0)}}
+
+  /* hero */
+  header.hero{padding:30px 0 10px}
+  .hero .eyebrow{color:#9c7a2e;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+  .hero h1{font-size:32px;font-weight:700;letter-spacing:-.015em;margin:8px 0 2px;color:#3a2e1d}
+  .hero h1 b{color:var(--green-deep)}
+  .hero .meta{color:var(--muted);font-size:13.5px;margin-top:8px}
+  .hero .meta b{color:var(--ink);font-weight:600}
+
+  .heroband{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:16px;margin:24px 0 6px}
+  .hcard{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:22px;
+        padding:22px 24px;box-shadow:0 3px 14px rgba(93,70,42,.07);position:relative;overflow:hidden}
+  .hcard.value{background:linear-gradient(150deg,#fbf3df,#f6ead0);border-color:rgba(224,167,64,.35)}
+  .hcard .lab{color:var(--muted);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .hcard .big{font-size:40px;font-weight:780;letter-spacing:-.02em;color:#3a2e1d;line-height:1.05;margin-top:6px}
+  .hcard.value .big{color:#a9781f}
+  .hcard .big small{font-size:18px;font-weight:600;color:var(--muted)}
+  .hcard .sub{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .hcard .sun{position:absolute;right:-22px;top:-22px;width:120px;height:120px;border-radius:50%;
+    background:radial-gradient(circle at 40% 40%,rgba(242,196,104,.5),rgba(224,167,64,.12) 60%,transparent 72%);pointer-events:none}
+  .verdict{display:flex;align-items:center;gap:13px}
+  .vlight{width:42px;height:42px;border-radius:50%;flex:none;position:relative}
+  .vlight.green{background:radial-gradient(circle at 38% 32%,var(--good2),var(--good));box-shadow:0 0 16px rgba(95,163,95,.45)}
+  .vlight.amber{background:radial-gradient(circle at 38% 32%,var(--gold2),var(--gold));box-shadow:0 0 16px rgba(224,167,64,.5)}
+  .vlight.red{background:radial-gradient(circle at 38% 32%,#e8917a,var(--bad));box-shadow:0 0 16px rgba(212,105,74,.5)}
+  .verdict .vt{font-size:17px;font-weight:700;color:#3a2e1d;line-height:1.25}
+  .verdict .vs{color:var(--muted);font-size:13px;margin-top:2px}
+
+  /* we're on it — done-for-you features */
+  .section-h{display:flex;align-items:baseline;gap:12px;margin:34px 0 4px}
+  .section-h h2{font-size:20px;font-weight:700;color:#3a2e1d;letter-spacing:-.01em}
+  .section-h .hint{color:var(--faint);font-size:13px}
+  .ribbon{color:#9c7a2e;font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;margin-top:26px}
+
+  .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0}
+  .act{display:flex;gap:14px;background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);
+       border-radius:18px;padding:17px 19px;box-shadow:0 2px 9px rgba(93,70,42,.06);align-items:flex-start}
+  .act.hot{border-color:rgba(212,105,74,.4);background:linear-gradient(170deg,#fbefe9,#f7e7da)}
+  .act.win{border-color:rgba(95,163,95,.4);background:linear-gradient(170deg,#eef6e9,#e7f0df)}
+  .act .ic{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;font-size:20px;
+           background:var(--bg2);border:1px solid var(--line)}
+  .act.hot .ic{background:rgba(212,105,74,.13);border-color:rgba(212,105,74,.3)}
+  .act.win .ic{background:rgba(95,163,95,.13);border-color:rgba(95,163,95,.3)}
+  .act h3{font-size:14.5px;font-weight:700;color:#3a2e1d;display:flex;align-items:center;gap:8px}
+  .act h3 .tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;
+              background:var(--good);border-radius:6px;padding:2px 7px}
+  .act.hot h3 .tag{background:var(--bad)}
+  .act p{color:var(--muted);font-size:13px;margin-top:5px;line-height:1.45}
+  .act p b{color:var(--ink);font-weight:600}
+  .act .cta{margin-top:9px;display:inline-block;font-size:12.5px;font-weight:650;color:var(--green-deep)}
+  .act.hot .cta{color:#ab4c33}
+  .act .cta::after{content:" →"}
+
+  /* fleet */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;padding-bottom:18px;margin-top:14px}
+  .inv{background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:20px;padding:19px 20px;
+       display:flex;flex-direction:column;gap:11px;position:relative;box-shadow:0 2px 11px rgba(93,70,42,.07)}
+  .inv.bad-edge{border-color:rgba(212,105,74,.5)} .inv.warn-edge{border-color:rgba(224,167,64,.55)}
+  .res{position:absolute;top:-9px;right:14px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+       background:var(--bg2);border:1px solid var(--line);border-radius:99px;padding:2px 9px;color:var(--muted)}
+  .res.panel{color:#9c7a2e}
+  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .inv-head h3{font-size:15px;font-weight:700;color:#3a2e1d}
+  .inv-head .model{color:var(--muted);font-size:12px;margin-top:2px}
+  .pill{font-size:11.5px;font-weight:650;letter-spacing:.03em;padding:4px 10px;border-radius:99px;white-space:nowrap}
+  .pill.ok{background:rgba(95,163,95,.14);color:#3d7a3d}
+  .pill.underperforming{background:rgba(224,167,64,.16);color:#9c6f1c}
+  .pill.comm_gap{background:rgba(91,138,168,.14);color:#46708c}
+  .pill.dead,.pill.fault{background:rgba(212,105,74,.14);color:#ab4c33}
+  .moneyrow{display:flex;justify-content:space-between;align-items:flex-end}
+  .moneyrow .now{font-size:13px;color:var(--muted)} .moneyrow .now b{color:#3a2e1d;font-size:15px;font-weight:700}
+  .moneyrow .lost{font-size:12.5px;color:#b9543a;font-weight:600;text-align:right}
+  .moneyrow .lost.zero{color:var(--good);font-weight:600}
+  .peerwrap{display:flex;align-items:center;gap:9px}
+  .peerbar{height:7px;border-radius:4px;background:rgba(93,70,42,.1);overflow:hidden;flex:1}
+  .peerbar i{display:block;height:100%;border-radius:4px;background:var(--good);transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .peerbar i.warn{background:var(--warn)} .peerbar i.bad{background:var(--bad)}
+  .peerwrap .pv{font-size:12.5px;font-weight:700;color:#3a2e1d;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+  .spark{width:100%;height:40px;display:block}
+  .diag{color:var(--muted);font-size:12.8px;line-height:1.45;border-top:1px solid var(--line);padding-top:10px}
+  .diag b{color:var(--ink);font-weight:600}
+  .diag .fix{display:inline-block;margin-top:7px;font-size:12px;font-weight:650;color:var(--green-deep)}
+  .diag .fix.hot{color:#ab4c33}
+
+  footer{border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;padding:24px 0 46px;margin-top:30px;line-height:1.6}
+  footer b{color:var(--ink)}
+  .empty{padding:80px 0;color:var(--muted);text-align:center;grid-column:1/-1}
+  @media(max-width:820px){.heroband{grid-template-columns:1fr}.actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></a>
+    <div class="navlinks">
+      <span class="live"><span class="dot"></span> live</span>
+      <a href="#fleet">Your inverters</a>
+      <a href="#" id="addArray">+ Add an array</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">Your array, working for you</div>
+    <h1 id="title">Welcome home.</h1>
+    <p class="meta" id="meta"></p>
+
+    <div class="heroband">
+      <div class="hcard value">
+        <div class="sun"></div>
+        <div class="lab">Value earned today</div>
+        <div class="big" id="todayValue">—</div>
+        <div class="sub" id="todaySub">energy offset + renewable credits</div>
+      </div>
+      <div class="hcard">
+        <div class="lab">Health right now</div>
+        <div class="verdict" style="margin-top:10px">
+          <div class="vlight" id="vlight"></div>
+          <div><div class="vt" id="vt">—</div><div class="vs" id="vs"></div></div>
+        </div>
+      </div>
+      <div class="hcard">
+        <div class="lab">Lifetime value</div>
+        <div class="big" id="lifeValue">—</div>
+        <div class="sub" id="lifeSub">since your panels switched on</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- WE'RE ON IT -->
+  <div class="ribbon">We're on it — so you don't have to be</div>
+  <div class="section-h" style="margin-top:6px">
+    <h2>What your agent did for you</h2>
+    <span class="hint">no dashboards to read · we bring you the verdict and the paperwork</span>
+  </div>
+  <div class="actions" id="actions"></div>
+
+  <!-- GROUND TRUTH -->
+  <div class="section-h" id="fleet">
+    <h2>Every inverter, measured against its neighbors</h2>
+    <span class="hint">same sky, same weather — so a dead string can't hide behind a cloudy day</span>
+  </div>
+  <div class="grid" id="grid"><div class="empty">Loading your array…</div></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+// ---- value model (transparent estimate; backend _value_model is source of truth) ----
+const ENERGY_RATE = 0.21;       // $/kWh blended residential offset (VT-ish)
+const REC_PER_MWH = 38;         // $/MWh REC value
+const val = kwh => kwh*ENERGY_RATE + (kwh/1000)*REC_PER_MWH;
+const usd = n => n==null ? "—" : "$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const usd0 = n => "$"+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
+const fmt = n => n==null ? "—" : Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
+
+const STATUS_LABEL = {ok:"Pulling its weight", underperforming:"Working hard, falling short", comm_gap:"Gone quiet", dead:"Not coming home", fault:"Something's wrong"};
+const FIX = {
+  dead:"Draft the warranty claim", fault:"Draft the service request",
+  underperforming:"See what's dragging it", comm_gap:"How to bring it back", ok:""
+};
+
+function spark(daily, color){
+  if(!daily || !daily.length) return "";
+  const w=300,h=40,max=Math.max(...daily.map(d=>d.kwh),0.001);
+  const pts=daily.map((d,i)=>`${(i/(daily.length-1))*w},${h-3-(d.kwh/max)*(h-8)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
+    ${daily.map((d,i)=>d.kwh===0?`<circle cx="${(i/(daily.length-1))*w}" cy="${h-3}" r="2.2" fill="var(--bad)"/>`:"").join("")}
+  </svg>`;
+}
+
+// estimate per-inverter window $ lost: how far below its fair share it ran
+function invLostKwh(inv, fleetWindowKwh, totalNameplate){
+  if(!inv.peer_index || inv.peer_index>=0.85 || inv.nameplate_kw==null) {
+    if(inv.status==="dead"||inv.status==="fault"){ // dead: lost ~ what a healthy peer share would've made
+      const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
+      return Math.max(0, fair - (inv.window_kwh||0));
+    }
+    return 0;
+  }
+  const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
+  return Math.max(0, fair/Math.max(inv.peer_index,0.01) - (inv.window_kwh||0));
+}
+
+function render(data){
+  const s=data.summary, a=data.array, invs=data.inverters;
+  const totalNameplate = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
+
+  document.getElementById("title").innerHTML =
+    a.name + " is <b>" + (s.inverters_attention===0 ? "running clean" : "mostly humming") + "</b>.";
+  document.getElementById("meta").innerHTML =
+    `<b>${a.capacity_kw ?? "?"} kW</b> · ${a.vendor_mix||""}` +
+    (a.module_count?` · ${a.module_count} panels`:"") +
+    ` · reading <b>${data.source==="live"?"live from your hardware":"demo data"}</b>` +
+    ` · last checked ${new Date(data.generated_at).toLocaleString([], {hour:'numeric',minute:'2-digit',month:'short',day:'numeric'})}`;
+
+  // hero value
+  const todayV = val(s.today_kwh);
+  document.getElementById("todayValue").innerHTML = usd(todayV) + ` <small>· ${fmt(s.today_kwh)} kWh</small>`;
+  document.getElementById("lifeValue").innerHTML = usd0(val(s.window_kwh)*26) ;  // ~lifetime proxy from window
+  document.getElementById("lifeSub").textContent = "estimated — connect live to pin it exactly";
+
+  // verdict light
+  const attn=s.inverters_attention;
+  const hasRed = invs.some(i=>i.status==="dead"||i.status==="fault");
+  const light = hasRed ? "red" : attn>0 ? "amber" : "green";
+  document.getElementById("vlight").className = "vlight "+light;
+  document.getElementById("vt").textContent =
+    attn===0 ? "All clear" : `${attn} of your ${s.inverters_total} need a look`;
+  document.getElementById("vs").textContent =
+    attn===0 ? "Every inverter is pulling its weight." :
+    hasRed ? "One has stopped earning — we've drafted the claim." :
+    "Quiet money leak caught early.";
+
+  // ---- WE'RE ON IT actions ----
+  const acts=[];
+  const dead = invs.find(i=>i.status==="dead"||i.status==="fault");
+  const under = invs.filter(i=>i.status==="underperforming");
+  const totalLostKwh = invs.reduce((t,i)=>t+invLostKwh(i,s.window_kwh,totalNameplate),0);
+  const yearLost = totalLostKwh/(s.window_days||14)*365;
+
+  acts.push(`<div class="act">
+    <div class="ic">👁️</div>
+    <div><h3>Watching every panel, every day <span class="tag">always on</span></h3>
+    <p>We compared all <b>${s.inverters_total} inverters</b> against each other under the same sky for ${s.window_days} days. Weather cancels out — so we catch the quiet underperformer the day it starts, not on next year's bill.</p></div></div>`);
+
+  if(dead){
+    const lost = invLostKwh(dead,s.window_kwh,totalNameplate);
+    acts.push(`<div class="act hot">
+      <div class="ic">📋</div>
+      <div><h3>Warranty claim drafted <span class="tag">ready to send</span></h3>
+      <p><b>${dead.serial}</b> stopped earning ${dead.stale_hours?Math.round(dead.stale_hours/24):"a few"} days ago — that's about <b>${usd(val(lost))}</b> gone so far. We wrote the service email with the fault code, dates, and lost-kWh evidence attached.</p>
+      <span class="cta">Review &amp; send the claim</span></div></div>`);
+  }
+  if(under.length){
+    const uLostYr = under.reduce((t,i)=>t+invLostKwh(i,s.window_kwh,totalNameplate),0)/(s.window_days||14)*365;
+    acts.push(`<div class="act">
+      <div class="ic">🔍</div>
+      <div><h3>Found a quiet money leak <span class="tag">diagnosed</span></h3>
+      <p><b>${under.length} inverter${under.length>1?"s are":" is"}</b> running below ${under.length>1?"their":"its"} fair share — likely shading, soiling, or a tired string. Left alone that's about <b>${usd0(val(uLostYr))}/yr</b> slipping away. We've pinpointed which one and why.</p>
+      <span class="cta">See the diagnosis</span></div></div>`);
+  }
+  acts.push(`<div class="act win">
+    <div class="ic">💰</div>
+    <div><h3>You may be sitting on REC money <span class="tag">opportunity</span></h3>
+    <p>Your array minted roughly <b>${Math.floor(s.window_kwh/1000*26)} RECs</b> worth of renewable credits this year. Many owners never sell these — the installer keeps them. We can hand you to a <b>NEPOOL Operator</b> who files them for you.</p>
+    <a class="cta" href="https://solaroperator.org">Explore selling your RECs</a></div></div>`);
+
+  document.getElementById("actions").innerHTML = acts.join("");
+
+  // ---- FLEET ----
+  const order={fault:0,dead:1,underperforming:2,comm_gap:3,ok:4};
+  const sorted=[...invs].sort((x,y)=>order[x.status]-order[y.status]);
+  document.getElementById("grid").innerHTML = sorted.map(inv=>{
+    const edge=(inv.status==="dead"||inv.status==="fault")?"bad-edge":(inv.status==="underperforming")?"warn-edge":"";
+    const pi=inv.peer_index, barCls=pi==null?"":pi<0.7?"bad":pi<0.85?"warn":"";
+    const sparkColor=inv.status==="ok"?"var(--good)":inv.status==="comm_gap"?"var(--sky)":"var(--warn)";
+    const lostK=invLostKwh(inv,s.window_kwh,totalNameplate);
+    const lostHtml = lostK>0.5
+      ? `<div class="lost">−${usd(val(lostK))} this ${s.window_days}d</div>`
+      : `<div class="lost zero">on the money</div>`;
+    const res=inv.panel_resolution==="panel"?"per-panel":inv.panel_resolution==="module"?"per-module":"string-level";
+    const fixCls=(inv.status==="dead"||inv.status==="fault")?"fix hot":"fix";
+    return `<div class="inv ${edge}">
+      <span class="res ${inv.panel_resolution==='panel'?'panel':''}">${res} truth</span>
+      <div class="inv-head">
+        <div><h3>${inv.serial}</h3><div class="model">${inv.model} · ${inv.vendor}${inv.nameplate_kw?` · ${inv.nameplate_kw} kW`:""}</div></div>
+        <span class="pill ${inv.status}">${STATUS_LABEL[inv.status]||inv.status}</span>
+      </div>
+      <div class="moneyrow">
+        <div class="now">making <b>${inv.ac_power_w==null?"—":fmt(inv.ac_power_w/1000)+" kW"}</b> right now</div>
+        ${lostHtml}
+      </div>
+      <div class="peerwrap">
+        <div class="peerbar"><i class="${barCls}" style="width:${Math.min((pi||0)*100,100)}%"></i></div>
+        <div class="pv">${pi==null?"—":pi.toFixed(2)}</div>
+      </div>
+      ${spark(inv.daily, sparkColor)}
+      <div class="diag">${inv.diagnosis}
+        ${inv.stale_hours!=null&&inv.stale_hours>24?` <b>Last heard from ${fmt(inv.stale_hours)}h ago.</b>`:""}
+        ${FIX[inv.status]?`<br><span class="${fixCls}">${FIX[inv.status]} →</span>`:""}</div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("foot").innerHTML =
+    `<b>How we know:</b> every inverter's share of the harvest is weighed against its share of the hardware — `+
+    `1.00 means it's pulling its weight. Below <b>${data.thresholds.underperform_peer_index}</b> it's working hard but falling short; `+
+    `<b>${data.thresholds.dead_days}</b> zero-days while its neighbors produce and we call it home; quiet for <b>${data.thresholds.comm_gap_hours}h</b> and we flag the silence. `+
+    `Readings come straight from your hardware — SolarEdge, Enphase, and Fronius. `+
+    `Value figures are estimates at ${usd(ENERGY_RATE)}/kWh + ${usd0(REC_PER_MWH)}/MWh REC; connect live to pin them exactly.`;
+}
+
+document.getElementById("addArray").onclick=e=>{e.preventDefault();alert("Connect flow: paste one SolarEdge account key and every array you own appears at once. (Wired on the backend: /v1/array-owners/solaredge/discover)")};
+
+fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render)
+  .catch(()=>{document.getElementById("grid").innerHTML=
+    `<div class="empty">No array data yet. Warm it up:<br><code>python3 capture/inverters.py --demo</code></div>`});
+</script>
+</body>
+</html>
