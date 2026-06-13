@@ -399,15 +399,32 @@
   // (toward the cursor), double-click empty space to reset. View state persists
   // across re-renders. Inverters/arrays/buttons are excluded so the existing
   // HTML5 drag-to-rearrange and clicks keep working untouched.
-  let _view = { x:0, y:0, z:1 };
+  let _view = { x:0, y:0, z:1 }, _fitDone = false;
   function applyCanvasView(host){
     const c = (host||document).querySelector("#sandbox .sb-canvas");
     if(c) c.style.transform = `translate(${_view.x}px,${_view.y}px) scale(${_view.z})`;
   }
+  // Auto-fit: scale + center the fleet so it fills the viewport (no empty void).
+  function fitView(host){
+    const vp = (host||document).querySelector(".sb-viewport");
+    const c  = (host||document).querySelector("#sandbox .sb-canvas");
+    if(!vp || !c) return;
+    const prev = c.style.transform;
+    c.style.transform = "none";                      // measure natural (unscaled) content
+    const cr = c.getBoundingClientRect();
+    const cw = cr.width, ch = cr.height;
+    c.style.transform = prev;
+    const vw = vp.clientWidth, vh = vp.clientHeight;
+    if(!cw || !ch || !vw || !vh) return;
+    const z = Math.max(0.4, Math.min(2.2, Math.min(vw/cw, vh/ch) * 0.92));
+    _view = { z, x: (vw - cw*z)/2, y: Math.max(8, (vh - ch*z)/2) };
+    applyCanvasView(host);
+  }
   function wirePanZoom(host){
     const vp = host.querySelector(".sb-viewport");
     if(!vp) return;
-    applyCanvasView(host);
+    if(!_fitDone){ _fitDone = true; requestAnimationFrame(() => fitView(host)); }  // fit once layout settles
+    else applyCanvasView(host);                         // keep the user's view across re-renders
     vp.addEventListener("wheel", e => {
       e.preventDefault();
       const r = vp.getBoundingClientRect();
@@ -433,7 +450,7 @@
     vp.addEventListener("pointercancel", end);
     vp.addEventListener("dblclick", e => {
       if(e.target.closest(".sb-inv,.sb-array,button,a")) return;
-      _view = { x:0, y:0, z:1 }; applyCanvasView(host);
+      fitView(host);                                    // double-click empty space → re-fit to screen
     });
   }
 
