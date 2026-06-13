@@ -13,7 +13,8 @@
     <div class="navlinks">
       <span class="live"><span class="dot"></span> live</span>
       <a href="#fleet">Your inverters</a>
-      <a href="#" id="addArray">+ Add an array</a>
+      <a href="#pricing">Pricing</a>
+      <a href="onboarding.html" id="getStarted" style="color:var(--good);font-weight:600">Get started →</a>
     </div>
   </nav>
 
@@ -58,6 +59,46 @@
     <span class="hint">same sky, same weather — so a dead string can't hide behind a cloudy day</span>
   </div>
   <div class="grid" id="grid"><div class="empty">Loading your array…</div></div>
+
+  <!-- PRICING -->
+  <section class="pricing" id="pricing">
+    <div class="eyebrow">Pricing</div>
+    <h2>Your first array is on us.</h2>
+    <p class="sub">Start watching for free, forever. Add more arrays only when you want to — billed per array, per month, and it gets cheaper the more you connect. No setup fee. Cancel anytime.</p>
+
+    <div class="pricecard">
+      <div class="pc-main">
+        <div class="sun"></div>
+        <span class="pc-free">First array free</span>
+        <div class="pc-price">$9<small> / array / mo</small></div>
+        <div class="pc-tag">14-day free trial · no card to start</div>
+        <div class="pc-sub">Connect, see your whole fleet measured against itself, and decide later. We only charge from the 2nd array — and the per-array price drops as you scale.</div>
+        <ul class="pc-list">
+          <li><span class="ck">✓</span><span>One credential connects every array on your account</span></li>
+          <li><span class="ck">✓</span><span>Ground-truth, per-inverter health vs. its own neighbors</span></li>
+          <li><span class="ck">✓</span><span>Plain-English alerts, always in dollars</span></li>
+          <li><span class="ck">✓</span><span>Warranty &amp; service claims pre-drafted with evidence</span></li>
+          <li><span class="ck">✓</span><span>We surface REC money you may be leaving on the table</span></li>
+        </ul>
+        <div class="pc-cta">
+          <a href="onboarding.html" class="btn-primary-lg">Start free →</a>
+          <span class="note"><b>14 days free.</b> No card required to begin.</span>
+        </div>
+      </div>
+
+      <div class="pc-tiers">
+        <h3>Volume pricing</h3>
+        <div class="ph">graduated — each band priced only on the arrays within it</div>
+        <div style="margin-top:10px">
+          <div class="tier"><div class="tn">1st array<small>get started, stay free</small></div><div class="tp free">FREE</div></div>
+          <div class="tier"><div class="tn">Arrays 2–10<small>homeowners &amp; prosumers</small></div><div class="tp">$9<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+          <div class="tier"><div class="tn">Arrays 11–50<small>multi-site owners</small></div><div class="tp">$8<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+          <div class="tier"><div class="tn">Arrays 51+<small>community-solar hosts</small></div><div class="tp">$6.50<span style="color:var(--faint);font-weight:500;font-size:12px"> /mo ea</span></div></div>
+        </div>
+        <div class="pc-foot">Example: 1 array = <b style="color:var(--ink)">free</b> · 7 arrays = <b style="color:var(--ink)">$54/mo</b> · 25 arrays = <b style="color:var(--ink)">$208/mo</b>. No setup fee, ever.</div>
+      </div>
+    </div>
+  </section>
 
   <footer id="foot"></footer>
 </div>

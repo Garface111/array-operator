@@ -549,8 +549,9 @@ document.addEventListener("click", e => {
   else if((act==="diag"||act==="comm") && inv){ e.preventDefault(); openDiagModal(inv); }
 });
 
-// ---- '+ Add an array' nav link ----
-document.getElementById("addArray").onclick = e => { e.preventDefault(); openAddArrayModal(); };
+// ---- '+ Add an array' nav link (only present on the in-app dashboard view) ----
+const _addArray = document.getElementById("addArray");
+if(_addArray) _addArray.onclick = e => { e.preventDefault(); openAddArrayModal(); };
 
 fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render)
   .catch(()=>{document.getElementById("grid").innerHTML=
