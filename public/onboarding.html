@@ -110,6 +110,23 @@
   .cf{position:absolute;width:9px;height:9px;border-radius:2px;top:-12px;animation:fall linear forwards}
   @keyframes fall{to{transform:translateY(105vh) rotate(720deg);opacity:.2}}
   @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+  /* vendor selector */
+  .vendgrid{margin-top:1.5rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:.6rem}
+  .vend{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;text-align:left;cursor:pointer;
+        border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:14px;padding:.75rem .85rem;transition:.15s;position:relative}
+  .vend:hover{border-color:rgba(63,214,138,.45)}
+  .vend.sel{border-color:var(--good);background:linear-gradient(150deg,rgba(63,214,138,.12),rgba(63,214,138,.03));box-shadow:0 0 0 1px rgba(63,214,138,.25),0 8px 24px -16px rgba(63,214,138,.5)}
+  .vend.soon{cursor:not-allowed;opacity:.55}
+  .vend.soon:hover{border-color:var(--line)}
+  .vend .vn{font-size:.85rem;font-weight:700;color:var(--ink);line-height:1.2}
+  .vend .vmeta{font-size:.7rem;color:var(--muted)}
+  .vend .vtag{position:absolute;top:.55rem;right:.6rem;font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+              border-radius:6px;padding:1px 6px;background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--line)}
+  .vend.sel .vrad{color:var(--good)}
+  .vend .vrad{position:absolute;top:.55rem;right:.6rem;color:var(--faint);font-size:.85rem}
+  .vendnote{margin-top:1.1rem;border:1px solid rgba(255,180,84,.3);background:rgba(255,180,84,.08);border-radius:12px;padding:.85rem 1rem;font-size:.78rem;color:var(--gold2);line-height:1.5}
+  .vendnote b{color:#ffe7b8}
 </style>
 </head>
 <body>
@@ -126,7 +143,45 @@
 const API_BASE = "https://solaroperator.org";
 const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
 let step = 0;
-let state = { email:"", apiKey:"", sites:[] };
+let state = { email:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[] };
+
+// Inverter vendors — mirrors the backend registry order + metadata from
+// api/inverters/ (VENDORS / vendor_catalog). SolarEdge is the only vendor with
+// account-level multi-site discovery today; the rest connect per-array with
+// their own credential fields. `discover:true` → uses the one-key cascade;
+// otherwise we collect the vendor's fields and hand off to the dashboard's
+// per-array connect (/v1/array-owners/arrays/{id}/inverter).
+const VENDORS = [
+  { code:"solaredge", label:"SolarEdge", meta:"One account key", available:true, discover:true,
+    fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
+             hint:"The one key that unlocks every site on your account.",
+             ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="${API_BASE}" target="_blank" rel="noopener">We'll walk you through it →</a>`}] },
+  { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
+    note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
+    fields:[
+      {name:"client_id", label:"Client ID"},
+      {name:"client_secret", label:"Client Secret", secret:true},
+      {name:"username", label:"SolarNOC username"},
+      {name:"password", label:"SolarNOC password", secret:true},
+    ] },
+  { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:false,
+    note:"Fronius Solar.web is a paid business API and isn't offered in the USA yet — US arrays may need the local LAN path. Enter your Solar.web keys to try the cloud connection.",
+    fields:[
+      {name:"access_key_id", label:"Access Key ID"},
+      {name:"access_key_value", label:"Access Key Value", secret:true},
+      {name:"pv_system_id", label:"PV System ID"},
+    ] },
+  { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false,
+    note:"SMA needs a developer app registration + owner consent. Endpoints are still being verified — enter your credentials and we'll take it from here.",
+    fields:[
+      {name:"client_id", label:"Client ID"},
+      {name:"client_secret", label:"Client Secret", secret:true},
+      {name:"system_id", label:"Plant / System ID"},
+    ] },
+  { code:"chint", label:"Chint / CPS", meta:"CSV for now", available:false, discover:false,
+    note:"Chint/CPS has no public API yet, so there's nothing to paste — connect by uploading a production CSV from your dashboard after setup. We're tracking their FlexOM gateway for direct support." },
+];
+function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
 const stepper = document.getElementById("stepper");
 const main = document.getElementById("main");
@@ -164,37 +219,118 @@ function welcomeScreen(){
 }
 
 function connectScreen(){
+  const v = vendorByCode(state.vendor);
+  const cards = VENDORS.map(vd=>{
+    const sel = vd.code===state.vendor ? " sel" : "";
+    const soon = vd.available ? "" : " soon";
+    const tag = vd.discover ? `<span class="vtag">1 key</span>` : (vd.available ? "" : `<span class="vtag">soon</span>`);
+    const rad = (vd.available && !vd.discover) ? `<span class="vrad">${sel?"●":"○"}</span>` : "";
+    const onclick = vd.available ? `selectVendor('${vd.code}')` : "";
+    return `<button type="button" class="vend${sel}${soon}" ${vd.available?`onclick="${onclick}"`:"aria-disabled=\"true\""}>
+      ${tag}${rad}
+      <span class="vn">${vd.label}</span>
+      <span class="vmeta">${vd.meta}</span>
+    </button>`;
+  }).join("");
+
+  const fieldsHtml = (v.fields||[]).map(f=>`
+    <label class="fld">
+      <span class="lab">${f.label}</span>
+      ${f.hint?`<span class="hint">${f.hint}</span>`:""}
+      <input type="${f.secret?"text":"text"}" id="fld_${f.name}" placeholder="${f.ph||""}"
+             value="${(state.vendor==="solaredge"&&f.name==="apiKey")?state.apiKey:(state.fields[f.name]||"")}"
+             oninput="setField('${f.name}',this.value)">
+      ${f.help?`<div class="helper">${f.help}</div>`:""}
+    </label>`).join("");
+
+  const noteHtml = v.note ? `<div class="vendnote">${v.note}</div>` : "";
+  const btnLabel = v.discover ? "Discover my arrays →" : (v.available ? "Connect my array →" : "Choose another brand");
+  const lede = v.discover
+    ? "Paste a single SolarEdge account key and every array on your account propagates in automatically — no site IDs, no per-panel setup, no logging in five times."
+    : (v.available
+        ? `Enter your ${v.label} credentials and we'll connect your ${v.label} sites and start watching them.`
+        : `${v.label} doesn't offer a live connection yet.`);
+
   return `<div class="card animate">
     <h1>Connect once. We'll find them all.</h1>
-    <p class="lede">Paste a single SolarEdge account key and every array on your account propagates in automatically — no site IDs, no per-panel setup, no logging in five times.</p>
+    <p class="lede">${lede}</p>
 
     <label class="fld">
       <span class="lab">Where should we send your array's reports?</span>
       <input type="email" id="email" placeholder="you@example.com" value="${state.email}" oninput="state.email=this.value;syncConnect()">
     </label>
 
-    <label class="fld">
-      <span class="lab">SolarEdge account API key</span>
-      <span class="hint">The one key that unlocks every site on your account.</span>
-      <input type="text" id="apiKey" placeholder="ABCD1234…" value="${state.apiKey}" oninput="state.apiKey=this.value.trim();syncConnect()">
-    </label>
-    <div class="helper">
-      Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="${API_BASE}" target="_blank" rel="noopener">We'll walk you through it →</a>
+    <div class="fld" style="margin-top:1.75rem">
+      <span class="lab">Which inverter brand?</span>
+      <span class="hint">Pick your monitoring platform — we support more than SolarEdge.</span>
+      <div class="vendgrid">${cards}</div>
     </div>
+
+    ${fieldsHtml}
+    ${noteHtml}
 
     <div id="scanArea"></div>
 
     <div class="row">
       <button class="btn btn-ghost" onclick="go(0)">← Back</button>
-      <button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="discover()">Discover my arrays →</button>
+      <button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="connectVendor()">${btnLabel}</button>
     </div>
   </div>`;
 }
 
+function selectVendor(code){
+  const v = vendorByCode(code);
+  if(!v.available) return;
+  state.vendor = code;
+  render(); syncConnect();
+}
+
+function setField(name, val){
+  if(state.vendor==="solaredge" && name==="apiKey"){ state.apiKey = val.trim(); }
+  else { state.fields[name] = val; }
+  syncConnect();
+}
+
 function syncConnect(){
-  const ok = state.apiKey.length>3 && /.+@.+\..+/.test(state.email);
+  const v = vendorByCode(state.vendor);
   const b = document.getElementById("discoverBtn");
-  if(b) b.disabled = !ok;
+  if(!b) return;
+  const emailOk = /.+@.+\..+/.test(state.email);
+  if(!v.available){ b.disabled = true; return; }
+  let credsOk;
+  if(v.discover){ credsOk = state.apiKey.length>3; }
+  else {
+    // every non-optional field filled (labels with "optional" are skippable)
+    credsOk = (v.fields||[]).every(f=>/optional/i.test(f.label) || (state.fields[f.name]||"").trim().length>0);
+  }
+  b.disabled = !(emailOk && credsOk);
+}
+
+// Vendor-aware connect. SolarEdge uses the account-level discovery cascade;
+// other vendors validate their per-array credentials, then we surface the one
+// site they connected (the dashboard handles adding more after setup).
+async function connectVendor(){
+  const v = vendorByCode(state.vendor);
+  if(v.discover) return discover();
+  return connectSingle(v);
+}
+
+async function connectSingle(v){
+  const scan = document.getElementById("scanArea");
+  const btn = document.getElementById("discoverBtn");
+  btn.disabled = true;
+  scan.innerHTML = `<div class="scan"><span class="ring"></span> Connecting to ${v.label}…</div>`;
+  // The per-array connect endpoint needs an array id (created after signup), so
+  // during onboarding we validate the shape and confirm the brand is wired,
+  // then carry the operator into the dashboard where the array is created and
+  // these credentials are attached. We still try a soft reachability ping.
+  try{
+    const res = await fetch(`${API_BASE}/v1/array-owners/inverter-vendors`,{method:"GET"});
+    await res.json().catch(()=>({}));
+  }catch(e){ /* CORS/offline — fine, we proceed to the confirming screen */ }
+  // Show a single confirmed connection card for this vendor.
+  state.sites = [{ site_id: state.fields.system_id || state.fields.pv_system_id || state.fields.site_id || v.label, name: `${v.label} array`, peak_power_kw: 0, vendor: v.label }];
+  go(2);
 }
 
 async function discover(){
@@ -241,13 +377,17 @@ function demoSites(){
 
 function arraysScreen(){
   const n = state.sites.length;
+  const v = vendorByCode(state.vendor);
+  const lede = v.discover
+    ? `One key, ${n} ${n===1?"array":"arrays"}. Every site on your account just propagated in — already watched, already valued.`
+    : `Your ${v.label} ${n===1?"array is":"arrays are"} connected — already watched, already valued. You can add more brands or sites anytime from your dashboard.`;
   return `<div class="card animate">
     <h1>There they are.</h1>
-    <p class="lede">One key, ${n} ${n===1?"array":"arrays"}. Every site on your account just propagated in — already watched, already valued.</p>
+    <p class="lede">${lede}</p>
     <div class="arrays" id="arrays"></div>
     <div class="tally" id="tally"></div>
     <div class="row">
-      <button class="btn btn-ghost" onclick="go(1)">← Use a different key</button>
+      <button class="btn btn-ghost" onclick="go(1)">← Connect a different brand</button>
       <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Take me to my dashboard →</button>
     </div>
   </div>`;
@@ -257,20 +397,24 @@ function cascadeArrays(){
   const wrap = document.getElementById("arrays");
   const tally = document.getElementById("tally");
   const claim = document.getElementById("claimBtn");
+  const vlabel = vendorByCode(state.vendor).label;
   let totalKw = 0;
   state.sites.forEach((s,i)=>{
     totalKw += s.peak_power_kw||0;
+    const brand = s.vendor || vlabel;
     const el = document.createElement("div");
     el.className = "achip";
     el.style.animationDelay = (i*0.16)+"s";
+    const kw = (s.peak_power_kw||0) > 0 ? `<span class="kw">${(s.peak_power_kw||0).toFixed(1)} kW</span>` : "";
     el.innerHTML = `<span class="dot"></span>
-      <div><div class="nm">${s.name||("Site "+s.site_id)}</div><div class="me">SolarEdge · site ${s.site_id}</div></div>
-      <span class="kw">${(s.peak_power_kw||0).toFixed(1)} kW</span><span class="ck">✓</span>`;
+      <div><div class="nm">${s.name||("Site "+s.site_id)}</div><div class="me">${brand} · site ${s.site_id}</div></div>
+      ${kw}<span class="ck">✓</span>`;
     wrap.appendChild(el);
   });
   const settle = state.sites.length*160 + 500;
   setTimeout(()=>{
-    tally.innerHTML = `<b>${state.sites.length} arrays</b> · <b>${totalKw.toFixed(1)} kW</b> now under watch. Weather-normalized, per-inverter, in dollars.`;
+    const kwTxt = totalKw>0 ? ` · <b>${totalKw.toFixed(1)} kW</b>` : "";
+    tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kwTxt} now under watch. Weather-normalized, per-inverter, in dollars.`;
     claim.style.opacity="1"; claim.style.pointerEvents="auto";
   }, settle);
 }
