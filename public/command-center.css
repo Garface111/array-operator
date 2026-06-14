@@ -1,0 +1,132 @@
+/* ============================================================================
+ * Array Operator — Portfolio Command Center (command-center.css)
+ *
+ * The fleet-scale front door for owners running many arrays. Sits ABOVE the
+ * per-site fleet tree (sandbox) on the Arrays tab. KPI strip + a triage queue
+ * of every flagged inverter across the whole portfolio, sorted by $ at stake.
+ * Uses the existing dark-solarpunk tokens (--good/--warn/--bad/--sky/--ink).
+ * ==========================================================================*/
+
+#commandCenter{ margin-top:18px; }
+
+/* ---- header ---- */
+.cc-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+.cc-head h2{ font-size:21px; font-weight:760; letter-spacing:-.01em; color:var(--ink); }
+.cc-head .cc-sub{ color:var(--faint); font-size:13px; margin-top:2px; }
+.cc-asof{ color:var(--faint); font-size:12px; font-variant-numeric:tabular-nums; }
+.cc-asof b{ color:var(--good); }
+
+/* ---- KPI strip ---- */
+.cc-kpis{ display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px; }
+@media(max-width:1100px){ .cc-kpis{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:620px){ .cc-kpis{ grid-template-columns:repeat(2,1fr); } }
+.cc-kpi{
+  background:linear-gradient(168deg,#121a24,#0c1219); border:1px solid var(--line);
+  border-radius:16px; padding:14px 16px; position:relative; overflow:hidden;
+}
+.cc-kpi .k{ font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); font-weight:650; }
+.cc-kpi .v{ font-size:27px; font-weight:780; letter-spacing:-.02em; color:var(--ink); margin-top:6px; font-variant-numeric:tabular-nums; line-height:1.04; }
+.cc-kpi .s{ font-size:12px; color:var(--muted); margin-top:3px; }
+.cc-kpi.risk .v{ color:var(--bad); text-shadow:0 0 22px rgba(255,107,107,.25); }
+.cc-kpi.recovered .v{ color:var(--good2); text-shadow:0 0 22px rgba(63,214,138,.25); }
+.cc-kpi.flagged .v{ color:var(--warn); }
+.cc-kpi.healthy .v{ color:var(--good2); }
+/* tiny health meter under the % */
+.cc-meter{ height:5px; border-radius:99px; background:rgba(255,255,255,.07); margin-top:9px; overflow:hidden; }
+.cc-meter i{ display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--good),var(--good2)); }
+
+/* ---- toolbar ---- */
+.cc-tools{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.cc-search{ position:relative; flex:1 1 220px; min-width:180px; }
+.cc-search input{
+  width:100%; box-sizing:border-box; background:var(--bg2); border:1px solid var(--line);
+  border-radius:10px; padding:9px 12px 9px 32px; color:var(--ink); font-size:13.5px; outline:none;
+}
+.cc-search input:focus{ border-color:rgba(63,214,138,.5); }
+.cc-search::before{ content:"⌕"; position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--faint); font-size:15px; }
+.cc-chips{ display:inline-flex; gap:6px; background:var(--bg2); border:1px solid var(--line); border-radius:10px; padding:3px; }
+.cc-chip{
+  border:0; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600;
+  padding:6px 11px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+}
+.cc-chip:hover{ color:var(--ink); }
+.cc-chip.on{ background:rgba(255,255,255,.07); color:var(--ink); }
+.cc-chip .n{ font-variant-numeric:tabular-nums; font-size:11px; color:var(--faint); }
+.cc-chip.on .n{ color:var(--ink); }
+.cc-chip .d{ width:7px; height:7px; border-radius:50%; }
+.cc-chip .d.crit{ background:var(--bad); } .cc-chip .d.under{ background:var(--warn); } .cc-chip .d.quiet{ background:var(--sky); }
+.cc-sel{ background:var(--bg2); border:1px solid var(--line); border-radius:10px; color:var(--ink); font-size:12.5px; padding:8px 10px; cursor:pointer; }
+.cc-spacer{ flex:1; }
+
+/* bulk action bar (appears when rows selected) */
+.cc-bulk{ display:none; align-items:center; gap:10px; }
+.cc-bulk.show{ display:inline-flex; }
+.cc-bulk .cnt{ font-size:12.5px; color:var(--muted); }
+.cc-bulk .cnt b{ color:var(--ink); }
+.cc-btn{ border:0; border-radius:9px; padding:8px 14px; font-size:12.5px; font-weight:680; cursor:pointer; }
+.cc-btn.primary{ background:var(--good); color:#06281a; }
+.cc-btn.primary:hover{ background:var(--good2); }
+.cc-btn.ghost{ background:transparent; border:1px solid var(--line); color:var(--muted); }
+.cc-btn.ghost:hover{ color:var(--ink); border-color:var(--good); }
+
+/* ---- triage table ---- */
+.cc-tablewrap{ border:1px solid var(--line); border-radius:16px; overflow:hidden; background:rgba(255,255,255,.012); }
+.cc-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.cc-table thead th{
+  text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint);
+  font-weight:650; padding:11px 14px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.02);
+  white-space:nowrap; user-select:none;
+}
+.cc-table th.sortable{ cursor:pointer; }
+.cc-table th.sortable:hover{ color:var(--muted); }
+.cc-table th .arrow{ color:var(--good); margin-left:3px; }
+.cc-table th.num, .cc-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.cc-table tbody tr.row{ border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; transition:background .12s; }
+.cc-table tbody tr.row:hover{ background:rgba(255,255,255,.03); }
+.cc-table tbody tr.row.sel{ background:rgba(63,214,138,.06); }
+.cc-table td{ padding:11px 14px; vertical-align:middle; color:var(--ink); }
+.cc-table td.shrink{ width:1%; white-space:nowrap; }
+.cc-sevdot{ width:9px; height:9px; border-radius:50%; display:inline-block; flex:0 0 auto; }
+.cc-sevdot.crit{ background:var(--bad); box-shadow:0 0 9px rgba(255,107,107,.6); }
+.cc-sevdot.under{ background:var(--warn); box-shadow:0 0 9px rgba(255,180,84,.5); }
+.cc-sevdot.quiet{ background:var(--sky); box-shadow:0 0 9px rgba(94,194,255,.5); }
+.cc-site{ font-weight:650; color:var(--ink); }
+.cc-site small{ display:block; color:var(--faint); font-weight:500; font-size:11.5px; margin-top:1px; }
+.cc-inv{ color:var(--muted); }
+.cc-inv b{ color:var(--ink); font-weight:600; }
+.cc-verdict{ font-size:12.5px; }
+.cc-verdict.crit{ color:var(--bad); } .cc-verdict.under{ color:var(--warn); } .cc-verdict.quiet{ color:var(--sky); }
+.cc-pi{ font-weight:700; color:var(--ink); }
+.cc-pi small{ color:var(--faint); font-weight:500; }
+.cc-loss{ font-weight:720; color:var(--bad); }
+.cc-state{ font-size:11px; font-weight:650; padding:3px 9px; border-radius:99px; white-space:nowrap; }
+.cc-state.new{ background:rgba(255,255,255,.06); color:var(--muted); }
+.cc-state.progress{ background:rgba(94,194,255,.14); color:var(--sky); }
+.cc-state.snoozed{ background:rgba(255,255,255,.04); color:var(--faint); }
+.cc-check{ width:15px; height:15px; accent-color:var(--good); cursor:pointer; }
+
+/* expand drawer */
+.cc-drawer td{ padding:0; }
+.cc-drawer .inner{
+  padding:16px 18px 18px; background:rgba(2,6,12,.45); border-bottom:1px solid var(--line);
+  display:grid; grid-template-columns:1.4fr 1fr; gap:18px;
+}
+@media(max-width:760px){ .cc-drawer .inner{ grid-template-columns:1fr; } }
+.cc-drawer h4{ font-size:13px; color:var(--ink); font-weight:700; margin:0 0 6px; }
+.cc-drawer p{ margin:0 0 10px; color:var(--muted); font-size:13px; line-height:1.55; }
+.cc-drawer p b{ color:var(--ink); }
+.cc-evidence{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:8px 0 12px; }
+.cc-evidence .e{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:9px 11px; }
+.cc-evidence .en{ font-size:18px; font-weight:760; color:var(--ink); font-variant-numeric:tabular-nums; }
+.cc-evidence .ec{ font-size:11px; color:var(--faint); margin-top:1px; }
+.cc-rec{ background:rgba(63,214,138,.06); border-left:3px solid var(--good); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--ink); line-height:1.5; }
+.cc-rec b{ color:var(--good2); }
+.cc-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+
+.cc-empty{ padding:34px 16px; text-align:center; color:var(--faint); font-size:13.5px; }
+.cc-foot{ color:var(--faint); font-size:12px; margin-top:10px; line-height:1.6; }
+
+/* divider that demotes the old fleet tree to a per-site drill-down */
+.cc-treedivider{ display:flex; align-items:baseline; gap:10px; margin:30px 0 4px; padding-top:20px; border-top:1px solid var(--line); }
+.cc-treedivider h3{ font-size:16px; font-weight:700; color:var(--ink); }
+.cc-treedivider span{ color:var(--faint); font-size:12.5px; }

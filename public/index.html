@@ -6,6 +6,7 @@
 <title>Array Operator — your array, working for you</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="command-center.css">
 </head>
 <body>
 <div class="wrap">
@@ -66,6 +67,15 @@
   <!-- ============================ TAB: ARRAYS (default) ============================ -->
   <section class="panel" id="panelArrays" role="tabpanel" aria-label="Arrays">
 
+    <!-- PORTFOLIO COMMAND CENTER — fleet-scale front door (KPI strip + triage queue) -->
+    <section id="commandCenter"></section>
+
+    <!-- DRILL-DOWN — the per-site fleet tree, demoted below the portfolio view -->
+    <div class="cc-treedivider">
+      <h3>Per-site fleet tree</h3>
+      <span>drill into one array — drag any inverter to re-measure it against new neighbors</span>
+    </div>
+
     <!-- (TOP) SANDBOX — live 3-tier fleet tree; drag any inverter to rearrange -->
     <section id="sbWrap"><div id="sandbox"></div></section>
 
@@ -102,5 +112,6 @@
 
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
+<script src="command-center.js"></script>
 </body>
 </html>
