@@ -383,14 +383,7 @@
     // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
       const show = () => {
-        const d = node.dataset;
-        const bits = [
-          d.model && `model ${d.model}`, d.np, d.power,
-          d.win, d.mode && `mode ${d.mode}`,
-          d.diag
-        ].filter(Boolean).join(" · ");
-        const foot = document.getElementById("sbFoot");
-        if(foot) foot.innerHTML = `<b>${esc(d.name)}</b> — <span class="sb-foot-status ${STATUS_CLASS[d.status]||'ok'}">${esc(STATUS_LABEL[d.status]||d.status)}</span> · ${esc(bits)}`;
+        // the rich detail card (showDetailCard) replaces the old one-line #sbFoot detail
         host.querySelectorAll(".sb-inv.sel").forEach(n=>n.classList.remove("sel"));
         node.classList.add("sel");
         showDetailCard(node);
