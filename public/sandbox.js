@@ -430,23 +430,30 @@
         const p = document.createElementNS(SB_SVGNS, "path");
         p.setAttribute("class", cls); p.setAttribute("d", d); return p;
       };
-      let maxJoin = 0; const feeders = [];
-      invs.forEach(inv => {
-        const ix = inv.offsetLeft + inv.offsetWidth / 2;
-        const iy = inv.offsetTop;
-        const joinY = Math.max(iy - 12, 2);
-        if(joinY > maxJoin) maxJoin = joinY;
-        // drawn card→trunk (bottom→top) so the dashed flow animates UPWARD
-        feeders.push(`M ${ix} ${iy} C ${ix} ${iy - 12}, ${cx} ${joinY + 12}, ${cx} ${joinY}`);
+      // STRAIGHT vertical line up each column: every inverter connects straight up
+      // to the card directly above it — or into the array, for the top row — with a
+      // small gap at both ends so things "barely touch". No central trunk/funnel.
+      const meta = invs.map(inv => ({
+        x: inv.offsetLeft + inv.offsetWidth / 2,
+        top: inv.offsetTop,
+        bottom: inv.offsetTop + inv.offsetHeight,
+      }));
+      const GAP = 6;
+      const segs = [];
+      meta.forEach(m => {
+        const above = meta
+          .filter(o => Math.abs(o.x - m.x) < 16 && o.top < m.top - 2)
+          .sort((a, b) => b.top - a.top)[0];
+        const yTop = above ? above.bottom + GAP : -24;   // straight up into the array
+        const yBot = m.top - GAP;
+        if(yBot - yTop > 3) segs.push([m.x, yBot, yTop]);
       });
-      const trunk = `M ${cx} ${maxJoin} L ${cx} -30`;  // rise into the array card
-      svg.appendChild(mk("trunk", trunk));
-      feeders.forEach(d => svg.appendChild(mk("feed", d)));
-      // sparse glowing motes, one per wire, phase-staggered so they don't pulse
-      // in lockstep — energy flowing up, organic rather than mechanical.
-      [trunk, ...feeders].forEach((d, i) => {
+      segs.forEach((sg, i) => {
+        const d = `M ${sg[0]} ${sg[1]} L ${sg[0]} ${sg[2]}`;
+        svg.appendChild(mk("feed", d));
+        // one phase-staggered mote rises straight up each line
         const p = mk("flow", d);
-        const ph = ((i * 2654435761 >>> 0) % 1000) / 1000 * 3;  // 0..3s pseudo-random
+        const ph = ((i * 2654435761 >>> 0) % 1000) / 1000 * 3;
         p.style.animationDelay = (-ph).toFixed(2) + "s";
         svg.appendChild(p);
       });

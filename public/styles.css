@@ -302,7 +302,7 @@
      inverter cluster (see drawFleetConnectors in sandbox.js). */
   /* faint hairline from the array into the comb; the rising SVG mote (below)
      is what conveys energy flowing UP into the array. */
-  .sb-link.v2{width:1px;height:30px;margin:0 auto;background:rgba(63,214,138,.14)}
+  .sb-link.v2{width:1px;height:30px;margin:0 auto;background:transparent}
 
   /* TIER 2: Array */
   .sb-array{border-radius:14px;padding:14px 16px;border:1px solid rgba(94,194,255,.28);
@@ -327,11 +327,15 @@
   svg.sb-wires path{fill:none}
   /* minimal "mindspace" flow: barely-there structure + sparse glowing motes that
      rise (staggered per-path in JS) so energy reads as flowing UP into the array. */
-  svg.sb-wires path.feed,svg.sb-wires path.trunk{stroke:rgba(63,214,138,.12);stroke-width:1}
+  svg.sb-wires path.feed,svg.sb-wires path.trunk{stroke:rgba(63,214,138,.10);stroke-width:1}
+  /* slick, barely-bordered cards so the fleet floats; status (warn/bad) borders win */
+  .sb-inv{border-color:rgba(255,255,255,.05)}
+  .sb-alert{border-color:rgba(255,255,255,.06)}
+  .sb-array{border-color:rgba(94,194,255,.16)}
   svg.sb-wires path.flow{stroke:rgba(205,255,232,.95);stroke-width:2.5;stroke-linecap:round;
     stroke-dasharray:5 26;filter:drop-shadow(0 0 6px rgba(63,214,138,.85));animation:moterise 3s linear infinite}
   @keyframes moterise{to{stroke-dashoffset:-31}}
-  .sb-teeth{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding-top:0;position:relative}
+  .sb-teeth{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;padding-top:0;position:relative}
   .sb-inv{flex:0 0 auto;width:92px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
     background:linear-gradient(165deg,var(--card),var(--card2));padding:10px 8px 9px;text-align:center;position:relative;
     transition:transform .12s,border-color .12s,box-shadow .12s}
