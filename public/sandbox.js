@@ -430,6 +430,7 @@
       });
       checkPeerDrops();
       refreshDataCards();      // keep live-metric data cards in step with the kW ticker
+      refreshDetailCard();     // keep the open inverter detail card (kW + lost-$) live too
     }, 2600);
   }
 
@@ -525,8 +526,67 @@
     }
     return h;
   }
+  // Which inverter the open detail card is bound to (matched by stable data-inv-id
+  // so it survives fleet re-renders that re-create the .sb-inv element), plus the
+  // live "lost so far" $ accumulator state for that card. Cleared when the card is
+  // dismissed or its inverter disappears.
+  let _detailInvId = null;
+  let _detailLost = 0;            // running $ lost since this card opened
+  let _detailLostTs = 0;         // last tick time (ms) the accumulator advanced
+
+  // Statuses that always count as "losing money" for the lost-$ figure.
+  const LOST_STATES = new Set(["underperforming", "comm_gap", "dead", "fault"]);
+  // Demo energy value used to translate missing kW into $ lost. ~$0.24/kWh is a
+  // believable blended retail + incentive value for residential/commercial solar.
+  const LOST_RATE_PER_KWH = 0.24;
+  // Demo time-compression: a real 2.6s tick advances the lost-$ clock by this many
+  // simulated minutes so the figure visibly ticks upward instead of crawling at
+  // wall-clock rate. (Demo only — production drives this from real elapsed energy.)
+  const LOST_DEMO_MIN_PER_TICK = 6;
+
+  // Find the currently-selected .sb-inv element by its stable data-inv-id.
+  function _selectedInv(){
+    if(_detailInvId == null) return null;
+    return document.querySelector(`#sandbox .sb-inv[data-inv-id="${CSS.escape(String(_detailInvId))}"]`);
+  }
+
+  // Estimate the kW this inverter is *missing* vs. where it should be: the most of
+  // (peer-median expectation) and (nameplate-implied expectation), minus its live
+  // output. A non-reporting inverter (dead / comm_gap → live "—") counts as 0 kW
+  // out, so it's missing its whole expected production. Returns 0 for a healthy
+  // inverter that's keeping up with its peers.
+  function _missingKW(node, flagged){
+    let live = _liveKW(node);                                    // live kW (from .sb-now-val)
+    if(!isFinite(live)) live = 0;                                // not reporting → producing nothing
+    const col = node.closest(".sb-col");
+    let expected = live;
+    if(col){
+      // peer expectation: median live kW of same-array peers that are reporting
+      const peers = [...col.querySelectorAll(".sb-inv")]
+        .map(_liveKW).filter(v => isFinite(v) && v > 0).sort((a,b) => a-b);
+      if(peers.length >= 2){
+        const med = peers[Math.floor(peers.length/2)];
+        if(med > expected) expected = med;
+      }
+    }
+    // nameplate-implied floor (only for an inverter already flagged down): one with
+    // no reporting peers should still show a loss. Assume a modest ~30% of nameplate
+    // as the "should-be" mid-day baseline so the demo figure stays believable.
+    if(flagged){
+      const np = _nameplateKW(node);
+      if(isFinite(np) && np > 0){
+        const npExpected = np * 0.30;
+        if(npExpected > expected) expected = npExpected;
+      }
+    }
+    const miss = expected - live;
+    return miss > 0.01 ? miss : 0;
+  }
+
   // Build/replace the detail card for the clicked .sb-inv card. Owner-framed: what
-  // an array owner wants to know about one inverter at a glance.
+  // an array owner wants to know about one inverter at a glance. The kW-now value,
+  // status pill, peer index and "lost so far" $ are LIVE — refreshDetailCard()
+  // (driven by startLiveTicker) updates them in place each tick.
   function showDetailCard(node){
     const host = detailHost();
     const d = node.dataset;
@@ -540,8 +600,13 @@
     const sCls = STATUS_CLASS[d.status] || "ok";
     const sLabel = STATUS_LABEL[d.status] || d.status || "";
 
+    // bind the live updater to this inverter and reset the lost-$ accumulator
+    _detailInvId = d.invId != null ? d.invId : null;
+    _detailLost = 0;
+    _detailLostTs = Date.now();
+
     const rows = [
-      pi && `<div class="sb-dc-row"><span class="sb-dc-k">Peer index</span><span class="sb-dc-v"><b class="${sCls}">${esc(pi)}</b> vs its peers</span></div>`,
+      pi && `<div class="sb-dc-row"><span class="sb-dc-k">Peer index</span><span class="sb-dc-v"><b class="dc-pi ${sCls}">${esc(pi)}</b> vs its peers</span></div>`,
       d.np && `<div class="sb-dc-row"><span class="sb-dc-k">Nameplate</span><span class="sb-dc-v">${esc(d.np)}</span></div>`,
       d.win && `<div class="sb-dc-row"><span class="sb-dc-k">Last 14 days</span><span class="sb-dc-v">${esc(d.win)}</span></div>`,
       d.mode && `<div class="sb-dc-row"><span class="sb-dc-k">Mode</span><span class="sb-dc-v">${esc(d.mode)}</span></div>`,
@@ -555,18 +620,96 @@
           <div class="sb-dc-name">${esc(d.name)}</div>
           <div class="sb-dc-array">${esc(arrayName)}</div>
         </div>
-        <div class="sb-dc-now"><span class="sb-live-dot"></span><b>${esc(liveStr)}</b></div>
-        <div class="sb-dc-pill ${sCls}">${esc(sLabel)}</div>
+        <div class="sb-dc-now"><span class="sb-live-dot"></span><b class="dc-kw">${esc(liveStr)}</b></div>
+        <div class="sb-dc-pill dc-pill ${sCls}">${esc(sLabel)}</div>
+        <div class="sb-dc-lost" hidden><span class="sb-dc-lost-k">Lost so far</span><b class="dc-lost">$0</b></div>
         <div class="sb-dc-rows">${rows}</div>
         ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
       </div>`);
     card.querySelector(".sb-dc-x").onclick = () => {
       card.remove();
+      _detailInvId = null;               // stop live updates for this card
       document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
       setDefaultFoot();
     };
     host.innerHTML = "";
     host.appendChild(card);
+    refreshDetailCard();                 // seed the live figures immediately
+  }
+
+  // Live-refresh the open detail card in place (called each ticker tick). Re-reads
+  // the selected inverter's current kW / status / peer index and advances the
+  // "lost so far" $ accumulator. No-op (and a graceful stop) when no card is open
+  // or the selected inverter has gone away.
+  function refreshDetailCard(){
+    const host = document.getElementById("sbDetail");
+    const card = host ? host.querySelector(".sb-detail-card") : null;
+    if(!card){ _detailInvId = null; return; }      // card dismissed → nothing to update
+    if(_detailInvId == null) return;               // no inverter bound
+
+    const node = _selectedInv();
+    if(!node){                                     // inverter removed / deselected → stop gracefully
+      _detailInvId = null;
+      return;
+    }
+    const d = node.dataset;
+
+    // 1) live kW now
+    const liveEl = node.querySelector(".sb-now-val");
+    const live = liveEl ? liveEl.textContent : null;
+    const kwEl = card.querySelector(".dc-kw");
+    if(kwEl){
+      const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
+      if(kwEl.textContent !== liveStr) kwEl.textContent = liveStr;
+    }
+
+    // 2) status pill (label + class) can change as the inverter recovers / drops
+    const sCls = STATUS_CLASS[d.status] || "ok";
+    const sLabel = STATUS_LABEL[d.status] || d.status || "";
+    const pill = card.querySelector(".dc-pill");
+    if(pill){
+      pill.className = "sb-dc-pill dc-pill " + sCls;
+      if(pill.textContent !== sLabel) pill.textContent = sLabel;
+    }
+
+    // 3) peer index value + class
+    const piEl = node.querySelector(".sb-pi span");
+    const pi = piEl ? piEl.textContent.trim() : "";
+    const piOut = card.querySelector(".dc-pi");
+    if(piOut && pi){
+      piOut.className = "dc-pi " + sCls;
+      if(piOut.textContent !== pi) piOut.textContent = pi;
+    }
+
+    // 4) live "lost so far" $ — accumulate missing kW × rate × elapsed hours.
+    // Underperforming/down inverters (by status OR a live peer shortfall) tick up;
+    // healthy ones show $0 and the row is hidden. Wall-clock elapsed is scaled by
+    // the demo time-compression so the figure visibly advances each tick.
+    const now = Date.now();
+    const wallHr = Math.max(0, (now - _detailLostTs) / 3600000);
+    _detailLostTs = now;
+    // map ~2.6s of wall time onto LOST_DEMO_MIN_PER_TICK simulated minutes
+    const dtHr = wallHr * ((LOST_DEMO_MIN_PER_TICK * 60) / 2.6);
+    const flaggedByState = LOST_STATES.has(d.status) || node.classList.contains("sb-inv-alarm");
+    const missKW = _missingKW(node, flaggedByState);
+    // only accumulate when the inverter is genuinely under (flagged or a real shortfall)
+    if(dtHr > 0 && missKW > 0 && (flaggedByState || missKW >= 0.5)){
+      _detailLost += missKW * LOST_RATE_PER_KWH * dtHr;
+    }
+    const lostRow = card.querySelector(".sb-dc-lost");
+    const lostOut = card.querySelector(".dc-lost");
+    if(lostRow && lostOut){
+      if(_detailLost > 0){
+        lostRow.hidden = false;
+        const txt = "$" + _detailLost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if(lostOut.textContent !== txt){
+          lostOut.textContent = txt;
+          lostOut.classList.remove("tick"); void lostOut.offsetWidth; lostOut.classList.add("tick");
+        }
+      } else {
+        lostRow.hidden = true;       // healthy → omit the $ figure
+      }
+    }
   }
 
 
