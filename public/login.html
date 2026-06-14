@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · Array Operator</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0a0e14; --bg2:#0e131c; --ink:#eaf0f7; --muted:#8b97a8; --faint:#6b7686;
+    --good:#3fd68a; --good2:#7ff0bb; --warn:#ffb454; --bad:#ff6b6b;
+    --line:rgba(255,255,255,.08); --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.018);
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{
+    margin:0; background:radial-gradient(1200px 700px at 75% -10%, #16202e 0%, var(--bg) 55%);
+    background-attachment:fixed; color:var(--ink); min-height:100%;
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+  }
+  a{color:inherit}
+  .top{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;font-size:16px;
+       padding:1.5rem 1.75rem}
+  .logo{height:2rem;width:2rem;border-radius:999px;flex:none;
+        background:radial-gradient(circle at 35% 30%,var(--good2),var(--good) 55%,#1f7d54 100%);
+        box-shadow:0 0 0 4px rgba(63,214,138,.1),0 6px 18px rgba(63,214,138,.35)}
+  .top small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-top:-2px}
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4rem}
+  .card{width:100%;max-width:25rem;background:linear-gradient(165deg,var(--card),var(--card2));
+        border:1px solid var(--line);border-radius:22px;padding:2rem;
+        box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  h1{margin:0;font-size:1.5rem;line-height:1.15;font-weight:720;letter-spacing:-.02em;
+     background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin-top:.5rem;font-size:.9rem;color:var(--muted)}
+  .tabs{display:flex;gap:.35rem;background:rgba(0,0,0,.3);border:1px solid var(--line);
+        border-radius:12px;padding:.3rem;margin:1.5rem 0 .5rem}
+  .tab{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:650;font-size:.85rem;
+       padding:.5rem;border-radius:9px;cursor:pointer;transition:.15s}
+  .tab.on{background:rgba(63,214,138,.14);color:var(--good2);box-shadow:inset 0 0 0 1px rgba(63,214,138,.3)}
+  label.fld{display:block;margin-top:1.25rem}
+  label.fld .lab{font-size:.85rem;font-weight:700;color:var(--ink)}
+  input{width:100%;margin-top:.5rem;padding:.7rem .85rem;background:rgba(0,0,0,.35);
+    border:1px solid var(--line);border-radius:10px;font:inherit;color:var(--ink);transition:.15s}
+  input::placeholder{color:var(--faint)}
+  input:focus{outline:none;border-color:var(--good);box-shadow:0 0 0 3px rgba(63,214,138,.15)}
+  .btn{display:inline-flex;width:100%;align-items:center;justify-content:center;gap:.5rem;border-radius:11px;
+       padding:.8rem 1.5rem;font-size:.95rem;font-weight:700;border:0;cursor:pointer;transition:.15s;margin-top:1.4rem}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:linear-gradient(180deg,var(--good2),var(--good));color:#06140d;box-shadow:0 4px 16px rgba(63,214,138,.28)}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.06)}
+  .msg{margin-top:1rem;font-size:.82rem;line-height:1.5;border-radius:10px;padding:.7rem .85rem;display:none}
+  .msg.show{display:block}
+  .msg.err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);color:#ffb1b1}
+  .msg.ok{background:rgba(63,214,138,.1);border:1px solid rgba(63,214,138,.3);color:var(--good2)}
+  .foot{margin-top:1.5rem;font-size:.82rem;color:var(--muted);text-align:center}
+  .foot a{color:var(--good);font-weight:650;text-decoration:underline;text-underline-offset:2px}
+  .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(6,20,13,.25);border-top-color:#06140d;animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="logo" aria-hidden="true"></span>
+    <span>Array Operator<small>by EnergyAgent</small></span>
+  </div>
+  <main>
+    <div class="card">
+      <h1>Welcome back.</h1>
+      <p class="sub">Sign in to your array dashboard.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab on" id="tabPw" role="tab" onclick="setMode('pw')">Password</button>
+        <button class="tab" id="tabMagic" role="tab" onclick="setMode('magic')">Email me a link</button>
+      </div>
+
+      <!-- PASSWORD -->
+      <form id="formPw" onsubmit="return doPassword(event)">
+        <label class="fld"><span class="lab">Email</span>
+          <input type="email" id="pwEmail" autocomplete="username" placeholder="you@example.com" required></label>
+        <label class="fld"><span class="lab">Password</span>
+          <input type="password" id="pwPass" autocomplete="current-password" placeholder="Your password" required></label>
+        <button class="btn btn-primary" id="pwBtn" type="submit">Sign in →</button>
+      </form>
+
+      <!-- MAGIC -->
+      <form id="formMagic" class="hide" onsubmit="return doMagic(event)">
+        <label class="fld"><span class="lab">Email</span>
+          <input type="email" id="magicEmail" autocomplete="username" placeholder="you@example.com" required></label>
+        <button class="btn btn-primary" id="magicBtn" type="submit">Email me a sign-in link →</button>
+      </form>
+
+      <div class="msg" id="msg"></div>
+
+      <p class="foot">New here? <a href="/onboarding">Start your free trial →</a></p>
+    </div>
+  </main>
+
+<script>
+// Same-origin on arrayoperator.com (/v1/* proxies to Railway via _redirects).
+// On a local static preview, hit the Railway backend directly (CORS allows it).
+const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
+  ? "https://web-production-49c83.up.railway.app" : "";
+const NEPOOL_LOGIN = "https://nepooloperator.com/accounts";
+
+const msg = document.getElementById("msg");
+function showMsg(text, kind){ msg.className = "msg show " + kind; msg.innerHTML = text; }
+function clearMsg(){ msg.className = "msg"; }
+
+function setMode(m){
+  const pw = m === "pw";
+  document.getElementById("tabPw").classList.toggle("on", pw);
+  document.getElementById("tabMagic").classList.toggle("on", !pw);
+  document.getElementById("formPw").classList.toggle("hide", !pw);
+  document.getElementById("formMagic").classList.toggle("hide", pw);
+  clearMsg();
+}
+
+function go(url){ window.location.assign(url); }
+function enterDashboard(){ go("/?fresh=1&t=" + Date.now()); }
+
+async function doPassword(e){
+  e.preventDefault();
+  const btn = document.getElementById("pwBtn");
+  const email = document.getElementById("pwEmail").value.trim().toLowerCase();
+  const password = document.getElementById("pwPass").value;
+  if(!email || !password) return false;
+  btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Signing in…'; clearMsg();
+  try{
+    const r = await fetch(`${API_BASE}/v1/auth/password-login`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ email, password })
+    });
+    if(r.status === 401){
+      showMsg("That email or password didn't match. Try again, or use the sign-in link instead.", "err");
+      btn.disabled = false; btn.textContent = "Sign in →"; return false;
+    }
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok || !d.session_token){
+      showMsg(d.detail || "Sign-in failed. Please try again in a moment.", "err");
+      btn.disabled = false; btn.textContent = "Sign in →"; return false;
+    }
+    // Wrong product? Send them to their real home rather than a confusing dashboard.
+    if(d.product && d.product !== "array_operator"){
+      showMsg("That's a NEPOOL Operator account — taking you there…", "ok");
+      setTimeout(()=>go(NEPOOL_LOGIN), 900); return false;
+    }
+    try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
+    enterDashboard();
+  }catch(err){
+    showMsg("Couldn't reach the server. Check your connection and try again.", "err");
+    btn.disabled = false; btn.textContent = "Sign in →";
+  }
+  return false;
+}
+
+async function doMagic(e){
+  e.preventDefault();
+  const btn = document.getElementById("magicBtn");
+  const email = document.getElementById("magicEmail").value.trim().toLowerCase();
+  if(!email) return false;
+  btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Sending…'; clearMsg();
+  try{
+    await fetch(`${API_BASE}/v1/auth/request`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ email })
+    });
+    // Always succeed-looking to avoid leaking which emails exist.
+    showMsg("If that email has an account, a secure sign-in link is on its way. It expires in 15 minutes.", "ok");
+    btn.textContent = "Link sent ✓";
+  }catch(err){
+    showMsg("Couldn't send the link. Check your connection and try again.", "err");
+    btn.disabled = false; btn.textContent = "Email me a sign-in link →";
+  }
+  return false;
+}
+
+// If a magic-link dropped us here with ?token=, exchange it for a session and
+// go straight in. (?error= comes from a failed exchange elsewhere.)
+(async function bootstrap(){
+  const params = new URLSearchParams(location.search);
+  const token = params.get("token");
+  if(params.get("email")) document.getElementById("pwEmail").value = params.get("email");
+  if(!token) return;
+  showMsg("Signing you in…", "ok");
+  try{
+    const r = await fetch(`${API_BASE}/v1/auth/verify`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ token })
+    });
+    const d = await r.json().catch(()=>({}));
+    if(r.ok && d.session_token){
+      try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
+      enterDashboard(); return;
+    }
+    showMsg("That sign-in link is invalid or expired — request a fresh one below.", "err");
+  }catch(_){
+    showMsg("Couldn't verify that sign-in link. Try signing in below.", "err");
+  }
+})();
+</script>
+</body>
+</html>

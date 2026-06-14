@@ -65,7 +65,7 @@
   label.fld{display:block;margin-top:1.5rem}
   label.fld .lab{font-size:.875rem;font-weight:700;color:var(--ink)}
   label.fld .hint{font-size:.8rem;color:var(--muted);margin-top:.2rem}
-  input[type=text],input[type=email]{width:100%;margin-top:.55rem;padding:.7rem .85rem;background:rgba(0,0,0,.35);
+  input[type=text],input[type=email],input[type=password]{width:100%;margin-top:.55rem;padding:.7rem .85rem;background:rgba(0,0,0,.35);
     border:1px solid var(--line);border-radius:10px;font:inherit;color:var(--ink);transition:.15s}
   input::placeholder{color:var(--faint)}
   input:focus{outline:none;border-color:var(--good);box-shadow:0 0 0 3px rgba(63,214,138,.15)}
@@ -161,7 +161,7 @@ const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.h
   : "";
 const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
 let step = 0;
-let state = { name:"", email:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"" };
+let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"" };
 
 // Inverter vendors — mirrors the backend registry order + metadata from
 // api/inverters/ (VENDORS / vendor_catalog). SolarEdge is the only vendor with
@@ -284,6 +284,13 @@ function connectScreen(){
       <input type="email" id="email" placeholder="you@example.com" value="${state.email}" oninput="state.email=this.value;syncConnect()">
     </label>
 
+    <label class="fld">
+      <span class="lab">Set a password <span style="color:var(--faint);font-weight:500">— optional</span></span>
+      <span class="hint">So you can sign in anytime, no email link needed. 10+ characters with a letter and a number. Leave blank to sign in by emailed link.</span>
+      <input type="password" id="password" autocomplete="new-password" placeholder="Create a password" value="${state.password||''}" oninput="state.password=this.value;syncConnect()">
+      <div class="helper" id="pwHint"></div>
+    </label>
+
     <div class="fld" style="margin-top:1.75rem">
       <span class="lab">Which inverter brand?</span>
       <span class="hint">Pick your monitoring platform — we support more than SolarEdge.</span>
@@ -321,6 +328,13 @@ function syncConnect(){
   if(!b) return;
   const emailOk = /.+@.+\..+/.test(state.email);
   const nameOk = (state.name||"").trim().length >= 2;
+  // Password is OPTIONAL; if typed it must meet the backend rule (10+ chars,
+  // a letter and a digit) or /start would 400. Surface a live hint.
+  const pw = state.password || "";
+  const pwOk = pw.length === 0 || (pw.length >= 10 && /[a-zA-Z]/.test(pw) && /[0-9]/.test(pw));
+  const pwHint = document.getElementById("pwHint");
+  if(pwHint) pwHint.textContent = (pw.length > 0 && !pwOk)
+    ? "At least 10 characters, including a letter and a number." : "";
   if(!v.available){ b.disabled = true; return; }
   let credsOk;
   if(v.discover){ credsOk = state.apiKey.length>3; }
@@ -328,7 +342,7 @@ function syncConnect(){
     // every non-optional field filled (labels with "optional" are skippable)
     credsOk = (v.fields||[]).every(f=>/optional/i.test(f.label) || (state.fields[f.name]||"").trim().length>0);
   }
-  b.disabled = !(emailOk && nameOk && credsOk);
+  b.disabled = !(emailOk && nameOk && credsOk && pwOk);
 }
 
 // Vendor-aware pre-signup preview. EVERY available vendor now hits the public
@@ -545,6 +559,7 @@ async function finish(){
         company,
         array_count: Math.max(state.sites.length, 1),
         product: "array_operator",
+        ...(state.password ? { password: state.password } : {}),
       })
     });
     const startData = await startRes.json().catch(()=>({}));

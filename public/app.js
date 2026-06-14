@@ -629,20 +629,31 @@ function adaptOverview(o){
 }
 
 function loadDashboard(){
-  let session = null;
-  // Accept a session handed in via the URL (?token= from the magic-link email or
-  // a post-onboarding hand-off), persist it under the key the dashboard reads,
-  // then scrub it from the address bar so it doesn't linger in history.
-  try {
-    const u = new URL(window.location.href);
-    const urlTok = u.searchParams.get("token");
-    if(urlTok){
-      localStorage.setItem("so_session", urlTok);
+  // A magic-link (or hand-off) may drop a ONE-TIME login token in the URL as
+  // ?token=. Exchange it for a real session via /v1/auth/verify (it is NOT a
+  // ready session — storing it raw would 401), scrub it from the address bar,
+  // then render. Password sign-in (login.html) stores so_session directly.
+  let u = null;
+  try { u = new URL(window.location.href); } catch(e){}
+  const urlTok = u && u.searchParams.get("token");
+  if(urlTok){
+    try {
       u.searchParams.delete("token");
       window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
-    }
-  } catch(e){}
+    } catch(e){}
+    fetch("/v1/auth/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ token: urlTok }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if(d && d.session_token){ try { localStorage.setItem("so_session", d.session_token); } catch(e){} } })
+      .finally(renderFromSession);
+    return;
+  }
+  renderFromSession();
+}
+function renderFromSession(){
+  let session = null;
   try { session = localStorage.getItem("so_session"); } catch(e){}
+  // Surface a "Sign in" link to signed-out visitors (hidden once authed).
+  try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
   const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
     `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
 

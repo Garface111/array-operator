@@ -23,3 +23,10 @@
 /onboarding           /onboarding.html   200
 /signup               /onboarding.html   301
 /get-started          /onboarding.html   301
+
+# ── Pretty login URL ────────────────────────────────────────────────────
+# Inline email+password sign-in (also exchanges a magic-link ?token=). Calls
+# the same-origin /v1/* proxy above. The EnergyAgent landing page's "Log in to
+# Array Operator" button points here.
+/login                /login.html        200
+/signin               /login.html        301
