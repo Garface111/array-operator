@@ -206,20 +206,23 @@
   .panel{display:none}
   .panel.active{display:block}
 
-  /* Master Account + billing cards */
-  .acct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:14px;margin-top:14px}
-  .acct-card{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;
-    padding:17px 19px;box-shadow:0 18px 44px -30px rgba(0,0,0,.7);position:relative}
-  .acct-card.good{border-color:rgba(63,214,138,.3);background:linear-gradient(150deg,rgba(63,214,138,.1),rgba(63,214,138,.02))}
-  .acct-card.warn{border-color:rgba(255,180,84,.35);background:linear-gradient(150deg,rgba(255,180,84,.1),rgba(255,180,84,.02))}
-  .acct-card .k{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-  .acct-card .v{font-size:20px;font-weight:740;color:var(--ink);margin-top:7px;letter-spacing:-.01em;line-height:1.2;word-break:break-word}
-  .acct-card .v small{font-size:13px;font-weight:600;color:var(--muted)}
-  .acct-card .sub{color:var(--muted);font-size:12.5px;margin-top:5px;line-height:1.45}
-  .acct-edit{display:flex;gap:8px;align-items:center;margin-top:9px}
-  .acct-edit input{flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;
-    padding:9px 11px;color:var(--ink);font-size:14px}
-  .acct-edit input:focus{outline:none;border-color:rgba(63,214,138,.5)}
+  /* Master Account — flat "all business" list of horizontal rows */
+  .acct-list{margin-top:16px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    background:linear-gradient(165deg,var(--card),var(--card2));box-shadow:0 18px 44px -30px rgba(0,0,0,.7)}
+  .acct-list .empty{padding:22px}
+  .acct-row{display:grid;grid-template-columns:180px minmax(0,1fr) auto;align-items:center;gap:18px;
+    padding:15px 20px;border-bottom:1px solid var(--line)}
+  .acct-row:last-child{border-bottom:0}
+  .acct-row .r-k{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .acct-row .r-v{color:var(--ink);font-size:15px;font-weight:640;min-width:0;line-height:1.35;word-break:break-word}
+  .acct-row .r-v .r-sub{display:block;color:var(--muted);font-size:12.5px;font-weight:500;margin-top:3px;line-height:1.45}
+  .acct-row .r-v .r-big{font-size:21px;font-weight:760;letter-spacing:-.01em}
+  .acct-row .r-v small{font-size:13px;font-weight:600;color:var(--muted)}
+  .acct-row .r-a{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+  /* inline-editable rows: input fills the value cell, Save sits in the action cell */
+  .acct-edit .r-v input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);
+    border-radius:9px;padding:9px 11px;color:var(--ink);font-size:14px}
+  .acct-edit .r-v input:focus{outline:none;border-color:rgba(63,214,138,.5)}
   .acct-btn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);font-size:12.5px;font-weight:650;
     border-radius:9px;padding:9px 14px;cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s}
   .acct-btn:hover{border-color:rgba(63,214,138,.5);background:rgba(63,214,138,.08)}
@@ -227,8 +230,13 @@
   .acct-btn.primary{border:0;background:linear-gradient(180deg,var(--good2),var(--good));color:#06140d;
     box-shadow:0 4px 16px rgba(63,214,138,.28)}
   .acct-btn.primary:hover{filter:brightness(1.06)}
-  .acct-msg{font-size:12px;color:var(--muted);margin-top:7px;min-height:14px}
+  .acct-msg{font-size:12px;color:var(--muted);margin-top:6px}
+  .acct-msg:empty{margin:0}
   .acct-msg.ok{color:var(--good)} .acct-msg.err{color:var(--bad)}
+  @media(max-width:640px){
+    .acct-row{grid-template-columns:1fr;gap:8px;align-items:start}
+    .acct-row .r-a{justify-content:flex-start}
+  }
 
   /* Reports panel */
   .rep-card{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:20px;
@@ -267,7 +275,9 @@
   /* canvas: horizontal scroll of columns */
   .sb-viewport{position:relative;overflow:hidden;height:calc(100vh - 210px);min-height:440px;border-radius:14px;cursor:grab;touch-action:none;background:rgba(255,255,255,.012)}
   .sb-viewport.panning{cursor:grabbing}
-  .sb-canvas{position:relative;display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0;will-change:transform}
+  .sb-canvas{position:relative;display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0}
+  /* promote to a GPU layer only mid-gesture; idle = re-rasterized crisp at scale */
+  .sb-canvas.sb-interacting{will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
 
   /* TIER 1: Alert */

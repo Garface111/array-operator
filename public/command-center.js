@@ -188,6 +188,7 @@
 
     renderBody();
     wire();
+    applyTriageState();   // keep the collapse pill's flagged-count fresh
   }
 
   function chip(id,label,n,dot){
@@ -397,6 +398,44 @@ Thank you,
     MODEL = buildModel(FleetStore.snapshot());
     render();
   }
+
+  /* ===========================================================================
+   * 6. COLLAPSIBLE TRIAGE QUEUE — the header (#triageToggle, in index.html)
+   * shows/hides #ccQueue. Starts COLLAPSED by default so the fleet tree leads;
+   * the queue still renders into #ccQueue in the background, just hidden.
+   * ==========================================================================*/
+  function applyTriageState(){
+    const head = document.getElementById("triageToggle");
+    const queue = document.getElementById("ccQueue");
+    if(!head || !queue) return;
+    const collapsed = head.classList.contains("collapsed");
+    queue.hidden = collapsed;
+    head.setAttribute("aria-expanded", String(!collapsed));
+    const hint = document.getElementById("triageHint");
+    if(hint){
+      const n = (MODEL && MODEL.kpis) ? MODEL.kpis.flagged : null;
+      hint.textContent = collapsed
+        ? (n ? `Show ${num(n)} flagged →` : "Show queue →")
+        : "Hide queue";
+    }
+  }
+  function toggleTriage(){
+    const head = document.getElementById("triageToggle");
+    if(!head) return;
+    head.classList.toggle("collapsed");
+    applyTriageState();
+  }
+  // Document-level delegation (matches app.js's CTA pattern) so the toggle works
+  // regardless of when #triageToggle is parsed or the Arrays tab is activated.
+  // The header starts COLLAPSED — the `collapsed` class is set in index.html.
+  document.addEventListener("click", e => { if(e.target.closest("#triageToggle")) toggleTriage(); });
+  document.addEventListener("keydown", e => {
+    if((e.key==="Enter"||e.key===" ") && e.target.closest && e.target.closest("#triageToggle")){
+      e.preventDefault(); toggleTriage();
+    }
+  });
+  if(document.readyState!=="loading") applyTriageState();
+  else document.addEventListener("DOMContentLoaded", applyTriageState);
 
   window.__ccLoad = () => FleetStore.load();
   FleetStore.subscribe(onStore);

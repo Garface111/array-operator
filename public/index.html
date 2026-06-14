@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="command-center.css">
+<link rel="stylesheet" href="claims.css">
 </head>
 <body>
 <div class="wrap">
@@ -14,54 +15,19 @@
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
+    <a class="tab" id="tabClaims" href="#claims" role="tab">Claims</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
   </div>
 
   <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
+  <!-- All business: one flat list of horizontal rows — identity, login & billing.
+       Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
   <section class="panel" id="panelAccount" role="tabpanel" aria-label="Master Account">
     <div class="section-h" style="margin-top:18px">
       <h2>Master account</h2>
-      <span class="hint">your operator profile, plan &amp; billing — in one place</span>
+      <span class="hint">your profile, login &amp; billing — all in one place</span>
     </div>
-    <div class="acct-grid" id="acctCards"><div class="empty">Loading your account…</div></div>
-
-    <!-- BILLING -->
-    <div class="section-h" id="billing" style="margin-top:32px">
-      <h2>Billing</h2>
-      <span class="hint">billed by total kWh in your arrays — directly tied to how much they get paid</span>
-    </div>
-    <div class="acct-grid" id="billingCards"><div class="empty">Loading billing…</div></div>
-    <div id="billingActions" style="margin-top:14px"></div>
-
-    <!-- VOLUME PRICING (moved here — it lives with billing) -->
-    <section class="pricing" id="pricing">
-      <div class="eyebrow">Pricing</div>
-      <h2>What you pay</h2>
-      <p class="sub">Billed by the kilowatt-hour your arrays generate — directly tied to how much they get paid.</p>
-
-      <div class="pricecard">
-        <div class="pc-main">
-          <div class="pc-price">0.5&cent;<small> / kWh</small></div>
-          <div class="pc-tag">on the energy your arrays actually generate</div>
-          <div class="pc-sub">About <b>$4.50/mo</b> for a typical home array. You're charged on real metered output — when the sun doesn't shine, you don't pay. No per-array fees, no setup fee.</div>
-          <div class="pc-cta">
-            <a href="onboarding.html" class="btn-primary-lg">Start free →</a>
-            <span class="note">14-day free trial · no card to start · cancel anytime.</span>
-          </div>
-        </div>
-
-        <div class="pc-tiers">
-          <h3>Volume pricing</h3>
-          <div class="ph">graduated — each band priced only on the kWh within it</div>
-          <div style="margin-top:10px">
-            <div class="tier"><div class="tn">First 20,000 kWh / mo<small>homeowners &amp; prosumers</small></div><div class="tp">0.5<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
-            <div class="tier"><div class="tn">20k – 200k kWh / mo<small>multi-site owners</small></div><div class="tp">0.45<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
-            <div class="tier"><div class="tn">200,000+ kWh / mo<small>community-solar hosts</small></div><div class="tp">0.4<span style="color:var(--faint);font-weight:500;font-size:12px">&cent; /kWh</span></div></div>
-          </div>
-          <div class="pc-foot">Example: a 8 kW home (~900 kWh/mo) = <b style="color:var(--ink)">~$4.50/mo</b> · a 99 kW commercial array (~10,000 kWh/mo) = <b style="color:var(--ink)">~$50/mo</b>. No setup fee, ever.</div>
-        </div>
-      </div>
-    </section>
+    <div class="acct-list" id="acctList"><div class="empty">Loading your account…</div></div>
   </section>
 
   <!-- ============================ TAB: ARRAYS (default) ============================ -->
@@ -79,40 +45,38 @@
     <!-- (TOP) SANDBOX — live 3-tier fleet tree; drag any inverter to rearrange -->
     <section id="sbWrap"><div id="sandbox"></div></section>
 
-    <!-- Triage queue — every flagged inverter across the portfolio, worst leak first -->
-    <div class="cc-treedivider">
+    <!-- Triage queue — collapsible header; COLLAPSED by default so the fleet tree
+         leads. Clicking the header toggles #ccQueue (wired in command-center.js). -->
+    <div class="cc-treedivider cc-collapsible collapsed" id="triageToggle" role="button"
+         tabindex="0" aria-expanded="false" aria-controls="ccQueue">
+      <span class="cc-chevron" aria-hidden="true">▸</span>
       <h3>Triage queue</h3>
       <span>every flagged inverter across the fleet — sorted by dollars at stake</span>
+      <span class="cc-spacerflex"></span>
+      <span class="cc-collapse-hint" id="triageHint">Show queue →</span>
     </div>
-    <section id="ccQueue"></section>
+    <section id="ccQueue" hidden></section>
 
+  </section>
+
+  <!-- ============================ TAB: CLAIMS ============================ -->
+  <!-- Automatic warranty claims. The agent opens a claim the moment an inverter
+       dies or faults, drafts the manufacturer email with peer-measured evidence,
+       and runs it through a lifecycle the owner controls. Rendered by claims.js
+       into #claimsRoot; send policy (manual/auto/auto+grace) is owner-set. -->
+  <section class="panel" id="panelClaims" role="tabpanel" aria-label="Claims">
+    <div id="claimsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Checking your fleet for warranty events…</div></div>
   </section>
 
   <!-- ============================ TAB: REPORTS ============================ -->
   <section class="panel" id="panelReports" role="tabpanel" aria-label="Reports">
     <div class="section-h" style="margin-top:18px">
       <h2>Reports</h2>
-      <span class="hint">quarterly performance for your arrays — delivered however you like</span>
+      <span class="hint">drop a billing spreadsheet — we match it and send invoices + summaries on your schedule</span>
     </div>
-    <div class="rep-card">
-      <span class="rep-eyebrow">Coming soon</span>
-      <h3>Quarterly performance reports for your arrays</h3>
-      <p>We'll roll up every array's production, peer-measured health, and the dollars earned (and recovered) into one clean report — delivered however you like, by email or PDF. Tell us how often you'd like it and where to send it, and we'll start sending the moment reports go live.</p>
-      <div class="rep-fields">
-        <label class="rep-fld">
-          <span class="rl">Cadence</span>
-          <select id="repCadence">
-            <option value="quarterly">Quarterly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-        <label class="rep-fld">
-          <span class="rl">Send to</span>
-          <input type="email" id="repEmail" autocomplete="email" placeholder="you@example.com">
-        </label>
-      </div>
-      <div class="rep-note" id="repNote">Not sending yet — reports aren't live, so nothing will be delivered. This just remembers how you'd like them once they launch.</div>
-    </div>
+    <!-- Filled by reports.js (window.__aoLoadReports): upload → match preview →
+         schedule + recipient slider + format choice → subscriptions list. -->
+    <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
   </section>
 
 </div>
@@ -121,5 +85,7 @@
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
 <script src="command-center.js"></script>
+<script src="claims.js"></script>
+<script src="reports.js"></script>
 </body>
 </html>

@@ -291,6 +291,7 @@
         <div></div>
         <div class="sb-head-actions">
           <div class="sb-head-btns">
+            <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
             <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
@@ -392,6 +393,7 @@
       node.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") { e.preventDefault(); show(); } });
     });
 
+    wireFullscreen(host);
     wireAddButton(host);
     wireNewArrayButton(host);
     wireResetButton(host);
@@ -1010,10 +1012,60 @@
   // across re-renders. Inverters/arrays/buttons are excluded so the existing
   // HTML5 drag-to-rearrange and clicks keep working untouched.
   let _view = { x:0, y:0, z:1 }, _fitDone = false;
+  // Promote the canvas to its own GPU layer ONLY while the user is actively
+  // panning/zooming (smooth), then drop the promotion shortly after so the browser
+  // re-rasterizes it crisply at the current scale. A permanent will-change keeps a
+  // single 1× texture that gets stretched on zoom — that's what looked fuzzy.
+  let _interactTimer = null;
+  function markInteracting(c){
+    if(!c) return;
+    c.classList.add("sb-interacting");
+    clearTimeout(_interactTimer);
+    _interactTimer = setTimeout(() => c.classList.remove("sb-interacting"), 200);
+  }
   function applyCanvasView(host){
     const c = (host||document).querySelector("#sandbox .sb-canvas");
-    if(c) c.style.transform = `translate(${_view.x}px,${_view.y}px) scale(${_view.z})`;
+    if(!c) return;
+    // round the pan offset to whole pixels so text/edges don't land on half-pixels
+    c.style.transform = `translate(${Math.round(_view.x)}px,${Math.round(_view.y)}px) scale(${_view.z})`;
+    markInteracting(c);
   }
+  // ---- Full-screen mode: maximize #sbWrap (the whole fleet-tree card) to fill
+  // the viewport via a CSS overlay class (.sb-fs). We drive it with our own class
+  // rather than the native Fullscreen API because that API silently no-ops inside
+  // embedded webviews; a position:fixed overlay works everywhere. Esc exits. ----
+  let _fsBound = false;
+  function fsLabel(){
+    const wrap = document.getElementById("sbWrap");
+    const btn  = document.getElementById("sbFullscreen");
+    if(btn) btn.textContent = (wrap && wrap.classList.contains("sb-fs")) ? "⤢ Exit full screen" : "⛶ Full screen";
+  }
+  function exitFs(){
+    const wrap = document.getElementById("sbWrap");
+    if(wrap && wrap.classList.contains("sb-fs")){
+      wrap.classList.remove("sb-fs");
+      document.body.classList.remove("sb-fs-lock");
+      fsLabel();
+      requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+    }
+  }
+  function wireFullscreen(host){
+    const btn  = host.querySelector("#sbFullscreen");
+    const wrap = document.getElementById("sbWrap");
+    if(!btn || !wrap) return;
+    fsLabel();
+    btn.onclick = () => {
+      const on = wrap.classList.toggle("sb-fs");
+      document.body.classList.toggle("sb-fs-lock", on);   // freeze the page behind it
+      fsLabel();
+      requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+    };
+    if(!_fsBound){
+      _fsBound = true;
+      document.addEventListener("keydown", e => { if(e.key === "Escape") exitFs(); });
+    }
+  }
+
   // Auto-fit: scale + center the fleet so it fills the viewport (no empty void).
   function fitView(host){
     const vp = (host||document).querySelector(".sb-viewport");
@@ -1445,54 +1497,58 @@
   function signInPrompt(){ return `<div class="empty">Sign in to manage your master account. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; }
   function sessionExpired(){ return `<div class="empty">Your session expired — <a href="onboarding.html" style="color:var(--good)">sign in again →</a></div>`; }
 
-  function plainCard(label, valueHTML, subHTML, cls){
-    return `<div class="acct-card ${cls||""}">
-      <div class="k">${esc(label)}</div>
-      <div class="v">${valueHTML}</div>
-      ${subHTML ? `<div class="sub">${subHTML}</div>` : ""}
+  /* ---- horizontal-row builders for the flat "all business" account list ---- */
+  function rowStatic(label, valueHTML, subHTML, actionHTML){
+    return `<div class="acct-row">
+      <div class="r-k">${esc(label)}</div>
+      <div class="r-v">${valueHTML}${subHTML ? `<span class="r-sub">${subHTML}</span>` : ""}</div>
+      <div class="r-a">${actionHTML || ""}</div>
     </div>`;
   }
-  function editCard(label, field, value, placeholder){
-    return `<div class="acct-card">
-      <div class="k">${esc(label)}</div>
-      <div class="acct-edit" data-field="${esc(field)}">
+  function rowEdit(label, field, value, placeholder){
+    return `<div class="acct-row acct-edit" data-field="${esc(field)}">
+      <div class="r-k">${esc(label)}</div>
+      <div class="r-v">
         <input type="text" autocomplete="off" spellcheck="false" value="${esc(value||"")}" placeholder="${esc(placeholder||"")}">
-        <button class="acct-btn" type="button">Save</button>
+        <div class="acct-msg"></div>
       </div>
-      <div class="acct-msg"></div>
+      <div class="r-a"><button class="acct-btn" type="button">Save</button></div>
     </div>`;
   }
 
-  function renderAccount(a){
-    const cards = document.getElementById("acctCards");
-    if(!cards) return;
+  function renderAccountList(a){
+    const list = document.getElementById("acctList");
+    if(!list) return;
     const company  = pick(a, ["company_name","company"], "");
     const operator = pick(a, ["operator_name","name","owner_name"], "");
     const email    = pick(a, ["email","operator_email"], "");
-    const plan     = pick(a, ["plan","plan_name","tier"], "Free");
-    const status   = pick(a, ["subscription_status","status"], "trial");
-    const trialEnds = pick(a, ["trial_ends_at","trial_end","trial_expires_at"], null);
-    const onTrial  = a.on_trial === true || a.trial === true || /trial/i.test(String(status));
 
-    let subSub = "", subCls = "";
-    if(onTrial){ subCls = "warn"; subSub = trialEnds ? `Free trial — ends ${fmtDate(trialEnds)}` : "Free trial in progress"; }
-    else if(/active|paid/i.test(String(status))){ subCls = "good"; subSub = "Subscription active"; }
+    // One flat list of rows: identity → login & password → bill → payment.
+    list.innerHTML =
+      rowStatic("Name", esc(operator || "—")) +
+      rowEdit("Company", "company", company, "Add your company name") +
+      rowEdit("Email", "email", email, "you@example.com") +
+      rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
+      rowStatic("Password", "••••••••",
+        "Passwordless — you sign in with a secure link we email you. Nothing to remember.",
+        `<button class="acct-btn" id="loginLink" type="button">Email me a sign-in link</button>`) +
+      rowStatic("Your bill",
+        `<span class="r-big" id="billAmount">Loading…</span>`,
+        `<span id="billWhy"></span>`) +
+      rowStatic("Payment method",
+        `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
+        null,
+        `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`);
 
-    cards.innerHTML = [
-      editCard("Company", "company", company, "Add your company name"),
-      plainCard("Operator", esc(operator || "—")),
-      editCard("Email", "email", email, "you@example.com"),
-      plainCard("Plan", esc(titleCase(plan)), null, /free/i.test(String(plan)) ? "good" : ""),
-      plainCard("Subscription", esc(titleCase(status) || "Active"), subSub, subCls),
-    ].join("");
     wireAcctEdits();
+    wireLoginLink();
   }
 
   function wireAcctEdits(){
-    document.querySelectorAll("#acctCards .acct-edit").forEach(row => {
+    document.querySelectorAll("#acctList .acct-edit").forEach(row => {
       const inp = row.querySelector("input");
       const btn = row.querySelector(".acct-btn");
-      const msg = row.parentElement.querySelector(".acct-msg");
+      const msg = row.querySelector(".acct-msg");
       const field = row.dataset.field;             // "company" | "email"
       btn.onclick = async () => {
         const val = inp.value.trim();
@@ -1510,6 +1566,8 @@
           if(r.ok){
             if(msg){ msg.className = "acct-msg ok"; msg.textContent = "Saved."; }
             if(_account) _account[field === "company" ? "company_name" : "email"] = val;
+            // Email is also the login — keep the Login row in sync.
+            if(field === "email"){ const lg = document.getElementById("loginEmail"); if(lg) lg.textContent = val; }
           } else {
             if(msg){ msg.className = "acct-msg err"; msg.textContent = `Couldn't save (HTTP ${r.status}) — try again.`; }
           }
@@ -1521,60 +1579,98 @@
     });
   }
 
+  // Passwordless sign-in: email the owner a fresh magic link from the account page.
+  function wireLoginLink(){
+    const btn = document.getElementById("loginLink");
+    if(!btn) return;
+    const sub = btn.closest(".acct-row").querySelector(".r-sub");
+    btn.onclick = async () => {
+      const h = authHeaders();
+      if(!h){ if(sub) sub.textContent = "Sign in first."; return; }
+      const email = (_account && pick(_account, ["email","operator_email"], "")) || "your email";
+      btn.disabled = true;
+      if(sub) sub.textContent = "Sending…";
+      try{
+        const r = await fetch("/v1/account/login-link", { method:"POST",
+          headers: Object.assign({ "Content-Type":"application/json" }, h), body: "{}" });
+        if(sub) sub.textContent = r.ok
+          ? `Sent — check ${email} for your sign-in link.`
+          : "Couldn't send a link right now — please try again shortly.";
+      }catch(e){ if(sub) sub.textContent = "Couldn't reach the server — check your connection."; }
+      btn.disabled = false;
+    };
+  }
+
+  // Fill the "Your bill" + "Payment method" rows once billing data lands.
   async function renderBilling(h){
-    const box = document.getElementById("billingCards");
-    const actions = document.getElementById("billingActions");
-    if(!box) return;
-    box.innerHTML = `<div class="empty">Loading billing…</div>`;
+    const amtEl = document.getElementById("billAmount");
+    const whyEl = document.getElementById("billWhy");
+    if(!amtEl) return;
 
     let summary = null, invoice = null;
     try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); } catch(e){}
     try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); } catch(e){}
 
-    const cards = [];
-    const basis = pick(summary, ["billing_basis"], null);
     // Amounts from billing-summary are in (possibly fractional) CENTS.
     const usdFromCents = c => (c==null ? "—" : "$" + (Number(c)/100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+    const basis  = pick(summary, ["billing_basis"], null);
+    const status = pick(summary, ["subscription_status","status"], (_account && pick(_account, ["subscription_status","status"], "")) || "");
+    const onTrial = (_account && (_account.on_trial === true || _account.trial === true)) || /trial/i.test(String(status));
+    const trialEnds = _account ? pick(_account, ["trial_ends_at","trial_end","trial_expires_at"], null) : null;
 
+    let amount = "—", why = "";
     if(basis === "kwh"){
       // Array Operator — billed by generation.
-      const mtdKwh   = pick(summary, ["mtd_kwh"], null);
-      const rate     = pick(summary, ["rate_cents_per_kwh"], null);   // decimal cents/kWh
-      const totalC   = pick(summary, ["total_cents"], null);          // month-to-date estimate, cents
-      const arrays   = pick(summary, ["billable_arrays"], null);
-      if(rate != null)    cards.push(plainCard("Rate", `${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent; <small>/ kWh · volume discounts</small>`));
-      if(mtdKwh != null)  cards.push(plainCard("Generated this month", `${Number(mtdKwh).toLocaleString(undefined,{maximumFractionDigits:0})} <small>kWh</small>`));
-      if(arrays != null)  cards.push(plainCard("Arrays connected", esc(String(arrays))));
-      if(totalC != null)  cards.push(plainCard("This month so far", `${usdFromCents(totalC)} <small>· est.</small>`));
-    } else {
+      const mtdKwh = pick(summary, ["mtd_kwh"], null);
+      const rate   = pick(summary, ["rate_cents_per_kwh"], null);
+      const totalC = pick(summary, ["total_cents"], null);
+      const arrays = pick(summary, ["billable_arrays"], null);
+      amount = `${usdFromCents(totalC)} <small>this month</small>`;
+      const bits = [];
+      if(rate != null && mtdKwh != null) bits.push(`${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh × ${Number(mtdKwh).toLocaleString(undefined,{maximumFractionDigits:0})} kWh generated`);
+      else if(rate != null)              bits.push(`${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent; per kWh your arrays generate`);
+      if(arrays != null)                 bits.push(`across ${arrays} array${Number(arrays)===1?"":"s"}`);
+      why = bits.join(" ");
+    } else if(summary){
       // NEPOOL Operator — billed per array (legacy shape kept for the verifier app).
       const arrayCount = pick(summary, ["billable_arrays","array_count","arrays_count","arrays"], null);
       const fullUnit   = pick(summary, ["full_unit_cents"], null);
       const totalC     = pick(summary, ["total_cents"], null);
-      if(arrayCount != null) cards.push(plainCard("Arrays connected", esc(String(arrayCount))));
-      if(fullUnit != null)   cards.push(plainCard("Price tier", `${usdFromCents(fullUnit)} <small>/ array / mo</small>`));
-      if(totalC != null)     cards.push(plainCard("Monthly total", usdFromCents(totalC)));
+      amount = `${usdFromCents(totalC)} <small>this month</small>`;
+      const bits = [];
+      if(fullUnit != null)   bits.push(`${usdFromCents(fullUnit)} per array / mo`);
+      if(arrayCount != null) bits.push(`× ${arrayCount} array${Number(arrayCount)===1?"":"s"}`);
+      why = bits.join(" ");
+    } else {
+      amount = `$0.00 <small>this month</small>`;
+      why = "You're only billed for the kWh your arrays generate.";
     }
 
+    // Trial + next-invoice context appended to the "why".
+    const ctx = [];
+    if(onTrial) ctx.push(trialEnds ? `free trial through ${fmtDate(trialEnds)} — nothing charged yet` : "free trial — nothing charged yet");
     const invAmt = invoice ? pick(invoice, ["amount_cents","amount_due","total","amount"], null) : null;
     if(invAmt != null){
       const invDate = pick(invoice, ["period_end","due_date","date","next_payment_date"], null);
-      cards.push(plainCard("Next invoice", `${usdFromCents(invAmt)}${invDate ? ` <small>· ${fmtDate(invDate)}</small>` : ""}`));
+      ctx.push(`next invoice ${usdFromCents(invAmt)}${invDate ? ` on ${fmtDate(invDate)}` : ""}`);
     }
+    if(ctx.length) why = why ? `${why} · ${ctx.join(" · ")}` : ctx.join(" · ");
 
-    box.innerHTML = cards.length ? cards.join("")
-      : `<div class="acct-card"><div class="k">Billing</div><div class="v">You're on a free trial</div>
-           <div class="sub">No invoices yet — you're only billed for the kWh your arrays generate, and never during your trial. Add a card whenever you're ready.</div></div>`;
+    amtEl.innerHTML = amount;
+    if(whyEl) whyEl.innerHTML = why || "—";
 
-    // Manage-billing button: portal if a card already exists, otherwise add-payment-method.
-    const sStatus = String(pick(summary, ["subscription_status","status"], "") || "");
+    // Payment state + button. A card exists only on a real paid/active status or an
+    // explicit flag — a bare trial does NOT mean a card is on file (that's why the
+    // default CTA is "Add credit card").
+    const sStatus = String(status || "");
     const hasCard = (summary && (summary.has_payment_method === true || summary.has_card === true))
-      || /active|past_due|paid|trialing/i.test(sStatus);
-    if(actions){
-      actions.innerHTML = `<button class="acct-btn primary" id="billManage" type="button">${hasCard ? "Manage billing / update card" : "Manage billing / add card"}</button>
-        <div class="acct-msg" id="billMsg"></div>`;
-      const btn = document.getElementById("billManage");
-      if(btn) btn.onclick = () => manageBilling(hasCard);
+      || /active|past_due|paid/i.test(sStatus);
+    const payState = document.getElementById("payState");
+    const btn = document.getElementById("billManage");
+    if(payState) payState.textContent = hasCard ? "Card on file" : "No card on file";
+    if(btn){
+      btn.textContent = hasCard ? "Update credit card" : "Add credit card";
+      btn.onclick = () => manageBilling(hasCard);
     }
   }
 
@@ -1606,24 +1702,20 @@
   }
 
   async function loadAccount(){
-    const cards = document.getElementById("acctCards");
-    if(!cards) return;
+    const list = document.getElementById("acctList");
+    if(!list) return;
     const h = authHeaders();
-    if(!h){
-      cards.innerHTML = signInPrompt();
-      const box = document.getElementById("billingCards"); if(box) box.innerHTML = "";
-      const act = document.getElementById("billingActions"); if(act) act.innerHTML = "";
-      return;
-    }
-    cards.innerHTML = `<div class="empty">Loading your account…</div>`;
+    if(!h){ list.innerHTML = signInPrompt(); return; }
+    list.innerHTML = `<div class="empty">Loading your account…</div>`;
     try{
       const r = await fetch("/v1/account", { headers: h });
-      if(r.status === 401){ cards.innerHTML = sessionExpired(); return; }
+      if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
       if(!r.ok) throw new Error("account " + r.status);
       _account = await r.json();
-      renderAccount(_account);
+      renderAccountList(_account);
     }catch(e){
-      cards.innerHTML = `<div class="empty">Couldn't load your account right now — please refresh.</div>`;
+      list.innerHTML = `<div class="empty">Couldn't load your account right now — please refresh.</div>`;
+      return;
     }
     renderBilling(h);
   }
@@ -1633,6 +1725,10 @@
    * Nothing is sent; the cadence selector just records intent for later.
    * ==========================================================================*/
   function loadReports(){
+    // The Reports tab is now the automatic-billing surface, owned by reports.js
+    // (window.__aoLoadReports). Delegate to it; the legacy placeholder prefill
+    // below only runs if reports.js failed to load (defensive).
+    if(window.__aoLoadReports){ window.__aoLoadReports(); return; }
     const email = document.getElementById("repEmail");
     if(!email) return;
     const apply = a => { if(a && !email.value){ const e = pick(a, ["email","operator_email"], ""); if(e) email.value = e; } };
@@ -1651,11 +1747,13 @@
   const TABS = {
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
+    claims:  { panel: "panelClaims",  tab: "tabClaims"  },
     reports: { panel: "panelReports", tab: "tabReports" },
   };
   function tabFromHash(){
     const h = location.hash;
     if(h === "#account") return "account";
+    if(h === "#claims")  return "claims";
     if(h === "#reports") return "reports";
     return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing
   }
@@ -1677,6 +1775,9 @@
       if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
     } else if(active === "account"){
       loadAccount();
+    } else if(active === "claims"){
+      load();                                       // ensure the fleet is loaded so claims can reconcile
+      if(window.__claimsLoad) window.__claimsLoad();
     } else if(active === "reports"){
       loadReports();
     }
