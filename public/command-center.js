@@ -135,17 +135,17 @@
           <h2>Portfolio command center</h2>
           <div class="cc-sub">${esc(simNote)}</div>
         </div>
-        <div class="cc-asof"><b>●</b> updated just now</div>
+        <div class="cc-asof" id="ccAsof">${asofText()}</div>
       </div>
 
       <div class="cc-kpis">
-        <div class="cc-kpi"><div class="k">Sites</div><div class="v">${num(k.sites)}</div><div class="s">arrays under management</div></div>
-        <div class="cc-kpi"><div class="k">Inverters</div><div class="v">${num(k.inverters)}</div><div class="s">monitored across the fleet</div></div>
-        <div class="cc-kpi healthy"><div class="k">Healthy</div><div class="v">${k.healthyPct}%</div>
-          <div class="cc-meter"><i style="width:${k.healthyPct}%"></i></div></div>
-        <div class="cc-kpi risk"><div class="k">At risk / mo</div><div class="v">${usd0(k.riskMo)}</div><div class="s">leaking right now</div></div>
-        <div class="cc-kpi flagged"><div class="k">Flagged now</div><div class="v">${num(k.flagged)}</div><div class="s">${k.crit} critical · ${k.flagged-k.crit} watch</div></div>
-        <div class="cc-kpi recovered"><div class="k">Recovered YTD</div><div class="v">${usd0(MODEL.recovered)}</div><div class="s">claims & fixes you've banked</div></div>
+        <div class="cc-kpi"><div class="k">Sites</div><div class="v" data-kpi="sites">${num(k.sites)}</div><div class="s">arrays under management</div></div>
+        <div class="cc-kpi"><div class="k">Inverters</div><div class="v" data-kpi="inverters">${num(k.inverters)}</div><div class="s">monitored across the fleet</div></div>
+        <div class="cc-kpi healthy"><div class="k">Healthy</div><div class="v" data-kpi="healthy">${k.healthyPct}%</div>
+          <div class="cc-meter"><i data-kpi="healthmeter" style="width:${k.healthyPct}%"></i></div></div>
+        <div class="cc-kpi risk"><div class="k">At risk / mo</div><div class="v" data-kpi="risk">${usd0(k.riskMo)}</div><div class="s">leaking right now</div></div>
+        <div class="cc-kpi flagged"><div class="k">Flagged now</div><div class="v" data-kpi="flagged">${num(k.flagged)}</div><div class="s" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</div></div>
+        <div class="cc-kpi recovered"><div class="k">Recovered YTD</div><div class="v" data-kpi="recovered">${usd0(MODEL.recovered)}</div><div class="s">claims & fixes you've banked</div></div>
       </div>`;
 
     // the triage queue (toolbar + table + foot) renders into its own container
@@ -361,19 +361,47 @@ Thank you,
   }
 
   /* ===========================================================================
-   * 5. LOAD
+   * 5. LIVE — KPIs reflect the fleet and keep updating. The store runs a
+   * heartbeat (polls the backend when live, gently evolves the demo otherwise)
+   * and emits kind "live"; we repaint the KPI numbers IN PLACE so the strip
+   * stays current without rebuilding the triage queue under the user's hands.
    * ==========================================================================*/
-  // React to the shared store: rebuild the portfolio model + re-render on ANY
-  // change — including ones triggered by the sandbox (a drag re-measures peer
-  // indices, which moves the KPIs and the triage queue here in the same frame).
-  function onStore(){
+  function asofText(){
+    const t = (window.FleetStore && FleetStore.lastUpdate) ? FleetStore.lastUpdate() : 0;
+    const s = t ? Math.max(0, Math.round((Date.now()-t)/1000)) : 0;
+    return `<b>●</b> ${s<2 ? "updated just now" : "updated "+s+"s ago"}`;
+  }
+  function setText(sel, val){ const el = document.querySelector(sel); if(el && el.textContent!==val) el.textContent = val; }
+
+  // recompute KPIs from the store and write them into the existing strip
+  function paintKpis(){
     if(!host()) return;
+    MODEL = buildModel(FleetStore.snapshot());   // keep the model fresh for the queue too
+    const k = MODEL.kpis;
+    setText('[data-kpi="sites"]', num(k.sites));
+    setText('[data-kpi="inverters"]', num(k.inverters));
+    setText('[data-kpi="healthy"]', k.healthyPct+"%");
+    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.width = k.healthyPct+"%";
+    setText('[data-kpi="risk"]', usd0(k.riskMo));
+    setText('[data-kpi="flagged"]', num(k.flagged));
+    setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
+    setText('[data-kpi="recovered"]', usd0(MODEL.recovered));
+    const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
+  }
+
+  // React to the shared store: a "live" beat just repaints the numbers; any
+  // structural change (load / drag / triage) does the full render.
+  function onStore(state, kind){
+    if(!host()) return;
+    if(kind === "live" && document.querySelector('[data-kpi="risk"]')){ paintKpis(); return; }
     MODEL = buildModel(FleetStore.snapshot());
     render();
   }
 
   window.__ccLoad = () => FleetStore.load();
   FleetStore.subscribe(onStore);
+  // tick the "updated Ns ago" label once a second (cheap, text-only)
+  setInterval(() => { const a = document.getElementById("ccAsof"); if(a) a.innerHTML = asofText(); }, 1000);
   if(document.readyState!=="loading") FleetStore.load();
   else document.addEventListener("DOMContentLoaded", FleetStore.load);
 })();

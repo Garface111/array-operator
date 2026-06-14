@@ -1692,7 +1692,7 @@
   // Triage-only updates are ignored; they don't touch the tree.
   if(window.FleetStore){
     FleetStore.subscribe((s, kind) => {
-      if(kind === "triage") return;
+      if(kind === "triage" || kind === "live") return;   // its own kW ticker handles live motion
       if(document.getElementById("sandbox")) renderFromStore();
     });
   }

@@ -204,6 +204,7 @@ window.FleetStore = (function(){
   /* ===========================================================================
    * LOAD — one fetch (live) or one simulated fleet (demo), shared by both views
    * ==========================================================================*/
+  let _lastUpdate = 0;
   function ingest(arrays, opts){
     state.arrays = arrays;
     state.simulated = !!(opts && opts.simulated);
@@ -211,7 +212,45 @@ window.FleetStore = (function(){
     state.arrays.forEach(recompute);
     if(!state.focus.length) state.focus = defaultFocusIds();
     state.loaded = true;
+    _lastUpdate = Date.now();
+    startHeartbeat();
     notify("load");
+  }
+
+  /* ---- live heartbeat: keeps the dashboard genuinely live ----
+   * Real data → poll the backend every ~45s and re-ingest. Simulated demo →
+   * gently evolve the fleet so the KPIs visibly breathe. Either way we stamp
+   * _lastUpdate and emit "live" (a lightweight beat the command center repaints
+   * in place; the fleet tree ignores it — its own kW ticker handles motion). */
+  let _hb = null, _beat = 0;
+  function startHeartbeat(){
+    if(_hb) return;
+    _hb = setInterval(() => {
+      _beat++;
+      if(state.simulated){
+        liveDrift();
+        _lastUpdate = Date.now();
+        notify("live");
+      } else if(_beat % 9 === 0){           // ~45s
+        refetch();                          // real telemetry refresh (ingest stamps _lastUpdate)
+      }
+    }, 5000);
+  }
+  // bounded random-walk on the demo fleet: underperformers' recent output and the
+  // recovered total drift a little each beat. No status flips → no structural churn.
+  function liveDrift(){
+    state.arrays.forEach(a => {
+      a.inverters.forEach(i => {
+        if(i.current_power_w != null && i.current_power_w > 0){
+          if(i._baseP == null) i._baseP = i.current_power_w;
+          i.current_power_w = Math.max(0, Math.round(i._baseP * (1 + (Math.random()-0.5)*0.03)));
+        }
+        if(i.status === "underperforming" && i.window_kwh){
+          i.window_kwh = Math.max(1, i.window_kwh * (1 + (Math.random()-0.5)*0.012));
+        }
+      });
+    });
+    if(Math.random() < 0.3) state.recovered += Math.round(10 + Math.random()*60);
   }
 
   function refetch(){
@@ -300,6 +339,7 @@ window.FleetStore = (function(){
     reassignInverter, reorderInverters, createArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
     isLoaded: () => state.loaded,
+    lastUpdate: () => _lastUpdate,
     WINDOW_DAYS,
   };
 })();
