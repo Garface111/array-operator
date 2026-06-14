@@ -310,7 +310,8 @@
         v.textContent = (drift/1000).toFixed(1);
         v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
       });
-      checkPeerDrops();
+      // peer-drop alert popups (floating cards + toasts) removed by request — the
+      // triage queue in the command center is the home for "what needs a look".
     }, 2600);
   }
 
