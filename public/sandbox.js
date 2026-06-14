@@ -439,11 +439,17 @@
         // drawn card→trunk (bottom→top) so the dashed flow animates UPWARD
         feeders.push(`M ${ix} ${iy} C ${ix} ${iy - 12}, ${cx} ${joinY + 12}, ${cx} ${joinY}`);
       });
-      const trunk = `M ${cx} ${maxJoin} L ${cx} -16`;
+      const trunk = `M ${cx} ${maxJoin} L ${cx} -30`;  // rise into the array card
       svg.appendChild(mk("trunk", trunk));
       feeders.forEach(d => svg.appendChild(mk("feed", d)));
-      svg.appendChild(mk("flow", trunk));   // bright animated overlay
-      feeders.forEach(d => svg.appendChild(mk("flow", d)));
+      // sparse glowing motes, one per wire, phase-staggered so they don't pulse
+      // in lockstep — energy flowing up, organic rather than mechanical.
+      [trunk, ...feeders].forEach((d, i) => {
+        const p = mk("flow", d);
+        const ph = ((i * 2654435761 >>> 0) % 1000) / 1000 * 3;  // 0..3s pseudo-random
+        p.style.animationDelay = (-ph).toFixed(2) + "s";
+        svg.appendChild(p);
+      });
       teeth.appendChild(svg);
     });
   }
