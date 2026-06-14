@@ -544,10 +544,17 @@
   // wall-clock rate. (Demo only — production drives this from real elapsed energy.)
   const LOST_DEMO_MIN_PER_TICK = 6;
 
-  // Find the currently-selected .sb-inv element by its stable data-inv-id.
+  // Find the currently-selected .sb-inv. The demo data has no unique inverter_id,
+  // so we track by a stable (array name | inverter name) key instead.
+  function _invKey(node){
+    const col = node.closest(".sb-col");
+    const arr = col ? ((col.querySelector(".sb-array-name")||{}).textContent || "") : "";
+    const name = node.dataset.name || (node.querySelector(".sb-inv-name")||{}).textContent || "";
+    return arr.trim() + " || " + name.trim();
+  }
   function _selectedInv(){
     if(_detailInvId == null) return null;
-    return document.querySelector(`#sandbox .sb-inv[data-inv-id="${CSS.escape(String(_detailInvId))}"]`);
+    return [...document.querySelectorAll("#sandbox .sb-inv")].find(el => _invKey(el) === _detailInvId) || null;
   }
 
   // Estimate the kW this inverter is *missing* vs. where it should be: the most of
@@ -601,7 +608,7 @@
     const sLabel = STATUS_LABEL[d.status] || d.status || "";
 
     // bind the live updater to this inverter and reset the lost-$ accumulator
-    _detailInvId = d.invId != null ? d.invId : null;
+    _detailInvId = _invKey(node);          // unique (array|name) key — demo has no unique inverter_id
     _detailLost = 0;
     _detailLostTs = Date.now();
 
