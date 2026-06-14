@@ -275,7 +275,7 @@
   /* canvas: horizontal scroll of columns */
   .sb-viewport{position:relative;overflow:hidden;height:calc(100vh - 210px);min-height:440px;border-radius:14px;cursor:grab;touch-action:none;background:rgba(255,255,255,.012)}
   .sb-viewport.panning{cursor:grabbing}
-  .sb-canvas{position:relative;display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0}
+  .sb-canvas{position:relative;display:flex;gap:54px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0}
   /* promote to a GPU layer only mid-gesture; idle = re-rasterized crisp at scale */
   .sb-canvas.sb-interacting{will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
@@ -335,7 +335,7 @@
   svg.sb-wires path.flow{stroke:rgba(205,255,232,.95);stroke-width:2.5;stroke-linecap:round;
     stroke-dasharray:5 26;filter:drop-shadow(0 0 6px rgba(63,214,138,.85));animation:moterise 3s linear infinite}
   @keyframes moterise{to{stroke-dashoffset:-31}}
-  .sb-teeth{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;padding-top:0;position:relative}
+  .sb-teeth{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding-top:0;position:relative}
   .sb-inv{flex:0 0 auto;width:92px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
     background:linear-gradient(165deg,var(--card),var(--card2));padding:10px 8px 9px;text-align:center;position:relative;
     transition:transform .12s,border-color .12s,box-shadow .12s}
