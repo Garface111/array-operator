@@ -274,11 +274,14 @@
          </div>
          <div class="sb-head-actions"><div class="sb-head-btns">
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
+           <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>
          <div class="sb-empty">No arrays connected yet — hit <b>+ Add array</b> to bring your inverters in.</div>`;
       wireAddButton(host);
       wireNewArrayButton(host);
+      wireCardButton(host); // "+ Card" menu (Note / Data)
+      renderCards();        // fixed cards still show; free cards need a canvas (appear once arrays exist)
       return;
     }
 
@@ -290,6 +293,7 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
+            <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
             <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
           </div>
           <div class="sb-legend">
@@ -404,6 +408,8 @@
     wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
+    wireCardButton(host); // "+ Card" menu (Note / Data)
+    renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
   }
 
   // ---- live output ticker: updates each card's "kW now" in place. With live
@@ -423,6 +429,7 @@
         v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
       });
       checkPeerDrops();
+      refreshDataCards();      // keep live-metric data cards in step with the kW ticker
     }, 2600);
   }
 
@@ -562,6 +569,297 @@
     host.appendChild(card);
   }
 
+
+  /* ===========================================================================
+   * FREE-FORM OWNER CARDS — note cards (editable sticky) + data cards (live
+   * metric) the owner can drop onto the canvas. Two placement modes:
+   *   free  → rendered INTO .sb-canvas, so the card pans/zooms WITH the fleet
+   *           (x/y stored in canvas coordinates). Recreated at the end of every
+   *           render() (the canvas is rebuilt each render — idempotent rebuild).
+   *   fixed → rendered into a persistent #sbCardsFixed layer on #sbWrap, pinned
+   *           to the panel (x/y in panel pixels); survives re-renders like #sbAlerts.
+   * A pin toggle flips a card free↔fixed (its x/y is re-seeded near viewport
+   * center on the flip so it never lands off-screen). All cards persist to
+   * localStorage under CARDS_KEY as {id,kind,mode,x,y,text?,title?,metric?}.
+   * ==========================================================================*/
+  const CARDS_KEY = "ao_cards";
+  // Live-fleet metrics, computed from the rendered .sb-inv DOM each tick.
+  const ATTENTION_STATES = new Set(["warn","underperforming","comm_gap","dead","fault"]);
+  const CARD_METRICS = {
+    fleet_now:  { label:"Fleet output now", unit:"kW",   compute: fleetNowKW },
+    attention:  { label:"Needs attention",  unit:"",     compute: needsAttention },
+    capacity:   { label:"Total capacity",   unit:"kW",   compute: totalCapacityKW },
+    arrays:     { label:"Arrays",           unit:"",     compute: arrayCount },
+  };
+  const METRIC_ORDER = ["fleet_now","attention","capacity","arrays"];
+
+  function _invNowKW(inv){
+    // Prefer the live ticker's displayed value; fall back to the seeded base watts.
+    const v = inv.querySelector(".sb-now-val");
+    const live = v ? parseFloat(v.textContent) : NaN;
+    if(isFinite(live)) return live;
+    const nowEl = inv.querySelector(".sb-inv-now");
+    const baseW = nowEl ? parseFloat(nowEl.dataset.basew) : NaN;
+    return isFinite(baseW) ? baseW/1000 : 0;
+  }
+  function _invNpKW(inv){ const m = (inv.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; }
+  function fleetNowKW(){
+    let s = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { const k = _invNowKW(inv); if(isFinite(k)) s += k; });
+    return s.toFixed(1);
+  }
+  function needsAttention(){
+    let n = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { if(ATTENTION_STATES.has(inv.dataset.status)) n++; });
+    return String(n);
+  }
+  function totalCapacityKW(){
+    let s = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { const k = _invNpKW(inv); if(isFinite(k)) s += k; });
+    return (Math.round(s*10)/10).toString();
+  }
+  function arrayCount(){ return String(document.querySelectorAll("#sandbox .sb-col").length); }
+
+  // ---- card storage (localStorage; mirrors saveOrder / saveRename style) ----
+  function loadCards(){
+    try {
+      const v = JSON.parse(localStorage.getItem(CARDS_KEY));
+      return Array.isArray(v) ? v.filter(c => c && c.id && (c.kind==="note"||c.kind==="data")) : [];
+    } catch(e){ return []; }
+  }
+  function saveCards(cards){
+    try { localStorage.setItem(CARDS_KEY, JSON.stringify(cards)); } catch(e){}
+  }
+  function updateCard(id, patch){
+    const cards = loadCards();
+    const c = cards.find(x => x.id === id);
+    if(!c) return;
+    Object.assign(c, patch);
+    saveCards(cards);
+  }
+  function removeCard(id){ saveCards(loadCards().filter(c => c.id !== id)); }
+  function newCardId(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  // Persistent fixed-card layer on #sbWrap (survives re-renders, like #sbAlerts).
+  function fixedCardHost(){
+    let h = document.getElementById("sbCardsFixed");
+    if(!h){
+      h = document.createElement("div");
+      h.id = "sbCardsFixed"; h.className = "sb-cards-fixed";
+      (document.getElementById("sbWrap") || document.body).appendChild(h);
+    }
+    return h;
+  }
+
+  // Pick a sensible spawn point near the viewport center.
+  // mode=free → canvas coords (invert the pan/zoom transform). mode=fixed → panel px.
+  function centerFor(mode){
+    const wrap = document.getElementById("sbWrap");
+    const vp = document.querySelector("#sandbox .sb-viewport");
+    if(mode === "fixed"){
+      const wr = wrap ? wrap.getBoundingClientRect() : { width:600, height:400 };
+      return { x: Math.max(12, wr.width/2 - 105), y: Math.max(12, wr.height/2 - 70) };
+    }
+    // free: map viewport-center screen point back through _view (translate+scale)
+    if(vp){
+      const cx = vp.clientWidth/2, cy = vp.clientHeight/2;
+      return { x: (cx - _view.x)/_view.z - 105, y: (cy - _view.y)/_view.z - 70 };
+    }
+    return { x: 40, y: 40 };
+  }
+
+  // ---- "+ Card" head button → small Note/Data menu ----
+  function wireCardButton(host){
+    const btn = host.querySelector("#sbAddCard");
+    if(!btn) return;
+    const wrap = btn.closest(".sb-cardbtn-wrap") || btn.parentElement;
+    btn.onclick = e => {
+      e.stopPropagation();
+      if(wrap.querySelector(".sb-card-menu")){ closeCardMenu(); return; }
+      const menu = el(`<div class="sb-card-menu" role="menu">
+        <button type="button" data-kind="note" role="menuitem">Note<span class="mk-sub">Editable sticky note</span></button>
+        <button type="button" data-kind="data" role="menuitem">Data<span class="mk-sub">Live fleet metric</span></button>
+      </div>`);
+      menu.addEventListener("click", ev => ev.stopPropagation());
+      menu.querySelectorAll("button[data-kind]").forEach(b => {
+        b.onclick = () => { addCard(b.dataset.kind); closeCardMenu(); };
+      });
+      wrap.appendChild(menu);
+      setTimeout(() => document.addEventListener("click", closeCardMenu, { once:true }), 0);
+    };
+  }
+  function closeCardMenu(){
+    document.querySelectorAll(".sb-card-menu").forEach(m => m.remove());
+  }
+
+  // Create a brand-new card (default free), persist it, and render it.
+  function addCard(kind){
+    const pos = centerFor("free");
+    const card = {
+      id: newCardId(), kind, mode: "free",
+      x: Math.round(pos.x), y: Math.round(pos.y),
+    };
+    if(kind === "note"){ card.title = ""; card.text = ""; }
+    else { card.metric = "fleet_now"; }
+    const cards = loadCards(); cards.push(card); saveCards(cards);
+    renderCards();
+    refreshDataCards();
+  }
+
+  // ---- reconcile cards into the canvas (free) + fixed layer (idempotent) ----
+  function renderCards(){
+    const canvas = document.querySelector("#sandbox .sb-canvas");
+    const fixed = fixedCardHost();
+    const cards = loadCards();
+    const wantFree = new Set(), wantFixed = new Set();
+    cards.forEach(c => (c.mode === "fixed" ? wantFixed : wantFree).add(c.id));
+
+    // drop stale nodes
+    if(canvas) [...canvas.querySelectorAll(":scope > .sb-card")].forEach(n => { if(!wantFree.has(n.dataset.cardId)) n.remove(); });
+    [...fixed.querySelectorAll(":scope > .sb-card")].forEach(n => { if(!wantFixed.has(n.dataset.cardId)) n.remove(); });
+
+    cards.forEach(c => {
+      const layer = c.mode === "fixed" ? fixed : canvas;
+      if(!layer) return;                       // free card with no canvas yet (empty fleet) — skip
+      let node = layer.querySelector(`:scope > .sb-card[data-card-id="${c.id}"]`);
+      if(node){ positionCard(node, c); }       // already present → just keep position synced
+      else { layer.appendChild(buildCardNode(c)); }
+    });
+    refreshDataCards();
+  }
+
+  function positionCard(node, c){
+    node.style.left = (c.x||0) + "px";
+    node.style.top  = (c.y||0) + "px";
+  }
+
+  function buildCardNode(c){
+    const node = el(`<div class="sb-card" data-card-id="${esc(c.id)}" data-kind="${esc(c.kind)}" draggable="false"></div>`);
+    // a pointerdown anywhere on a card must never reach the viewport pan handler
+    node.addEventListener("pointerdown", e => e.stopPropagation());
+    positionCard(node, c);
+    const pinned = c.mode === "fixed";
+    const bar = el(`<div class="sb-card-bar">
+        <span class="sb-card-grip" aria-hidden="true">⠿</span>
+        <span class="sb-card-kind">${c.kind === "note" ? "Note" : "Data"}</span>
+        <button class="sb-card-btn sb-card-pin${pinned?" pinned":""}" type="button"
+                title="${pinned?"Pinned to panel — click to free":"Floats with the fleet — click to pin"}"
+                aria-label="Toggle pin">${pinned?"📌":"📍"}</button>
+        <button class="sb-card-btn sb-card-x" type="button" title="Delete card" aria-label="Delete card">×</button>
+      </div>`);
+    const body = el(`<div class="sb-card-body"></div>`);
+    if(c.kind === "note") buildNoteBody(body, c);
+    else buildDataBody(body, c);
+    node.appendChild(bar);
+    node.appendChild(body);
+
+    bar.querySelector(".sb-card-x").onclick = ev => { ev.stopPropagation(); removeCard(c.id); node.remove(); };
+    bar.querySelector(".sb-card-pin").onclick = ev => { ev.stopPropagation(); togglePin(c.id); };
+    wireCardDrag(node, bar, c.id);
+    return node;
+  }
+
+  // Note card: editable title + body (contenteditable), debounced-persist on input.
+  function buildNoteBody(body, c){
+    const title = el(`<div class="sb-note-title" contenteditable="true" data-ph="Title"></div>`);
+    const text  = el(`<div class="sb-note-text" contenteditable="true" data-ph="Write a note…"></div>`);
+    title.textContent = c.title || "";
+    text.textContent  = c.text  || "";
+    [title, text].forEach(ed => {
+      // editing/typing must never start a card drag or pan the canvas
+      ["pointerdown","mousedown","click","dblclick"].forEach(ev => ed.addEventListener(ev, e => e.stopPropagation()));
+      ed.addEventListener("keydown", e => e.stopPropagation());
+    });
+    title.addEventListener("input", () => updateCard(c.id, { title: title.textContent }));
+    text.addEventListener("input",  () => updateCard(c.id, { text:  text.textContent  }));
+    body.appendChild(title);
+    body.appendChild(text);
+  }
+
+  // Data card: metric dropdown + live value (updated by the ticker via refreshDataCards).
+  function buildDataBody(body, c){
+    const metric = CARD_METRICS[c.metric] ? c.metric : "fleet_now";
+    if(metric !== c.metric) updateCard(c.id, { metric });
+    const opts = METRIC_ORDER.map(k =>
+      `<option value="${k}"${k===metric?" selected":""}>${esc(CARD_METRICS[k].label)}</option>`).join("");
+    const sel = el(`<select class="sb-data-pick" aria-label="Metric">${opts}</select>`);
+    const valWrap = el(`<div class="sb-data-val"><span class="sb-data-num">—</span><span class="sb-data-unit"></span></div>`);
+    const label = el(`<div class="sb-data-label">${esc(CARD_METRICS[metric].label)}</div>`);
+    ["pointerdown","mousedown","click"].forEach(ev => sel.addEventListener(ev, e => e.stopPropagation()));
+    sel.addEventListener("change", () => {
+      updateCard(c.id, { metric: sel.value });
+      label.textContent = CARD_METRICS[sel.value].label;
+      refreshDataCards();
+    });
+    body.appendChild(sel);
+    body.appendChild(valWrap);
+    body.appendChild(label);
+  }
+
+  // Recompute every data card's value from the live fleet DOM (call each tick).
+  function refreshDataCards(){
+    document.querySelectorAll('.sb-card[data-kind="data"]').forEach(node => {
+      const id = node.dataset.cardId;
+      const sel = node.querySelector(".sb-data-pick");
+      const metric = sel ? sel.value : "fleet_now";
+      const def = CARD_METRICS[metric] || CARD_METRICS.fleet_now;
+      const num = node.querySelector(".sb-data-num");
+      const unit = node.querySelector(".sb-data-unit");
+      if(num) num.textContent = def.compute();
+      if(unit) unit.textContent = def.unit || "";
+    });
+  }
+
+  // Flip a card free↔fixed. Re-seed its x/y near viewport center for the new
+  // coordinate space so it never lands off-screen, persist, and re-render.
+  function togglePin(id){
+    const cards = loadCards();
+    const c = cards.find(x => x.id === id);
+    if(!c) return;
+    c.mode = c.mode === "fixed" ? "free" : "fixed";
+    const pos = centerFor(c.mode);
+    c.x = Math.round(pos.x); c.y = Math.round(pos.y);
+    saveCards(cards);
+    renderCards();
+  }
+
+  // Pointer-drag a card by its title bar. For free cards the canvas is scaled by
+  // _view.z, so divide pointer deltas by z to keep dragging 1:1 at any zoom. All
+  // handlers stopPropagation so card drag never triggers canvas pan / inv drag.
+  function wireCardDrag(node, handle, id){
+    let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+    handle.addEventListener("pointerdown", e => {
+      if(e.button !== 0) return;
+      if(e.target.closest("button")) return;        // pin / × buttons handle themselves
+      e.stopPropagation();                          // never start a canvas pan
+      e.preventDefault();
+      const cards = loadCards(); const c = cards.find(x => x.id === id);
+      if(!c) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      origX = c.x || 0; origY = c.y || 0;
+      node.classList.add("dragging");
+      try { handle.setPointerCapture(e.pointerId); } catch(_){}
+    });
+    handle.addEventListener("pointermove", e => {
+      if(!dragging) return;
+      e.stopPropagation();
+      const isFree = !node.parentElement || !node.parentElement.classList.contains("sb-cards-fixed");
+      const z = isFree ? (_view.z || 1) : 1;        // free cards live in the scaled canvas
+      const nx = origX + (e.clientX - startX)/z;
+      const ny = origY + (e.clientY - startY)/z;
+      node.style.left = nx + "px";
+      node.style.top  = ny + "px";
+    });
+    const end = e => {
+      if(!dragging) return;
+      dragging = false;
+      node.classList.remove("dragging");
+      if(e){ e.stopPropagation(); try { handle.releasePointerCapture(e.pointerId); } catch(_){} }
+      updateCard(id, { x: Math.round(parseFloat(node.style.left)||0), y: Math.round(parseFloat(node.style.top)||0) });
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    // prevent the grip from initiating an HTML5 drag of any ancestor
+    handle.addEventListener("dragstart", e => e.preventDefault());
+  }
 
   // ---- pan + zoom the fleet canvas. Drag empty space to pan, wheel to zoom
   // (toward the cursor), double-click empty space to reset. View state persists
