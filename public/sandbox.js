@@ -17,6 +17,7 @@
 (function(){
   const SESSION_KEY = "so_session";
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
+  const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
@@ -74,6 +75,114 @@
       const d = rank(a[0].array_id) - rank(b[0].array_id);
       return d !== 0 ? d : a[1] - b[1];
     }).map(x=>x[0]);
+  }
+
+  // ---- saved inline renames (localStorage) ----
+  // Owner-edited array / inverter names, keyed by stable id, re-applied every render.
+  function loadRenames(){
+    try {
+      const v = JSON.parse(localStorage.getItem(RENAME_KEY)) || {};
+      return { arrays: (v.arrays && typeof v.arrays==="object") ? v.arrays : {},
+               inverters: (v.inverters && typeof v.inverters==="object") ? v.inverters : {} };
+    } catch(e){ return { arrays:{}, inverters:{} }; }
+  }
+  function saveRename(kind, id, name){
+    if(id==null || id==="") return;
+    const all = loadRenames();
+    const bucket = all[kind] || (all[kind] = {});
+    const v = String(name==null ? "" : name).trim();
+    if(v) bucket[String(id)] = v; else delete bucket[String(id)];
+    try { localStorage.setItem(RENAME_KEY, JSON.stringify(all)); } catch(e){}
+  }
+  // Re-apply stored renames to the freshly-rendered DOM (runs on every render).
+  function applyRenames(host){
+    const all = loadRenames();
+    host.querySelectorAll(".sb-col").forEach(col => {
+      const nm = all.arrays[String(col.dataset.arrayId)];
+      if(nm){ const t = col.querySelector(".sb-array-name"); if(t) t.textContent = nm; }
+    });
+    host.querySelectorAll(".sb-inv").forEach(card => {
+      const nm = all.inverters[String(card.dataset.invId)];
+      if(nm){
+        const t = card.querySelector(".sb-inv-name");
+        if(t) t.textContent = nm;
+        card.dataset.name = nm;     // keep detail-line / alerts in sync with the rename
+      }
+    });
+  }
+
+  // ---- inline-rename editing for array & inverter names -------------------
+  // Click a name → edit in place (contenteditable). Enter / blur saves the
+  // trimmed value to localStorage; Escape or an empty value reverts. While
+  // editing we disable the enclosing draggable so a click-to-edit never starts
+  // an HTML5 drag, and stop pointer/mouse events from bubbling into drag wiring.
+  function wireRenames(host){
+    host.querySelectorAll(".sb-array-name").forEach(node =>
+      makeEditable(node, "arrays", node.closest(".sb-col"), () =>
+        (node.closest(".sb-col")||{}).dataset && node.closest(".sb-col").dataset.arrayId,
+        node.closest(".sb-array")));
+    host.querySelectorAll(".sb-inv-name").forEach(node => {
+      const card = node.closest(".sb-inv");
+      makeEditable(node, "inverters", card, () => card && card.dataset.invId, card);
+    });
+  }
+
+  function makeEditable(node, kind, idEl, getId, dragEl){
+    if(!node || node._editWired) return;
+    node._editWired = true;
+    node.classList.add("sb-editable");
+
+    // don't let a click on the name select/drag the card or pan the canvas
+    ["mousedown","pointerdown"].forEach(ev =>
+      node.addEventListener(ev, e => e.stopPropagation()));
+
+    node.addEventListener("click", e => {
+      e.stopPropagation();
+      if(node.isContentEditable) return;
+      beginEdit();
+    });
+
+    function beginEdit(){
+      const original = node.textContent;
+      node.dataset.orig = original;
+      if(dragEl) dragEl.setAttribute("draggable", "false");
+      node.setAttribute("contenteditable", "true");
+      node.classList.add("sb-editing");
+      node.focus();
+      // place caret at end / select all for quick overwrite
+      try {
+        const r = document.createRange(); r.selectNodeContents(node);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      } catch(_){}
+
+      let done = false;
+      const finish = (commit) => {
+        if(done) return; done = true;
+        node.removeAttribute("contenteditable");
+        node.classList.remove("sb-editing");
+        if(dragEl) dragEl.setAttribute("draggable", "true");
+        node.removeEventListener("keydown", onKey);
+        node.removeEventListener("blur", onBlur);
+        const val = node.textContent.trim();
+        if(commit && val){
+          node.textContent = val;
+          const id = getId && getId();
+          saveRename(kind, id, val);
+          if(kind === "inverters" && idEl) idEl.dataset.name = val;   // keep detail-line in sync
+        } else {
+          node.textContent = node.dataset.orig || original;           // revert (cancel / empty)
+        }
+        delete node.dataset.orig;
+      };
+      const onKey = e => {
+        e.stopPropagation();
+        if(e.key === "Enter"){ e.preventDefault(); node.blur(); }
+        else if(e.key === "Escape"){ e.preventDefault(); finish(false); }
+      };
+      const onBlur = () => finish(true);
+      node.addEventListener("keydown", onKey);
+      node.addEventListener("blur", onBlur);
+    }
   }
 
   // ---- backend writes (authed, same-origin relative) ----
@@ -291,6 +400,8 @@
     wireResetButton(host);
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
+    applyRenames(host);   // re-apply owner inline renames (array & inverter names)
+    wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
   }
