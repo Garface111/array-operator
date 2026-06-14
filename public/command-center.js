@@ -183,6 +183,7 @@
 
   function render(){
     const h = host(); if(!h || !MODEL) return;
+    const q = document.getElementById("ccQueue");
     const k = MODEL.kpis;
     const regions = ["all", ...Array.from(new Set(MODEL.rows.map(r=>r.region))).filter(x=>x&&x!=="—").sort()];
     const simNote = MODEL.simulated
@@ -206,8 +207,12 @@
         <div class="cc-kpi risk"><div class="k">At risk / mo</div><div class="v">${usd0(k.riskMo)}</div><div class="s">leaking right now</div></div>
         <div class="cc-kpi flagged"><div class="k">Flagged now</div><div class="v">${num(k.flagged)}</div><div class="s">${k.crit} critical · ${k.flagged-k.crit} watch</div></div>
         <div class="cc-kpi recovered"><div class="k">Recovered YTD</div><div class="v">${usd0(MODEL.recovered)}</div><div class="s">claims & fixes you've banked</div></div>
-      </div>
+      </div>`;
 
+    // the triage queue (toolbar + table + foot) renders into its own container
+    // below the fleet tree — gracefully no-op if that container isn't present.
+    if(!q) return;
+    q.innerHTML = `
       <div class="cc-tools">
         <label class="cc-search"><input id="ccQ" type="text" placeholder="Search site, inverter, or host…" value="${esc(UI.q)}" autocomplete="off"></label>
         <div class="cc-chips" id="ccSev">
@@ -326,7 +331,7 @@
     if(sev) sev.querySelectorAll(".cc-chip").forEach(c => c.onclick = () => { UI.sev=c.dataset.sev; UI.expanded=null; render(); });
     const region = document.getElementById("ccRegion");
     if(region) region.onchange = () => { UI.region=region.value; UI.expanded=null; render(); };
-    document.querySelectorAll("#commandCenter th.sortable").forEach(th => th.onclick = () => {
+    document.querySelectorAll("#ccQueue th.sortable").forEach(th => th.onclick = () => {
       const col = th.dataset.sort;
       if(UI.sort===col) UI.dir*=-1; else { UI.sort=col; UI.dir = col==="site"?1:-1; }
       render();

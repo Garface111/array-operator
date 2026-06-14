@@ -67,10 +67,10 @@
   <!-- ============================ TAB: ARRAYS (default) ============================ -->
   <section class="panel" id="panelArrays" role="tabpanel" aria-label="Arrays">
 
-    <!-- PORTFOLIO COMMAND CENTER — fleet-scale front door (KPI strip + triage queue) -->
+    <!-- PORTFOLIO COMMAND CENTER — KPI strip (the portfolio roll-up) -->
     <section id="commandCenter"></section>
 
-    <!-- DRILL-DOWN — the per-site fleet tree, demoted below the portfolio view -->
+    <!-- Per-site fleet tree — the interactive drill-down, directly under the KPIs -->
     <div class="cc-treedivider">
       <h3>Per-site fleet tree</h3>
       <span>drill into one array — drag any inverter to re-measure it against new neighbors</span>
@@ -78,6 +78,13 @@
 
     <!-- (TOP) SANDBOX — live 3-tier fleet tree; drag any inverter to rearrange -->
     <section id="sbWrap"><div id="sandbox"></div></section>
+
+    <!-- Triage queue — every flagged inverter across the portfolio, worst leak first -->
+    <div class="cc-treedivider">
+      <h3>Triage queue</h3>
+      <span>every flagged inverter across the fleet — sorted by dollars at stake</span>
+    </div>
+    <section id="ccQueue"></section>
 
   </section>
 
