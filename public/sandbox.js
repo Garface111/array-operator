@@ -267,7 +267,7 @@
     host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
 
-    // click/keyboard → detail line
+    // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
       const show = () => {
         const d = node.dataset;
@@ -280,6 +280,7 @@
         if(foot) foot.innerHTML = `<b>${esc(d.name)}</b> — <span class="sb-foot-status ${STATUS_CLASS[d.status]||'ok'}">${esc(STATUS_LABEL[d.status]||d.status)}</span> · ${esc(bits)}`;
         host.querySelectorAll(".sb-inv.sel").forEach(n=>n.classList.remove("sel"));
         node.classList.add("sel");
+        showDetailCard(node);
       };
       node.addEventListener("click", show);
       node.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") { e.preventDefault(); show(); } });
@@ -392,6 +393,62 @@
       `<button class="sb-ac-x" type="button" title="Dismiss" aria-label="Dismiss alert">×</button>`;
     card.querySelector(".sb-ac-x").onclick = () => { _dismissed.add(d.key); card.remove(); };
     return card;
+  }
+
+  // ---- selected-inverter DETAIL CARD ----
+  // Persistent host on #sbWrap (survives fleet re-renders, like #sbAlerts), pinned
+  // bottom-RIGHT of the viewport so it never overlaps the bottom-left alert cards.
+  function detailHost(){
+    let h = document.getElementById("sbDetail");
+    if(!h){
+      h = document.createElement("div");
+      h.id = "sbDetail"; h.className = "sb-detail-host"; h.setAttribute("aria-live", "polite");
+      (document.getElementById("sbWrap") || document.body).appendChild(h);
+    }
+    return h;
+  }
+  // Build/replace the detail card for the clicked .sb-inv card. Owner-framed: what
+  // an array owner wants to know about one inverter at a glance.
+  function showDetailCard(node){
+    const host = detailHost();
+    const d = node.dataset;
+    const liveEl = node.querySelector(".sb-now-val");
+    const live = liveEl ? liveEl.textContent : null;
+    const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
+    const piEl = node.querySelector(".sb-pi span");
+    const pi = piEl ? piEl.textContent.trim() : "";
+    const col = node.closest(".sb-col");
+    const arrayName = col ? (col.querySelector(".sb-array-name") || {}).textContent || "" : "";
+    const sCls = STATUS_CLASS[d.status] || "ok";
+    const sLabel = STATUS_LABEL[d.status] || d.status || "";
+
+    const rows = [
+      pi && `<div class="sb-dc-row"><span class="sb-dc-k">Peer index</span><span class="sb-dc-v"><b class="${sCls}">${esc(pi)}</b> vs its peers</span></div>`,
+      d.np && `<div class="sb-dc-row"><span class="sb-dc-k">Nameplate</span><span class="sb-dc-v">${esc(d.np)}</span></div>`,
+      d.win && `<div class="sb-dc-row"><span class="sb-dc-k">Last 14 days</span><span class="sb-dc-v">${esc(d.win)}</span></div>`,
+      d.mode && `<div class="sb-dc-row"><span class="sb-dc-k">Mode</span><span class="sb-dc-v">${esc(d.mode)}</span></div>`,
+      d.model && `<div class="sb-dc-row"><span class="sb-dc-k">Model</span><span class="sb-dc-v">${esc(d.model)}</span></div>`,
+    ].filter(Boolean).join("");
+
+    const card = el(`
+      <div class="sb-detail-card" role="dialog" aria-label="Inverter detail">
+        <button class="sb-dc-x" type="button" title="Dismiss" aria-label="Close detail">×</button>
+        <div class="sb-dc-head">
+          <div class="sb-dc-name">${esc(d.name)}</div>
+          <div class="sb-dc-array">${esc(arrayName)}</div>
+        </div>
+        <div class="sb-dc-now"><span class="sb-live-dot"></span><b>${esc(liveStr)}</b></div>
+        <div class="sb-dc-pill ${sCls}">${esc(sLabel)}</div>
+        <div class="sb-dc-rows">${rows}</div>
+        ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
+      </div>`);
+    card.querySelector(".sb-dc-x").onclick = () => {
+      card.remove();
+      document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
+      setDefaultFoot();
+    };
+    host.innerHTML = "";
+    host.appendChild(card);
   }
 
 
