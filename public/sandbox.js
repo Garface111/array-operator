@@ -17,6 +17,7 @@
 (function(){
   const SESSION_KEY = "so_session";
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
+  const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
@@ -74,6 +75,114 @@
       const d = rank(a[0].array_id) - rank(b[0].array_id);
       return d !== 0 ? d : a[1] - b[1];
     }).map(x=>x[0]);
+  }
+
+  // ---- saved inline renames (localStorage) ----
+  // Owner-edited array / inverter names, keyed by stable id, re-applied every render.
+  function loadRenames(){
+    try {
+      const v = JSON.parse(localStorage.getItem(RENAME_KEY)) || {};
+      return { arrays: (v.arrays && typeof v.arrays==="object") ? v.arrays : {},
+               inverters: (v.inverters && typeof v.inverters==="object") ? v.inverters : {} };
+    } catch(e){ return { arrays:{}, inverters:{} }; }
+  }
+  function saveRename(kind, id, name){
+    if(id==null || id==="") return;
+    const all = loadRenames();
+    const bucket = all[kind] || (all[kind] = {});
+    const v = String(name==null ? "" : name).trim();
+    if(v) bucket[String(id)] = v; else delete bucket[String(id)];
+    try { localStorage.setItem(RENAME_KEY, JSON.stringify(all)); } catch(e){}
+  }
+  // Re-apply stored renames to the freshly-rendered DOM (runs on every render).
+  function applyRenames(host){
+    const all = loadRenames();
+    host.querySelectorAll(".sb-col").forEach(col => {
+      const nm = all.arrays[String(col.dataset.arrayId)];
+      if(nm){ const t = col.querySelector(".sb-array-name"); if(t) t.textContent = nm; }
+    });
+    host.querySelectorAll(".sb-inv").forEach(card => {
+      const nm = all.inverters[String(card.dataset.invId)];
+      if(nm){
+        const t = card.querySelector(".sb-inv-name");
+        if(t) t.textContent = nm;
+        card.dataset.name = nm;     // keep detail-line / alerts in sync with the rename
+      }
+    });
+  }
+
+  // ---- inline-rename editing for array & inverter names -------------------
+  // Click a name → edit in place (contenteditable). Enter / blur saves the
+  // trimmed value to localStorage; Escape or an empty value reverts. While
+  // editing we disable the enclosing draggable so a click-to-edit never starts
+  // an HTML5 drag, and stop pointer/mouse events from bubbling into drag wiring.
+  function wireRenames(host){
+    host.querySelectorAll(".sb-array-name").forEach(node =>
+      makeEditable(node, "arrays", node.closest(".sb-col"), () =>
+        (node.closest(".sb-col")||{}).dataset && node.closest(".sb-col").dataset.arrayId,
+        node.closest(".sb-array")));
+    host.querySelectorAll(".sb-inv-name").forEach(node => {
+      const card = node.closest(".sb-inv");
+      makeEditable(node, "inverters", card, () => card && card.dataset.invId, card);
+    });
+  }
+
+  function makeEditable(node, kind, idEl, getId, dragEl){
+    if(!node || node._editWired) return;
+    node._editWired = true;
+    node.classList.add("sb-editable");
+
+    // don't let a click on the name select/drag the card or pan the canvas
+    ["mousedown","pointerdown"].forEach(ev =>
+      node.addEventListener(ev, e => e.stopPropagation()));
+
+    node.addEventListener("click", e => {
+      e.stopPropagation();
+      if(node.isContentEditable) return;
+      beginEdit();
+    });
+
+    function beginEdit(){
+      const original = node.textContent;
+      node.dataset.orig = original;
+      if(dragEl) dragEl.setAttribute("draggable", "false");
+      node.setAttribute("contenteditable", "true");
+      node.classList.add("sb-editing");
+      node.focus();
+      // place caret at end / select all for quick overwrite
+      try {
+        const r = document.createRange(); r.selectNodeContents(node);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      } catch(_){}
+
+      let done = false;
+      const finish = (commit) => {
+        if(done) return; done = true;
+        node.removeAttribute("contenteditable");
+        node.classList.remove("sb-editing");
+        if(dragEl) dragEl.setAttribute("draggable", "true");
+        node.removeEventListener("keydown", onKey);
+        node.removeEventListener("blur", onBlur);
+        const val = node.textContent.trim();
+        if(commit && val){
+          node.textContent = val;
+          const id = getId && getId();
+          saveRename(kind, id, val);
+          if(kind === "inverters" && idEl) idEl.dataset.name = val;   // keep detail-line in sync
+        } else {
+          node.textContent = node.dataset.orig || original;           // revert (cancel / empty)
+        }
+        delete node.dataset.orig;
+      };
+      const onKey = e => {
+        e.stopPropagation();
+        if(e.key === "Enter"){ e.preventDefault(); node.blur(); }
+        else if(e.key === "Escape"){ e.preventDefault(); finish(false); }
+      };
+      const onBlur = () => finish(true);
+      node.addEventListener("keydown", onKey);
+      node.addEventListener("blur", onBlur);
+    }
   }
 
   // ---- backend writes (authed, same-origin relative) ----
@@ -165,11 +274,14 @@
          </div>
          <div class="sb-head-actions"><div class="sb-head-btns">
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
+           <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>
          <div class="sb-empty">No arrays connected yet — hit <b>+ Add array</b> to bring your inverters in.</div>`;
       wireAddButton(host);
       wireNewArrayButton(host);
+      wireCardButton(host); // "+ Card" menu (Note / Data)
+      renderCards();        // fixed cards still show; free cards need a canvas (appear once arrays exist)
       return;
     }
 
@@ -181,6 +293,7 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
+            <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
             <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
           </div>
           <div class="sb-legend">
@@ -267,19 +380,13 @@
     host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
 
-    // click/keyboard → detail line
+    // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
       const show = () => {
-        const d = node.dataset;
-        const bits = [
-          d.model && `model ${d.model}`, d.np, d.power,
-          d.win, d.mode && `mode ${d.mode}`,
-          d.diag
-        ].filter(Boolean).join(" · ");
-        const foot = document.getElementById("sbFoot");
-        if(foot) foot.innerHTML = `<b>${esc(d.name)}</b> — <span class="sb-foot-status ${STATUS_CLASS[d.status]||'ok'}">${esc(STATUS_LABEL[d.status]||d.status)}</span> · ${esc(bits)}`;
+        // the rich detail card (showDetailCard) replaces the old one-line #sbFoot detail
         host.querySelectorAll(".sb-inv.sel").forEach(n=>n.classList.remove("sel"));
         node.classList.add("sel");
+        showDetailCard(node);
       };
       node.addEventListener("click", show);
       node.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") { e.preventDefault(); show(); } });
@@ -290,8 +397,12 @@
     wireResetButton(host);
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
+    applyRenames(host);   // re-apply owner inline renames (array & inverter names)
+    wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
+    wireCardButton(host); // "+ Card" menu (Note / Data)
+    renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
   }
 
   // ---- live output ticker: updates each card's "kW now" in place. With live
@@ -312,6 +423,8 @@
       });
       // peer-drop alert popups (floating cards + toasts) removed by request — the
       // triage queue in the command center is the home for "what needs a look".
+      refreshDataCards();      // keep live-metric data cards in step with the kW ticker
+      refreshDetailCard();     // keep the open inverter detail card (kW + lost-$) live too
     }, 2600);
   }
 
@@ -395,6 +508,502 @@
     return card;
   }
 
+  // ---- selected-inverter DETAIL CARD ----
+  // Persistent host on #sbWrap (survives fleet re-renders, like #sbAlerts), pinned
+  // bottom-RIGHT of the viewport so it never overlaps the bottom-left alert cards.
+  function detailHost(){
+    let h = document.getElementById("sbDetail");
+    if(!h){
+      h = document.createElement("div");
+      h.id = "sbDetail"; h.className = "sb-detail-host"; h.setAttribute("aria-live", "polite");
+      (document.getElementById("sbWrap") || document.body).appendChild(h);
+    }
+    return h;
+  }
+  // Which inverter the open detail card is bound to (matched by stable data-inv-id
+  // so it survives fleet re-renders that re-create the .sb-inv element), plus the
+  // live "lost so far" $ accumulator state for that card. Cleared when the card is
+  // dismissed or its inverter disappears.
+  let _detailInvId = null;
+  let _detailLost = 0;            // running $ lost since this card opened
+  let _detailLostTs = 0;         // last tick time (ms) the accumulator advanced
+
+  // Statuses that always count as "losing money" for the lost-$ figure.
+  const LOST_STATES = new Set(["underperforming", "comm_gap", "dead", "fault"]);
+  // Demo energy value used to translate missing kW into $ lost. ~$0.24/kWh is a
+  // believable blended retail + incentive value for residential/commercial solar.
+  const LOST_RATE_PER_KWH = 0.24;
+  // Demo time-compression: a real 2.6s tick advances the lost-$ clock by this many
+  // simulated minutes so the figure visibly ticks upward instead of crawling at
+  // wall-clock rate. (Demo only — production drives this from real elapsed energy.)
+  const LOST_DEMO_MIN_PER_TICK = 6;
+
+  // Find the currently-selected .sb-inv. The demo data has no unique inverter_id,
+  // so we track by a stable (array name | inverter name) key instead.
+  function _invKey(node){
+    const col = node.closest(".sb-col");
+    const arr = col ? ((col.querySelector(".sb-array-name")||{}).textContent || "") : "";
+    const name = node.dataset.name || (node.querySelector(".sb-inv-name")||{}).textContent || "";
+    return arr.trim() + " || " + name.trim();
+  }
+  function _selectedInv(){
+    if(_detailInvId == null) return null;
+    return [...document.querySelectorAll("#sandbox .sb-inv")].find(el => _invKey(el) === _detailInvId) || null;
+  }
+
+  // Estimate the kW this inverter is *missing* vs. where it should be: the most of
+  // (peer-median expectation) and (nameplate-implied expectation), minus its live
+  // output. A non-reporting inverter (dead / comm_gap → live "—") counts as 0 kW
+  // out, so it's missing its whole expected production. Returns 0 for a healthy
+  // inverter that's keeping up with its peers.
+  function _missingKW(node, flagged){
+    let live = _liveKW(node);                                    // live kW (from .sb-now-val)
+    if(!isFinite(live)) live = 0;                                // not reporting → producing nothing
+    const col = node.closest(".sb-col");
+    let expected = live;
+    if(col){
+      // peer expectation: median live kW of same-array peers that are reporting
+      const peers = [...col.querySelectorAll(".sb-inv")]
+        .map(_liveKW).filter(v => isFinite(v) && v > 0).sort((a,b) => a-b);
+      if(peers.length >= 2){
+        const med = peers[Math.floor(peers.length/2)];
+        if(med > expected) expected = med;
+      }
+    }
+    // nameplate-implied floor (only for an inverter already flagged down): one with
+    // no reporting peers should still show a loss. Assume a modest ~30% of nameplate
+    // as the "should-be" mid-day baseline so the demo figure stays believable.
+    if(flagged){
+      const np = _nameplateKW(node);
+      if(isFinite(np) && np > 0){
+        const npExpected = np * 0.30;
+        if(npExpected > expected) expected = npExpected;
+      }
+    }
+    const miss = expected - live;
+    return miss > 0.01 ? miss : 0;
+  }
+
+  // Build/replace the detail card for the clicked .sb-inv card. Owner-framed: what
+  // an array owner wants to know about one inverter at a glance. The kW-now value,
+  // status pill, peer index and "lost so far" $ are LIVE — refreshDetailCard()
+  // (driven by startLiveTicker) updates them in place each tick.
+  function showDetailCard(node){
+    const host = detailHost();
+    const d = node.dataset;
+    const liveEl = node.querySelector(".sb-now-val");
+    const live = liveEl ? liveEl.textContent : null;
+    const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
+    const piEl = node.querySelector(".sb-pi span");
+    const pi = piEl ? piEl.textContent.trim() : "";
+    const col = node.closest(".sb-col");
+    const arrayName = col ? (col.querySelector(".sb-array-name") || {}).textContent || "" : "";
+    const sCls = STATUS_CLASS[d.status] || "ok";
+    const sLabel = STATUS_LABEL[d.status] || d.status || "";
+
+    // bind the live updater to this inverter and reset the lost-$ accumulator
+    _detailInvId = _invKey(node);          // unique (array|name) key — demo has no unique inverter_id
+    _detailLost = 0;
+    _detailLostTs = Date.now();
+
+    const rows = [
+      pi && `<div class="sb-dc-row"><span class="sb-dc-k">Peer index</span><span class="sb-dc-v"><b class="dc-pi ${sCls}">${esc(pi)}</b> vs its peers</span></div>`,
+      d.np && `<div class="sb-dc-row"><span class="sb-dc-k">Nameplate</span><span class="sb-dc-v">${esc(d.np)}</span></div>`,
+      d.win && `<div class="sb-dc-row"><span class="sb-dc-k">Last 14 days</span><span class="sb-dc-v">${esc(d.win)}</span></div>`,
+      d.mode && `<div class="sb-dc-row"><span class="sb-dc-k">Mode</span><span class="sb-dc-v">${esc(d.mode)}</span></div>`,
+      d.model && `<div class="sb-dc-row"><span class="sb-dc-k">Model</span><span class="sb-dc-v">${esc(d.model)}</span></div>`,
+    ].filter(Boolean).join("");
+
+    const card = el(`
+      <div class="sb-detail-card" role="dialog" aria-label="Inverter detail">
+        <button class="sb-dc-x" type="button" title="Dismiss" aria-label="Close detail">×</button>
+        <div class="sb-dc-head">
+          <div class="sb-dc-name">${esc(d.name)}</div>
+          <div class="sb-dc-array">${esc(arrayName)}</div>
+        </div>
+        <div class="sb-dc-now"><span class="sb-live-dot"></span><b class="dc-kw">${esc(liveStr)}</b></div>
+        <div class="sb-dc-pill dc-pill ${sCls}">${esc(sLabel)}</div>
+        <div class="sb-dc-lost" hidden><span class="sb-dc-lost-k">Lost so far</span><b class="dc-lost">$0</b></div>
+        <div class="sb-dc-rows">${rows}</div>
+        ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
+      </div>`);
+    card.querySelector(".sb-dc-x").onclick = () => {
+      card.remove();
+      _detailInvId = null;               // stop live updates for this card
+      document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
+      setDefaultFoot();
+    };
+    host.innerHTML = "";
+    host.appendChild(card);
+    refreshDetailCard();                 // seed the live figures immediately
+  }
+
+  // Live-refresh the open detail card in place (called each ticker tick). Re-reads
+  // the selected inverter's current kW / status / peer index and advances the
+  // "lost so far" $ accumulator. No-op (and a graceful stop) when no card is open
+  // or the selected inverter has gone away.
+  function refreshDetailCard(){
+    const host = document.getElementById("sbDetail");
+    const card = host ? host.querySelector(".sb-detail-card") : null;
+    if(!card){ _detailInvId = null; return; }      // card dismissed → nothing to update
+    if(_detailInvId == null) return;               // no inverter bound
+
+    const node = _selectedInv();
+    if(!node){                                     // inverter removed / deselected → stop gracefully
+      _detailInvId = null;
+      return;
+    }
+    const d = node.dataset;
+
+    // 1) live kW now
+    const liveEl = node.querySelector(".sb-now-val");
+    const live = liveEl ? liveEl.textContent : null;
+    const kwEl = card.querySelector(".dc-kw");
+    if(kwEl){
+      const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
+      if(kwEl.textContent !== liveStr) kwEl.textContent = liveStr;
+    }
+
+    // 2) status pill (label + class) can change as the inverter recovers / drops
+    const sCls = STATUS_CLASS[d.status] || "ok";
+    const sLabel = STATUS_LABEL[d.status] || d.status || "";
+    const pill = card.querySelector(".dc-pill");
+    if(pill){
+      pill.className = "sb-dc-pill dc-pill " + sCls;
+      if(pill.textContent !== sLabel) pill.textContent = sLabel;
+    }
+
+    // 3) peer index value + class
+    const piEl = node.querySelector(".sb-pi span");
+    const pi = piEl ? piEl.textContent.trim() : "";
+    const piOut = card.querySelector(".dc-pi");
+    if(piOut && pi){
+      piOut.className = "dc-pi " + sCls;
+      if(piOut.textContent !== pi) piOut.textContent = pi;
+    }
+
+    // 4) live "lost so far" $ — accumulate missing kW × rate × elapsed hours.
+    // Underperforming/down inverters (by status OR a live peer shortfall) tick up;
+    // healthy ones show $0 and the row is hidden. Wall-clock elapsed is scaled by
+    // the demo time-compression so the figure visibly advances each tick.
+    const now = Date.now();
+    const wallHr = Math.max(0, (now - _detailLostTs) / 3600000);
+    _detailLostTs = now;
+    // map ~2.6s of wall time onto LOST_DEMO_MIN_PER_TICK simulated minutes
+    const dtHr = wallHr * ((LOST_DEMO_MIN_PER_TICK * 60) / 2.6);
+    const flaggedByState = LOST_STATES.has(d.status) || node.classList.contains("sb-inv-alarm");
+    const missKW = _missingKW(node, flaggedByState);
+    // only accumulate when the inverter is genuinely under (flagged or a real shortfall)
+    if(dtHr > 0 && missKW > 0 && (flaggedByState || missKW >= 0.5)){
+      _detailLost += missKW * LOST_RATE_PER_KWH * dtHr;
+    }
+    const lostRow = card.querySelector(".sb-dc-lost");
+    const lostOut = card.querySelector(".dc-lost");
+    if(lostRow && lostOut){
+      if(_detailLost > 0){
+        lostRow.hidden = false;
+        const txt = "$" + _detailLost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if(lostOut.textContent !== txt){
+          lostOut.textContent = txt;
+          lostOut.classList.remove("tick"); void lostOut.offsetWidth; lostOut.classList.add("tick");
+        }
+      } else {
+        lostRow.hidden = true;       // healthy → omit the $ figure
+      }
+    }
+  }
+
+
+  /* ===========================================================================
+   * FREE-FORM OWNER CARDS — note cards (editable sticky) + data cards (live
+   * metric) the owner can drop onto the canvas. Two placement modes:
+   *   free  → rendered INTO .sb-canvas, so the card pans/zooms WITH the fleet
+   *           (x/y stored in canvas coordinates). Recreated at the end of every
+   *           render() (the canvas is rebuilt each render — idempotent rebuild).
+   *   fixed → rendered into a persistent #sbCardsFixed layer on #sbWrap, pinned
+   *           to the panel (x/y in panel pixels); survives re-renders like #sbAlerts.
+   * A pin toggle flips a card free↔fixed (its x/y is re-seeded near viewport
+   * center on the flip so it never lands off-screen). All cards persist to
+   * localStorage under CARDS_KEY as {id,kind,mode,x,y,text?,title?,metric?}.
+   * ==========================================================================*/
+  const CARDS_KEY = "ao_cards";
+  // Live-fleet metrics, computed from the rendered .sb-inv DOM each tick.
+  const ATTENTION_STATES = new Set(["warn","underperforming","comm_gap","dead","fault"]);
+  const CARD_METRICS = {
+    fleet_now:  { label:"Fleet output now", unit:"kW",   compute: fleetNowKW },
+    attention:  { label:"Needs attention",  unit:"",     compute: needsAttention },
+    capacity:   { label:"Total capacity",   unit:"kW",   compute: totalCapacityKW },
+    arrays:     { label:"Arrays",           unit:"",     compute: arrayCount },
+  };
+  const METRIC_ORDER = ["fleet_now","attention","capacity","arrays"];
+
+  function _invNowKW(inv){
+    // Prefer the live ticker's displayed value; fall back to the seeded base watts.
+    const v = inv.querySelector(".sb-now-val");
+    const live = v ? parseFloat(v.textContent) : NaN;
+    if(isFinite(live)) return live;
+    const nowEl = inv.querySelector(".sb-inv-now");
+    const baseW = nowEl ? parseFloat(nowEl.dataset.basew) : NaN;
+    return isFinite(baseW) ? baseW/1000 : 0;
+  }
+  function _invNpKW(inv){ const m = (inv.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; }
+  function fleetNowKW(){
+    let s = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { const k = _invNowKW(inv); if(isFinite(k)) s += k; });
+    return s.toFixed(1);
+  }
+  function needsAttention(){
+    let n = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { if(ATTENTION_STATES.has(inv.dataset.status)) n++; });
+    return String(n);
+  }
+  function totalCapacityKW(){
+    let s = 0; document.querySelectorAll("#sandbox .sb-inv").forEach(inv => { const k = _invNpKW(inv); if(isFinite(k)) s += k; });
+    return (Math.round(s*10)/10).toString();
+  }
+  function arrayCount(){ return String(document.querySelectorAll("#sandbox .sb-col").length); }
+
+  // ---- card storage (localStorage; mirrors saveOrder / saveRename style) ----
+  function loadCards(){
+    try {
+      const v = JSON.parse(localStorage.getItem(CARDS_KEY));
+      return Array.isArray(v) ? v.filter(c => c && c.id && (c.kind==="note"||c.kind==="data")) : [];
+    } catch(e){ return []; }
+  }
+  function saveCards(cards){
+    try { localStorage.setItem(CARDS_KEY, JSON.stringify(cards)); } catch(e){}
+  }
+  function updateCard(id, patch){
+    const cards = loadCards();
+    const c = cards.find(x => x.id === id);
+    if(!c) return;
+    Object.assign(c, patch);
+    saveCards(cards);
+  }
+  function removeCard(id){ saveCards(loadCards().filter(c => c.id !== id)); }
+  function newCardId(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  // Persistent fixed-card layer on #sbWrap (survives re-renders, like #sbAlerts).
+  function fixedCardHost(){
+    let h = document.getElementById("sbCardsFixed");
+    if(!h){
+      h = document.createElement("div");
+      h.id = "sbCardsFixed"; h.className = "sb-cards-fixed";
+      (document.getElementById("sbWrap") || document.body).appendChild(h);
+    }
+    return h;
+  }
+
+  // Pick a sensible spawn point near the viewport center.
+  // mode=free → canvas coords (invert the pan/zoom transform). mode=fixed → panel px.
+  function centerFor(mode){
+    const wrap = document.getElementById("sbWrap");
+    const vp = document.querySelector("#sandbox .sb-viewport");
+    if(mode === "fixed"){
+      const wr = wrap ? wrap.getBoundingClientRect() : { width:600, height:400 };
+      return { x: Math.max(12, wr.width/2 - 105), y: Math.max(12, wr.height/2 - 70) };
+    }
+    // free: map viewport-center screen point back through _view (translate+scale)
+    if(vp){
+      const cx = vp.clientWidth/2, cy = vp.clientHeight/2;
+      return { x: (cx - _view.x)/_view.z - 105, y: (cy - _view.y)/_view.z - 70 };
+    }
+    return { x: 40, y: 40 };
+  }
+
+  // ---- "+ Card" head button → small Note/Data menu ----
+  function wireCardButton(host){
+    const btn = host.querySelector("#sbAddCard");
+    if(!btn) return;
+    const wrap = btn.closest(".sb-cardbtn-wrap") || btn.parentElement;
+    btn.onclick = e => {
+      e.stopPropagation();
+      if(wrap.querySelector(".sb-card-menu")){ closeCardMenu(); return; }
+      const menu = el(`<div class="sb-card-menu" role="menu">
+        <button type="button" data-kind="note" role="menuitem">Note<span class="mk-sub">Editable sticky note</span></button>
+        <button type="button" data-kind="data" role="menuitem">Data<span class="mk-sub">Live fleet metric</span></button>
+      </div>`);
+      menu.addEventListener("click", ev => ev.stopPropagation());
+      menu.querySelectorAll("button[data-kind]").forEach(b => {
+        b.onclick = () => { addCard(b.dataset.kind); closeCardMenu(); };
+      });
+      wrap.appendChild(menu);
+      setTimeout(() => document.addEventListener("click", closeCardMenu, { once:true }), 0);
+    };
+  }
+  function closeCardMenu(){
+    document.querySelectorAll(".sb-card-menu").forEach(m => m.remove());
+  }
+
+  // Create a brand-new card (default free), persist it, and render it.
+  function addCard(kind){
+    const pos = centerFor("free");
+    const card = {
+      id: newCardId(), kind, mode: "free",
+      x: Math.round(pos.x), y: Math.round(pos.y),
+    };
+    if(kind === "note"){ card.title = ""; card.text = ""; }
+    else { card.metric = "fleet_now"; }
+    const cards = loadCards(); cards.push(card); saveCards(cards);
+    renderCards();
+    refreshDataCards();
+  }
+
+  // ---- reconcile cards into the canvas (free) + fixed layer (idempotent) ----
+  function renderCards(){
+    const canvas = document.querySelector("#sandbox .sb-canvas");
+    const fixed = fixedCardHost();
+    const cards = loadCards();
+    const wantFree = new Set(), wantFixed = new Set();
+    cards.forEach(c => (c.mode === "fixed" ? wantFixed : wantFree).add(c.id));
+
+    // drop stale nodes
+    if(canvas) [...canvas.querySelectorAll(":scope > .sb-card")].forEach(n => { if(!wantFree.has(n.dataset.cardId)) n.remove(); });
+    [...fixed.querySelectorAll(":scope > .sb-card")].forEach(n => { if(!wantFixed.has(n.dataset.cardId)) n.remove(); });
+
+    cards.forEach(c => {
+      const layer = c.mode === "fixed" ? fixed : canvas;
+      if(!layer) return;                       // free card with no canvas yet (empty fleet) — skip
+      let node = layer.querySelector(`:scope > .sb-card[data-card-id="${c.id}"]`);
+      if(node){ positionCard(node, c); }       // already present → just keep position synced
+      else { layer.appendChild(buildCardNode(c)); }
+    });
+    refreshDataCards();
+  }
+
+  function positionCard(node, c){
+    node.style.left = (c.x||0) + "px";
+    node.style.top  = (c.y||0) + "px";
+  }
+
+  function buildCardNode(c){
+    const node = el(`<div class="sb-card" data-card-id="${esc(c.id)}" data-kind="${esc(c.kind)}" draggable="false"></div>`);
+    // a pointerdown anywhere on a card must never reach the viewport pan handler
+    node.addEventListener("pointerdown", e => e.stopPropagation());
+    positionCard(node, c);
+    const pinned = c.mode === "fixed";
+    const bar = el(`<div class="sb-card-bar">
+        <span class="sb-card-grip" aria-hidden="true">⠿</span>
+        <span class="sb-card-kind">${c.kind === "note" ? "Note" : "Data"}</span>
+        <button class="sb-card-btn sb-card-pin${pinned?" pinned":""}" type="button"
+                title="${pinned?"Pinned to panel — click to free":"Floats with the fleet — click to pin"}"
+                aria-label="Toggle pin">${pinned?"📌":"📍"}</button>
+        <button class="sb-card-btn sb-card-x" type="button" title="Delete card" aria-label="Delete card">×</button>
+      </div>`);
+    const body = el(`<div class="sb-card-body"></div>`);
+    if(c.kind === "note") buildNoteBody(body, c);
+    else buildDataBody(body, c);
+    node.appendChild(bar);
+    node.appendChild(body);
+
+    bar.querySelector(".sb-card-x").onclick = ev => { ev.stopPropagation(); removeCard(c.id); node.remove(); };
+    bar.querySelector(".sb-card-pin").onclick = ev => { ev.stopPropagation(); togglePin(c.id); };
+    wireCardDrag(node, bar, c.id);
+    return node;
+  }
+
+  // Note card: editable title + body (contenteditable), debounced-persist on input.
+  function buildNoteBody(body, c){
+    const title = el(`<div class="sb-note-title" contenteditable="true" data-ph="Title"></div>`);
+    const text  = el(`<div class="sb-note-text" contenteditable="true" data-ph="Write a note…"></div>`);
+    title.textContent = c.title || "";
+    text.textContent  = c.text  || "";
+    [title, text].forEach(ed => {
+      // editing/typing must never start a card drag or pan the canvas
+      ["pointerdown","mousedown","click","dblclick"].forEach(ev => ed.addEventListener(ev, e => e.stopPropagation()));
+      ed.addEventListener("keydown", e => e.stopPropagation());
+    });
+    title.addEventListener("input", () => updateCard(c.id, { title: title.textContent }));
+    text.addEventListener("input",  () => updateCard(c.id, { text:  text.textContent  }));
+    body.appendChild(title);
+    body.appendChild(text);
+  }
+
+  // Data card: metric dropdown + live value (updated by the ticker via refreshDataCards).
+  function buildDataBody(body, c){
+    const metric = CARD_METRICS[c.metric] ? c.metric : "fleet_now";
+    if(metric !== c.metric) updateCard(c.id, { metric });
+    const opts = METRIC_ORDER.map(k =>
+      `<option value="${k}"${k===metric?" selected":""}>${esc(CARD_METRICS[k].label)}</option>`).join("");
+    const sel = el(`<select class="sb-data-pick" aria-label="Metric">${opts}</select>`);
+    const valWrap = el(`<div class="sb-data-val"><span class="sb-data-num">—</span><span class="sb-data-unit"></span></div>`);
+    const label = el(`<div class="sb-data-label">${esc(CARD_METRICS[metric].label)}</div>`);
+    ["pointerdown","mousedown","click"].forEach(ev => sel.addEventListener(ev, e => e.stopPropagation()));
+    sel.addEventListener("change", () => {
+      updateCard(c.id, { metric: sel.value });
+      label.textContent = CARD_METRICS[sel.value].label;
+      refreshDataCards();
+    });
+    body.appendChild(sel);
+    body.appendChild(valWrap);
+    body.appendChild(label);
+  }
+
+  // Recompute every data card's value from the live fleet DOM (call each tick).
+  function refreshDataCards(){
+    document.querySelectorAll('.sb-card[data-kind="data"]').forEach(node => {
+      const id = node.dataset.cardId;
+      const sel = node.querySelector(".sb-data-pick");
+      const metric = sel ? sel.value : "fleet_now";
+      const def = CARD_METRICS[metric] || CARD_METRICS.fleet_now;
+      const num = node.querySelector(".sb-data-num");
+      const unit = node.querySelector(".sb-data-unit");
+      if(num) num.textContent = def.compute();
+      if(unit) unit.textContent = def.unit || "";
+    });
+  }
+
+  // Flip a card free↔fixed. Re-seed its x/y near viewport center for the new
+  // coordinate space so it never lands off-screen, persist, and re-render.
+  function togglePin(id){
+    const cards = loadCards();
+    const c = cards.find(x => x.id === id);
+    if(!c) return;
+    c.mode = c.mode === "fixed" ? "free" : "fixed";
+    const pos = centerFor(c.mode);
+    c.x = Math.round(pos.x); c.y = Math.round(pos.y);
+    saveCards(cards);
+    renderCards();
+  }
+
+  // Pointer-drag a card by its title bar. For free cards the canvas is scaled by
+  // _view.z, so divide pointer deltas by z to keep dragging 1:1 at any zoom. All
+  // handlers stopPropagation so card drag never triggers canvas pan / inv drag.
+  function wireCardDrag(node, handle, id){
+    let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+    handle.addEventListener("pointerdown", e => {
+      if(e.button !== 0) return;
+      if(e.target.closest("button")) return;        // pin / × buttons handle themselves
+      e.stopPropagation();                          // never start a canvas pan
+      e.preventDefault();
+      const cards = loadCards(); const c = cards.find(x => x.id === id);
+      if(!c) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      origX = c.x || 0; origY = c.y || 0;
+      node.classList.add("dragging");
+      try { handle.setPointerCapture(e.pointerId); } catch(_){}
+    });
+    handle.addEventListener("pointermove", e => {
+      if(!dragging) return;
+      e.stopPropagation();
+      const isFree = !node.parentElement || !node.parentElement.classList.contains("sb-cards-fixed");
+      const z = isFree ? (_view.z || 1) : 1;        // free cards live in the scaled canvas
+      const nx = origX + (e.clientX - startX)/z;
+      const ny = origY + (e.clientY - startY)/z;
+      node.style.left = nx + "px";
+      node.style.top  = ny + "px";
+    });
+    const end = e => {
+      if(!dragging) return;
+      dragging = false;
+      node.classList.remove("dragging");
+      if(e){ e.stopPropagation(); try { handle.releasePointerCapture(e.pointerId); } catch(_){} }
+      updateCard(id, { x: Math.round(parseFloat(node.style.left)||0), y: Math.round(parseFloat(node.style.top)||0) });
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    // prevent the grip from initiating an HTML5 drag of any ancestor
+    handle.addEventListener("dragstart", e => e.preventDefault());
+  }
 
   // ---- pan + zoom the fleet canvas. Drag empty space to pan, wheel to zoom
   // (toward the cursor), double-click empty space to reset. View state persists

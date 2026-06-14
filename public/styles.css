@@ -267,7 +267,7 @@
   /* canvas: horizontal scroll of columns */
   .sb-viewport{position:relative;overflow:hidden;height:calc(100vh - 210px);min-height:440px;border-radius:14px;cursor:grab;touch-action:none;background:rgba(255,255,255,.012)}
   .sb-viewport.panning{cursor:grabbing}
-  .sb-canvas{display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0;will-change:transform}
+  .sb-canvas{position:relative;display:flex;gap:26px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0;will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
 
   /* TIER 1: Alert */
@@ -296,6 +296,10 @@
     background:linear-gradient(165deg,rgba(94,194,255,.08),rgba(255,255,255,.015));text-align:center}
   .sb-array-k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--sky)}
   .sb-array-name{font-size:16px;font-weight:740;color:var(--ink);margin-top:4px;letter-spacing:-.01em}
+  /* inline-editable names (array + inverter): hint with a text caret + faint hover outline */
+  .sb-editable{cursor:text;border-radius:6px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .12s,background-color .12s}
+  .sb-editable:hover{outline-color:rgba(94,194,255,.35)}
+  .sb-editable.sb-editing{outline:1px solid var(--good);outline-offset:2px;background:rgba(63,214,138,.1);cursor:text}
   .sb-array-meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:wrap}
   .sb-srctag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--faint);letter-spacing:.02em}
   .sb-srctag.live{background:rgba(63,214,138,.16);color:var(--good)}
@@ -451,6 +455,42 @@
   .sb-ac-x{flex:none;background:none;border:0;color:var(--faint);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
   .sb-ac-x:hover{color:var(--ink)}
 
+  /* ===== Selected-inverter detail card (bottom-right of viewport) ===== */
+  .sb-detail-host{position:absolute;right:24px;bottom:24px;width:min(330px,42%);z-index:7}
+  .sb-detail-card{position:relative;padding:14px 15px 13px;border-radius:14px;border:1px solid var(--line);
+    background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -20px rgba(0,0,0,.85);
+    animation:dcin .32s ease}
+  @keyframes dcin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .sb-dc-x{position:absolute;top:9px;right:10px;background:none;border:0;color:var(--faint);
+    font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+  .sb-dc-x:hover{color:var(--ink)}
+  .sb-dc-head{padding-right:18px}
+  .sb-dc-name{font-size:14px;font-weight:700;color:var(--ink)}
+  .sb-dc-array{font-size:11px;color:var(--muted);margin-top:2px}
+  .sb-dc-now{display:flex;align-items:center;gap:7px;margin:10px 0 9px;font-size:18px;color:var(--ink)}
+  .sb-dc-now b{font-weight:700}
+  .sb-dc-pill{display:inline-block;font-size:11px;font-weight:650;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--line);margin-bottom:10px}
+  .sb-dc-pill.ok{color:var(--good);border-color:rgba(63,214,138,.45);background:rgba(63,214,138,.08)}
+  .sb-dc-pill.warn{color:var(--warn);border-color:rgba(255,180,84,.45);background:rgba(255,180,84,.08)}
+  .sb-dc-pill.bad{color:var(--bad);border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.08)}
+  .sb-dc-rows{display:flex;flex-direction:column;gap:5px}
+  .sb-dc-row{display:flex;justify-content:space-between;gap:12px;font-size:12px}
+  .sb-dc-k{color:var(--muted);flex:none}
+  .sb-dc-v{color:var(--ink);text-align:right}
+  .sb-dc-v b.ok{color:var(--good)} .sb-dc-v b.warn{color:var(--warn)} .sb-dc-v b.bad{color:var(--bad)}
+  .sb-dc-diag{margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:11.5px;line-height:1.45;color:var(--muted)}
+  /* live "lost so far" $ — ticks upward while an under/down inverter is open */
+  .sb-dc-lost{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    margin-bottom:10px;padding:7px 10px;border-radius:8px;
+    border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.07)}
+  .sb-dc-lost[hidden]{display:none}
+  .sb-dc-lost-k{font-size:11px;color:var(--muted)}
+  .sb-dc-lost b.dc-lost{font-size:16px;font-weight:700;color:var(--bad);font-variant-numeric:tabular-nums}
+  .dc-lost.tick{animation:lostflash .5s ease}
+  @keyframes lostflash{0%{color:var(--warn)}100%{color:var(--bad)}}
+
   /* ===== 'Reset layout' text button (sandbox header) ===== */
   .sb-head-btns{display:flex;align-items:center;gap:10px}
   .sb-resetbtn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);
@@ -516,6 +556,60 @@
   .sb-mbtn.primary:hover:not(:disabled){filter:brightness(1.06)}
   .sb-mbtn.ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line)}
   .sb-mbtn.ghost:hover{border-color:var(--good);color:var(--good)}
+
+  /* ===== Free-form cards on the canvas (note / data, free / fixed) ===== */
+  /* "+ Card" head button + its pop-up kind menu */
+  .sb-cardbtn-wrap{position:relative;display:inline-flex}
+  .sb-cardbtn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);
+    font-size:12.5px;font-weight:650;padding:8px 13px;border-radius:11px;cursor:pointer;white-space:nowrap;
+    transition:border-color .15s,color .15s,background .15s}
+  .sb-cardbtn:hover{border-color:rgba(63,214,138,.5);color:var(--good);background:rgba(63,214,138,.07)}
+  .sb-cardbtn:active{transform:translateY(1px)}
+  .sb-card-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:150px;
+    display:flex;flex-direction:column;gap:2px;padding:6px;border-radius:12px;border:1px solid var(--line);
+    background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -20px rgba(0,0,0,.85);
+    animation:dcin .18s ease}
+  .sb-card-menu button{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
+    color:var(--ink);font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:8px}
+  .sb-card-menu button:hover{background:rgba(255,255,255,.06);color:var(--good)}
+  .sb-card-menu .mk-sub{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px}
+
+  /* the cards themselves (shared chrome for free + fixed) */
+  .sb-card{position:absolute;width:210px;border-radius:13px;border:1px solid var(--line);
+    background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -22px rgba(0,0,0,.85);
+    z-index:5;touch-action:none;animation:dcin .26s ease}
+  .sb-card.dragging{opacity:.92;box-shadow:0 26px 60px -20px rgba(0,0,0,.9);cursor:grabbing}
+  .sb-card-bar{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 9px;border-bottom:1px solid var(--line);
+    cursor:grab;touch-action:none;border-radius:13px 13px 0 0;background:rgba(255,255,255,.02)}
+  .sb-card.dragging .sb-card-bar{cursor:grabbing}
+  .sb-card-grip{color:var(--faint);font-size:13px;line-height:1;flex:none;user-select:none}
+  .sb-card-kind{flex:1;min-width:0;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .sb-card-btn{flex:none;background:none;border:0;color:var(--faint);font-size:13px;line-height:1;cursor:pointer;
+    padding:2px 4px;border-radius:6px}
+  .sb-card-btn:hover{color:var(--ink);background:rgba(255,255,255,.06)}
+  .sb-card-pin.pinned{color:var(--good)}
+  .sb-card-body{padding:10px 11px 12px}
+
+  /* note card */
+  .sb-note-title{font-size:13px;font-weight:700;color:var(--ink);outline:none;min-height:1.2em;
+    border-bottom:1px solid transparent}
+  .sb-note-title:focus{border-bottom-color:var(--line)}
+  .sb-note-title:empty:before{content:attr(data-ph);color:var(--faint);font-weight:600}
+  .sb-note-text{margin-top:7px;font-size:12px;line-height:1.5;color:var(--muted);outline:none;min-height:2.4em;
+    white-space:pre-wrap;word-break:break-word}
+  .sb-note-text:empty:before{content:attr(data-ph);color:var(--faint)}
+
+  /* data card */
+  .sb-data-pick{width:100%;font-size:11.5px;color:var(--ink);background:rgba(255,255,255,.04);
+    border:1px solid var(--line);border-radius:8px;padding:5px 7px;cursor:pointer}
+  .sb-data-pick:focus{outline:none;border-color:rgba(63,214,138,.5)}
+  .sb-data-val{margin-top:9px;font-size:26px;font-weight:760;color:var(--ink);line-height:1.05;letter-spacing:-.01em}
+  .sb-data-unit{font-size:13px;font-weight:600;color:var(--muted);margin-left:3px}
+  .sb-data-label{margin-top:3px;font-size:10.5px;color:var(--faint)}
+
+  /* fixed-card overlay layer pinned to the panel (survives re-render) */
+  .sb-cards-fixed{position:absolute;inset:0;pointer-events:none;z-index:7}
+  .sb-cards-fixed .sb-card{pointer-events:auto}
 
   @media(max-width:720px){
     .sb-head-actions{align-items:stretch;width:100%}
