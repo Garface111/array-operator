@@ -372,7 +372,6 @@
 
           <!-- TIER 3: Inverters comb -->
           <div class="sb-comb">
-            <div class="sb-bus"></div>
             <div class="sb-teeth">${teeth}</div>
           </div>
         </div>`;
@@ -405,7 +404,54 @@
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
     wireCardButton(host); // "+ Card" menu (Note / Data)
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
+    drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
   }
+
+  // Draw the converging feeder wires for every array: each inverter curves up into
+  // a single central trunk that flows UP into its array card (replacing the old
+  // horizontal comb/bus). The SVG lives inside .sb-teeth so it pans/zooms with the
+  // canvas transform; positions use untransformed layout offsets. Redrawn after
+  // each render and (debounced) on resize.
+  const SB_SVGNS = "http://www.w3.org/2000/svg";
+  function drawFleetConnectors(host){
+    const root = (host && host.querySelectorAll) ? host : document;
+    root.querySelectorAll(".sb-comb").forEach(comb => {
+      const teeth = comb.querySelector(".sb-teeth");
+      if(!teeth) return;
+      const invs = [...teeth.querySelectorAll(".sb-inv")];
+      const old = teeth.querySelector("svg.sb-wires");
+      if(old) old.remove();
+      if(!invs.length) return;
+      const W = teeth.clientWidth, H = teeth.clientHeight, cx = W / 2;
+      const svg = document.createElementNS(SB_SVGNS, "svg");
+      svg.setAttribute("class", "sb-wires");
+      svg.setAttribute("width", W); svg.setAttribute("height", H);
+      const mk = (cls, d) => {
+        const p = document.createElementNS(SB_SVGNS, "path");
+        p.setAttribute("class", cls); p.setAttribute("d", d); return p;
+      };
+      let maxJoin = 0; const feeders = [];
+      invs.forEach(inv => {
+        const ix = inv.offsetLeft + inv.offsetWidth / 2;
+        const iy = inv.offsetTop;
+        const joinY = Math.max(iy - 12, 2);
+        if(joinY > maxJoin) maxJoin = joinY;
+        // drawn card→trunk (bottom→top) so the dashed flow animates UPWARD
+        feeders.push(`M ${ix} ${iy} C ${ix} ${iy - 12}, ${cx} ${joinY + 12}, ${cx} ${joinY}`);
+      });
+      const trunk = `M ${cx} ${maxJoin} L ${cx} -16`;
+      svg.appendChild(mk("trunk", trunk));
+      feeders.forEach(d => svg.appendChild(mk("feed", d)));
+      svg.appendChild(mk("flow", trunk));   // bright animated overlay
+      feeders.forEach(d => svg.appendChild(mk("flow", d)));
+      teeth.appendChild(svg);
+    });
+  }
+  let _sbWireResize = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(_sbWireResize);
+    _sbWireResize = setTimeout(() => drawFleetConnectors(document), 150);
+  });
 
   // ---- live output ticker: updates each card's "kW now" in place. With live
   // telemetry this reflects polled current_power_w; on demo data it drifts gently
