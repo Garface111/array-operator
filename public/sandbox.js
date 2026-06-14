@@ -1482,7 +1482,15 @@
 
   function authHeaders(){ const s = getSession(); return s ? { Authorization: "Bearer " + s } : null; }
   function titleCase(s){ return String(s==null?"":s).replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()); }
-  function fmtDate(d){ try { return new Date(d).toLocaleDateString([], {month:"short",day:"numeric",year:"numeric"}); } catch(e){ return String(d); } }
+  function fmtDate(d){
+    try {
+      // A bare YYYY-MM-DD parses as UTC midnight, which renders a day early in
+      // timezones behind UTC (trial-end / invoice dates). Pin those to local time.
+      const m = (typeof d === "string") && d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const date = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(d);
+      return date.toLocaleDateString([], {month:"short",day:"numeric",year:"numeric"});
+    } catch(e){ return String(d); }
+  }
   function usdMaybe(n){
     if(n==null) return "—";
     const num = Number(n);

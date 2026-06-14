@@ -151,9 +151,14 @@
 <div id="confetti"></div>
 
 <script>
-// Same-origin: arrayoperator.com proxies /v1/* and /accounts to the shared
-// Railway backend via _redirects, so the whole flow stays on the brand domain.
-const API_BASE = "";
+// On the live domain, arrayoperator.com proxies /v1/* to the shared Railway
+// backend via _redirects, so we stay same-origin (API_BASE = ""). On a local
+// static preview (localhost:8088) there's no proxy, so point straight at the
+// Railway backend — its CORS allow-list already includes localhost:8088, so the
+// real preview/onboarding calls work and you see YOUR real arrays, not the demo.
+const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
+  ? "https://web-production-49c83.up.railway.app"
+  : "";
 const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
 let step = 0;
 let state = { name:"", email:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"" };

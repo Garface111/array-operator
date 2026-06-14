@@ -188,3 +188,66 @@ body.sb-fs-lock{ overflow:hidden; }
 
 /* the canvas viewport now fills the card top-to-bottom (no header row above it) */
 .sb-viewport{ height:min(64vh,580px); min-height:380px; }
+
+/* ============================================================================
+ * Reports tab — automatic billing reports (reports.js / .rb-*)
+ * ==========================================================================*/
+.rb-upload{ margin-bottom:18px; }
+.rb-drop{ display:flex; flex-direction:column; align-items:center; gap:5px; text-align:center;
+  margin-top:16px; padding:30px 18px; border:1.5px dashed var(--line); border-radius:16px;
+  background:rgba(255,255,255,.02); cursor:pointer; transition:border-color .15s, background .15s; }
+.rb-drop:hover, .rb-drop-over{ border-color:rgba(63,214,138,.55); background:rgba(63,214,138,.06); }
+.rb-drop-ico{ font-size:22px; color:var(--good); }
+.rb-drop-main{ font-weight:650; color:var(--ink); font-size:14.5px; }
+.rb-drop-sub{ font-size:12px; color:var(--faint); }
+.rb-status{ display:inline-block; font-size:12.5px; margin-top:10px; color:var(--muted); }
+.rb-status.rb-ok{ color:var(--good); } .rb-status.rb-err{ color:var(--bad); }
+.rb-status.rb-busy{ color:var(--sky); }
+.rb-sub-status{ margin-top:0; }
+
+.rb-preview{ margin-bottom:18px; }
+.rb-matchgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:13px; margin:14px 0 4px; }
+.rb-matchgrid > div{ display:flex; flex-direction:column; gap:3px; }
+.rb-k{ font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); }
+.rb-v{ font-size:15px; font-weight:620; color:var(--ink); }
+.rb-amt{ color:var(--good); }
+.rb-warn{ margin:12px 0; padding:10px 13px; border-radius:10px; font-size:12.5px; line-height:1.5;
+  background:rgba(255,180,84,.09); border:1px solid rgba(255,180,84,.3); color:var(--warn); }
+
+.rb-controls{ display:flex; flex-wrap:wrap; gap:18px; margin:18px 0 4px; }
+.rb-ctl{ display:flex; flex-direction:column; gap:7px; }
+.rb-ctl .rl{ font-size:11.5px; font-weight:600; color:var(--muted); letter-spacing:.02em; }
+.rb-seg{ display:inline-flex; background:rgba(255,255,255,.04); border:1px solid var(--line);
+  border-radius:11px; padding:3px; gap:2px; }
+.rb-seg button{ border:0; background:transparent; color:var(--muted); font:600 12.5px/1 inherit;
+  padding:8px 13px; border-radius:8px; cursor:pointer; transition:background .12s,color .12s; }
+.rb-seg button:hover{ color:var(--ink); }
+.rb-seg button.on{ background:rgba(63,214,138,.16); color:var(--good2); }
+.rb-slider button.on{ background:rgba(94,194,255,.16); color:var(--sky); }
+.rb-checks{ display:flex; flex-direction:column; gap:7px; }
+.rb-checks label{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink); cursor:pointer; }
+.rb-emails{ display:flex; gap:14px; flex-wrap:wrap; margin-top:16px; }
+.rb-emails .rep-fld{ flex:1; min-width:190px; }
+.rb-actions{ display:flex; align-items:center; gap:11px; margin-top:18px; flex-wrap:wrap; }
+.rb-save{ background:var(--good); color:#06231a; border:0; padding:10px 18px; border-radius:10px;
+  font-weight:700; cursor:pointer; }
+.rb-cancel{ background:transparent; border:1px solid var(--line); color:var(--muted);
+  padding:10px 16px; border-radius:10px; cursor:pointer; }
+
+.rb-listwrap{ margin-top:8px; }
+.rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+  background:linear-gradient(165deg,var(--card),var(--card2)); border:1px solid var(--line);
+  border-radius:14px; padding:14px 16px; margin-bottom:11px; }
+.rb-sub.rb-paused{ opacity:.6; }
+.rb-sub-name{ font-size:15px; font-weight:680; color:var(--ink); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rb-sub-meta{ font-size:12px; color:var(--faint); margin-top:4px; }
+.rb-chip{ font-size:10.5px; font-weight:600; letter-spacing:.02em; padding:3px 8px; border-radius:20px;
+  background:rgba(255,255,255,.06); color:var(--muted); }
+.rb-chip-live{ background:rgba(94,194,255,.16); color:var(--sky); }
+.rb-chip-off{ background:rgba(255,107,107,.14); color:var(--bad); }
+.rb-sub-acts{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.rb-mini button{ padding:6px 10px; font-size:11.5px; }
+.rb-btn{ background:rgba(255,255,255,.05); border:1px solid var(--line); color:var(--ink);
+  padding:7px 12px; border-radius:9px; font-size:12.5px; cursor:pointer; text-decoration:none; }
+.rb-btn:hover{ background:rgba(255,255,255,.09); }
+.rb-danger{ color:var(--bad); }
