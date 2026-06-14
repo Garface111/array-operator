@@ -1,0 +1,305 @@
+/* ============================================================================
+ * Array Operator — FleetStore (fleet-store.js)
+ *
+ * THE single source of truth for the whole Arrays tab. Both the per-site fleet
+ * tree (sandbox.js) and the portfolio command center (command-center.js) read
+ * the SAME canonical fleet from here and route EVERY mutation through here, so a
+ * change in one view (drag an inverter, create an array, mark a claim) updates
+ * the other instantly — no second fetch, no drift.
+ *
+ * Canonical shape:
+ *   array = { id, name, region, host, vendor, inverters:[ inv ] }
+ *   inv   = { id, name, model, nameplate_kw, peer_index, status, window_kwh,
+ *             current_power_w, stale_hours, diagnosis }
+ *
+ * Reactivity: subscribe(fn) → fn(state) on every change. Mutations update the
+ * in-memory model + notify SYNCHRONOUSLY (instant cross-view update), then
+ * persist to the backend in the background when signed in (optimistic; reverts
+ * by re-fetching on failure). Peer indices are recomputed locally on structural
+ * changes so the demo is genuinely reactive; the live backend stays the
+ * authority and its values overwrite on the post-write refetch.
+ * ==========================================================================*/
+window.FleetStore = (function(){
+  "use strict";
+
+  const SESSION_KEY = "so_session";
+  const TRIAGE_KEY  = "cc_triage_state";   // {rowKey: "progress"|"snoozed"}
+  const WINDOW_DAYS = 14;
+  const UNDERPERF_PI = 0.85;               // at/above = healthy
+  const getSession = () => { try { return localStorage.getItem(SESSION_KEY); } catch(e){ return null; } };
+
+  // ---- state ----
+  const state = {
+    arrays: [],
+    loaded: false,
+    simulated: false,
+    recovered: 0,
+    focus: [],                 // arrayIds the sandbox shows (subset, keeps it from being 100 columns)
+    triage: loadTriage(),      // shared workflow state, keyed by `${arrayId}|${invName}`
+  };
+  let _invSeq = 1;             // unique inverter id allocator (demo + new)
+
+  const subs = new Set();
+  // kind ∈ "load" | "fleet" | "triage" | "focus" — lets a subscriber ignore
+  // changes it doesn't care about (e.g. the fleet tree skips triage-only updates).
+  function subscribe(fn){ subs.add(fn); if(state.loaded){ try{ fn(state,"load"); }catch(e){} } return () => subs.delete(fn); }
+  function notify(kind){ subs.forEach(fn => { try{ fn(state, kind||"fleet"); }catch(e){} }); }
+
+  function loadTriage(){ try { return JSON.parse(localStorage.getItem(TRIAGE_KEY))||{}; } catch(e){ return {}; } }
+  function saveTriage(){ try { localStorage.setItem(TRIAGE_KEY, JSON.stringify(state.triage)); } catch(e){} }
+
+  /* ===========================================================================
+   * DERIVED HELPERS — peer-index recompute + per-array alert rollup
+   * ==========================================================================*/
+
+  // Recompute each producing inverter's peer_index (share of harvest vs share of
+  // hardware) against its CURRENT array cohort, and refresh ok/underperforming.
+  // Intrinsic states (dead/fault/comm_gap) are hardware/comms facts — left as-is.
+  function recompute(a){
+    const producing = a.inverters.filter(i => i.status==="ok" || i.status==="underperforming");
+    const so = producing
+      .filter(i => i.nameplate_kw>0 && i.window_kwh!=null)
+      .map(i => i.window_kwh / i.nameplate_kw);
+    let median = 0;
+    if(so.length){ const s=[...so].sort((x,y)=>x-y); median = s[Math.floor(s.length/2)]; }
+    producing.forEach(i => {
+      if(!median || !i.nameplate_kw){ return; }
+      const pi = (i.window_kwh / i.nameplate_kw) / median;
+      i.peer_index = Math.round(pi*100)/100;
+      i.status = pi >= UNDERPERF_PI ? "ok" : "underperforming";
+      i.diagnosis = i.status==="ok"
+        ? "Pulling its weight."
+        : `Running ~${Math.round((1-pi)*100)}% below its neighbors under the same sky — likely shading, soiling, or a tired string.`;
+    });
+  }
+
+  function alertFor(a){
+    const f = a.inverters;
+    const dead = f.some(i => i.status==="dead" || i.status==="fault");
+    const under = f.filter(i => i.status==="underperforming").length;
+    const quiet = f.some(i => i.status==="comm_gap");
+    const flagged = f.filter(i => i.status!=="ok").length;
+    if(dead)  return { level:"critical", count:flagged, status:"dead",            headline:"An inverter stopped earning" };
+    if(under) return { level:"warn",     count:flagged, status:"underperforming", headline:"A money leak caught early" };
+    if(quiet) return { level:"warn",     count:flagged, status:"comm_gap",        headline:"An inverter has gone quiet" };
+    return      { level:"ok",       count:0,       status:"ok",             headline:"All clear" };
+  }
+
+  /* ===========================================================================
+   * SELECTORS — shape the canonical fleet for each consumer
+   * ==========================================================================*/
+
+  // sandbox shape: { columns:[…], summary:{…} }. `ids` optional → focus subset.
+  function toColumns(ids){
+    const list = (ids && ids.length) ? state.arrays.filter(a => ids.includes(a.id)) : state.arrays;
+    const columns = list.map(a => ({
+      array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
+      inverter_source: "solaredge", inverter_count: a.inverters.length,
+      alert: alertFor(a),
+      inverters: a.inverters.map(i => ({
+        inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
+        peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
+        window_kwh: i.window_kwh, current_power_w: i.current_power_w,
+        last_mode: i.status==="dead" ? "SHUTDOWN" : i.status==="comm_gap" ? "" : "PRODUCING",
+        vendor: a.vendor || "solaredge",
+      })),
+    }));
+    const invTotal = list.reduce((t,a)=>t+a.inverters.length,0);
+    return { tiers:["alerts","arrays","inverters"],
+             summary:{ arrays_total:list.length, inverters_total:invTotal,
+                       attention:list.filter(a=>alertFor(a).level!=="ok").length },
+             columns };
+  }
+
+  // command-center shape: the raw canonical arrays + meta (it computes its own KPIs)
+  function snapshot(){ return { arrays: state.arrays, simulated: state.simulated, recovered_ytd: state.recovered }; }
+
+  function focusColumns(){ return toColumns(state.focus.length ? state.focus : defaultFocusIds()); }
+  function focusIds(){ return state.focus.length ? state.focus.slice() : defaultFocusIds(); }
+
+  // default sandbox focus = the worst few sites (most flagged / biggest leak),
+  // so the tree opens on something worth looking at instead of 100 columns.
+  function defaultFocusIds(){
+    const scored = state.arrays.map(a => {
+      const flagged = a.inverters.filter(i=>i.status!=="ok").length;
+      return { id:a.id, flagged };
+    }).sort((x,y)=> y.flagged - x.flagged);
+    const worst = scored.filter(s=>s.flagged>0).slice(0,4).map(s=>s.id);
+    return worst.length ? worst : state.arrays.slice(0,3).map(a=>a.id);
+  }
+
+  /* ===========================================================================
+   * MUTATIONS — update in-memory, notify SYNC, persist async when live
+   * ==========================================================================*/
+  const isLive = () => !!getSession();
+  function apiPost(path, body){
+    const s = getSession();
+    return fetch(path, { method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s },
+      body: body!=null ? JSON.stringify(body) : "{}" })
+      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); });
+  }
+
+  function findArray(id){ return state.arrays.find(a => String(a.id)===String(id)); }
+  function findInv(invId){
+    for(const a of state.arrays){ const i=a.inverters.find(x=>String(x.id)===String(invId)); if(i) return {a,i}; }
+    return null;
+  }
+
+  // move an inverter to another array at `position`; recompute BOTH cohorts.
+  function reassignInverter(invId, toArrayId, position){
+    const hit = findInv(invId); const dest = findArray(toArrayId);
+    if(!hit || !dest) return;
+    const { a:from, i } = hit;
+    from.inverters = from.inverters.filter(x => x!==i);
+    const pos = Math.max(0, Math.min(position==null?dest.inverters.length:position, dest.inverters.length));
+    dest.inverters.splice(pos, 0, i);
+    recompute(from); recompute(dest);
+    notify();
+    if(isLive()){
+      apiPost("/v1/array-owners/inverters/reassign",
+              { inverter_id: invId, target_array_id: toArrayId, position: pos })
+        .then(() => refetch()).catch(() => refetch());
+    }
+  }
+
+  function reorderInverters(arrayId, orderedIds){
+    const a = findArray(arrayId); if(!a) return;
+    const byId = new Map(a.inverters.map(i => [String(i.id), i]));
+    const next = orderedIds.map(id => byId.get(String(id))).filter(Boolean);
+    a.inverters.forEach(i => { if(!next.includes(i)) next.push(i); });
+    a.inverters = next;
+    notify();
+    if(isLive()){
+      apiPost("/v1/array-owners/inverters/reorder", { array_id: arrayId, ordered_inverter_ids: orderedIds })
+        .catch(() => refetch());
+    }
+  }
+
+  function createArray(name){
+    const id = "new-" + (_invSeq++);
+    state.arrays.push({ id, name, region:"—", host:"", vendor:"", inverters:[] });
+    notify();
+    if(isLive()){ apiPost("/v1/array-owners/arrays", { name }).then(()=>refetch()).catch(()=>refetch()); }
+    return id;
+  }
+
+  function resetLayout(){
+    if(isLive()){ apiPost("/v1/array-owners/layout/reset").then(()=>refetch()).catch(()=>refetch()); }
+    else { notify(); }   // demo has no server grouping to snap back to
+  }
+
+  function setTriage(key, st){
+    if(st==="new") delete state.triage[key]; else state.triage[key]=st;
+    saveTriage(); notify("triage");
+  }
+  function setTriageBatch(keys, st){
+    keys.forEach(k => { if(st==="new") delete state.triage[k]; else state.triage[k]=st; });
+    saveTriage(); notify("triage");
+  }
+  function triageState(key){ return state.triage[key] || "new"; }
+
+  function setFocus(ids){ state.focus = (ids||[]).map(x=>x); notify("focus"); }
+
+  /* ===========================================================================
+   * LOAD — one fetch (live) or one simulated fleet (demo), shared by both views
+   * ==========================================================================*/
+  function ingest(arrays, opts){
+    state.arrays = arrays;
+    state.simulated = !!(opts && opts.simulated);
+    state.recovered = (opts && opts.recovered) || 0;
+    state.arrays.forEach(recompute);
+    if(!state.focus.length) state.focus = defaultFocusIds();
+    state.loaded = true;
+    notify("load");
+  }
+
+  function refetch(){
+    const s = getSession(); if(!s) return Promise.resolve();
+    return fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+s } })
+      .then(r => { if(!r.ok) throw 0; return r.json(); })
+      .then(t => { if(t.columns && t.columns.length) ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 }); })
+      .catch(()=>{});
+  }
+
+  let _loading = false;
+  function load(){
+    if(state.loaded || _loading) return;     // single shared bootstrap — both views may call it
+    _loading = true;
+    if(getSession()){
+      fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+getSession() } })
+        .then(r => { if(!r.ok) throw 0; return r.json(); })
+        .then(t => {
+          if(t.columns && t.columns.length) ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
+          else ingest(simulateFleet(), { simulated:true, recovered:18450 });
+        })
+        .catch(() => ingest(simulateFleet(), { simulated:true, recovered:18450 }));
+    } else {
+      ingest(simulateFleet(), { simulated:true, recovered:18450 });
+    }
+  }
+
+  // adapt the live fleet-tree (sandbox columns) → canonical arrays
+  function adaptTree(t){
+    return (t.columns||[]).map(c => ({
+      id: c.array_id, name: c.array_name, region:"—", host: c.client_name||"",
+      vendor: c.vendor||"solaredge",
+      inverters: (c.inverters||[]).map(inv => ({
+        id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
+        name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
+        peer_index: inv.peer_index, status: inv.status, window_kwh: inv.window_kwh,
+        current_power_w: inv.current_power_w, stale_hours: inv.stale_hours,
+        diagnosis: inv.diagnosis || "",
+      })),
+    }));
+  }
+
+  /* ---- deterministic 100-array simulated fleet (demo / preview) ---- */
+  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+  const REGIONS = ["Northern VT","Mad River Valley","Champlain Islands","NH Upper Valley","The Berkshires","Central VT"];
+  const HOSTS   = ["Green Mountain Solar","Catamount Energy Co-op","Maple Ridge Community","Sugarbush Holdings","Lakeside Dairy LLC","Riverbend Schools","Northfield Municipal","Birchwood Properties"];
+  const PLACES  = ["Londonderry","Maple Street","Cover Catamount","Stowe Hollow","Waitsfield","Bristol Cliffs","Hinesburg Flats","Richmond Bridge","Underhill","Jericho Center","Cabot Creamery","Hardwick","Craftsbury","Greensboro Bend","Morrisville","Johnson Mill","Enosburg Falls","Swanton Yard","Grand Isle","Vergennes","Middlebury","Brandon Depot","Rutland Yard","Killington Base","Ludlow Mill","Chester Depot","Springfield Works","Bellows Falls","Brattleboro","Wilmington Ridge","Dover Notch","Manchester Center","Bennington Mill","Pownal Flats","Arlington","Dorset Quarry","Pawlet","Poultney","Fair Haven","Castleton"];
+  const NAMEPLATES = [10,11.4,20,33.3];
+  function simulateFleet(){
+    const rng = mulberry32(0x5ECA11);
+    const pick = arr => arr[Math.floor(rng()*arr.length)];
+    const arrays = [];
+    for(let n=0;n<100;n++){
+      const invCount = 8 + Math.floor(rng()*9);
+      const place = PLACES[n % PLACES.length];
+      const name = n < PLACES.length ? place : `${place} ${Math.floor(n/PLACES.length)+1}`;
+      const inverters = [];
+      for(let j=0;j<invCount;j++){
+        const r = rng(); let status="ok";
+        if(r<0.020) status="dead"; else if(r<0.030) status="fault";
+        else if(r<0.085) status="underperforming"; else if(r<0.115) status="comm_gap";
+        const np = pick(NAMEPLATES);
+        const fair = np * 4.6 * WINDOW_DAYS;
+        let pi=1+(rng()-0.5)*0.06, win=fair*pi, power=np*1000*(0.55+rng()*0.25);
+        if(status==="underperforming"){ pi=0.55+rng()*0.27; win=fair*pi; power=np*1000*(0.30+rng()*0.20); }
+        else if(status==="comm_gap"){ pi=null; win=fair*(0.6+rng()*0.3); power=null; }
+        else if(status==="dead"){ pi=null; win=0; power=0; }
+        else if(status==="fault"){ pi=0.18+rng()*0.18; win=fair*pi; power=np*1000*0.12; }
+        inverters.push({
+          id: _invSeq++, name:`Inverter ${j+1}`, model:`SE${np}K`, nameplate_kw:np,
+          peer_index:pi, status, window_kwh:Math.round(win*10)/10,
+          current_power_w: power==null?null:Math.round(power),
+          stale_hours: status==="comm_gap" ? Math.round(12+rng()*60) : (status==="dead"? Math.round(48+rng()*120):null),
+          diagnosis: "",
+        });
+      }
+      arrays.push({ id:n+1, name, region:pick(REGIONS), host:pick(HOSTS), vendor:"solaredge", inverters });
+    }
+    return arrays;
+  }
+
+  // ---- public API ----
+  return {
+    subscribe, load,
+    snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
+    reassignInverter, reorderInverters, createArray, resetLayout,
+    setTriage, setTriageBatch, triageState, isLive,
+    isLoaded: () => state.loaded,
+    WINDOW_DAYS,
+  };
+})();

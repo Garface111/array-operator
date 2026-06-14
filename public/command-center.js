@@ -47,65 +47,6 @@
    * 1. DATA — normalize to a flat list of flagged inverters w/ $ at stake.
    * ==========================================================================*/
 
-  // deterministic PRNG so the simulated fleet is stable across renders
-  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-
-  const REGIONS = ["Northern VT","Mad River Valley","Champlain Islands","NH Upper Valley","The Berkshires","Central VT"];
-  const HOSTS   = ["Green Mountain Solar","Catamount Energy Co-op","Maple Ridge Community","Sugarbush Holdings","Lakeside Dairy LLC","Riverbend Schools","Northfield Municipal","Birchwood Properties"];
-  const PLACES  = ["Londonderry","Maple Street","Cover Catamount","Stowe Hollow","Waitsfield","Bristol Cliffs","Hinesburg Flats","Richmond Bridge","Underhill","Jericho Center","Cabot Creamery","Hardwick","Craftsbury","Greensboro Bend","Morrisville","Johnson Mill","Enosburg Falls","Swanton Yard","Grand Isle","Vergennes","Middlebury","Brandon Depot","Rutland Yard","Killington Base","Ludlow Mill","Chester Depot","Springfield Works","Bellows Falls","Brattleboro","Wilmington Ridge","Dover Notch","Manchester Center","Bennington Mill","Pownal Flats","Arlington","Dorset Quarry","Pawlet","Poultney","Fair Haven","Castleton"];
-  const NAMEPLATES = [10,11.4,20,33.3];
-
-  // simulate a 100-array fleet (1,196 inverters) — stable via seeded RNG
-  function simulateFleet(){
-    const rng = mulberry32(0x5ECA11);
-    const pick = arr => arr[Math.floor(rng()*arr.length)];
-    const arrays = [];
-    const N_ARRAYS = 100;
-    for(let i=0;i<N_ARRAYS;i++){
-      const invCount = 8 + Math.floor(rng()*9);        // 8..16, ~12 avg
-      const place = PLACES[i % PLACES.length];
-      const name = i < PLACES.length ? place : `${place} ${Math.floor(i/PLACES.length)+1}`;
-      const inverters = [];
-      for(let j=0;j<invCount;j++){
-        const r = rng();
-        let status="ok";
-        if(r<0.020) status="dead";
-        else if(r<0.030) status="fault";
-        else if(r<0.085) status="underperforming";
-        else if(r<0.115) status="comm_gap";
-        const np = pick(NAMEPLATES);
-        // fair-share window kWh for a healthy unit of this nameplate (14d, ~VT June)
-        const fair = np * 4.6 * WINDOW_DAYS;            // ~4.6 kWh/kW/day
-        let pi=1+(rng()-0.5)*0.06, win=fair*pi, power=np*1000*(0.55+rng()*0.25);
-        if(status==="underperforming"){ pi=0.55+rng()*0.27; win=fair*pi; power=np*1000*(0.30+rng()*0.20); }
-        else if(status==="comm_gap"){ pi=null; win=fair*(0.6+rng()*0.3); power=null; }
-        else if(status==="dead"){ pi=null; win=0; power=0; }
-        else if(status==="fault"){ pi=0.18+rng()*0.18; win=fair*pi; power=np*1000*0.12; }
-        inverters.push({
-          name:`Inverter ${j+1}`, model:`SE${np}K`, nameplate_kw:np,
-          peer_index:pi, status, window_kwh:Math.round(win*10)/10,
-          current_power_w: power==null?null:Math.round(power),
-          stale_hours: status==="comm_gap" ? Math.round(12+rng()*60) : (status==="dead"? Math.round(48+rng()*120):null)
-        });
-      }
-      arrays.push({ id:i+1, name, region:pick(REGIONS), host:pick(HOSTS), vendor:"solaredge", inverters });
-    }
-    return { arrays, simulated:true, recovered_ytd: 18450 };   // recovered $ is tracked server-side in prod
-  }
-
-  // adapt the live fleet-tree shape (sandbox's columns) → internal arrays
-  function adaptTree(tree){
-    const arrays = (tree.columns||[]).map(c => ({
-      id:c.array_id, name:c.array_name, region:"—", host:c.client_name||"",
-      vendor:c.vendor||"", inverters:(c.inverters||[]).map(inv => ({
-        name:inv.name, model:inv.model, nameplate_kw:inv.nameplate_kw,
-        peer_index:inv.peer_index, status:inv.status, window_kwh:inv.window_kwh,
-        current_power_w:inv.current_power_w, stale_hours:inv.stale_hours
-      }))
-    }));
-    return { arrays, simulated:false, recovered_ytd:(tree.summary&&tree.summary.recovered_ytd)||0 };
-  }
-
   // per-inverter lost-kWh estimate over the window (same logic family as app.js)
   function lostKwh(inv, fleetWindowKwh, totalNameplate){
     const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
@@ -127,7 +68,7 @@
         const lk = lostKwh(inv, fleetWin, totalNp);
         const lossMo = val(lk)/WINDOW_DAYS*30;
         rows.push({
-          key:`${a.id}|${inv.name}`, site:a.name, region:a.region, host:a.host, vendor:a.vendor,
+          key:`${a.id}|${inv.name}`, arrayId:a.id, site:a.name, region:a.region, host:a.host, vendor:a.vendor,
           inv:inv.name, model:inv.model, nameplate:inv.nameplate_kw, status:inv.status,
           sev:SEV[inv.status], pi:inv.peer_index, stale:inv.stale_hours,
           lossMo, lossYr:lossMo*12, lostKwh:lk, windowKwh:inv.window_kwh,
@@ -151,10 +92,8 @@
    * ==========================================================================*/
   let MODEL=null;
   const UI = { q:"", sev:"all", region:"all", sort:"loss", dir:-1, expanded:null, selected:new Set() };
-  function loadWf(){ try { return JSON.parse(localStorage.getItem(STATE_KEY))||{}; } catch(e){ return {}; } }
-  function saveWf(m){ try { localStorage.setItem(STATE_KEY, JSON.stringify(m)); } catch(e){} }
-  let WF = loadWf();
-  const wfState = key => WF[key] || "new";
+  // triage workflow state is shared via FleetStore so the rest of the app sees it
+  const wfState = key => FleetStore.triageState(key);
 
   function filteredRows(){
     const q = UI.q.trim().toLowerCase();
@@ -316,6 +255,7 @@
               : `<button class="cc-btn primary" data-do="progress" data-key="${esc(r.key)}">Start working it</button>`}
             <button class="cc-btn ghost" data-do="progress" data-key="${esc(r.key)}">Mark in progress</button>
             <button class="cc-btn ghost" data-do="snooze" data-key="${esc(r.key)}">Snooze</button>
+            <button class="cc-btn ghost" data-do="focus" data-key="${esc(r.key)}">Open in fleet tree →</button>
           </div>
         </div>
       </div></td></tr>`;
@@ -365,20 +305,26 @@
       e.stopPropagation();
       const key=b.dataset.key, act=b.dataset.do;
       const r = MODEL.rows.find(x=>x.key===key);
-      if(act==="claim"){ openClaim(r); WF[key]="progress"; saveWf(WF); }
-      else if(act==="progress"){ WF[key]="progress"; saveWf(WF); }
-      else if(act==="snooze"){ WF[key]="snoozed"; saveWf(WF); }
-      render();
+      // mutating shared state notifies the store → this view (and any other) re-renders
+      if(act==="claim"){ openClaim(r); FleetStore.setTriage(key,"progress"); }
+      else if(act==="progress"){ FleetStore.setTriage(key,"progress"); }
+      else if(act==="snooze"){ FleetStore.setTriage(key,"snoozed"); }
+      else if(act==="focus" && r){
+        FleetStore.setFocus([r.arrayId]);            // jump the fleet tree to this site
+        const tree = document.getElementById("sbWrap");
+        if(tree) tree.scrollIntoView({ behavior:"smooth", block:"start" });
+        toast(`Fleet tree focused on ${r.site}.`);
+      }
     });
   }
 
   function bulkClaim(){
     const keys=[...UI.selected];
     const claimable = keys.map(k=>MODEL.rows.find(r=>r.key===k)).filter(r=>r&&(r.status==="dead"||r.status==="fault"));
-    keys.forEach(k=>{ WF[k]="progress"; }); saveWf(WF);
     toast(`${keys.length} item${keys.length===1?"":"s"} moved to In progress${claimable.length?` · opening ${claimable.length} claim${claimable.length===1?"":"s"}`:""}.`);
     if(claimable.length) openClaim(claimable[0]);
-    UI.selected.clear(); render();
+    UI.selected.clear();
+    FleetStore.setTriageBatch(keys, "progress");   // one notify → re-render
   }
 
   // lightweight mailto claim (self-contained; the per-site sandbox has the full editor)
@@ -417,21 +363,17 @@ Thank you,
   /* ===========================================================================
    * 5. LOAD
    * ==========================================================================*/
-  function load(){
+  // React to the shared store: rebuild the portfolio model + re-render on ANY
+  // change — including ones triggered by the sandbox (a drag re-measures peer
+  // indices, which moves the KPIs and the triage queue here in the same frame).
+  function onStore(){
     if(!host()) return;
-    const session = getSession();
-    if(session){
-      fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+session } })
-        .then(r => { if(!r.ok) throw 0; return r.json(); })
-        .then(t => { MODEL = buildModel((t.columns&&t.columns.length)?adaptTree(t):simulateFleet()); render(); })
-        .catch(() => { MODEL = buildModel(simulateFleet()); render(); });
-    } else {
-      MODEL = buildModel(simulateFleet());
-      render();
-    }
+    MODEL = buildModel(FleetStore.snapshot());
+    render();
   }
 
-  window.__ccLoad = load;
-  if(document.readyState!=="loading") load();
-  else document.addEventListener("DOMContentLoaded", load);
+  window.__ccLoad = () => FleetStore.load();
+  FleetStore.subscribe(onStore);
+  if(document.readyState!=="loading") FleetStore.load();
+  else document.addEventListener("DOMContentLoaded", FleetStore.load);
 })();

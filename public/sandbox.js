@@ -460,46 +460,31 @@
     if(btn) btn.onclick = openAddArrayModal;
   }
 
-  /* ---- 'Reset layout' — POST /layout/reset: snap every inverter back to its
-   * discovered (vendor) grouping on the SERVER, then reload the live tree. ---- */
+  /* ---- 'Reset layout' — snap inverters back to their discovered grouping.
+   * Goes through the store (which persists to the server when live). ---- */
   function wireResetButton(host){
     const btn = host.querySelector("#sbReset");
     if(!btn) return;
-    btn.onclick = async () => {
-      const session = getSession();
-      if(!session){ load(); return; }   // demo / signed-out — nothing server-side to reset
+    btn.onclick = () => {
       setSaving("Resetting to your discovered grouping…");
-      try {
-        const d = await apiPost("/v1/array-owners/layout/reset");
-        toast(`Snapped ${d && d.reset!=null ? d.reset : "all"} inverters back to their vendor grouping.`, "ok");
-        reload();
-      } catch(e){
-        toast("Couldn't reset the layout — please retry.", "err");
-        reload();
-      }
+      FleetStore.resetLayout();           // store notifies → our subscription re-renders
     };
   }
 
-  /* ---- 'New empty array' — POST /arrays {name}: create an empty owner-defined
-   * group to drag inverters into, then reload so the new column appears. ---- */
+  /* ---- 'New empty array' — create an owner-defined group to drag inverters
+   * into. Goes through the store (persists when live). ---- */
   function wireNewArrayButton(host){
     const btn = host.querySelector("#sbNewArray");
     if(!btn) return;
-    btn.onclick = async () => {
-      const session = getSession();
-      if(!session){ toast("Sign in first to create an array.", "err"); return; }
+    btn.onclick = () => {
       let name = window.prompt("Name your new array (then drag inverters into it):", "");
       if(name == null) return;                 // cancelled
       name = name.trim();
       if(!name){ toast("Enter a name for the new array.", "err"); return; }
       setSaving("Creating your new array…");
-      try {
-        await apiPost("/v1/array-owners/arrays", { name });
-        reload();
-      } catch(e){
-        toast("Couldn't create that array — please retry.", "err");
-        reload();
-      }
+      const newId = FleetStore.createArray(name);
+      // make sure the new (empty) column is visible in the focused subset
+      const f = FleetStore.focusIds(); if(f.indexOf(newId)===-1) FleetStore.setFocus(f.concat([newId]));
     };
   }
 
@@ -595,15 +580,22 @@
         card.dataset.arrayId = col.dataset.arrayId;          // optimistic: its new home array
         host.querySelectorAll(".sb-col").forEach(updateColCount);
 
-        const invId = parseInt(card.dataset.invId, 10);
-        const destArrayId = parseInt(col.dataset.arrayId, 10);
-        // No real id / no session (demo tree) → optimistic-only, nothing to persist.
-        if(isNaN(invId) || !getSession()) return;
+        const invId = card.dataset.invId;
+        const destArrayId = col.dataset.arrayId;
+        if(invId==null || invId==="" || !window.FleetStore) return;
 
-        if(String(col.dataset.arrayId) !== String(from)){
-          persistReassign(card, invId, destArrayId);
+        // Route the move through the shared store. The store updates the
+        // canonical fleet, recomputes peer indices for BOTH cohorts, and notifies
+        // every subscriber — so the command center's KPIs + triage queue move in
+        // the same frame, and our subscription re-renders this tree from truth.
+        if(String(destArrayId) !== String(from)){
+          const teeth = card.closest(".sb-teeth");
+          const position = teeth ? [...teeth.querySelectorAll(".sb-inv")].indexOf(card) : 0;
+          FleetStore.reassignInverter(invId, destArrayId, Math.max(0, position));
         } else {
-          persistReorder(col, destArrayId);
+          const teeth = col.querySelector(".sb-teeth");
+          const ordered = teeth ? [...teeth.querySelectorAll(".sb-inv")].map(n => n.dataset.invId).filter(Boolean) : [];
+          FleetStore.reorderInverters(destArrayId, ordered);
         }
       });
     });
@@ -632,69 +624,20 @@
     });
   }
 
-  // Cross-array move: persist + RELOAD so peer-index / alerts / counts reflect the new
-  // cohort (the whole point of a move). Cached reload is fast; reassign itself is instant.
-  function persistReassign(card, invId, destArrayId){
-    const teeth = card.closest(".sb-teeth");
-    const position = teeth ? [...teeth.querySelectorAll(".sb-inv")].indexOf(card) : 0;
-    setSaving("Moving inverter & re-measuring against new neighbors…");
-    apiPost("/v1/array-owners/inverters/reassign",
-            { inverter_id: invId, target_array_id: destArrayId, position: Math.max(0, position) })
-      .then(() => reload())                               // reconcile with fresh peer math
-      .catch(() => { toast("Couldn't move that inverter — putting it back.", "err"); reload(); });
-  }
-
-  // Within-array reorder: peer cohort is unchanged, so trust the optimistic DOM move and
-  // just persist the new order. Revert by reloading only on failure.
-  function persistReorder(col, arrayId){
-    const teeth = col.querySelector(".sb-teeth");
-    const ordered = teeth
-      ? [...teeth.querySelectorAll(".sb-inv")].map(n => parseInt(n.dataset.invId, 10)).filter(n => !isNaN(n))
-      : [];
-    if(!ordered.length) return;
-    setSaving("Saving order…");
-    apiPost("/v1/array-owners/inverters/reorder", { array_id: arrayId, ordered_inverter_ids: ordered })
-      .then(() => clearSaving())
-      .catch(() => { toast("Couldn't save the new order — reloading.", "err"); reload(); });
-  }
-
-  // Re-fetch the live tree and re-render WITHOUT the full loading-state wipe (smoother than
-  // load() after a write). Dims the canvas while in flight. Falls back to load() if signed out.
-  function reload(opts){
+  // The fleet tree is now a VIEW over the shared FleetStore — it renders the
+  // store's focused subset of arrays rather than fetching its own. Re-renders are
+  // driven by the store subscription (below), so a change here OR in the command
+  // center lands in both places in the same frame. The old per-write apiPost/
+  // reload dance is gone: mutations go through FleetStore, which persists.
+  function renderFromStore(){
     const host = document.getElementById("sandbox");
-    if(!host) return;
-    const session = getSession();
-    if(!session){ load(); return; }
-    const canvas = host.querySelector(".sb-canvas");
-    if(canvas) canvas.classList.add("sb-busy");
-    const url = "/v1/array-owners/fleet-tree" + (opts && opts.force ? "?force=1" : "");
-    fetch(url, { headers: { Authorization: "Bearer " + session } })
-      .then(r => { if(!r.ok) throw new Error("fleet-tree " + r.status); return r.json(); })
-      .then(render)                                       // render() rebuilds innerHTML → busy class drops
-      .catch(() => { if(canvas) canvas.classList.remove("sb-busy"); toast("Couldn't refresh the fleet tree — please retry.", "err"); });
+    if(!host || !window.FleetStore) return;
+    if(!FleetStore.isLoaded()){ host.innerHTML = `<div class="sb-empty">Loading your fleet tree…</div>`; FleetStore.load(); return; }
+    render(FleetStore.focusColumns());
   }
-
-  function load(){
-    const host = document.getElementById("sandbox");
-    if(!host) return;
-    let session = null;
-    try { session = localStorage.getItem(SESSION_KEY); } catch(e){}
-    host.innerHTML = `<div class="sb-empty">Loading your fleet tree…</div>`;
-
-    if(!session){
-      // Anonymous — show the demo tree so the structure still reads.
-      fetch("fleet-tree-demo.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render)
-        .catch(()=>{ host.innerHTML = `<div class="sb-empty">Sign in to see your live fleet tree. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; });
-      return;
-    }
-    fetch("/v1/array-owners/fleet-tree", { headers: { Authorization: "Bearer " + session } })
-      .then(r => { if(!r.ok) throw new Error("fleet-tree " + r.status); return r.json(); })
-      .then(render)
-      .catch(() => {
-        fetch("fleet-tree-demo.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render)
-          .catch(()=>{ host.innerHTML = `<div class="sb-empty">Couldn't load your fleet tree — please refresh.</div>`; });
-      });
-  }
+  // names the rest of the file / tab system still call:
+  function reload(){ renderFromStore(); }
+  function load(){ renderFromStore(); }
 
   /* ===========================================================================
    * ADD-ARRAY MODAL — dark-skinned vendor picker. Mirrors the onboarding wizard's
@@ -1133,4 +1076,14 @@
   document.addEventListener("DOMContentLoaded", applyView);
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
+
+  // ---- shared store: re-render the fleet tree whenever the canonical fleet (or
+  // the focused subset) changes — including changes made from the command center.
+  // Triage-only updates are ignored; they don't touch the tree.
+  if(window.FleetStore){
+    FleetStore.subscribe((s, kind) => {
+      if(kind === "triage") return;
+      if(document.getElementById("sandbox")) renderFromStore();
+    });
+  }
 })();
