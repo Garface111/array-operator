@@ -296,6 +296,10 @@
     background:linear-gradient(165deg,rgba(94,194,255,.08),rgba(255,255,255,.015));text-align:center}
   .sb-array-k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--sky)}
   .sb-array-name{font-size:16px;font-weight:740;color:var(--ink);margin-top:4px;letter-spacing:-.01em}
+  /* inline-editable names (array + inverter): hint with a text caret + faint hover outline */
+  .sb-editable{cursor:text;border-radius:6px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .12s,background-color .12s}
+  .sb-editable:hover{outline-color:rgba(94,194,255,.35)}
+  .sb-editable.sb-editing{outline:1px solid var(--good);outline-offset:2px;background:rgba(63,214,138,.1);cursor:text}
   .sb-array-meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:wrap}
   .sb-srctag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--faint);letter-spacing:.02em}
   .sb-srctag.live{background:rgba(63,214,138,.16);color:var(--good)}
