@@ -209,8 +209,15 @@ function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 // use, the extension READS their durable account API key, and it lands here.
 // We then run the SAME /public/preview reveal + connect flow as the paste path.
 let EXT_PRESENT = false;
+// The EnergyAgent helper on the Chrome Web Store (same extension NEPOOL Operator
+// uses — it gains SolarEdge + arrayoperator.com support in v1.8.0).
+const EXT_STORE_URL = "https://chromewebstore.google.com/detail/solar-operator-sync/ocohbimolfpnkjcjhiodopjjlhclinpl";
 function extSend(type, extra){
   try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
+}
+function extInstallClicked(){
+  const w = document.getElementById("extWatch");
+  if (w) w.innerHTML = "Waiting for the helper… once it's added, come back to this tab and your arrays appear automatically — no refresh needed.";
 }
 window.addEventListener("message", (e) => {
   if (e.source !== window) return;
@@ -349,13 +356,20 @@ function connectScreen(){
       <div class="vendgrid">${cards}</div>
     </div>
 
-    ${(v.code === "solaredge" && EXT_PRESENT) ? `
+    ${v.code === "solaredge" ? (EXT_PRESENT ? `
     <div class="callout" style="margin-top:1.5rem">
       <div class="t">⚡ One-click connect — no API key needed</div>
-      <div class="s">You've got the EnergyAgent browser helper installed. Click below, sign in to SolarEdge the way you always do, and your arrays appear here automatically.</div>
+      <div class="s">Your EnergyAgent helper is installed. Click below, sign into SolarEdge the way you always do, and your arrays appear here automatically.</div>
       <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSolarEdge()">Log in with SolarEdge →</button>
     </div>
-    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>` : ""}
+    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>` : `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ Skip the API key — add our 1-click helper</div>
+      <div class="s">A free Chrome extension reads your arrays straight from your SolarEdge login — nothing to find, nothing to paste. The same helper that powers NEPOOL Operator. Add it, come back here, and your arrays appear on their own.</div>
+      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
+      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
+    </div>
+    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>`) : ""}
 
     ${fieldsHtml}
     ${noteHtml}
