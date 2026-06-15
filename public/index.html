@@ -21,6 +21,14 @@
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
+    <!-- Signed-in identity chip — which account am I in. Top-right, next to the
+         Reports tab. Email filled from /v1/account; shown only when authed
+         (toggled by renderFromSession in app.js). Click → Master Account. -->
+    <a class="tab tab-whoami" id="tabWhoami" href="#account" role="tab"
+       title="You're signed in — view your master account" style="display:none">
+      <span class="whoami-dot" aria-hidden="true"></span>
+      <span class="whoami-email" id="whoamiEmail">…</span>
+    </a>
   </div>
 
   <!-- ============================ TAB: MASTER ACCOUNT ============================ -->

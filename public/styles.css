@@ -411,6 +411,18 @@
   .tab.active{color:var(--good)}
   .tab.active::after{background:linear-gradient(90deg,var(--good),var(--good2));
     box-shadow:0 0 12px rgba(63,214,138,.5)}
+  /* Right-aligned tabbar items: sign-in prompt + signed-in identity chip.
+     Both size to content (not flex:1) and hug the right edge next to Reports. */
+  #tabSignIn{flex:0 0 auto}
+  .tab.tab-whoami{flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;gap:8px;
+    max-width:240px;padding:7px 13px 7px 11px;border:1px solid var(--line);border-radius:999px;
+    background:var(--card);color:var(--muted);font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+  .tab.tab-whoami:hover{color:var(--ink);background:rgba(255,255,255,.055);border-color:rgba(63,214,138,.35)}
+  .tab.tab-whoami::after{display:none}            /* no underline indicator on the chip */
+  .tab-whoami .whoami-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    background:var(--good);box-shadow:0 0 8px rgba(63,214,138,.7)}
+  .tab-whoami .whoami-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-variant-numeric:tabular-nums}
 
   /* ===== '+ Add array' button (sandbox header) ===== */
   .sb-addbtn{display:inline-flex;align-items:center;gap:7px;border:0;cursor:pointer;

@@ -114,8 +114,14 @@
         try {
           if(window.FleetStore && FleetStore.refetch){
             await FleetStore.refetch();
-            // Make sure the new array isn't hidden by a stale focus subset.
-            if(FleetStore.setFocus && FleetStore.defaultFocusIds) FleetStore.setFocus(FleetStore.defaultFocusIds());
+            // Show the FULL fleet after a connect — the owner just added an array,
+            // they want to see it alongside everything they already had, not a
+            // curated "worst few" subset. (defaultFocusIds() collapses to flagged
+            // arrays only, which would hide the rest — the opposite of "added".)
+            if(FleetStore.setFocus && FleetStore.snapshot){
+              const all = (FleetStore.snapshot().arrays || []).map(a => a.id);
+              if(all.length) FleetStore.setFocus(all);
+            }
           }
         } catch(e){}
         closeAddModal();
@@ -1646,7 +1652,11 @@
           try {
             if(window.FleetStore && FleetStore.refetch){
               await FleetStore.refetch();
-              if(FleetStore.setFocus && FleetStore.defaultFocusIds) FleetStore.setFocus(FleetStore.defaultFocusIds());
+              // Show the full fleet (new array + everything already there).
+              if(FleetStore.setFocus && FleetStore.snapshot){
+                const all = (FleetStore.snapshot().arrays || []).map(a => a.id);
+                if(all.length) FleetStore.setFocus(all);
+              }
             }
           } catch(e){}
           closeAddModal(); load(); return;

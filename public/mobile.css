@@ -11,11 +11,14 @@
   .wrap { padding: 0 12px; }
   body { overflow-x: hidden; }
 
-  /* ── Tab bar: 4 tabs, one line, sticky so navigation is always reachable ── */
+  /* ── Tab bar: 4 tabs on line 1; the identity chip wraps to its own line ── */
   .tabbar { gap: 2px; padding: 3px; margin: 10px 0 2px;
-            position: sticky; top: 0; z-index: 40; }
+            position: sticky; top: 0; z-index: 40; flex-wrap: wrap; }
   .tab { font-size: 11px; letter-spacing: -.1px; padding: 11px 2px;
          line-height: 1.1; min-height: 42px; }
+  /* Identity chip: full-width strip under the tabs so the email isn't clipped. */
+  .tab.tab-whoami { flex: 1 0 100%; max-width: none; margin-left: 0; margin-top: 4px;
+                    justify-content: center; min-height: 0; }
 
   /* ── Portfolio command center ──────────────────────────────────────────── */
   #commandCenter { margin-top: 12px; }

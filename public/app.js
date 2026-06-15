@@ -654,6 +654,31 @@ function renderFromSession(){
   try { session = localStorage.getItem("so_session"); } catch(e){}
   // Surface a "Sign in" link to signed-out visitors (hidden once authed).
   try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
+  // Signed-in identity chip (top-right): show which account this session is in.
+  // One lightweight /v1/account read fills the email; hidden when signed out or
+  // if the session is stale (so it never claims an account we can't confirm).
+  try {
+    const who = document.getElementById("tabWhoami");
+    const whoEmail = document.getElementById("whoamiEmail");
+    if(who){
+      if(session){
+        who.style.display = "";
+        if(whoEmail && !whoEmail.dataset.real) whoEmail.textContent = "…";
+        fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+          .then(r => r.ok ? r.json() : null)
+          .then(a => {
+            if(a && a.email && whoEmail){
+              whoEmail.textContent = a.email;
+              whoEmail.dataset.real = "1";
+              who.title = "Signed in as " + a.email + " — view your master account";
+            } else { who.style.display = "none"; }
+          })
+          .catch(() => { who.style.display = "none"; });
+      } else {
+        who.style.display = "none";
+      }
+    }
+  } catch(e){}
   const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
     `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
 
