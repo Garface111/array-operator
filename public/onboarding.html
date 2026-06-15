@@ -202,6 +202,58 @@ const VENDORS = [
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
+// ── Extension bridge: zero-key SolarEdge connect ──────────────────────────
+// The EnergyAgent extension injects so_bridge.js on arrayoperator.com, which
+// announces SO_EXTENSION_PRESENT and relays SO_CAPTURE_LANDED. When present we
+// offer "Log in with SolarEdge" — the owner signs into the portal they already
+// use, the extension READS their durable account API key, and it lands here.
+// We then run the SAME /public/preview reveal + connect flow as the paste path.
+let EXT_PRESENT = false;
+function extSend(type, extra){
+  try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
+}
+window.addEventListener("message", (e) => {
+  if (e.source !== window) return;
+  const d = e.data; if (!d || typeof d !== "object") return;
+  if (d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)) {
+    if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1) render(); }   // reveal the one-click path
+  }
+  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
+});
+// The bridge announces at document_start (before this runs), so ask explicitly too.
+extSend("SO_STATUS_REQUEST");
+
+function loginWithSolarEdge(){
+  const scan = document.getElementById("scanArea");
+  const emailOk = /.+@.+\..+/.test(state.email);
+  const nameOk = (state.name||"").trim().length >= 2;
+  if (!nameOk || !emailOk){
+    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
+    return;
+  }
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening SolarEdge — sign in there and your arrays appear here automatically.</div>`;
+  extSend("SO_OPEN_PORTAL", { url: "https://monitoring.solaredge.com/", active: true });
+}
+
+function onSolarEdgeCapture(d){
+  state.vendor = "solaredge";
+  const scan = document.getElementById("scanArea");
+  if (d.apiKey){
+    state.apiKey = d.apiKey;
+    if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Got your SolarEdge account — pulling your arrays…</div>`;
+    connectVendor();                         // reuse the existing reveal with the captured key
+    return;
+  }
+  // No durable key (rare) — fall back to the site list if we got one, else prompt.
+  if (Array.isArray(d.sites) && d.sites.length){
+    state.sites = d.sites.map(s => ({ site_id: s.site_id, name: s.name, peak_power_kw: s.peak_power_kw }));
+    state.realSites = true; state.totals = null;
+    go(2);
+    return;
+  }
+  if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached SolarEdge but couldn't read an API key automatically — paste your account key below and we'll take it from here.</div>`;
+}
+
 const stepper = document.getElementById("stepper");
 const main = document.getElementById("main");
 
@@ -296,6 +348,14 @@ function connectScreen(){
       <span class="hint">Pick your monitoring platform — we support more than SolarEdge.</span>
       <div class="vendgrid">${cards}</div>
     </div>
+
+    ${(v.code === "solaredge" && EXT_PRESENT) ? `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ One-click connect — no API key needed</div>
+      <div class="s">You've got the EnergyAgent browser helper installed. Click below, sign in to SolarEdge the way you always do, and your arrays appear here automatically.</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSolarEdge()">Log in with SolarEdge →</button>
+    </div>
+    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>` : ""}
 
     ${fieldsHtml}
     ${noteHtml}
