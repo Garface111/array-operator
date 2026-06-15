@@ -226,7 +226,8 @@ window.addEventListener("message", (e) => {
     if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1) render(); }   // reveal the one-click path
   }
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
-  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onFroniusCapture(d);
+  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onReadingsCapture(d, "fronius", "Fronius Solar.web");
+  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "sma") onReadingsCapture(d, "sma", "SMA Sunny Portal");
 });
 // The bridge announces at document_start (before this runs), so ask explicitly too.
 extSend("SO_STATUS_REQUEST");
@@ -262,7 +263,10 @@ function onSolarEdgeCapture(d){
   if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached SolarEdge but couldn't read an API key automatically — paste your account key below and we'll take it from here.</div>`;
 }
 
-function loginWithFronius(){
+function loginWithFronius(){ openPortalLogin("fronius", "https://www.solarweb.com/", "Fronius Solar.web"); }
+function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com/", "SMA Sunny Portal"); }
+
+function openPortalLogin(vendor, url, label){
   const scan = document.getElementById("scanArea");
   const emailOk = /.+@.+\..+/.test(state.email);
   const nameOk = (state.name||"").trim().length >= 2;
@@ -270,30 +274,28 @@ function loginWithFronius(){
     if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
     return;
   }
-  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening Fronius Solar.web — sign in there and your inverters appear here automatically.</div>`;
-  extSend("SO_OPEN_PORTAL", { url: "https://www.solarweb.com/", active: true });
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and your inverters appear here automatically.</div>`;
+  extSend("SO_OPEN_PORTAL", { url, active: true });
 }
 
-// Fronius capture carries the READINGS themselves (no API key — Solar.web's
-// Query API is paid/not-US), so unlike SolarEdge we don't call /public/preview.
-// We render the captured systems directly, stash the raw capture, and POST it to
-// /v1/array-owners/inverter-capture after signup (in finish()).
-function onFroniusCapture(d){
-  state.vendor = "fronius";
+// Readings-capture vendors (Fronius, SMA): the extension ships the READINGS
+// themselves (no API key — their official APIs are paid/high-friction), so unlike
+// SolarEdge we don't call /public/preview. We render the captured systems, stash
+// the raw capture, and POST it to /v1/array-owners/inverter-capture after signup.
+function onReadingsCapture(d, vendor, label){
+  state.vendor = vendor;
   const scan = document.getElementById("scanArea");
   const caps = Array.isArray(d.sites) ? d.sites : [];
   if (!caps.length){
-    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached Fronius but couldn't read your systems yet — make sure you're signed in at solarweb.com, then click again.</div>`;
+    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached ${label} but couldn't read your systems yet — make sure you're signed in there, then click again.</div>`;
     return;
   }
-  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Got your Fronius account — reading your inverters…</div>`;
-  // Keep the raw capture for the post-signup ingest.
-  state.froniusCapture = { provider: "fronius", sites: caps };
-  // Map to the reveal's site shape. peak_power_kw may be a derived hint.
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Got your ${label} account — reading your inverters…</div>`;
+  state.readingsCapture = { provider: vendor, sites: caps };
   let totalKw = 0;
   state.sites = caps.map(s=>{
     const kw = Number(s.peak_power_kw)||0; totalKw += kw;
-    return { site_id: s.site_id, name: s.name, peak_power_kw: kw, vendor: "Fronius",
+    return { site_id: s.site_id, name: s.name, peak_power_kw: kw, vendor: label.split(" ")[0],
              inverter_count: (s.inverters||[]).length || s.inverter_count || null };
   });
   state.realSites = true;
@@ -418,6 +420,14 @@ function connectScreen(){
       <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithFronius()">Log in with Fronius →</button>
     </div>
     <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your Solar.web keys below —</div>` : ""}
+
+    ${v.code === "sma" && EXT_PRESENT ? `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ One-click connect — no API key needed</div>
+      <div class="s">Your EnergyAgent helper is installed. Click below, sign into SMA Sunny Portal the way you always do, and your inverters appear here automatically — each one, individually.</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSMA()">Log in with SMA →</button>
+    </div>
+    <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your SMA developer keys below —</div>` : ""}
 
     ${fieldsHtml}
     ${noteHtml}
@@ -711,11 +721,11 @@ async function finish(){
           const v = vendorByCode(state.vendor);
           const hdr = {"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`};
           let conn, cd;
-          if(state.vendor==="fronius" && state.froniusCapture){
+          if(state.readingsCapture && (state.vendor==="fronius" || state.vendor==="sma")){
             // Extension-captured readings (no key to attach) — ingest them so the
             // dashboard + sandbox comb populate the instant they sign in.
             conn = await fetch(`${API_BASE}/v1/array-owners/inverter-capture`, {
-              method:"POST", headers:hdr, body: JSON.stringify(state.froniusCapture)
+              method:"POST", headers:hdr, body: JSON.stringify(state.readingsCapture)
             });
             cd = await conn.json().catch(()=>({}));
             state.arraysConnected = !!(conn.ok && cd.ok && cd.sites_captured);
