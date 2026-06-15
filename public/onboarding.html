@@ -226,6 +226,7 @@ window.addEventListener("message", (e) => {
     if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1) render(); }   // reveal the one-click path
   }
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
+  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onFroniusCapture(d);
 });
 // The bridge announces at document_start (before this runs), so ask explicitly too.
 extSend("SO_STATUS_REQUEST");
@@ -259,6 +260,45 @@ function onSolarEdgeCapture(d){
     return;
   }
   if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached SolarEdge but couldn't read an API key automatically — paste your account key below and we'll take it from here.</div>`;
+}
+
+function loginWithFronius(){
+  const scan = document.getElementById("scanArea");
+  const emailOk = /.+@.+\..+/.test(state.email);
+  const nameOk = (state.name||"").trim().length >= 2;
+  if (!nameOk || !emailOk){
+    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
+    return;
+  }
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening Fronius Solar.web — sign in there and your inverters appear here automatically.</div>`;
+  extSend("SO_OPEN_PORTAL", { url: "https://www.solarweb.com/", active: true });
+}
+
+// Fronius capture carries the READINGS themselves (no API key — Solar.web's
+// Query API is paid/not-US), so unlike SolarEdge we don't call /public/preview.
+// We render the captured systems directly, stash the raw capture, and POST it to
+// /v1/array-owners/inverter-capture after signup (in finish()).
+function onFroniusCapture(d){
+  state.vendor = "fronius";
+  const scan = document.getElementById("scanArea");
+  const caps = Array.isArray(d.sites) ? d.sites : [];
+  if (!caps.length){
+    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">We reached Fronius but couldn't read your systems yet — make sure you're signed in at solarweb.com, then click again.</div>`;
+    return;
+  }
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Got your Fronius account — reading your inverters…</div>`;
+  // Keep the raw capture for the post-signup ingest.
+  state.froniusCapture = { provider: "fronius", sites: caps };
+  // Map to the reveal's site shape. peak_power_kw may be a derived hint.
+  let totalKw = 0;
+  state.sites = caps.map(s=>{
+    const kw = Number(s.peak_power_kw)||0; totalKw += kw;
+    return { site_id: s.site_id, name: s.name, peak_power_kw: kw, vendor: "Fronius",
+             inverter_count: (s.inverters||[]).length || s.inverter_count || null };
+  });
+  state.realSites = true;
+  state.totals = totalKw>0 ? { peak_power_kw: Math.round(totalKw*10)/10, annual_value_usd: 0 } : null;
+  go(2);
 }
 
 const stepper = document.getElementById("stepper");
@@ -370,6 +410,14 @@ function connectScreen(){
       <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
     </div>
     <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>`) : ""}
+
+    ${v.code === "fronius" && EXT_PRESENT ? `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ One-click connect — no API key needed</div>
+      <div class="s">Your EnergyAgent helper is installed. Click below, sign into Fronius Solar.web the way you always do, and your inverters appear here automatically — each one, individually.</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithFronius()">Log in with Fronius →</button>
+    </div>
+    <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your Solar.web keys below —</div>` : ""}
 
     ${fieldsHtml}
     ${noteHtml}
@@ -663,7 +711,15 @@ async function finish(){
           const v = vendorByCode(state.vendor);
           const hdr = {"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`};
           let conn, cd;
-          if(state.vendor==="solaredge" && state.apiKey){
+          if(state.vendor==="fronius" && state.froniusCapture){
+            // Extension-captured readings (no key to attach) — ingest them so the
+            // dashboard + sandbox comb populate the instant they sign in.
+            conn = await fetch(`${API_BASE}/v1/array-owners/inverter-capture`, {
+              method:"POST", headers:hdr, body: JSON.stringify(state.froniusCapture)
+            });
+            cd = await conn.json().catch(()=>({}));
+            state.arraysConnected = !!(conn.ok && cd.ok && cd.sites_captured);
+          } else if(state.vendor==="solaredge" && state.apiKey){
             conn = await fetch(`${API_BASE}/v1/array-owners/solaredge/connect-account`, {
               method:"POST", headers:hdr, body: JSON.stringify({api_key: state.apiKey})
             });
