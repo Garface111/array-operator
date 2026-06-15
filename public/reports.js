@@ -48,6 +48,7 @@
     }
     el.innerHTML = shell();
     wireUpload();
+    renderDoc();              // right pane starts as the "drop a sheet" placeholder
     await refreshList();
   }
   window.__aoLoadReports = load;
@@ -61,20 +62,25 @@
 
   function shell() {
     return `
-      <div class="rb-upload rep-card" id="rbUpload">
-        <span class="rep-eyebrow">Step 1 · Match a spreadsheet</span>
-        <h3>Drop a billing spreadsheet</h3>
-        <p>Any of your billing workbooks — we recognize the customer, rate, and
-           the latest billing period automatically, whatever the sheet is named.</p>
-        <label class="rb-drop" id="rbDrop">
-          <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
-          <span class="rb-drop-ico">⬆</span>
-          <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
-          <span class="rb-drop-sub">.xlsx — up to 8 MB</span>
-        </label>
-        <div class="rb-status" id="rbStatus"></div>
+      <div class="rb-layout">
+        <div class="rb-col-form">
+          <div class="rb-upload rep-card" id="rbUpload">
+            <span class="rep-eyebrow">Step 1 · Match a spreadsheet</span>
+            <h3>Drop a billing spreadsheet</h3>
+            <p>Any of your billing workbooks — we recognize the customer, rate, and
+               the latest billing period automatically, whatever the sheet is named.</p>
+            <label class="rb-drop" id="rbDrop">
+              <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
+              <span class="rb-drop-ico">⬆</span>
+              <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
+              <span class="rb-drop-sub">.xlsx — up to 8 MB</span>
+            </label>
+            <div class="rb-status" id="rbStatus"></div>
+          </div>
+          <div id="rbPreview"></div>
+        </div>
+        <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
-      <div id="rbPreview"></div>
       <div class="rb-listwrap">
         <div class="cc-treedivider"><h3>Scheduled reports</h3>
           <span>each customer's automatic invoice + summary, on its cadence</span></div>
@@ -199,8 +205,120 @@
            below to preview a delivery to yourself first.</p>
       </div>`;
     wireSegments(host);
-    $("#rbCancel").onclick = () => { PENDING = null; host.innerHTML = ""; $("#rbStatus").textContent = ""; };
+    $("#rbCancel").onclick = () => { PENDING = null; host.innerHTML = ""; $("#rbStatus").textContent = ""; renderDoc(); };
     $("#rbSave").onclick = saveSchedule;
+
+    // Live document preview (right pane) — paint now, then repaint on any change.
+    renderDoc();
+    host.querySelectorAll("#rbCadence button, #rbMode button").forEach(b => b.addEventListener("click", renderDoc));
+    host.querySelectorAll("#rbFormats input, #rbSummary, #rbTrueup").forEach(i => i.addEventListener("change", renderDoc));
+    ["rbClientEmail", "rbOpEmail"].forEach(id => { const el = $("#" + id); if (el) el.addEventListener("input", renderDoc); });
+  }
+
+  /* ---- live document preview (the right pane) -------------------------------
+   * A client-side mock of the PDF invoice + performance summary we'll deliver,
+   * built from the matched workbook and the current form state. Mirrors what the
+   * backend renders, so the operator sees exactly what their customer receives
+   * before saving. (The saved subscription's "Preview" button fetches the REAL
+   * backend PDF; this is the instant, pre-save what-you'll-send view.) */
+  function docDate(s) {
+    if (!s) return "—";
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s);
+    return isNaN(d) ? String(s) : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function currentDocState() {
+    return {
+      cadence: segValue("rbCadence") || "monthly",
+      mode: segValue("rbMode") || "to_me",
+      formats: checkedFormats().length ? checkedFormats() : ["pdf"],
+      summary: $("#rbSummary") ? $("#rbSummary").checked : true,
+      trueup: $("#rbTrueup") ? $("#rbTrueup").checked : false,
+      clientEmail: ($("#rbClientEmail") || {}).value || "",
+      opEmail: ($("#rbOpEmail") || {}).value || "",
+    };
+  }
+
+  function docPlaceholder() {
+    return `<div class="rb-doc-cap">Report preview</div>
+      <div class="rb-doc-empty">
+        <span class="ico">📄</span>
+        <b>Your report appears here</b>
+        <div>Drop a billing spreadsheet and we'll show the exact invoice &amp;
+        performance summary your customer receives — updating live as you set
+        the cadence, format, and recipient.</div>
+      </div>`;
+  }
+
+  function renderDoc() {
+    const pane = $("#rbDocPane");
+    if (!pane) return;
+    if (!PENDING) { pane.innerHTML = docPlaceholder(); return; }
+    const m = PENDING.match, ci = m.computed_invoice || {};
+    const s = currentDocState();
+    const ratePct = m.billing_rate != null ? Math.round(m.billing_rate * 100) + "%" : null;
+    const model = MODEL_LABEL[m.billing_model] || m.billing_model || "Solar billing";
+    const periodLabel = `${docDate(ci.period_start)} – ${docDate(ci.period_end)}`;
+    const cadenceWord = s.cadence === "quarterly" ? "Quarterly" : "Monthly";
+
+    const lineSub = [
+      ci.kwh != null ? `${fmt0(ci.kwh)} kWh generated` : null,
+      ratePct ? `${ratePct} billing rate` : null,
+    ].filter(Boolean).join(" · ");
+
+    const summary = s.summary ? `
+      <div class="rb-doc-summary">
+        <h4>Performance summary</h4>
+        <div class="rb-doc-stats">
+          <div class="st"><b>${fmt0(ci.kwh)}</b><span>kWh this period</span></div>
+          <div class="st"><b>${ratePct || "—"}</b><span>billing rate</span></div>
+          <div class="st"><b>${money(ci.amount_owed)}</b><span>amount due</span></div>
+        </div>
+        <p class="rb-doc-note">Over ${periodLabel}, ${esc(m.customer.name || "this array")} generated
+        ${fmt0(ci.kwh)} kWh${ratePct ? `, billed at ${ratePct} of generation` : ""}. Full production and
+        peer-measured health detail is included in the attached report.</p>
+      </div>` : "";
+
+    const recipient = s.mode === "to_both"
+      ? `you + ${esc(s.clientEmail || m.customer.email || "your client")}`
+      : s.mode === "to_client"
+        ? esc(s.clientEmail || m.customer.email || "your client")
+        : "you";
+    const badges = s.formats.map(f => `<span class="rb-doc-badge">${esc(f.toUpperCase())}</span>`).join("");
+
+    pane.innerHTML = `
+      <div class="rb-doc-cap">Live preview — exactly what gets delivered</div>
+      <div class="rb-doc-paper">
+        <div class="rb-doc-band">
+          <div class="brand">⚡ Array Operator<small>Solar generation billing</small></div>
+          <div class="doctype">INVOICE<small>${cadenceWord} · ${docDate(ci.period_end)}</small></div>
+        </div>
+        <div class="rb-doc-body">
+          <div class="rb-doc-parties">
+            <div><span class="lab">From</span><b>${esc(s.opEmail || "Your operator account")}</b>
+              <span class="sub">via Array Operator</span></div>
+            <div style="text-align:right"><span class="lab">Bill to</span><b>${esc(m.customer.name || "—")}</b>
+              <span class="sub">${esc(s.clientEmail || m.customer.email || "")}</span></div>
+          </div>
+          <table class="rb-doc-table">
+            <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>${esc(model)}</b>${lineSub ? `<br><small>${esc(lineSub)}</small>` : ""}
+                  <br><small>Period ${periodLabel}</small></td>
+                <td class="num">${money(ci.amount_owed)}</td>
+              </tr>
+            </tbody>
+            <tfoot><tr class="rb-doc-total"><td>Total due</td><td class="num amt">${money(ci.amount_owed)}</td></tr></tfoot>
+          </table>
+          ${summary}
+        </div>
+        <div class="rb-doc-foot">
+          <span>Delivered ${esc(s.cadence)} · to ${recipient}</span>
+          <span class="rb-doc-badges">${badges}</span>
+        </div>
+      </div>`;
   }
 
   function wireSegments(host) {

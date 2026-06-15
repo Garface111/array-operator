@@ -251,3 +251,52 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:7px 12px; border-radius:9px; font-size:12.5px; cursor:pointer; text-decoration:none; }
 .rb-btn:hover{ background:rgba(255,255,255,.09); }
 .rb-danger{ color:var(--bad); }
+
+/* ---- two-column reports layout: form (left) + live document preview (right) ---- */
+.rb-layout{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }
+@media(max-width:1080px){ .rb-layout{ grid-template-columns:1fr; } }
+.rb-col-form{ min-width:0; }
+.rb-col-form .rep-card{ max-width:none; }     /* fill the column, not the global 700px cap */
+.rb-col-doc{ position:sticky; top:18px; min-width:0; }
+@media(max-width:1080px){ .rb-col-doc{ position:static; } }
+.rb-doc-cap{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); font-weight:650; margin:0 2px 9px; }
+
+/* placeholder shown before a spreadsheet is matched */
+.rb-doc-empty{ border:1.5px dashed var(--line); border-radius:16px; padding:46px 28px; text-align:center; }
+.rb-doc-empty .ico{ font-size:30px; display:block; margin-bottom:10px; opacity:.75; }
+.rb-doc-empty b{ display:block; color:var(--muted); font-weight:680; font-size:14.5px; margin-bottom:6px; }
+.rb-doc-empty div{ color:var(--faint); font-size:12.5px; line-height:1.55; max-width:340px; margin:0 auto; }
+
+/* the "paper" — a light document so it reads as the real PDF on the dark app */
+.rb-doc-paper{ background:#fff; color:#16202b; border-radius:14px; overflow:hidden;
+  box-shadow:0 26px 70px -30px rgba(0,0,0,.75); font-size:13px; }
+.rb-doc-band{ background:linear-gradient(120deg,#0f3d2e,#0a2a20); color:#eafff5;
+  padding:18px 22px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.rb-doc-band .brand{ font-weight:800; font-size:16px; letter-spacing:-.01em; }
+.rb-doc-band .brand small{ display:block; font-weight:500; font-size:11px; color:#8fdcc0; margin-top:3px; }
+.rb-doc-band .doctype{ text-align:right; font-weight:800; font-size:15px; letter-spacing:.1em; }
+.rb-doc-band .doctype small{ display:block; font-weight:500; font-size:11px; color:#8fdcc0; letter-spacing:0; margin-top:3px; }
+.rb-doc-body{ padding:20px 22px; }
+.rb-doc-parties{ display:flex; justify-content:space-between; gap:18px; margin-bottom:14px; }
+.rb-doc-parties .lab{ font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:#8a98a6; }
+.rb-doc-parties b{ display:block; font-size:14px; color:#16202b; margin-top:3px; }
+.rb-doc-parties .sub{ font-size:12px; color:#5a6b7b; }
+.rb-doc-table{ width:100%; border-collapse:collapse; }
+.rb-doc-table th{ text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em;
+  color:#8a98a6; border-bottom:1px solid #e3e9ef; padding:8px 0; }
+.rb-doc-table td{ padding:12px 0; border-bottom:1px solid #eef2f6; vertical-align:top; line-height:1.45; }
+.rb-doc-table td small{ color:#5a6b7b; }
+.rb-doc-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rb-doc-total td{ border-bottom:0; font-weight:800; font-size:15px; padding-top:13px; }
+.rb-doc-total .amt{ color:#0a7d4f; }
+.rb-doc-summary{ margin-top:16px; border-top:1px dashed #dde4ea; padding-top:14px; }
+.rb-doc-summary h4{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#5a6b7b; margin:0 0 10px; }
+.rb-doc-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.rb-doc-stats .st{ background:#f3f7fa; border-radius:10px; padding:10px 12px; }
+.rb-doc-stats .st b{ display:block; font-size:18px; color:#16202b; font-variant-numeric:tabular-nums; }
+.rb-doc-stats .st span{ font-size:10.5px; color:#5a6b7b; }
+.rb-doc-note{ margin:11px 0 0; font-size:12px; line-height:1.55; color:#5a6b7b; }
+.rb-doc-foot{ background:#f7f9fb; border-top:1px solid #eef2f6; padding:12px 22px;
+  font-size:11.5px; color:#5a6b7b; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.rb-doc-badges{ display:flex; gap:6px; }
+.rb-doc-badge{ background:#e8f5ee; color:#0a7d4f; font-weight:700; font-size:10px; padding:3px 8px; border-radius:20px; }
