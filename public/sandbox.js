@@ -144,6 +144,13 @@
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
     }
     if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma"].includes(d.provider)) handleCaptureLanded(d);
+    if(d.type === "SO_CAPTURE_FAILED"){
+      const note = _ov && _ov.querySelector("#sbNote");
+      if(note){
+        note.className = "sb-note err";
+        note.textContent = `${BRAND[d.provider]||d.provider} didn't connect: ${d.reason||"unknown error"}. Make sure you're signed in on the portal tab, then click again.`;
+      }
+    }
   });
   extSend("SO_STATUS_REQUEST");   // ask explicitly in case the bridge announced before we listened
 
