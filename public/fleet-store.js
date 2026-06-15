@@ -114,7 +114,14 @@ window.FleetStore = (function(){
   // command-center shape: the raw canonical arrays + meta (it computes its own KPIs)
   function snapshot(){ return { arrays: state.arrays, simulated: state.simulated, recovered_ytd: state.recovered }; }
 
-  function focusColumns(){ return toColumns(state.focus.length ? state.focus : defaultFocusIds()); }
+  function focusColumns(){
+    const out = toColumns(state.focus.length ? state.focus : defaultFocusIds());
+    // Never blank the tree while arrays exist — if a stale/empty focus filtered
+    // everything out, fall back to the default focus so the sandbox always shows
+    // something (mirrors the command center, which renders all arrays).
+    if(!out.columns.length && state.arrays.length) return toColumns(defaultFocusIds());
+    return out;
+  }
   function focusIds(){ return state.focus.length ? state.focus.slice() : defaultFocusIds(); }
 
   // default sandbox focus = the worst few sites (most flagged / biggest leak),
@@ -210,6 +217,13 @@ window.FleetStore = (function(){
     state.simulated = !!(opts && opts.simulated);
     state.recovered = (opts && opts.recovered) || 0;
     state.arrays.forEach(recompute);
+    // Reconcile the sandbox focus against the NEW array set. Drop any focused ids
+    // that no longer exist (demo→live swap, or arrays the extension added after a
+    // prior load) — otherwise a stale focus filters every real array out and the
+    // fleet tree renders blank while the command center (which reads ALL arrays)
+    // shows them. If nothing valid remains, fall back to the default focus.
+    const liveIds = new Set(state.arrays.map(a => a.id));
+    state.focus = state.focus.filter(id => liveIds.has(id));
     if(!state.focus.length) state.focus = defaultFocusIds();
     state.loaded = true;
     _lastUpdate = Date.now();
