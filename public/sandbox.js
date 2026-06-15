@@ -106,7 +106,26 @@
       }
       data = {}; try { data = await r.json(); } catch(e){}
       const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured);
-      if(ok){ closeAddModal(); load(); return; }
+      if(ok){
+        // Pull the freshly-attached array(s) from the server and re-render the
+        // tree. load() short-circuits when the store is already loaded (it is, on
+        // the dashboard), so we must force a real re-fetch.
+        if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Bringing your inverters onto the canvas…`; }
+        try {
+          if(window.FleetStore && FleetStore.refetch){
+            await FleetStore.refetch();
+            // Make sure the new array isn't hidden by a stale focus subset.
+            if(FleetStore.setFocus && FleetStore.defaultFocusIds) FleetStore.setFocus(FleetStore.defaultFocusIds());
+          }
+        } catch(e){}
+        closeAddModal();
+        if(typeof toast === "function"){
+          const n = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
+          toast(n ? `Connected — ${n} inverter${n===1?"":"s"} live on your canvas.` : `Connected — your inverters are on the canvas.`, "ok");
+        }
+        load();   // re-render the (now refreshed) store
+        return;
+      }
       if(note){ note.className = "sb-note err"; note.textContent = (data && (data.message||data.detail)) || `Couldn't bring in that ${BRAND[d.provider]||d.provider} account (HTTP ${r.status}).`; }
     }catch(err){
       if(note){ note.className = "sb-note err"; note.textContent = "We couldn't reach the connection service just now — check your network and try again."; }
@@ -1623,7 +1642,15 @@
           if(connectBtn) connectBtn.disabled = false; return;
         }
         const ok = r.ok && (data.connected || data.created || data.matched || data.ok || data.array_id);
-        if(ok){ closeAddModal(); load(); return; }
+        if(ok){
+          try {
+            if(window.FleetStore && FleetStore.refetch){
+              await FleetStore.refetch();
+              if(FleetStore.setFocus && FleetStore.defaultFocusIds) FleetStore.setFocus(FleetStore.defaultFocusIds());
+            }
+          } catch(e){}
+          closeAddModal(); load(); return;
+        }
         note.className = "sb-note err";
         note.textContent = (data && (data.message || data.detail)) ||
           `Couldn't connect that ${v.label} account (HTTP ${r.status}). Double-check the credentials and try again.`;

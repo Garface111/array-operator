@@ -348,11 +348,12 @@ window.FleetStore = (function(){
 
   // ---- public API ----
   return {
-    subscribe, load,
+    subscribe, load, refetch,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     reassignInverter, reorderInverters, createArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
     isLoaded: () => state.loaded,
+    isSimulated: () => !!state.simulated,
     lastUpdate: () => _lastUpdate,
     WINDOW_DAYS,
   };
