@@ -1244,24 +1244,23 @@
     else applyCanvasView(host);                         // keep the user's view across re-renders
     vp.addEventListener("wheel", e => {
       e.preventDefault();
-      // Canvas convention: pinch / Ctrl|Cmd+scroll = ZOOM, plain scroll = PAN.
-      // Scroll-to-pan is the fix for a dense fleet — when columns fill the viewport
-      // there's no empty background left to click-drag, so you couldn't pan at all.
-      if(e.ctrlKey || e.metaKey){
-        const r = vp.getBoundingClientRect();
-        const cx = e.clientX - r.left, cy = e.clientY - r.top, prev = _view.z;
-        const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
-        _view.x = cx - (cx - _view.x) * (next/prev);
-        _view.y = cy - (cy - _view.y) * (next/prev);
-        _view.z = next; applyCanvasView(host, true);   // zoom → promote + re-crisp
-      } else {
-        // Two-finger trackpad scroll gives deltaX+deltaY; a plain mouse wheel gives
-        // deltaY only (shift+wheel pans horizontally).
-        let dx = e.deltaX, dy = e.deltaY;
-        if(e.shiftKey && !dx){ dx = dy; dy = 0; }
-        _view.x -= dx; _view.y -= dy;
+      // Canvas convention: the wheel ZOOMS in/out, centered on the cursor — that's
+      // the in/out depth gesture people expect on a map-style canvas. Pan the dense
+      // fleet by dragging empty space, or middle-drag from anywhere (cards fill the
+      // view), or hold Shift to nudge it sideways with the wheel.
+      if(e.shiftKey){
+        // Shift+wheel → horizontal pan (a useful escape hatch when zoomed in).
+        _view.x -= (e.deltaX || e.deltaY);
         applyCanvasView(host);                          // pan → no promote (holds, crisp)
+        return;
       }
+      const r = vp.getBoundingClientRect();
+      const cx = e.clientX - r.left, cy = e.clientY - r.top, prev = _view.z;
+      const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+      if(next === prev) return;                          // already at a zoom limit
+      _view.x = cx - (cx - _view.x) * (next/prev);
+      _view.y = cy - (cy - _view.y) * (next/prev);
+      _view.z = next; applyCanvasView(host, true);       // zoom → promote + re-crisp
     }, { passive:false });
     // Suppress OS middle-click autoscroll so a middle-drag can pan instead.
     vp.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); });
