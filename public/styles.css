@@ -290,7 +290,10 @@
   /* canvas: horizontal scroll of columns */
   .sb-viewport{position:relative;overflow:hidden;height:calc(100vh - 210px);min-height:440px;border-radius:14px;cursor:grab;touch-action:none;background:rgba(255,255,255,.012)}
   .sb-viewport.panning{cursor:grabbing}
-  .sb-canvas{position:relative;display:flex;gap:54px;align-items:flex-start;padding:6px 2px 18px;width:max-content;transform-origin:0 0}
+  /* Generous padding = an always-grabbable empty margin around the fleet so you
+     can left-drag empty space to pan even when columns pack the viewport. It's
+     inside the scaled canvas, so the grab-zone grows with zoom. */
+  .sb-canvas{position:relative;display:flex;gap:54px;align-items:flex-start;padding:48px 72px 80px;width:max-content;transform-origin:0 0}
   /* promote to a GPU layer only mid-gesture; idle = re-rasterized crisp at scale */
   .sb-canvas.sb-interacting{will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
