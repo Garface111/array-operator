@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Array Operator — your array, working for you</title>
+<!-- Whole-system browser error capture — loaded first so it sees errors from
+     every later script. POSTs to the shared backend /v1/client-error. -->
+<script src="error-reporter.js"></script>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
 <script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
