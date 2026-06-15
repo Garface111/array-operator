@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Set up your array · Array Operator</title>
+<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
+<script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   /* Design language matched to array-operator-ea.netlify.app (styles.css):
@@ -50,7 +52,7 @@
   .card{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:22px;padding:2rem;
         box-shadow:0 24px 60px -28px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.02)}
   @media(min-width:640px){.card{padding:2.25rem}}
-  h1{font-size:1.95rem;line-height:1.12;font-weight:720;letter-spacing:-.02em;
+  h1{font-size:1.95rem;line-height:1.22;font-weight:720;letter-spacing:-.02em;padding-bottom:.14em;
      background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
   .lede{margin-top:.85rem;font-size:1rem;color:var(--muted);line-height:1.55}
   .callout{margin-top:2rem;border:1px solid rgba(63,214,138,.3);background:linear-gradient(150deg,rgba(63,214,138,.12),rgba(63,214,138,.03));border-radius:16px;padding:1.25rem}
@@ -138,11 +140,65 @@
   .vh-big{font-size:2.7rem;font-weight:780;letter-spacing:-.02em;color:var(--good2);line-height:1.05;margin-top:.3rem;
     text-shadow:0 0 24px rgba(63,214,138,.3);font-variant-numeric:tabular-nums}
   .vh-sub{color:var(--muted);font-size:.78rem;margin-top:.45rem;line-height:1.5}
+
+  /* Day/night toggle control (top bar, right) */
+  .theme-toggle{margin-left:auto;cursor:pointer;border:1px solid var(--line);background:var(--card);
+    color:var(--muted);width:34px;height:34px;border-radius:10px;display:inline-grid;place-items:center;
+    font-size:15px;line-height:1;transition:color .15s,border-color .15s,background .15s}
+  .theme-toggle:hover{color:var(--good);border-color:var(--good)}
+  .theme-toggle .tt-ico{line-height:1;pointer-events:none}
+
+  /* ===== DAY MODE — NEPOOL Operator light palette (in color, not shape) ===== */
+  html[data-theme="day"]{
+    --bg:#faf8f5; --bg2:#f1ebe1; --ink:#18181b; --muted:#586068; --faint:#8f8a80;
+    --gold:#c07d2a; --gold2:#8c4e1c; --sky:#2877c0; --good:#059669; --good2:#10b981;
+    --warn:#b56d2c; --bad:#dc2626; --line:#e7e1d6; --card:#ffffff; --card2:#fcfaf7;
+    color-scheme:light;
+  }
+  html[data-theme="day"] body{background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%);}
+  html[data-theme="day"] h1{background:linear-gradient(180deg,#15281e,#3c574a);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  html[data-theme="day"] .pill.todo{background:#ffffff;}
+  html[data-theme="day"] .pill.todo .n{background:#efe9df;}
+  html[data-theme="day"] .pill.active{color:#fff;}
+  html[data-theme="day"] .pill.active .n{background:rgba(255,255,255,.28);color:#fff;}
+  html[data-theme="day"] input[type=text],
+  html[data-theme="day"] input[type=email],
+  html[data-theme="day"] input[type=password]{background:#ffffff;color:var(--ink);}
+  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#10b981,#047857);color:#fff;box-shadow:0 4px 14px -4px rgba(4,120,87,.45);}
+  html[data-theme="day"] .btn-ghost{background:#ffffff;}
+  html[data-theme="day"] .vend{background:#ffffff;}
+  html[data-theme="day"] .vend .vtag{background:#efe9df;}
+  html[data-theme="day"] .vendnote b{color:#8c4e1c;}
+  html[data-theme="day"] .card{box-shadow:0 10px 30px -14px rgba(40,32,20,.16),0 0 0 1px rgba(40,32,20,.03);}
+  html[data-theme="day"] .achip{box-shadow:0 6px 18px -10px rgba(40,32,20,.18);}
+  html[data-theme="day"] .vh-big{text-shadow:none;}
 </style>
 </head>
 <body>
 <div class="shell">
-  <div class="topbar"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></div>
+  <div class="topbar"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span>
+    <button class="theme-toggle" id="themeToggle" type="button"
+            title="Toggle day / night" aria-label="Toggle day or night theme">
+      <span class="tt-ico" aria-hidden="true">☾</span>
+    </button>
+  </div>
+  <script>
+    /* Day/night toggle — persists in localStorage (ao_theme), shared sitewide. */
+    (function(){
+      var btn = document.getElementById("themeToggle");
+      function read(){ try { return localStorage.getItem("ao_theme") === "day"; } catch(e){ return false; } }
+      function apply(day){
+        document.documentElement.setAttribute("data-theme", day ? "day" : "night");
+        if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
+      }
+      var day = read(); apply(day);
+      if (btn) btn.addEventListener("click", function(){
+        day = !day;
+        try { localStorage.setItem("ao_theme", day ? "day" : "night"); } catch(e){}
+        apply(day);
+      });
+    })();
+  </script>
   <nav aria-label="Setup progress">
     <ol class="stepper" id="stepper"></ol>
   </nav>

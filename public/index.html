@@ -4,12 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Array Operator — your array, working for you</title>
+<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
+<script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="command-center.css">
 <link rel="stylesheet" href="claims.css">
 <link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded last to override -->
+<link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <meta name="theme-color" content="#0a0e14">
+<style>
+  /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
+  .theme-toggle{flex:0 0 auto;align-self:center;cursor:pointer;border:1px solid var(--line);
+    background:var(--card);color:var(--muted);width:34px;height:34px;border-radius:10px;margin:0 2px 0 6px;
+    display:inline-grid;place-items:center;font-size:15px;line-height:1;
+    transition:color .15s,border-color .15s,background .15s}
+  .theme-toggle:hover{color:var(--good);border-color:var(--good)}
+  .theme-toggle .tt-ico{line-height:1;pointer-events:none}
+  @media(max-width:600px){.theme-toggle{width:38px;height:38px;margin-left:2px}}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -19,6 +32,11 @@
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
     <a class="tab" id="tabClaims" href="#claims" role="tab">Claims</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
+    <!-- Day/night toggle: flips to the NEPOOL-Operator light palette and persists. -->
+    <button class="theme-toggle" id="themeToggle" type="button"
+            title="Toggle day / night" aria-label="Toggle day or night theme">
+      <span class="tt-ico" aria-hidden="true">☾</span>
+    </button>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
     <!-- Signed-in identity chip — which account am I in. Top-right, next to the
@@ -99,5 +117,26 @@
 <script src="command-center.js"></script>
 <script src="claims.js"></script>
 <script src="reports.js"></script>
+<script>
+  /* Day/night toggle wiring — persists choice in localStorage (ao_theme) and
+     keeps the icon + the browser chrome color (meta theme-color) in sync. */
+  (function(){
+    var btn = document.getElementById("themeToggle");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    function read(){ try { return localStorage.getItem("ao_theme") === "day"; } catch(e){ return false; } }
+    function apply(day){
+      document.documentElement.setAttribute("data-theme", day ? "day" : "night");
+      if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
+      if (meta) meta.setAttribute("content", day ? "#faf8f5" : "#0a0e14");
+    }
+    var day = read();
+    apply(day);
+    if (btn) btn.addEventListener("click", function(){
+      day = !day;
+      try { localStorage.setItem("ao_theme", day ? "day" : "night"); } catch(e){}
+      apply(day);
+    });
+  })();
+</script>
 </body>
 </html>

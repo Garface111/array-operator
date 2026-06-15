@@ -1,0 +1,268 @@
+/* ============================================================================
+ * Array Operator — DAY MODE  (theme-day.css)
+ *
+ * A light skin that recolors the dark-solarpunk dashboard to look exactly like
+ * NEPOOL Operator *in color* (the shapes/layout are untouched). Activated by
+ * setting  <html data-theme="day">  (see the toggle + init in index.html).
+ *
+ * Palette is lifted straight from NEPOOL Operator's design tokens:
+ *   cream page  #faf8f5     cream border #e8e2d9
+ *   emerald     #34d399 / #10b981 / #059669 / #047857 / #065f46
+ *   wood ochre  #e6b470 / #d4914a / #b56d2c / #8c4e1c
+ *   ink text    zinc-900 #18181b
+ *
+ * Strategy: (1) re-point every CSS custom property so everything that already
+ * reads var(--…) flips for free, then (2) override the hardcoded dark hexes and
+ * rgba(255,255,255,…) "lift" surfaces that don't go through a variable. Loaded
+ * LAST so its higher-specificity html[data-theme="day"] rules win; !important is
+ * used to also beat the dark .ao-*!important modal skin in styles.css.
+ * Dark mode is the default and is left completely untouched.
+ * ==========================================================================*/
+
+html[data-theme="day"]{
+  /* ---- core surfaces / ink ---- */
+  --bg:#faf8f5;            /* cream page surface */
+  --bg2:#f1ebe1;           /* warm fill for inputs, search, chips, .res */
+  --ink:#18181b;           /* zinc-900 primary text */
+  --muted:#586068;         /* readable secondary text on cream */
+  --faint:#8f8a80;         /* hints / tertiary, warm gray */
+
+  /* ---- accents ---- */
+  --good:#059669;          /* emerald-700 — legible accent on white/cream */
+  --good2:#10b981;         /* emerald-600 — bright value text + button top */
+  --green-deep:#047857;
+  --gold:#c07d2a;          /* wood ochre */
+  --gold2:#8c4e1c;         /* deeper wood (was the bright highlight) */
+  --sky:#2877c0;           /* calm info blue (comm-gap / array tier / info) */
+  --warn:#b56d2c;          /* wood-500 amber — reads on light */
+  --bad:#dc2626;           /* red-600 — reads on light */
+
+  /* ---- lines + cards ---- */
+  --line:#e7e1d6;          /* warm cream hairline (NEPOOL cream-border) */
+  --card:#ffffff;          /* white card */
+  --card2:#fcfaf7;         /* faint warm card (gradient partner) */
+
+  /* day-only helpers used in the overrides below */
+  --day-chip:#efe9df;      /* neutral warm chip/tag fill */
+  --day-tile:#f1ece2;      /* icon tiles */
+  --day-track:rgba(0,0,0,.09);   /* progress/meter tracks */
+  --day-hover:rgba(0,0,0,.04);   /* row / button hover wash */
+  --day-surf:#faf6f0;      /* very subtle raised surface */
+
+  color-scheme:light;
+  background:#faf8f5;
+}
+
+/* ── page background ────────────────────────────────────────────────────── */
+html[data-theme="day"],
+html[data-theme="day"] body{background:#faf8f5 !important}
+html[data-theme="day"] body{
+  background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%) !important;
+  background-attachment:fixed !important;
+}
+
+/* ── gradient "clipped" headings (white→gray text is invisible on cream) ──── */
+html[data-theme="day"] .hero h1,
+html[data-theme="day"] .pricing h2{
+  background:linear-gradient(180deg,#15281e,#3c574a) !important;
+  -webkit-background-clip:text;background-clip:text;color:transparent !important;
+}
+
+/* ── nav / brand ──────────────────────────────────────────────────────────── */
+html[data-theme="day"] nav{
+  background:linear-gradient(180deg,#faf8f5 64%,transparent) !important;
+}
+
+/* ── primary CTA buttons → NEPOOL emerald with white text ─────────────────── */
+html[data-theme="day"] .btn-primary-lg,
+html[data-theme="day"] .acct-btn.primary,
+html[data-theme="day"] .sb-addbtn,
+html[data-theme="day"] .sb-mbtn.primary,
+html[data-theme="day"] .ao-btn-primary,
+html[data-theme="day"] .cc-btn.primary,
+html[data-theme="day"] .cl-btn.primary,
+html[data-theme="day"] .cl-segbtn.on,
+html[data-theme="day"] .cc-collapsible .cc-collapse-hint,
+html[data-theme="day"] .rb-save{
+  background:linear-gradient(180deg,#10b981,#047857) !important;
+  color:#ffffff !important;
+  box-shadow:0 4px 14px -4px rgba(4,120,87,.45) !important;
+}
+html[data-theme="day"] .cc-btn.primary:hover,
+html[data-theme="day"] .cl-btn.primary:hover{background:linear-gradient(180deg,#10b981,#059669) !important}
+
+/* ── small green tags keep dark text but on the lighter emerald ──────────── */
+html[data-theme="day"] .act h3 .tag,
+html[data-theme="day"] .pc-free{color:#053024 !important}
+
+/* ── inputs / selects / textareas → white fields on the card ──────────────── */
+html[data-theme="day"] .acct-edit .r-v input,
+html[data-theme="day"] .acct-pw-edit input,
+html[data-theme="day"] .rep-fld select,
+html[data-theme="day"] .rep-fld input,
+html[data-theme="day"] .sb-fld input,
+html[data-theme="day"] .sb-data-pick,
+html[data-theme="day"] .ao-input,
+html[data-theme="day"] .ao-textarea,
+html[data-theme="day"] .cc-search input,
+html[data-theme="day"] .cl-fld input,
+html[data-theme="day"] .cl-fld textarea,
+html[data-theme="day"] .cl-grace input{
+  background:#ffffff !important;color:var(--ink) !important;border-color:var(--line) !important;
+}
+
+/* ── ghost / secondary buttons → white with warm border ───────────────────── */
+html[data-theme="day"] .acct-btn,
+html[data-theme="day"] .acct-pw-eye,
+html[data-theme="day"] .sb-togglebtn,
+html[data-theme="day"] .sb-resetbtn,
+html[data-theme="day"] .sb-cardbtn,
+html[data-theme="day"] .sb-mbtn.ghost,
+html[data-theme="day"] .ao-btn-ghost,
+html[data-theme="day"] .ao-btn:not(.ao-btn-primary),
+html[data-theme="day"] .rb-btn,
+html[data-theme="day"] .rb-cancel,
+html[data-theme="day"] .cl-btn.ghost,
+html[data-theme="day"] .cc-btn.ghost{
+  background:#ffffff !important;color:var(--ink) !important;border:1px solid var(--line) !important;
+}
+html[data-theme="day"] .rb-btn:hover,
+html[data-theme="day"] .cl-x:hover{background:var(--day-hover) !important}
+
+/* ── icon tiles ───────────────────────────────────────────────────────────── */
+html[data-theme="day"] .act .ic{background:var(--day-tile) !important}
+
+/* ── neutral chips / tags / badges (warm cream fill) ──────────────────────── */
+html[data-theme="day"] .sb-srctag,
+html[data-theme="day"] .sb-brand,
+html[data-theme="day"] .sb-brand.chint,
+html[data-theme="day"] .sb-brand.mixed,
+html[data-theme="day"] .sb-vend .vtag,
+html[data-theme="day"] .cc-state.new,
+html[data-theme="day"] .cc-state.snoozed,
+html[data-theme="day"] .cl-col-n,
+html[data-theme="day"] .cl-chip,
+html[data-theme="day"] .rb-chip{background:var(--day-chip) !important}
+
+/* ── progress / meter / peer tracks ───────────────────────────────────────── */
+html[data-theme="day"] .peerbar,
+html[data-theme="day"] .cc-meter,
+html[data-theme="day"] .sb-pi{background:var(--day-track) !important}
+
+/* ── code chips in footer / empty state ───────────────────────────────────── */
+html[data-theme="day"] footer code,
+html[data-theme="day"] .empty code{background:var(--day-hover) !important}
+
+/* ── raised "panel-ish" surfaces that used near-zero white alpha ──────────── */
+html[data-theme="day"] .sb-viewport,
+html[data-theme="day"] .cc-tablewrap,
+html[data-theme="day"] .cl-col,
+html[data-theme="day"] .rb-drop{background:var(--day-surf) !important}
+html[data-theme="day"] .sb-vend,
+html[data-theme="day"] .cc-collapsible,
+html[data-theme="day"] .cc-evidence .e{background:#ffffff !important}
+html[data-theme="day"] .sb-card-bar{background:var(--day-surf) !important}
+
+/* ── segmented controls ───────────────────────────────────────────────────── */
+html[data-theme="day"] .rb-seg,
+html[data-theme="day"] .cc-chips,
+html[data-theme="day"] .cc-sel,
+html[data-theme="day"] .cl-seg{background:var(--bg2) !important}
+html[data-theme="day"] .cc-chip.on{background:#ffffff !important}
+
+/* ── tab bar hovers + whoami chip ─────────────────────────────────────────── */
+html[data-theme="day"] .tab:hover{background:var(--day-hover) !important;color:var(--ink) !important}
+html[data-theme="day"] .tab.tab-whoami{background:#ffffff !important}
+html[data-theme="day"] .tab.tab-whoami:hover{background:var(--day-surf) !important}
+
+/* ── triage table rows ────────────────────────────────────────────────────── */
+html[data-theme="day"] .cc-table thead th{background:var(--day-surf) !important;border-bottom-color:var(--line) !important}
+html[data-theme="day"] .cc-table tbody tr.row{border-bottom-color:var(--line) !important}
+html[data-theme="day"] .cc-table tbody tr.row:hover{background:var(--day-hover) !important}
+html[data-theme="day"] .cc-drawer .inner{background:var(--day-surf) !important}
+
+/* ── KPI cards / policy bar / claim cards → white (were dark gradients) ───── */
+html[data-theme="day"] .cc-kpi,
+html[data-theme="day"] .cl-kpi,
+html[data-theme="day"] .cl-policy,
+html[data-theme="day"] .cl-card{
+  background:linear-gradient(168deg,#ffffff,#fbf8f3) !important;
+}
+
+/* ── frosted floating clusters over the fleet tree ────────────────────────── */
+html[data-theme="day"] .sb-head-btns,
+html[data-theme="day"] .sb-legend{
+  background:rgba(255,255,255,.72) !important;border-color:var(--line) !important;
+}
+
+/* ── overlays / scrims (were near-black) → soft warm dim ──────────────────── */
+html[data-theme="day"] .ao-overlay,
+html[data-theme="day"] .sb-ov,
+html[data-theme="day"] .cl-modal-back{
+  background:rgba(30,38,32,.34) !important;
+}
+
+/* ── modals / toasts / alert cards / dropdown menus → light ───────────────── */
+html[data-theme="day"] .ao-modal,
+html[data-theme="day"] .sb-modal,
+html[data-theme="day"] .cl-modal,
+html[data-theme="day"] .sb-toast,
+html[data-theme="day"] .sb-detail-card,
+html[data-theme="day"] .sb-card,
+html[data-theme="day"] .sb-card-menu{
+  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  border-color:var(--line) !important;
+  box-shadow:0 24px 60px -28px rgba(40,32,20,.35) !important;
+}
+html[data-theme="day"] .cl-menu{background:#ffffff !important;border-color:var(--line) !important;
+  box-shadow:0 18px 44px -20px rgba(40,32,20,.3) !important}
+html[data-theme="day"] .ao-modal-foot,
+html[data-theme="day"] .sb-modal-foot{background:var(--day-surf) !important}
+/* red-tinted alert variants stay red, just light */
+html[data-theme="day"] .sb-toast.alert,
+html[data-theme="day"] .sb-alert-card{
+  background:linear-gradient(165deg,#ffffff,#fdeceb) !important;border-color:rgba(220,38,38,.4) !important;
+}
+html[data-theme="day"] .cl-x{background:var(--day-tile) !important;color:var(--muted) !important}
+html[data-theme="day"] .ao-sites,
+html[data-theme="day"] .ao-site,
+html[data-theme="day"] .ao-diag-stat,
+html[data-theme="day"] .ao-evidence{background:#ffffff !important;border-color:var(--line) !important}
+
+/* ── sandbox menu / card hovers ───────────────────────────────────────────── */
+html[data-theme="day"] .sb-card-menu button:hover,
+html[data-theme="day"] .sb-card-btn:hover,
+html[data-theme="day"] .cl-menu-i:hover{background:var(--day-hover) !important}
+
+/* ── login-portal buttons inside the add-array modal ──────────────────────── */
+html[data-theme="day"] .sb-login-btn{
+  background:linear-gradient(165deg,#ffffff,#f7f3ec) !important;border-color:var(--line) !important;
+}
+html[data-theme="day"] .sb-login-btn:hover{background:var(--day-surf) !important}
+
+/* ── fleet-tree feeder wires / flow motes (light mint vanished on cream) ──── */
+html[data-theme="day"] svg.sb-wires path.feed,
+html[data-theme="day"] svg.sb-wires path.trunk{stroke:rgba(5,150,105,.20) !important}
+html[data-theme="day"] svg.sb-wires path.flow{
+  stroke:rgba(5,150,105,.9) !important;filter:drop-shadow(0 0 5px rgba(5,150,105,.5)) !important;
+}
+
+/* ── soften the heavy black drop-shadows the dark theme used everywhere ───── */
+html[data-theme="day"] .hcard,
+html[data-theme="day"] .act,
+html[data-theme="day"] .inv,
+html[data-theme="day"] .acct-list,
+html[data-theme="day"] .rep-card,
+html[data-theme="day"] .pc-main,
+html[data-theme="day"] .pc-tiers,
+html[data-theme="day"] .rb-sub{
+  box-shadow:0 2px 10px -4px rgba(40,32,20,.12), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+}
+
+/* ── the live "verdict" / value glow text-shadows are loud on white ───────── */
+html[data-theme="day"] .hcard.value .big,
+html[data-theme="day"] .pc-price,
+html[data-theme="day"] .cc-kpi.recovered .v,
+html[data-theme="day"] .cc-kpi.risk .v,
+html[data-theme="day"] .cl-kpi.atstake .v,
+html[data-theme="day"] .cl-kpi.recovered .v{text-shadow:none !important}

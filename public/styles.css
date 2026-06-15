@@ -35,7 +35,7 @@
   /* hero */
   header.hero{padding:30px 0 10px}
   .hero .eyebrow{color:var(--good);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
-  .hero h1{font-size:34px;font-weight:720;letter-spacing:-.02em;margin:10px 0 2px;
+  .hero h1{font-size:34px;font-weight:720;line-height:1.2;letter-spacing:-.02em;margin:10px 0 2px;padding-bottom:.12em;
     background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
   .hero h1 b{-webkit-text-fill-color:var(--good);color:var(--good)}
   .hero .meta{color:var(--muted);font-size:13.5px;margin-top:10px;font-variant-numeric:tabular-nums}
@@ -163,7 +163,7 @@
   /* ── Pricing section (owner front door) ───────────────────────────────── */
   .pricing{margin:46px 0 8px}
   .pricing .eyebrow{color:var(--good);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
-  .pricing h2{font-size:26px;font-weight:740;letter-spacing:-.02em;margin:8px 0 4px;
+  .pricing h2{font-size:26px;font-weight:740;line-height:1.2;letter-spacing:-.02em;margin:8px 0 4px;padding-bottom:.12em;
     background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
   .pricing .sub{color:var(--muted);font-size:14px;max-width:560px;line-height:1.55}
   .pricecard{margin-top:22px;display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:stretch}
@@ -293,7 +293,15 @@
   /* Generous padding = an always-grabbable empty margin around the fleet so you
      can left-drag empty space to pan even when columns pack the viewport. It's
      inside the scaled canvas, so the grab-zone grows with zoom. */
-  .sb-canvas{position:relative;display:flex;gap:54px;align-items:flex-start;padding:48px 72px 80px;width:max-content;transform-origin:0 0}
+  .sb-canvas{position:relative;display:flex;gap:108px;align-items:flex-start;padding:48px 72px 80px;width:max-content;transform-origin:0 0}
+  /* Drag-to-pan must never be hijacked by an accidental text selection (a stray
+     selection makes the browser try to drag the TEXT instead of panning). Make
+     the whole fleet card unselectable; user-select inherits, so this cascades to
+     every node. Re-enable selection only where the owner is actually typing:
+     names mid-rename (contenteditable=true), note cards, and form fields. */
+  #sbWrap{-webkit-user-select:none;-ms-user-select:none;user-select:none}
+  #sbWrap [contenteditable="true"],
+  #sbWrap input,#sbWrap textarea,#sbWrap select{-webkit-user-select:text;-ms-user-select:text;user-select:text}
   /* promote to a GPU layer only mid-gesture; idle = re-rasterized crisp at scale */
   .sb-canvas.sb-interacting{will-change:transform}
   .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
