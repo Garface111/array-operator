@@ -1082,12 +1082,17 @@
     clearTimeout(_interactTimer);
     _interactTimer = setTimeout(() => c.classList.remove("sb-interacting"), 200);
   }
-  function applyCanvasView(host){
+  // promote=true only for ZOOM: it briefly GPU-layers the canvas (smooth, then
+  // re-rasterizes crisp on de-promote). PAN must NOT promote — translating never
+  // changes scale, so it needs no re-raster, and the promote→de-promote cycle is
+  // exactly what made a finished pan visibly "snap"/relocate. Pan stays a plain,
+  // rock-solid, main-painted transform that holds precisely where you drop it.
+  function applyCanvasView(host, promote){
     const c = (host||document).querySelector("#sandbox .sb-canvas");
     if(!c) return;
     // round the pan offset to whole pixels so text/edges don't land on half-pixels
     c.style.transform = `translate(${Math.round(_view.x)}px,${Math.round(_view.y)}px) scale(${_view.z})`;
-    markInteracting(c);
+    if(promote) markInteracting(c);
   }
   // ---- Full-screen mode: maximize #sbWrap (the whole fleet-tree card) to fill
   // the viewport via a CSS overlay class (.sb-fs). We drive it with our own class
@@ -1153,7 +1158,7 @@
       const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
       _view.x = cx - (cx - _view.x) * (next/prev);
       _view.y = cy - (cy - _view.y) * (next/prev);
-      _view.z = next; applyCanvasView(host);
+      _view.z = next; applyCanvasView(host, true);   // zoom → promote + re-crisp
     }, { passive:false });
     let panning=false, sx=0, sy=0;
     vp.addEventListener("pointerdown", e => {
