@@ -187,7 +187,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .sb-legend{ background:rgba(8,12,18,.55); -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px); border:1px solid var(--line); border-radius:11px; padding:5px 11px; }
 
 /* the canvas viewport now fills the card top-to-bottom (no header row above it) */
-.sb-viewport{ height:min(64vh,580px); min-height:380px; }
+.sb-viewport{ height:min(80vh,720px); min-height:560px; }
 
 /* ============================================================================
  * Reports tab — automatic billing reports (reports.js / .rb-*)
