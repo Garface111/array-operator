@@ -1244,16 +1244,38 @@
     else applyCanvasView(host);                         // keep the user's view across re-renders
     vp.addEventListener("wheel", e => {
       e.preventDefault();
-      const r = vp.getBoundingClientRect();
-      const cx = e.clientX - r.left, cy = e.clientY - r.top, prev = _view.z;
-      const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
-      _view.x = cx - (cx - _view.x) * (next/prev);
-      _view.y = cy - (cy - _view.y) * (next/prev);
-      _view.z = next; applyCanvasView(host, true);   // zoom → promote + re-crisp
+      // Canvas convention: pinch / Ctrl|Cmd+scroll = ZOOM, plain scroll = PAN.
+      // Scroll-to-pan is the fix for a dense fleet — when columns fill the viewport
+      // there's no empty background left to click-drag, so you couldn't pan at all.
+      if(e.ctrlKey || e.metaKey){
+        const r = vp.getBoundingClientRect();
+        const cx = e.clientX - r.left, cy = e.clientY - r.top, prev = _view.z;
+        const next = Math.min(2.5, Math.max(0.4, prev * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+        _view.x = cx - (cx - _view.x) * (next/prev);
+        _view.y = cy - (cy - _view.y) * (next/prev);
+        _view.z = next; applyCanvasView(host, true);   // zoom → promote + re-crisp
+      } else {
+        // Two-finger trackpad scroll gives deltaX+deltaY; a plain mouse wheel gives
+        // deltaY only (shift+wheel pans horizontally).
+        let dx = e.deltaX, dy = e.deltaY;
+        if(e.shiftKey && !dx){ dx = dy; dy = 0; }
+        _view.x -= dx; _view.y -= dy;
+        applyCanvasView(host);                          // pan → no promote (holds, crisp)
+      }
     }, { passive:false });
+    // Suppress OS middle-click autoscroll so a middle-drag can pan instead.
+    vp.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); });
     let panning=false, sx=0, sy=0;
     vp.addEventListener("pointerdown", e => {
-      if(e.button!==0 || e.target.closest(".sb-inv,.sb-array,button,a,input,.sb-comb-empty")) return;
+      const onControl = e.target.closest("button,a,input");
+      // MIDDLE button pans from ANYWHERE (essential when cards fill the view).
+      // LEFT button pans only from empty space, since cards are drag-to-rearrange.
+      if(e.button === 1){
+        if(onControl) return;
+        e.preventDefault();
+      } else if(e.button !== 0 || onControl || e.target.closest(".sb-inv,.sb-array,.sb-comb-empty")){
+        return;
+      }
       panning=true; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
       vp.classList.add("panning");
       try{ vp.setPointerCapture(e.pointerId); }catch(_){}
