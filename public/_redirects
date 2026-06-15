@@ -30,3 +30,11 @@
 # Array Operator" button points here.
 /login                /login.html        200
 /signin               /login.html        301
+
+# ── Sample account (read-only demo) ─────────────────────────────────────
+# Mints a read-only demo session via the same-origin /v1/demo/enter proxy and
+# hands off to /accounts. MUST be same-origin with /accounts so the localStorage
+# token handoff works. The EnergyAgent landing page's Array "See a sample
+# account" link points here.
+/demo-account         /demo-account.html   200
+/sample-account       /demo-account.html   301

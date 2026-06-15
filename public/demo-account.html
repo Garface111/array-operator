@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loading your demo… · Array Operator</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0a0e14">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  /* Palette mirrors login.html / index.html — keep in sync with the Array Operator theme. */
+  :root{
+    --bg:#0a0e14; --bg2:#0e131c; --ink:#eaf0f7; --muted:#8b97a8; --faint:#6b7686;
+    --good:#3fd68a; --good2:#7ff0bb; --bad:#ff6b6b;
+    --line:rgba(255,255,255,.08); --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.018);
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{
+    margin:0; color:var(--ink); min-height:100%;
+    background:radial-gradient(1200px 700px at 75% -10%, #16202e 0%, var(--bg) 55%);
+    background-attachment:fixed;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.6;
+    display:flex; flex-direction:column;
+  }
+  a{color:var(--good2); text-decoration:none}
+  a:hover{text-decoration:underline}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--good); outline-offset:2px; border-radius:6px}
+
+  .nav{display:flex; align-items:center; justify-content:space-between;
+    max-width:1080px; width:100%; margin:0 auto; padding:18px 24px}
+  .wordmark{display:inline-flex; align-items:center; gap:10px; font-weight:700;
+    font-size:1.05rem; color:var(--ink)}
+  .wordmark:hover{text-decoration:none}
+  .sun{width:14px; height:14px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--good2),var(--good) 55%,#1f7d54 100%);
+    box-shadow:0 0 0 4px rgba(63,214,138,.14), 0 0 14px rgba(63,214,138,.55)}
+  .nav-link{font-size:.92rem; font-weight:600; color:var(--muted)}
+  .nav-link:hover{color:var(--good2)}
+
+  .wrap{flex:1; display:flex; align-items:center; justify-content:center; padding:24px}
+  .card{
+    width:100%; max-width:30rem; text-align:center;
+    background:linear-gradient(165deg,var(--card),var(--card2));
+    border:1px solid var(--line); border-radius:22px; padding:48px 40px;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);
+  }
+  .ring{
+    height:2.6rem; width:2.6rem; border-radius:999px; margin:0 auto 22px;
+    border:3px solid rgba(127,240,187,.18); border-top-color:var(--good2);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  h1{font-size:1.5rem; letter-spacing:-0.02em; margin:0 0 12px; font-weight:800}
+  .sub{color:var(--muted); margin:0; font-size:1rem}
+  .card.fallback a{color:var(--good2); font-weight:600}
+
+  @media (prefers-reduced-motion: reduce){ .ring{animation:none} }
+  @media (max-width:640px){ .card{padding:40px 26px} }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <a class="wordmark" href="/"><span class="sun" aria-hidden="true"></span>Array Operator</a>
+  <nav aria-label="Primary"><a class="nav-link" href="/accounts">Sign in</a></nav>
+</header>
+
+<main class="wrap">
+  <div class="card" id="demo-card" role="status" aria-live="polite">
+    <div class="ring" aria-hidden="true"></div>
+    <h1>Loading your demo…</h1>
+    <p class="sub">We&rsquo;re signing you in to a sample array account. You&rsquo;ll see
+    real-looking, per-inverter ground-truth data &mdash; kept read-only so you
+    can&rsquo;t break anything.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  // ── Integration contract (mirrors the proven nepooloperator.com/demo-account) ──
+  // • /v1/* is proxied to the Railway backend by _redirects, so a same-origin
+  //   relative URL reaches /v1/demo/enter.
+  // • The token is stored under "so_session" (raw bearer string) because the
+  //   accounts SPA reads localStorage.getItem("so_session"). demo-account.html
+  //   MUST be same-origin with /accounts for this handoff to work.
+  var DEMO_ENTER_URL = "/v1/demo/enter";
+  var SPA_TOKEN_KEY  = "so_session";
+  var SPA_HOME       = "/accounts/";
+  var TIMEOUT_MS     = 8000;
+
+  function showFallback() {
+    var card = document.getElementById("demo-card");
+    if (!card) return;
+    card.classList.add("fallback");
+    card.innerHTML =
+      '<h1>Demo temporarily unavailable</h1>' +
+      '<p class="sub">The demo&rsquo;s temporarily unavailable &mdash; please try the ' +
+      '<a href="/onboarding">get started</a> link instead.</p>';
+  }
+
+  function enterDemo() {
+    var done = false;
+    var controller = ("AbortController" in window) ? new AbortController() : null;
+
+    var timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      if (controller) controller.abort();
+      console.error("[demo] /v1/demo/enter timed out after " + TIMEOUT_MS + "ms");
+      showFallback();
+    }, TIMEOUT_MS);
+
+    fetch(DEMO_ENTER_URL, {
+      headers: { "Accept": "application/json" },
+      signal: controller ? controller.signal : undefined
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (done) return;
+        var token = data && (data.session_token || data.token);
+        if (!data || data.ok !== true || !token) {
+          throw new Error("unexpected response: " + JSON.stringify(data));
+        }
+        done = true;
+        clearTimeout(timer);
+        localStorage.setItem(SPA_TOKEN_KEY, token);
+        window.location.href = SPA_HOME;
+      })
+      .catch(function (err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        console.error("[demo] could not enter demo:", err);
+        showFallback();
+      });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", enterDemo);
+  } else {
+    enterDemo();
+  }
+}());
+</script>
+</body>
+</html>
