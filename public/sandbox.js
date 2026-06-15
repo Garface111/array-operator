@@ -453,8 +453,8 @@
           <div class="sb-link v1 ${aCls}"></div>
 
           <!-- TIER 2: Array (this node is the column drag handle) -->
-          <div class="sb-array" draggable="true">
-            <span class="sb-drag" title="Drag to reorder arrays" aria-hidden="true">⠿</span>
+          <div class="sb-array">
+            <span class="sb-drag" draggable="true" role="button" title="Drag this grip to reorder the array">⠿</span>
             <div class="sb-array-k">Array</div>
             <div class="sb-array-name">${esc(col.array_name)}</div>
             <div class="sb-array-meta"><span class="sb-array-count">${col.inverter_count} inverter${col.inverter_count===1?'':'s'}</span> ${srcTag} ${brandChip}</div>
@@ -1264,26 +1264,29 @@
     }, { passive:false });
     // Suppress OS middle-click autoscroll so a middle-drag can pan instead.
     vp.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); });
-    let panning=false, sx=0, sy=0;
+    let panning=false, captured=false, pid=null, sx=0, sy=0;
     vp.addEventListener("pointerdown", e => {
       const onControl = e.target.closest("button,a,input");
-      // MIDDLE button pans from ANYWHERE (essential when cards fill the view).
-      // LEFT button pans only from empty space, since cards are drag-to-rearrange.
+      // MIDDLE button pans from ANYWHERE. LEFT button pans from the whole canvas
+      // EXCEPT the things you grab to rearrange: inverter cards (.sb-inv), the
+      // array reorder grip (.sb-drag), and empty-array drop zones. The array BODY
+      // now pans (only its ⠿ grip reorders), so a packed fleet is movable.
       if(e.button === 1){
         if(onControl) return;
         e.preventDefault();
-      } else if(e.button !== 0 || onControl || e.target.closest(".sb-inv,.sb-array,.sb-comb-empty")){
+      } else if(e.button !== 0 || onControl || e.target.closest(".sb-inv,.sb-drag,.sb-comb-empty")){
         return;
       }
-      panning=true; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
-      vp.classList.add("panning");
-      try{ vp.setPointerCapture(e.pointerId); }catch(_){}
+      panning=true; captured=false; pid=e.pointerId; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
     });
     vp.addEventListener("pointermove", e => {
       if(!panning) return;
+      // Defer pointer capture until the first real move, so a plain click still
+      // reaches the element underneath (e.g. click an array name to rename it).
+      if(!captured){ captured=true; vp.classList.add("panning"); try{ vp.setPointerCapture(pid); }catch(_){} }
       _view.x = e.clientX - sx; _view.y = e.clientY - sy; applyCanvasView(host);
     });
-    const end = () => { panning=false; vp.classList.remove("panning"); };
+    const end = () => { panning=false; captured=false; vp.classList.remove("panning"); };
     vp.addEventListener("pointerup", end);
     vp.addEventListener("pointercancel", end);
     vp.addEventListener("dblclick", e => {
@@ -1343,18 +1346,22 @@
     const canvas = host.querySelector(".sb-canvas");
     if(!canvas) return;
     let dragEl = null;
-    canvas.querySelectorAll(".sb-array").forEach(arr => {
-      arr.addEventListener("dragstart", e => {
-        const col = arr.closest(".sb-col");
+    // Only the grip (⠿) starts an array-reorder drag — the array body is free to
+    // pan. (The whole array node used to be draggable, which turned pan attempts
+    // into accidental array moves.)
+    canvas.querySelectorAll(".sb-array .sb-drag").forEach(grip => {
+      grip.addEventListener("dragstart", e => {
+        const col = grip.closest(".sb-col");
         if(!col) return;
         dragEl = col;
         canvas.classList.add("dragging-active");
+        try { e.dataTransfer.setDragImage(col, 24, 18); } catch(_){}   // ghost the column, not the glyph
         // let the lift styling paint before the drag image snapshots
         requestAnimationFrame(() => col.classList.add("dragging"));
         e.dataTransfer.effectAllowed = "move";
         try { e.dataTransfer.setData("text/plain", col.dataset.arrayId || ""); } catch(_){}
       });
-      arr.addEventListener("dragend", () => {
+      grip.addEventListener("dragend", () => {
         if(dragEl) dragEl.classList.remove("dragging");
         canvas.classList.remove("dragging-active");
         dragEl = null;
