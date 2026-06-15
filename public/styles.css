@@ -233,6 +233,21 @@
   .acct-msg{font-size:12px;color:var(--muted);margin-top:6px}
   .acct-msg:empty{margin:0}
   .acct-msg.ok{color:var(--good)} .acct-msg.err{color:var(--bad)}
+  /* password set/change editor (Master Account → Password row) */
+  .acct-pw-edit{display:flex;flex-direction:column;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .acct-pw-fld{display:block}
+  .acct-pw-lab{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .acct-pw-edit input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);
+    border-radius:9px;padding:9px 11px;color:var(--ink);font-size:14px}
+  .acct-pw-edit input:focus{outline:none;border-color:rgba(63,214,138,.5)}
+  .acct-pw-wrap{position:relative;display:block}
+  .acct-pw-wrap input{padding-right:62px}
+  .acct-pw-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);border:1px solid var(--line);
+    background:rgba(255,255,255,.05);color:var(--muted);font-size:11.5px;font-weight:650;border-radius:7px;
+    padding:5px 9px;cursor:pointer}
+  .acct-pw-eye:hover{color:var(--ink);border-color:rgba(63,214,138,.5)}
+  .acct-pw-hint{font-size:12px;color:var(--faint);line-height:1.45}
+  .acct-pw-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px}
   @media(max-width:640px){
     .acct-row{grid-template-columns:1fr;gap:8px;align-items:start}
     .acct-row .r-a{justify-content:flex-start}

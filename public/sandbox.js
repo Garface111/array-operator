@@ -1734,9 +1734,7 @@
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
-      rowStatic("Password", "••••••••",
-        "Passwordless — you sign in with a secure link we email you. Nothing to remember.",
-        `<button class="acct-btn" id="loginLink" type="button">Email me a sign-in link</button>`) +
+      passwordRow(a) +
       rowStatic("Your bill",
         `<span class="r-big" id="billAmount">Loading…</span>`,
         `<span id="billWhy"></span>`) +
@@ -1746,7 +1744,116 @@
         `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`);
 
     wireAcctEdits();
-    wireLoginLink();
+    wirePasswordRow();
+  }
+
+  /* ---- Password row: view (masked + show-as-you-type) and set/change it.
+   * A stored password is hashed, so it can't be shown — "view" means reveal what
+   * you type. Backend: GET /v1/account → has_password; POST /v1/auth/set-password
+   * { password, current_password? } (current required only when one already exists;
+   * rule: 10+ chars, a letter, a number). ------------------------------------ */
+  function passwordRow(a){
+    const hasPw = !!(a && a.has_password === true);
+    const stateTxt = hasPw ? "••••••••" : "Not set yet";
+    const subTxt = hasPw
+      ? "You sign in with your email and password."
+      : "Add a password so you can sign in without the emailed link.";
+    const btnLabel = hasPw ? "Change password" : "Set a password";
+    const curField = hasPw ? `
+          <label class="acct-pw-fld"><span class="acct-pw-lab">Current password</span>
+            <input type="password" id="pwCurrent" autocomplete="current-password" placeholder="Current password"></label>` : "";
+    return `<div class="acct-row" id="rowPassword" data-haspw="${hasPw}">
+      <div class="r-k">Password</div>
+      <div class="r-v">
+        <span id="pwState">${stateTxt}</span>
+        <span class="r-sub" id="pwSub">${subTxt}</span>
+        <div class="acct-pw-edit" id="pwEdit" hidden>${curField}
+          <label class="acct-pw-fld"><span class="acct-pw-lab">New password</span>
+            <span class="acct-pw-wrap">
+              <input type="password" id="pwNew" autocomplete="new-password" placeholder="At least 10 characters">
+              <button type="button" class="acct-pw-eye" id="pwEye" aria-label="Show password">Show</button>
+            </span></label>
+          <label class="acct-pw-fld"><span class="acct-pw-lab">Confirm new password</span>
+            <input type="password" id="pwConfirm" autocomplete="new-password" placeholder="Re-enter the new password"></label>
+          <div class="acct-pw-hint">At least 10 characters, including a letter and a number.</div>
+          <div class="acct-pw-actions">
+            <button class="acct-btn primary" id="pwSave" type="button">Save password</button>
+            <button class="acct-btn" id="pwCancel" type="button">Cancel</button>
+          </div>
+          <div class="acct-msg" id="pwMsg"></div>
+        </div>
+      </div>
+      <div class="r-a"><button class="acct-btn" id="pwToggle" type="button">${btnLabel}</button></div>
+    </div>`;
+  }
+
+  function wirePasswordRow(){
+    const toggle = document.getElementById("pwToggle");
+    const editEl = document.getElementById("pwEdit");
+    const row    = document.getElementById("rowPassword");
+    if(!toggle || !editEl || !row) return;
+    const hasPw = row.dataset.haspw === "true";
+    const pwNew = document.getElementById("pwNew");
+    const pwConfirm = document.getElementById("pwConfirm");
+    const pwCurrent = document.getElementById("pwCurrent");
+    const eye = document.getElementById("pwEye");
+    const msg = document.getElementById("pwMsg");
+    const baseLabel = hasPw ? "Change password" : "Set a password";
+    const setMsg = (t, cls) => { if(msg){ msg.className = "acct-msg" + (cls ? " " + cls : ""); msg.textContent = t; } };
+    const close = () => {
+      editEl.setAttribute("hidden", ""); toggle.textContent = baseLabel;
+      [pwNew, pwConfirm, pwCurrent].forEach(i => { if(i) i.value = ""; }); setMsg("");
+    };
+
+    toggle.onclick = () => {
+      if(editEl.hasAttribute("hidden")){
+        editEl.removeAttribute("hidden"); toggle.textContent = "Close";
+        const first = pwCurrent || pwNew; if(first) try{ first.focus(); }catch(e){}
+      } else close();
+    };
+    const cancel = document.getElementById("pwCancel");
+    if(cancel) cancel.onclick = close;
+
+    // The only honest "view your password": reveal what you're typing (the stored
+    // one is hashed and unrecoverable). Toggles both new + confirm together.
+    if(eye && pwNew) eye.onclick = () => {
+      const show = pwNew.type === "password";
+      pwNew.type = show ? "text" : "password";
+      if(pwConfirm) pwConfirm.type = pwNew.type;
+      eye.textContent = show ? "Hide" : "Show";
+      eye.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    };
+
+    const save = document.getElementById("pwSave");
+    if(save) save.onclick = async () => {
+      const np = (pwNew && pwNew.value) || "", cf = (pwConfirm && pwConfirm.value) || "";
+      if(np.length < 10 || !/[a-zA-Z]/.test(np) || !/[0-9]/.test(np)){
+        setMsg("At least 10 characters, including a letter and a number.", "err"); return; }
+      if(np !== cf){ setMsg("The two passwords don't match.", "err"); return; }
+      if(hasPw && !(pwCurrent && pwCurrent.value)){ setMsg("Enter your current password to change it.", "err"); return; }
+      const h = authHeaders();
+      if(!h){ setMsg("Sign in first.", "err"); return; }
+      const body = { password: np };
+      if(hasPw) body.current_password = pwCurrent.value;
+      save.disabled = true; setMsg("Saving…");
+      try{
+        const r = await fetch("/v1/auth/set-password", { method:"POST",
+          headers: Object.assign({ "Content-Type":"application/json" }, h),
+          body: JSON.stringify(body) });
+        const d = await r.json().catch(() => ({}));
+        if(r.ok && d.ok){
+          if(_account) _account.has_password = true;
+          setMsg(hasPw ? "Password changed." : "Password set.", "ok");
+          // Re-render the row from the fresh state so a follow-up change correctly
+          // asks for the (now-set) current password. Re-fill billing too, since a
+          // full re-render resets the bill row to its loading state.
+          setTimeout(() => { if(_account){ renderAccountList(_account); renderBilling(authHeaders()); } }, 1100);
+        } else {
+          setMsg((d && d.detail) ? d.detail : `Couldn't save (HTTP ${r.status}).`, "err");
+          save.disabled = false;
+        }
+      }catch(e){ setMsg("Couldn't reach the server — check your connection.", "err"); save.disabled = false; }
+    };
   }
 
   function wireAcctEdits(){
