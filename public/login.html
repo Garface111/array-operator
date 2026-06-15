@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in · Array Operator</title>
+<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
+<script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   :root{
@@ -57,12 +59,44 @@
   .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(6,20,13,.25);border-top-color:#06140d;animation:spin .7s linear infinite;display:inline-block}
   @keyframes spin{to{transform:rotate(360deg)}}
   .hide{display:none!important}
+
+  /* Day/night toggle control (header, top-right) */
+  .theme-toggle{margin-left:auto;cursor:pointer;border:1px solid var(--line);background:var(--card);
+    color:var(--muted);width:34px;height:34px;border-radius:10px;display:inline-grid;place-items:center;
+    font-size:15px;line-height:1;transition:color .15s,border-color .15s,background .15s}
+  .theme-toggle:hover{color:var(--good);border-color:var(--good)}
+  .theme-toggle .tt-ico{line-height:1;pointer-events:none}
+
+  /* ===== DAY MODE — NEPOOL Operator light palette (in color, not shape) ===== */
+  html[data-theme="day"]{
+    --bg:#faf8f5; --bg2:#f1ebe1; --ink:#18181b; --muted:#586068; --faint:#8f8a80;
+    --good:#059669; --good2:#10b981; --warn:#b56d2c; --bad:#dc2626;
+    --line:#e7e1d6; --card:#ffffff; --card2:#fcfaf7;
+    color-scheme:light;
+  }
+  html[data-theme="day"] body{
+    background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%);
+  }
+  html[data-theme="day"] h1{
+    background:linear-gradient(180deg,#15281e,#3c574a);-webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  html[data-theme="day"] .tabs{background:#f1ebe1;}
+  html[data-theme="day"] .tab.on{background:#ffffff;color:#059669;box-shadow:inset 0 0 0 1px rgba(5,150,105,.35);}
+  html[data-theme="day"] input{background:#ffffff;color:var(--ink);}
+  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#10b981,#047857);color:#fff;box-shadow:0 4px 14px -4px rgba(4,120,87,.45);}
+  html[data-theme="day"] .card{box-shadow:0 10px 30px -12px rgba(40,32,20,.18);}
+  html[data-theme="day"] .msg.err{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.3);color:#b42318;}
+  html[data-theme="day"] .ring{border-color:rgba(255,255,255,.45);border-top-color:#fff;}
 </style>
 </head>
 <body>
   <div class="top">
     <span class="logo" aria-hidden="true"></span>
     <span>Array Operator<small>by EnergyAgent</small></span>
+    <button class="theme-toggle" id="themeToggle" type="button"
+            title="Toggle day / night" aria-label="Toggle day or night theme">
+      <span class="tt-ico" aria-hidden="true">☾</span>
+    </button>
   </div>
   <main>
     <div class="card">
@@ -97,6 +131,23 @@
   </main>
 
 <script>
+// Day/night toggle — persists in localStorage (ao_theme), shared with the dashboard.
+(function(){
+  var btn = document.getElementById("themeToggle");
+  function read(){ try { return localStorage.getItem("ao_theme") === "day"; } catch(e){ return false; } }
+  function apply(day){
+    document.documentElement.setAttribute("data-theme", day ? "day" : "night");
+    if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
+  }
+  var day = read(); apply(day);
+  if (btn) btn.addEventListener("click", function(){
+    day = !day;
+    try { localStorage.setItem("ao_theme", day ? "day" : "night"); } catch(e){}
+    apply(day);
+  });
+})();
+</script>
+<script>
 // Same-origin on arrayoperator.com (/v1/* proxies to Railway via _redirects).
 // On a local static preview, hit the Railway backend directly (CORS allows it).
 const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
@@ -129,7 +180,7 @@ async function doPassword(e){
   try{
     const r = await fetch(`${API_BASE}/v1/auth/password-login`, {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, product: "array_operator" })
     });
     if(r.status === 401){
       showMsg("That email or password didn't match. Try again, or use the sign-in link instead.", "err");
@@ -163,7 +214,7 @@ async function doMagic(e){
   try{
     await fetch(`${API_BASE}/v1/auth/request`, {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, product: "array_operator" })
     });
     // Always succeed-looking to avoid leaking which emails exist.
     showMsg("If that email has an account, a secure sign-in link is on its way. It expires in 15 minutes.", "ok");
