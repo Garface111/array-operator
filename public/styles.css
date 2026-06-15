@@ -581,6 +581,29 @@
   .sb-mbtn.ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line)}
   .sb-mbtn.ghost:hover{border-color:var(--good);color:var(--good)}
 
+  /* ===== One-click portal login (Add-array modal lead path) ===== */
+  .sb-login-grid{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+  .sb-login-btn{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    width:100%;text-align:left;cursor:pointer;padding:14px 16px;border-radius:13px;
+    border:1px solid var(--line);background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.02));
+    transition:border-color .15s,background .15s,transform .1s}
+  .sb-login-btn:hover{border-color:rgba(63,214,138,.5);background:rgba(63,214,138,.07)}
+  .sb-login-btn:active{transform:translateY(1px)}
+  .sb-login-brand{font-size:12px;font-weight:800;letter-spacing:.02em;padding:4px 9px;border-radius:999px}
+  .sb-login-cta{font-size:14.5px;font-weight:700;color:var(--ink)}
+  .sb-login-install{margin:14px 0 4px;width:100%}
+  .sb-login-hint{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:4px}
+  .sb-linkbtn{background:none;border:0;color:var(--good);font-weight:650;font-size:inherit;
+    cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
+  .sb-linkbtn.sb-back{display:inline-block;margin-bottom:10px;text-decoration:none}
+  .sb-or{display:flex;align-items:center;gap:12px;margin:14px 0 10px;color:var(--faint);font-size:12px}
+  .sb-or::before,.sb-or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .sb-manual-toggle{width:100%}
+  .sb-spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(63,214,138,.3);
+    border-top-color:var(--good);border-radius:50%;vertical-align:-2px;margin-right:6px;
+    animation:sb-spin .7s linear infinite}
+  @keyframes sb-spin{to{transform:rotate(360deg)}}
+
   /* ===== Free-form cards on the canvas (note / data, free / fixed) ===== */
   /* "+ Card" head button + its pop-up kind menu */
   .sb-cardbtn-wrap{position:relative;display:inline-flex}

@@ -57,6 +57,72 @@
 
   function getSession(){ try { return localStorage.getItem(SESSION_KEY); } catch(e){ return null; } }
 
+  /* ---- EnergyAgent extension bridge (one-click portal login) ----
+   * The helper injects so_bridge.js on arrayoperator.com: it announces
+   * SO_EXTENSION_PRESENT and relays SO_CAPTURE_LANDED. We ask the owner to log
+   * into their monitoring portal the way they already do; the extension reads
+   * their inverters and lands them here, and we attach to their account. */
+  let EXT_PRESENT = false;
+  const EXT_STORE_URL = "https://chromewebstore.google.com/detail/solar-operator-sync/ocohbimolfpnkjcjhiodopjjlhclinpl";
+  // Portal URLs per vendor for the one-click login.
+  const PORTAL_URL = {
+    solaredge: "https://monitoring.solaredge.com/",
+    fronius:   "https://www.solarweb.com/",
+    sma:       "https://ennexos.sunnyportal.com/",
+  };
+  function extSend(type, extra){
+    try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
+  }
+  function openPortalLogin(vendor){
+    const url = PORTAL_URL[vendor];
+    if(!url) return;
+    const note = _ov && _ov.querySelector("#sbNote");
+    if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your inverters appear here automatically.`; }
+    extSend("SO_OPEN_PORTAL", { url, active: true });
+  }
+  // A capture landed from the extension. Owner is already signed in (dashboard),
+  // so attach straight to their account: SolarEdge by its account key,
+  // Fronius/SMA by ingesting the per-inverter readings the extension shipped.
+  async function handleCaptureLanded(d){
+    const session = getSession();
+    const note = _ov && _ov.querySelector("#sbNote");
+    if(!session){
+      if(note){ note.className = "sb-note err"; note.innerHTML = `Please sign in first — <a href="onboarding.html">get started →</a>.`; }
+      return;
+    }
+    const hdr = { "Content-Type":"application/json", "Authorization":"Bearer "+session };
+    if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Got your ${esc(BRAND[d.provider]||d.provider)} account — bringing your inverters in…`; }
+    try{
+      let r, data;
+      if(d.provider === "solaredge" && d.apiKey){
+        r = await fetch("/v1/array-owners/solaredge/connect-account",
+          { method:"POST", headers:hdr, body: JSON.stringify({ api_key: d.apiKey }) });
+      } else if((d.provider === "fronius" || d.provider === "sma") && Array.isArray(d.sites) && d.sites.length){
+        r = await fetch("/v1/array-owners/inverter-capture",
+          { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
+      } else {
+        if(note){ note.className = "sb-note err"; note.textContent = `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
+        return;
+      }
+      data = {}; try { data = await r.json(); } catch(e){}
+      const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured);
+      if(ok){ closeAddModal(); load(); return; }
+      if(note){ note.className = "sb-note err"; note.textContent = (data && (data.message||data.detail)) || `Couldn't bring in that ${BRAND[d.provider]||d.provider} account (HTTP ${r.status}).`; }
+    }catch(err){
+      if(note){ note.className = "sb-note err"; note.textContent = "We couldn't reach the connection service just now — check your network and try again."; }
+    }
+  }
+  window.addEventListener("message", (e) => {
+    if(e.source !== window) return;
+    const d = e.data; if(!d || typeof d !== "object") return;
+    if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
+      if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
+    }
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma"].includes(d.provider)) handleCaptureLanded(d);
+  });
+  extSend("SO_STATUS_REQUEST");   // ask explicitly in case the bridge announced before we listened
+
+
   // ---- saved column order (localStorage) ----
   function loadOrder(){
     try { const v = JSON.parse(localStorage.getItem(ORDER_KEY)); return Array.isArray(v) ? v.map(String) : []; }
@@ -1371,6 +1437,8 @@
    * already-deployed connect endpoints. On success it re-loads the fleet tree.
    * ==========================================================================*/
   let _ov = null, _escH = null;
+  let renderAddModalBody = null;   // assigned when the Add-array modal opens; the
+                                   // extension-present listener calls it to re-render.
   function ensureOv(){
     if(_ov) return _ov;
     _ov = document.createElement("div");
@@ -1388,7 +1456,8 @@
   function openAddArrayModal(){
     const ov = ensureOv();
     let vendor = "solaredge";
-    const fields = {};                 // field name -> current value
+    let manual = false;                // false = one-click login view; true = paste-keys view
+    const fields = {};                 // field name -> current value (manual mode)
 
     ov.innerHTML = `
       <div class="sb-modal" role="dialog" aria-modal="true" aria-label="Add an array">
@@ -1396,70 +1465,118 @@
           <div class="sb-modal-title">Add an array</div>
           <button class="sb-modal-x" type="button" aria-label="Close">&times;</button>
         </div>
-        <div class="sb-modal-body">
-          <p class="sb-modal-lede">Pick your monitoring platform and connect. SolarEdge unlocks every site on your account with one key; Locus, Fronius and SMA connect per array.</p>
-          <div class="sb-vendgrid" id="sbVendGrid"></div>
-          <div id="sbVendFields"></div>
-          <div class="sb-note" id="sbNote"></div>
-        </div>
-        <div class="sb-modal-foot">
-          <button class="sb-mbtn ghost" type="button" id="sbCancel">Cancel</button>
-          <button class="sb-mbtn primary" type="button" id="sbConnect" disabled>Connect</button>
-        </div>
+        <div class="sb-modal-body" id="sbModalBody"></div>
+        <div class="sb-note" id="sbNote"></div>
+        <div class="sb-modal-foot" id="sbModalFoot"></div>
       </div>`;
     ov.classList.add("open");
 
-    const grid = ov.querySelector("#sbVendGrid");
-    const fieldsBox = ov.querySelector("#sbVendFields");
+    const body = ov.querySelector("#sbModalBody");
+    const foot = ov.querySelector("#sbModalFoot");
     const note = ov.querySelector("#sbNote");
-    const connectBtn = ov.querySelector("#sbConnect");
 
-    function renderGrid(){
-      grid.innerHTML = VENDORS.map(vd => {
-        const sel = vd.code===vendor ? " sel" : "";
-        const soon = vd.available ? "" : " soon";
-        const tag = vd.discover ? `<span class="vtag">1 key</span>` : (vd.available ? "" : `<span class="vtag">soon</span>`);
-        return `<button type="button" class="sb-vend${sel}${soon}" data-code="${esc(vd.code)}" ${vd.available?"":'aria-disabled="true"'}>
-          ${tag}<span class="vn">${esc(vd.label)}</span><span class="vmeta">${esc(vd.meta||"")}</span>
-        </button>`;
-      }).join("");
-      grid.querySelectorAll(".sb-vend").forEach(b => {
-        b.onclick = () => {
-          const vd = vendorByCode(b.dataset.code);
-          if(!vd.available) return;
-          vendor = vd.code;
-          note.className = "sb-note"; note.textContent = "";
-          renderGrid(); renderFields();
-        };
-      });
-    }
+    // Login-capable vendors (one-click via the helper). Chint stays manual/CSV.
+    const LOGIN_VENDORS = ["solaredge","fronius","sma"];
 
-    function renderFields(){
-      const v = vendorByCode(vendor);
-      // f.help / v.note carry trusted markup copied from onboarding — inject raw.
-      const flds = (v.fields||[]).map(f => `
-        <label class="sb-fld">
-          <span class="lab">${esc(f.label)}</span>
-          ${f.hint?`<span class="hint">${esc(f.hint)}</span>`:""}
-          <input type="text" autocomplete="off" spellcheck="false" data-name="${esc(f.name)}"
-                 placeholder="${esc(f.ph||"")}" value="${esc(fields[f.name]||"")}">
-          ${f.help?`<div class="help">${f.help}</div>`:""}
-        </label>`).join("");
-      fieldsBox.innerHTML = flds + (v.note ? `<div class="sb-vendnote">${v.note}</div>` : "");
-      fieldsBox.querySelectorAll("input[data-name]").forEach(inp => {
-        inp.oninput = () => { fields[inp.dataset.name] = inp.value; validate(); };
-      });
-      connectBtn.textContent = v.available ? (v.discover ? "Discover & connect" : "Connect array") : "Not available yet";
-      validate();
-    }
+    // Render the modal body for the current mode. Exposed via closure so the
+    // extension-present detector (handleCaptureLanded's sibling listener) can
+    // re-render the moment the helper announces itself.
+    renderAddModalBody = function(){
+      note.className = "sb-note"; note.textContent = "";
+      if(!manual){
+        // ── One-click login view (the lead path) ──
+        const loginBtns = LOGIN_VENDORS.map(code => `
+          <button type="button" class="sb-login-btn" data-login="${code}">
+            <span class="sb-login-brand sb-brand ${code}">${esc(BRAND[code]||code)}</span>
+            <span class="sb-login-cta">Log in with ${esc(BRAND[code]||code)} →</span>
+          </button>`).join("");
+        const extBlock = EXT_PRESENT
+          ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
+             <div class="sb-login-grid">${loginBtns}</div>`
+          : `<p class="sb-modal-lede">Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.</p>
+             <a class="sb-mbtn primary sb-login-install" href="${EXT_STORE_URL}" target="_blank" rel="noopener">Add the 1-click helper — free →</a>
+             <div class="sb-login-hint">Already added it? <button type="button" class="sb-linkbtn" id="sbRecheck">Re-check</button></div>`;
+        body.innerHTML = extBlock +
+          `<div class="sb-or"><span>or</span></div>
+           <button type="button" class="sb-mbtn ghost sb-manual-toggle" id="sbManualToggle">Enter keys manually instead</button>`;
+        foot.innerHTML = `<button class="sb-mbtn ghost" type="button" id="sbCancel">Close</button>`;
 
-    function validate(){
-      const v = vendorByCode(vendor);
-      if(!v.available){ connectBtn.disabled = true; return; }
-      let ok;
-      if(v.discover) ok = (fields.apiKey||"").trim().length > 3;
-      else ok = (v.fields||[]).every(f => /optional/i.test(f.label) || (fields[f.name]||"").trim().length > 0);
-      connectBtn.disabled = !ok;
+        body.querySelectorAll("[data-login]").forEach(b => {
+          b.onclick = () => openPortalLogin(b.dataset.login);
+        });
+        const recheck = body.querySelector("#sbRecheck");
+        if(recheck) recheck.onclick = () => extSend("SO_STATUS_REQUEST");
+        body.querySelector("#sbManualToggle").onclick = () => { manual = true; renderAddModalBody(); };
+      } else {
+        // ── Manual key-entry view (buried behind the button) ──
+        body.innerHTML = `
+          <button type="button" class="sb-linkbtn sb-back" id="sbBackToLogin">← Back to one-click login</button>
+          <p class="sb-modal-lede">Paste your monitoring credentials. SolarEdge unlocks every site on your account with one key; Locus, Fronius and SMA connect per array.</p>
+          <div class="sb-vendgrid" id="sbVendGrid"></div>
+          <div id="sbVendFields"></div>`;
+        foot.innerHTML = `
+          <button class="sb-mbtn ghost" type="button" id="sbCancel">Cancel</button>
+          <button class="sb-mbtn primary" type="button" id="sbConnect" disabled>Connect</button>`;
+        body.querySelector("#sbBackToLogin").onclick = () => { manual = false; renderAddModalBody(); };
+        wireManualFlow();
+        foot.querySelector("#sbConnect").onclick = submitConnect;
+      }
+      const cancel = foot.querySelector("#sbCancel");
+      if(cancel) cancel.onclick = closeAddModal;
+    };
+
+    // ---- manual flow (the original grid + fields + validate) ----
+    function wireManualFlow(){
+      const grid = body.querySelector("#sbVendGrid");
+      const fieldsBox = body.querySelector("#sbVendFields");
+      const connectBtn = foot.querySelector("#sbConnect");
+
+      function renderGrid(){
+        grid.innerHTML = VENDORS.map(vd => {
+          const sel = vd.code===vendor ? " sel" : "";
+          const soon = vd.available ? "" : " soon";
+          const tag = vd.discover ? `<span class="vtag">1 key</span>` : (vd.available ? "" : `<span class="vtag">soon</span>`);
+          return `<button type="button" class="sb-vend${sel}${soon}" data-code="${esc(vd.code)}" ${vd.available?"":'aria-disabled="true"'}>
+            ${tag}<span class="vn">${esc(vd.label)}</span><span class="vmeta">${esc(vd.meta||"")}</span>
+          </button>`;
+        }).join("");
+        grid.querySelectorAll(".sb-vend").forEach(b => {
+          b.onclick = () => {
+            const vd = vendorByCode(b.dataset.code);
+            if(!vd.available) return;
+            vendor = vd.code;
+            note.className = "sb-note"; note.textContent = "";
+            renderGrid(); renderFields();
+          };
+        });
+      }
+      function renderFields(){
+        const v = vendorByCode(vendor);
+        const flds = (v.fields||[]).map(f => `
+          <label class="sb-fld">
+            <span class="lab">${esc(f.label)}</span>
+            ${f.hint?`<span class="hint">${esc(f.hint)}</span>`:""}
+            <input type="text" autocomplete="off" spellcheck="false" data-name="${esc(f.name)}"
+                   placeholder="${esc(f.ph||"")}" value="${esc(fields[f.name]||"")}">
+            ${f.help?`<div class="help">${f.help}</div>`:""}
+          </label>`).join("");
+        fieldsBox.innerHTML = flds + (v.note ? `<div class="sb-vendnote">${v.note}</div>` : "");
+        fieldsBox.querySelectorAll("input[data-name]").forEach(inp => {
+          inp.oninput = () => { fields[inp.dataset.name] = inp.value; validate(); };
+        });
+        connectBtn.textContent = v.available ? (v.discover ? "Discover & connect" : "Connect array") : "Not available yet";
+        validate();
+      }
+      function validate(){
+        const v = vendorByCode(vendor);
+        if(!v.available){ connectBtn.disabled = true; return; }
+        let ok;
+        if(v.discover) ok = (fields.apiKey||"").trim().length > 3;
+        else ok = (v.fields||[]).every(f => /optional/i.test(f.label) || (fields[f.name]||"").trim().length > 0);
+        connectBtn.disabled = !ok;
+      }
+      renderGrid();
+      renderFields();
     }
 
     async function submitConnect(){
@@ -1471,70 +1588,59 @@
         note.innerHTML = `Please sign in first — <a href="onboarding.html">get started →</a>, then come back to add arrays.`;
         return;
       }
-      // build config (apiKey -> api_key), mirroring onboarding
       const config = {};
       (v.fields||[]).forEach(f => {
         const val = (fields[f.name]||"").trim();
         if(val) config[f.name==="apiKey" ? "api_key" : f.name] = val;
       });
-
-      let url, body;
+      let url, body2;
       if(vendor==="solaredge"){
         url = "/v1/array-owners/solaredge/connect-account";
-        body = { api_key: config.api_key };
+        body2 = { api_key: config.api_key };
       } else if(vendor==="locus" && (fields.partner_id||"").trim()){
         url = "/v1/array-owners/locus/connect-account";
-        body = { client_id: fields.client_id, client_secret: fields.client_secret,
+        body2 = { client_id: fields.client_id, client_secret: fields.client_secret,
                  username: fields.username, password: fields.password,
                  partner_id: parseInt(fields.partner_id, 10) };
       } else {
         url = "/v1/array-owners/connect-single";
-        body = { vendor, config };
+        body2 = { vendor, config };
       }
-
+      const connectBtn = foot.querySelector("#sbConnect");
       note.className = "sb-note";
       note.textContent = v.discover ? `Reaching your ${v.label} account…` : `Connecting your ${v.label} system…`;
-      connectBtn.disabled = true;
+      if(connectBtn) connectBtn.disabled = true;
       try{
         const r = await fetch(url, {
           method:"POST",
           headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+session },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body2)
         });
         let data = {}; try { data = await r.json(); } catch(e){}
         if(r.status===401){
           note.className = "sb-note err";
           note.innerHTML = `Your session expired — <a href="onboarding.html">sign in again →</a> to add this array.`;
-          connectBtn.disabled = false; return;
+          if(connectBtn) connectBtn.disabled = false; return;
         }
         const ok = r.ok && (data.connected || data.created || data.matched || data.ok || data.array_id);
-        if(ok){
-          closeAddModal();
-          load();   // re-fetch + re-render so the new array column appears immediately
-          return;
-        }
+        if(ok){ closeAddModal(); load(); return; }
         note.className = "sb-note err";
         note.textContent = (data && (data.message || data.detail)) ||
           `Couldn't connect that ${v.label} account (HTTP ${r.status}). Double-check the credentials and try again.`;
-        connectBtn.disabled = false;
+        if(connectBtn) connectBtn.disabled = false;
       }catch(err){
         note.className = "sb-note err";
         note.textContent = "We couldn't reach the connection service just now — check your network and try again.";
-        connectBtn.disabled = false;
+        const cb = foot.querySelector("#sbConnect"); if(cb) cb.disabled = false;
       }
     }
 
     ov.querySelector(".sb-modal-x").onclick = closeAddModal;
-    ov.querySelector("#sbCancel").onclick = closeAddModal;
-    connectBtn.onclick = submitConnect;
     ov.onclick = e => { if(e.target === ov) closeAddModal(); };
     _escH = e => { if(e.key==="Escape") closeAddModal(); };
     document.addEventListener("keydown", _escH);
 
-    renderGrid();
-    renderFields();
-    const first = ov.querySelector(".sb-vend");
-    if(first) try { first.focus(); } catch(e){}
+    renderAddModalBody();
   }
 
   /* ===========================================================================
