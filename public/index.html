@@ -25,10 +25,56 @@
   .theme-toggle:hover{color:var(--good);border-color:var(--good)}
   .theme-toggle .tt-ico{line-height:1;pointer-events:none}
   @media(max-width:600px){.theme-toggle{width:38px;height:38px;margin-left:2px}}
+
+  /* Demo onboarding banner — anonymous-visitor conversion bar. Sits above the
+     tab bar; gradient-accented so the "make your own account" CTA is the most
+     prominent thing on the page. Hidden by default (hidden attr); app.js shows
+     it only when there's no session. */
+  .demo-banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    justify-content:space-between;margin:18px 0 4px;padding:16px 20px;border-radius:16px;
+    border:1px solid rgba(245,185,66,.28);
+    background:linear-gradient(100deg,rgba(245,185,66,.10),rgba(94,194,255,.06) 60%,rgba(63,214,138,.05));
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
+  .demo-banner[hidden]{display:none}
+  .db-left{display:flex;align-items:center;gap:14px;flex:1 1 420px;min-width:0}
+  .db-badge{flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.16em;
+    color:var(--gold2);background:rgba(245,185,66,.14);border:1px solid rgba(245,185,66,.30);
+    padding:5px 9px;border-radius:999px;white-space:nowrap}
+  .db-copy{color:var(--muted);font-size:13.5px;line-height:1.45}
+  .db-copy b{color:var(--ink);font-weight:700}
+  .db-right{display:flex;align-items:center;gap:14px;flex:0 0 auto}
+  .db-cta{display:inline-block;font-size:14px;font-weight:750;color:#0a0e14;
+    background:linear-gradient(180deg,var(--gold2),var(--gold));
+    padding:11px 20px;border-radius:12px;text-decoration:none;white-space:nowrap;
+    box-shadow:0 6px 20px -6px rgba(245,185,66,.55);transition:transform .12s,box-shadow .12s,filter .12s}
+  .db-cta:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 9px 26px -7px rgba(245,185,66,.7)}
+  .db-cta:active{transform:translateY(0)}
+  .db-signin{font-size:13px;font-weight:650;color:var(--muted);text-decoration:none;white-space:nowrap}
+  .db-signin:hover{color:var(--ink)}
+  @media(max-width:600px){
+    .demo-banner{padding:14px 15px;gap:13px;margin:12px 0 2px}
+    .db-right{flex:1 1 100%}
+    .db-cta{flex:1 1 auto;text-align:center}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- DEMO ONBOARDING BANNER — shown ONLY to anonymous visitors (toggled by
+       renderFromSession in app.js). Tells them this is a live demo and gives a
+       big, unmissable path to make their own account. Hidden the moment a
+       session exists, so signed-in owners never see it. -->
+  <div class="demo-banner" id="demoBanner" role="region" aria-label="You're viewing a demo" hidden>
+    <div class="db-left">
+      <span class="db-badge">LIVE DEMO</span>
+      <span class="db-copy">This is a sample array, fully working. <b>Make it yours in 60 seconds</b> — connect your inverter and watch your real numbers land here.</span>
+    </div>
+    <div class="db-right">
+      <a class="db-cta" href="/onboarding">Make your own account →</a>
+      <a class="db-signin" href="/login">Sign in</a>
+    </div>
+  </div>
+
   <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>

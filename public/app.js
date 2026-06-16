@@ -654,6 +654,9 @@ function renderFromSession(){
   try { session = localStorage.getItem("so_session"); } catch(e){}
   // Surface a "Sign in" link to signed-out visitors (hidden once authed).
   try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
+  // Big demo→signup conversion banner: shown ONLY to anonymous visitors, hidden
+  // the instant a session exists so signed-in owners never see it.
+  try { const db = document.getElementById("demoBanner"); if(db) db.hidden = !!session; } catch(e){}
   // Signed-in identity chip (top-right): show which account this session is in.
   // One lightweight /v1/account read fills the email; hidden when signed out or
   // if the session is stale (so it never claims an account we can't confirm).
