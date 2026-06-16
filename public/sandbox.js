@@ -652,6 +652,8 @@
         <div></div>
         <div class="sb-head-actions">
           <div class="sb-head-btns">
+            <button class="sb-resetbtn" id="sbUndo" type="button" title="Undo the last inverter move (Ctrl/Cmd+Z)" disabled>↶ Undo</button>
+            <button class="sb-resetbtn" id="sbRedo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷ Redo</button>
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
@@ -798,6 +800,7 @@
 
     wireFullscreen(host);
     wireOrient(host);
+    wireUndoRedo(host);   // ↶ Undo / ↷ Redo for inverter moves (FleetStore history)
     wireExpandAll(host);  // "Show all inverters" — open/collapse every array's comb
     wireAddButton(host);
     wireNewArrayButton(host);
@@ -1616,6 +1619,39 @@
     if(!_fsBound){
       _fsBound = true;
       document.addEventListener("keydown", e => { if(e.key === "Escape") exitFs(); });
+    }
+  }
+
+  // ↶ Undo / ↷ Redo for inverter moves. The history lives in FleetStore (command-
+  // inverse for reassign/reorder; structural commits clear it). Buttons reflect
+  // canUndo/canRedo, and Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z are bound once globally.
+  let _undoKeysBound = false;
+  function syncUndoRedoButtons(){
+    const u = document.getElementById("sbUndo"), r = document.getElementById("sbRedo");
+    if(u) u.disabled = !(window.FleetStore && FleetStore.canUndo && FleetStore.canUndo());
+    if(r) r.disabled = !(window.FleetStore && FleetStore.canRedo && FleetStore.canRedo());
+  }
+  function wireUndoRedo(host){
+    const u = host.querySelector("#sbUndo"), r = host.querySelector("#sbRedo");
+    if(u) u.onclick = () => { if(window.FleetStore) FleetStore.undo(); };
+    if(r) r.onclick = () => { if(window.FleetStore) FleetStore.redo(); };
+    syncUndoRedoButtons();
+    if(!_undoKeysBound){
+      _undoKeysBound = true;
+      document.addEventListener("keydown", e => {
+        // Only when the Arrays tab / sandbox is on screen and not editing text.
+        if(!document.getElementById("sandbox")) return;
+        const tag = (e.target && e.target.tagName) || "";
+        if(/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (e.target && e.target.isContentEditable)) return;
+        const mod = e.metaKey || e.ctrlKey;
+        if(mod && (e.key === "z" || e.key === "Z")){
+          e.preventDefault();
+          if(window.FleetStore){ e.shiftKey ? FleetStore.redo() : FleetStore.undo(); }
+        } else if(mod && (e.key === "y" || e.key === "Y")){   // Ctrl+Y = redo (Windows convention)
+          e.preventDefault();
+          if(window.FleetStore) FleetStore.redo();
+        }
+      });
     }
   }
 
@@ -2650,6 +2686,7 @@
   if(window.FleetStore){
     FleetStore.subscribe((s, kind) => {
       if(kind === "triage" || kind === "live") return;   // its own kW ticker handles live motion
+      if(kind === "history"){ syncUndoRedoButtons(); return; }  // just refresh button state
       if(document.getElementById("sandbox")) renderFromStore();
     });
   }

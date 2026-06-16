@@ -67,10 +67,49 @@ window.FleetStore = (function(){
   let _invSeq = 1;             // unique inverter id allocator (demo + new)
 
   const subs = new Set();
-  // kind ∈ "load" | "fleet" | "triage" | "focus" — lets a subscriber ignore
-  // changes it doesn't care about (e.g. the fleet tree skips triage-only updates).
+  // kind ∈ "load" | "fleet" | "triage" | "focus" | "history" — lets a subscriber
+  // ignore changes it doesn't care about (e.g. the fleet tree skips triage-only).
   function subscribe(fn){ subs.add(fn); if(state.loaded){ try{ fn(state,"load"); }catch(e){} } return () => subs.delete(fn); }
   function notify(kind){ subs.forEach(fn => { try{ fn(state, kind||"fleet"); }catch(e){} }); }
+
+  /* ---- UNDO / REDO -----------------------------------------------------------
+   * Command-inverse history for the DRAG operations (reassign + reorder). These
+   * invert exactly (stable inverter/array ids) and their inverses call the same
+   * store mutators, so the backend stays in sync (each replays the real endpoint).
+   * Structural commits — createArray, deleteArray, resetLayout, and any fresh
+   * load/ingest — are BARRIERS that clear history, so we never offer a broken
+   * undo across an add/delete/reset. Each entry = { undo(), redo() } closures. */
+  const HISTORY_LIMIT = 100;
+  let _undoStack = [], _redoStack = [], _applyingHistory = false;
+  function pushHistory(entry){
+    if(_applyingHistory) return;            // don't record while replaying history
+    _undoStack.push(entry);
+    if(_undoStack.length > HISTORY_LIMIT) _undoStack.shift();
+    _redoStack = [];                        // a new action invalidates the redo branch
+    notify("history");
+  }
+  function clearHistory(){
+    if(_applyingHistory) return;
+    if(!_undoStack.length && !_redoStack.length) return;
+    _undoStack = []; _redoStack = [];
+    notify("history");
+  }
+  function canUndo(){ return _undoStack.length > 0; }
+  function canRedo(){ return _redoStack.length > 0; }
+  function undo(){
+    const e = _undoStack.pop(); if(!e) return;
+    _applyingHistory = true;
+    try { e.undo(); } finally { _applyingHistory = false; }
+    _redoStack.push(e);
+    notify("history");
+  }
+  function redo(){
+    const e = _redoStack.pop(); if(!e) return;
+    _applyingHistory = true;
+    try { e.redo(); } finally { _applyingHistory = false; }
+    _undoStack.push(e);
+    notify("history");
+  }
 
   function loadTriage(){ try { return JSON.parse(localStorage.getItem(TRIAGE_KEY))||{}; } catch(e){ return {}; } }
   function saveTriage(){ try { localStorage.setItem(TRIAGE_KEY, JSON.stringify(state.triage)); } catch(e){} }
@@ -198,11 +237,21 @@ window.FleetStore = (function(){
     const hit = findInv(invId); const dest = findArray(toArrayId);
     if(!hit || !dest) return;
     const { a:from, i } = hit;
-    from.inverters = from.inverters.filter(x => x!==i);
+    const fromArrayId = from.id;                          // capture origin for the inverse
+    const fromPos = from.inverters.indexOf(i);
+    from.inverters = from.inverters.filter(x => x !== i);
     const pos = Math.max(0, Math.min(position==null?dest.inverters.length:position, dest.inverters.length));
     dest.inverters.splice(pos, 0, i);
     recompute(from); recompute(dest);
     notify();
+    // Record an exact inverse (stable ids) for undo/redo. A move BACK to the same
+    // array is just a no-op origin; skip pushing history then.
+    if(String(fromArrayId) !== String(toArrayId)){
+      pushHistory({
+        redo: () => reassignInverter(invId, toArrayId, pos),
+        undo: () => reassignInverter(invId, fromArrayId, fromPos),
+      });
+    }
     if(isLive()){
       apiPost("/v1/array-owners/inverters/reassign",
               { inverter_id: invId, target_array_id: toArrayId, position: pos })
@@ -212,11 +261,20 @@ window.FleetStore = (function(){
 
   function reorderInverters(arrayId, orderedIds){
     const a = findArray(arrayId); if(!a) return;
+    const oldOrder = a.inverters.map(i => String(i.id));  // capture for the inverse
     const byId = new Map(a.inverters.map(i => [String(i.id), i]));
     const next = orderedIds.map(id => byId.get(String(id))).filter(Boolean);
     a.inverters.forEach(i => { if(!next.includes(i)) next.push(i); });
     a.inverters = next;
+    const newOrder = a.inverters.map(i => String(i.id));
     notify();
+    // Only record if the order actually changed.
+    if(oldOrder.join(",") !== newOrder.join(",")){
+      pushHistory({
+        redo: () => reorderInverters(arrayId, newOrder),
+        undo: () => reorderInverters(arrayId, oldOrder),
+      });
+    }
     if(isLive()){
       apiPost("/v1/array-owners/inverters/reorder", { array_id: arrayId, ordered_inverter_ids: orderedIds })
         .catch(() => refetch());
@@ -227,6 +285,7 @@ window.FleetStore = (function(){
     const id = "new-" + (_invSeq++);
     state.arrays.push({ id, name, region:"—", host:"", vendor:"", inverters:[] });
     notify();
+    clearHistory();   // structural commit — a barrier (drag history doesn't cross it)
     if(isLive()){ apiPost("/v1/array-owners/arrays", { name }).then(()=>refetch()).catch(()=>refetch()); }
     return id;
   }
@@ -237,6 +296,7 @@ window.FleetStore = (function(){
     if(state.arrays.length === before) return;            // nothing matched
     state.focus = state.focus.filter(f => String(f) !== String(id));
     notify();                                             // optimistic, sync cross-view update
+    clearHistory();   // structural commit — a barrier
     if(isLive()){
       apiDelete("/v1/array-owners/arrays/" + encodeURIComponent(id))
         .then(()=>refetch()).catch(()=>refetch());        // refetch re-ingests authoritative tree (reverts on failure)
@@ -244,6 +304,7 @@ window.FleetStore = (function(){
   }
 
   function resetLayout(){
+    clearHistory();   // server regroups everything — a barrier
     if(isLive()){ apiPost("/v1/array-owners/layout/reset").then(()=>refetch()).catch(()=>refetch()); }
     else { notify(); }   // demo has no server grouping to snap back to
   }
@@ -465,6 +526,7 @@ window.FleetStore = (function(){
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
+    undo, redo, canUndo, canRedo, clearHistory,
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,
     lastUpdate: () => _lastUpdate,
