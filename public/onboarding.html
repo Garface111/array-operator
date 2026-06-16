@@ -323,20 +323,30 @@ function onSolarEdgeCapture(d){
 
 function loginWithFronius(){ openPortalLogin("fronius", "https://www.solarweb.com/", "Fronius Solar.web"); }
 function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com/", "SMA Sunny Portal"); }
-// Chint/CPS is login-only (no key to paste). The extension capture is not yet
-// grounded against a live account, so guard with a timeout: if nothing lands or
-// fails (e.g. an older published extension with no chint support), resolve the
-// spinner honestly instead of hanging.
+// Chint/CPS is login-only (no key to paste). Capture works by reading the
+// portal's own data as it loads — which means the owner must OPEN each site so
+// its inverters load. We tell them that explicitly, and guard with a timeout so
+// the spinner resolves honestly if nothing lands.
 let _chintTimer = null;
 function loginWithChint(){
+  const emailOk = /.+@.+\..+/.test(state.email);
+  const nameOk = (state.name||"").trim().length >= 2;
+  if (!nameOk || !emailOk){
+    const scan = document.getElementById("scanArea");
+    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
+    return;
+  }
   openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
+  // Chint-specific instruction: the data loads only when the owner opens a site.
+  const scan = document.getElementById("scanArea");
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening Chint Power Monitor — sign in, then <b>click into each of your sites</b> so we can read its inverters. They'll appear here automatically.</div>`;
   if (_chintTimer) clearTimeout(_chintTimer);
   _chintTimer = setTimeout(() => {
-    const scan = document.getElementById("scanArea");
-    if (scan && /Opening Chint/.test(scan.innerHTML)) {
-      scan.innerHTML = `<div class="helper" style="color:var(--warn)">Chint/CPS support is in final verification against live accounts — if your inverters didn't appear, we don't have them fully automated just yet. Finish setup and we'll bring your Chint arrays in the moment it's ready.</div>`;
+    const s = document.getElementById("scanArea");
+    if (s && /Opening Chint|click into each/.test(s.innerHTML)) {
+      s.innerHTML = `<div class="helper" style="color:var(--warn)">Didn't see your Chint inverters yet — make sure you're signed in at monitor.chintpowersystems.com and <b>click into each site</b> (that's what loads its inverters). Then try again. Finish setup and we'll bring them in the moment they're read.</div>`;
     }
-  }, 95000);
+  }, 120000);
 }
 
 function openPortalLogin(vendor, url, label){
