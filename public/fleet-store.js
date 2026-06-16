@@ -124,9 +124,16 @@ window.FleetStore = (function(){
   }
   function focusIds(){ return state.focus.length ? state.focus.slice() : defaultFocusIds(); }
 
-  // default sandbox focus = the worst few sites (most flagged / biggest leak),
-  // so the tree opens on something worth looking at instead of 100 columns.
+  // Default sandbox focus.
+  // A REAL signed-in owner ALWAYS sees EVERY array — never a subset. Hiding any of
+  // an owner's real arrays reads as "the app forgot my arrays" (it never lost them;
+  // the data is persisted server-side). This is a hard product invariant.
+  // The "worst few" narrowing exists ONLY to keep the ANONYMOUS 100-array SIMULATED
+  // demo fleet from opening as 100 columns for a marketing visitor.
   function defaultFocusIds(){
+    // Real owner (signed-in, non-simulated): show all arrays, no exceptions.
+    if(!state.simulated) return state.arrays.map(a => a.id);
+    // Anonymous demo only: open on the worst few sites so it isn't 100 columns.
     const scored = state.arrays.map(a => {
       const flagged = a.inverters.filter(i=>i.status!=="ok").length;
       return { id:a.id, flagged };
