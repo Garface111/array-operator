@@ -10,9 +10,17 @@
 #commandCenter{ margin-top:18px; }
 
 /* ---- header ---- */
-.cc-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+.cc-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.cc-headmain{ min-width:0; }
 .cc-head h2{ font-size:21px; font-weight:760; letter-spacing:-.01em; color:var(--ink); }
 .cc-head .cc-sub{ color:var(--faint); font-size:13px; margin-top:2px; }
+/* one-line portfolio summary that replaces the old KPI box grid */
+.cc-summary{ font-size:15px; line-height:1.5; color:var(--muted); margin-top:6px; max-width:62ch; }
+.cc-summary b{ color:var(--ink); font-weight:720; font-variant-numeric:tabular-nums; }
+.cc-summary b.ok{ color:var(--good2); }
+.cc-summary b.warn{ color:var(--warn); }
+.cc-summary .cc-summary-sub{ color:var(--faint); font-size:13px; font-variant-numeric:tabular-nums; }
+.cc-summary .cc-summary-note{ display:block; color:var(--faint); font-size:12.5px; margin-top:3px; }
 .cc-asof{ color:var(--faint); font-size:12px; font-variant-numeric:tabular-nums; }
 .cc-asof b{ color:var(--good); }
 

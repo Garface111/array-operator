@@ -131,19 +131,12 @@
 
     h.innerHTML = `
       <div class="cc-head">
-        <div>
+        <div class="cc-headmain">
           <h2>Portfolio command center</h2>
+          <p class="cc-summary">Managing <b data-kpi="sites">${num(k.sites)}</b> arrays and <b data-kpi="inverters">${num(k.inverters)}</b> inverters — <b class="ok" data-kpi="healthy">${k.healthyPct}%</b> healthy, <b class="warn" data-kpi="flagged">${num(k.flagged)}</b> flagged (<span class="cc-summary-sub" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</span>).</p>
           <div class="cc-sub">${esc(simNote)}</div>
         </div>
         <div class="cc-asof" id="ccAsof">${asofText()}</div>
-      </div>
-
-      <div class="cc-kpis">
-        <div class="cc-kpi"><div class="k">Sites</div><div class="v" data-kpi="sites">${num(k.sites)}</div><div class="s">arrays under management</div></div>
-        <div class="cc-kpi"><div class="k">Inverters</div><div class="v" data-kpi="inverters">${num(k.inverters)}</div><div class="s">monitored across the fleet</div></div>
-        <div class="cc-kpi healthy"><div class="k">Healthy</div><div class="v" data-kpi="healthy">${k.healthyPct}%</div>
-          <div class="cc-meter"><i data-kpi="healthmeter" style="width:${k.healthyPct}%"></i></div></div>
-        <div class="cc-kpi flagged"><div class="k">Flagged now</div><div class="v" data-kpi="flagged">${num(k.flagged)}</div><div class="s" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</div></div>
       </div>`;
 
     // the triage queue (toolbar + table + foot) renders into its own container
