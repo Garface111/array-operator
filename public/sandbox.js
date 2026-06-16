@@ -140,6 +140,15 @@
         load();   // re-render the (now refreshed) store
         return;
       }
+      // A rotated/expired session surfaces as 401 OR 403 "Invalid or inactive
+      // tenant key" — guide the owner to re-auth instead of showing the raw error.
+      const authDead = r.status===401 ||
+        (r.status===403 && /tenant key|sign in|session/i.test((data && (data.detail||data.message))||""));
+      if(authDead){
+        try { localStorage.removeItem("so_session"); } catch(e){}
+        if(note){ note.className = "sb-note err"; note.innerHTML = `Your session expired — <a href="onboarding.html">sign in again →</a>, then reconnect. Your existing arrays are safe.`; }
+        return;
+      }
       if(note){ note.className = "sb-note err"; note.textContent = (data && (data.message||data.detail)) || `Couldn't bring in that ${BRAND[d.provider]||d.provider} account (HTTP ${r.status}).`; }
     }catch(err){
       if(note){ note.className = "sb-note err"; note.textContent = "We couldn't reach the connection service just now — check your network and try again."; }
@@ -1685,9 +1694,16 @@
           body: JSON.stringify(body2)
         });
         let data = {}; try { data = await r.json(); } catch(e){}
-        if(r.status===401){
+        // A dead/rotated session can surface as 401 OR as 403 "Invalid or inactive
+        // tenant key" (the backend falls through to the tenant-key auth path when
+        // the session token no longer verifies). Treat BOTH as "please sign in
+        // again" — never show the owner the raw tenant-key error.
+        const authDead = r.status===401 ||
+          (r.status===403 && /tenant key|sign in|session/i.test((data && (data.detail||data.message))||""));
+        if(authDead){
+          try { localStorage.removeItem("so_session"); } catch(e){}
           note.className = "sb-note err";
-          note.innerHTML = `Your session expired — <a href="onboarding.html">sign in again →</a> to add this array.`;
+          note.innerHTML = `Your session expired — <a href="onboarding.html">sign in again →</a> to add this array. Your existing arrays are safe.`;
           if(connectBtn) connectBtn.disabled = false; return;
         }
         const ok = r.ok && (data.connected || data.created || data.matched || data.ok || data.array_id);
