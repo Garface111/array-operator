@@ -441,42 +441,68 @@
   // a kWh figure formatted compactly for the Min/Cur/Max stat row
   function kwhFmt(v){ return v==null ? "—" : (v>=100 ? Math.round(v) : (Math.round(v*10)/10)); }
 
-  // A tiny status-tinted sparkline (no axis/labels) of one inverter's daily series,
-  // for the array card's at-a-glance "how's my whole array doing" strip. Zero-output
-  // days get a red dot. Falls back to a flat dim line when there's no history.
-  function miniSpark(daily, tone){
-    const w = 46, h = 18, pad = 2;
+  // ONE combined graph for the whole array: sum every inverter's daily kWh by date
+  // into a single series, then draw it full-width with an area fill + time axis.
+  // This is the ARRAY's own production history — "how's my array doing" at a glance —
+  // not a grid of per-inverter minis. Tone tracks the array's live output vs its
+  // combined rated capacity (green at/near max → amber → orange → idle when nothing
+  // is reporting). Days where the whole array made nothing get a red dot.
+  function arrayGraph(sortedInvs){
+    if(!sortedInvs || !sortedInvs.length) return "";
+    // aggregate daily kWh across all inverters, keyed by date
+    const byDate = new Map();
+    sortedInvs.forEach(inv => {
+      (inv.daily || []).forEach(d => {
+        if(!d || d.date == null) return;
+        const k = Math.max(0, +d.kwh || 0);
+        byDate.set(d.date, (byDate.get(d.date) || 0) + k);
+      });
+    });
+    // array-level live tone: combined current vs combined nameplate
+    let curW = 0, maxW = 0, anyReporting = false;
+    sortedInvs.forEach(inv => {
+      if(inv.nameplate_kw != null) maxW += inv.nameplate_kw * 1000;
+      if(inv.current_power_w != null){ curW += inv.current_power_w; anyReporting = true; }
+    });
+    const tone = (anyReporting && maxW) ? pctTone(Math.max(0, Math.min(100, Math.round((curW/maxW)*100)))) : "idle";
     const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "#ffb454" : tone === "idle" ? "var(--faint)" : "var(--good)";
-    if(!Array.isArray(daily) || daily.length < 2){
-      return `<svg class="sb-ag-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 2"/></svg>`;
+
+    // sort the summed series by date (ISO sorts naturally; demo "d-N" handled too)
+    const sortKey = s => {
+      if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+      const m = String(s).match(/d-?(\d+)/);
+      return m ? String(1e6 - (+m[1])).padStart(9,"0") : s;   // d-14 oldest → d-1 newest
+    };
+    const dates = [...byDate.keys()].sort((a,b)=> sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0);
+    if(dates.length < 2){
+      return `<div class="sb-ag"><div class="sb-ag-k">Array production · last 14 days</div>
+        <div class="sb-ag-nodata">history building — graph appears once 2+ days are stored</div></div>`;
     }
-    const vals = daily.map(d => Math.max(0, +d.kwh || 0));
+    const vals = dates.map(d => byDate.get(d));
+    const totalKwh = vals.reduce((s,v)=>s+v,0);
+    const w = 300, h = 56, pad = 4;
     const max = Math.max(...vals, 0.001);
     const X = i => pad + (i/(vals.length-1))*(w-2*pad);
     const Y = v => h-pad - (v/max)*(h-2*pad);
     const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="1.4" fill="var(--bad)"/>` : "").join("");
-    return `<svg class="sb-ag-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>${zeros}
-    </svg>`;
-  }
-  // The array card's at-a-glance grid: one mini status-tinted graph per inverter
-  // (sorted biggest-kW first, same order as the comb). Lets an owner read the whole
-  // array's health in one look without expanding it. `invs` already sorted by caller.
-  function arrayGlance(sortedInvs){
-    if(!sortedInvs || !sortedInvs.length) return "";
-    const cells = sortedInvs.map(inv => {
-      const maxW = inv.nameplate_kw!=null ? inv.nameplate_kw*1000 : null;
-      const curW = inv.current_power_w!=null ? inv.current_power_w : null;
-      const tone = (curW!=null && maxW)
-        ? pctTone(Math.max(0, Math.min(100, Math.round((curW/maxW)*100))))
-        : "idle";
-      const nm = inv.name!=null ? String(inv.name) : "";
-      return `<div class="sb-ag-cell ${tone}" title="${esc(nm)}">${miniSpark(inv.daily, tone)}</div>`;
-    }).join("");
+    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
+    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="2" fill="var(--bad)"/>` : "").join("");
+    const last = dates.length-1, mid = Math.floor(last/2);
+    const lo = _sparkTimeLabel(dates[0], last, 0);
+    const mp = _sparkTimeLabel(dates[mid], last, mid);
+    const hi = _sparkTimeLabel(dates[last], last, last);
+    const totalLbl = totalKwh >= 1000 ? `${(totalKwh/1000).toFixed(1)} MWh` : `${Math.round(totalKwh)} kWh`;
     return `<div class="sb-ag">
-      <div class="sb-ag-k">Inverters at a glance</div>
-      <div class="sb-ag-grid">${cells}</div>
+      <div class="sb-ag-head">
+        <span class="sb-ag-k">Array production · last ${dates.length} days</span>
+        <span class="sb-ag-total">${totalLbl}</span>
+      </div>
+      <svg class="sb-ag-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <polygon points="${area}" fill="${stroke}" opacity="0.13"/>
+        <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+        ${zeros}
+      </svg>
+      <div class="sb-spark-axis"><span>${esc(lo)}</span><span>${esc(mp)}</span><span>${esc(hi)}</span></div>
     </div>`;
   }
 
@@ -734,7 +760,7 @@
                 <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
               </div>
             </div>
-            ${arrayGlance(sortedInvs)}
+            ${arrayGraph(sortedInvs)}
           </div>
 
           <!-- Collapsible inverter comb — hidden until the array is expanded -->
@@ -1026,9 +1052,16 @@
       ? `<a class="sb-origin sb-dc-origin" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
       : "";
 
+    // Blown-up spark: clone the card's own rendered sparkline (already in the DOM)
+    // so the modal shows the same daily-output graph at a large size.
+    const sparkSrc = node.querySelector(".sb-spark-wrap");
+    const bigSpark = sparkSrc
+      ? `<div class="sb-dc-spark">${sparkSrc.outerHTML}</div>`
+      : `<div class="sb-dc-nospark">No output history yet</div>`;
+
     const card = el(`
-      <div class="sb-detail-card" role="dialog" aria-label="Inverter detail">
-        <button class="sb-dc-x" type="button" title="Dismiss" aria-label="Close detail">×</button>
+      <div class="sb-detail-card sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
+        <button class="sb-dc-x" type="button" title="Close" aria-label="Close detail">×</button>
         <div class="sb-dc-head">
           <div class="sb-dc-name">${esc(d.name)}</div>
           <div class="sb-dc-array">${esc(arrayName)}</div>
@@ -1036,19 +1069,37 @@
         <div class="sb-dc-now"><span class="sb-live-dot"></span><b class="dc-kw">${esc(liveStr)}</b></div>
         <div class="sb-dc-pill dc-pill ${sCls}">${esc(sLabel)}</div>
         <div class="sb-dc-lost" hidden><span class="sb-dc-lost-k">Lost so far</span><b class="dc-lost">$0</b></div>
+        ${bigSpark}
         <div class="sb-dc-rows">${rows}</div>
         ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
         ${originRow}
       </div>`);
-    card.querySelector(".sb-dc-x").onclick = () => {
-      card.remove();
+
+    const close = () => {
       _detailInvId = null;               // stop live updates for this card
       document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
+      host.classList.remove("sb-dc-open");
+      host.innerHTML = "";
+      document.removeEventListener("keydown", onKey);
       setDefaultFoot();
     };
+    const onKey = (e) => { if(e.key === "Escape") close(); };
+    card.querySelector(".sb-dc-x").onclick = close;
+
+    // Dimmed backdrop behind the centered modal; click-out closes.
+    const backdrop = el(`<div class="sb-dc-backdrop"></div>`);
+    backdrop.addEventListener("click", close);
+
     host.innerHTML = "";
+    // #sbWrap has a CSS transform (translateX(-50%)), which would make the modal's
+    // position:fixed center relative to #sbWrap instead of the viewport. Reparent
+    // the host to <body> while open so the backdrop + card center to the real
+    // viewport; close() puts it back so the default corner panel still anchors right.
+    if(host.parentElement !== document.body) document.body.appendChild(host);
+    host.classList.add("sb-dc-open");     // switches host to full-screen centering layer
+    host.appendChild(backdrop);
     host.appendChild(card);
-    makeDetailDraggable(host, card);     // owner can drag the card by its header
+    document.addEventListener("keydown", onKey);
     refreshDetailCard();                 // seed the live figures immediately
   }
 

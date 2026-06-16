@@ -312,15 +312,13 @@
     background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.018));text-align:left}
   .sb-array-body{display:flex;gap:14px;align-items:stretch}
 
-  /* at-a-glance per-inverter mini-graphs on the array card (whole-array health) */
+  /* ONE combined production graph for the whole array (sum of all its inverters) */
   .sb-ag{margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
-  .sb-ag-k{font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--faint);margin-bottom:8px}
-  .sb-ag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:7px}
-  .sb-ag-cell{border-radius:7px;padding:3px;border:1px solid var(--line);background:rgba(255,255,255,.02);transition:border-color .15s}
-  .sb-ag-cell.warn{border-color:rgba(255,160,70,.4);background:rgba(255,150,60,.05)}
-  .sb-ag-cell.bad{border-color:rgba(255,120,50,.5);background:rgba(255,110,44,.07)}
-  .sb-ag-cell.idle{opacity:.55}
-  .sb-ag-spark{display:block;width:100%;height:18px}
+  .sb-ag-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px}
+  .sb-ag-k{font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--faint)}
+  .sb-ag-total{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sb-ag-graph{display:block;width:100%;height:56px}
+  .sb-ag-nodata{font-size:9.5px;color:var(--faint);font-style:italic;padding:10px 0}
 
   /* LEFT inner column: array identity + where its data comes from */
   .sb-array-details{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
@@ -593,6 +591,38 @@
     background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -20px rgba(0,0,0,.85);
     animation:dcin .32s ease}
   @keyframes dcin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* ── Click-to-zoom: the detail becomes a large CENTERED, PINNED modal ── */
+  /* When open, the host turns into a full-viewport centering layer (above the
+     whole sandbox) holding a dimmed backdrop + the blown-up card. */
+  .sb-detail-host.sb-dc-open{position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;
+    margin:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px}
+  .sb-dc-backdrop{position:fixed;inset:0;background:rgba(2,6,12,.78);backdrop-filter:blur(4px);
+    animation:dcfade .22s ease;cursor:zoom-out}
+  @keyframes dcfade{from{opacity:0}to{opacity:1}}
+  /* the blown-up card itself — OPAQUE so the fleet behind doesn't show through */
+  .sb-detail-card.sb-dc-modal{position:relative;z-index:1;width:min(560px,92vw);
+    max-height:88vh;overflow:auto;padding:26px 30px 26px;border-radius:20px;
+    background:linear-gradient(165deg,var(--bg2),#0b0f17);
+    box-shadow:0 40px 110px -30px rgba(0,0,0,.9),0 0 0 1px rgba(63,214,138,.18);
+    animation:dcpop .26s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes dcpop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+  .sb-dc-modal .sb-dc-x{top:16px;right:18px;font-size:24px}
+  .sb-dc-modal .sb-dc-name{font-size:22px}
+  .sb-dc-modal .sb-dc-array{font-size:13px;margin-top:3px}
+  .sb-dc-modal .sb-dc-now{font-size:30px;margin:16px 0 12px}
+  .sb-dc-modal .sb-dc-pill{font-size:13px;padding:5px 13px;margin-bottom:16px}
+  .sb-dc-modal .sb-dc-rows{gap:9px}
+  .sb-dc-modal .sb-dc-row{font-size:14px}
+  .sb-dc-modal .sb-dc-diag{font-size:13.5px;margin-top:16px;padding-top:14px}
+  .sb-dc-modal .sb-dc-origin{margin-top:16px;padding-top:14px;font-size:13px}
+  /* blown-up daily-output graph inside the modal */
+  .sb-dc-spark{margin:6px 0 18px}
+  .sb-dc-spark .sb-spark-wrap{width:100%}
+  .sb-dc-spark .sb-inv-spark{width:100%;height:120px}
+  .sb-dc-spark .sb-spark-axis{font-size:11px;margin-top:4px}
+  .sb-dc-nospark{margin:8px 0 18px;padding:22px;border-radius:12px;border:1px dashed var(--line);
+    text-align:center;color:var(--muted);font-size:13px}
   .sb-dc-x{position:absolute;top:9px;right:10px;background:none;border:0;color:var(--faint);
     font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
   .sb-dc-x:hover{color:var(--ink)}
