@@ -400,6 +400,30 @@
     return `<div class="sb-pi"><div class="sb-pi-bar ${cls}" style="width:${pct}%"></div><span class="${cls}">${pi.toFixed(2)}</span></div>`;
   }
 
+  // Mini output graph for an inverter card: an SVG area-line of its daily kWh
+  // series (real backend telemetry for signed-in owners; synthetic for the demo
+  // fleet). Zero-output days get a red dot so a dead/quiet streak reads instantly.
+  // Returns "" when there's no series (then the card shows a "no history yet" note).
+  function invSpark(daily, statusCls){
+    if(!Array.isArray(daily) || daily.length < 2) return "";
+    const w = 132, h = 34, pad = 3;
+    const vals = daily.map(d => Math.max(0, +d.kwh || 0));
+    const max = Math.max(...vals, 0.001);
+    const stroke = statusCls === "bad" ? "var(--bad)" : statusCls === "warn" ? "var(--warn)" : "var(--good)";
+    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
+    const Y = v => h-pad - (v/max)*(h-2*pad);
+    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
+    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="1.8" fill="var(--bad)"/>` : "").join("");
+    return `<svg class="sb-inv-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points="${area}" fill="${stroke}" opacity="0.12"/>
+      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${zeros}
+    </svg>`;
+  }
+  // a kWh figure formatted compactly for the Min/Cur/Max stat row
+  function kwhFmt(v){ return v==null ? "—" : (v>=100 ? Math.round(v) : (Math.round(v*10)/10)); }
+
   // per-inverter vendor badge (smaller variant of the array brand chip) — empty if unknown
   function brandHTML(vendor){
     return (vendor && BRAND[vendor])
@@ -534,14 +558,26 @@
         brandChip = `<span class="sb-brand mixed" title="${esc(labels)}">mixed · ${esc(labels)}</span>`;
       }
 
-      // bottom comb — one prong per inverter (each individually drag-movable).
-      // The drag id is the REAL, server-known inv.inverter_id (stable DB id); the
-      // vendor badge is now per-inverter (inv.vendor), since an array can hold a
-      // mixed-vendor cohort after owner moves.
-      const teeth = invs.length ? invs.map(inv => {
+      // bottom comb — one card per inverter (each individually drag-movable).
+      // Sorted by SIZE (nameplate kW), biggest first, per Ford's design. The drag
+      // id is the REAL server-known inv.inverter_id; vendor badge is per-inverter.
+      const sortedInvs = invs.slice().sort((x, y) =>
+        (y.nameplate_kw || 0) - (x.nameplate_kw || 0) || String(x.name).localeCompare(String(y.name)));
+      const teeth = sortedInvs.length ? sortedInvs.map(inv => {
         const sCls = STATUS_CLASS[inv.status] || "ok";
         const np = inv.nameplate_kw!=null ? `${inv.nameplate_kw} kW` : "";
         const power = inv.current_power_w!=null ? `${(inv.current_power_w/1000).toFixed(2)} kW now` : "";
+        const curKw = inv.current_power_w!=null ? (inv.current_power_w/1000) : null;
+        // Min / Max are REAL lowest & highest DAILY kWh in the window (backend);
+        // Current is the live kW reading. Max also falls back to nameplate (rated
+        // ceiling) when there's no daily history yet.
+        const maxKwh = inv.peak_kwh!=null ? inv.peak_kwh : null;
+        const minKwh = inv.min_kwh!=null ? inv.min_kwh : null;
+        const spark = invSpark(inv.daily, sCls);
+        const isAlert = sCls !== "ok";
+        const alertLine = isAlert
+          ? `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`
+          : `<div class="sb-inv-alert ok">All good</div>`;
         return `
           <div class="sb-inv ${sCls}" tabindex="0" draggable="true"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
@@ -550,11 +586,17 @@
                data-np="${esc(np)}" data-win="${esc(inv.window_kwh!=null?inv.window_kwh+' kWh / 14d':'')}"
                data-mode="${esc(inv.last_mode||"")}" data-power="${esc(power)}"
                data-origin-url="${esc(inv.origin_url||"")}" data-origin-label="${esc(inv.origin_label||"")}">
-            <div class="sb-inv-dot"></div>
-            <div class="sb-inv-name">${esc(inv.name)}</div>
-            <div class="sb-inv-now" data-basew="${inv.current_power_w!=null?inv.current_power_w:''}"><span class="sb-live-dot"></span><b class="sb-now-val">${inv.current_power_w!=null?(inv.current_power_w/1000).toFixed(1):'—'}</b> kW now</div>
-            ${peerBar(inv.peer_index)}
-            <div class="sb-inv-status ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"")}</div>
+            <div class="sb-inv-top">
+              <div class="sb-inv-name">${esc(inv.name)}</div>
+              ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
+            </div>
+            ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
+            <div class="sb-inv-stats">
+              <div class="sb-inv-stat"><span class="sb-inv-stat-k">Min</span><b>${kwhFmt(minKwh)}</b></div>
+              <div class="sb-inv-stat cur"><span class="sb-inv-stat-k">Current</span><b class="sb-now-val" data-basew="${inv.current_power_w!=null?inv.current_power_w:''}">${curKw!=null?curKw.toFixed(1):'—'}</b><span class="sb-inv-stat-u">kW</span></div>
+              <div class="sb-inv-stat"><span class="sb-inv-stat-k">Max</span><b>${kwhFmt(maxKwh)}</b></div>
+            </div>
+            ${alertLine}
             ${brandHTML(inv.vendor)}
           </div>`;
       }).join("")

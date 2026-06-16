@@ -100,6 +100,7 @@ window.FleetStore = (function(){
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
         window_kwh: i.window_kwh, current_power_w: i.current_power_w,
+        daily: i.daily || [], min_kwh: i.min_kwh, peak_kwh: i.peak_kwh,
         last_mode: i.status==="dead" ? "SHUTDOWN" : i.status==="comm_gap" ? "" : "PRODUCING",
         vendor: a.vendor || "solaredge",
       })),
@@ -339,6 +340,7 @@ window.FleetStore = (function(){
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
         peer_index: inv.peer_index, status: inv.status, window_kwh: inv.window_kwh,
         current_power_w: inv.current_power_w, stale_hours: inv.stale_hours,
+        daily: inv.daily || [], min_kwh: inv.min_kwh, peak_kwh: inv.peak_kwh,
         diagnosis: inv.diagnosis || "",
       })),
     }));
@@ -370,10 +372,25 @@ window.FleetStore = (function(){
         else if(status==="comm_gap"){ pi=null; win=fair*(0.6+rng()*0.3); power=null; }
         else if(status==="dead"){ pi=null; win=0; power=0; }
         else if(status==="fault"){ pi=0.18+rng()*0.18; win=fair*pi; power=np*1000*0.12; }
+        // synthetic 14-day daily kWh series for the demo card graph (demo fleet only;
+        // a real signed-in owner gets the backend's real per-inverter daily series).
+        const fairDay = np * 4.6;            // a "fair" day's kWh for this nameplate
+        const daily = [];
+        for(let day=0; day<WINDOW_DAYS; day++){
+          let kwh;
+          if(status==="dead") kwh = day < WINDOW_DAYS-3 ? fairDay*(0.85+rng()*0.3) : 0;       // recently died
+          else if(status==="comm_gap") kwh = day < WINDOW_DAYS-2 ? fairDay*(0.8+rng()*0.3) : 0; // went quiet
+          else if(status==="underperforming") kwh = fairDay*(0.45+rng()*0.25);
+          else if(status==="fault") kwh = fairDay*(0.1+rng()*0.2);
+          else kwh = fairDay*(0.8+rng()*0.35);
+          daily.push({ date:`d-${WINDOW_DAYS-day}`, kwh: Math.round(kwh*10)/10 });
+        }
+        const kwhVals = daily.map(d=>d.kwh);
         inverters.push({
           id: _invSeq++, name:`Inverter ${j+1}`, model:`SE${np}K`, nameplate_kw:np,
           peer_index:pi, status, window_kwh:Math.round(win*10)/10,
           current_power_w: power==null?null:Math.round(power),
+          daily, min_kwh: Math.round(Math.min(...kwhVals)*10)/10, peak_kwh: Math.round(Math.max(...kwhVals)*10)/10,
           stale_hours: status==="comm_gap" ? Math.round(12+rng()*60) : (status==="dead"? Math.round(48+rng()*120):null),
           diagnosis: "",
         });
