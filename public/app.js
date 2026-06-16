@@ -684,22 +684,42 @@ function renderFromSession(){
   } catch(e){}
   const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
     `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
+  // Session expired / invalid → DON'T silently show demo (that made owners think
+  // their real arrays were "forgotten" when in fact they were just logged out by a
+  // server-side session-secret rotation). Clear the dead token and prompt re-auth.
+  const reauth = () => {
+    try { localStorage.removeItem("so_session"); } catch(e){}
+    const g = document.getElementById("grid");
+    if(g) g.innerHTML =
+      `<div class="empty">Your session expired — <a href="/login">sign back in</a> to see your arrays. ` +
+      `Your data is safe; you've just been signed out.</div>`;
+    try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = ""; } catch(e){}
+    try { const who = document.getElementById("tabWhoami"); if(who) who.style.display = "none"; } catch(e){}
+    try { const db = document.getElementById("demoBanner"); if(db) db.hidden = true; } catch(e){}
+  };
 
   if(session){
     fetch("/v1/array-owners/overview", { headers: { Authorization: "Bearer " + session } })
-      .then(r => { if(!r.ok) throw new Error("overview " + r.status); return r.json(); })
+      .then(r => {
+        // An invalid/expired session is an AUTH failure (401/403), not a data
+        // outage — handle it distinctly so we never paint demo over a logout.
+        if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
+        if(!r.ok) throw new Error("overview " + r.status);
+        return r.json();
+      })
       .then(o => {
         const arrays = o.arrays || [];
         if(!arrays.length){
-          // Signed in but nothing connected yet — fall back to demo so the page
-          // still tells the story, with a clear "demo" label via render().
-          return fetch("inverter-truth.json").then(r=>r.json()).then(render);
+          // Signed in, genuinely nothing connected yet — show the honest empty
+          // state, NOT demo (demo numbers on a real account read as fake data).
+          return empty();
         }
         render(adaptOverview(o));
       })
-      .catch(() => {
-        // Live fetch failed (expired session / network) — show the demo rather
-        // than a blank page; the marketing narrative still lands.
+      .catch((err) => {
+        if(err && err.auth){ reauth(); return; }   // expired session → re-auth prompt
+        // Transient (network / 5xx) — keep the page useful with demo rather than a
+        // blank panel, but only for NON-auth errors so a logout never shows demo.
         fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
       });
   } else {
