@@ -132,14 +132,11 @@
       } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint") && Array.isArray(d.sites) && d.sites.length){
         r = await fetch("/v1/array-owners/inverter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
-      } else if(d.provider === "gmp" && Array.isArray(d.accounts) && d.accounts.length){
+      } else if((d.provider === "gmp" || d.provider === "vec" || d.provider === "wec") && Array.isArray(d.accounts) && d.accounts.length){
+        // Utility-meter capture (GMP server-pull + VEC/WEC client-pull) all land
+        // as a per-account daily[] payload → the one proven utility-meter endpoint.
         r = await fetch("/v1/array-owners/utility-meter-capture",
-          { method:"POST", headers:hdr, body: JSON.stringify({ provider: "gmp", accounts: d.accounts }) });
-      } else if((d.provider === "vec" || d.provider === "wec") && d.host && d.auth_token){
-        // SmartHub utilities: the extension captured the owner's portal session
-        // (host + email + auth_token); the backend pulls generation server-side.
-        r = await fetch("/v1/array-owners/smarthub-meter-capture",
-          { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, host: d.host, email: d.email, auth_token: d.auth_token }) });
+          { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, accounts: d.accounts }) });
       } else {
         if(note){ note.className = "sb-note err"; note.textContent = `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
         return;
@@ -424,6 +421,36 @@
   // a kWh figure formatted compactly for the Min/Cur/Max stat row
   function kwhFmt(v){ return v==null ? "—" : (v>=100 ? Math.round(v) : (Math.round(v*10)/10)); }
 
+  // Live output bar: current power as a % of the inverter's MAX (rated nameplate).
+  // The bar fills to that %, and the card tints progressively orange the further
+  // current drifts BELOW max (full green at/near max → amber → deep orange when
+  // far below). Carries data-curw/data-maxw so the live ticker recomputes it in
+  // place each tick. When the inverter isn't reporting (night/offline) we show a
+  // dim idle bar rather than a false 0%-of-max alarm.
+  function pctTone(pct){
+    // pct 0..100 of max. >=80 green, scaling to deep orange near 0.
+    if(pct == null) return "idle";
+    if(pct >= 80) return "ok";
+    if(pct >= 55) return "warn";
+    return "bad";
+  }
+  function outputBar(inv){
+    const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
+    const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
+    const reporting = curW != null && maxW;
+    const pct = reporting ? Math.max(0, Math.min(100, Math.round((curW / maxW) * 100))) : null;
+    const tone = reporting ? pctTone(pct) : "idle";
+    const curKw = curW != null ? (curW / 1000) : null;
+    const maxKw = maxW != null ? (maxW / 1000) : null;
+    const label = reporting
+      ? `<b class="sb-ob-pct">${pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`
+      : `<span class="sb-ob-idle">not producing right now</span>`;
+    return `<div class="sb-outbar ${tone}" data-curw="${curW!=null?curW:''}" data-maxw="${maxW!=null?maxW:''}">
+      <div class="sb-ob-head"><span class="sb-ob-k">Output now</span>${label}</div>
+      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${reporting?pct:0}%"></div></div>
+    </div>`;
+  }
+
   // per-inverter vendor badge (smaller variant of the array brand chip) — empty if unknown
   function brandHTML(vendor){
     return (vendor && BRAND[vendor])
@@ -590,12 +617,19 @@
         const maxKwh = inv.peak_kwh!=null ? inv.peak_kwh : null;
         const minKwh = inv.min_kwh!=null ? inv.min_kwh : null;
         const spark = invSpark(inv.daily, sCls);
+        // output tone: live current vs rated max (nameplate) — drives the bar AND
+        // the whole-card orange tint. idle (not reporting) carries no alarm tint.
+        const _maxW = inv.nameplate_kw!=null ? inv.nameplate_kw*1000 : null;
+        const _curW = inv.current_power_w!=null ? inv.current_power_w : null;
+        const obTone = (_curW!=null && _maxW)
+          ? pctTone(Math.max(0, Math.min(100, Math.round((_curW/_maxW)*100))))
+          : "idle";
         const isAlert = sCls !== "ok";
         const alertLine = isAlert
           ? `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`
           : `<div class="sb-inv-alert ok">All good</div>`;
         return `
-          <div class="sb-inv ${sCls}" tabindex="0" draggable="true"
+          <div class="sb-inv ${sCls}" tabindex="0" draggable="true" data-tone="${obTone}"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
@@ -607,11 +641,7 @@
               ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
             </div>
             ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
-            <div class="sb-inv-stats">
-              <div class="sb-inv-stat"><span class="sb-inv-stat-k">Min</span><b>${kwhFmt(minKwh)}</b></div>
-              <div class="sb-inv-stat cur"><span class="sb-inv-stat-k">Current</span><b class="sb-now-val" data-basew="${inv.current_power_w!=null?inv.current_power_w:''}">${curKw!=null?curKw.toFixed(1):'—'}</b><span class="sb-inv-stat-u">kW</span></div>
-              <div class="sb-inv-stat"><span class="sb-inv-stat-k">Max</span><b>${kwhFmt(maxKwh)}</b></div>
-            </div>
+            ${outputBar(inv)}
             ${alertLine}
             ${brandHTML(inv.vendor)}
           </div>`;
@@ -763,14 +793,26 @@
   function startLiveTicker(){
     if(_liveTimer) clearInterval(_liveTimer);
     _liveTimer = setInterval(() => {
-      document.querySelectorAll("#sandbox .sb-inv-now").forEach(el => {
-        const base = parseFloat(el.dataset.basew);
-        if(!base) return;                          // not reporting → leave at — / 0
-        const drift = base * (1 + Math.sin(Date.now()/2600 + base) * 0.009 + (Math.random()-0.5)*0.006);
-        const v = el.querySelector(".sb-now-val");
-        if(!v) return;
-        v.textContent = (drift/1000).toFixed(1);
-        v.classList.remove("tick"); void v.offsetWidth; v.classList.add("tick");
+      document.querySelectorAll("#sandbox .sb-outbar").forEach(bar => {
+        const maxW = parseFloat(bar.dataset.maxw);
+        const base = parseFloat(bar.dataset.curw);
+        if(!maxW || !base) return;                 // idle / not reporting → leave as-is
+        // gently drift the live current around its last reading so the bar breathes
+        const cur = base * (1 + Math.sin(Date.now()/2600 + base) * 0.009 + (Math.random()-0.5)*0.006);
+        const pct = Math.max(0, Math.min(100, Math.round((cur/maxW)*100)));
+        const tone = pctTone(pct);
+        const fill = bar.querySelector(".sb-ob-fill");
+        if(fill) fill.style.width = pct + "%";
+        const pctEl = bar.querySelector(".sb-ob-pct");
+        if(pctEl) pctEl.textContent = pct + "%";
+        const curEl = bar.querySelector(".sb-ob-cur");
+        if(curEl) curEl.textContent = (cur/1000).toFixed(1);
+        // retone the bar + the whole card if the band changed
+        if(!bar.classList.contains(tone)){
+          bar.classList.remove("ok","warn","bad","idle"); bar.classList.add(tone);
+        }
+        const card = bar.closest(".sb-inv");
+        if(card && card.dataset.tone !== tone) card.dataset.tone = tone;
       });
       // peer-drop alert popups (floating cards + toasts) removed by request — the
       // triage queue in the command center is the home for "what needs a look".
