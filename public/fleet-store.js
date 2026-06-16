@@ -154,6 +154,11 @@ window.FleetStore = (function(){
       body: body!=null ? JSON.stringify(body) : "{}" })
       .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); });
   }
+  function apiDelete(path){
+    const s = getSession();
+    return fetch(path, { method:"DELETE", headers:{ "Authorization":"Bearer "+s } })
+      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); });
+  }
 
   function findArray(id){ return state.arrays.find(a => String(a.id)===String(id)); }
   function findInv(invId){
@@ -197,6 +202,18 @@ window.FleetStore = (function(){
     notify();
     if(isLive()){ apiPost("/v1/array-owners/arrays", { name }).then(()=>refetch()).catch(()=>refetch()); }
     return id;
+  }
+
+  function deleteArray(id){
+    const before = state.arrays.length;
+    state.arrays = state.arrays.filter(a => String(a.id) !== String(id));
+    if(state.arrays.length === before) return;            // nothing matched
+    state.focus = state.focus.filter(f => String(f) !== String(id));
+    notify();                                             // optimistic, sync cross-view update
+    if(isLive()){
+      apiDelete("/v1/array-owners/arrays/" + encodeURIComponent(id))
+        .then(()=>refetch()).catch(()=>refetch());        // refetch re-ingests authoritative tree (reverts on failure)
+    }
   }
 
   function resetLayout(){
@@ -404,7 +421,7 @@ window.FleetStore = (function(){
   return {
     subscribe, load, refetch,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
-    reassignInverter, reorderInverters, createArray, resetLayout,
+    reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,
