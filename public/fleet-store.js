@@ -270,9 +270,25 @@ window.FleetStore = (function(){
   function refetch(){
     const s = getSession(); if(!s) return Promise.resolve();
     return fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+s } })
-      .then(r => { if(!r.ok) throw 0; return r.json(); })
-      .then(t => { if(t.columns && t.columns.length) ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 }); })
-      .catch(()=>{});
+      .then(r => {
+        if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
+        if(!r.ok) throw 0;
+        return r.json();
+      })
+      // A signed-in owner's REAL tree — ingest it even when empty (no columns),
+      // so a freshly-added-but-still-empty array is reflected, NOT masked by demo.
+      .then(t => { ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 }); })
+      .catch((err)=>{ if(err && err.auth) onAuthExpired(); /* transient: keep current state */ });
+  }
+
+  // Session expired/invalid while signed in. Clear the dead token and flip the
+  // store to a signed-out state so views prompt re-auth instead of showing the
+  // simulated demo fleet over the owner's real (still-persisted) arrays.
+  function onAuthExpired(){
+    try { localStorage.removeItem(SESSION_KEY); } catch(e){}
+    state.arrays = []; state.simulated = false; state.authExpired = true;
+    state.loaded = true; state.focus = [];
+    notify("auth");
   }
 
   let _loading = false;
@@ -281,13 +297,27 @@ window.FleetStore = (function(){
     _loading = true;
     if(getSession()){
       fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+getSession() } })
-        .then(r => { if(!r.ok) throw 0; return r.json(); })
-        .then(t => {
-          if(t.columns && t.columns.length) ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
-          else ingest(simulateFleet(), { simulated:true, recovered:18450 });
+        .then(r => {
+          // 401/403 = expired/invalid session, NOT a data outage. Do not paint
+          // the simulated demo fleet over the owner's real arrays.
+          if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
+          if(!r.ok) throw 0;
+          return r.json();
         })
-        .catch(() => ingest(simulateFleet(), { simulated:true, recovered:18450 }));
+        .then(t => {
+          // Signed in → always show the owner's REAL tree, even if it's empty.
+          // Empty means "you haven't connected/added anything yet" (honest empty
+          // state), NEVER the fake 100-array demo — that's only for anon visitors.
+          ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
+        })
+        .catch((err) => {
+          if(err && err.auth){ onAuthExpired(); return; }
+          // Transient (network/5xx) for a signed-in owner: show an honest empty
+          // tree rather than a fake fleet that looks like their data changed.
+          ingest([], {});
+        });
     } else {
+      // Anonymous visitor (marketing/preview) — the simulated fleet tells the story.
       ingest(simulateFleet(), { simulated:true, recovered:18450 });
     }
   }
