@@ -18,7 +18,7 @@
   const SESSION_KEY = "so_session";
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
   const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
-  const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
+  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
@@ -35,6 +35,13 @@
         {name:"username", label:"SolarNOC username"},
         {name:"password", label:"SolarNOC password", secret:true},
         {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
+      ] },
+    { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack", available:true, discover:false,
+      note:"Sign in with your AlsoEnergy / PowerTrack portal login — the same username & password you use at hmi.alsoenergy.com. Add a Site ID to connect one site.",
+      fields:[
+        {name:"username", label:"AlsoEnergy username"},
+        {name:"password", label:"AlsoEnergy password", secret:true},
+        {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
       ] },
     { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:false,
       note:"Fronius Solar.web is a paid business API and isn't offered in the USA yet — US arrays may need the local LAN path. Enter your Solar.web keys to try the cloud connection.",

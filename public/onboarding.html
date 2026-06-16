@@ -239,6 +239,13 @@ const VENDORS = [
       {name:"password", label:"SolarNOC password", secret:true},
       {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
     ] },
+  { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack", available:true, discover:false,
+    note:"Sign in with your AlsoEnergy / PowerTrack portal login — the same username & password you use at hmi.alsoenergy.com. Add a Site ID to connect one site.",
+    fields:[
+      {name:"username", label:"AlsoEnergy username"},
+      {name:"password", label:"AlsoEnergy password", secret:true},
+      {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
+    ] },
   { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:false,
     note:"Fronius Solar.web is a paid business API and isn't offered in the USA yet — US arrays may need the local LAN path. Enter your Solar.web keys to try the cloud connection.",
     fields:[

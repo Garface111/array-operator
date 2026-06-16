@@ -24,7 +24,7 @@ window.LayoutView = (function(){
   const POS_KEY  = "ao_layout_positions_v1";     // { [arrayId]: {x,y} } in canvas pixels
 
   // Brand labels for the vendor chip — same set sandbox.js / fleet-store.js use.
-  const BRAND = { solaredge:"SolarEdge", locus:"Locus", fronius:"Fronius", sma:"SMA", chint:"Chint" };
+  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint" };
   // status → swatch class / owner-framed label (kept in step with sandbox.js).
   const STATUS_CLASS = { ok:"ok", underperforming:"warn", comm_gap:"warn", dead:"bad", fault:"bad" };
   const STATUS_LABEL = {
