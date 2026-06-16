@@ -600,29 +600,36 @@
   .sb-dc-backdrop{position:fixed;inset:0;background:rgba(2,6,12,.78);backdrop-filter:blur(4px);
     animation:dcfade .22s ease;cursor:zoom-out}
   @keyframes dcfade{from{opacity:0}to{opacity:1}}
-  /* the blown-up card itself — OPAQUE so the fleet behind doesn't show through */
-  .sb-detail-card.sb-dc-modal{position:relative;z-index:1;width:min(560px,92vw);
-    max-height:88vh;overflow:auto;padding:26px 30px 26px;border-radius:20px;
-    background:linear-gradient(165deg,var(--bg2),#0b0f17);
-    box-shadow:0 40px 110px -30px rgba(0,0,0,.9),0 0 0 1px rgba(63,214,138,.18);
+  /* the blown-up card: a transparent modal wrapper holding a CLONE of the small
+     .sb-inv card, scaled up. Just bigger — same fields, same layout. */
+  .sb-dc-modal{position:relative;z-index:1;
     animation:dcpop .26s cubic-bezier(.2,.9,.3,1.2)}
   @keyframes dcpop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
-  .sb-dc-modal .sb-dc-x{top:16px;right:18px;font-size:24px}
-  .sb-dc-modal .sb-dc-name{font-size:22px}
-  .sb-dc-modal .sb-dc-array{font-size:13px;margin-top:3px}
-  .sb-dc-modal .sb-dc-now{font-size:30px;margin:16px 0 12px}
-  .sb-dc-modal .sb-dc-pill{font-size:13px;padding:5px 13px;margin-bottom:16px}
-  .sb-dc-modal .sb-dc-rows{gap:9px}
-  .sb-dc-modal .sb-dc-row{font-size:14px}
-  .sb-dc-modal .sb-dc-diag{font-size:13.5px;margin-top:16px;padding-top:14px}
-  .sb-dc-modal .sb-dc-origin{margin-top:16px;padding-top:14px;font-size:13px}
-  /* blown-up daily-output graph inside the modal */
-  .sb-dc-spark{margin:6px 0 18px}
-  .sb-dc-spark .sb-spark-wrap{width:100%}
-  .sb-dc-spark .sb-inv-spark{width:100%;height:120px}
-  .sb-dc-spark .sb-spark-axis{font-size:11px;margin-top:4px}
-  .sb-dc-nospark{margin:8px 0 18px;padding:22px;border-radius:12px;border:1px dashed var(--line);
-    text-align:center;color:var(--muted);font-size:13px}
+  .sb-dc-modal .sb-dc-x{position:absolute;top:-14px;right:-14px;z-index:3;width:34px;height:34px;
+    border-radius:999px;background:var(--bg2);border:1px solid var(--line);color:var(--ink);
+    font-size:20px;line-height:1;cursor:pointer;box-shadow:0 8px 20px -8px rgba(0,0,0,.8)}
+  .sb-dc-modal .sb-dc-x:hover{color:var(--good);border-color:rgba(63,214,138,.5)}
+  /* the cloned inverter card, blown up. Override the 152px tooth width + bump the
+     inner type/elements so it reads as a large version of the exact same card. */
+  .sb-dc-bigcard .sb-inv{width:min(440px,90vw);padding:22px 24px;border-radius:18px;cursor:default;
+    background:linear-gradient(165deg,#10161f,#0b0f17);
+    box-shadow:0 40px 110px -30px rgba(0,0,0,.9),0 0 0 1px rgba(63,214,138,.18)}
+  /* keep the warm under-performance tint, but over an OPAQUE base so nothing shows through */
+  .sb-dc-bigcard .sb-inv[data-tone="warn"]{background:linear-gradient(165deg,rgba(255,150,60,.12),#12151b)}
+  .sb-dc-bigcard .sb-inv[data-tone="bad"]{background:linear-gradient(165deg,rgba(255,110,44,.16),#12141a)}
+  .sb-dc-bigcard .sb-inv:hover{transform:none}
+  .sb-dc-bigcard .sb-inv-name{font-size:21px}
+  .sb-dc-bigcard .sb-inv-size{font-size:15px}
+  .sb-dc-bigcard .sb-spark-wrap{margin:16px 0 6px}
+  .sb-dc-bigcard .sb-inv-spark{height:120px}
+  .sb-dc-bigcard .sb-spark-axis{font-size:12px;margin-top:5px}
+  .sb-dc-bigcard .sb-ob-k{font-size:11px}
+  .sb-dc-bigcard .sb-ob-pct{font-size:30px}
+  .sb-dc-bigcard .sb-ob-of{font-size:12px}
+  .sb-dc-bigcard .sb-ob-idle{font-size:13px}
+  .sb-dc-bigcard .sb-ob-track{height:12px;margin-top:4px}
+  .sb-dc-bigcard .sb-inv-alert{font-size:14px;margin-top:16px;padding:8px 12px;border-radius:10px}
+  .sb-dc-bigcard .sb-brand,.sb-dc-bigcard .sb-brandlink{font-size:13px;margin-top:14px}
   .sb-dc-x{position:absolute;top:9px;right:10px;background:none;border:0;color:var(--faint);
     font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
   .sb-dc-x:hover{color:var(--ink)}

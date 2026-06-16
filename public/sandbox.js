@@ -1052,28 +1052,21 @@
       ? `<a class="sb-origin sb-dc-origin" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
       : "";
 
-    // Blown-up spark: clone the card's own rendered sparkline (already in the DOM)
-    // so the modal shows the same daily-output graph at a large size.
-    const sparkSrc = node.querySelector(".sb-spark-wrap");
-    const bigSpark = sparkSrc
-      ? `<div class="sb-dc-spark">${sparkSrc.outerHTML}</div>`
-      : `<div class="sb-dc-nospark">No output history yet</div>`;
+    // BLOWN-UP CARD = an exact clone of the small inverter card, just bigger.
+    // Cloning the live .sb-inv node guarantees identical data + styling (name,
+    // size, spark, output bar, alert line, brand) — no separate layout to drift.
+    const clone = node.cloneNode(true);
+    clone.classList.remove("sel", "inv-dragging");
+    clone.removeAttribute("draggable");
+    clone.removeAttribute("tabindex");
+    clone.removeAttribute("style");
 
     const card = el(`
-      <div class="sb-detail-card sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
+      <div class="sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
         <button class="sb-dc-x" type="button" title="Close" aria-label="Close detail">×</button>
-        <div class="sb-dc-head">
-          <div class="sb-dc-name">${esc(d.name)}</div>
-          <div class="sb-dc-array">${esc(arrayName)}</div>
-        </div>
-        <div class="sb-dc-now"><span class="sb-live-dot"></span><b class="dc-kw">${esc(liveStr)}</b></div>
-        <div class="sb-dc-pill dc-pill ${sCls}">${esc(sLabel)}</div>
-        <div class="sb-dc-lost" hidden><span class="sb-dc-lost-k">Lost so far</span><b class="dc-lost">$0</b></div>
-        ${bigSpark}
-        <div class="sb-dc-rows">${rows}</div>
-        ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
-        ${originRow}
+        <div class="sb-dc-bigcard"></div>
       </div>`);
+    card.querySelector(".sb-dc-bigcard").appendChild(clone);
 
     const close = () => {
       _detailInvId = null;               // stop live updates for this card
@@ -1100,7 +1093,9 @@
     host.appendChild(backdrop);
     host.appendChild(card);
     document.addEventListener("keydown", onKey);
-    refreshDetailCard();                 // seed the live figures immediately
+    // The blown-up card is a static snapshot clone, so there's nothing for the
+    // live ticker to update in here — unbind it so refreshDetailCard() no-ops.
+    _detailInvId = null;
   }
 
   // Make the floating inverter detail card movable: drag it by its header. We move
