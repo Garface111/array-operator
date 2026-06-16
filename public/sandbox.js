@@ -69,7 +69,7 @@
     solaredge: "https://monitoring.solaredge.com/",
     fronius:   "https://www.solarweb.com/",
     sma:       "https://ennexos.sunnyportal.com/",
-    chint:     "https://solar.chintpower.com/",
+    chint:     "https://monitor.chintpowersystems.com/",
   };
   function extSend(type, extra){
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}

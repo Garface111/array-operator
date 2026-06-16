@@ -329,7 +329,7 @@ function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com
 // spinner honestly instead of hanging.
 let _chintTimer = null;
 function loginWithChint(){
-  openPortalLogin("chint", "https://solar.chintpower.com/", "Chint Connect");
+  openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
   if (_chintTimer) clearTimeout(_chintTimer);
   _chintTimer = setTimeout(() => {
     const scan = document.getElementById("scanArea");
