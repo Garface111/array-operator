@@ -886,16 +886,23 @@
   // ---- live output ticker: updates each card's "kW now" in place. With live
   // telemetry this reflects polled current_power_w; on demo data it drifts gently
   // (~1%) around the last-known value. Each tick also runs the peer-drop alert.
-  let _liveTimer = null;
+  let _liveTimer = null, _liveBeat = 0;
   function startLiveTicker(){
     if(_liveTimer) clearInterval(_liveTimer);
+    _liveBeat = 0;
     _liveTimer = setInterval(() => {
+      _liveBeat++;
+      const t = Date.now();
       document.querySelectorAll("#sandbox .sb-outbar").forEach(bar => {
         const maxW = parseFloat(bar.dataset.maxw);
         const base = parseFloat(bar.dataset.curw);
         if(!maxW || !base) return;                 // idle / not reporting → leave as-is
-        // gently drift the live current around its last reading so the bar breathes
-        const cur = base * (1 + Math.sin(Date.now()/2600 + base) * 0.009 + (Math.random()-0.5)*0.006);
+        // Smoothly breathe the live current around its last REAL reading every second.
+        // A slow continuous sine (no per-tick random jitter, so the 1s cadence glides
+        // instead of twitching) — paired with the CSS width/color transition this reads
+        // as a living, real-time bar while the actual number refreshes hourly underneath.
+        const phase = t/9000 + (base % 997);       // unique, slow per-inverter phase
+        const cur = base * (1 + Math.sin(phase) * 0.012);
         const pct = Math.max(0, Math.min(100, Math.round((cur/maxW)*100)));
         const tone = pctTone(pct);
         const fill = bar.querySelector(".sb-ob-fill");
@@ -911,11 +918,13 @@
         const card = bar.closest(".sb-inv");
         if(card && card.dataset.tone !== tone) card.dataset.tone = tone;
       });
-      // peer-drop alert popups (floating cards + toasts) removed by request — the
-      // triage queue in the command center is the home for "what needs a look".
-      refreshDataCards();      // keep live-metric data cards in step with the kW ticker
-      refreshDetailCard();     // keep the open inverter detail card (kW + lost-$) live too
-    }, 2600);
+      // The heavier per-card / detail-card recomputes don't need 1s resolution —
+      // run them every ~3rd beat so the 1-second bar animation stays cheap & smooth.
+      if(_liveBeat % 3 === 0){
+        refreshDataCards();      // keep live-metric data cards in step
+        refreshDetailCard();     // keep the open inverter detail card (kW + lost-$) live too
+      }
+    }, 1000);
   }
 
   // ---- live-output helpers (used by the detail card's "lost so far" $ math).

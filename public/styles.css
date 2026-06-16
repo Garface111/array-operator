@@ -276,13 +276,15 @@
   #sbWrap{position:relative;left:50%;transform:translateX(-50%);width:96vw;max-width:96vw;margin-top:10px;padding:22px 24px 24px;background:var(--card2);border:1px solid var(--line);border-radius:22px}
 
   /* ── Almost-full-screen sandbox: the Arrays tab is just the canvas + the pinned
-     commander card. Wider, taller, less chrome — glance at it and you understand. */
-  #sbWrap.sb-fullscreen{width:96vw;max-width:96vw;margin-top:8px;padding:10px 12px 12px;border-radius:16px}
+     commander card. Aligned to the centered content column (command-center.css
+     sets #sbWrap to width:100% of the centered .wrap) — no viewport breakout, so
+     nothing clips off the right edge. Taller viewport so the canvas dominates. */
+  #sbWrap.sb-fullscreen{margin-top:8px;padding:10px 12px 12px;border-radius:16px}
   #sbWrap.sb-fullscreen .sb-viewport{height:calc(100vh - 150px);min-height:520px}
 
-  /* ── PINNED FLEET COMMANDER — whole-fleet health at a glance ── */
-  #fleetCommander{position:relative;left:50%;transform:translateX(-50%);
-    width:96vw;max-width:96vw;margin:6px auto 4px}
+  /* ── PINNED FLEET COMMANDER — whole-fleet health at a glance, centered in the
+     same content column as the sandbox below it. ── */
+  #fleetCommander{width:100%;max-width:100%;margin:6px 0 4px}
   .fc-card{display:flex;align-items:center;gap:24px;padding:14px 22px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(165deg,#10161f,#0b0f17);
     box-shadow:0 18px 44px -26px rgba(0,0,0,.85)}
@@ -482,7 +484,7 @@
   .sb-ob-of .sb-ob-cur{color:var(--muted);font-weight:700}
   .sb-ob-idle{font-size:9px;color:var(--faint);font-style:italic}
   .sb-ob-track{height:7px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
-  .sb-ob-fill{height:100%;border-radius:999px;transition:width .6s ease,background .4s ease}
+  .sb-ob-fill{height:100%;border-radius:999px;transition:width 1s linear,background .6s ease}
   /* tone: green at/near max → amber → deep orange far below max → idle (offline) */
   .sb-outbar.ok   .sb-ob-pct{color:var(--good)}   .sb-outbar.ok   .sb-ob-fill{background:linear-gradient(90deg,#2fae6e,var(--good))}
   .sb-outbar.warn .sb-ob-pct{color:#ffb454}        .sb-outbar.warn .sb-ob-fill{background:linear-gradient(90deg,#e8932f,#ffb454)}
