@@ -50,8 +50,8 @@
         {name:"client_secret", label:"Client Secret", secret:true},
         {name:"system_id", label:"Plant / System ID"},
       ] },
-    { code:"chint", label:"Chint / CPS", meta:"CSV for now", available:false, discover:false,
-      note:"Chint/CPS has no public API yet, so there's nothing to paste — connect by uploading a production CSV from your dashboard after setup. We're tracking their FlexOM gateway for direct support." },
+    { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false,
+      note:"Chint/CPS has no key to paste — use the one-click 'Log in with Chint' option above. Support is in final verification against live accounts." },
   ];
   function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
@@ -69,6 +69,7 @@
     solaredge: "https://monitoring.solaredge.com/",
     fronius:   "https://www.solarweb.com/",
     sma:       "https://ennexos.sunnyportal.com/",
+    chint:     "https://solar.chintpower.com/",
   };
   function extSend(type, extra){
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
@@ -97,7 +98,7 @@
       if(d.provider === "solaredge" && d.apiKey){
         r = await fetch("/v1/array-owners/solaredge/connect-account",
           { method:"POST", headers:hdr, body: JSON.stringify({ api_key: d.apiKey }) });
-      } else if((d.provider === "fronius" || d.provider === "sma") && Array.isArray(d.sites) && d.sites.length){
+      } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint") && Array.isArray(d.sites) && d.sites.length){
         r = await fetch("/v1/array-owners/inverter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
       } else {
@@ -143,7 +144,7 @@
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
     }
-    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma"].includes(d.provider)) handleCaptureLanded(d);
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint"].includes(d.provider)) handleCaptureLanded(d);
     if(d.type === "SO_CAPTURE_FAILED"){
       const note = _ov && _ov.querySelector("#sbNote");
       if(note){
@@ -1535,8 +1536,8 @@
     const foot = ov.querySelector("#sbModalFoot");
     const note = ov.querySelector("#sbNote");
 
-    // Login-capable vendors (one-click via the helper). Chint stays manual/CSV.
-    const LOGIN_VENDORS = ["solaredge","fronius","sma"];
+    // Login-capable vendors (one-click via the helper).
+    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint"];
 
     // Render the modal body for the current mode. Exposed via closure so the
     // extension-present detector (handleCaptureLanded's sibling listener) can

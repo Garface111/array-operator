@@ -253,8 +253,8 @@ const VENDORS = [
       {name:"client_secret", label:"Client Secret", secret:true},
       {name:"system_id", label:"Plant / System ID"},
     ] },
-  { code:"chint", label:"Chint / CPS", meta:"CSV for now", available:false, discover:false,
-    note:"Chint/CPS has no public API yet, so there's nothing to paste — connect by uploading a production CSV from your dashboard after setup. We're tracking their FlexOM gateway for direct support." },
+  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:true, discover:false, loginOnly:true,
+    note:"New — sign into the Chint Connect monitoring portal you already use and the EnergyAgent helper reads your inverters automatically (no key to paste). Chint/CPS support is in final verification against live accounts." },
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
@@ -284,6 +284,8 @@ window.addEventListener("message", (e) => {
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onReadingsCapture(d, "fronius", "Fronius Solar.web");
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "sma") onReadingsCapture(d, "sma", "SMA Sunny Portal");
+  if (d.type === "SO_CAPTURE_LANDED" && d.provider === "chint") onReadingsCapture(d, "chint", "Chint Connect");
+  if (d.type === "SO_CAPTURE_FAILED") onCaptureFailed(d);
 });
 // The bridge announces at document_start (before this runs), so ask explicitly too.
 extSend("SO_STATUS_REQUEST");
@@ -321,6 +323,21 @@ function onSolarEdgeCapture(d){
 
 function loginWithFronius(){ openPortalLogin("fronius", "https://www.solarweb.com/", "Fronius Solar.web"); }
 function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com/", "SMA Sunny Portal"); }
+// Chint/CPS is login-only (no key to paste). The extension capture is not yet
+// grounded against a live account, so guard with a timeout: if nothing lands or
+// fails (e.g. an older published extension with no chint support), resolve the
+// spinner honestly instead of hanging.
+let _chintTimer = null;
+function loginWithChint(){
+  openPortalLogin("chint", "https://solar.chintpower.com/", "Chint Connect");
+  if (_chintTimer) clearTimeout(_chintTimer);
+  _chintTimer = setTimeout(() => {
+    const scan = document.getElementById("scanArea");
+    if (scan && /Opening Chint/.test(scan.innerHTML)) {
+      scan.innerHTML = `<div class="helper" style="color:var(--warn)">Chint/CPS support is in final verification against live accounts — if your inverters didn't appear, we don't have them fully automated just yet. Finish setup and we'll bring your Chint arrays in the moment it's ready.</div>`;
+    }
+  }, 95000);
+}
 
 function openPortalLogin(vendor, url, label){
   const scan = document.getElementById("scanArea");
@@ -357,6 +374,16 @@ function onReadingsCapture(d, vendor, label){
   state.realSites = true;
   state.totals = totalKw>0 ? { peak_power_kw: Math.round(totalKw*10)/10, annual_value_usd: 0 } : null;
   go(2);
+}
+
+// A readings-capture vendor gave up (e.g. not signed in, or — for Chint — the
+// extraction endpoints aren't grounded yet). Resolve the spinner with the real
+// reason instead of leaving it spinning.
+function onCaptureFailed(d){
+  if (d && d.provider === "chint" && _chintTimer){ clearTimeout(_chintTimer); _chintTimer = null; }
+  const scan = document.getElementById("scanArea");
+  const label = ({solaredge:"SolarEdge",fronius:"Fronius Solar.web",sma:"SMA Sunny Portal",chint:"Chint Connect"})[d && d.provider] || (d && d.provider) || "the portal";
+  if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">${label} didn't connect: ${(d && d.reason)||"unknown error"}. Make sure you're signed in on the portal tab, then click the login button again.</div>`;
 }
 
 const stepper = document.getElementById("stepper");
@@ -423,9 +450,11 @@ function connectScreen(){
   const btnLabel = v.discover ? "Discover my arrays →" : (v.available ? "Connect my array →" : "Choose another brand");
   const lede = v.discover
     ? "Paste a single SolarEdge account key and every array on your account propagates in automatically — no site IDs, no per-panel setup, no logging in five times."
-    : (v.available
-        ? `Enter your ${v.label} credentials and we'll connect your ${v.label} sites and start watching them.`
-        : `${v.label} doesn't offer a live connection yet.`);
+    : (v.loginOnly
+        ? `Sign into the ${v.label} monitoring portal you already use — no keys, no spreadsheets. Your inverters appear here on their own.`
+        : (v.available
+            ? `Enter your ${v.label} credentials and we'll connect your ${v.label} sites and start watching them.`
+            : `${v.label} doesn't offer a live connection yet.`));
 
   return `<div class="card animate">
     <h1>Connect once. We'll find them all.</h1>
@@ -485,6 +514,19 @@ function connectScreen(){
     </div>
     <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your SMA developer keys below —</div>` : ""}
 
+    ${v.code === "chint" ? (EXT_PRESENT ? `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ One-click connect — no API key needed</div>
+      <div class="s">Your EnergyAgent helper is installed. Click below, sign into your Chint Connect monitoring portal the way you always do, and your inverters appear here automatically.</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithChint()">Log in with Chint →</button>
+    </div>` : `
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ Connect Chint without hunting for keys</div>
+      <div class="s">Chint/CPS has no public API — but our free Chrome helper reads your inverters straight from your Chint Connect login. Add it, come back here, and your arrays appear on their own.</div>
+      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
+      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
+    </div>`) : ""}
+
     ${fieldsHtml}
     ${noteHtml}
 
@@ -492,7 +534,7 @@ function connectScreen(){
 
     <div class="row">
       <button class="btn btn-ghost" onclick="go(0)">← Back</button>
-      <button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="connectVendor()">${btnLabel}</button>
+      ${v.loginOnly ? "" : `<button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="connectVendor()">${btnLabel}</button>`}
     </div>
   </div>`;
 }
@@ -777,7 +819,7 @@ async function finish(){
           const v = vendorByCode(state.vendor);
           const hdr = {"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`};
           let conn, cd;
-          if(state.readingsCapture && (state.vendor==="fronius" || state.vendor==="sma")){
+          if(state.readingsCapture && (state.vendor==="fronius" || state.vendor==="sma" || state.vendor==="chint")){
             // Extension-captured readings (no key to attach) — ingest them so the
             // dashboard + sandbox comb populate the instant they sign in.
             conn = await fetch(`${API_BASE}/v1/array-owners/inverter-capture`, {
