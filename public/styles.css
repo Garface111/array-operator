@@ -504,6 +504,11 @@
   .sb-brand.locus{background:rgba(94,194,255,.14);color:var(--sky);border-color:rgba(94,194,255,.3)}
   .sb-brand.fronius{background:rgba(63,214,138,.14);color:var(--good);border-color:rgba(63,214,138,.3)}
   .sb-brand.sma{background:rgba(127,240,187,.12);color:var(--good2);border-color:rgba(63,214,138,.25)}
+  /* merged brand pill that is itself the portal deep link: keeps the vendor color
+     of .sb-brand above, but reads as clickable (pointer + subtle hover lift). */
+  a.sb-brandlink{text-decoration:none;cursor:pointer;
+    transition:border-color .12s,filter .12s,transform .12s}
+  a.sb-brandlink:hover{filter:brightness(1.12);border-color:var(--good);transform:translateY(-1px)}
 
   /* ===== Drag-to-rearrange columns ===== */
   .sb-array{position:relative}

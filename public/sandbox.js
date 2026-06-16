@@ -461,19 +461,40 @@
   // Render column.origin_links when the backend supplies them; otherwise fall
   // back to a single base portal link derived from PORTAL_URL keyed by the array's
   // vendor (or the first of its vendors[]). Empty string when nothing resolves.
-  function originLinksHTML(col){
+  // Resolve the deep-link rows for a column: backend-supplied origin_links when
+  // present, else a single base portal link derived from PORTAL_URL keyed by the
+  // array's vendor (or the first of its vendors[]). Returns [] when nothing resolves.
+  function originLinks(col){
     let links = Array.isArray(col.origin_links) ? col.origin_links.slice() : [];
     if(!links.length){
       const v = col.vendor || (Array.isArray(col.vendors) && col.vendors[0]) || "";
       const url = PORTAL_URL[v];
       if(url) links = [{ vendor:v, label: BRAND[v] || v, url }];
     }
+    return links;
+  }
+  function originLinksHTML(col){
+    const links = originLinks(col);
     if(!links.length) return "";
     const rows = links.map(l => {
       const label = l.label || BRAND[l.vendor] || l.vendor || "portal";
       return `<a class="sb-origin" href="${esc(l.url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
     }).join("");
     return `<div class="sb-origins">${rows}</div>`;
+  }
+  // Single merged brand pill for a single-vendor array: a vendor-COLORED pill that
+  // is ITSELF the portal link ("Open in SolarEdge ↗") when a URL resolves, else a
+  // plain non-clickable brand pill. Returns "" when col has no single vendor.
+  function brandLinkHTML(col){
+    if(!col.vendor) return "";
+    const v = col.vendor;
+    const label = BRAND[v] || v;
+    const links = originLinks(col);
+    const url = links.length ? links[0].url : "";
+    if(url){
+      return `<a class="sb-brand sb-brandlink ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
+    }
+    return `<span class="sb-brand ${esc(v)}">${esc(label)}</span>`;
   }
   // refresh the "N inverters" count on a column from its live card count
   function updateColCount(col){
@@ -541,18 +562,13 @@
       const aCls = ALERT_CLASS[a.level] || "ok";
       const isOpen = expanded.has(String(col.array_id));
       const invs = col.inverters || [];
-      const srcTag = (col.inverter_source === "live" || col.inverter_source === "solaredge")
-        ? `<span class="sb-srctag live">live · per-inverter</span>`
-        : col.inverter_source === "array"
-          ? `<span class="sb-srctag">array-level</span>`
-          : col.inverter_count > 0
-            ? `<span class="sb-srctag live">live · per-inverter</span>`
-            : `<span class="sb-srctag off">empty</span>`;
-      // tier-2 chip: single vendor when uniform, else a "mixed" chip listing the vendors
-      // present (a column can now hold mixed-vendor inverters after owner moves).
+      // tier-2 chip:
+      //  - single vendor → ONE merged, vendor-colored, clickable brand pill that
+      //    is itself the portal link ("Open in SolarEdge ↗"); see brandLinkHTML.
+      //  - mixed vendors → a "mixed · …" chip (origin link(s) render beneath it).
       let brandChip = "";
       if(col.vendor){
-        brandChip = `<span class="sb-brand ${esc(col.vendor)}">${esc(BRAND[col.vendor] || col.vendor)}</span>`;
+        brandChip = brandLinkHTML(col);
       } else if(Array.isArray(col.vendors) && col.vendors.length){
         const labels = col.vendors.map(v => BRAND[v] || v).join(" · ");
         brandChip = `<span class="sb-brand mixed" title="${esc(labels)}">mixed · ${esc(labels)}</span>`;
@@ -615,8 +631,8 @@
               <div class="sb-array-details">
                 <div class="sb-array-k">Array</div>
                 <div class="sb-array-name">${esc(col.array_name)}</div>
-                <div class="sb-array-meta">${srcTag} ${brandChip}</div>
-                ${originLinksHTML(col)}
+                <div class="sb-array-meta">${brandChip}</div>
+                ${col.vendor ? "" : originLinksHTML(col)}
                 <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"
                         title="Show or hide this array's inverters">
                   <span class="sb-inv-toggle-chev" aria-hidden="true">▸</span>
