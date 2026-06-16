@@ -1,24 +1,31 @@
 /* ============================================================================
  * Array Operator — Sandbox view (sandbox.js)
  *
- * Renders the three-tier fleet structure that mirrors the backend data model:
+ * Renders the fleet as one ARRAY CARD per column. Each card has a two-column body:
  *
- *     Alerts   (top row)    — one per array, rolled-up worst inverter state
- *       │
- *     Arrays   (middle row) — one column per array
- *       │
- *     Inverters(bottom row) — the "comb": N real inverter prongs per array
+ *     ┌─ Array card ─────────────────────────────────┐
+ *     │  Array details        │  Alerts              │
+ *     │  name · N inverters   │  rolled-up headline  │
+ *     │  live tag · brand     │  count flagged       │
+ *     │  origin site links ↗  │  (tinted ok/warn/bad)│
+ *     │  [{n} inverters ▸]    │                      │
+ *     └───────────────────────┴──────────────────────┘
+ *           └─ collapsible inverter comb (hidden until expanded) ─┐
+ *              N real inverter prongs + SVG feeder wires          │
  *
- * Top controls bottom: each Alert sits above its Array, each Array fans out to
- * its inverters. Data: GET /v1/array-owners/fleet-tree (live SolarEdge per-
- * inverter telemetry, peer-analyzed within each site). The organization of this
- * canvas IS the schema: Tenant → Array → Inverter, with alerts riding on top.
+ * The array card is the clean main view; its inverter comb is COLLAPSED by
+ * default and expands per-array (persisted to localStorage). The alert that used
+ * to ride on a separate top tier now lives in the card's right inner column.
+ * Data: GET /v1/array-owners/fleet-tree (live per-inverter telemetry, peer-
+ * analyzed within each site; origin_links deep-link to the vendor portal). The
+ * organization of this canvas IS the schema: Tenant → Array → Inverter.
  * ==========================================================================*/
 (function(){
   const SESSION_KEY = "so_session";
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
   const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
-  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint" };
+  const EXPAND_KEY = "ao_array_expanded";    // persisted set of array_ids whose inverter comb is expanded (JSON array)
+  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
@@ -77,6 +84,7 @@
     fronius:   "https://www.solarweb.com/",
     sma:       "https://ennexos.sunnyportal.com/",
     chint:     "https://monitor.chintpowersystems.com/",
+    gmp:       "https://greenmountainpower.com/",
   };
   function extSend(type, extra){
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
@@ -117,17 +125,21 @@
       } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint") && Array.isArray(d.sites) && d.sites.length){
         r = await fetch("/v1/array-owners/inverter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
+      } else if(d.provider === "gmp" && Array.isArray(d.accounts) && d.accounts.length){
+        r = await fetch("/v1/array-owners/utility-meter-capture",
+          { method:"POST", headers:hdr, body: JSON.stringify({ provider: "gmp", accounts: d.accounts }) });
       } else {
         if(note){ note.className = "sb-note err"; note.textContent = `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
         return;
       }
       data = {}; try { data = await r.json(); } catch(e){}
-      const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured);
+      const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured || data.accounts_captured);
+      const isMeter = d.provider === "gmp";
       if(ok){
         // Pull the freshly-attached array(s) from the server and re-render the
         // tree. load() short-circuits when the store is already loaded (it is, on
         // the dashboard), so we must force a real re-fetch.
-        if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Bringing your inverters onto the canvas…`; }
+        if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Bringing your ${isMeter?"meter production":"inverters"} onto the canvas…`; }
         try {
           if(window.FleetStore && FleetStore.refetch){
             await FleetStore.refetch();
@@ -143,8 +155,19 @@
         } catch(e){}
         closeAddModal();
         if(typeof toast === "function"){
-          const n = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
-          toast(n ? `Connected — ${n} inverter${n===1?"":"s"} live on your canvas.` : `Connected — your inverters are on the canvas.`, "ok");
+          if(isMeter){
+            // Utility-meter capture: count accounts that actually had solar
+            // production vs. ones with no generation (honest — don't imply solar
+            // where there's none).
+            const accts = Array.isArray(data.accounts) ? data.accounts : [];
+            const withGen = accts.filter(a => a.has_generation).length;
+            const noGen = accts.length - withGen;
+            if(withGen) toast(`Connected — ${withGen} GMP account${withGen===1?"":"s"} with solar production on your canvas${noGen?` (${noGen} had no solar)`:""}.`, "ok");
+            else toast(noGen ? `Connected GMP — but ${noGen} account${noGen===1?"":"s"} showed no solar production yet.` : `Connected your GMP meter data.`, "ok");
+          } else {
+            const n = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
+            toast(n ? `Connected — ${n} inverter${n===1?"":"s"} live on your canvas.` : `Connected — your inverters are on the canvas.`, "ok");
+          }
         }
         load();   // re-render the (now refreshed) store
         return;
@@ -169,7 +192,7 @@
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
     }
-    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint"].includes(d.provider)) handleCaptureLanded(d);
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp"].includes(d.provider)) handleCaptureLanded(d);
     if(d.type === "SO_CAPTURE_FAILED"){
       const note = _ov && _ov.querySelector("#sbNote");
       if(note){
@@ -370,6 +393,38 @@
     return (vendor && BRAND[vendor])
       ? `<span class="sb-brand sb-inv-brand ${esc(vendor)}">${esc(BRAND[vendor])}</span>` : "";
   }
+
+  // ---- per-array expanded state (which inverter combs are open) ----
+  // Persisted as a JSON array of array_id strings under EXPAND_KEY; collapsed is
+  // the default so the array cards stay the clean main view.
+  function getExpandedSet(){
+    try {
+      const a = JSON.parse(localStorage.getItem(EXPAND_KEY) || "[]");
+      return new Set(Array.isArray(a) ? a.map(String) : []);
+    } catch(e){ return new Set(); }
+  }
+  function saveExpandedSet(set){
+    try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...set])); } catch(e){}
+  }
+
+  // ---- origin-site deep links for an array's "Array details" column ----
+  // Render column.origin_links when the backend supplies them; otherwise fall
+  // back to a single base portal link derived from PORTAL_URL keyed by the array's
+  // vendor (or the first of its vendors[]). Empty string when nothing resolves.
+  function originLinksHTML(col){
+    let links = Array.isArray(col.origin_links) ? col.origin_links.slice() : [];
+    if(!links.length){
+      const v = col.vendor || (Array.isArray(col.vendors) && col.vendors[0]) || "";
+      const url = PORTAL_URL[v];
+      if(url) links = [{ vendor:v, label: BRAND[v] || v, url }];
+    }
+    if(!links.length) return "";
+    const rows = links.map(l => {
+      const label = l.label || BRAND[l.vendor] || l.vendor || "portal";
+      return `<a class="sb-origin" href="${esc(l.url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
+    }).join("");
+    return `<div class="sb-origins">${rows}</div>`;
+  }
   // refresh the "N inverters" count on a column from its live card count
   function updateColCount(col){
     const n = col.querySelectorAll(".sb-teeth .sb-inv").length;
@@ -429,9 +484,11 @@
         </div>
       </div>`;
 
+    const expanded = getExpandedSet();   // which arrays have their inverter comb open
     const columns = cols.map(col => {
       const a = col.alert || {level:"ok"};
       const aCls = ALERT_CLASS[a.level] || "ok";
+      const isOpen = expanded.has(String(col.array_id));
       const invs = col.inverters || [];
       const srcTag = (col.inverter_source === "live" || col.inverter_source === "solaredge")
         ? `<span class="sb-srctag live">live · per-inverter</span>`
@@ -464,7 +521,8 @@
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
                data-np="${esc(np)}" data-win="${esc(inv.window_kwh!=null?inv.window_kwh+' kWh / 14d':'')}"
-               data-mode="${esc(inv.last_mode||"")}" data-power="${esc(power)}">
+               data-mode="${esc(inv.last_mode||"")}" data-power="${esc(power)}"
+               data-origin-url="${esc(inv.origin_url||"")}" data-origin-label="${esc(inv.origin_label||"")}">
             <div class="sb-inv-dot"></div>
             <div class="sb-inv-name">${esc(inv.name)}</div>
             <div class="sb-inv-now" data-basew="${inv.current_power_w!=null?inv.current_power_w:''}"><span class="sb-live-dot"></span><b class="sb-now-val">${inv.current_power_w!=null?(inv.current_power_w/1000).toFixed(1):'—'}</b> kW now</div>
@@ -475,26 +533,37 @@
       }).join("")
         : `<div class="sb-comb-empty">Empty array — drag inverters here</div>`;
 
+      const n = col.inverter_count;
+      const countLbl = `${n} inverter${n===1?'':'s'}`;
       return `
-        <div class="sb-col" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
-          <!-- TIER 1: Alert -->
-          <div class="sb-alert ${aCls}">
-            <div class="sb-alert-k">Alerts</div>
-            <div class="sb-alert-h">${esc(a.headline||"All clear")}</div>
-            <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
-          </div>
-          <div class="sb-link v1 ${aCls}"></div>
-
-          <!-- TIER 2: Array (this node is the column drag handle) -->
+        <div class="sb-col${isOpen?' expanded':''}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
+          <!-- ARRAY CARD: two inner columns — details (left) + alerts (right).
+               The grip (⠿) is the whole-column reorder handle. -->
           <div class="sb-array">
             <span class="sb-drag" draggable="true" role="button" title="Drag this grip to reorder the array">⠿</span>
-            <div class="sb-array-k">Array</div>
-            <div class="sb-array-name">${esc(col.array_name)}</div>
-            <div class="sb-array-meta"><span class="sb-array-count">${col.inverter_count} inverter${col.inverter_count===1?'':'s'}</span> ${srcTag} ${brandChip}</div>
+            <div class="sb-array-body">
+              <!-- LEFT: array identity + where its data comes from -->
+              <div class="sb-array-details">
+                <div class="sb-array-k">Array</div>
+                <div class="sb-array-name">${esc(col.array_name)}</div>
+                <div class="sb-array-meta">${srcTag} ${brandChip}</div>
+                ${originLinksHTML(col)}
+                <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"
+                        title="Show or hide this array's inverters">
+                  <span class="sb-inv-toggle-chev" aria-hidden="true">▸</span>
+                  <span class="sb-array-count">${countLbl}</span>
+                </button>
+              </div>
+              <!-- RIGHT: rolled-up alert for THIS array (colour by level) -->
+              <div class="sb-alert ${aCls}">
+                <div class="sb-alert-k">Alerts</div>
+                <div class="sb-alert-h">${esc(a.headline||"All clear")}</div>
+                <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
+              </div>
+            </div>
           </div>
-          <div class="sb-link v2"></div>
 
-          <!-- TIER 3: Inverters comb -->
+          <!-- Collapsible inverter comb — hidden until the array is expanded -->
           <div class="sb-comb">
             <div class="sb-teeth">${teeth}</div>
           </div>
@@ -522,6 +591,7 @@
     wireResetButton(host);
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
+    wireInvToggle(host);  // expand/collapse each array's inverter comb (persisted)
     applyRenames(host);   // re-apply owner inline renames (array & inverter names)
     wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
@@ -540,6 +610,9 @@
   function drawFleetConnectors(host){
     const root = (host && host.querySelectorAll) ? host : document;
     root.querySelectorAll(".sb-comb").forEach(comb => {
+      // skip collapsed arrays — their teeth are display:none and unmeasurable
+      const ownerCol = comb.closest(".sb-col");
+      if(ownerCol && !ownerCol.classList.contains("expanded")) return;
       const teeth = comb.querySelector(".sb-teeth");
       if(!teeth) return;
       const invs = [...teeth.querySelectorAll(".sb-inv")];
@@ -613,89 +686,15 @@
     }, 2600);
   }
 
-  // ---- auto-alert: flag an inverter that drops beneath its array peers by a
-  // significant margin. Specific output (live kW / nameplate kW) is compared to
-  // the array's peer median; more than PEER_DROP_MARGIN below it -> alarm. Driven
-  // by live telemetry in production, by the demo ticker here. State-tracked so it
-  // fires once per drop event (never spams) and clears on recovery.
-  const PEER_DROP_MARGIN = 0.25;
-  const _dismissed = new Set();        // alert keys the user dismissed (re-armed on recovery)
-  let _dropInit = false;               // first pass seeds the baseline silently
+  // ---- live-output helpers (used by the detail card's "lost so far" $ math).
+  // The floating peer-drop alert cards that once also used these were removed —
+  // each array's rolled-up alert now lives in its card's right inner column.
   function _liveKW(el){ const v = el.querySelector(".sb-now-val"); return v ? parseFloat(v.textContent) : NaN; }
   function _nameplateKW(el){ const m = (el.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : NaN; }
-  function checkPeerDrops(){
-    const dropped = [];                            // {key,name,arrayName,pct}
-    document.querySelectorAll("#sandbox .sb-col").forEach(col => {
-      const rows = [...col.querySelectorAll(".sb-inv")].map(el => {
-        const np = _nameplateKW(el), kw = _liveKW(el);
-        const nowEl = el.querySelector(".sb-inv-now");
-        const baseW = nowEl ? parseFloat(nowEl.dataset.basew) : NaN;
-        return { el, name: el.dataset.name || "An inverter",
-                 liveSO: (np > 0 && isFinite(kw))    ? kw / np           : null,
-                 baseSO: (np > 0 && isFinite(baseW)) ? (baseW/1000) / np : null };
-      }).filter(r => r.liveSO != null && r.baseSO != null);
-      if(rows.length < 2) return;                  // need peers ("friends") to compare against
-      // Stable baseline: peer median of NORMAL (base) output, so jitter and one
-      // dipping inverter never drag the bar and trip false alarms.
-      const baseline = rows.map(r => r.baseSO).sort((a,b) => a-b)[Math.floor(rows.length/2)];
-      if(baseline <= 0) return;
-      const arrName = (col.querySelector(".sb-array-name") || {}).textContent || "";
-      rows.forEach(r => {
-        const below = (baseline - r.liveSO) / baseline;   // how far live output is below the peer norm
-        if(below >= PEER_DROP_MARGIN){
-          r.el.classList.add("sb-inv-alarm");
-          dropped.push({ key: arrName + "|" + r.name, name: r.name, arrayName: arrName, pct: Math.round(below*100) });
-        } else {
-          r.el.classList.remove("sb-inv-alarm");
-        }
-      });
-    });
-    reconcileAlertCards(dropped);
-  }
-  // Persistent alerts host: lives on #sbWrap (which render() never rebuilds), so
-  // cards survive fleet re-renders.
-  function alertHost(){
-    let h = document.getElementById("sbAlerts");
-    if(!h){
-      h = document.createElement("div");
-      h.id = "sbAlerts"; h.className = "sb-alerts"; h.setAttribute("aria-live", "polite");
-      (document.getElementById("sbWrap") || document.body).appendChild(h);
-    }
-    return h;
-  }
-  // Declarative reconcile: #sbAlerts holds exactly one card per currently-dropped
-  // inverter (keyed array|name). Idempotent — no duplicates, recovered drops clear,
-  // a dismissed one stays gone until that inverter recovers and drops again.
-  function reconcileAlertCards(dropped){
-    const host = alertHost();
-    const want = new Set(dropped.map(d => d.key));
-    [...host.children].forEach(card => { if(!want.has(card.dataset.key)) card.remove(); });
-    _dismissed.forEach(k => { if(!want.has(k)) _dismissed.delete(k); });   // recovered → re-arm
-    const have = new Set([...host.children].map(c => c.dataset.key));
-    dropped.forEach(d => {
-      if(have.has(d.key) || _dismissed.has(d.key)) return;
-      host.prepend(makeAlertCard(d));
-      if(_dropInit) toast(`⚠️ ${d.name} dropped ${d.pct}% below its array peers`, "alert");
-    });
-    while(host.children.length > 4) host.lastElementChild.remove();
-    _dropInit = true;
-  }
-  function makeAlertCard(d){
-    const card = document.createElement("div");
-    card.className = "sb-alert-card";
-    card.dataset.key = d.key;
-    card.innerHTML =
-      `<span class="sb-ac-ic">⚠️</span>` +
-      `<div class="sb-ac-body"><div class="sb-ac-h">${esc(d.name)} dropped <b>${d.pct}%</b> below its peers</div>` +
-      `<div class="sb-ac-sub">${esc(d.arrayName)} · live telemetry</div></div>` +
-      `<button class="sb-ac-x" type="button" title="Dismiss" aria-label="Dismiss alert">×</button>`;
-    card.querySelector(".sb-ac-x").onclick = () => { _dismissed.add(d.key); card.remove(); };
-    return card;
-  }
 
   // ---- selected-inverter DETAIL CARD ----
-  // Persistent host on #sbWrap (survives fleet re-renders, like #sbAlerts), pinned
-  // bottom-RIGHT of the viewport so it never overlaps the bottom-left alert cards.
+  // Persistent host on #sbWrap (survives fleet re-renders), pinned bottom-RIGHT of
+  // the viewport.
   function detailHost(){
     let h = document.getElementById("sbDetail");
     if(!h){
@@ -799,6 +798,18 @@
       d.model && `<div class="sb-dc-row"><span class="sb-dc-k">Model</span><span class="sb-dc-v">${esc(d.model)}</span></div>`,
     ].filter(Boolean).join("");
 
+    // origin deep-link: jump to this inverter's source site (or its vendor's portal
+    // as a fallback) to analyze it deeper in the monitoring tool that owns its data.
+    let originUrl = d.originUrl || "";
+    let originLabel = d.originLabel || "";
+    if(!originUrl && d.vendor && PORTAL_URL[d.vendor]){
+      originUrl = PORTAL_URL[d.vendor];
+      originLabel = originLabel || BRAND[d.vendor] || d.vendor;
+    }
+    const originRow = originUrl
+      ? `<a class="sb-origin sb-dc-origin" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
+      : "";
+
     const card = el(`
       <div class="sb-detail-card" role="dialog" aria-label="Inverter detail">
         <button class="sb-dc-x" type="button" title="Dismiss" aria-label="Close detail">×</button>
@@ -811,6 +822,7 @@
         <div class="sb-dc-lost" hidden><span class="sb-dc-lost-k">Lost so far</span><b class="dc-lost">$0</b></div>
         <div class="sb-dc-rows">${rows}</div>
         ${d.diag ? `<div class="sb-dc-diag">${esc(d.diag)}</div>` : ""}
+        ${originRow}
       </div>`);
     card.querySelector(".sb-dc-x").onclick = () => {
       card.remove();
@@ -876,7 +888,7 @@
     _detailLostTs = now;
     // map ~2.6s of wall time onto LOST_DEMO_MIN_PER_TICK simulated minutes
     const dtHr = wallHr * ((LOST_DEMO_MIN_PER_TICK * 60) / 2.6);
-    const flaggedByState = LOST_STATES.has(d.status) || node.classList.contains("sb-inv-alarm");
+    const flaggedByState = LOST_STATES.has(d.status);
     const missKW = _missingKW(node, flaggedByState);
     // only accumulate when the inverter is genuinely under (flagged or a real shortfall)
     if(dtHr > 0 && missKW > 0 && (flaggedByState || missKW >= 0.5)){
@@ -1412,6 +1424,29 @@
     canvas.addEventListener("drop", e => { if(dragEl) e.preventDefault(); });
   }
 
+  /* ---- expand/collapse an array's inverter comb ----
+   * Collapsed by default (clean array-card view); the toggle flips .sb-col.expanded
+   * which CSS uses to show/hide the comb, and persists the open set to localStorage.
+   * Expanding redraws the SVG feeder wires (teeth have no measurable size while the
+   * comb is display:none, so they must be drawn once it becomes visible). */
+  function wireInvToggle(host){
+    host.querySelectorAll(".sb-inv-toggle").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        const col = btn.closest(".sb-col");
+        if(!col) return;
+        const id = String(col.dataset.arrayId);
+        const open = !col.classList.contains("expanded");
+        col.classList.toggle("expanded", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        const set = getExpandedSet();
+        if(open) set.add(id); else set.delete(id);
+        saveExpandedSet(set);
+        if(open) drawFleetConnectors(host);   // teeth now measurable → draw wires
+      });
+    });
+  }
+
   /* ---- HTML5 drag of individual inverter cards → PERSISTED to the backend ----
    * (a) reorder within a comb  → POST /inverters/reorder  (peer cohort unchanged → trust optimistic)
    * (b) move across combs      → POST /inverters/reassign (changes the real peer cohort → reload to
@@ -1562,7 +1597,7 @@
     const note = ov.querySelector("#sbNote");
 
     // Login-capable vendors (one-click via the helper).
-    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint"];
+    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint","gmp"];
 
     // Render the modal body for the current mode. Exposed via closure so the
     // extension-present detector (handleCaptureLanded's sibling listener) can
@@ -1576,6 +1611,7 @@
             <span class="sb-login-brand sb-brand ${code}">${esc(BRAND[code]||code)}</span>
             <span class="sb-login-cta">Log in with ${esc(BRAND[code]||code)} →</span>
             ${code==="chint" ? `<span class="sb-login-tip">Open each of your sites once — all its inverters come in together.</span>` : ""}
+            ${code==="gmp" ? `<span class="sb-login-tip">Your utility meter — brings in each account's solar production (whole-array, not per-inverter). Good when you have no inverter portal.</span>` : ""}
           </button>`).join("");
         const extBlock = EXT_PRESENT
           ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
