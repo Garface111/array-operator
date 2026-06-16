@@ -1667,13 +1667,19 @@
     c.style.transform = prev;
     const vw = vp.clientWidth, vh = vp.clientHeight;
     if(!cw || !ch || !vw || !vh) return;
-    const z = Math.max(0.5, Math.min(1.15, Math.min(vw/cw, vh/ch) * 0.96));
-    const scaledH = ch * z;
-    // Top-anchor when the (often-collapsed) cards are shorter than the viewport,
-    // so they sit at the top with room to expand into — never floating dead-center
-    // in a tall empty canvas.
-    const y = scaledH < vh - 32 ? 56 : Math.max(8, (vh - scaledH)/2);
-    _view = { z, x: (vw - cw*z)/2, y };
+    // Fit so the whole fleet is visible, but never shrink so far it becomes a tiny
+    // island in a sea of empty space — a glance at the zoomed-out view should read
+    // instantly. Floor the zoom at 0.72 and let wide content scroll horizontally.
+    const z = Math.max(0.72, Math.min(1.15, Math.min(vw/cw, vh/ch) * 0.98));
+    const scaledW = cw * z, scaledH = ch * z;
+    // Horizontal: center when the fleet is narrower than the viewport; otherwise
+    // left-anchor (small margin) so it fills from the left and scrolls right —
+    // never floating off to one side with a dead gap.
+    const x = scaledW < vw - 32 ? (vw - scaledW)/2 : 48;
+    // Vertical: top-anchor short (collapsed) fleets so they sit up top with room to
+    // expand into; center tall ones.
+    const y = scaledH < vh - 32 ? 40 : Math.max(8, (vh - scaledH)/2);
+    _view = { z, x, y };
     applyCanvasView(host);
   }
   function wirePanZoom(host){

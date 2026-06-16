@@ -110,34 +110,23 @@
   </section>
 
   <!-- ============================ TAB: ARRAYS (default) ============================ -->
+  <!-- One job: the sandbox, almost full-screen, with a single pinned COMMANDER
+       card that gives whole-fleet health at a glance. No KPI strip, no triage
+       table, no sub-headers — just the at-a-glance health + the canvas. -->
   <section class="panel" id="panelArrays" role="tabpanel" aria-label="Arrays">
 
-    <!-- PORTFOLIO COMMAND CENTER — KPI strip (the portfolio roll-up) -->
-    <section id="commandCenter"></section>
+    <!-- PINNED FLEET COMMANDER — whole-fleet health in one glance. Rendered by
+         command-center.js into #fleetCommander. -->
+    <section id="fleetCommander" aria-label="Fleet health at a glance"></section>
 
-    <!-- Per-site fleet tree — the interactive drill-down, directly under the KPIs -->
-    <div class="cc-treedivider">
-      <h3>Per-site fleet tree</h3>
-      <span>drill into one array — drag any inverter to re-measure it against new neighbors</span>
-    </div>
-
-    <!-- (TOP) SANDBOX — live fleet tree of array cards; expand any array to its
-         inverter comb and drag any inverter to rearrange. Rendered by sandbox.js
-         into #sandbox. -->
-    <section id="sbWrap">
+    <!-- SANDBOX — the live fleet tree, almost full-screen. Rendered by sandbox.js
+         into #sandbox. Glance at the most zoomed-out view = perfect understanding. -->
+    <section id="sbWrap" class="sb-fullscreen">
       <div id="sandbox"></div>
     </section>
 
-    <!-- Triage queue — collapsible header; COLLAPSED by default so the fleet tree
-         leads. Clicking the header toggles #ccQueue (wired in command-center.js). -->
-    <div class="cc-treedivider cc-collapsible collapsed" id="triageToggle" role="button"
-         tabindex="0" aria-expanded="false" aria-controls="ccQueue">
-      <span class="cc-chevron" aria-hidden="true">▸</span>
-      <h3>Triage queue</h3>
-      <span>every flagged inverter across the fleet — sorted by dollars at stake</span>
-      <span class="cc-spacerflex"></span>
-      <span class="cc-collapse-hint" id="triageHint">Show queue →</span>
-    </div>
+    <!-- Triage queue still renders (hidden) so other views can read its model,
+         but it's no longer surfaced on this tab — the sandbox IS the view. -->
     <section id="ccQueue" hidden></section>
 
   </section>

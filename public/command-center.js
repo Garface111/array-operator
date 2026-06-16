@@ -118,9 +118,53 @@
   /* ===========================================================================
    * 3. RENDER
    * ==========================================================================*/
-  function host(){ return document.getElementById("commandCenter"); }
+  function host(){ return document.getElementById("fleetCommander"); }
 
   function render(){
+    const h = host(); if(!h || !MODEL) return;
+    const q = document.getElementById("ccQueue");
+    const k = MODEL.kpis;
+    const healthCls = k.healthyPct >= 95 ? "ok" : k.healthyPct >= 85 ? "warn" : "bad";
+    const riskMo = Math.round(MODEL.kpis.riskMo || 0);
+    const simNote = MODEL.simulated
+      ? `Demo fleet — sign in to load yours`
+      : `Live from your connected arrays`;
+
+    // PINNED COMMANDER CARD — whole-fleet health at a single glance. Big health %,
+    // a status-colored meter, the counts, the flagged breakdown, $/mo at stake,
+    // and a live "updated Ns ago". No table, no extra chrome.
+    h.innerHTML = `
+      <div class="fc-card ${healthCls}">
+        <div class="fc-health">
+          <div class="fc-health-num"><b data-kpi="healthy">${k.healthyPct}</b><span>%</span></div>
+          <div class="fc-health-lbl">fleet healthy</div>
+        </div>
+        <div class="fc-mid">
+          <div class="fc-meter"><div class="fc-meter-fill ${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%"></div></div>
+          <div class="fc-stats">
+            <span class="fc-stat"><b data-kpi="sites">${num(k.sites)}</b> arrays</span>
+            <span class="fc-dot">·</span>
+            <span class="fc-stat"><b data-kpi="inverters">${num(k.inverters)}</b> inverters</span>
+            <span class="fc-dot">·</span>
+            <span class="fc-stat ${k.flagged?"flag":""}"><b data-kpi="flagged">${num(k.flagged)}</b> flagged</span>
+            <span class="fc-sub" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</span>
+          </div>
+        </div>
+        <div class="fc-right">
+          ${riskMo>=1 ? `<div class="fc-risk"><span class="fc-risk-k">at stake</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span></div>` : `<div class="fc-allclear">All clear 🌞</div>`}
+          <div class="fc-asof" id="ccAsof">${asofText()}</div>
+        </div>
+      </div>
+      <div class="fc-note">${esc(simNote)}</div>`;
+
+    // The triage queue still renders into its hidden container so other views that
+    // read MODEL stay in sync — but it's no longer surfaced on this tab.
+    if(!q) return;
+    q.innerHTML = "";
+  }
+
+  // legacy render kept for reference / other callers
+  function renderQueueLEGACY(){
     const h = host(); if(!h || !MODEL) return;
     const q = document.getElementById("ccQueue");
     const k = MODEL.kpis;
@@ -128,19 +172,6 @@
     const simNote = MODEL.simulated
       ? `Simulated 100-array portfolio — sign in to load your live fleet.`
       : `Live from your connected arrays.`;
-
-    h.innerHTML = `
-      <div class="cc-head">
-        <div class="cc-headmain">
-          <h2>Portfolio command center</h2>
-          <p class="cc-summary">Managing <b data-kpi="sites">${num(k.sites)}</b> arrays and <b data-kpi="inverters">${num(k.inverters)}</b> inverters — <b class="ok" data-kpi="healthy">${k.healthyPct}%</b> healthy, <b class="warn" data-kpi="flagged">${num(k.flagged)}</b> flagged (<span class="cc-summary-sub" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</span>).</p>
-          <div class="cc-sub">${esc(simNote)}</div>
-        </div>
-        <div class="cc-asof" id="ccAsof">${asofText()}</div>
-      </div>`;
-
-    // the triage queue (toolbar + table + foot) renders into its own container
-    // below the fleet tree — gracefully no-op if that container isn't present.
     if(!q) return;
     q.innerHTML = `
       <div class="cc-tools">
