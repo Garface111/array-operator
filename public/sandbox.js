@@ -25,7 +25,7 @@
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
   const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
   const EXPAND_KEY = "ao_array_expanded";    // persisted set of array_ids whose inverter comb is expanded (JSON array)
-  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP" };
+  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP", vec:"VEC", wec:"WEC" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
@@ -85,6 +85,8 @@
     sma:       "https://ennexos.sunnyportal.com/",
     chint:     "https://monitor.chintpowersystems.com/",
     gmp:       "https://greenmountainpower.com/",
+    vec:       "https://vermontelectric.smarthub.coop/",
+    wec:       "https://washingtonelectric.smarthub.coop/",
   };
   function extSend(type, extra){
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
@@ -93,6 +95,7 @@
     const url = PORTAL_URL[vendor];
     if(!url) return;
     const note = _ov && _ov.querySelector("#sbNote");
+    const isMeter = vendor === "gmp" || vendor === "vec" || vendor === "wec";
     if(note){
       note.className = "sb-note";
       // Chint reports its inverters per SITE, and the extension only sees a
@@ -101,9 +104,12 @@
       const chintTip = vendor === "chint"
         ? ` <b>Open each of your sites once</b> — every site you open brings in all of its inverters automatically (you don't need to click into individual inverters). Visit every site so none are left behind.`
         : "";
-      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your inverters appear here automatically.${chintTip}`;
+      const what = isMeter ? "solar production" : "inverters";
+      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.${chintTip}`;
     }
-    extSend("SO_OPEN_PORTAL", { url, active: true });
+    // Pass the provider so the extension arms the right capture intent (a SmartHub
+    // host serves many co-ops; vendor disambiguates vec vs wec vs a bill-only login).
+    extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor, vendor: vendor });
   }
   // A capture landed from the extension. Owner is already signed in (dashboard),
   // so attach straight to their account: SolarEdge by its account key,
@@ -128,13 +134,18 @@
       } else if(d.provider === "gmp" && Array.isArray(d.accounts) && d.accounts.length){
         r = await fetch("/v1/array-owners/utility-meter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: "gmp", accounts: d.accounts }) });
+      } else if((d.provider === "vec" || d.provider === "wec") && d.host && d.auth_token){
+        // SmartHub utilities: the extension captured the owner's portal session
+        // (host + email + auth_token); the backend pulls generation server-side.
+        r = await fetch("/v1/array-owners/smarthub-meter-capture",
+          { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, host: d.host, email: d.email, auth_token: d.auth_token }) });
       } else {
         if(note){ note.className = "sb-note err"; note.textContent = `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
         return;
       }
       data = {}; try { data = await r.json(); } catch(e){}
       const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured || data.accounts_captured);
-      const isMeter = d.provider === "gmp";
+      const isMeter = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
       if(ok){
         // Pull the freshly-attached array(s) from the server and re-render the
         // tree. load() short-circuits when the store is already loaded (it is, on
@@ -192,7 +203,7 @@
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
     }
-    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp"].includes(d.provider)) handleCaptureLanded(d);
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)) handleCaptureLanded(d);
     if(d.type === "SO_CAPTURE_FAILED"){
       const note = _ov && _ov.querySelector("#sbNote");
       if(note){
@@ -1602,7 +1613,7 @@
     const note = ov.querySelector("#sbNote");
 
     // Login-capable vendors (one-click via the helper).
-    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint","gmp"];
+    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint","gmp","vec","wec"];
 
     // Render the modal body for the current mode. Exposed via closure so the
     // extension-present detector (handleCaptureLanded's sibling listener) can
@@ -1617,6 +1628,7 @@
             <span class="sb-login-cta">Log in with ${esc(BRAND[code]||code)} →</span>
             ${code==="chint" ? `<span class="sb-login-tip">Open each of your sites once — all its inverters come in together.</span>` : ""}
             ${code==="gmp" ? `<span class="sb-login-tip">Your utility meter — brings in each account's solar production (whole-array, not per-inverter). Good when you have no inverter portal.</span>` : ""}
+            ${(code==="vec"||code==="wec") ? `<span class="sb-login-tip">Your utility meter (SmartHub) — brings in each account's solar production (whole-array, not per-inverter). Good when you have no inverter portal.</span>` : ""}
           </button>`).join("");
         const extBlock = EXT_PRESENT
           ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
