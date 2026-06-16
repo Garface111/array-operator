@@ -412,11 +412,31 @@
     const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
     const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
     const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="1.8" fill="var(--bad)"/>` : "").join("");
-    return `<svg class="sb-inv-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-      <polygon points="${area}" fill="${stroke}" opacity="0.12"/>
-      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${zeros}
-    </svg>`;
+    // time scale: label the oldest (left), a midpoint, and the newest (right) day
+    const last = daily.length - 1, mid = Math.floor(last/2);
+    const lo = _sparkTimeLabel(daily[0].date, last, 0);
+    const mp = _sparkTimeLabel(daily[mid].date, last, mid);
+    const hi = _sparkTimeLabel(daily[last].date, last, last);
+    const axis = `<div class="sb-spark-axis"><span>${esc(lo)}</span><span>${esc(mp)}</span><span>${esc(hi)}</span></div>`;
+    return `<div class="sb-spark-wrap">
+      <svg class="sb-inv-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <polygon points="${area}" fill="${stroke}" opacity="0.12"/>
+        <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${zeros}
+      </svg>${axis}</div>`;
+  }
+  // A short time-axis label for one point in the daily series. Real data carries
+  // ISO dates ("2026-06-09") → "M/D"; the demo carries "d-N" (N days ago) → the
+  // newest point is "now", the oldest "Nd", a midpoint "Nd". Falls back gracefully.
+  function _sparkTimeLabel(date, lastIdx, idx){
+    const isNewest = idx === lastIdx;
+    if(typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)){
+      const d = new Date(date + "T00:00:00");
+      if(!isNaN(d)) return isNewest ? "now" : `${d.getMonth()+1}/${d.getDate()}`;
+    }
+    const m = typeof date === "string" ? date.match(/d-?(\d+)/) : null;
+    if(m){ const n = +m[1]; return isNewest || n <= 1 ? "now" : `${n}d`; }
+    return isNewest ? "now" : "";
   }
   // a kWh figure formatted compactly for the Min/Cur/Max stat row
   function kwhFmt(v){ return v==null ? "—" : (v>=100 ? Math.round(v) : (Math.round(v*10)/10)); }

@@ -406,7 +406,11 @@
   .sb-inv-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
   .sb-inv-name{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.2;word-break:break-word}
   .sb-inv-size{font-size:10px;font-weight:700;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
-  .sb-inv-spark{display:block;width:100%;height:34px;margin:7px 0 2px}
+  .sb-inv-spark{display:block;width:100%;height:34px;margin:0}
+  .sb-spark-wrap{margin:7px 0 2px}
+  .sb-spark-axis{display:flex;justify-content:space-between;margin-top:1px}
+  .sb-spark-axis span{font-size:7.5px;font-weight:600;color:var(--faint);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .sb-spark-axis span:nth-child(2){opacity:.6}
   .sb-inv-nospark{height:34px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--faint);margin:7px 0 2px;border:1px dashed var(--line);border-radius:8px}
   /* live output bar: current power as % of rated max; fill + card tint by tone */
   .sb-outbar{margin-top:7px}
