@@ -85,7 +85,16 @@
     const url = PORTAL_URL[vendor];
     if(!url) return;
     const note = _ov && _ov.querySelector("#sbNote");
-    if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your inverters appear here automatically.`; }
+    if(note){
+      note.className = "sb-note";
+      // Chint reports its inverters per SITE, and the extension only sees a
+      // site's inverters once the owner OPENS that site. Multi-site owners (e.g.
+      // Bruce/GMCS) must click into each site once — so spell that out here.
+      const chintTip = vendor === "chint"
+        ? ` <b>Open each of your sites once</b> — every site you open brings in all of its inverters automatically (you don't need to click into individual inverters). Visit every site so none are left behind.`
+        : "";
+      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your inverters appear here automatically.${chintTip}`;
+    }
     extSend("SO_OPEN_PORTAL", { url, active: true });
   }
   // A capture landed from the extension. Owner is already signed in (dashboard),
@@ -1566,6 +1575,7 @@
           <button type="button" class="sb-login-btn" data-login="${code}">
             <span class="sb-login-brand sb-brand ${code}">${esc(BRAND[code]||code)}</span>
             <span class="sb-login-cta">Log in with ${esc(BRAND[code]||code)} →</span>
+            ${code==="chint" ? `<span class="sb-login-tip">Open each of your sites once — all its inverters come in together.</span>` : ""}
           </button>`).join("");
         const extBlock = EXT_PRESENT
           ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>

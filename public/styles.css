@@ -621,7 +621,7 @@
 
   /* ===== One-click portal login (Add-array modal lead path) ===== */
   .sb-login-grid{display:flex;flex-direction:column;gap:10px;margin:16px 0}
-  .sb-login-btn{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  .sb-login-btn{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
     width:100%;text-align:left;cursor:pointer;padding:14px 16px;border-radius:13px;
     border:1px solid var(--line);background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.02));
     transition:border-color .15s,background .15s,transform .1s}
@@ -629,6 +629,7 @@
   .sb-login-btn:active{transform:translateY(1px)}
   .sb-login-brand{font-size:12px;font-weight:800;letter-spacing:.02em;padding:4px 9px;border-radius:999px}
   .sb-login-cta{font-size:14.5px;font-weight:700;color:var(--ink)}
+  .sb-login-tip{flex-basis:100%;font-size:12px;line-height:1.4;color:var(--muted);font-weight:500;margin-top:2px}
   .sb-login-install{margin:14px 0 4px;width:100%}
   .sb-login-hint{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:4px}
   .sb-linkbtn{background:none;border:0;color:var(--good);font-weight:650;font-size:inherit;
