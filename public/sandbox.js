@@ -25,6 +25,7 @@
   const ORDER_KEY = "ao_array_order";        // persisted column order (array_id strings) — harmless UI preference
   const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
   const EXPAND_KEY = "ao_array_expanded";    // persisted set of array_ids whose inverter comb is expanded (JSON array)
+  const ORIENT_KEY = "ao_sandbox_orient";    // "vertical" (arrays side-by-side, inverters below) | "horizontal" (arrays stacked left, inverters spread right)
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP", vec:"VEC", wec:"WEC" };
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
@@ -418,6 +419,17 @@
     try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...set])); } catch(e){}
   }
 
+  // ---- sandbox orientation (vertical = arrays side-by-side, inverters drop BELOW
+  // each array; horizontal = arrays stacked on the LEFT, inverters spread out to
+  // the RIGHT of their array). Persisted under ORIENT_KEY; default vertical. ----
+  function getOrient(){
+    try { return localStorage.getItem(ORIENT_KEY) === "horizontal" ? "horizontal" : "vertical"; }
+    catch(e){ return "vertical"; }
+  }
+  function setOrient(o){
+    try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
+  }
+
   // ---- origin-site deep links for an array's "Array details" column ----
   // Render column.origin_links when the backend supplies them; otherwise fall
   // back to a single base portal link derived from PORTAL_URL keyed by the array's
@@ -482,6 +494,7 @@
         <div class="sb-head-actions">
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
+            <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
             <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
@@ -581,7 +594,7 @@
         </div>`;
     }).join("");
 
-    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas">${columns}</div></div>
+    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()}">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
 
     // click/keyboard → detail line + rich detail card
@@ -597,6 +610,7 @@
     });
 
     wireFullscreen(host);
+    wireOrient(host);
     wireAddButton(host);
     wireNewArrayButton(host);
     wireResetButton(host);
@@ -620,6 +634,13 @@
   const SB_SVGNS = "http://www.w3.org/2000/svg";
   function drawFleetConnectors(host){
     const root = (host && host.querySelectorAll) ? host : document;
+    // The feeder wires model inverters flowing UP into the array (vertical layout).
+    // In horizontal orientation the comb sits to the RIGHT of the card, so the
+    // vertical wires don't apply — skip them cleanly.
+    if(getOrient() === "horizontal"){
+      root.querySelectorAll("svg.sb-wires").forEach(s => s.remove());
+      return;
+    }
     root.querySelectorAll(".sb-comb").forEach(comb => {
       // skip collapsed arrays — their teeth are display:none and unmeasurable
       const ownerCol = comb.closest(".sb-col");
@@ -1277,6 +1298,20 @@
     }
   }
 
+  // Orientation toggle: flips the persisted vertical/horizontal layout and re-renders
+  // the fleet (the canvas orientation class is applied in render() from getOrient()).
+  function wireOrient(host){
+    const btn = host.querySelector("#sbOrient");
+    if(!btn) return;
+    const horiz = getOrient() === "horizontal";
+    btn.textContent = horiz ? "⬍ Stacked" : "⬌ Horizontal";
+    btn.onclick = () => {
+      setOrient(getOrient() === "horizontal" ? "vertical" : "horizontal");
+      renderFromStore();                                   // re-render with the new orientation
+      requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+    };
+  }
+
   // Auto-fit: scale + center the fleet so it fills the viewport (no empty void).
   function fitView(host){
     const vp = (host||document).querySelector(".sb-viewport");
@@ -1441,24 +1476,37 @@
   }
 
   /* ---- expand/collapse an array's inverter comb ----
-   * Collapsed by default (clean array-card view); the toggle flips .sb-col.expanded
-   * which CSS uses to show/hide the comb, and persists the open set to localStorage.
-   * Expanding redraws the SVG feeder wires (teeth have no measurable size while the
-   * comb is display:none, so they must be drawn once it becomes visible). */
+   * Collapsed by default (clean array-card view). Clicking ANYWHERE on the array
+   * card toggles it (the small "N inverters" chevron is just an affordance now);
+   * clicks on interactive bits inside the card (origin links, the rename field,
+   * the drag grip) are excluded so they keep their own behaviour. Flips
+   * .sb-col.expanded which CSS uses to show/hide the comb, and persists the open
+   * set to localStorage. Expanding redraws the SVG feeder wires (teeth have no
+   * measurable size while the comb is display:none, so they must be drawn once
+   * it becomes visible). */
+  function toggleArray(col, host, force){
+    if(!col) return;
+    const id = String(col.dataset.arrayId);
+    const open = (force != null) ? force : !col.classList.contains("expanded");
+    col.classList.toggle("expanded", open);
+    const btn = col.querySelector(".sb-inv-toggle");
+    if(btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+    const set = getExpandedSet();
+    if(open) set.add(id); else set.delete(id);
+    saveExpandedSet(set);
+    if(open) drawFleetConnectors(host);   // teeth now measurable → draw wires
+  }
   function wireInvToggle(host){
-    host.querySelectorAll(".sb-inv-toggle").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.stopPropagation();
-        const col = btn.closest(".sb-col");
-        if(!col) return;
-        const id = String(col.dataset.arrayId);
-        const open = !col.classList.contains("expanded");
-        col.classList.toggle("expanded", open);
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-        const set = getExpandedSet();
-        if(open) set.add(id); else set.delete(id);
-        saveExpandedSet(set);
-        if(open) drawFleetConnectors(host);   // teeth now measurable → draw wires
+    host.querySelectorAll(".sb-col").forEach(col => {
+      const card = col.querySelector(".sb-array");
+      if(!card) return;
+      card.addEventListener("click", e => {
+        // ignore clicks on interactive children (origin links, editable name,
+        // drag grip, inputs) so they keep their own behaviour. The "N inverters"
+        // chevron is a plain button INSIDE the card, so its clicks bubble here and
+        // toggle too — no separate handler needed.
+        if(e.target.closest("a, .sb-drag, [contenteditable='true'], input, textarea")) return;
+        toggleArray(col, host);
       });
     });
   }

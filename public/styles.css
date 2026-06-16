@@ -356,6 +356,22 @@
   /* ===== Collapsible inverter comb — hidden until its array is expanded ===== */
   .sb-comb{display:none;margin-top:14px}
   .sb-col.expanded .sb-comb{display:block}
+  /* whole array card is the expand affordance now (click anywhere to toggle) */
+  .sb-array{cursor:pointer}
+  .sb-array .sb-array-name,.sb-array .sb-drag,.sb-array a{cursor:auto}
+  .sb-array .sb-drag{cursor:grab}
+  .sb-array a{cursor:pointer}
+
+  /* ===== HORIZONTAL orientation: arrays stacked on the LEFT, each array's
+     inverters spread out to the RIGHT of its card. Toggled via the ⬌ button;
+     the canvas gets .sb-orient-horizontal. Default (vertical) is the side-by-side
+     columns with inverters dropping below. ===== */
+  .sb-canvas.sb-orient-horizontal{flex-direction:column;gap:34px;align-items:stretch;width:max-content}
+  .sb-canvas.sb-orient-horizontal .sb-col{flex-direction:row;align-items:flex-start;gap:34px;min-width:0;max-width:none}
+  .sb-canvas.sb-orient-horizontal .sb-array{flex:0 0 340px;width:340px}
+  .sb-canvas.sb-orient-horizontal .sb-comb{margin-top:0;align-self:center}
+  .sb-canvas.sb-orient-horizontal .sb-col.expanded .sb-comb{display:flex;align-items:center}
+  .sb-canvas.sb-orient-horizontal .sb-teeth{flex-wrap:nowrap}
   /* converging feeder wires: each inverter curves up into a central trunk that
      flows into the array. Drawn as SVG by drawFleetConnectors(); sits behind the
      inverter cards and scales with the pan/zoom canvas transform. */
