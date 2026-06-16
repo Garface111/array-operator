@@ -441,6 +441,45 @@
   // a kWh figure formatted compactly for the Min/Cur/Max stat row
   function kwhFmt(v){ return v==null ? "—" : (v>=100 ? Math.round(v) : (Math.round(v*10)/10)); }
 
+  // A tiny status-tinted sparkline (no axis/labels) of one inverter's daily series,
+  // for the array card's at-a-glance "how's my whole array doing" strip. Zero-output
+  // days get a red dot. Falls back to a flat dim line when there's no history.
+  function miniSpark(daily, tone){
+    const w = 46, h = 18, pad = 2;
+    const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "#ffb454" : tone === "idle" ? "var(--faint)" : "var(--good)";
+    if(!Array.isArray(daily) || daily.length < 2){
+      return `<svg class="sb-ag-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 2"/></svg>`;
+    }
+    const vals = daily.map(d => Math.max(0, +d.kwh || 0));
+    const max = Math.max(...vals, 0.001);
+    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
+    const Y = v => h-pad - (v/max)*(h-2*pad);
+    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="1.4" fill="var(--bad)"/>` : "").join("");
+    return `<svg class="sb-ag-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>${zeros}
+    </svg>`;
+  }
+  // The array card's at-a-glance grid: one mini status-tinted graph per inverter
+  // (sorted biggest-kW first, same order as the comb). Lets an owner read the whole
+  // array's health in one look without expanding it. `invs` already sorted by caller.
+  function arrayGlance(sortedInvs){
+    if(!sortedInvs || !sortedInvs.length) return "";
+    const cells = sortedInvs.map(inv => {
+      const maxW = inv.nameplate_kw!=null ? inv.nameplate_kw*1000 : null;
+      const curW = inv.current_power_w!=null ? inv.current_power_w : null;
+      const tone = (curW!=null && maxW)
+        ? pctTone(Math.max(0, Math.min(100, Math.round((curW/maxW)*100))))
+        : "idle";
+      const nm = inv.name!=null ? String(inv.name) : "";
+      return `<div class="sb-ag-cell ${tone}" title="${esc(nm)}">${miniSpark(inv.daily, tone)}</div>`;
+    }).join("");
+    return `<div class="sb-ag">
+      <div class="sb-ag-k">Inverters at a glance</div>
+      <div class="sb-ag-grid">${cells}</div>
+    </div>`;
+  }
+
   // Live output bar: current power as a % of the inverter's MAX (rated nameplate).
   // The bar fills to that %, and the card tints progressively orange the further
   // current drifts BELOW max (full green at/near max → amber → deep orange when
@@ -694,6 +733,7 @@
                 <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
               </div>
             </div>
+            ${arrayGlance(sortedInvs)}
           </div>
 
           <!-- Collapsible inverter comb — hidden until the array is expanded -->
