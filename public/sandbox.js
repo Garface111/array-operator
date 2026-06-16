@@ -628,6 +628,7 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
+            <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
             <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
@@ -771,6 +772,7 @@
 
     wireFullscreen(host);
     wireOrient(host);
+    wireExpandAll(host);  // "Show all inverters" — open/collapse every array's comb
     wireAddButton(host);
     wireNewArrayButton(host);
     wireResetButton(host);
@@ -1574,6 +1576,37 @@
       renderFromStore();                                   // re-render with the new orientation
       requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
     };
+  }
+
+  // "Show all inverters" — open (or, when all are already open, collapse) EVERY
+  // array's inverter comb in one click. Mirrors toggleArray's persisted-set logic
+  // but batches the write + a single connector redraw + one re-fit so it stays
+  // snappy across a big fleet instead of N separate redraws.
+  function expandAllArrays(host, open){
+    const cols = [...host.querySelectorAll(".sb-col")];
+    if(!cols.length) return;
+    const set = getExpandedSet();
+    cols.forEach(col => {
+      const id = String(col.dataset.arrayId);
+      col.classList.toggle("expanded", open);
+      const tog = col.querySelector(".sb-inv-toggle");
+      if(tog) tog.setAttribute("aria-expanded", open ? "true" : "false");
+      if(open) set.add(id); else set.delete(id);
+    });
+    saveExpandedSet(set);
+    if(open) drawFleetConnectors(host);   // teeth measurable now → draw feeder wires once
+    requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+  }
+  function wireExpandAll(host){
+    const btn = host.querySelector("#sbExpandAll");
+    if(!btn) return;
+    const allExpanded = () => {
+      const cols = [...host.querySelectorAll(".sb-col")];
+      return cols.length > 0 && cols.every(c => c.classList.contains("expanded"));
+    };
+    const syncLabel = () => { btn.textContent = allExpanded() ? "⊖ Collapse all" : "⊕ Show all inverters"; };
+    syncLabel();   // reflect the persisted open/closed state on every render
+    btn.onclick = () => { expandAllArrays(host, !allExpanded()); syncLabel(); };
   }
 
   // Auto-fit: scale + center the fleet so it fills the viewport (no empty void).
