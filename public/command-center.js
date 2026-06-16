@@ -143,9 +143,7 @@
         <div class="cc-kpi"><div class="k">Inverters</div><div class="v" data-kpi="inverters">${num(k.inverters)}</div><div class="s">monitored across the fleet</div></div>
         <div class="cc-kpi healthy"><div class="k">Healthy</div><div class="v" data-kpi="healthy">${k.healthyPct}%</div>
           <div class="cc-meter"><i data-kpi="healthmeter" style="width:${k.healthyPct}%"></i></div></div>
-        <div class="cc-kpi risk"><div class="k">At risk / mo</div><div class="v" data-kpi="risk">${usd0(k.riskMo)}</div><div class="s">leaking right now</div></div>
         <div class="cc-kpi flagged"><div class="k">Flagged now</div><div class="v" data-kpi="flagged">${num(k.flagged)}</div><div class="s" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</div></div>
-        <div class="cc-kpi recovered"><div class="k">Recovered YTD</div><div class="v" data-kpi="recovered">${usd0(MODEL.recovered)}</div><div class="s">claims & fixes you've banked</div></div>
       </div>`;
 
     // the triage queue (toolbar + table + foot) renders into its own container
@@ -383,10 +381,8 @@ Thank you,
     setText('[data-kpi="inverters"]', num(k.inverters));
     setText('[data-kpi="healthy"]', k.healthyPct+"%");
     const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.width = k.healthyPct+"%";
-    setText('[data-kpi="risk"]', usd0(k.riskMo));
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
-    setText('[data-kpi="recovered"]', usd0(MODEL.recovered));
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
   }
 
@@ -394,7 +390,7 @@ Thank you,
   // structural change (load / drag / triage) does the full render.
   function onStore(state, kind){
     if(!host()) return;
-    if(kind === "live" && document.querySelector('[data-kpi="risk"]')){ paintKpis(); return; }
+    if(kind === "live" && document.querySelector('[data-kpi="flagged"]')){ paintKpis(); return; }
     MODEL = buildModel(FleetStore.snapshot());
     render();
   }

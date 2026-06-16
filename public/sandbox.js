@@ -421,10 +421,13 @@
 
   // ---- sandbox orientation (vertical = arrays side-by-side, inverters drop BELOW
   // each array; horizontal = arrays stacked on the LEFT, inverters spread out to
-  // the RIGHT of their array). Persisted under ORIENT_KEY; default vertical. ----
+  // the RIGHT of their array). Persisted under ORIENT_KEY; DEFAULT horizontal. ----
   function getOrient(){
-    try { return localStorage.getItem(ORIENT_KEY) === "horizontal" ? "horizontal" : "vertical"; }
-    catch(e){ return "vertical"; }
+    try {
+      const v = localStorage.getItem(ORIENT_KEY);
+      // default to horizontal when the owner hasn't explicitly chosen vertical
+      return v === "vertical" ? "vertical" : "horizontal";
+    } catch(e){ return "horizontal"; }
   }
   function setOrient(o){
     try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
@@ -864,7 +867,45 @@
     };
     host.innerHTML = "";
     host.appendChild(card);
+    makeDetailDraggable(host, card);     // owner can drag the card by its header
     refreshDetailCard();                 // seed the live figures immediately
+  }
+
+  // Make the floating inverter detail card movable: drag it by its header. We move
+  // the HOST (#sbDetail), switching it from its default right/bottom anchor to an
+  // explicit left/top once the owner starts dragging, and clamp it inside #sbWrap
+  // so it can't be flung off-screen. Pointer events so it works with mouse + touch.
+  function makeDetailDraggable(host, card){
+    const handle = card.querySelector(".sb-dc-head");
+    if(!handle) return;
+    handle.classList.add("sb-dc-grab");
+    handle.addEventListener("pointerdown", e => {
+      if(e.target.closest("a, button")) return;          // links/close button keep their own behaviour
+      e.preventDefault();
+      const bounds = (document.getElementById("sbWrap") || document.body).getBoundingClientRect();
+      const cr = host.getBoundingClientRect();
+      // pin to left/top in the wrap's coordinate space (drop the right/bottom anchor)
+      const startX = e.clientX, startY = e.clientY;
+      let left = cr.left - bounds.left, top = cr.top - bounds.top;
+      host.style.right = "auto"; host.style.bottom = "auto";
+      host.style.left = left + "px"; host.style.top = top + "px";
+      host.classList.add("sb-dragging");
+      try { handle.setPointerCapture(e.pointerId); } catch(_){}
+      const move = ev => {
+        const nx = left + (ev.clientX - startX), ny = top + (ev.clientY - startY);
+        const maxX = bounds.width - cr.width - 6, maxY = bounds.height - cr.height - 6;
+        host.style.left = Math.max(6, Math.min(maxX, nx)) + "px";
+        host.style.top  = Math.max(6, Math.min(maxY, ny)) + "px";
+      };
+      const up = ev => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        host.classList.remove("sb-dragging");
+        try { handle.releasePointerCapture(ev.pointerId); } catch(_){}
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+    });
   }
 
   // Live-refresh the open detail card in place (called each ticker tick). Re-reads
@@ -1609,7 +1650,13 @@
   function renderFromStore(){
     const host = document.getElementById("sandbox");
     if(!host || !window.FleetStore) return;
-    if(!FleetStore.isLoaded()){ host.innerHTML = `<div class="sb-empty">Loading your fleet tree…</div>`; FleetStore.load(); return; }
+    if(!FleetStore.isLoaded()){
+      // Kick the fetch immediately and show a light, unobtrusive skeleton (not a
+      // big "Loading…" banner) so startup feels instant rather than blocked.
+      host.innerHTML = `<div class="sb-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>`;
+      FleetStore.load();
+      return;
+    }
     render(FleetStore.focusColumns());
   }
   // names the rest of the file / tab system still call:

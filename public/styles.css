@@ -427,6 +427,14 @@
   .sb-foot-status.ok{color:var(--good)} .sb-foot-status.warn{color:var(--warn)} .sb-foot-status.bad{color:var(--bad)}
   .sb-foot b{color:var(--ink)}
   .sb-empty{color:var(--muted);text-align:center;padding:60px 20px;font-size:14px;border:1px dashed var(--line);border-radius:16px}
+  /* light instant-startup skeleton: a few pulsing card ghosts while the fleet
+     fetch is in flight (replaces the old "Loading…" banner so startup feels live) */
+  .sb-skeleton{display:flex;gap:24px;padding:48px 24px;align-items:flex-start}
+  .sb-skeleton span{display:block;width:300px;height:120px;border-radius:14px;
+    background:linear-gradient(100deg,rgba(255,255,255,.03) 30%,rgba(255,255,255,.07) 50%,rgba(255,255,255,.03) 70%);
+    background-size:200% 100%;animation:sbshimmer 1.1s ease-in-out infinite;border:1px solid var(--line)}
+  .sb-skeleton span:nth-child(2){opacity:.7} .sb-skeleton span:nth-child(3){opacity:.45}
+  @keyframes sbshimmer{to{background-position:-200% 0}}
 
   @media(max-width:720px){
     .sb-inv{width:80px}
@@ -542,6 +550,10 @@
     font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
   .sb-dc-x:hover{color:var(--ink)}
   .sb-dc-head{padding-right:18px}
+  .sb-dc-grab{cursor:grab;touch-action:none;user-select:none}
+  .sb-dc-grab:active{cursor:grabbing}
+  .sb-detail-host.sb-dragging{cursor:grabbing}
+  .sb-detail-host.sb-dragging .sb-detail-card{box-shadow:0 24px 60px -20px rgba(0,0,0,.85),0 0 0 1px rgba(63,214,138,.35)}
   .sb-dc-name{font-size:14px;font-weight:700;color:var(--ink)}
   .sb-dc-array{font-size:11px;color:var(--muted);margin-top:2px}
   .sb-dc-now{display:flex;align-items:center;gap:7px;margin:10px 0 9px;font-size:18px;color:var(--ink)}
