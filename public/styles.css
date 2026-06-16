@@ -408,12 +408,24 @@
   .sb-inv-size{font-size:10px;font-weight:700;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
   .sb-inv-spark{display:block;width:100%;height:34px;margin:7px 0 2px}
   .sb-inv-nospark{height:34px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--faint);margin:7px 0 2px;border:1px dashed var(--line);border-radius:8px}
-  .sb-inv-stats{display:flex;justify-content:space-between;gap:4px;margin-top:5px}
-  .sb-inv-stat{flex:1 1 0;text-align:center;display:flex;flex-direction:column;gap:1px;min-width:0}
-  .sb-inv-stat-k{font-size:8px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700}
-  .sb-inv-stat b{font-size:12px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
-  .sb-inv-stat.cur b{font-size:14px;color:var(--ink)}
-  .sb-inv-stat-u{font-size:8px;color:var(--faint)}
+  /* live output bar: current power as % of rated max; fill + card tint by tone */
+  .sb-outbar{margin-top:7px}
+  .sb-ob-head{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;margin-bottom:4px}
+  .sb-ob-k{font-size:8px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;flex:1 1 auto}
+  .sb-ob-pct{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .sb-ob-of{font-size:8.5px;color:var(--faint);font-weight:600}
+  .sb-ob-of .sb-ob-cur{color:var(--muted);font-weight:700}
+  .sb-ob-idle{font-size:9px;color:var(--faint);font-style:italic}
+  .sb-ob-track{height:7px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+  .sb-ob-fill{height:100%;border-radius:999px;transition:width .6s ease,background .4s ease}
+  /* tone: green at/near max → amber → deep orange far below max → idle (offline) */
+  .sb-outbar.ok   .sb-ob-pct{color:var(--good)}   .sb-outbar.ok   .sb-ob-fill{background:linear-gradient(90deg,#2fae6e,var(--good))}
+  .sb-outbar.warn .sb-ob-pct{color:#ffb454}        .sb-outbar.warn .sb-ob-fill{background:linear-gradient(90deg,#e8932f,#ffb454)}
+  .sb-outbar.bad  .sb-ob-pct{color:#ff8a3d}        .sb-outbar.bad  .sb-ob-fill{background:linear-gradient(90deg,#ff6a2c,#ff8a3d)}
+  .sb-outbar.idle .sb-ob-pct{color:var(--faint)}   .sb-outbar.idle .sb-ob-fill{background:rgba(255,255,255,.12)}
+  /* the whole inverter card drifts orange as live output falls below its max */
+  .sb-inv[data-tone="warn"]{border-color:rgba(255,160,70,.45);background:linear-gradient(165deg,rgba(255,150,60,.06),var(--card2))}
+  .sb-inv[data-tone="bad"]{border-color:rgba(255,120,50,.6);background:linear-gradient(165deg,rgba(255,110,44,.1),var(--card2))}
   .sb-inv-alert{font-size:9.5px;font-weight:700;margin-top:7px;padding:3px 6px;border-radius:7px;text-align:center;letter-spacing:.01em}
   .sb-inv-alert.ok{color:var(--good);background:rgba(63,214,138,.08)}
   .sb-inv-alert.warn{color:var(--warn);background:rgba(255,180,84,.12)}

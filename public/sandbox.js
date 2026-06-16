@@ -551,7 +551,6 @@
          </div>
          <div class="sb-head-actions"><div class="sb-head-btns">
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
-           <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>
          <div class="sb-empty">No arrays connected yet — hit <b>+ Add array</b> to bring your inverters in.</div>`;
@@ -572,7 +571,6 @@
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
-            <span class="sb-cardbtn-wrap"><button class="sb-cardbtn" id="sbAddCard" type="button" title="Drop a note or live-metric card onto the canvas">+ Card</button></span>
             <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
           </div>
           <div class="sb-legend">
@@ -700,6 +698,17 @@
       node.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") { e.preventDefault(); show(); } });
     });
 
+    // right-click an array card → small "Delete array" menu (persisted via FleetStore)
+    host.addEventListener("contextmenu", e => {
+      const col = e.target.closest && e.target.closest(".sb-col");
+      if(!col || !host.contains(col)) return;        // not on an array card → native menu
+      e.preventDefault();
+      const id = col.dataset.arrayId;
+      const nameEl = col.querySelector(".sb-array-name");
+      const name = nameEl ? nameEl.textContent.trim() : "this array";
+      showArrayCtxMenu(e.clientX, e.clientY, id, name);
+    });
+
     wireFullscreen(host);
     wireOrient(host);
     wireAddButton(host);
@@ -824,7 +833,17 @@
   // ---- live-output helpers (used by the detail card's "lost so far" $ math).
   // The floating peer-drop alert cards that once also used these were removed —
   // each array's rolled-up alert now lives in its card's right inner column.
-  function _liveKW(el){ const v = el.querySelector(".sb-now-val"); return v ? parseFloat(v.textContent) : NaN; }
+  function _liveKW(el){
+    // live kW now reads from the output bar's live current figure (.sb-ob-cur),
+    // falling back to its seeded data-curw watts. (The old .sb-now-val on the card
+    // was replaced by the live output bar.)
+    const c = el.querySelector(".sb-ob-cur");
+    const live = c ? parseFloat(c.textContent) : NaN;
+    if(isFinite(live)) return live;
+    const bar = el.querySelector(".sb-outbar");
+    const w = bar ? parseFloat(bar.dataset.curw) : NaN;
+    return isFinite(w) ? w/1000 : NaN;
+  }
   function _nameplateKW(el){ const m = (el.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : NaN; }
 
   // ---- selected-inverter DETAIL CARD ----
@@ -910,8 +929,8 @@
   function showDetailCard(node){
     const host = detailHost();
     const d = node.dataset;
-    const liveEl = node.querySelector(".sb-now-val");
-    const live = liveEl ? liveEl.textContent : null;
+    const lk = _liveKW(node);                                    // live kW from the output bar
+    const live = isFinite(lk) ? lk.toFixed(1) : null;
     const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
     const piEl = node.querySelector(".sb-pi span");
     const pi = piEl ? piEl.textContent.trim() : "";
@@ -1026,8 +1045,8 @@
     const d = node.dataset;
 
     // 1) live kW now
-    const liveEl = node.querySelector(".sb-now-val");
-    const live = liveEl ? liveEl.textContent : null;
+    const lk = _liveKW(node);
+    const live = isFinite(lk) ? lk.toFixed(1) : null;
     const kwEl = card.querySelector(".dc-kw");
     if(kwEl){
       const liveStr = (live && live !== "—") ? `${live} kW now` : (d.power || "— kW now");
@@ -1108,12 +1127,12 @@
   const METRIC_ORDER = ["fleet_now","attention","capacity","arrays"];
 
   function _invNowKW(inv){
-    // Prefer the live ticker's displayed value; fall back to the seeded base watts.
-    const v = inv.querySelector(".sb-now-val");
-    const live = v ? parseFloat(v.textContent) : NaN;
+    // Prefer the live output bar's displayed current; fall back to its seeded watts.
+    const c = inv.querySelector(".sb-ob-cur");
+    const live = c ? parseFloat(c.textContent) : NaN;
     if(isFinite(live)) return live;
-    const nowEl = inv.querySelector(".sb-inv-now");
-    const baseW = nowEl ? parseFloat(nowEl.dataset.basew) : NaN;
+    const bar = inv.querySelector(".sb-outbar");
+    const baseW = bar ? parseFloat(bar.dataset.curw) : NaN;
     return isFinite(baseW) ? baseW/1000 : 0;
   }
   function _invNpKW(inv){ const m = (inv.dataset.np||"").match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; }
@@ -1201,6 +1220,50 @@
   }
   function closeCardMenu(){
     document.querySelectorAll(".sb-card-menu").forEach(m => m.remove());
+  }
+
+  // ---- right-click array context menu → "Delete array" (persisted via FleetStore) ----
+  // Self-contained: one menu in the DOM at a time, appended to <body> (absolute) so the
+  // canvas overflow can't clip it. Dismissed on outside click / Escape / scroll / another
+  // contextmenu. Confirming calls FleetStore.deleteArray(id) (optimistic + backend DELETE).
+  function closeArrayCtxMenu(){
+    document.querySelectorAll(".sb-ctxmenu").forEach(m => m.remove());
+    document.removeEventListener("click", closeArrayCtxMenu, true);
+    document.removeEventListener("keydown", _arrayCtxKey, true);
+    document.removeEventListener("scroll", closeArrayCtxMenu, true);
+    document.removeEventListener("contextmenu", _arrayCtxOther, true);
+  }
+  function _arrayCtxKey(e){ if(e.key === "Escape") closeArrayCtxMenu(); }
+  function _arrayCtxOther(e){
+    // a contextmenu landing on our own menu shouldn't dismiss it; anything else does
+    if(!(e.target.closest && e.target.closest(".sb-ctxmenu"))) closeArrayCtxMenu();
+  }
+  function showArrayCtxMenu(x, y, id, name){
+    closeArrayCtxMenu();                               // only ever one menu
+    const menu = el(`<div class="sb-ctxmenu" role="menu">
+      <button type="button" class="sb-ctxmenu-del" role="menuitem">Delete array</button>
+    </div>`);
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+    menu.addEventListener("click", ev => ev.stopPropagation());
+    menu.querySelector(".sb-ctxmenu-del").onclick = () => {
+      if(confirm(`Delete array "${name}"? This removes it and its inverters from your fleet.`)){
+        FleetStore.deleteArray(id);
+      }
+      closeArrayCtxMenu();
+    };
+    document.body.appendChild(menu);
+    // keep the menu inside the viewport if it would overflow the right/bottom edge
+    const r = menu.getBoundingClientRect();
+    if(r.right > window.innerWidth) menu.style.left = Math.max(4, window.innerWidth - r.width - 4) + "px";
+    if(r.bottom > window.innerHeight) menu.style.top = Math.max(4, window.innerHeight - r.height - 4) + "px";
+    // dismissers (capture phase so they fire before anything stops propagation)
+    setTimeout(() => {
+      document.addEventListener("click", closeArrayCtxMenu, true);
+      document.addEventListener("keydown", _arrayCtxKey, true);
+      document.addEventListener("scroll", closeArrayCtxMenu, true);
+      document.addEventListener("contextmenu", _arrayCtxOther, true);
+    }, 0);
   }
 
   // Create a brand-new card (default free), persist it, and render it.
