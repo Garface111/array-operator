@@ -24,9 +24,36 @@ window.FleetStore = (function(){
 
   const SESSION_KEY = "so_session";
   const TRIAGE_KEY  = "cc_triage_state";   // {rowKey: "progress"|"snoozed"}
+  const CACHE_KEY   = "ao_fleet_cache";    // last real fleet tree, for instant paint on reload
   const WINDOW_DAYS = 14;
   const UNDERPERF_PI = 0.85;               // at/above = healthy
   const getSession = () => { try { return localStorage.getItem(SESSION_KEY); } catch(e){ return null; } };
+
+  // ---- instant-reload cache --------------------------------------------------
+  // The first paint used to BLOCK on the /fleet-tree round-trip, so a slow/cold
+  // backend left the sandbox blank for seconds. We now snapshot a signed-in
+  // owner's real tree to localStorage and hydrate from it INSTANTLY on reload,
+  // then refresh from the network in the background. Keyed per-session so a
+  // different login can't read the previous owner's cached fleet.
+  function cacheKeyFor(sess){ return CACHE_KEY + ":" + (sess ? sess.slice(0,12) : "anon"); }
+  function saveFleetCache(arrays, recovered){
+    const s = getSession(); if(!s) return;                 // only cache real, signed-in data
+    try {
+      localStorage.setItem(cacheKeyFor(s), JSON.stringify({
+        v: 1, at: Date.now(), recovered: recovered||0, arrays: arrays
+      }));
+    } catch(e){ /* quota/serialise — non-fatal, just lose the fast path */ }
+  }
+  function readFleetCache(){
+    const s = getSession(); if(!s) return null;
+    try {
+      const raw = localStorage.getItem(cacheKeyFor(s));
+      if(!raw) return null;
+      const c = JSON.parse(raw);
+      if(!c || c.v !== 1 || !Array.isArray(c.arrays)) return null;
+      return c;
+    } catch(e){ return null; }
+  }
 
   // ---- state ----
   const state = {
@@ -252,6 +279,11 @@ window.FleetStore = (function(){
     if(!state.focus.length) state.focus = defaultFocusIds();
     state.loaded = true;
     _lastUpdate = Date.now();
+    // Snapshot real, signed-in fleet data for an instant paint on the next reload.
+    // (Skip the simulated demo and the hydrate path itself, which pass fromCache.)
+    if(!state.simulated && !(opts && opts.fromCache) && getSession()){
+      saveFleetCache(arrays, state.recovered);
+    }
     startHeartbeat();
     notify("load");
   }
@@ -310,7 +342,9 @@ window.FleetStore = (function(){
   // store to a signed-out state so views prompt re-auth instead of showing the
   // simulated demo fleet over the owner's real (still-persisted) arrays.
   function onAuthExpired(){
+    const s = getSession();
     try { localStorage.removeItem(SESSION_KEY); } catch(e){}
+    try { if(s) localStorage.removeItem(cacheKeyFor(s)); } catch(e){}
     state.arrays = []; state.simulated = false; state.authExpired = true;
     state.loaded = true; state.focus = [];
     notify("auth");
@@ -321,6 +355,14 @@ window.FleetStore = (function(){
     if(state.loaded || _loading) return;     // single shared bootstrap — both views may call it
     _loading = true;
     if(getSession()){
+      // INSTANT PAINT: if we have a cached snapshot of this owner's real tree,
+      // ingest it immediately so the sandbox renders with zero network wait, then
+      // refresh from the backend in the background and re-ingest the authoritative
+      // tree when it arrives. No cache (first ever load) → fall through to fetch.
+      const cached = readFleetCache();
+      if(cached){
+        ingest(cached.arrays, { recovered: cached.recovered, fromCache: true });
+      }
       fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+getSession() } })
         .then(r => {
           // 401/403 = expired/invalid session, NOT a data outage. Do not paint
@@ -337,9 +379,9 @@ window.FleetStore = (function(){
         })
         .catch((err) => {
           if(err && err.auth){ onAuthExpired(); return; }
-          // Transient (network/5xx) for a signed-in owner: show an honest empty
-          // tree rather than a fake fleet that looks like their data changed.
-          ingest([], {});
+          // Transient (network/5xx) for a signed-in owner: keep the cached tree if
+          // we painted one; otherwise show an honest empty tree (never a fake fleet).
+          if(!cached) ingest([], {});
         });
     } else {
       // Anonymous visitor (marketing/preview) — the simulated fleet tells the story.
