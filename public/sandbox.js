@@ -1278,8 +1278,13 @@
     c.style.transform = prev;
     const vw = vp.clientWidth, vh = vp.clientHeight;
     if(!cw || !ch || !vw || !vh) return;
-    const z = Math.max(0.4, Math.min(2.2, Math.min(vw/cw, vh/ch) * 0.92));
-    _view = { z, x: (vw - cw*z)/2, y: Math.max(8, (vh - ch*z)/2) };
+    const z = Math.max(0.5, Math.min(1.15, Math.min(vw/cw, vh/ch) * 0.96));
+    const scaledH = ch * z;
+    // Top-anchor when the (often-collapsed) cards are shorter than the viewport,
+    // so they sit at the top with room to expand into — never floating dead-center
+    // in a tall empty canvas.
+    const y = scaledH < vh - 32 ? 56 : Math.max(8, (vh - scaledH)/2);
+    _view = { z, x: (vw - cw*z)/2, y };
     applyCanvasView(host);
   }
   function wirePanZoom(host){

@@ -121,17 +121,11 @@
       <span>drill into one array — drag any inverter to re-measure it against new neighbors</span>
     </div>
 
-    <!-- (TOP) SANDBOX — live 3-tier fleet tree; drag any inverter to rearrange.
-         Two sub-views: the default inverter comb (#sandbox) and a free-form
-         spatial site map (#sbLayout, rendered by layout-view.js). #sbViewTabs
-         flips between them; the active view persists in localStorage. -->
+    <!-- (TOP) SANDBOX — live fleet tree of array cards; expand any array to its
+         inverter comb and drag any inverter to rearrange. Rendered by sandbox.js
+         into #sandbox. -->
     <section id="sbWrap">
-      <div id="sbViewTabs" role="tablist" aria-label="Fleet view">
-        <button id="sbTabInverters" class="sb-vtab active" type="button" role="tab" aria-selected="true">Inverters</button>
-        <button id="sbTabLayout" class="sb-vtab" type="button" role="tab" aria-selected="false">Layout</button>
-      </div>
       <div id="sandbox"></div>
-      <div id="sbLayout" hidden></div>
     </section>
 
     <!-- Triage queue — collapsible header; COLLAPSED by default so the fleet tree
@@ -173,7 +167,6 @@
 <script src="fleet-store.js"></script>
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
-<script src="layout-view.js"></script>
 <script src="command-center.js"></script>
 <script src="claims.js"></script>
 <script src="reports.js"></script>

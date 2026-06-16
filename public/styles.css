@@ -304,11 +304,46 @@
   #sbWrap input,#sbWrap textarea,#sbWrap select{-webkit-user-select:text;-ms-user-select:text;user-select:text}
   /* promote to a GPU layer only mid-gesture; idle = re-rasterized crisp at scale */
   .sb-canvas.sb-interacting{will-change:transform}
-  .sb-col{flex:0 0 auto;min-width:220px;max-width:300px;display:flex;flex-direction:column;align-items:stretch}
+  .sb-col{flex:0 0 auto;min-width:340px;max-width:460px;display:flex;flex-direction:column;align-items:stretch}
 
-  /* TIER 1: Alert */
+  /* ===== ARRAY CARD — the glassy main node, with two inner columns ===== */
+  /* The whole card is the column; the ⠿ grip (top-right corner) reorders it. */
+  .sb-array{position:relative;border-radius:14px;padding:15px 16px;border:1px solid var(--line);
+    background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.018));text-align:left}
+  .sb-array-body{display:flex;gap:14px;align-items:stretch}
+
+  /* LEFT inner column: array identity + where its data comes from */
+  .sb-array-details{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+  .sb-array-k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--sky)}
+  .sb-array-name{font-size:16px;font-weight:740;color:var(--ink);margin-top:4px;letter-spacing:-.01em}
+  /* inline-editable names (array + inverter): hint with a text caret + faint hover outline */
+  .sb-editable{cursor:text;border-radius:6px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .12s,background-color .12s}
+  .sb-editable:hover{outline-color:rgba(94,194,255,.35)}
+  .sb-editable.sb-editing{outline:1px solid var(--good);outline-offset:2px;background:rgba(63,214,138,.1);cursor:text}
+  .sb-array-meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:7px;justify-content:flex-start;align-items:center;flex-wrap:wrap}
+  .sb-srctag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--faint);letter-spacing:.02em}
+  .sb-srctag.live{background:rgba(63,214,138,.16);color:var(--good)}
+  .sb-srctag.off{background:rgba(255,107,107,.14);color:var(--bad)}
+
+  /* data-scraping site deep links (column.origin_links → vendor portals) */
+  .sb-origins{display:flex;flex-direction:column;gap:3px;margin-top:9px}
+  .sb-origin{font-size:11.5px;font-weight:650;color:var(--good);text-decoration:none;letter-spacing:.01em}
+  .sb-origin:hover{color:var(--good2);text-decoration:underline}
+
+  /* expand/collapse toggle for this array's inverter comb */
+  .sb-inv-toggle{margin-top:11px;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;
+    background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px 5px 10px;color:var(--muted);font-size:12px;font-weight:650;cursor:pointer;
+    transition:border-color .12s,color .12s,background .12s}
+  .sb-inv-toggle:hover{border-color:rgba(63,214,138,.45);color:var(--ink)}
+  .sb-inv-toggle .sb-array-count{font-variant-numeric:tabular-nums}
+  .sb-inv-toggle-chev{display:inline-block;color:var(--good);font-size:11px;transition:transform .15s}
+  .sb-col.expanded .sb-inv-toggle-chev{transform:rotate(90deg)}
+
+  /* RIGHT inner column: rolled-up alert for THIS array (tinted by level) */
   .sb-alert{border-radius:14px;padding:13px 15px;border:1px solid var(--line);position:relative;
     background:linear-gradient(165deg,var(--card),var(--card2))}
+  .sb-array .sb-alert{flex:0 0 42%;align-self:stretch}
   .sb-alert.ok{border-color:rgba(63,214,138,.28)}
   .sb-alert.warn{border-color:rgba(255,180,84,.4);background:linear-gradient(165deg,rgba(255,180,84,.1),rgba(255,180,84,.03))}
   .sb-alert.bad{border-color:rgba(255,107,107,.45);background:linear-gradient(165deg,rgba(255,107,107,.12),rgba(255,107,107,.03))}
@@ -318,34 +353,9 @@
   .sb-alert-h{font-size:14px;font-weight:700;color:var(--ink);margin-top:5px;line-height:1.3}
   .sb-alert-c{font-size:12px;color:var(--muted);margin-top:3px}
 
-  /* connectors */
-  .sb-link{width:2px;height:26px;margin:0 auto;background:var(--line)}
-  .sb-link.v1.ok{background:linear-gradient(var(--good),rgba(63,214,138,.2))}
-  .sb-link.v1.warn{background:linear-gradient(var(--warn),rgba(255,180,84,.2))}
-  .sb-link.v1.bad{background:linear-gradient(var(--bad),rgba(255,107,107,.2))}
-  /* megaline: the bright single trunk segment from the array into the comb;
-     power flows UP into the array. The SVG feeder wires continue it through the
-     inverter cluster (see drawFleetConnectors in sandbox.js). */
-  /* faint hairline from the array into the comb; the rising SVG mote (below)
-     is what conveys energy flowing UP into the array. */
-  .sb-link.v2{width:1px;height:30px;margin:0 auto;background:transparent}
-
-  /* TIER 2: Array */
-  .sb-array{border-radius:14px;padding:14px 16px;border:1px solid rgba(94,194,255,.28);
-    background:linear-gradient(165deg,rgba(94,194,255,.08),rgba(255,255,255,.015));text-align:center}
-  .sb-array-k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--sky)}
-  .sb-array-name{font-size:16px;font-weight:740;color:var(--ink);margin-top:4px;letter-spacing:-.01em}
-  /* inline-editable names (array + inverter): hint with a text caret + faint hover outline */
-  .sb-editable{cursor:text;border-radius:6px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .12s,background-color .12s}
-  .sb-editable:hover{outline-color:rgba(94,194,255,.35)}
-  .sb-editable.sb-editing{outline:1px solid var(--good);outline-offset:2px;background:rgba(63,214,138,.1);cursor:text}
-  .sb-array-meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:wrap}
-  .sb-srctag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--faint);letter-spacing:.02em}
-  .sb-srctag.live{background:rgba(63,214,138,.16);color:var(--good)}
-  .sb-srctag.off{background:rgba(255,107,107,.14);color:var(--bad)}
-
-  /* TIER 3: Inverter comb */
-  .sb-comb{margin-top:0}
+  /* ===== Collapsible inverter comb — hidden until its array is expanded ===== */
+  .sb-comb{display:none;margin-top:14px}
+  .sb-col.expanded .sb-comb{display:block}
   /* converging feeder wires: each inverter curves up into a central trunk that
      flows into the array. Drawn as SVG by drawFleetConnectors(); sits behind the
      inverter cards and scales with the pan/zoom canvas transform. */
@@ -356,8 +366,6 @@
   svg.sb-wires path.feed,svg.sb-wires path.trunk{stroke:rgba(63,214,138,.10);stroke-width:1}
   /* slick, barely-bordered cards so the fleet floats; status (warn/bad) borders win */
   .sb-inv{border-color:rgba(255,255,255,.05)}
-  .sb-alert{border-color:rgba(255,255,255,.06)}
-  .sb-array{border-color:rgba(94,194,255,.16)}
   svg.sb-wires path.flow{stroke:rgba(205,255,232,.95);stroke-width:2.5;stroke-linecap:round;
     stroke-dasharray:5 26;filter:drop-shadow(0 0 6px rgba(63,214,138,.85));animation:moterise 3s linear infinite}
   @keyframes moterise{to{stroke-dashoffset:-31}}
@@ -370,7 +378,7 @@
   @keyframes sbflowv{0%{background-position:0 -130%,0 0}100%{background-position:0 130%,0 0}}
   @keyframes sbflowup{0%{background-position:0 130%,0 0}100%{background-position:0 -130%,0 0}}
   @keyframes sbflowh{0%{background-position:-60% 0,0 0}100%{background-position:165% 0,0 0}}
-  @media (prefers-reduced-motion:reduce){.sb-link.v2,svg.sb-wires path.flow{animation:none}}
+  @media (prefers-reduced-motion:reduce){svg.sb-wires path.flow{animation:none}}
   .sb-inv:hover,.sb-inv:focus{transform:translateY(-2px);border-color:rgba(63,214,138,.5);outline:none;box-shadow:0 10px 24px -14px rgba(0,0,0,.8)}
   .sb-inv.sel{border-color:var(--good);box-shadow:0 0 0 1px var(--good),0 10px 24px -14px rgba(0,0,0,.8)}
   .sb-inv.warn{border-color:rgba(255,180,84,.4)}
@@ -405,8 +413,13 @@
   .sb-empty{color:var(--muted);text-align:center;padding:60px 20px;font-size:14px;border:1px dashed var(--line);border-radius:16px}
 
   @media(max-width:720px){
-    .sb-col{min-width:180px}
     .sb-inv{width:80px}
+  }
+  /* narrow viewports: the array card's two inner columns stack vertically */
+  @media(max-width:560px){
+    .sb-col{min-width:260px}
+    .sb-array-body{flex-direction:column}
+    .sb-array .sb-alert{flex-basis:auto;align-self:auto}
   }
 
   /* ===== VIEW TABS (NEPOOL-style pill/underline, dark skin) ===== */
@@ -502,20 +515,6 @@
   .sb-toast.ok{border-color:rgba(63,214,138,.45)}
   .sb-toast.err{border-color:rgba(255,107,107,.5)}
   .sb-toast.alert{border-color:rgba(255,107,107,.7);background:linear-gradient(165deg,#2a1416,#1a0f12)}
-  .sb-inv-alarm{border-color:var(--bad)!important;animation:alarmpulse 1.05s ease-in-out infinite}
-  @keyframes alarmpulse{0%,100%{box-shadow:0 0 0 1px rgba(255,107,107,.5),0 0 12px -2px rgba(255,107,107,.4)}50%{box-shadow:0 0 0 1px rgba(255,107,107,.85),0 0 22px 0 rgba(255,107,107,.8)}}
-  .sb-alert.sb-alert-flash{animation:alertbanner 1.7s ease}
-  @keyframes alertbanner{0%{box-shadow:0 0 0 0 rgba(255,180,84,.55)}100%{box-shadow:0 0 0 13px rgba(255,180,84,0)}}
-  .sb-alerts{position:absolute;left:24px;bottom:24px;width:min(420px,46%);display:flex;flex-direction:column;gap:8px;z-index:6}
-  .sb-alert-card{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:12px;border:1px solid rgba(255,107,107,.45);background:linear-gradient(165deg,#241318,#171015);box-shadow:0 14px 34px -18px rgba(0,0,0,.8);animation:acin .35s ease}
-  @keyframes acin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .sb-ac-ic{font-size:15px;line-height:1.2;flex:none}
-  .sb-ac-body{flex:1;min-width:0}
-  .sb-ac-h{font-size:12.5px;color:var(--ink);font-weight:600}
-  .sb-ac-h b{color:var(--bad)}
-  .sb-ac-sub{font-size:10.5px;color:var(--muted);margin-top:2px}
-  .sb-ac-x{flex:none;background:none;border:0;color:var(--faint);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
-  .sb-ac-x:hover{color:var(--ink)}
 
   /* ===== Selected-inverter detail card (bottom-right of viewport) ===== */
   .sb-detail-host{position:absolute;right:24px;bottom:24px;width:min(330px,42%);z-index:7}
@@ -552,6 +551,10 @@
   .sb-dc-lost b.dc-lost{font-size:16px;font-weight:700;color:var(--bad);font-variant-numeric:tabular-nums}
   .dc-lost.tick{animation:lostflash .5s ease}
   @keyframes lostflash{0%{color:var(--warn)}100%{color:var(--bad)}}
+  /* origin deep-link row — jump to this inverter's source site / vendor portal */
+  .sb-dc-origin{display:inline-block;margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:12px;font-weight:650;color:var(--good);text-decoration:none}
+  .sb-dc-origin:hover{color:var(--good2);text-decoration:underline}
 
   /* ===== 'Reset layout' text button (sandbox header) ===== */
   .sb-head-btns{display:flex;align-items:center;gap:10px}
@@ -704,56 +707,3 @@
 
 
 
-  /* ===== Layout tab (spatial fleet map) ===== */
-  /* Sub-view switch that sits above #sandbox / #sbLayout inside #sbWrap. */
-  #sbViewTabs{display:inline-flex;gap:4px;margin:0 0 14px;padding:4px;border:1px solid var(--line);
-              border-radius:12px;background:rgba(255,255,255,.025)}
-  .sb-vtab{border:0;cursor:pointer;background:transparent;color:var(--muted);font-size:13px;font-weight:650;
-           padding:7px 16px;border-radius:9px;transition:background .15s,color .15s}
-  .sb-vtab:hover{color:var(--ink)}
-  .sb-vtab.active{background:rgba(94,194,255,.12);color:var(--sky)}
-  #sbLayout{position:relative}   /* positioning context for the pinned detail panel */
-
-  .lay-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-  .lay-toolbar .sb-spacerflex,.lay-toolbar .lay-spacer{flex:1 1 auto}
-  .lay-hint{color:var(--muted);font-size:12.5px}
-
-  .lay-viewport{position:relative;overflow:auto;height:calc(100vh - 250px);min-height:440px;border-radius:14px;
-                border:1px solid var(--line);background:rgba(255,255,255,.012)}
-  .lay-canvas{position:relative;min-height:100%;width:100%}
-
-  .lay-node{position:absolute;width:196px;box-sizing:border-box;
-            background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);
-            border-left:3px solid var(--line);border-radius:14px;padding:12px 14px;
-            cursor:grab;user-select:none;touch-action:none;box-shadow:0 6px 20px rgba(0,0,0,.28);
-            transition:border-color .15s,box-shadow .15s,transform .05s}
-  .lay-node:hover{border-color:rgba(94,194,255,.4)}
-  .lay-node.sel{border-color:rgba(94,194,255,.7);box-shadow:0 8px 26px rgba(94,194,255,.22)}
-  .lay-node.dragging{cursor:grabbing;z-index:20;box-shadow:0 14px 34px rgba(0,0,0,.45);opacity:.95}
-  .lay-node.ok{border-left-color:var(--good)}
-  .lay-node.warn{border-left-color:var(--warn)}
-  .lay-node.bad{border-left-color:var(--bad)}
-  .lay-node-top{display:flex;align-items:center;gap:8px}
-  .lay-node-name{font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lay-node-meta{display:flex;align-items:center;gap:8px;margin-top:7px}
-  .lay-node-count{color:var(--muted);font-size:11.5px}
-  .lay-node-kw{display:flex;align-items:center;gap:6px;margin-top:8px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
-  .lay-node-kw b{color:var(--ink);font-weight:700;font-size:13px}
-
-  /* inline array detail panel — pinned bottom-right of the layout panel */
-  .lay-detail{position:absolute;right:24px;bottom:24px;width:300px;max-height:60vh;overflow:auto;z-index:40;
-              background:linear-gradient(170deg,var(--bg2),var(--bg));border:1px solid var(--line);
-              border-radius:16px;padding:16px 16px 14px;box-shadow:0 18px 44px rgba(0,0,0,.5)}
-  .lay-d-x{position:absolute;top:10px;right:12px;border:0;background:transparent;color:var(--muted);
-           cursor:pointer;font-size:18px;line-height:1}
-  .lay-d-x:hover{color:var(--ink)}
-  .lay-d-head{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--ink)}
-  .lay-d-sub{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;margin-top:6px}
-  .lay-d-rows{margin-top:12px;display:flex;flex-direction:column;gap:7px}
-  .lay-d-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;font-size:12px}
-  .lay-d-mid{min-width:0;display:flex;flex-direction:column;gap:1px}
-  .lay-d-kw{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
-  .lay-d-name{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lay-d-stat{font-size:10.5px;color:var(--muted)}
-  .lay-d-stat.warn{color:var(--warn)} .lay-d-stat.bad{color:var(--bad)} .lay-d-stat.ok{color:var(--good)}
-  .lay-d-empty{color:var(--muted);font-size:12px;padding:6px 0}
