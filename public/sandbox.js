@@ -773,6 +773,9 @@
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
                data-np="${esc(np)}" data-win="${esc(inv.window_kwh!=null?inv.window_kwh+' kWh / 14d':'')}"
                data-mode="${esc(inv.last_mode||"")}" data-power="${esc(power)}"
+               data-np-kw="${esc(inv.nameplate_kw!=null?inv.nameplate_kw:'')}" data-win-kwh="${esc(inv.window_kwh!=null?inv.window_kwh:'')}"
+               data-pi="${esc(inv.peer_index!=null?inv.peer_index:'')}" data-stale="${esc(inv.stale_hours!=null?inv.stale_hours:'')}"
+               data-peak="${esc(inv.peak_kwh!=null?inv.peak_kwh:'')}" data-min="${esc(inv.min_kwh!=null?inv.min_kwh:'')}"
                data-origin-url="${esc(inv.origin_url||"")}" data-origin-label="${esc(inv.origin_label||"")}">
             <div class="sb-inv-top">
               <div class="sb-inv-name">${esc(inv.name)}</div>
@@ -1211,6 +1214,51 @@
       ? `<a class="sb-origin sb-dc-origin" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
       : "";
 
+    // ---- ENRICHED stats for the blown-up card: $ at stake, peer index, last-seen,
+    // nameplate, 14-day kWh, peak/low day, model. $ at stake is computed from this
+    // inverter's shortfall vs its FAIR SHARE of the array's production (same model
+    // as the overview grid / command center).
+    const npKw   = parseFloat(d.npKw) || 0;
+    const winKwh = parseFloat(d.winKwh);
+    const piNum  = parseFloat(d.pi);
+    const stale  = parseFloat(d.stale);
+    const peak   = parseFloat(d.peak);
+    const minD   = parseFloat(d.min);
+
+    // fair-share $ at stake from the array cohort (sum sibling inverter np + win)
+    let lossMo = 0;
+    if(col){
+      const sibs = [...col.querySelectorAll(".sb-inv")];
+      const totalNp  = sibs.reduce((t,n)=> t + (parseFloat(n.dataset.npKw)||0), 0) || 1;
+      const fleetWin = sibs.reduce((t,n)=> t + (parseFloat(n.dataset.winKwh)||0), 0);
+      const fair = npKw/totalNp*fleetWin;
+      let lostKwh = 0;
+      if(d.status==="dead" || d.status==="fault") lostKwh = Math.max(0, fair-(winKwh||0));
+      else if(d.status==="underperforming" && piNum) lostKwh = Math.max(0, fair/Math.max(piNum,0.01)-(winKwh||0));
+      lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
+    }
+
+    const lastSeen = (d.status==="comm_gap" && isFinite(stale) && stale>0)
+      ? (stale>=48 ? `${Math.round(stale/24)} days ago` : `${Math.round(stale)} h ago`)
+      : (d.status==="dead" ? "not reporting" : "live now");
+
+    const stat = (k,v,cls) => v ? `<div class="sb-dc-stat"><span class="sb-dc-sk">${k}</span><span class="sb-dc-sv ${cls||""}">${v}</span></div>` : "";
+    const statsHTML = [
+      lossMo>=1 ? `<div class="sb-dc-stat hero"><span class="sb-dc-sk">$ at stake</span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
+      stat("Peer index", isFinite(piNum) ? `${piNum.toFixed(2)} <small>vs neighbors</small>` : "", sCls),
+      stat("Nameplate", npKw ? `${npKw} kW` : ""),
+      stat("Last 14 days", isFinite(winKwh) ? `${winKwh.toLocaleString()} kWh` : ""),
+      stat("Last seen", lastSeen, d.status==="comm_gap"||d.status==="dead" ? "warn" : "ok"),
+      stat("Best day", isFinite(peak) ? `${peak} kWh` : ""),
+      stat("Lowest day", isFinite(minD) ? `${minD} kWh` : ""),
+      stat("Model", d.model || ""),
+    ].filter(Boolean).join("");
+
+    const diagHTML = d.diag
+      ? `<div class="sb-dc-diag ${sCls}">${esc(d.diag)}</div>` : "";
+    const arrayTag = arrayName
+      ? `<div class="sb-dc-array">${esc(arrayName)}</div>` : "";
+
     // BLOWN-UP CARD = an exact clone of the small inverter card, just bigger.
     // Cloning the live .sb-inv node guarantees identical data + styling (name,
     // size, spark, output bar, alert line, brand) — no separate layout to drift.
@@ -1223,7 +1271,11 @@
     const card = el(`
       <div class="sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
         <button class="sb-dc-x" type="button" title="Close" aria-label="Close detail">×</button>
+        ${arrayTag}
         <div class="sb-dc-bigcard"></div>
+        ${diagHTML}
+        <div class="sb-dc-stats">${statsHTML}</div>
+        ${originRow ? `<div class="sb-dc-actions">${originRow}</div>` : ""}
       </div>`);
     card.querySelector(".sb-dc-bigcard").appendChild(clone);
 
