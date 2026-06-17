@@ -613,20 +613,38 @@
     if(pct >= 55) return "warn";
     return "bad";
   }
-  function outputBar(inv){
+  // Single source of truth for an inverter's LIVE output state, used by both the
+  // output bar and the whole-card tint so they never disagree.
+  //  - A literal 0 (or a trickle below ~1% of rated / 25W) means the panels are
+  //    idle RIGHT NOW — evening, night, or simply not generating. That is NOT an
+  //    underperformance alarm, so it reads as "idle" (calm), never orange. This is
+  //    the fix for healthy "All good" inverters glowing orange every evening when
+  //    SolarEdge reports current_power_w: 0 instead of null.
+  //  - The orange/red output tint only fires when the inverter's HEALTH status is
+  //    already flagged (dead/fault/underperforming). A healthy inverter dipping
+  //    under clouds is normal and shouldn't alarm — real underperformance is caught
+  //    by the peer-based health status, which carries its own border + alert line.
+  function outputState(inv, statusCls){
     const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
-    const reporting = curW != null && maxW;
-    const pct = reporting ? Math.max(0, Math.min(100, Math.round((curW / maxW) * 100))) : null;
-    const tone = reporting ? pctTone(pct) : "idle";
+    const meaningful = curW != null && maxW != null && curW > Math.max(25, maxW * 0.01);
+    if(!meaningful) return { reporting: false, pct: null, tone: "idle" };
+    const pct = Math.max(0, Math.min(100, Math.round((curW / maxW) * 100)));
+    const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
+    return { reporting: true, pct, tone };
+  }
+  function outputBar(inv, statusCls){
+    const os = outputState(inv, statusCls);
+    const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
+    const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
     const curKw = curW != null ? (curW / 1000) : null;
     const maxKw = maxW != null ? (maxW / 1000) : null;
-    const label = reporting
-      ? `<b class="sb-ob-pct">${pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`
+    const label = os.reporting
+      ? `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`
       : `<span class="sb-ob-idle">not producing right now</span>`;
-    return `<div class="sb-outbar ${tone}" data-curw="${curW!=null?curW:''}" data-maxw="${maxW!=null?maxW:''}">
+    return `<div class="sb-outbar ${os.tone}" data-curw="${curW!=null?curW:''}" data-maxw="${maxW!=null?maxW:''}">
       <div class="sb-ob-head"><span class="sb-ob-k">Output now</span>${label}</div>
-      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${reporting?pct:0}%"></div></div>
+      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${os.reporting?os.pct:0}%"></div></div>
     </div>`;
   }
 
@@ -824,13 +842,10 @@
         const maxKwh = inv.peak_kwh!=null ? inv.peak_kwh : null;
         const minKwh = inv.min_kwh!=null ? inv.min_kwh : null;
         const spark = invSpark(inv.daily, sCls);
-        // output tone: live current vs rated max (nameplate) — drives the bar AND
-        // the whole-card orange tint. idle (not reporting) carries no alarm tint.
-        const _maxW = inv.nameplate_kw!=null ? inv.nameplate_kw*1000 : null;
-        const _curW = inv.current_power_w!=null ? inv.current_power_w : null;
-        const obTone = (_curW!=null && _maxW)
-          ? pctTone(Math.max(0, Math.min(100, Math.round((_curW/_maxW)*100))))
-          : "idle";
+        // output tone drives the bar AND the whole-card tint — see outputState():
+        // a near-zero live reading (evening/night) is idle (no alarm), and the
+        // orange tint only fires when health is already flagged.
+        const obTone = outputState(inv, sCls).tone;
         const isAlert = sCls !== "ok";
         const alertLine = isAlert
           ? `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`
@@ -851,7 +866,7 @@
               ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
             </div>
             ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
-            ${outputBar(inv)}
+            ${outputBar(inv, sCls)}
             ${alertLine}
             ${brandHTML(inv.vendor)}
           </div>`;
@@ -1129,7 +1144,12 @@
         const phase = t/9000 + (base % 997);       // unique, slow per-inverter phase
         const cur = base * (1 + Math.sin(phase) * 0.012);
         const pct = Math.max(0, Math.min(100, Math.round((cur/maxW)*100)));
-        const tone = pctTone(pct);
+        // Health-aware tone (mirrors outputState): a healthy inverter never goes
+        // orange just because live output dips — only a flagged inverter does. This
+        // keeps the 1s ticker from re-introducing the false-orange on "All good" cards.
+        const card = bar.closest(".sb-inv");
+        const statusCls = card ? (card.classList.contains("bad") ? "bad" : card.classList.contains("warn") ? "warn" : "ok") : "ok";
+        const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
         const fill = bar.querySelector(".sb-ob-fill");
         if(fill) fill.style.width = pct + "%";
         const pctEl = bar.querySelector(".sb-ob-pct");
@@ -1140,7 +1160,6 @@
         if(!bar.classList.contains(tone)){
           bar.classList.remove("ok","warn","bad","idle"); bar.classList.add(tone);
         }
-        const card = bar.closest(".sb-inv");
         if(card && card.dataset.tone !== tone) card.dataset.tone = tone;
       });
       // The heavier per-card / detail-card recomputes don't need 1s resolution —
