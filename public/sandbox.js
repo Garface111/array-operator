@@ -541,7 +541,7 @@
   // not a grid of per-inverter minis. Tone tracks the array's live output vs its
   // combined rated capacity (green at/near max → amber → orange → idle when nothing
   // is reporting). Days where the whole array made nothing get a red dot.
-  function arrayGraph(sortedInvs){
+  function arrayGraph(sortedInvs, arrayDaily){
     if(!sortedInvs || !sortedInvs.length) return "";
     // aggregate daily kWh across all inverters, keyed by date
     const byDate = new Map();
@@ -552,6 +552,16 @@
         byDate.set(d.date, (byDate.get(d.date) || 0) + k);
       });
     });
+    // Fallback to the ARRAY's own production history (backend DailyGeneration)
+    // when per-inverter series are sparse — e.g. Chint reports site-level daily
+    // (weekETrend backfill) but no per-inverter history. This makes the graph
+    // appear immediately on connect instead of waiting for days to accumulate.
+    if(byDate.size < 2 && Array.isArray(arrayDaily)){
+      arrayDaily.forEach(d => {
+        if(!d || d.date == null) return;
+        byDate.set(d.date, Math.max(byDate.get(d.date) || 0, Math.max(0, +d.kwh || 0)));
+      });
+    }
     // array-level live tone: combined current vs combined nameplate
     let curW = 0, maxW = 0, anyReporting = false;
     sortedInvs.forEach(inv => {
@@ -919,7 +929,7 @@
                 <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
               </div>
             </div>
-            ${arrayGraph(sortedInvs)}
+            ${arrayGraph(sortedInvs, col.daily)}
           </div>
 
           <!-- Collapsible inverter comb — hidden until the array is expanded -->

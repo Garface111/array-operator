@@ -162,6 +162,7 @@ window.FleetStore = (function(){
       array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
       inverter_source: "solaredge", inverter_count: a.inverters.length,
       alert: alertFor(a),
+      daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       inverters: a.inverters.map(i => ({
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
@@ -491,6 +492,10 @@ window.FleetStore = (function(){
     return (t.columns||[]).map(c => ({
       id: c.array_id, name: c.array_name, region:"—", host: c.client_name||"",
       vendor: c.vendor||"solaredge",
+      // Array-level production history (backend DailyGeneration) — used by the
+      // array graph when inverters carry site-level history but no per-inverter
+      // series (e.g. Chint weekETrend backfill).
+      daily: c.daily || [],
       inverters: (c.inverters||[]).map(inv => ({
         id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
