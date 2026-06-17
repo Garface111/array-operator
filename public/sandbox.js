@@ -1270,7 +1270,6 @@
 
     const card = el(`
       <div class="sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
-        <button class="sb-dc-x" type="button" title="Close" aria-label="Close detail">×</button>
         ${arrayTag}
         <div class="sb-dc-bigcard"></div>
         ${diagHTML}
@@ -1283,16 +1282,20 @@
       _detailInvId = null;               // stop live updates for this card
       document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
       host.classList.remove("sb-dc-open");
+      host.removeEventListener("click", close);   // don't stack listeners across opens
       host.innerHTML = "";
       document.removeEventListener("keydown", onKey);
       setDefaultFoot();
     };
     const onKey = (e) => { if(e.key === "Escape") close(); };
-    card.querySelector(".sb-dc-x").onclick = close;
 
-    // Dimmed backdrop behind the centered modal; click-out closes.
+    // Click anywhere that ISN'T the card closes it. The host (.sb-dc-open) is a
+    // full-viewport flex layer, so a click landing on the host/backdrop (i.e.
+    // outside the card) closes; clicks inside the card are stopped.
     const backdrop = el(`<div class="sb-dc-backdrop"></div>`);
     backdrop.addEventListener("click", close);
+    card.addEventListener("click", e => e.stopPropagation());
+    host.addEventListener("click", close);
 
     host.innerHTML = "";
     // #sbWrap has a CSS transform (translateX(-50%)), which would make the modal's
