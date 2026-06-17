@@ -1293,7 +1293,6 @@
     wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
-    wireCardLift(host);   // scroll over a card to lift it toward you; click off to settle
     wireCardButton(host); // "+ Card" menu (Note / Data)
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
     drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
@@ -2547,71 +2546,6 @@
       fitView(host);                                    // double-click empty space → re-fit to screen
     });
   }
-
-  // ── Scroll-to-lift ──────────────────────────────────────────────────────────
-  // Wheeling over an inverter card raises it toward you (progressive, a bit per
-  // tick) up to a cap; once maxed, further scroll falls through to the canvas
-  // zoom so the gesture never feels trapped. Click anywhere else and the lifted
-  // card settles back down with a springy ease. One card lifted at a time.
-  // Listener is on the VIEWPORT in CAPTURE phase so it runs BEFORE wirePanZoom's
-  // bubble-phase wheel→zoom handler; while we're still raising a card we consume
-  // the event (preventDefault + stop) so the canvas doesn't zoom underneath it.
-  let _liftCard = null, _lift = 0, _liftPointerBound = false;  // current lifted card + its 0..1 amount
-  const LIFT_STEP = 0.18;                 // fraction added per wheel tick
-  function _setLift(card, v){
-    _lift = Math.max(0, Math.min(1, v));
-    card.style.setProperty("--lift", _lift.toFixed(3));
-  }
-  function _settleLift(){
-    if(!_liftCard) return;
-    const card = _liftCard; _liftCard = null;
-    card.classList.add("sb-settling");
-    _setLift(card, 0);
-    const done = () => {
-      card.classList.remove("sb-lifted","sb-settling");
-      card.style.removeProperty("--lift");
-      card.removeEventListener("transitionend", done);
-    };
-    card.addEventListener("transitionend", done);
-    // fallback in case transitionend doesn't fire (e.g. reduced-motion)
-    setTimeout(done, 520);
-  }
-  function wireCardLift(host){
-    const vp = host.querySelector(".sb-viewport");
-    if(!vp || vp._liftWired) return;
-    vp._liftWired = true;
-    vp.addEventListener("wheel", e => {
-      const card = e.target.closest && e.target.closest(".sb-inv");
-      // Not over a card, or a different card than the one raised → let pan/zoom
-      // have the wheel, and drop any existing lift so it doesn't get stranded.
-      if(!card){ if(_liftCard) _settleLift(); return; }
-      if(_liftCard && _liftCard !== card) _settleLift();
-      const rising = e.deltaY < 0;                 // scroll UP = lift toward you
-      // At the cap and still pushing further up → let it through to zoom.
-      if(rising && _liftCard === card && _lift >= 1) return;
-      // Scrolling DOWN with no active lift → nothing to lower; pass through.
-      if(!rising && !_liftCard) return;
-      e.preventDefault();
-      e.stopPropagation();                         // beat the bubble-phase zoom
-      if(_liftCard !== card){
-        _liftCard = card; _lift = 0;
-        card.classList.remove("sb-settling");
-        card.classList.add("sb-lifted");
-      }
-      _setLift(card, _lift + (rising ? LIFT_STEP : -LIFT_STEP));
-      if(_lift <= 0) _settleLift();                 // scrolled all the way back down
-    }, { capture:true, passive:false });
-    // Click / pointer anywhere that ISN'T the raised card → settle it back down.
-    if(!_liftPointerBound){
-      _liftPointerBound = true;
-      document.addEventListener("pointerdown", e => {
-        if(!_liftCard) return;
-        if(e.target.closest && e.target.closest(".sb-inv") === _liftCard) return;
-        _settleLift();
-      }, true);
-    }
-  }
-
 
   /* ---- '+ Add array' button wiring ---- */
   function wireAddButton(host){
