@@ -542,6 +542,7 @@
   .sb-inv{flex:0 0 auto;width:152px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
     background:linear-gradient(165deg,var(--card),var(--card2));padding:0;text-align:left;position:relative;
     overflow:hidden;content-visibility:auto;contain-intrinsic-size:248px;
+    display:flex;flex-direction:column;
     transition:transform .12s,border-color .12s,box-shadow .12s}
   /* inverter cards sit ABOVE the SVG feeder wires */
   .sb-inv{z-index:1}
@@ -618,6 +619,7 @@
      keeping its own opaque bg so text/sparkline never wash out (spec bug #1:
      plate opacity >=0.8). The liquid rises behind it (z-index 1). */
   .sb-inv-plate{position:relative;z-index:3;display:flex;flex-direction:column;
+    flex:1 1 auto;
     margin:6px;padding:9px 9px 8px;border-radius:9px;
     background:rgba(11,16,23,.82);border:1px solid rgba(255,255,255,.05);
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
