@@ -419,7 +419,10 @@
   /* state variants — mirror the inverter liquid tone language, boosted opacity.
      --ok uses the EXACT sandbox .sb-liquid green (rgba 24,165,86 / 46,213,115). */
   .fc-tank--ok{background:linear-gradient(90deg,rgba(24,165,86,.8),rgba(46,213,115,.62))}
-  .fc-tank--warn{background:linear-gradient(90deg,rgba(220,160,40,.74),rgba(255,200,90,.56))}
+  .fc-tank--warn{background:linear-gradient(90deg,rgba(245,158,11,.92),rgba(255,193,64,.78))}
+  /* lighten the scrim over the warn state so the amber reads as vivid gold, not
+     muted olive (the dark scrim was dulling it). */
+  .fc-card.warn::after{background:linear-gradient(90deg,rgba(8,12,18,.3),rgba(8,12,18,.2))}
   .fc-tank--warn::before,.fc-tank--warn::after{
     background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(255,215,130,.62),transparent 70%)}
   .fc-tank--bad{background:linear-gradient(90deg,rgba(200,90,40,.76),rgba(255,140,90,.58))}
