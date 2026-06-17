@@ -266,3 +266,77 @@ html[data-theme="day"] .cc-kpi.recovered .v,
 html[data-theme="day"] .cc-kpi.risk .v,
 html[data-theme="day"] .cl-kpi.atstake .v,
 html[data-theme="day"] .cl-kpi.recovered .v{text-shadow:none !important}
+
+/* ===========================================================================
+ * NEW SANDBOX SURFACES (overview grid, fleet commander, enriched detail modal,
+ * split toolbar) — these use hardcoded dark gradients that bypass the variables,
+ * so flip them to the cream/white palette here.
+ * ==========================================================================*/
+
+/* ── fleet COMMANDER bar ──────────────────────────────────────────────────── */
+html[data-theme="day"] .fc-card{
+  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  border-color:var(--line) !important;
+  box-shadow:0 2px 12px -5px rgba(40,32,20,.14), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+}
+html[data-theme="day"] .fc-card.ok{border-color:rgba(5,150,105,.35) !important}
+html[data-theme="day"] .fc-card.warn{border-color:rgba(181,109,44,.4) !important}
+html[data-theme="day"] .fc-card.bad{border-color:rgba(220,38,38,.4) !important}
+html[data-theme="day"] .fc-meter{background:var(--day-track) !important}
+html[data-theme="day"] .fc-health-num span,
+html[data-theme="day"] .fc-stats{color:var(--muted) !important}
+html[data-theme="day"] .fc-stat b{color:var(--ink) !important}
+
+/* ── OVERVIEW GRID tiles ──────────────────────────────────────────────────── */
+html[data-theme="day"] .sb-tile{
+  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  border-color:var(--line) !important;
+  box-shadow:0 2px 10px -4px rgba(40,32,20,.12), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+}
+html[data-theme="day"] .sb-tile.warn{background:linear-gradient(168deg,#fffaf3,#fdf3e6) !important;border-color:rgba(181,109,44,.32) !important}
+html[data-theme="day"] .sb-tile.bad{background:linear-gradient(168deg,#fff6f5,#fdeceb) !important;border-color:rgba(220,38,38,.32) !important}
+html[data-theme="day"] .sb-tile:hover{box-shadow:0 12px 26px -14px rgba(40,32,20,.28) !important}
+html[data-theme="day"] .sb-tile-name{color:var(--ink) !important}
+html[data-theme="day"] .sb-tile-sub{color:var(--muted) !important}
+html[data-theme="day"] .sb-tile-flag.ok{color:var(--good) !important;background:rgba(5,150,105,.1) !important}
+html[data-theme="day"] .sb-tile-flag.warn{color:var(--warn) !important;background:rgba(181,109,44,.13) !important}
+html[data-theme="day"] .sb-tile-flag.bad{color:var(--bad) !important;background:rgba(220,38,38,.1) !important}
+html[data-theme="day"] .sb-tile-risk{color:var(--bad) !important}
+html[data-theme="day"] .sb-tile-risk small{color:var(--faint) !important}
+
+/* ── ENRICHED detail modal: blown-up card + stat panel ────────────────────── */
+html[data-theme="day"] .sb-dc-bigcard .sb-inv{
+  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  box-shadow:0 30px 80px -28px rgba(40,32,20,.4),0 0 0 1px rgba(5,150,105,.18) !important;
+}
+html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="warn"]{background:linear-gradient(168deg,#fffaf3,#fdf3e6) !important}
+html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="bad"]{background:linear-gradient(168deg,#fff6f5,#fdeceb) !important}
+html[data-theme="day"] .sb-dc-diag{
+  background:var(--day-surf) !important;color:var(--ink) !important;border-left-color:var(--good) !important;
+}
+html[data-theme="day"] .sb-dc-diag.warn{border-left-color:var(--warn) !important}
+html[data-theme="day"] .sb-dc-diag.bad{border-left-color:var(--bad) !important}
+html[data-theme="day"] .sb-dc-stat{
+  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;border-color:var(--line) !important;
+}
+html[data-theme="day"] .sb-dc-stat.hero{
+  background:linear-gradient(168deg,#fff6f5,#fdeceb) !important;border-color:rgba(220,38,38,.32) !important;
+}
+html[data-theme="day"] .sb-dc-sv{color:var(--ink) !important}
+html[data-theme="day"] .sb-dc-sk,
+html[data-theme="day"] .sb-dc-sv small{color:var(--faint) !important}
+html[data-theme="day"] .sb-dc-sv.ok{color:var(--good) !important}
+html[data-theme="day"] .sb-dc-sv.warn{color:var(--warn) !important}
+html[data-theme="day"] .sb-dc-sv.bad{color:var(--bad) !important}
+html[data-theme="day"] .sb-dc-array{color:var(--sky) !important}
+html[data-theme="day"] .sb-dc-actions .sb-dc-origin{
+  background:var(--day-surf) !important;border-color:var(--line) !important;color:var(--ink) !important;
+}
+
+/* ── split toolbar: frosted clusters were dark glass ──────────────────────── */
+html[data-theme="day"] .sb-head-btns{
+  background:rgba(255,255,255,.72) !important;border-color:var(--line) !important;
+}
+html[data-theme="day"] .sb-legend{
+  background:rgba(255,255,255,.7) !important;border-color:var(--line) !important;
+}
