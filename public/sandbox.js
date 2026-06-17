@@ -834,6 +834,128 @@
       ? `<span class="sb-brand sb-inv-brand ${esc(vendor)}">${esc(BRAND[vendor])}</span>` : "";
   }
 
+  // ── ARRAY-LEVEL mirrors of the inverter card's live axes ────────────────────
+  // The array card is the inverter card's bigger sibling: SAME construction
+  // (liquid fill behind a frosted plate, production graph, NOW chip, output bar,
+  // health badge, vendor link) but every signal is the WHOLE ARRAY's aggregate.
+  // The two-clocks rule still holds: NOW = instantaneous aggregate output;
+  // HEALTH = the 14-day verdict (arrayHealth / shared FleetStore classifier).
+
+  // Aggregate "output now" across an array: summed current ÷ summed rated max,
+  // estimating a per-inverter max from production history when a vendor gives no
+  // nameplate (mirrors outputState/estNameplateW). The pct IS the array's average
+  // production level — its live output as a % of combined capacity. Tone stays
+  // calm (green/idle) unless the array's 14-day health is already flagged, so a
+  // passing cloud never turns the bar orange.
+  function arrayOutputState(invs, healthTone){
+    let curW = 0, maxW = 0, anyReporting = false, anyRealNp = false, anyMax = false;
+    (invs || []).forEach(inv => {
+      const realW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
+      const m = realW != null ? realW : estNameplateW(inv);
+      if(realW != null) anyRealNp = true;
+      if(m != null){ maxW += m; anyMax = true; }
+      if(inv.current_power_w != null){ curW += inv.current_power_w; anyReporting = true; }
+    });
+    const floor = anyMax ? Math.max(25, maxW * 0.01) : 25;
+    const producing = anyReporting && curW > floor;
+    const estimated = anyMax && !anyRealNp;
+    if(!producing) return { reporting:false, pct:null, tone:"idle", curW:0, maxW: anyMax?maxW:null, estimated };
+    if(!anyMax)    return { reporting:true, pct:null, tone:(healthTone==="ok"?"ok":pctTone(50)), curW, maxW:null, estimated:false };
+    const pct = Math.max(0, Math.min(100, Math.round((curW / maxW) * 100)));
+    const tone = (healthTone === "ok") ? "ok" : pctTone(pct);
+    return { reporting:true, pct, tone, curW, maxW, estimated };
+  }
+
+  // The array's NOW chip state (its liveness axis) — mirrors liveState but for the
+  // whole array. Producing when the array makes power; Asleep at night with zero
+  // output; "Not producing" (amber) ONLY when daylight + zero AND the 14-day
+  // health (shared arrayHealth classifier) already sees trouble — never an
+  // independent cloud false-alarm; otherwise a calm "Idle".
+  function arrayLiveState(col, os, healthTone, liveAnoms){
+    const sleeping = (col.is_daylight === false) && !os.reporting;
+    if(sleeping) return { key:"asleep", label:"Asleep", tone:"sleep" };
+    if(os.reporting) return { key:"producing", label:"Producing", tone:"ok" };
+    if(col.is_daylight === false)
+      return { key:"idle", label:"Idle", tone:"idle", title:"The sun is down — the array is resting." };
+    if(healthTone !== "ok" || liveAnoms > 0)
+      return { key:"dark", label:"Not producing", tone:"warn",
+               title:"This array isn't producing while the sun is up." };
+    return { key:"idle", label:"Idle", tone:"idle",
+             title:"Not producing right now — but nothing looks wrong." };
+  }
+
+  // Array output bar — mirrors outputBar(), but the % is the array's AVERAGE
+  // production level (combined current ÷ combined rated max). Carries the same
+  // data-curw/data-maxw so the live ticker breathes it in place like an inverter.
+  function arrayOutputBar(os){
+    const fmt = v => v >= 100 ? Math.round(v) : (Math.round(v * 10) / 10);
+    const curKw = os.curW != null ? os.curW / 1000 : null;
+    const maxKw = os.maxW != null ? os.maxW / 1000 : null;
+    let label;
+    if(!os.reporting){
+      label = `<span class="sb-ob-idle">array not producing right now</span>`;
+    } else if(os.pct != null){
+      const ofTxt = os.estimated
+        ? `<span title="No rated nameplate from this vendor — combined max estimated from peak production.">of ~est · <b class="sb-ob-cur">${fmt(curKw)}</b>/~${fmt(maxKw)} kW</span>`
+        : `array avg · <b class="sb-ob-cur">${fmt(curKw)}</b>/${fmt(maxKw)} kW`;
+      label = `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">${ofTxt}</span>`;
+    } else {
+      label = `<b class="sb-ob-pct">${fmt(curKw)} kW</b><span class="sb-ob-of">producing now</span>`;
+    }
+    const fillPct = os.reporting ? (os.pct != null ? os.pct : 100) : 0;
+    return `<div class="sb-outbar ${os.tone}" data-curw="${os.curW!=null?os.curW:''}" data-maxw="${os.maxW!=null?os.maxW:''}"${os.estimated?' data-est="1"':''}>
+      <div class="sb-ob-head"><span class="sb-ob-k">Output now</span>${label}</div>
+      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${fillPct}%"></div></div>
+    </div>`;
+  }
+
+  // Array liquid-fill layer — the SAME energy-as-liquid metaphor as the inverter
+  // card, driven by the array's aggregate capacity factor. Bubbles/stars seeded by
+  // array_id so they're stable across the 60s re-render (mirrors liquidLayer).
+  function arrayLiquidLayer(col, os, healthTone){
+    const sleeping = (col.is_daylight === false) && !os.reporting;
+    let st;
+    if(sleeping) st = "sleep";
+    else if(healthTone === "bad") st = "fault";
+    else if(os.pct != null && os.pct >= 98) st = "clip";
+    else if(os.pct != null && os.pct < 35) st = "low";
+    else st = "ok";
+    let pct;
+    if(sleeping) pct = 14;
+    else if(os.pct != null) pct = Math.max(0, Math.min(100, os.pct));
+    else pct = os.reporting ? 55 : 0;
+    const seed = "a" + (col.array_id != null ? col.array_id : col.array_name);
+    let bubbles = "";
+    if(!sleeping && st !== "fault" && pct > 0){
+      const rnd = _seedRand(seed);
+      const n = Math.min(7, 3 + Math.round((pct / 100) * 4));
+      for(let i=0;i<n;i++){
+        const sz = (5 + rnd()*9).toFixed(1);
+        const left = (8 + rnd()*84).toFixed(1);
+        const dur = (3 + rnd()*2.4).toFixed(2);
+        const delay = (rnd()*3).toFixed(2);
+        bubbles += `<span style="width:${sz}px;height:${sz}px;left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+      }
+    }
+    let stars = "";
+    if(sleeping){
+      const rnd = _seedRand(seed + "n");
+      for(let i=0;i<7;i++){
+        const sz = (1.5 + rnd()*2.2).toFixed(1);
+        const left = (8 + rnd()*84).toFixed(1);
+        const bottom = (2 + rnd()*11).toFixed(1);
+        const dur = (2.5 + rnd()*2.5).toFixed(2);
+        const delay = (rnd()*3).toFixed(2);
+        stars += `<span style="width:${sz}px;height:${sz}px;left:${left}%;bottom:${bottom}px;animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+      }
+    }
+    const moon = sleeping ? `<span class="sb-liq-moon" aria-hidden="true">🌙</span>` : "";
+    return `<div class="sb-liquid sb-liquid--${st}" style="height:${pct}%" aria-hidden="true">
+        <div class="sb-liq-bubbles">${bubbles}</div>
+        <div class="sb-liq-stars">${stars}</div>
+      </div>${moon}`;
+  }
+
   // ---- per-array expanded state (which inverter combs are open) ----
   // Persisted as a JSON array of array_id strings under EXPAND_KEY; collapsed is
   // the default so the array cards stay the clean main view.
@@ -1151,6 +1273,7 @@
     wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
+    wireCardLift(host);   // scroll over a card to lift it toward you; click off to settle
     wireCardButton(host); // "+ Card" menu (Note / Data)
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
     drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
@@ -2404,6 +2527,71 @@
       fitView(host);                                    // double-click empty space → re-fit to screen
     });
   }
+
+  // ── Scroll-to-lift ──────────────────────────────────────────────────────────
+  // Wheeling over an inverter card raises it toward you (progressive, a bit per
+  // tick) up to a cap; once maxed, further scroll falls through to the canvas
+  // zoom so the gesture never feels trapped. Click anywhere else and the lifted
+  // card settles back down with a springy ease. One card lifted at a time.
+  // Listener is on the VIEWPORT in CAPTURE phase so it runs BEFORE wirePanZoom's
+  // bubble-phase wheel→zoom handler; while we're still raising a card we consume
+  // the event (preventDefault + stop) so the canvas doesn't zoom underneath it.
+  let _liftCard = null, _lift = 0, _liftPointerBound = false;  // current lifted card + its 0..1 amount
+  const LIFT_STEP = 0.18;                 // fraction added per wheel tick
+  function _setLift(card, v){
+    _lift = Math.max(0, Math.min(1, v));
+    card.style.setProperty("--lift", _lift.toFixed(3));
+  }
+  function _settleLift(){
+    if(!_liftCard) return;
+    const card = _liftCard; _liftCard = null;
+    card.classList.add("sb-settling");
+    _setLift(card, 0);
+    const done = () => {
+      card.classList.remove("sb-lifted","sb-settling");
+      card.style.removeProperty("--lift");
+      card.removeEventListener("transitionend", done);
+    };
+    card.addEventListener("transitionend", done);
+    // fallback in case transitionend doesn't fire (e.g. reduced-motion)
+    setTimeout(done, 520);
+  }
+  function wireCardLift(host){
+    const vp = host.querySelector(".sb-viewport");
+    if(!vp || vp._liftWired) return;
+    vp._liftWired = true;
+    vp.addEventListener("wheel", e => {
+      const card = e.target.closest && e.target.closest(".sb-inv");
+      // Not over a card, or a different card than the one raised → let pan/zoom
+      // have the wheel, and drop any existing lift so it doesn't get stranded.
+      if(!card){ if(_liftCard) _settleLift(); return; }
+      if(_liftCard && _liftCard !== card) _settleLift();
+      const rising = e.deltaY < 0;                 // scroll UP = lift toward you
+      // At the cap and still pushing further up → let it through to zoom.
+      if(rising && _liftCard === card && _lift >= 1) return;
+      // Scrolling DOWN with no active lift → nothing to lower; pass through.
+      if(!rising && !_liftCard) return;
+      e.preventDefault();
+      e.stopPropagation();                         // beat the bubble-phase zoom
+      if(_liftCard !== card){
+        _liftCard = card; _lift = 0;
+        card.classList.remove("sb-settling");
+        card.classList.add("sb-lifted");
+      }
+      _setLift(card, _lift + (rising ? LIFT_STEP : -LIFT_STEP));
+      if(_lift <= 0) _settleLift();                 // scrolled all the way back down
+    }, { capture:true, passive:false });
+    // Click / pointer anywhere that ISN'T the raised card → settle it back down.
+    if(!_liftPointerBound){
+      _liftPointerBound = true;
+      document.addEventListener("pointerdown", e => {
+        if(!_liftCard) return;
+        if(e.target.closest && e.target.closest(".sb-inv") === _liftCard) return;
+        _settleLift();
+      }, true);
+    }
+  }
+
 
   /* ---- '+ Add array' button wiring ---- */
   function wireAddButton(host){

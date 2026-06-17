@@ -554,6 +554,26 @@
   .sb-inv.sel{border-color:var(--good);box-shadow:0 0 0 1px var(--good),0 10px 24px -14px rgba(0,0,0,.8)}
   .sb-inv.warn{border-color:rgba(255,180,84,.4)}
   .sb-inv.bad{border-color:rgba(255,107,107,.5)}
+  /* ===== Scroll-to-lift: wheel over a card raises it toward you (--lift 0..1).
+     Placed AFTER :hover so it wins on equal specificity. Driven by wireCardLift().
+     Settles back down (springy) on .sb-settling when you click elsewhere. ===== */
+  .sb-inv.sb-lifted{
+    transform:scale(calc(1 + .14 * var(--lift,0))) translateY(calc(-26px * var(--lift,0)));
+    z-index:60;
+    box-shadow:
+      0 calc(34px * var(--lift,0)) calc(64px * var(--lift,0)) -18px rgba(0,0,0,.88),
+      0 calc(10px * var(--lift,0)) calc(22px * var(--lift,0)) -14px rgba(0,0,0,.7),
+      0 0 0 1px rgba(63,214,138,calc(.28 * var(--lift,0)));
+  }
+  /* keep it lifted (not the -2px hover nudge) while raised */
+  .sb-inv.sb-lifted:hover,.sb-inv.sb-lifted:focus{
+    transform:scale(calc(1 + .14 * var(--lift,0))) translateY(calc(-26px * var(--lift,0)));
+  }
+  .sb-inv.sb-settling{transition:transform .44s cubic-bezier(.34,1.4,.5,1),box-shadow .44s ease}
+  @media (prefers-reduced-motion:reduce){
+    .sb-inv.sb-lifted{transform:none;box-shadow:0 0 0 1px rgba(63,214,138,calc(.4 * var(--lift,0)))}
+    .sb-inv.sb-settling{transition:box-shadow .2s ease}
+  }
   .sb-inv-dot{width:9px;height:9px;border-radius:50%;margin:0 auto 6px;background:var(--good);box-shadow:0 0 10px rgba(63,214,138,.7)}
   .sb-inv.warn .sb-inv-dot{background:var(--warn);box-shadow:0 0 10px rgba(255,180,84,.7)}
   .sb-inv.bad .sb-inv-dot{background:var(--bad);box-shadow:0 0 10px rgba(255,107,107,.7)}
