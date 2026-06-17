@@ -33,11 +33,12 @@
   const STATUS_LABEL = {
     dead:"Stopped earning", fault:"Hardware fault",
     underperforming:"Below its neighbors", comm_gap:"Gone quiet", ok:"Pulling its weight",
-    live_dark:"Not producing now"
+    live_dark:"Not producing now", monitoring:"Monitoring"
   };
   const SEV = {                                   // status → triage severity bucket
     dead:"crit", fault:"crit", underperforming:"under", comm_gap:"quiet", ok:"ok",
-    live_dark:"quiet"   // live anomaly: real but unpriced, like a comms gap — watch bucket
+    live_dark:"quiet",   // live anomaly: real but unpriced, like a comms gap — watch bucket
+    monitoring:"ok"      // not enough evidence yet — not a flagged row
   };
   const SEV_RANK = { crit:0, under:1, quiet:2, ok:3 };
   const ACTION = {
@@ -78,6 +79,9 @@
           status = "live_dark";
         }
         if(status === "ok"){ invHealthy++; return; }
+        // "monitoring" = not enough history to judge yet — neutral, never a flagged
+        // row. Count it as not-flagged (don't drag the healthy %) and skip the table.
+        if(status === "monitoring"){ invHealthy++; return; }
         // live_dark carries no priced loss yet (unconfirmed, like comm_gap) — the
         // dollars are claimed once 14-day health confirms it dead/underperforming.
         const lk = (status === "live_dark") ? 0 : lostKwh(inv, fleetWin, totalNp);

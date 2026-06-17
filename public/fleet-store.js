@@ -121,15 +121,31 @@ window.FleetStore = (function(){
   // Recompute each producing inverter's peer_index (share of harvest vs share of
   // hardware) against its CURRENT array cohort, and refresh ok/underperforming.
   // Intrinsic states (dead/fault/comm_gap) are hardware/comms facts — left as-is.
+  //
+  // EVIDENCE GUARD: a peer verdict ("Below its neighbors") is only honest when we
+  // actually have the history to back it. When an inverter has no usable 14-day
+  // window (freshly connected, no daily history yet) OR there are fewer than 2
+  // producing peers with history to compare against (degenerate cohort), we can't
+  // judge it — so it gets the neutral "monitoring" status instead of a green/amber
+  // verdict it hasn't earned. This is what fixes cards reading "Below its
+  // neighbors" while showing "no history yet" and a healthy live output %.
   function recompute(a){
-    const producing = a.inverters.filter(i => i.status==="ok" || i.status==="underperforming");
-    const so = producing
-      .filter(i => i.nameplate_kw>0 && i.window_kwh!=null)
-      .map(i => i.window_kwh / i.nameplate_kw);
+    const producing = a.inverters.filter(i => i.status==="ok" || i.status==="underperforming" || i.status==="monitoring");
+    const eligible = producing.filter(i => i.nameplate_kw>0 && i.window_kwh!=null && i.window_kwh>0);
+    const so = eligible.map(i => i.window_kwh / i.nameplate_kw);
     let median = 0;
     if(so.length){ const s=[...so].sort((x,y)=>x-y); median = s[Math.floor(s.length/2)]; }
+    // Need at least 2 inverters WITH history to have a real peer comparison.
+    const haveCohort = eligible.length >= 2 && median > 0;
     producing.forEach(i => {
-      if(!median || !i.nameplate_kw){ return; }
+      const hasHistory = i.nameplate_kw>0 && i.window_kwh!=null && i.window_kwh>0;
+      if(!haveCohort || !hasHistory){
+        // Not enough evidence to judge — show neutral, claim nothing.
+        i.status = "monitoring";
+        i.peer_index = null;
+        i.diagnosis = "Gathering data — not enough history yet to compare against its neighbors.";
+        return;
+      }
       const pi = (i.window_kwh / i.nameplate_kw) / median;
       i.peer_index = Math.round(pi*100)/100;
       i.status = pi >= UNDERPERF_PI ? "ok" : "underperforming";
@@ -144,7 +160,8 @@ window.FleetStore = (function(){
     const dead = f.some(i => i.status==="dead" || i.status==="fault");
     const under = f.filter(i => i.status==="underperforming").length;
     const quiet = f.some(i => i.status==="comm_gap");
-    const flagged = f.filter(i => i.status!=="ok").length;
+    // "monitoring" is neutral (not enough evidence) — it is NOT a flag.
+    const flagged = f.filter(i => i.status!=="ok" && i.status!=="monitoring").length;
     if(dead)  return { level:"critical", count:flagged, status:"dead",            headline:"An inverter stopped earning" };
     if(under) return { level:"warn",     count:flagged, status:"underperforming", headline:"A money leak caught early" };
     if(quiet) return { level:"warn",     count:flagged, status:"comm_gap",        headline:"An inverter has gone quiet" };

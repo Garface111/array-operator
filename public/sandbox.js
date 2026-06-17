@@ -379,10 +379,12 @@
 
   const STATUS_LABEL = {
     ok: "Pulling its weight", underperforming: "Below its neighbors",
-    comm_gap: "Gone quiet", dead: "Not coming home", fault: "Fault"
+    comm_gap: "Gone quiet", dead: "Not coming home", fault: "Fault",
+    monitoring: "Monitoring"
   };
   const STATUS_CLASS = {
-    ok: "ok", underperforming: "warn", comm_gap: "warn", dead: "bad", fault: "bad"
+    ok: "ok", underperforming: "warn", comm_gap: "warn", dead: "bad", fault: "bad",
+    monitoring: "info"
   };
   const ALERT_CLASS = { ok: "ok", warn: "warn", critical: "bad" };
 
@@ -411,6 +413,8 @@
         if(liveBad){ flagged++; liveAnoms++; }
         continue;
       }
+      // "monitoring" = not enough evidence to judge yet — neutral, never flagged.
+      if(inv.status === "monitoring") continue;
       flagged++;
       if(inv.status === "dead" || inv.status === "fault") crit++;
       const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
@@ -667,13 +671,18 @@
     const floor = maxW != null ? Math.max(25, maxW * 0.01) : 25;
     const producing = curW != null && curW > floor;
     if(!producing) return { reporting: false, pct: null, tone: "idle", estimated, maxW };
+    // The orange/red output tint only fires when HEALTH is already flagged
+    // (underperforming/fault/dead → "warn"/"bad"). "ok" AND the neutral
+    // "monitoring" (info) state are both calm — a healthy or not-yet-judged
+    // inverter dipping under clouds must not paint the card as a problem.
+    const calm = (statusCls === "ok" || statusCls === "info");
     if(maxW == null){
       // Real output but NO nameplate AND no history to estimate from — the only
       // case left without a %. Report absolute kW, calm tone.
-      return { reporting: true, pct: null, tone: (statusCls === "ok") ? "ok" : pctTone(50), estimated: false, maxW: null };
+      return { reporting: true, pct: null, tone: calm ? "ok" : pctTone(50), estimated: false, maxW: null };
     }
     const pct = Math.max(0, Math.min(100, Math.round((curW / maxW) * 100)));
-    const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
+    const tone = calm ? "ok" : pctTone(pct);
     return { reporting: true, pct, tone, estimated, maxW };
   }
   function outputBar(inv, statusCls){
@@ -1154,8 +1163,13 @@
         //    "All good on a dark inverter" contradiction.
         //  • NOW chip — the instantaneous liveness state (liveState), peer-checked.
         const isAlert = sCls !== "ok";
-        const healthLabel = isAlert ? (STATUS_LABEL[inv.status] || inv.status || "Needs a look") : "All good";
-        const healthBadge = `<div class="sb-inv-alert ${sCls}" title="Health over the last 14 days vs its peers.">${esc(healthLabel)}</div>`;
+        const isMonitoring = inv.status === "monitoring";
+        const healthLabel = isMonitoring ? "Monitoring"
+          : isAlert ? (STATUS_LABEL[inv.status] || inv.status || "Needs a look") : "All good";
+        const healthTitle = isMonitoring
+          ? "Gathering data — not enough history yet to compare this inverter against its neighbors."
+          : "Health over the last 14 days vs its peers.";
+        const healthBadge = `<div class="sb-inv-alert ${sCls}" title="${esc(healthTitle)}">${esc(healthLabel)}</div>`;
         const ls = liveState(inv, sortedInvs, col.is_daylight, sleeping);
         const nowChip = `<div class="sb-inv-now ${ls.tone}"${ls.title?` title="${esc(ls.title)}"`:""}><span class="sb-now-dot"></span>${esc(ls.label)}</div>`;
         // The whole-card tint: a live anomaly (dark while peers produce) edges the
