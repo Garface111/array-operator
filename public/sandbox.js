@@ -400,9 +400,17 @@
     const invs = col.inverters || [];
     const totalNp = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0) || 1;
     const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
-    let flagged = 0, crit = 0, lostKwh = 0;
+    let flagged = 0, crit = 0, lostKwh = 0, liveAnoms = 0;
     for(const inv of invs){
-      if(inv.status === "ok") continue;
+      // A LIVE anomaly (dark right now while peers produce) the 14-day health
+      // hasn't flagged yet still counts as flagged here — otherwise the tile reads
+      // "all good" while a card inside it shows "Not producing". Shared classifier.
+      const liveBad = inv.status === "ok" && window.FleetStore && FleetStore.liveVerdict
+        && FleetStore.liveVerdict(inv, invs, col.is_daylight) === "dark";
+      if(inv.status === "ok"){
+        if(liveBad){ flagged++; liveAnoms++; }
+        continue;
+      }
       flagged++;
       if(inv.status === "dead" || inv.status === "fault") crit++;
       const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
@@ -412,7 +420,7 @@
     }
     const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
     const tone = crit ? "bad" : flagged ? "warn" : "ok";
-    return { tone, flagged, crit, lossMo, total: invs.length };
+    return { tone, flagged, crit, lossMo, total: invs.length, liveAnoms };
   }
 
   function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -715,20 +723,20 @@
   //             real anomaly that the slow 14-day health hasn't caught yet (amber)
   //   "stale" → NO live reading while peers produce in daylight — unknown, could
   //             be a telemetry gap, not a confirmed power fault (neutral)
+  // The classifier itself lives in FleetStore so the grid + command center share
+  // the EXACT same logic (one source of truth — no drift across surfaces). This
+  // thin wrapper keeps a self-contained fallback for any context where the store
+  // isn't present (e.g. an isolated render test).
   function liveVerdict(inv, peers, isDaylight){
-    // Night/dusk: zero is expected and owned by the Sleeping state — never alarm.
+    if(window.FleetStore && FleetStore.liveVerdict)
+      return FleetStore.liveVerdict(inv, peers, isDaylight);
     if(isDaylight === false) return "ok";
     const floorOf = i => (i.nameplate_kw != null) ? Math.max(25, i.nameplate_kw*1000*0.01) : 25;
     const producing = i => i.current_power_w != null && i.current_power_w > floorOf(i);
-    if(producing(inv)) return "ok";                 // it's making power — clearly fine
-    // Quorum of lit siblings, so a single cloud-edge or a 2-inverter array can't
-    // raise a false alarm (mirrors the backend's degenerate-cohort caveat: a peer
-    // signal needs ≥2 producing peers to mean anything).
+    if(producing(inv)) return "ok";
     const litPeers = peers.filter(p =>
       p.inverter_id !== inv.inverter_id && producing(p)).length;
-    if(litPeers < 2) return "ok";                   // not enough peer signal to judge
-    // Peers ARE producing in daylight, but this one is not. A fresh reading that
-    // says ~0 is a real live zero (anomaly); a missing reading is just unknown.
+    if(litPeers < 2) return "ok";
     return (inv.current_power_w != null) ? "dark" : "stale";
   }
 

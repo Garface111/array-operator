@@ -152,6 +152,47 @@ window.FleetStore = (function(){
   }
 
   /* ===========================================================================
+   * LIVE LIVENESS — the SINGLE shared classifier for "is this inverter dark
+   * right now?". The fleet tree (sandbox.js), the overview grid, and the command
+   * center ALL call this, so the three surfaces can never again disagree about a
+   * live anomaly the way they did when each derived health from inv.status alone.
+   *
+   * This is deliberately SEPARATE from inv.status (the 14-day peer_analysis
+   * verdict). status answers "healthy over the window?"; liveVerdict answers
+   * "producing this instant, vs its daylight peers?". An inverter that just
+   * stalled reads status:"ok" for up to ~2 days — liveVerdict catches it now.
+   *   "ok"    producing, OR calmly idle (night / peers idle too / <2 lit peers)
+   *   "dark"  fresh reading ~0 W while >=2 daylight peers produce — a real anomaly
+   *   "stale" NO live reading while peers produce — unknown, not a confirmed fault
+   * ==========================================================================*/
+  const LIVE_FLOOR_W = 25;   // below this (or 1% of rated) = idle, not "producing"
+  function _liveFloor(inv){
+    return inv.nameplate_kw!=null ? Math.max(LIVE_FLOOR_W, inv.nameplate_kw*1000*0.01) : LIVE_FLOOR_W;
+  }
+  function isProducing(inv){
+    return inv && inv.current_power_w!=null && inv.current_power_w > _liveFloor(inv);
+  }
+  // peers identity: same array of inverter objects across all callers, so
+  // reference equality is the primary test; id is a defensive fallback.
+  function _samePeer(a,b){
+    return a===b
+      || (a.inverter_id!=null && a.inverter_id===b.inverter_id)
+      || (a.id!=null && a.id===b.id);
+  }
+  function liveVerdict(inv, peers, isDaylight){
+    if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
+    if(isProducing(inv)) return "ok";              // making power — clearly fine
+    const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p)).length;
+    if(lit < 2) return "ok";                       // not enough peer signal to judge
+    return (inv.current_power_w != null) ? "dark" : "stale";
+  }
+  // True when an inverter that 14-day health calls "ok" is actually a live
+  // anomaly RIGHT NOW (dark while peers produce). This is the cross-surface flag.
+  function isLiveAnomaly(inv, peers, isDaylight){
+    return inv.status === "ok" && liveVerdict(inv, peers, isDaylight) === "dark";
+  }
+
+  /* ===========================================================================
    * SELECTORS — shape the canonical fleet for each consumer
    * ==========================================================================*/
 
@@ -572,6 +613,7 @@ window.FleetStore = (function(){
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
+    liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,

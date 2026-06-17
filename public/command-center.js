@@ -32,15 +32,18 @@
 
   const STATUS_LABEL = {
     dead:"Stopped earning", fault:"Hardware fault",
-    underperforming:"Below its neighbors", comm_gap:"Gone quiet", ok:"Pulling its weight"
+    underperforming:"Below its neighbors", comm_gap:"Gone quiet", ok:"Pulling its weight",
+    live_dark:"Not producing now"
   };
   const SEV = {                                   // status → triage severity bucket
-    dead:"crit", fault:"crit", underperforming:"under", comm_gap:"quiet", ok:"ok"
+    dead:"crit", fault:"crit", underperforming:"under", comm_gap:"quiet", ok:"ok",
+    live_dark:"quiet"   // live anomaly: real but unpriced, like a comms gap — watch bucket
   };
   const SEV_RANK = { crit:0, under:1, quiet:2, ok:3 };
   const ACTION = {
     dead:"Draft warranty claim", fault:"Draft service request",
-    underperforming:"See the diagnosis", comm_gap:"Bring it back online"
+    underperforming:"See the diagnosis", comm_gap:"Bring it back online",
+    live_dark:"Check why it stopped"
   };
 
   /* ===========================================================================
@@ -64,14 +67,27 @@
       const fleetWin = a.inverters.reduce((t,i)=>t+(i.window_kwh||0),0);
       a.inverters.forEach(inv => {
         invTotal++;
-        if(inv.status==="ok"){ invHealthy++; return; }
-        const lk = lostKwh(inv, fleetWin, totalNp);
+        // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 14-day
+        // peer verdict; a fresh live anomaly (dark now while >=2 daylight peers
+        // produce) isn't caught by it yet, so we promote a status:"ok" inverter to
+        // a "live_dark" row. Shared FleetStore classifier → same logic as the tree
+        // + grid, so the three surfaces never disagree.
+        let status = inv.status;
+        if(status === "ok" && window.FleetStore && FleetStore.liveVerdict
+           && FleetStore.liveVerdict(inv, a.inverters, a.is_daylight) === "dark"){
+          status = "live_dark";
+        }
+        if(status === "ok"){ invHealthy++; return; }
+        // live_dark carries no priced loss yet (unconfirmed, like comm_gap) — the
+        // dollars are claimed once 14-day health confirms it dead/underperforming.
+        const lk = (status === "live_dark") ? 0 : lostKwh(inv, fleetWin, totalNp);
         const lossMo = val(lk)/WINDOW_DAYS*30;
         rows.push({
           key:`${a.id}|${inv.name}`, arrayId:a.id, site:a.name, region:a.region, host:a.host, vendor:a.vendor,
-          inv:inv.name, model:inv.model, nameplate:inv.nameplate_kw, status:inv.status,
-          sev:SEV[inv.status], pi:inv.peer_index, stale:inv.stale_hours,
+          inv:inv.name, model:inv.model, nameplate:inv.nameplate_kw, status,
+          sev:SEV[status], pi:inv.peer_index, stale:inv.stale_hours,
           lossMo, lossYr:lossMo*12, lostKwh:lk, windowKwh:inv.window_kwh,
+          live: status === "live_dark",
         });
       });
     });
@@ -151,7 +167,11 @@
           </div>
         </div>
         <div class="fc-right">
-          ${riskMo>=1 ? `<div class="fc-risk"><span class="fc-risk-k">recoverable</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span><span class="fc-risk-sub">by fixing the flagged inverters</span></div>` : `<div class="fc-allclear">All clear 🌞</div>`}
+          ${riskMo>=1
+            ? `<div class="fc-risk"><span class="fc-risk-k">recoverable</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span><span class="fc-risk-sub">by fixing the flagged inverters</span></div>`
+            : k.flagged
+              ? `<div class="fc-watch" data-kpi="watch"><b>${num(k.flagged)}</b> to check<span class="fc-risk-sub">live anomalies — no $ lost yet</span></div>`
+              : `<div class="fc-allclear">All clear 🌞</div>`}
           <div class="fc-asof" id="ccAsof">${asofText()}</div>
         </div>
       </div>
@@ -248,6 +268,8 @@
     const peers = "its array neighbors";
     const why = r.status==="comm_gap"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has gone quiet — no telemetry for <b>${r.stale!=null?r.stale+"h":"a while"}</b>. Its neighbors are still reporting, so this reads as a comms dropout, not a power fault. We can't bill lost output until it checks back in.`
+      : r.status==="live_dark"
+      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is reading <b>zero output right now</b> while its array neighbors are actively producing under the same sky. This is a LIVE reading — the 14-day health hasn't flagged it yet, so it just stopped. Could be an early-stage fault, a tripped breaker, or a brief dropout; check before it becomes lost revenue.`
       : r.status==="dead"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has produced <b>zero</b> for ~${r.stale!=null?Math.round(r.stale/24):"a few"} days while ${peers} kept producing — that rules out weather. Warranty claim is ready with the fault dates and peer-measured lost-kWh evidence.`
       : r.status==="fault"
@@ -255,6 +277,8 @@
       : `Over ${WINDOW_DAYS} days, <b>${esc(r.inv)}</b> made only <b>${r.pi!=null?Math.round(r.pi*100):"—"}%</b> of its fair share vs ${peers} under the same sky. That <b>${r.pi!=null?Math.round((1-r.pi)*100):"—"}% shortfall</b> is the unit — likely shading, soiling, or a tired string.`;
     const rec = r.status==="comm_gap"
       ? `Power-cycle the inverter's gateway / data logger and confirm it rejoins. No telemetry within a day → escalate to a site visit.`
+      : r.status==="live_dark"
+      ? `Confirm it's still dark (this is a live, possibly brief reading), then check the breaker/disconnect and the inverter's own fault log. If it stays at zero into tomorrow, the 14-day health will escalate it to a warranty-grade claim automatically.`
       : r.status==="underperforming"
       ? `Schedule a visual + IV-curve check on this inverter's strings. A failed module or cleaning is usually a fast-payback fix.`
       : `Send the drafted ${r.status==="fault"?"service request":"warranty claim"} to the manufacturer — evidence is attached and dated.`;
