@@ -627,8 +627,17 @@
   function outputState(inv, statusCls){
     const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
-    const meaningful = curW != null && maxW != null && curW > Math.max(25, maxW * 0.01);
-    if(!meaningful) return { reporting: false, pct: null, tone: "idle" };
+    // "Producing" needs only a real live reading. When we know the rated max we
+    // show % of max; when we DON'T (e.g. Chint reports no nameplate), we still
+    // show the absolute kW — never claim "not producing" just because nameplate
+    // is unknown. Below ~25W (or ~1% of rated, when known) = genuinely idle.
+    const floor = maxW != null ? Math.max(25, maxW * 0.01) : 25;
+    const producing = curW != null && curW > floor;
+    if(!producing) return { reporting: false, pct: null, tone: "idle" };
+    if(maxW == null){
+      // Real output, no nameplate to compute a % — report absolute, calm tone.
+      return { reporting: true, pct: null, tone: (statusCls === "ok") ? "ok" : pctTone(50) };
+    }
     const pct = Math.max(0, Math.min(100, Math.round((curW / maxW) * 100)));
     const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
     return { reporting: true, pct, tone };
@@ -639,12 +648,21 @@
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
     const curKw = curW != null ? (curW / 1000) : null;
     const maxKw = maxW != null ? (maxW / 1000) : null;
-    const label = os.reporting
-      ? `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`
-      : `<span class="sb-ob-idle">not producing right now</span>`;
+    let label;
+    if(!os.reporting){
+      label = `<span class="sb-ob-idle">not producing right now</span>`;
+    } else if(os.pct != null){
+      label = `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`;
+    } else {
+      // Producing, but no rated max known — show the live kW outright.
+      label = `<b class="sb-ob-pct">${curKw.toFixed(1)} kW</b><span class="sb-ob-of">producing now</span>`;
+    }
+    // With no nameplate we can't fill a %-of-max bar, so show it full at a calm
+    // tone to signal "producing" without implying a measured ratio.
+    const fillPct = os.reporting ? (os.pct != null ? os.pct : 100) : 0;
     return `<div class="sb-outbar ${os.tone}" data-curw="${curW!=null?curW:''}" data-maxw="${maxW!=null?maxW:''}">
       <div class="sb-ob-head"><span class="sb-ob-k">Output now</span>${label}</div>
-      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${os.reporting?os.pct:0}%"></div></div>
+      <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${fillPct}%"></div></div>
     </div>`;
   }
 
