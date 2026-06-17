@@ -416,8 +416,9 @@
      (mirrors the inverter card's frosted plate). */
   .fc-card::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
     border-radius:16px;background:linear-gradient(90deg,rgba(8,12,18,.46),rgba(8,12,18,.32))}
-  /* state variants — mirror the inverter liquid tone language, boosted opacity */
-  .fc-tank--ok{background:linear-gradient(90deg,rgba(24,175,92,.8),rgba(80,240,150,.6))}
+  /* state variants — mirror the inverter liquid tone language, boosted opacity.
+     --ok uses the EXACT sandbox .sb-liquid green (rgba 24,165,86 / 46,213,115). */
+  .fc-tank--ok{background:linear-gradient(90deg,rgba(24,165,86,.8),rgba(46,213,115,.62))}
   .fc-tank--warn{background:linear-gradient(90deg,rgba(220,160,40,.74),rgba(255,200,90,.56))}
   .fc-tank--warn::before,.fc-tank--warn::after{
     background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(255,215,130,.62),transparent 70%)}
