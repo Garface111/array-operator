@@ -369,9 +369,11 @@
   /* ── PINNED FLEET COMMANDER — whole-fleet health at a glance, centered in the
      same content column as the sandbox below it. ── */
   #fleetCommander{width:100%;max-width:100%;margin:6px 0 4px}
-  .fc-card{display:flex;align-items:center;gap:24px;padding:14px 22px;border-radius:16px;
+  .fc-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:24px;padding:11px 22px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(165deg,#10161f,#0b0f17);
     box-shadow:0 18px 44px -26px rgba(0,0,0,.85)}
+  /* All card content rides ABOVE the liquid tank (z-index 0). */
+  .fc-card > .fc-health,.fc-card > .fc-mid,.fc-card > .fc-right{position:relative;z-index:1}
   .fc-card.ok{border-color:rgba(63,214,138,.3)}
   .fc-card.warn{border-color:rgba(255,180,84,.35)}
   .fc-card.bad{border-color:rgba(255,107,107,.4)}
@@ -385,43 +387,39 @@
   .fc-card.warn .fc-health-num b{color:var(--warn)}
   .fc-card.bad  .fc-health-num b{color:var(--bad)}
   .fc-health-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-top:5px}
-  /* middle: meter + counts */
+  /* middle: counts */
   .fc-mid{flex:1 1 auto;min-width:0}
-  /* ── Horizontal LIQUID energy bar — the same energy-as-liquid metaphor as the
-     inverter cards, laid on its side: the liquid fills left→right with a wavy
-     leading edge and rising bubbles. Width = % fleet healthy. ── */
-  .fc-liquid{position:relative;height:18px;border-radius:999px;overflow:hidden;margin-bottom:11px;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.06);
-    box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
-  .fc-liquid-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;
-    transition:width .8s cubic-bezier(.4,0,.2,1),background 1s;overflow:hidden;
-    background:linear-gradient(90deg,rgba(24,165,86,.85),rgba(46,213,115,.55))}
-  /* The traveling meniscus — a soft bright crest riding the TOP surface of the
-     liquid (the horizontal analogue of the inverter card's surface wave). */
-  .fc-liquid-fill::before,.fc-liquid-fill::after{content:"";position:absolute;top:-10px;left:-50%;
-    width:200%;height:20px;
+  /* ── WHOLE-BAR LIQUID TANK — the entire top bar IS the tank. Energy rises from
+     the BOTTOM and fills the whole card; height = % fleet healthy. The liquid
+     sits BEHIND the content (z-index 0); all card content rides above it. Same
+     energy-as-liquid metaphor + wave crest + rising bubbles as the inverter
+     cards. ── */
+  .fc-tank{position:absolute;left:0;right:0;bottom:0;z-index:0;width:100%;
+    border-bottom-left-radius:16px;border-bottom-right-radius:16px;
+    transition:height 1s cubic-bezier(.4,0,.2,1),background 1s;overflow:hidden;
+    background:linear-gradient(180deg,rgba(46,213,115,.34),rgba(24,165,86,.6))}
+  /* the meniscus — a bright crest riding the TOP surface of the rising liquid */
+  .fc-tank::before,.fc-tank::after{content:"";position:absolute;top:-9px;left:-50%;
+    width:200%;height:18px;
     background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(120,255,170,.55),transparent 70%);
-    animation:fcliqwave 5s linear infinite}
-  .fc-liquid-fill::after{animation-duration:7s;animation-direction:reverse;opacity:.5}
-  @keyframes fcliqwave{from{transform:translateX(0)}to{transform:translateX(25%)}}
-  /* A brighter highlight pinned to the leading (right) edge so the fill reads as
-     a liquid front, not a flat bar. */
-  .fc-liquid-fill::after{box-shadow:none}
-  .fc-liq-bubbles span{position:absolute;bottom:2px;border-radius:50%;
+    animation:fctankwave 5s linear infinite}
+  .fc-tank::after{animation-duration:7s;animation-direction:reverse;opacity:.5}
+  @keyframes fctankwave{from{transform:translateX(0)}to{transform:translateX(25%)}}
+  .fc-liq-bubbles span{position:absolute;bottom:0;border-radius:50%;
     background:radial-gradient(circle at 35% 35%,rgba(190,255,210,.9),rgba(120,255,170,.2));
-    animation:fcliqrise linear infinite}
-  @keyframes fcliqrise{0%{transform:translateY(0) scale(.6);opacity:0}
-    20%{opacity:.85}100%{transform:translateY(-15px) scale(1);opacity:0}}
+    animation:fctankrise linear infinite}
+  @keyframes fctankrise{0%{transform:translateY(0) scale(.6);opacity:0}
+    18%{opacity:.85}100%{transform:translateY(-70px) scale(1);opacity:0}}
   /* state variants — mirror the inverter liquid tone language */
-  .fc-liquid-fill.ok{background:linear-gradient(90deg,rgba(24,175,92,.88),rgba(80,240,150,.5))}
-  .fc-liquid-fill.warn{background:linear-gradient(90deg,rgba(220,160,40,.78),rgba(255,200,90,.42))}
-  .fc-liquid-fill.warn::before,.fc-liquid-fill.warn::after{
+  .fc-tank--ok{background:linear-gradient(180deg,rgba(80,240,150,.4),rgba(24,175,92,.66))}
+  .fc-tank--warn{background:linear-gradient(180deg,rgba(255,200,90,.34),rgba(220,160,40,.6))}
+  .fc-tank--warn::before,.fc-tank--warn::after{
     background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(255,210,120,.5),transparent 70%)}
-  .fc-liquid-fill.bad{background:linear-gradient(90deg,rgba(200,90,40,.82),rgba(255,140,90,.46))}
-  .fc-liquid-fill.bad::before,.fc-liquid-fill.bad::after{
+  .fc-tank--bad{background:linear-gradient(180deg,rgba(255,140,90,.36),rgba(200,90,40,.62))}
+  .fc-tank--bad::before,.fc-tank--bad::after{
     background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(255,160,110,.5),transparent 70%)}
   @media (prefers-reduced-motion:reduce){
-    .fc-liquid-fill::before,.fc-liquid-fill::after,.fc-liq-bubbles span{animation:none !important}
+    .fc-tank::before,.fc-tank::after,.fc-liq-bubbles span{animation:none !important}
   }
   .fc-stats{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;font-size:15px;color:var(--muted)}
   .fc-stat b{font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}

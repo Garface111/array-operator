@@ -155,22 +155,21 @@
     // and a live "updated Ns ago". No table, no extra chrome.
     h.innerHTML = `
       <div class="fc-card ${healthCls}">
+        <div class="fc-tank fc-tank--${healthCls}" data-kpi="healthmeter" style="height:${k.healthyPct}%" aria-hidden="true">
+          <span class="fc-liq-bubbles">
+            <span style="left:9%;width:5px;height:5px;animation-duration:3.4s;animation-delay:.0s"></span>
+            <span style="left:24%;width:4px;height:4px;animation-duration:4.1s;animation-delay:.7s"></span>
+            <span style="left:41%;width:6px;height:6px;animation-duration:3.0s;animation-delay:1.3s"></span>
+            <span style="left:58%;width:4px;height:4px;animation-duration:4.6s;animation-delay:.4s"></span>
+            <span style="left:73%;width:5px;height:5px;animation-duration:3.7s;animation-delay:1.0s"></span>
+            <span style="left:88%;width:4px;height:4px;animation-duration:4.3s;animation-delay:1.6s"></span>
+          </span>
+        </div>
         <div class="fc-health">
           <div class="fc-health-num"><b data-kpi="healthy">${k.healthyPct}</b><span>%</span></div>
           <div class="fc-health-lbl">fleet healthy</div>
         </div>
         <div class="fc-mid">
-          <div class="fc-liquid" role="img" aria-label="${k.healthyPct}% of fleet healthy">
-            <div class="fc-liquid-fill ${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%">
-              <span class="fc-liq-bubbles">
-                <span style="left:14px;width:5px;height:5px;animation-duration:3.4s;animation-delay:.0s"></span>
-                <span style="left:38px;width:4px;height:4px;animation-duration:4.1s;animation-delay:.7s"></span>
-                <span style="left:72px;width:6px;height:6px;animation-duration:3.0s;animation-delay:1.3s"></span>
-                <span style="left:120px;width:4px;height:4px;animation-duration:4.6s;animation-delay:.4s"></span>
-                <span style="left:180px;width:5px;height:5px;animation-duration:3.7s;animation-delay:1.0s"></span>
-              </span>
-            </div>
-          </div>
           <div class="fc-stats">
             <span class="fc-stat"><b data-kpi="sites">${num(k.sites)}</b> arrays</span>
             <span class="fc-dot">·</span>
@@ -450,7 +449,7 @@ Thank you,
     setText('[data-kpi="sites"]', num(k.sites));
     setText('[data-kpi="inverters"]', num(k.inverters));
     setText('[data-kpi="healthy"]', k.healthyPct+"%");
-    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.width = k.healthyPct+"%";
+    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.height = k.healthyPct+"%";
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
