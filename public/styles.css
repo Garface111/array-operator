@@ -585,6 +585,29 @@
   .sb-inv-alert.bad{color:var(--bad);background:rgba(255,107,107,.13)}
   .sb-inv-alert.info{color:#8fb4e8;background:rgba(120,160,230,.12)}
 
+  /* ── NOW chip — the LIVENESS axis, kept visually distinct from the health badge.
+     A small left-aligned dot+word ("Producing / Idle / Not producing / No signal /
+     Asleep"). Sits right under the sparkline; the health badge stays at the card
+     foot. Two axes, two places, never one ambiguous label. */
+  .sb-inv-now{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;white-space:nowrap;
+    font-size:9.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;
+    margin-top:6px;padding:2px 7px 2px 6px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03)}
+  .sb-now-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .sb-inv-now.ok{color:var(--good)}
+  .sb-inv-now.idle{color:var(--faint)}
+  .sb-inv-now.warn{color:var(--warn);background:rgba(255,180,84,.10);border-color:rgba(255,180,84,.28)}
+  .sb-inv-now.info{color:#8fb4e8;background:rgba(120,160,230,.10);border-color:rgba(120,160,230,.26)}
+  .sb-inv-now.sleep{color:#aab4e8;background:rgba(120,135,210,.12);border-color:rgba(120,135,210,.26)}
+  /* the "Producing" dot softly pulses so a live card reads as alive */
+  .sb-inv-now.ok .sb-now-dot{animation:sb-now-pulse 2.4s ease-in-out infinite}
+  /* the amber "Not producing (peers are)" dot pulses to draw the eye */
+  .sb-inv-now.warn .sb-now-dot{animation:sb-now-pulse 1.6s ease-in-out infinite}
+  @keyframes sb-now-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.sb-inv-now .sb-now-dot{animation:none}}
+  /* sleeping card calms the NOW chip too (matches the alert/text treatment) */
+  .sb-inv.sleep .sb-inv-now{color:#aab4e8 !important}
+
   /* ───────────────  LIQUID-FILL ENERGY LAYER (design spec)  ─────────────── */
   /* The frosted plate holds ALL the card content above the liquid (z-index 3),
      keeping its own opaque bg so text/sparkline never wash out (spec bug #1:

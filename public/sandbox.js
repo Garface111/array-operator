@@ -732,6 +732,33 @@
     return (inv.current_power_w != null) ? "dark" : "stale";
   }
 
+  // ── NOW state — the card's explicit LIVENESS axis ───────────────────────────
+  // A card carries TWO independent truths that must never masquerade as one:
+  //   • NOW    — is it making power THIS INSTANT? (current_power_w)
+  //   • HEALTH — is it pulling its weight over 14 days? (inv.status, peer_analysis)
+  // Conflating them is what produced the "All good" badge on a dark inverter. So
+  // we surface NOW as its own small color-coded chip and leave the health badge
+  // to mean ONLY health. liveState maps the instantaneous reading (cross-checked
+  // against peers) to a labelled, toned state for that chip.
+  //   producing → green   making power now
+  //   idle      → grey     not producing, but calm (peers idle too / too few lit
+  //                        peers to judge) — nothing wrong
+  //   dark      → amber    not producing while ≥2 daylight peers are — the anomaly
+  //   stale     → blue     no live reading at all — unknown, not a confirmed fault
+  //   asleep    → lavender sun-down resting state (owned by the Sleeping visuals)
+  function liveState(inv, peers, isDaylight, sleeping){
+    if(sleeping) return { key:"asleep", label:"Asleep", tone:"sleep" };
+    if(outputState(inv, "ok").reporting)
+      return { key:"producing", label:"Producing", tone:"ok" };
+    const lv = liveVerdict(inv, peers, isDaylight);
+    if(lv === "dark")  return { key:"dark",  label:"Not producing", tone:"warn",
+                                title:"Dark right now while sibling inverters are producing." };
+    if(lv === "stale") return { key:"stale", label:"No signal", tone:"info",
+                                title:"No live reading from this inverter right now." };
+    return { key:"idle", label:"Idle", tone:"idle",
+             title:"Not producing right now — but its peers aren't either, so nothing's wrong." };
+  }
+
   function liquidLayer(inv, statusCls, isDaylight){
     const st = liquidState(inv, statusCls, isDaylight);
     const sleeping = st === "sleep";
@@ -974,24 +1001,22 @@
         const obTone = outputState(inv, sCls).tone;
         const liqSt = liquidState(inv, sCls, col.is_daylight);
         const sleeping = liqSt === "sleep";
+        // The card's two axes, kept SEPARATE and explicitly labelled:
+        //  • HEALTH badge — purely the 14-day peer verdict (inv.status). It no
+        //    longer second-guesses the live reading; that was the source of the
+        //    "All good on a dark inverter" contradiction.
+        //  • NOW chip — the instantaneous liveness state (liveState), peer-checked.
         const isAlert = sCls !== "ok";
-        // Cross-check the slow 14-day health against the live reading. If health
-        // says "ok" but the inverter is dark right now while peers produce in
-        // daylight, the green "All good" badge would be a lie — surface the live
-        // anomaly instead. Confirmed health alerts (bad/warn) always win.
-        const lv = isAlert ? "ok" : liveVerdict(inv, sortedInvs, col.is_daylight);
-        let alertLine;
-        if(isAlert){
-          alertLine = `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`;
-        } else if(lv === "dark"){
-          alertLine = `<div class="sb-inv-alert warn">Not producing — peers are</div>`;
-        } else if(lv === "stale"){
-          alertLine = `<div class="sb-inv-alert info">No live reading</div>`;
-        } else {
-          alertLine = `<div class="sb-inv-alert ok">All good</div>`;
-        }
+        const healthLabel = isAlert ? (STATUS_LABEL[inv.status] || inv.status || "Needs a look") : "All good";
+        const healthBadge = `<div class="sb-inv-alert ${sCls}" title="Health over the last 14 days vs its peers.">${esc(healthLabel)}</div>`;
+        const ls = liveState(inv, sortedInvs, col.is_daylight, sleeping);
+        const nowChip = `<div class="sb-inv-now ${ls.tone}"${ls.title?` title="${esc(ls.title)}"`:""}><span class="sb-now-dot"></span>${esc(ls.label)}</div>`;
+        // The whole-card tint: a live anomaly (dark while peers produce) edges the
+        // card amber so it reads as needing a look even before 14-day health flags
+        // it; otherwise the calm output tone drives it.
+        const cardTone = (!isAlert && ls.key === "dark") ? "warn" : obTone;
         return `
-          <div class="sb-inv ${sCls}${sleeping?' sleep':''}" tabindex="0" draggable="true" data-tone="${obTone}"
+          <div class="sb-inv ${sCls}${sleeping?' sleep':''}" tabindex="0" draggable="true" data-tone="${cardTone}"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
@@ -1008,8 +1033,9 @@
                 ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
               </div>
               ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
+              ${nowChip}
               ${outputBar(inv, sCls)}
-              ${alertLine}
+              ${healthBadge}
               ${brandHTML(inv.vendor)}
             </div>
           </div>`;
