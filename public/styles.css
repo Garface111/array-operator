@@ -414,11 +414,17 @@
     animation:fctankwave 5s linear infinite}
   .fc-tank::after{animation-duration:7s;animation-direction:reverse;opacity:.55}
   @keyframes fctankwave{from{transform:translateY(0)}to{transform:translateY(25%)}}
-  .fc-liq-bubbles span{position:absolute;bottom:0;border-radius:50%;
+  .fc-liq-bubbles span{position:absolute;left:0;border-radius:50%;
     background:radial-gradient(circle at 35% 35%,rgba(200,255,215,.95),rgba(120,255,170,.25));
     animation:fctankrise linear infinite}
-  @keyframes fctankrise{0%{transform:translateY(0) scale(.6);opacity:0}
-    18%{opacity:.9}100%{transform:translateY(-46px) scale(1);opacity:0}}
+  /* horizontal tank → bubbles drift toward the RIGHT (leading edge), not up.
+     The inline `left:%` is the START; they travel rightward and fade. */
+  @keyframes fctankrise{0%{transform:translateX(0) scale(.6);opacity:0}
+    18%{opacity:.9}100%{transform:translateX(46px) scale(1);opacity:0}}
+  /* spread the bubbles vertically so they don't all ride one line */
+  .fc-liq-bubbles span:nth-child(1){top:30%} .fc-liq-bubbles span:nth-child(2){top:62%}
+  .fc-liq-bubbles span:nth-child(3){top:44%} .fc-liq-bubbles span:nth-child(4){top:70%}
+  .fc-liq-bubbles span:nth-child(5){top:36%} .fc-liq-bubbles span:nth-child(6){top:55%}
   /* state variants — mirror the inverter liquid tone language, boosted opacity.
      --ok uses the EXACT sandbox .sb-liquid green (rgba 24,165,86 / 46,213,115). */
   .fc-tank--ok{background:linear-gradient(90deg,rgba(24,165,86,.8),rgba(46,213,115,.62))}
