@@ -416,7 +416,72 @@
   }
 
   function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
-  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  // ---- Weather badge above each array ----------------------------------------
+  // WMO weather-code → emoji + label, plus a per-array weather state. Real arrays
+  // with a lat/lng get a live Open-Meteo current-conditions pull (free, no key);
+  // arrays with only a coarse region, or the demo fleet, get a STABLE synthetic
+  // condition derived deterministically from the array id (so it doesn't flicker
+  // on every re-render). The badge upgrades in place when the live fetch lands.
+  const WX = {
+    clear:   { icon:"☀️", label:"Clear" },
+    pcloudy: { icon:"⛅", label:"Partly cloudy" },
+    cloudy:  { icon:"☁️", label:"Cloudy" },
+    fog:     { icon:"🌫️", label:"Fog" },
+    rain:    { icon:"🌧️", label:"Rain" },
+    snow:    { icon:"🌨️", label:"Snow" },
+    storm:   { icon:"⛈️", label:"Thunderstorm" },
+  };
+  function wxFromWmo(code){
+    if(code===0) return "clear";
+    if(code<=2) return "pcloudy";
+    if(code===3) return "cloudy";
+    if(code===45||code===48) return "fog";
+    if((code>=71&&code<=77)||(code>=85&&code<=86)) return "snow";
+    if(code>=95) return "storm";
+    if((code>=51&&code<=67)||(code>=80&&code<=82)) return "rain";
+    return "cloudy";
+  }
+  const _wxCache = {};   // arrayId → {key, temp} resolved condition (persists across re-renders)
+  function _hashStr(s){ let h=0; s=String(s); for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return Math.abs(h); }
+  function synthWx(col){
+    // deterministic per-array so the demo reads as "real, stable weather"
+    const keys = ["clear","clear","pcloudy","pcloudy","cloudy","rain","snow"];
+    const h = _hashStr(col.array_id != null ? col.array_id : col.array_name);
+    return { key: keys[h % keys.length], temp: 40 + (h % 45) };  // 40–84°F
+  }
+  function weatherBadge(col){
+    const cached = _wxCache[col.array_id] || synthWx(col);
+    const w = WX[cached.key] || WX.cloudy;
+    const tt = cached.temp != null ? `${w.label} · ${cached.temp}°F` : w.label;
+    return ` <span class="sb-wx" data-array-id="${esc(col.array_id)}" title="${esc(tt)}" aria-label="Weather: ${esc(tt)}">${w.icon}</span>`;
+  }
+  // After render, kick a live pull for arrays that carry real coordinates, then
+  // patch the badge in place. Demo/region-only arrays keep their stable synthetic icon.
+  function refreshWeather(host){
+    const cols = (window.FleetStore && FleetStore.focusColumns) ? (FleetStore.focusColumns().columns || []) : [];
+    cols.forEach(col => {
+      const lat = col.lat != null ? col.lat : col.latitude;
+      const lng = col.lng != null ? col.lng : col.longitude;
+      if(lat==null || lng==null) return;                 // no coords → keep synthetic
+      if(_wxCache[col.array_id]){ paintWx(host, col.array_id); return; }
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`;
+      fetch(url).then(r=>r.ok?r.json():null).then(j=>{
+        if(!j || !j.current) return;
+        _wxCache[col.array_id] = { key: wxFromWmo(j.current.weather_code), temp: Math.round(j.current.temperature_2m) };
+        paintWx(host, col.array_id);
+      }).catch(()=>{});
+    });
+  }
+  function paintWx(host, arrayId){
+    const cached = _wxCache[arrayId]; if(!cached) return;
+    const w = WX[cached.key] || WX.cloudy;
+    const tt = cached.temp != null ? `${w.label} · ${cached.temp}°F` : w.label;
+    (host||document).querySelectorAll(`.sb-wx[data-array-id="${CSS.escape(String(arrayId))}"]`).forEach(node => {
+      node.textContent = w.icon; node.title = tt; node.setAttribute("aria-label", "Weather: "+tt);
+    });
+  }
 
   // peer-index bar (0..~1.2 clamped) — green at/above 1, amber/ red below
   function peerBar(pi){
@@ -694,6 +759,7 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
+            <button class="sb-resetbtn" id="sbAlerts" type="button" title="Email me when an inverter goes down or underperforms">🔔 Alerts</button>
           </div>
         </div>
         <div class="sb-head-actions">
@@ -804,7 +870,7 @@
               <!-- LEFT: array identity + where its data comes from -->
               <div class="sb-array-details">
                 <div class="sb-array-k">Array</div>
-                <div class="sb-array-name">${esc(col.array_name)}</div>
+                <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
                 <div class="sb-array-meta">${brandChip}</div>
                 ${col.vendor ? "" : originLinksHTML(col)}
                 <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"
@@ -861,6 +927,7 @@
     wireOrient(host);
     wireViewMode(host);   // ⊞ Overview ↔ ⌗ Tree-view toggle
     wireShowAll(host);    // ⊟ Show all arrays (visible only when drilled into a subset)
+    wireAlerts(host);     // 🔔 inverter email alert settings
     wireUndoRedo(host);   // ↶ Undo / ↷ Redo for inverter moves (FleetStore history)
     wireExpandAll(host);  // "Show all inverters" — open/collapse every array's comb
     wireAddButton(host);
@@ -876,6 +943,7 @@
     wireCardButton(host); // "+ Card" menu (Note / Data)
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
     drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
+    refreshWeather(host); // live Open-Meteo pull for arrays with coords; synthetic otherwise
   }
 
   // A tiny tile sparkline (no axis) of an array's summed daily production, tinted
@@ -963,6 +1031,7 @@
     wireFullscreen(host);
     wireViewMode(host);
     wireShowAll(host);
+    wireAlerts(host);
     wireUndoRedo(host);
     wireAddButton(host);
     wireNewArrayButton(host);
@@ -1830,6 +1899,82 @@
     };
   }
 
+  // 🔔 Inverter email alerts — a small settings modal: toggle on/off, set the
+  // recipient email, the sensitivity threshold (alert under X% of peers), and a
+  // grace window. Persists to the backend (/v1/array-owners/alert-settings).
+  function wireAlerts(host){
+    const btn = host.querySelector("#sbAlerts");
+    if(!btn) return;
+    btn.onclick = () => openAlertsModal();
+  }
+  function openAlertsModal(){
+    document.querySelectorAll(".sb-alerts-back").forEach(n=>n.remove());
+    const back = el(`<div class="sb-alerts-back" role="dialog" aria-modal="true" aria-label="Inverter alerts">
+      <div class="sb-alerts-modal">
+        <button class="sb-alerts-x" type="button" aria-label="Close">×</button>
+        <div class="sb-alerts-title">🔔 Inverter down alerts</div>
+        <div class="sb-alerts-sub">Get an email the moment an inverter goes dark or slips below its neighbors.</div>
+        <label class="sb-alerts-toggle"><input type="checkbox" id="aaEnabled"> <span>Email me when an inverter needs attention</span></label>
+        <div class="sb-alerts-fields">
+          <label class="sb-alerts-field"><span>Send alerts to</span>
+            <input type="email" id="aaEmail" placeholder="you@example.com"></label>
+          <label class="sb-alerts-field"><span>Alert when output drops below <b id="aaThreshVal">50%</b> of its neighbors</span>
+            <input type="range" id="aaThresh" min="10" max="95" step="5" value="50"></label>
+          <label class="sb-alerts-field"><span>Wait <b id="aaGraceVal">12h</b> before alerting (ignore passing clouds)</span>
+            <input type="range" id="aaGrace" min="0" max="48" step="2" value="12"></label>
+        </div>
+        <div class="sb-alerts-note" id="aaNote"></div>
+        <div class="sb-alerts-actions">
+          <button class="sb-resetbtn" id="aaCancel" type="button">Cancel</button>
+          <button class="sb-addbtn" id="aaSave" type="button">Save</button>
+        </div>
+      </div></div>`);
+    document.body.appendChild(back);
+    const $ = id => back.querySelector(id);
+    const close = () => back.remove();
+    back.addEventListener("click", e => { if(e.target === back) close(); });
+    $("#aaCancel").onclick = close; $(".sb-alerts-x").onclick = close;
+    document.addEventListener("keydown", function esc(e){ if(e.key==="Escape"){ close(); document.removeEventListener("keydown", esc);} });
+
+    const thresh = $("#aaThresh"), grace = $("#aaGrace");
+    const syncLbls = () => { $("#aaThreshVal").textContent = thresh.value+"%"; $("#aaGraceVal").textContent = grace.value+"h"; };
+    thresh.oninput = syncLbls; grace.oninput = syncLbls;
+
+    // load current settings
+    const session = getSession();
+    if(!session){ $("#aaNote").innerHTML = `<a href="onboarding.html">Sign in</a> to set up alerts.`; }
+    else {
+      fetch("/v1/array-owners/alert-settings", { headers:{ "Authorization":"Bearer "+session } })
+        .then(r=>r.ok?r.json():null).then(s=>{
+          if(!s) return;
+          $("#aaEnabled").checked = !!s.enabled;
+          $("#aaEmail").value = s.email || "";
+          thresh.value = s.threshold_pct || 50;
+          grace.value = s.grace_hours != null ? s.grace_hours : 12;
+          syncLbls();
+        }).catch(()=>{});
+    }
+    syncLbls();
+
+    $("#aaSave").onclick = () => {
+      if(!session){ $("#aaNote").innerHTML = `<a href="onboarding.html">Sign in</a> first.`; return; }
+      const body = {
+        enabled: $("#aaEnabled").checked,
+        email: $("#aaEmail").value.trim(),
+        threshold_pct: parseInt(thresh.value,10),
+        grace_hours: parseInt(grace.value,10),
+      };
+      $("#aaNote").textContent = "Saving…";
+      fetch("/v1/array-owners/alert-settings", {
+        method:"PUT", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+session },
+        body: JSON.stringify(body)
+      }).then(r=>r.json().then(j=>({ok:r.ok, j}))).then(({ok,j})=>{
+        if(!ok){ $("#aaNote").textContent = (j && j.detail) || "Couldn't save — check the email."; return; }
+        close();
+        toast(j.enabled ? `Alerts on — we'll email ${j.email} when an inverter needs you.` : "Inverter alerts turned off.", "ok");
+      }).catch(()=>{ $("#aaNote").textContent = "Network error — try again."; });
+    };
+  }
   // "Show all arrays" — visible only in TREE view when the owner has drilled into a
   // narrowed subset (e.g. clicked one tile in the overview grid). The whole-fleet
   // view that actually works is the OVERVIEW GRID (the tree dumped 100 arrays into a

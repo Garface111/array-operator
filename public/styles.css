@@ -334,6 +334,31 @@
   .sb-tile-flag.bad{color:var(--bad);background:rgba(255,107,107,.14)}
   .sb-tile-risk{font-size:13px;font-weight:800;color:var(--bad);font-variant-numeric:tabular-nums}
   .sb-tile-risk small{font-size:9.5px;font-weight:600;color:var(--faint)}
+  /* weather badge beside the array name */
+  .sb-wx{display:inline-block;margin-left:6px;font-size:0.95em;line-height:1;cursor:default;
+    vertical-align:baseline;filter:saturate(1.05)}
+  /* ── inverter email-alert settings modal ── */
+  .sb-alerts-back{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:rgba(2,6,12,.72);backdrop-filter:blur(4px);padding:20px}
+  .sb-alerts-modal{position:relative;width:min(440px,94vw);padding:26px 28px 22px;border-radius:18px;
+    background:linear-gradient(165deg,#10161f,#0b0f17);border:1px solid var(--line);
+    box-shadow:0 30px 80px -28px rgba(0,0,0,.9);color:var(--ink)}
+  .sb-alerts-x{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--faint);
+    font-size:22px;line-height:1;cursor:pointer}
+  .sb-alerts-x:hover{color:var(--ink)}
+  .sb-alerts-title{font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .sb-alerts-sub{font-size:13px;color:var(--muted);margin:6px 0 16px;line-height:1.5}
+  .sb-alerts-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;cursor:pointer;
+    padding:11px 13px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+  .sb-alerts-toggle input{width:17px;height:17px;accent-color:var(--good);cursor:pointer}
+  .sb-alerts-fields{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+  .sb-alerts-field{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--muted)}
+  .sb-alerts-field b{color:var(--good);font-weight:800}
+  .sb-alerts-field input[type=email]{padding:9px 12px;border-radius:9px;border:1px solid var(--line);
+    background:rgba(255,255,255,.04);color:var(--ink);font-size:14px}
+  .sb-alerts-field input[type=range]{width:100%;accent-color:var(--good);cursor:pointer}
+  .sb-alerts-note{font-size:12.5px;color:var(--warn);margin-top:12px;min-height:1px}
+  .sb-alerts-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
   /* grid mode: the tiles ARE the legend (color-coded), and orientation/expand-all
      are canvas-only — hide them so the toolbar stays clean. */
   #sandbox.sb-mode-grid ~ * .sb-legend,
