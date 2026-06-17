@@ -1112,8 +1112,6 @@
 
     const expanded = getExpandedSet();   // which arrays have their inverter comb open
     const columns = cols.map(col => {
-      const a = col.alert || {level:"ok"};
-      const aCls = ALERT_CLASS[a.level] || "ok";
       const isOpen = expanded.has(String(col.array_id));
       const invs = col.inverters || [];
       // tier-2 chip:
@@ -1193,33 +1191,55 @@
 
       const n = col.inverter_count;
       const countLbl = `${n} inverter${n===1?'':'s'}`;
+
+      // ── ARRAY CARD: the inverter card's bigger sibling, SAME construction ──
+      // (liquid fill → frosted plate → name/size → production graph → NOW chip →
+      // output bar → health badge → vendor link + weather), every signal being
+      // the WHOLE ARRAY's aggregate. Two clocks kept separate: NOW = aggregate
+      // live output; HEALTH = the 14-day verdict (shared arrayHealth classifier).
+      const h = arrayHealth(col);                       // {tone,flagged,crit,total,liveAnoms,...}
+      const aOs = arrayOutputState(invs, h.tone);       // aggregate live output / capacity
+      const aSleeping = (col.is_daylight === false) && !aOs.reporting;
+      const aLs = arrayLiveState(col, aOs, h.tone, h.liveAnoms);
+      const aNowChip = `<div class="sb-inv-now ${aLs.tone}"${aLs.title?` title="${esc(aLs.title)}"`:""}><span class="sb-now-dot"></span>${esc(aLs.label)}</div>`;
+      const aHealthLabel = h.tone === "ok" ? "All good"
+        : h.tone === "bad" ? `${h.crit||h.flagged} down`
+        : `${h.flagged} to check`;
+      const aHealthBadge = `<div class="sb-inv-alert ${h.tone}" title="Array health over the last 14 days (${h.flagged} of ${h.total} inverter${h.total===1?'':'s'} flagged).">${esc(aHealthLabel)}</div>`;
+      // total rated size pill (sum of inverter nameplates), like the inverter's kW pill
+      const totNp = invs.reduce((t,i)=> t + (i.nameplate_kw||0), 0);
+      const sizePill = totNp > 0 ? `<span class="sb-inv-size">${totNp>=100?Math.round(totNp):(Math.round(totNp*10)/10)} kW</span>` : "";
+      // the whole-card tint mirrors the inverter card: amber on a live anomaly the
+      // 14-day health hasn't caught yet, else the calm aggregate output tone.
+      const aCardTone = (h.tone === "ok" && aLs.key === "dark") ? "warn" : aOs.tone;
+      // where the array's data comes from: a single clickable vendor brand-link
+      // when single-vendor, else the mixed chip + origin portal links beneath.
+      const srcLinks = col.vendor ? brandLinkHTML(col) : (brandChip + originLinksHTML(col));
+
       return `
         <div class="sb-col${isOpen?' expanded':''}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
-          <!-- ARRAY CARD: two inner columns — details (left) + alerts (right).
-               The grip (⠿) is the whole-column reorder handle. -->
-          <div class="sb-array">
+          <!-- ARRAY CARD — mirrors the inverter card's design, scaled to the array.
+               Whole card is the expand affordance; the ⠿ grip reorders it. -->
+          <div class="sb-array sb-array--card ${aSleeping?'sleep':''}" data-tone="${aCardTone}">
             <span class="sb-drag" draggable="true" role="button" title="Drag this grip to reorder the array">⠿</span>
-            <div class="sb-array-body">
-              <!-- LEFT: array identity + where its data comes from -->
-              <div class="sb-array-details">
+            ${arrayLiquidLayer(col, aOs, h.tone)}
+            <div class="sb-array-plate">
+              <div class="sb-inv-top">
                 <div class="sb-array-k">Array</div>
-                <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
-                <div class="sb-array-meta">${brandChip}</div>
-                ${col.vendor ? "" : originLinksHTML(col)}
-                <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"
-                        title="Show or hide this array's inverters">
-                  <span class="sb-inv-toggle-chev" aria-hidden="true">▸</span>
-                  <span class="sb-array-count">${countLbl}</span>
-                </button>
+                ${sizePill}
               </div>
-              <!-- RIGHT: rolled-up alert for THIS array (colour by level) -->
-              <div class="sb-alert ${aCls}">
-                <div class="sb-alert-k">Alerts</div>
-                <div class="sb-alert-h">${esc(a.headline||"All clear")}</div>
-                <div class="sb-alert-c">${a.count? a.count+' inverter'+(a.count>1?'s':'')+' flagged' : 'nothing to do'}</div>
-              </div>
+              <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
+              ${arrayGraph(sortedInvs, col.daily)}
+              ${aNowChip}
+              ${arrayOutputBar(aOs)}
+              ${aHealthBadge}
+              <div class="sb-array-src">${srcLinks}</div>
+              <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"
+                      title="Show or hide this array's inverters">
+                <span class="sb-inv-toggle-chev" aria-hidden="true">▸</span>
+                <span class="sb-array-count">${countLbl}</span>
+              </button>
             </div>
-            ${arrayGraph(sortedInvs, col.daily)}
           </div>
 
           <!-- Collapsible inverter comb — hidden until the array is expanded -->
@@ -1466,7 +1486,7 @@
         // Health-aware tone (mirrors outputState): a healthy inverter never goes
         // orange just because live output dips — only a flagged inverter does. This
         // keeps the 1s ticker from re-introducing the false-orange on "All good" cards.
-        const card = bar.closest(".sb-inv");
+        const card = bar.closest(".sb-inv, .sb-array");
         const statusCls = card ? (card.classList.contains("bad") ? "bad" : card.classList.contains("warn") ? "warn" : "ok") : "ok";
         const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
         const fill = bar.querySelector(".sb-ob-fill");

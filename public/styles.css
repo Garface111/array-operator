@@ -451,14 +451,35 @@
   .sb-canvas.sb-interacting{will-change:transform}
   .sb-col{flex:0 0 auto;min-width:340px;max-width:460px;display:flex;flex-direction:column;align-items:stretch}
 
-  /* ===== ARRAY CARD — the glassy main node, with two inner columns ===== */
-  /* The whole card is the column; the ⠿ grip (top-right corner) reorders it. */
-  .sb-array{position:relative;border-radius:14px;padding:15px 16px;border:1px solid var(--line);
-    background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.018));text-align:left}
-  .sb-array-body{display:flex;gap:14px;align-items:stretch}
+  /* ===== ARRAY CARD — the inverter card's bigger sibling, SAME construction:
+     a liquid-fill energy layer rising behind a frosted plate that holds the
+     array's identity, production graph, NOW chip, output bar, health badge and
+     vendor/weather source. The whole card is the column; the ⠿ grip reorders it. */
+  .sb-array{position:relative;border-radius:14px;border:1px solid var(--line);
+    background:linear-gradient(165deg,var(--card),var(--card2));text-align:left;
+    overflow:hidden;display:flex;flex-direction:column}
+  /* the whole array card drifts orange as aggregate output falls below max
+     (mirrors the inverter card's data-tone treatment) */
+  .sb-array--card[data-tone="warn"]{border-color:rgba(255,160,70,.45);background:linear-gradient(165deg,rgba(255,150,60,.06),var(--card2))}
+  .sb-array--card[data-tone="bad"]{border-color:rgba(255,120,50,.6);background:linear-gradient(165deg,rgba(255,110,44,.1),var(--card2))}
+  /* frosted plate sits ABOVE the liquid (z-index 3), like .sb-inv-plate, so the
+     content never washes out over the rising fill */
+  .sb-array-plate{position:relative;z-index:3;display:flex;flex-direction:column;
+    flex:1 1 auto;margin:7px;padding:13px 14px;border-radius:11px;
+    background:rgba(11,16,23,.82);border:1px solid rgba(255,255,255,.05);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  /* the array card's liquid layer fills the WHOLE card behind the plate */
+  .sb-array > .sb-liquid{border-radius:14px}
+  /* the array's NOW chip + output bar mirror the inverter's, just a touch larger */
+  .sb-array .sb-inv-now{margin-top:9px;font-size:10px}
+  .sb-array .sb-outbar{margin-top:9px}
+  .sb-array .sb-ob-pct{font-size:16px}
+  .sb-array .sb-inv-alert{margin-top:9px;font-size:10.5px;padding:4px 8px}
+  /* where the array's data comes from (brand-link / mixed chip / portal links) */
+  .sb-array-src{display:flex;flex-direction:column;gap:5px;margin-top:10px;align-items:flex-start}
 
   /* ONE combined production graph for the whole array (sum of all its inverters) */
-  .sb-ag{margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
+  .sb-ag{margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
   .sb-ag-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px}
   .sb-ag-k{font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--faint)}
   .sb-ag-total{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -778,7 +799,7 @@
   /* ===== Drag-to-rearrange columns ===== */
   .sb-array{position:relative}
   .sb-col{cursor:default}
-  .sb-drag{position:absolute;top:9px;right:10px;cursor:grab;color:var(--faint);font-size:13px;
+  .sb-drag{position:absolute;top:9px;right:10px;z-index:5;cursor:grab;color:var(--faint);font-size:13px;
     line-height:1;letter-spacing:-1px;user-select:none;padding:2px 3px;border-radius:6px;transition:color .15s,background .15s}
   .sb-drag:hover{color:var(--sky);background:rgba(94,194,255,.1)}
   .sb-drag:active{cursor:grabbing}
