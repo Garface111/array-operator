@@ -218,6 +218,22 @@
   .acct-row .r-v .r-sub{display:block;color:var(--muted);font-size:12.5px;font-weight:500;margin-top:3px;line-height:1.45}
   .acct-row .r-v .r-big{font-size:21px;font-weight:760;letter-spacing:-.01em}
   .acct-row .r-v small{font-size:13px;font-weight:600;color:var(--muted)}
+
+  /* Auto-refresh row — per-vendor credential cards for hands-free auto-login */
+  .ar-list{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+  .ar-row{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:rgba(255,255,255,.02)}
+  .ar-row-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .ar-vendor{font-size:14px;font-weight:680;color:var(--ink)}
+  .ar-badge{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .ar-badge.on{color:var(--good)}
+  .ar-badge.off{color:#e8932f}
+  .ar-switch{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);cursor:pointer}
+  .ar-fields{display:flex;flex-direction:column;gap:7px}
+  .ar-fields input{width:100%;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--bg);color:var(--ink)}
+  .ar-fields input:focus{outline:none;border-color:var(--good)}
+  .ar-actions{display:flex;gap:8px;margin-top:1px}
+  .ar-clear{color:#ff8a3d}
   .acct-row .r-a{display:flex;gap:8px;align-items:center;justify-content:flex-end}
   /* inline-editable rows: input fills the value cell, Save sits in the action cell */
   .acct-edit .r-v input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);

@@ -2309,13 +2309,14 @@
     const operator = pick(a, ["operator_name","name","owner_name"], "");
     const email    = pick(a, ["email","operator_email"], "");
 
-    // One flat list of rows: identity → login & password → bill → payment.
+    // One flat list of rows: identity → login & password → auto-refresh → bill → payment.
     list.innerHTML =
       rowStatic("Name", esc(operator || "—")) +
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
       passwordRow(a) +
+      autoRefreshRow() +
       rowStatic("Your bill",
         `<span class="r-big" id="billAmount">Loading…</span>`,
         `<span id="billWhy"></span>`) +
@@ -2326,6 +2327,106 @@
 
     wireAcctEdits();
     wirePasswordRow();
+    wireAutoRefreshRow();
+  }
+
+  /* ---- Auto-refresh row: manage the EnergyAgent extension's hourly auto-login
+   * so live production stays fresh hands-free. Credentials are stored ENCRYPTED on
+   * the owner's own machine (in the extension) and NEVER sent to our servers — this
+   * row just reads/writes that local vault through the so_bridge postMessage relay.
+   * Auto-refresh is ON by default (opt-out, per vendor). ---------------------- */
+  const AR_VENDORS = [
+    { id: "fronius", label: "Fronius (Solar.web)" },
+    { id: "sma", label: "SMA (Sunny Portal)" },
+    { id: "chint", label: "Chint" },
+  ];
+  let _vaultReq = {};                       // reqId → resolver, for bridge acks
+  function vaultOp(op, extra){
+    return new Promise((resolve) => {
+      const reqId = "vault-" + Date.now() + Math.random();
+      _vaultReq[reqId] = resolve;
+      extSend("SO_VAULT", Object.assign({ op, reqId }, extra || {}));
+      setTimeout(() => { if(_vaultReq[reqId]){ delete _vaultReq[reqId]; resolve({ ok:false, error:"timeout" }); } }, 4000);
+    });
+  }
+  // Listen for vault acks (separate from the capture listener so it can't interfere).
+  window.addEventListener("message", (e) => {
+    if(e.source !== window) return;
+    const d = e.data; if(!d || d.type !== "SO_VAULT_ACK" || !d.reqId) return;
+    const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
+  });
+
+  function autoRefreshRow(){
+    return `<div class="acct-row" id="rowAutoRefresh">
+      <div class="r-k">Auto-refresh</div>
+      <div class="r-v">
+        <span id="arState">Keeps your live production fresh automatically.</span>
+        <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any vendor anytime.</span>
+        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+      </div>
+    </div>`;
+  }
+
+  async function wireAutoRefreshRow(){
+    const listEl = document.getElementById("arList");
+    if(!listEl) return;
+    if(!EXT_PRESENT){
+      listEl.innerHTML = `<div class="acct-msg">Install the free EnergyAgent helper to enable hands-free auto-refresh. <a href="onboarding.html" style="color:var(--good)">Get it →</a></div>`;
+      return;
+    }
+    const resp = await vaultOp("status");
+    if(!resp || !resp.ok){
+      listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and reload.</div>`;
+      return;
+    }
+    const status = resp.status || {};
+    listEl.innerHTML = AR_VENDORS.map(v => {
+      const st = status[v.id] || { hasCreds:false, enabled:true };
+      const on = st.hasCreds && st.enabled;
+      const stateTxt = st.hasCreds ? (st.enabled ? "On" : "Off") : "Not set";
+      const stateCls = on ? "on" : (st.hasCreds ? "off" : "");
+      return `<div class="ar-row" data-vendor="${v.id}">
+        <div class="ar-row-top">
+          <span class="ar-vendor">${esc(v.label)}</span>
+          <span class="ar-badge ${stateCls}">${stateTxt}</span>
+          <label class="ar-switch"><input type="checkbox" class="ar-optout" ${st.hasCreds && !st.enabled ? "checked" : ""} ${st.hasCreds ? "" : "disabled"}><span>off</span></label>
+        </div>
+        <div class="ar-fields">
+          <input class="ar-user" type="text" autocomplete="off" placeholder="Portal username / email">
+          <input class="ar-pass" type="password" autocomplete="off" placeholder="${st.hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
+          <div class="ar-actions">
+            <button class="acct-btn primary ar-save" type="button">Save</button>
+            ${st.hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    listEl.querySelectorAll(".ar-row").forEach(row => {
+      const vendor = row.dataset.vendor;
+      const userEl = row.querySelector(".ar-user");
+      const passEl = row.querySelector(".ar-pass");
+      const saveBtn = row.querySelector(".ar-save");
+      const clearBtn = row.querySelector(".ar-clear");
+      const optEl = row.querySelector(".ar-optout");
+      saveBtn.addEventListener("click", async () => {
+        const u = (userEl.value||"").trim(), p = passEl.value||"";
+        if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent="Save",1500); return; }
+        saveBtn.textContent = "Saving…";
+        const r = await vaultOp("set", { vendor, username:u, password:p });
+        saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
+        passEl.value = "";
+        setTimeout(wireAutoRefreshRow, 800);
+      });
+      if(clearBtn) clearBtn.addEventListener("click", async () => {
+        await vaultOp("clear", { vendor });
+        wireAutoRefreshRow();
+      });
+      if(optEl) optEl.addEventListener("change", async () => {
+        await vaultOp("optout", { vendor, optedOut: optEl.checked });
+        wireAutoRefreshRow();
+      });
+    });
   }
 
   /* ---- Password row: view (masked + show-as-you-type) and set/change it.
