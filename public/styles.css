@@ -369,11 +369,19 @@
   /* ── PINNED FLEET COMMANDER — whole-fleet health at a glance, centered in the
      same content column as the sandbox below it. ── */
   #fleetCommander{width:100%;max-width:100%;margin:6px 0 4px}
-  .fc-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:24px;padding:11px 22px;border-radius:16px;
+  /* The CARD is the bottom layer = the tank container (holds the liquid). It no
+     longer lays out content directly; .fc-plate does. */
+  .fc-card{position:relative;overflow:hidden;padding:5px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(165deg,#10161f,#0b0f17);
     box-shadow:0 18px 44px -26px rgba(0,0,0,.85)}
-  /* All card content rides ABOVE the liquid tank (z0) and the contrast scrim (z1). */
-  .fc-card > .fc-health,.fc-card > .fc-mid,.fc-card > .fc-right{position:relative;z-index:2}
+  /* The PLATE is the TOP card — a frosted, slightly see-through panel floating
+     over the liquid (the inverter-card .sb-inv-plate trick): inset by a small
+     margin, translucent dark fill + backdrop blur so the energy tank shows
+     through behind it while text stays crisp. z-index 2 over the tank (z0). */
+  .fc-plate{position:relative;z-index:2;display:flex;align-items:center;gap:24px;
+    padding:11px 22px;border-radius:12px;
+    background:rgba(11,16,23,.62);border:1px solid rgba(255,255,255,.06);
+    backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
   .fc-card.ok{border-color:rgba(63,214,138,.3)}
   .fc-card.warn{border-color:rgba(255,180,84,.35)}
   .fc-card.bad{border-color:rgba(255,107,107,.4)}
@@ -411,18 +419,10 @@
     animation:fctankrise linear infinite}
   @keyframes fctankrise{0%{transform:translateY(0) scale(.6);opacity:0}
     18%{opacity:.9}100%{transform:translateY(-46px) scale(1);opacity:0}}
-  /* CONTRAST SCRIM — translucent darkener over the whole card, above the liquid
-     but below the text, so text reads cleanly over both filled + empty zones
-     (mirrors the inverter card's frosted plate). */
-  .fc-card::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
-    border-radius:16px;background:linear-gradient(90deg,rgba(8,12,18,.46),rgba(8,12,18,.32))}
   /* state variants — mirror the inverter liquid tone language, boosted opacity.
      --ok uses the EXACT sandbox .sb-liquid green (rgba 24,165,86 / 46,213,115). */
   .fc-tank--ok{background:linear-gradient(90deg,rgba(24,165,86,.8),rgba(46,213,115,.62))}
   .fc-tank--warn{background:linear-gradient(90deg,rgba(245,158,11,.92),rgba(255,193,64,.78))}
-  /* lighten the scrim over the warn state so the amber reads as vivid gold, not
-     muted olive (the dark scrim was dulling it). */
-  .fc-card.warn::after{background:linear-gradient(90deg,rgba(8,12,18,.3),rgba(8,12,18,.2))}
   .fc-tank--warn::before,.fc-tank--warn::after{
     background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(255,215,130,.62),transparent 70%)}
   .fc-tank--bad{background:linear-gradient(90deg,rgba(200,90,40,.76),rgba(255,140,90,.58))}

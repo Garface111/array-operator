@@ -165,6 +165,7 @@
             <span style="left:88%;width:4px;height:4px;animation-duration:4.3s;animation-delay:1.6s"></span>
           </span>
         </div>
+        <div class="fc-plate">
         <div class="fc-health">
           <div class="fc-health-num"><b data-kpi="healthy">${k.healthyPct}</b><span>%</span></div>
           <div class="fc-health-lbl">fleet healthy</div>
@@ -187,6 +188,7 @@
               : `<div class="fc-allclear">All clear 🌞</div>`}
           <div class="fc-asof" id="ccAsof">${asofText()}</div>
           <button class="fc-alerts-btn" id="fcAlerts" type="button" title="Email me when an inverter goes down or underperforms">🔔 Alerts</button>
+        </div>
         </div>
       </div>
       <div class="fc-note">${esc(simNote)}</div>`;
