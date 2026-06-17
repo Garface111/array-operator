@@ -386,6 +386,35 @@
   };
   const ALERT_CLASS = { ok: "ok", warn: "warn", critical: "bad" };
 
+  // ---- value model (mirrors command-center.js / app.js) — $ at stake estimate ----
+  const ENERGY_RATE = 0.21;       // $/kWh blended offset
+  const REC_PER_MWH = 38;         // $/MWh REC value
+  const SB_WINDOW_DAYS = 14;
+  const dollarVal = kwh => kwh*ENERGY_RATE + (kwh/1000)*REC_PER_MWH;
+  const usd0 = n => "$" + Math.round(Number(n)||0).toLocaleString();
+
+  // Per-array health rollup for the OVERVIEW GRID. Returns the worst-case tone
+  // (ok/warn/bad), flagged count, and estimated $/mo at stake across the array —
+  // grounded in the same peer-shortfall math the command center uses.
+  function arrayHealth(col){
+    const invs = col.inverters || [];
+    const totalNp = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0) || 1;
+    const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
+    let flagged = 0, crit = 0, lostKwh = 0;
+    for(const inv of invs){
+      if(inv.status === "ok") continue;
+      flagged++;
+      if(inv.status === "dead" || inv.status === "fault") crit++;
+      const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
+      if(inv.status === "dead" || inv.status === "fault") lostKwh += Math.max(0, fair-(inv.window_kwh||0));
+      else if(inv.status === "underperforming" && inv.peer_index) lostKwh += Math.max(0, fair/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
+      // comm_gap = unknown until it reports — no $ claimed
+    }
+    const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
+    const tone = crit ? "bad" : flagged ? "warn" : "ok";
+    return { tone, flagged, crit, lossMo, total: invs.length };
+  }
+
   function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
@@ -569,6 +598,18 @@
     try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
   }
 
+  // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array, the
+  // glanceable whole-fleet picture) vs "canvas" (the interactive tree the owner
+  // drills into). Persisted; DEFAULT grid so the zoomed-out glance leads. ----
+  const VIEWMODE_KEY = "ao_sandbox_viewmode";
+  function getViewMode(){
+    try { return localStorage.getItem(VIEWMODE_KEY) === "canvas" ? "canvas" : "grid"; }
+    catch(e){ return "grid"; }
+  }
+  function setViewMode(m){
+    try { localStorage.setItem(VIEWMODE_KEY, m === "canvas" ? "canvas" : "grid"); } catch(e){}
+  }
+
   // ---- origin-site deep links for an array's "Array details" column ----
   // Render column.origin_links when the backend supplies them; otherwise fall
   // back to a single base portal link derived from PORTAL_URL keyed by the array's
@@ -654,6 +695,7 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbUndo" type="button" title="Undo the last inverter move (Ctrl/Cmd+Z)" disabled>↶ Undo</button>
             <button class="sb-resetbtn" id="sbRedo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷ Redo</button>
+            <button class="sb-resetbtn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
@@ -668,6 +710,15 @@
           </div>
         </div>
       </div>`;
+
+    // ---- OVERVIEW GRID mode: a health-tinted tile per array, the whole fleet at
+    // a glance. Uses ALL arrays (not the focus subset), so an owner sees their
+    // entire fleet's state spatially. Click a tile → drill into that array (canvas
+    // view, focused + expanded). This is the default zoomed-out view. ----
+    if(getViewMode() === "grid"){
+      renderGrid(host, head);
+      return;
+    }
 
     const expanded = getExpandedSet();   // which arrays have their inverter comb open
     const columns = cols.map(col => {
@@ -774,6 +825,7 @@
 
     host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()}">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
+    host.classList.remove("sb-mode-grid");
 
     // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
@@ -800,6 +852,7 @@
 
     wireFullscreen(host);
     wireOrient(host);
+    wireViewMode(host);   // ⊞ Overview ↔ ⌗ Tree-view toggle
     wireUndoRedo(host);   // ↶ Undo / ↷ Redo for inverter moves (FleetStore history)
     wireExpandAll(host);  // "Show all inverters" — open/collapse every array's comb
     wireAddButton(host);
@@ -815,6 +868,97 @@
     wireCardButton(host); // "+ Card" menu (Note / Data)
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
     drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
+  }
+
+  // A tiny tile sparkline (no axis) of an array's summed daily production, tinted
+  // by the array's worst health. Pure inline SVG — cheap to draw 100+ of.
+  function tileSpark(col, tone){
+    const invs = col.inverters || [];
+    if(!invs.length) return "";
+    // sum daily kWh across the array's inverters into one series
+    const byDay = {};
+    let order = [];
+    for(const inv of invs){
+      for(const d of (inv.daily || [])){
+        if(!(d.date in byDay)){ byDay[d.date] = 0; order.push(d.date); }
+        byDay[d.date] += Math.max(0, +d.kwh || 0);
+      }
+    }
+    const vals = order.map(dt => byDay[dt]);
+    if(vals.length < 2) return "";
+    const w = 100, h = 26, pad = 2;
+    const max = Math.max(...vals, 0.001);
+    const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--good)";
+    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
+    const Y = v => h-pad - (v/max)*(h-2*pad);
+    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
+    return `<svg class="sb-tile-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points="${area}" fill="${stroke}" opacity="0.13"/>
+      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  // ---- OVERVIEW GRID: one health-tinted tile per array, packed to fill the width.
+  // Sorted worst-first so problems surface top-left. Click a tile → drill into that
+  // array on the canvas (focused + expanded). The whole fleet, understood at a glance.
+  function renderGrid(host, head){
+    const cols = (window.FleetStore && FleetStore.toColumns)
+      ? (FleetStore.toColumns().columns || [])
+      : [];
+    // compute health once, sort worst-first (crit → warn → ok), then by $ at stake
+    const rank = { bad:0, warn:1, ok:2 };
+    const tiles = cols.map(col => ({ col, h: arrayHealth(col) }))
+      .sort((a,b) => (rank[a.h.tone]-rank[b.h.tone]) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
+
+    const tilesHTML = tiles.map(({col, h}) => {
+      const flaggedBadge = h.flagged
+        ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
+        : `<span class="sb-tile-flag ok">all good</span>`;
+      const risk = h.lossMo >= 1
+        ? `<span class="sb-tile-risk">${usd0(h.lossMo)}<small>/mo</small></span>`
+        : ``;
+      return `
+        <button type="button" class="sb-tile ${h.tone}" data-array-id="${esc(col.array_id)}"
+                title="Open ${esc(col.array_name)} in the tree view">
+          <span class="sb-tile-dot ${h.tone}"></span>
+          <span class="sb-tile-name">${esc(col.array_name)}</span>
+          <span class="sb-tile-sub">${h.total} inverter${h.total===1?"":"s"}${col.vendor?` · ${esc(BRAND[col.vendor]||col.vendor)}`:""}</span>
+          ${tileSpark(col, h.tone)}
+          <span class="sb-tile-foot">${flaggedBadge}${risk}</span>
+        </button>`;
+    }).join("");
+
+    host.innerHTML = head +
+      `<div class="sb-gridwrap"><div class="sb-grid">${tilesHTML}</div></div>`;
+    host.classList.add("sb-mode-grid");
+
+    // Click a tile → switch to canvas, focused on that array + expanded.
+    host.querySelectorAll(".sb-tile").forEach(tile => {
+      tile.addEventListener("click", () => {
+        const id = tile.dataset.arrayId;
+        if(id == null) return;
+        setViewMode("canvas");
+        if(window.FleetStore && FleetStore.setFocus){
+          // try to coerce id back to the same type the store holds
+          const all = FleetStore.snapshot().arrays.map(a => a.id);
+          const match = all.find(x => String(x) === String(id));
+          FleetStore.setFocus([match != null ? match : id]);
+        }
+        try {
+          const set = getExpandedSet(); set.add(String(id)); saveExpandedSet(set);
+        } catch(e){}
+        renderFromStore();
+      });
+    });
+
+    wireFullscreen(host);
+    wireViewMode(host);
+    wireUndoRedo(host);
+    wireAddButton(host);
+    wireNewArrayButton(host);
+    wireResetButton(host);
+    wireCardButton(host);
   }
 
   // Draw the converging feeder wires for every array: each inverter curves up into
@@ -1606,6 +1750,17 @@
       requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
     }
   }
+  // Overview-grid ↔ tree-canvas toggle. Persists the mode and re-renders.
+  function wireViewMode(host){
+    const btn = host.querySelector("#sbViewMode");
+    if(!btn) return;
+    btn.onclick = () => {
+      setViewMode(getViewMode() === "grid" ? "canvas" : "grid");
+      renderFromStore();
+      requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+    };
+  }
+
   function wireFullscreen(host){
     const btn  = host.querySelector("#sbFullscreen");
     const wrap = document.getElementById("sbWrap");
