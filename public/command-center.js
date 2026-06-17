@@ -151,7 +151,7 @@
           </div>
         </div>
         <div class="fc-right">
-          ${riskMo>=1 ? `<div class="fc-risk"><span class="fc-risk-k">at stake</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span></div>` : `<div class="fc-allclear">All clear 🌞</div>`}
+          ${riskMo>=1 ? `<div class="fc-risk"><span class="fc-risk-k">recoverable</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span><span class="fc-risk-sub">by fixing the flagged inverters</span></div>` : `<div class="fc-allclear">All clear 🌞</div>`}
           <div class="fc-asof" id="ccAsof">${asofText()}</div>
         </div>
       </div>
