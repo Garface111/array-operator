@@ -143,7 +143,7 @@ function render(data){
   acts.push(`<div class="act win">
     <div class="ic">💰</div>
     <div><h3>You may be sitting on REC money <span class="tag">opportunity</span></h3>
-    <p>Your array minted roughly <b>${Math.floor(s.window_kwh/1000*26)} RECs</b> worth of renewable credits this year. Many owners never sell these — the installer keeps them. We can hand you to a <b>NEPOOL Operator</b> who files them for you.</p>
+    <p>Your array minted roughly <b>${Math.floor(s.window_kwh/1000*26)} RECs</b> worth of renewable credits this year. Many owners never sell these — the installer keeps them. We can hand you to a REC broker who files them for you.</p>
     <a class="cta" href="https://nepooloperator.com" target="_blank" rel="noopener">Explore selling your RECs</a></div></div>`);
 
   document.getElementById("actions").innerHTML = acts.join("");
