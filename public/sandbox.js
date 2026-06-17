@@ -690,13 +690,16 @@
     const summary = tree.summary || {};
     const head = `
       <div class="sb-head">
-        <div></div>
+        <div class="sb-head-left">
+          <div class="sb-head-btns">
+            <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
+            <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Show every array in the tree (you're viewing a single array you drilled into)" hidden>⊟ Show all arrays</button>
+          </div>
+        </div>
         <div class="sb-head-actions">
           <div class="sb-head-btns">
             <button class="sb-resetbtn" id="sbUndo" type="button" title="Undo the last inverter move (Ctrl/Cmd+Z)" disabled>↶ Undo</button>
             <button class="sb-resetbtn" id="sbRedo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷ Redo</button>
-            <button class="sb-resetbtn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
-            <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Show every array in the tree (you're viewing a single array you drilled into)" hidden>⊟ Show all arrays</button>
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
