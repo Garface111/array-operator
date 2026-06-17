@@ -299,12 +299,6 @@ extSend("SO_STATUS_REQUEST");
 
 function loginWithSolarEdge(){
   const scan = document.getElementById("scanArea");
-  const emailOk = /.+@.+\..+/.test(state.email);
-  const nameOk = (state.name||"").trim().length >= 2;
-  if (!nameOk || !emailOk){
-    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
-    return;
-  }
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening SolarEdge — sign in there and your arrays appear here automatically.</div>`;
   extSend("SO_OPEN_PORTAL", { url: "https://monitoring.solaredge.com/", active: true });
 }
@@ -336,13 +330,6 @@ function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com
 // the spinner resolves honestly if nothing lands.
 let _chintTimer = null;
 function loginWithChint(){
-  const emailOk = /.+@.+\..+/.test(state.email);
-  const nameOk = (state.name||"").trim().length >= 2;
-  if (!nameOk || !emailOk){
-    const scan = document.getElementById("scanArea");
-    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
-    return;
-  }
   openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
   // Chint-specific instruction: the data loads only when the owner opens a site.
   const scan = document.getElementById("scanArea");
@@ -358,12 +345,6 @@ function loginWithChint(){
 
 function openPortalLogin(vendor, url, label){
   const scan = document.getElementById("scanArea");
-  const emailOk = /.+@.+\..+/.test(state.email);
-  const nameOk = (state.name||"").trim().length >= 2;
-  if (!nameOk || !emailOk){
-    if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">Add your name and email above first — that's where your reports go.</div>`;
-    return;
-  }
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and your inverters appear here automatically.</div>`;
   extSend("SO_OPEN_PORTAL", { url, active: true });
 }
@@ -477,26 +458,9 @@ function connectScreen(){
     <h1>Connect once. We'll find them all.</h1>
     <p class="lede">${lede}</p>
 
-    <label class="fld">
-      <span class="lab">Your name</span>
-      <input type="text" id="name" placeholder="Jane Owner" value="${state.name}" oninput="state.name=this.value;syncConnect()">
-    </label>
-
-    <label class="fld">
-      <span class="lab">Where should we send your array's reports?</span>
-      <input type="email" id="email" placeholder="you@example.com" value="${state.email}" oninput="state.email=this.value;syncConnect()">
-    </label>
-
-    <label class="fld">
-      <span class="lab">Set a password <span style="color:var(--faint);font-weight:500">— optional</span></span>
-      <span class="hint">So you can sign in anytime, no email link needed. 10+ characters with a letter and a number. Leave blank to sign in by emailed link.</span>
-      <input type="password" id="password" autocomplete="new-password" placeholder="Create a password" value="${state.password||''}" oninput="state.password=this.value;syncConnect()">
-      <div class="helper" id="pwHint"></div>
-    </label>
-
-    <div class="fld" style="margin-top:1.75rem">
+    <div class="fld">
       <span class="lab">Which inverter brand?</span>
-      <span class="hint">Pick your monitoring platform — we support more than SolarEdge.</span>
+      <span class="hint">Pick your monitoring platform — no sign-up needed yet. Connect and see your arrays first.</span>
       <div class="vendgrid">${cards}</div>
     </div>
 
@@ -573,15 +537,8 @@ function syncConnect(){
   const v = vendorByCode(state.vendor);
   const b = document.getElementById("discoverBtn");
   if(!b) return;
-  const emailOk = /.+@.+\..+/.test(state.email);
-  const nameOk = (state.name||"").trim().length >= 2;
-  // Password is OPTIONAL; if typed it must meet the backend rule (10+ chars,
-  // a letter and a digit) or /start would 400. Surface a live hint.
-  const pw = state.password || "";
-  const pwOk = pw.length === 0 || (pw.length >= 10 && /[a-zA-Z]/.test(pw) && /[0-9]/.test(pw));
-  const pwHint = document.getElementById("pwHint");
-  if(pwHint) pwHint.textContent = (pw.length > 0 && !pwOk)
-    ? "At least 10 characters, including a letter and a number." : "";
+  // Connect-first: no name/email/password here — we collect the email AFTER the
+  // owner sees their arrays. The discover button only needs valid credentials.
   if(!v.available){ b.disabled = true; return; }
   let credsOk;
   if(v.discover){ credsOk = state.apiKey.length>3; }
@@ -589,7 +546,7 @@ function syncConnect(){
     // every non-optional field filled (labels with "optional" are skippable)
     credsOk = (v.fields||[]).every(f=>/optional/i.test(f.label) || (state.fields[f.name]||"").trim().length>0);
   }
-  b.disabled = !(emailOk && nameOk && credsOk && pwOk);
+  b.disabled = !credsOk;
 }
 
 // Vendor-aware pre-signup preview. EVERY available vendor now hits the public
@@ -682,11 +639,26 @@ function arraysScreen(){
     ${valueHero}
     <div class="arrays" id="arrays"></div>
     <div class="tally" id="tally"></div>
+    <label class="fld" id="emailFld" style="margin-top:1.5rem">
+      <span class="lab">${real ? "Save these arrays — where should we send your reports?" : "Where should we send your array's reports?"}</span>
+      <span class="hint">Your email is your login. We'll start your free 14-day trial — no card needed.</span>
+      <input type="email" id="email" placeholder="you@example.com" value="${state.email||''}" oninput="state.email=this.value;syncClaim()">
+    </label>
     <div class="row">
       <button class="btn btn-ghost" onclick="go(1)">← Connect a different brand</button>
       <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">${real?"Start my free trial →":"Take me to my dashboard →"}</button>
     </div>
   </div>`;
+}
+
+// Enable the claim/trial CTA only once a valid email is entered (the email is the
+// account identity now that it's collected here instead of on the connect step).
+function syncClaim(){
+  const claim = document.getElementById("claimBtn");
+  if(!claim) return;
+  const emailOk = /.+@.+\..+/.test(state.email||"");
+  claim.style.opacity = emailOk ? "1" : ".5";
+  claim.style.pointerEvents = emailOk ? "auto" : "none";
 }
 
 function cascadeArrays(){
@@ -717,7 +689,8 @@ function cascadeArrays(){
   setTimeout(()=>{
     const kwTxt = totalKw>0 ? ` · <b>${totalKw.toFixed(1)} kW</b>` : "";
     tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kwTxt} ${real?"ready":"in preview"}. Weather-normalized, per-inverter, in dollars.`;
-    claim.style.opacity="1"; claim.style.pointerEvents="auto";
+    syncClaim();                              // CTA unlocks once a valid email is entered
+    const em = document.getElementById("email"); if(em) em.focus();
     // Count the annual-value hero up to the real total for the sublime reveal.
     if(real && state.totals && state.totals.annual_value_usd>0){
       countUp(document.getElementById("vhBig"), state.totals.annual_value_usd, 1100);
@@ -797,12 +770,17 @@ async function finish(){
   go(3);
   burst();
   const company = state.sites.length ? `${vendorByCode(state.vendor).label} owner` : null;
+  // Name was removed from the funnel; derive a sane full_name from the email's
+  // local part (backend requires >=2 chars). The owner can edit it later in
+  // Master Account → Name.
+  const derivedName = ((state.email||"").split("@")[0] || "Array owner")
+    .replace(/[._-]+/g, " ").trim().replace(/\b\w/g, c => c.toUpperCase()) || "Array owner";
   try{
     const startRes = await fetch(`${API_BASE}/v1/onboarding/start`, {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
         email: state.email.trim(),
-        full_name: state.name.trim(),
+        full_name: derivedName.length >= 2 ? derivedName : "Array owner",
         company,
         array_count: Math.max(state.sites.length, 1),
         product: "array_operator",
