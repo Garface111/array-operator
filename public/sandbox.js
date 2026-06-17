@@ -1367,8 +1367,9 @@
     menu.style.top = y + "px";
     menu.addEventListener("click", ev => ev.stopPropagation());
     menu.querySelector(".sb-ctxmenu-del").onclick = () => {
-      if(confirm(`Delete array "${name}"? This removes it and its inverters from your fleet.`)){
+      if(confirm(`Delete array "${name}"? You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.`)){
         FleetStore.deleteArray(id);
+        toast(`Deleted "${name}" — press ↶ Undo (Ctrl/Cmd+Z) to bring it back.`, "ok");
       }
       closeArrayCtxMenu();
     };

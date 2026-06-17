@@ -291,16 +291,44 @@ window.FleetStore = (function(){
   }
 
   function deleteArray(id){
-    const before = state.arrays.length;
+    const idx = state.arrays.findIndex(a => String(a.id) === String(id));
+    if(idx === -1) return;                                 // nothing matched
+    const removed = state.arrays[idx];                     // keep full data for undo
+    const wasFocused = state.focus.some(f => String(f) === String(id));
     state.arrays = state.arrays.filter(a => String(a.id) !== String(id));
-    if(state.arrays.length === before) return;            // nothing matched
     state.focus = state.focus.filter(f => String(f) !== String(id));
-    notify();                                             // optimistic, sync cross-view update
-    clearHistory();   // structural commit — a barrier
+    notify();                                              // optimistic, sync cross-view update
+    // Persist the soft-delete. (refetch re-ingests the authoritative tree.)
     if(isLive()){
       apiDelete("/v1/array-owners/arrays/" + encodeURIComponent(id))
-        .then(()=>refetch()).catch(()=>refetch());        // refetch re-ingests authoritative tree (reverts on failure)
+        .then(()=>refetch()).catch(()=>refetch());
     }
+    // Record an UNDOABLE delete: undo re-inserts the array locally at its old spot
+    // AND revives it server-side via the restore endpoint; redo re-deletes it.
+    pushHistory({
+      undo: () => {
+        // re-insert locally at the original index (clamped)
+        if(!state.arrays.some(a => String(a.id) === String(id))){
+          const at = Math.min(idx, state.arrays.length);
+          state.arrays.splice(at, 0, removed);
+          if(wasFocused && !state.focus.some(f => String(f) === String(id))) state.focus.push(id);
+        }
+        notify();
+        if(isLive()){
+          apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/restore")
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+      redo: () => {
+        state.arrays = state.arrays.filter(a => String(a.id) !== String(id));
+        state.focus = state.focus.filter(f => String(f) !== String(id));
+        notify();
+        if(isLive()){
+          apiDelete("/v1/array-owners/arrays/" + encodeURIComponent(id))
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+    });
   }
 
   function resetLayout(){
