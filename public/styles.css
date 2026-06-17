@@ -583,6 +583,7 @@
   .sb-inv-alert.ok{color:var(--good);background:rgba(63,214,138,.08)}
   .sb-inv-alert.warn{color:var(--warn);background:rgba(255,180,84,.12)}
   .sb-inv-alert.bad{color:var(--bad);background:rgba(255,107,107,.13)}
+  .sb-inv-alert.info{color:#8fb4e8;background:rgba(120,160,230,.12)}
 
   /* ───────────────  LIQUID-FILL ENERGY LAYER (design spec)  ─────────────── */
   /* The frosted plate holds ALL the card content above the liquid (z-index 3),

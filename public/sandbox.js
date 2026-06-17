@@ -701,6 +701,37 @@
     if(os.pct != null && os.pct < 35) return "low";
     return "ok";
   }
+  // ── LIVE peer cross-check for the health badge ──────────────────────────────
+  // inv.status is a 14-DAY peer verdict (backend peer_analysis): an inverter that
+  // only just stalled keeps reading "ok" for up to DEAD_DAYS(=2) days. That is why
+  // a card can show the green "All good" badge while OUTPUT NOW reads "not
+  // producing right now" — the badge never consulted the live number. We close
+  // that gap by applying the SAME peer-relative idea to the INSTANTANEOUS reading:
+  // an inverter dark right now while a quorum of its daylight siblings produce is
+  // a real-time anomaly the badge must not paper over.
+  //   "ok"    → producing, OR calmly idle (night / peers also idle / too few lit
+  //             peers to judge) — badge may say "All good"
+  //   "dark"  → fresh live reading ~0 W while ≥2 peers produce in daylight — a
+  //             real anomaly that the slow 14-day health hasn't caught yet (amber)
+  //   "stale" → NO live reading while peers produce in daylight — unknown, could
+  //             be a telemetry gap, not a confirmed power fault (neutral)
+  function liveVerdict(inv, peers, isDaylight){
+    // Night/dusk: zero is expected and owned by the Sleeping state — never alarm.
+    if(isDaylight === false) return "ok";
+    const floorOf = i => (i.nameplate_kw != null) ? Math.max(25, i.nameplate_kw*1000*0.01) : 25;
+    const producing = i => i.current_power_w != null && i.current_power_w > floorOf(i);
+    if(producing(inv)) return "ok";                 // it's making power — clearly fine
+    // Quorum of lit siblings, so a single cloud-edge or a 2-inverter array can't
+    // raise a false alarm (mirrors the backend's degenerate-cohort caveat: a peer
+    // signal needs ≥2 producing peers to mean anything).
+    const litPeers = peers.filter(p =>
+      p.inverter_id !== inv.inverter_id && producing(p)).length;
+    if(litPeers < 2) return "ok";                   // not enough peer signal to judge
+    // Peers ARE producing in daylight, but this one is not. A fresh reading that
+    // says ~0 is a real live zero (anomaly); a missing reading is just unknown.
+    return (inv.current_power_w != null) ? "dark" : "stale";
+  }
+
   function liquidLayer(inv, statusCls, isDaylight){
     const st = liquidState(inv, statusCls, isDaylight);
     const sleeping = st === "sleep";
@@ -944,9 +975,21 @@
         const liqSt = liquidState(inv, sCls, col.is_daylight);
         const sleeping = liqSt === "sleep";
         const isAlert = sCls !== "ok";
-        const alertLine = isAlert
-          ? `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`
-          : `<div class="sb-inv-alert ok">All good</div>`;
+        // Cross-check the slow 14-day health against the live reading. If health
+        // says "ok" but the inverter is dark right now while peers produce in
+        // daylight, the green "All good" badge would be a lie — surface the live
+        // anomaly instead. Confirmed health alerts (bad/warn) always win.
+        const lv = isAlert ? "ok" : liveVerdict(inv, sortedInvs, col.is_daylight);
+        let alertLine;
+        if(isAlert){
+          alertLine = `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`;
+        } else if(lv === "dark"){
+          alertLine = `<div class="sb-inv-alert warn">Not producing — peers are</div>`;
+        } else if(lv === "stale"){
+          alertLine = `<div class="sb-inv-alert info">No live reading</div>`;
+        } else {
+          alertLine = `<div class="sb-inv-alert ok">All good</div>`;
+        }
         return `
           <div class="sb-inv ${sCls}${sleeping?' sleep':''}" tabindex="0" draggable="true" data-tone="${obTone}"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
