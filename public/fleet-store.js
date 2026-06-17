@@ -163,6 +163,7 @@ window.FleetStore = (function(){
       inverter_source: "solaredge", inverter_count: a.inverters.length,
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
+      is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
       inverters: a.inverters.map(i => ({
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
@@ -496,6 +497,9 @@ window.FleetStore = (function(){
       // array graph when inverters carry site-level history but no per-inverter
       // series (e.g. Chint weekETrend backfill).
       daily: c.daily || [],
+      // Server-computed sun-up flag (real solar elevation) — gates the card's
+      // calm "Sleeping" night state on (night AND zero output), never zero alone.
+      is_daylight: c.is_daylight !== false,
       inverters: (c.inverters||[]).map(inv => ({
         id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,

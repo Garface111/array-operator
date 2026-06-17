@@ -676,6 +676,73 @@
     </div>`;
   }
 
+  // ── Liquid-fill energy layer (design spec: liquid-cards/INTEGRATION-SPEC.md) ──
+  // A bubbling green fill rises BEHIND the card content (the frosted .sb-inv-plate
+  // sits above it, z-index 3, so text/sparkline never wash out). Fill height =
+  // capacity factor = current/max — the SAME number behind "Output now %", so no
+  // new data. The "Sleeping" night state (calm indigo pool) triggers ONLY on
+  // (sun-down AND zero output) using the server is_daylight flag — never zero
+  // alone, so a daytime fault that zeroes output stays alarming, not "asleep".
+  // Tiny deterministic PRNG seeded by serial → bubble positions are STABLE across
+  // the 60s poll re-render (spec bug #3: random re-roll makes bubbles teleport).
+  function _seedRand(seed){
+    let h = 2166136261 >>> 0;
+    const s = String(seed);
+    for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t>>>15, 1|t); t = (t + Math.imul(t ^ t>>>7, 61|t)) ^ t; return ((t ^ t>>>14) >>> 0) / 4294967296; };
+  }
+  function liquidState(inv, statusCls, isDaylight){
+    const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
+    const sleeping = (isDaylight === false) && (curW == null || curW <= 1);
+    if(sleeping) return "sleep";
+    if(statusCls === "bad") return "fault";
+    const os = outputState(inv, statusCls);
+    if(os.pct != null && os.pct >= 98) return "clip";
+    if(os.pct != null && os.pct < 35) return "low";
+    return "ok";
+  }
+  function liquidLayer(inv, statusCls, isDaylight){
+    const st = liquidState(inv, statusCls, isDaylight);
+    const sleeping = st === "sleep";
+    const os = outputState(inv, statusCls);
+    // Fill height: resting pool at night; capacity factor otherwise. With no
+    // nameplate (Chint) but real output, show a calm mid pool so it reads "on".
+    let pct;
+    if(sleeping) pct = 14;
+    else if(os.pct != null) pct = Math.max(0, Math.min(100, os.pct));
+    else pct = os.reporting ? 55 : 0;
+    // bubbles: none when sleeping/fault/empty; capped at 6 (spec perf rule).
+    let bubbles = "";
+    if(!sleeping && st !== "fault" && pct > 0){
+      const rnd = _seedRand(inv.inverter_id != null ? inv.inverter_id : inv.sn || inv.name);
+      const n = Math.min(6, 3 + Math.round((pct/100) * 4));
+      for(let i=0;i<n;i++){
+        const sz = (4 + rnd()*7).toFixed(1);
+        const left = (8 + rnd()*84).toFixed(1);
+        const dur = (3 + rnd()*2.4).toFixed(2);
+        const delay = (rnd()*3).toFixed(2);
+        bubbles += `<span style="width:${sz}px;height:${sz}px;left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+      }
+    }
+    let stars = "";
+    if(sleeping){
+      const rnd = _seedRand((inv.inverter_id != null ? inv.inverter_id : inv.sn || inv.name) + "n");
+      for(let i=0;i<5;i++){
+        const sz = (1.5 + rnd()*2).toFixed(1);
+        const left = (10 + rnd()*80).toFixed(1);
+        const bottom = (2 + rnd()*9).toFixed(1);
+        const dur = (2.5 + rnd()*2.5).toFixed(2);
+        const delay = (rnd()*3).toFixed(2);
+        stars += `<span style="width:${sz}px;height:${sz}px;left:${left}%;bottom:${bottom}px;animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+      }
+    }
+    const moon = sleeping ? `<span class="sb-liq-moon" aria-hidden="true">🌙</span>` : "";
+    return `<div class="sb-liquid sb-liquid--${st}" style="height:${pct}%" aria-hidden="true">
+        <div class="sb-liq-bubbles">${bubbles}</div>
+        <div class="sb-liq-stars">${stars}</div>
+      </div>${moon}`;
+  }
+
   // per-inverter vendor badge (smaller variant of the array brand chip) — empty if unknown
   function brandHTML(vendor){
     return (vendor && BRAND[vendor])
@@ -874,12 +941,14 @@
         // a near-zero live reading (evening/night) is idle (no alarm), and the
         // orange tint only fires when health is already flagged.
         const obTone = outputState(inv, sCls).tone;
+        const liqSt = liquidState(inv, sCls, col.is_daylight);
+        const sleeping = liqSt === "sleep";
         const isAlert = sCls !== "ok";
         const alertLine = isAlert
           ? `<div class="sb-inv-alert ${sCls}">${esc(STATUS_LABEL[inv.status]||inv.status||"Needs a look")}</div>`
           : `<div class="sb-inv-alert ok">All good</div>`;
         return `
-          <div class="sb-inv ${sCls}" tabindex="0" draggable="true" data-tone="${obTone}"
+          <div class="sb-inv ${sCls}${sleeping?' sleep':''}" tabindex="0" draggable="true" data-tone="${obTone}"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
@@ -889,14 +958,17 @@
                data-pi="${esc(inv.peer_index!=null?inv.peer_index:'')}" data-stale="${esc(inv.stale_hours!=null?inv.stale_hours:'')}"
                data-peak="${esc(inv.peak_kwh!=null?inv.peak_kwh:'')}" data-min="${esc(inv.min_kwh!=null?inv.min_kwh:'')}"
                data-origin-url="${esc(inv.origin_url||"")}" data-origin-label="${esc(inv.origin_label||"")}">
-            <div class="sb-inv-top">
-              <div class="sb-inv-name">${esc(inv.name)}</div>
-              ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
+            ${liquidLayer(inv, sCls, col.is_daylight)}
+            <div class="sb-inv-plate">
+              <div class="sb-inv-top">
+                <div class="sb-inv-name">${esc(inv.name)}</div>
+                ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
+              </div>
+              ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
+              ${outputBar(inv, sCls)}
+              ${alertLine}
+              ${brandHTML(inv.vendor)}
             </div>
-            ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
-            ${outputBar(inv, sCls)}
-            ${alertLine}
-            ${brandHTML(inv.vendor)}
           </div>`;
       }).join("")
         : `<div class="sb-comb-empty">Empty array — drag inverters here</div>`;
