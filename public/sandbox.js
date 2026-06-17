@@ -642,43 +642,62 @@
   //    already flagged (dead/fault/underperforming). A healthy inverter dipping
   //    under clouds is normal and shouldn't alarm — real underperformance is caught
   //    by the peer-based health status, which carries its own border + alert line.
+  // Estimated rated max (W) from the observed peak daily kWh when the vendor
+  // gives us no nameplate (e.g. some SolarEdge sites, Chint). Mirrors the
+  // backend's peer_analysis._infer_nameplate EXACTLY (peak daily kWh / 4 ≈ kW
+  // — a ~4 kWh/day-per-kW temperate ceiling) so the card's % matches the health
+  // math. This lets EVERY producing card show the % owners actually read,
+  // instead of some cards falling back to a bare kW. Always flagged estimated so
+  // the UI marks it "~est. max" and never passes a guess off as a hardware spec.
+  function estNameplateW(inv){
+    const vals = (inv.daily || []).map(d => +d.kwh || 0).filter(v => v > 0);
+    const peak = vals.length ? Math.max.apply(null, vals) : 0;
+    return peak > 0 ? (peak / 4) * 1000 : null;
+  }
   function outputState(inv, statusCls){
-    const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
+    const realW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
+    // No real nameplate → estimate one from production history so we can still
+    // show a %. estimated=true drives the "~est. max" label downstream.
+    const estW  = realW == null ? estNameplateW(inv) : null;
+    const maxW  = realW != null ? realW : estW;
+    const estimated = realW == null && estW != null;
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
-    // "Producing" needs only a real live reading. When we know the rated max we
-    // show % of max; when we DON'T (e.g. Chint reports no nameplate), we still
-    // show the absolute kW — never claim "not producing" just because nameplate
-    // is unknown. Below ~25W (or ~1% of rated, when known) = genuinely idle.
+    // "Producing" needs only a real live reading. Below ~25W (or ~1% of the
+    // rated/estimated max, when known) = genuinely idle.
     const floor = maxW != null ? Math.max(25, maxW * 0.01) : 25;
     const producing = curW != null && curW > floor;
-    if(!producing) return { reporting: false, pct: null, tone: "idle" };
+    if(!producing) return { reporting: false, pct: null, tone: "idle", estimated, maxW };
     if(maxW == null){
-      // Real output, no nameplate to compute a % — report absolute, calm tone.
-      return { reporting: true, pct: null, tone: (statusCls === "ok") ? "ok" : pctTone(50) };
+      // Real output but NO nameplate AND no history to estimate from — the only
+      // case left without a %. Report absolute kW, calm tone.
+      return { reporting: true, pct: null, tone: (statusCls === "ok") ? "ok" : pctTone(50), estimated: false, maxW: null };
     }
     const pct = Math.max(0, Math.min(100, Math.round((curW / maxW) * 100)));
     const tone = (statusCls === "ok") ? "ok" : pctTone(pct);
-    return { reporting: true, pct, tone };
+    return { reporting: true, pct, tone, estimated, maxW };
   }
   function outputBar(inv, statusCls){
     const os = outputState(inv, statusCls);
-    const maxW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
     const curKw = curW != null ? (curW / 1000) : null;
-    const maxKw = maxW != null ? (maxW / 1000) : null;
+    const maxKw = os.maxW != null ? (os.maxW / 1000) : null;
     let label;
     if(!os.reporting){
       label = `<span class="sb-ob-idle">not producing right now</span>`;
     } else if(os.pct != null){
-      label = `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW</span>`;
+      // Mark an estimated denominator honestly ("of ~est. max"); a real
+      // nameplate stays the plain "of max · cur/max kW".
+      const ofTxt = os.estimated
+        ? `<span title="No rated nameplate from this vendor — max estimated from peak production.">of ~est · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/~${maxKw.toFixed(1)} kW</span>`
+        : `of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW`;
+      label = `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">${ofTxt}</span>`;
     } else {
-      // Producing, but no rated max known — show the live kW outright.
+      // Producing, but no rated max AND no history to estimate from — last-resort
+      // absolute kW (should be rare now that history backstops the estimate).
       label = `<b class="sb-ob-pct">${curKw.toFixed(1)} kW</b><span class="sb-ob-of">producing now</span>`;
     }
-    // With no nameplate we can't fill a %-of-max bar, so show it full at a calm
-    // tone to signal "producing" without implying a measured ratio.
     const fillPct = os.reporting ? (os.pct != null ? os.pct : 100) : 0;
-    return `<div class="sb-outbar ${os.tone}" data-curw="${curW!=null?curW:''}" data-maxw="${maxW!=null?maxW:''}">
+    return `<div class="sb-outbar ${os.tone}" data-curw="${curW!=null?curW:''}" data-maxw="${os.maxW!=null?os.maxW:''}"${os.estimated?' data-est="1"':''}>
       <div class="sb-ob-head"><span class="sb-ob-k">Output now</span>${label}</div>
       <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${fillPct}%"></div></div>
     </div>`;
