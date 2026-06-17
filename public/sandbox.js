@@ -1088,7 +1088,6 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
-            <button class="sb-resetbtn" id="sbAlerts" type="button" title="Email me when an inverter goes down or underperforms">🔔 Alerts</button>
           </div>
         </div>
         <div class="sb-head-actions">
@@ -3556,6 +3555,9 @@
   document.addEventListener("DOMContentLoaded", applyView);
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
+  // expose the alerts settings modal so it can be opened from the top-bar
+  // Fleet Commander button (moved out of the sandbox head, May 2026).
+  window.__sbOpenAlerts = openAlertsModal;
 
   // ---- shared store: re-render the fleet tree whenever the canonical fleet (or
   // the focused subset) changes — including changes made from the command center.

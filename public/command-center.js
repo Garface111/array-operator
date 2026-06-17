@@ -160,7 +160,17 @@
           <div class="fc-health-lbl">fleet healthy</div>
         </div>
         <div class="fc-mid">
-          <div class="fc-meter"><div class="fc-meter-fill ${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%"></div></div>
+          <div class="fc-liquid" role="img" aria-label="${k.healthyPct}% of fleet healthy">
+            <div class="fc-liquid-fill ${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%">
+              <span class="fc-liq-bubbles">
+                <span style="left:14px;width:5px;height:5px;animation-duration:3.4s;animation-delay:.0s"></span>
+                <span style="left:38px;width:4px;height:4px;animation-duration:4.1s;animation-delay:.7s"></span>
+                <span style="left:72px;width:6px;height:6px;animation-duration:3.0s;animation-delay:1.3s"></span>
+                <span style="left:120px;width:4px;height:4px;animation-duration:4.6s;animation-delay:.4s"></span>
+                <span style="left:180px;width:5px;height:5px;animation-duration:3.7s;animation-delay:1.0s"></span>
+              </span>
+            </div>
+          </div>
           <div class="fc-stats">
             <span class="fc-stat"><b data-kpi="sites">${num(k.sites)}</b> arrays</span>
             <span class="fc-dot">·</span>
@@ -177,9 +187,17 @@
               ? `<div class="fc-watch" data-kpi="watch"><b>${num(k.flagged)}</b> to check<span class="fc-risk-sub">live anomalies — no $ lost yet</span></div>`
               : `<div class="fc-allclear">All clear 🌞</div>`}
           <div class="fc-asof" id="ccAsof">${asofText()}</div>
+          <button class="fc-alerts-btn" id="fcAlerts" type="button" title="Email me when an inverter goes down or underperforms">🔔 Alerts</button>
         </div>
       </div>
       <div class="fc-note">${esc(simNote)}</div>`;
+
+    // Wire the relocated Alerts button (moved here from the sandbox head). The
+    // settings modal lives in sandbox.js and is exposed as window.__sbOpenAlerts.
+    const alertsBtn = document.getElementById("fcAlerts");
+    if(alertsBtn) alertsBtn.onclick = () => {
+      if(typeof window.__sbOpenAlerts === "function") window.__sbOpenAlerts();
+    };
 
     // The triage queue still renders into its hidden container so other views that
     // read MODEL stay in sync — but it's no longer surfaced on this tab.
