@@ -693,7 +693,7 @@
         <div class="sb-head-left">
           <div class="sb-head-btns">
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
-            <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Show every array in the tree (you're viewing a single array you drilled into)" hidden>⊟ Show all arrays</button>
+            <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
           </div>
         </div>
         <div class="sb-head-actions">
@@ -1831,8 +1831,9 @@
   }
 
   // "Show all arrays" — visible only in TREE view when the owner has drilled into a
-  // narrowed subset (e.g. clicked one tile in the overview grid). Clears the focus
-  // so the tree shows every array again.
+  // narrowed subset (e.g. clicked one tile in the overview grid). The whole-fleet
+  // view that actually works is the OVERVIEW GRID (the tree dumped 100 arrays into a
+  // sparse single column), so this returns to the grid and clears the drill-in focus.
   function wireShowAll(host){
     const btn = host.querySelector("#sbShowAll");
     if(!btn) return;
@@ -1841,6 +1842,7 @@
     btn.hidden = !narrowed;
     btn.onclick = () => {
       if(window.FleetStore && FleetStore.clearFocus) FleetStore.clearFocus();
+      setViewMode("grid");                 // the grid IS the all-arrays view
       renderFromStore();
       requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
     };
@@ -1946,6 +1948,8 @@
     const vp = (host||document).querySelector(".sb-viewport");
     const c  = (host||document).querySelector("#sandbox .sb-canvas");
     if(!vp || !c) return;
+    vp.style.height = "";                              // reset any prior shrink so we measure the full CSS height
+    vp.style.minHeight = "";
     const prev = c.style.transform;
     c.style.transform = "none";                      // measure natural (unscaled) content
     const cr = c.getBoundingClientRect();
@@ -1967,6 +1971,21 @@
     const y = scaledH < vh - 32 ? 40 : Math.max(8, (vh - scaledH)/2);
     _view = { z, x, y };
     applyCanvasView(host);
+
+    // Collapse the empty void: when the fleet is much SHORTER than the viewport
+    // (e.g. drilled into one array — a top band over a sea of black), shrink the
+    // viewport to hug the content instead of holding the full calc(100vh-150px).
+    // Never shrink below a sensible floor, and never grow past the CSS max.
+    const vpEl = vp;
+    const needed = scaledH + 64;                       // content + top/bottom breathing room
+    if(needed < vh - 60){
+      const hpx = Math.max(280, Math.round(needed)) + "px";
+      vpEl.style.height = hpx;
+      vpEl.style.minHeight = hpx;                       // beat the CSS min-height:520px floor
+    } else {
+      vpEl.style.height = "";
+      vpEl.style.minHeight = "";                        // tall fleet → let CSS drive full height
+    }
   }
   function wirePanZoom(host){
     const vp = host.querySelector(".sb-viewport");
