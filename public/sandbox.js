@@ -696,6 +696,7 @@
             <button class="sb-resetbtn" id="sbUndo" type="button" title="Undo the last inverter move (Ctrl/Cmd+Z)" disabled>↶ Undo</button>
             <button class="sb-resetbtn" id="sbRedo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷ Redo</button>
             <button class="sb-resetbtn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
+            <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Show every array in the tree (you're viewing a single array you drilled into)" hidden>⊟ Show all arrays</button>
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
             <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
@@ -853,6 +854,7 @@
     wireFullscreen(host);
     wireOrient(host);
     wireViewMode(host);   // ⊞ Overview ↔ ⌗ Tree-view toggle
+    wireShowAll(host);    // ⊟ Show all arrays (visible only when drilled into a subset)
     wireUndoRedo(host);   // ↶ Undo / ↷ Redo for inverter moves (FleetStore history)
     wireExpandAll(host);  // "Show all inverters" — open/collapse every array's comb
     wireAddButton(host);
@@ -954,6 +956,7 @@
 
     wireFullscreen(host);
     wireViewMode(host);
+    wireShowAll(host);
     wireUndoRedo(host);
     wireAddButton(host);
     wireNewArrayButton(host);
@@ -1756,6 +1759,22 @@
     if(!btn) return;
     btn.onclick = () => {
       setViewMode(getViewMode() === "grid" ? "canvas" : "grid");
+      renderFromStore();
+      requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+    };
+  }
+
+  // "Show all arrays" — visible only in TREE view when the owner has drilled into a
+  // narrowed subset (e.g. clicked one tile in the overview grid). Clears the focus
+  // so the tree shows every array again.
+  function wireShowAll(host){
+    const btn = host.querySelector("#sbShowAll");
+    if(!btn) return;
+    const narrowed = getViewMode() === "canvas" && window.FleetStore
+      && FleetStore.focusIsNarrowed && FleetStore.focusIsNarrowed();
+    btn.hidden = !narrowed;
+    btn.onclick = () => {
+      if(window.FleetStore && FleetStore.clearFocus) FleetStore.clearFocus();
       renderFromStore();
       requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
     };

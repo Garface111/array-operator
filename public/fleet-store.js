@@ -190,6 +190,14 @@ window.FleetStore = (function(){
     return out;
   }
   function focusIds(){ return state.focus.length ? state.focus.slice() : defaultFocusIds(); }
+  // True when the tree is showing a NARROWED subset (owner drilled into one/few
+  // arrays from the overview grid) rather than the full default focus — drives the
+  // sandbox "Show all arrays" button.
+  function focusIsNarrowed(){
+    if(!state.focus.length) return false;          // empty focus = default (all/worst-few)
+    return state.focus.length < state.arrays.length;
+  }
+  function clearFocus(){ state.focus = []; notify("focus"); }
 
   // Default sandbox focus.
   // A REAL signed-in owner ALWAYS sees EVERY array — never a subset. Hiding any of
@@ -552,6 +560,7 @@ window.FleetStore = (function(){
   return {
     subscribe, load, refetch,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
+    focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
     undo, redo, canUndo, canRedo, clearHistory,
