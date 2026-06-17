@@ -1289,12 +1289,20 @@
     };
     const onKey = (e) => { if(e.key === "Escape") close(); };
 
-    // Click anywhere that ISN'T the card closes it. The host (.sb-dc-open) is a
-    // full-viewport flex layer, so a click landing on the host/backdrop (i.e.
-    // outside the card) closes; clicks inside the card are stopped.
+    // Click anywhere that ISN'T the card's actual content closes it. The host
+    // (.sb-dc-open) is a full-viewport flex layer. We DON'T blanket-stop clicks on
+    // the modal, because its grid cells stretch — the empty space under the left
+    // card (where the bigcard cell is taller than its content) is part of the modal
+    // and was a dead zone. Instead: keep open ONLY when the click lands on real
+    // content (the card clone, stats, diagnosis, array tag, or actions); otherwise
+    // close. Backdrop + host clicks also close.
+    const CONTENT_SEL = ".sb-inv, .sb-dc-stats, .sb-dc-diag, .sb-dc-array, .sb-dc-actions";
     const backdrop = el(`<div class="sb-dc-backdrop"></div>`);
     backdrop.addEventListener("click", close);
-    card.addEventListener("click", e => e.stopPropagation());
+    card.addEventListener("click", e => {
+      if(e.target.closest(CONTENT_SEL)) e.stopPropagation();   // real content → keep open
+      else close();                                            // empty modal area → close
+    });
     host.addEventListener("click", close);
 
     host.innerHTML = "";
