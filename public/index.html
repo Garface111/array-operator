@@ -30,19 +30,39 @@
      tab bar; gradient-accented so the "make your own account" CTA is the most
      prominent thing on the page. Hidden by default (hidden attr); app.js shows
      it only when there's no session. */
-  .demo-banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
-    justify-content:space-between;margin:18px 0 4px;padding:16px 20px;border-radius:16px;
-    border:1px solid rgba(245,185,66,.28);
-    background:linear-gradient(100deg,rgba(245,185,66,.10),rgba(94,194,255,.06) 60%,rgba(63,214,138,.05));
+  .demo-banner{margin:18px 0 8px;padding:0;border-radius:18px;
+    border:1px solid rgba(245,185,66,.28);overflow:hidden;
+    background:linear-gradient(115deg,rgba(245,185,66,.10),rgba(94,194,255,.06) 55%,rgba(63,214,138,.05));
     box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
   .demo-banner[hidden]{display:none}
-  .db-left{display:flex;align-items:center;gap:14px;flex:1 1 420px;min-width:0}
+  /* hero: value prop (left) + pricing card (right) */
+  .hero{display:flex;gap:28px;align-items:stretch;padding:26px 26px 22px;flex-wrap:wrap}
+  .hero-main{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
+  .hero-h1{font-size:30px;line-height:1.12;font-weight:820;letter-spacing:-.02em;color:var(--ink);margin:11px 0 0}
+  .hero-h1 em{font-style:normal;color:var(--gold2)}
+  .hero-sub{color:var(--muted);font-size:14.5px;line-height:1.5;margin:11px 0 0;max-width:60ch}
+  .hero-ctas{display:flex;align-items:center;gap:16px;margin-top:18px;flex-wrap:wrap}
+  .hero-trust{color:var(--muted);font-size:12px;line-height:1.5;margin-top:13px;opacity:.92}
+  .hero-price{flex:0 0 280px;align-self:center;border:1px solid rgba(63,214,138,.28);border-radius:14px;
+    padding:18px;background:rgba(8,14,20,.42)}
+  .hp-k{font-size:10.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .hp-rate{display:flex;align-items:baseline;gap:8px;margin-top:8px}
+  .hp-num{font-size:38px;font-weight:840;letter-spacing:-.02em;color:var(--good)}
+  .hp-unit{font-size:13px;color:var(--muted);font-weight:600;line-height:1.2}
+  .hp-eg{margin-top:8px;font-size:14px;font-weight:740;color:var(--ink)}
+  .hp-eg-sub{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px}
+  .hp-list{list-style:none;margin:13px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .hp-list li{font-size:12px;color:var(--muted);line-height:1.4;padding-left:16px;position:relative}
+  .hp-list li::before{content:"✓";position:absolute;left:0;color:var(--good);font-weight:800}
+  /* demo strip below the hero */
+  .db-demostrip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 26px;border-top:1px solid rgba(245,185,66,.18);background:rgba(245,185,66,.045)}
   .db-badge{flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.16em;
     color:var(--gold2);background:rgba(245,185,66,.14);border:1px solid rgba(245,185,66,.30);
     padding:5px 9px;border-radius:999px;white-space:nowrap}
+  .db-badge.sm{font-size:9.5px;padding:4px 8px}
   .db-copy{color:var(--muted);font-size:13.5px;line-height:1.45}
   .db-copy b{color:var(--ink);font-weight:700}
-  .db-right{display:flex;align-items:center;gap:14px;flex:0 0 auto}
   .db-cta{display:inline-block;font-size:14px;font-weight:750;color:#0a0e14;
     background:linear-gradient(180deg,var(--gold2),var(--gold));
     padding:11px 20px;border-radius:12px;text-decoration:none;white-space:nowrap;
@@ -51,27 +71,47 @@
   .db-cta:active{transform:translateY(0)}
   .db-signin{font-size:13px;font-weight:650;color:var(--muted);text-decoration:none;white-space:nowrap}
   .db-signin:hover{color:var(--ink)}
-  @media(max-width:600px){
-    .demo-banner{padding:14px 15px;gap:13px;margin:12px 0 2px}
-    .db-right{flex:1 1 100%}
-    .db-cta{flex:1 1 auto;text-align:center}
+  @media(max-width:760px){
+    .hero{padding:20px 16px 16px;gap:18px}
+    .hero-h1{font-size:24px}
+    .hero-price{flex:1 1 100%}
+    .hero-ctas .db-cta{flex:1 1 auto;text-align:center}
+    .db-demostrip{padding:11px 16px}
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- DEMO ONBOARDING BANNER — shown ONLY to anonymous visitors (toggled by
-       renderFromSession in app.js). Tells them this is a live demo and gives a
-       big, unmissable path to make their own account. Hidden the moment a
-       session exists, so signed-in owners never see it. -->
-  <div class="demo-banner" id="demoBanner" role="region" aria-label="You're viewing a demo" hidden>
-    <div class="db-left">
-      <span class="db-badge">LIVE DEMO</span>
-      <span class="db-copy">This is a sample array, fully working. <b>Make it yours in 60 seconds</b> — connect your inverter and watch your real numbers land here.</span>
+  <!-- VALUE-PROP HERO + LIVE-DEMO STRIP — shown ONLY to anonymous visitors
+       (toggled by renderFromSession in app.js via [hidden]). Tells a cold visitor
+       what Array Operator is, who it's for, and what it costs — BEFORE the live
+       demo below. Hidden the instant a session exists, so owners never see it. -->
+  <div class="demo-banner" id="demoBanner" role="region" aria-label="What Array Operator is" hidden>
+    <div class="hero">
+      <div class="hero-main">
+        <span class="db-badge">FOR SOLAR ARRAY OWNERS</span>
+        <h1 class="hero-h1">Your solar array, finally working <em>for you</em>.</h1>
+        <p class="hero-sub">Array Operator watches every inverter for you — catching the quiet underperformer the day it starts slipping, drafting the warranty claim when one dies, and showing you in plain dollars what your array is really worth. One connection. Every panel. No spreadsheets.</p>
+        <div class="hero-ctas">
+          <a class="db-cta" href="/onboarding">Start free — connect in 60 seconds →</a>
+          <a class="db-signin" href="/login">Sign in</a>
+        </div>
+        <div class="hero-trust">✓ 14-day free trial, no card &nbsp;·&nbsp; ✓ Read-only — we only see production data &nbsp;·&nbsp; ✓ Disconnect anytime, purged in 24h</div>
+      </div>
+      <aside class="hero-price" aria-label="Pricing">
+        <div class="hp-k">Simple, usage-based pricing</div>
+        <div class="hp-rate"><span class="hp-num">0.5¢</span><span class="hp-unit">/ kWh your array generates</span></div>
+        <div class="hp-eg" id="hpExample">≈ $5 / month for a 10&nbsp;kW home array<span class="hp-eg-sub">scales with your fleet — a 100&nbsp;kW array runs about $50/mo</span></div>
+        <ul class="hp-list">
+          <li>No setup fee · no contract</li>
+          <li>You only pay for power you actually make</li>
+          <li>Volume discounts above 20,000 kWh/mo</li>
+        </ul>
+      </aside>
     </div>
-    <div class="db-right">
-      <a class="db-cta" href="/onboarding">Make your own account →</a>
-      <a class="db-signin" href="/login">Sign in</a>
+    <div class="db-demostrip">
+      <span class="db-badge sm">LIVE DEMO BELOW</span>
+      <span class="db-copy">Everything under here is a real, working sample fleet — click around. <b>Make it yours in 60 seconds.</b></span>
     </div>
   </div>
 
