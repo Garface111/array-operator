@@ -606,8 +606,10 @@
     animation:sbliqrise linear infinite}
   @keyframes sbliqrise{0%{transform:translateY(0) scale(.6);opacity:0}
     15%{opacity:.85}100%{transform:translateY(-220px) scale(1);opacity:0}}
-  /* state variants — match the existing tone language */
-  .sb-liquid--clip{background:linear-gradient(180deg,rgba(90,200,255,.4),rgba(40,150,220,.8))}
+  /* state variants — match the existing tone language. Clipping/at-max stays
+     GREEN (full output is GOOD, not a separate cool state) — just a brighter,
+     fuller green than a mid-fill so "pinned at max" still reads distinctly. */
+  .sb-liquid--clip{background:linear-gradient(180deg,rgba(80,240,150,.5),rgba(24,175,92,.88))}
   .sb-liquid--low{background:linear-gradient(180deg,rgba(255,200,90,.36),rgba(220,160,40,.72))}
   .sb-liquid--fault{background:linear-gradient(180deg,rgba(255,170,60,.42),rgba(200,120,20,.8))}
   .sb-liquid--fault::before,.sb-liquid--fault::after{animation:none}
