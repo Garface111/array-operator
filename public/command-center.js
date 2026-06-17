@@ -155,7 +155,7 @@
     // and a live "updated Ns ago". No table, no extra chrome.
     h.innerHTML = `
       <div class="fc-card ${healthCls}">
-        <div class="fc-tank fc-tank--${healthCls}" data-kpi="healthmeter" style="height:${k.healthyPct}%" aria-hidden="true">
+        <div class="fc-tank fc-tank--${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%" aria-hidden="true">
           <span class="fc-liq-bubbles">
             <span style="left:9%;width:5px;height:5px;animation-duration:3.4s;animation-delay:.0s"></span>
             <span style="left:24%;width:4px;height:4px;animation-duration:4.1s;animation-delay:.7s"></span>
@@ -449,7 +449,7 @@ Thank you,
     setText('[data-kpi="sites"]', num(k.sites));
     setText('[data-kpi="inverters"]', num(k.inverters));
     setText('[data-kpi="healthy"]', k.healthyPct+"%");
-    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.height = k.healthyPct+"%";
+    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.width = k.healthyPct+"%";
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();

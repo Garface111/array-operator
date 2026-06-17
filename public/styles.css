@@ -372,8 +372,8 @@
   .fc-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:24px;padding:11px 22px;border-radius:16px;
     border:1px solid var(--line);background:linear-gradient(165deg,#10161f,#0b0f17);
     box-shadow:0 18px 44px -26px rgba(0,0,0,.85)}
-  /* All card content rides ABOVE the liquid tank (z-index 0). */
-  .fc-card > .fc-health,.fc-card > .fc-mid,.fc-card > .fc-right{position:relative;z-index:1}
+  /* All card content rides ABOVE the liquid tank (z0) and the contrast scrim (z1). */
+  .fc-card > .fc-health,.fc-card > .fc-mid,.fc-card > .fc-right{position:relative;z-index:2}
   .fc-card.ok{border-color:rgba(63,214,138,.3)}
   .fc-card.warn{border-color:rgba(255,180,84,.35)}
   .fc-card.bad{border-color:rgba(255,107,107,.4)}
@@ -389,35 +389,41 @@
   .fc-health-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-top:5px}
   /* middle: counts */
   .fc-mid{flex:1 1 auto;min-width:0}
-  /* ── WHOLE-BAR LIQUID TANK — the entire top bar IS the tank. Energy rises from
-     the BOTTOM and fills the whole card; height = % fleet healthy. The liquid
-     sits BEHIND the content (z-index 0); all card content rides above it. Same
-     energy-as-liquid metaphor + wave crest + rising bubbles as the inverter
-     cards. ── */
-  .fc-tank{position:absolute;left:0;right:0;bottom:0;z-index:0;width:100%;
-    border-bottom-left-radius:16px;border-bottom-right-radius:16px;
-    transition:height 1s cubic-bezier(.4,0,.2,1),background 1s;overflow:hidden;
-    background:linear-gradient(180deg,rgba(46,213,115,.34),rgba(24,165,86,.6))}
-  /* the meniscus — a bright crest riding the TOP surface of the rising liquid */
-  .fc-tank::before,.fc-tank::after{content:"";position:absolute;top:-9px;left:-50%;
-    width:200%;height:18px;
-    background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(120,255,170,.55),transparent 70%);
+  /* ── WHOLE-BAR LIQUID TANK — the entire top bar IS the tank. Energy fills
+     LEFT→RIGHT; width = % fleet healthy. The liquid sits BEHIND the content
+     (z-index 0). To keep text crisp regardless of fill (the inverter-card
+     frosted-plate trick), a translucent dark scrim rides ABOVE the liquid but
+     BELOW the text (z-index 1), and the content sits on top (z-index 2). Same
+     energy-as-liquid metaphor + wave crest + rising bubbles as the cards. ── */
+  .fc-tank{position:absolute;left:0;top:0;bottom:0;z-index:0;height:100%;
+    border-top-left-radius:16px;border-bottom-left-radius:16px;
+    transition:width 1s cubic-bezier(.4,0,.2,1),background 1s;overflow:hidden;
+    background:linear-gradient(90deg,rgba(24,165,86,.78),rgba(46,213,115,.62))}
+  /* the meniscus — a bright vertical crest riding the RIGHT (leading) edge */
+  .fc-tank::before,.fc-tank::after{content:"";position:absolute;right:-9px;top:-50%;
+    width:18px;height:200%;
+    background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(120,255,170,.7),transparent 70%);
     animation:fctankwave 5s linear infinite}
-  .fc-tank::after{animation-duration:7s;animation-direction:reverse;opacity:.5}
-  @keyframes fctankwave{from{transform:translateX(0)}to{transform:translateX(25%)}}
+  .fc-tank::after{animation-duration:7s;animation-direction:reverse;opacity:.55}
+  @keyframes fctankwave{from{transform:translateY(0)}to{transform:translateY(25%)}}
   .fc-liq-bubbles span{position:absolute;bottom:0;border-radius:50%;
-    background:radial-gradient(circle at 35% 35%,rgba(190,255,210,.9),rgba(120,255,170,.2));
+    background:radial-gradient(circle at 35% 35%,rgba(200,255,215,.95),rgba(120,255,170,.25));
     animation:fctankrise linear infinite}
   @keyframes fctankrise{0%{transform:translateY(0) scale(.6);opacity:0}
-    18%{opacity:.85}100%{transform:translateY(-70px) scale(1);opacity:0}}
-  /* state variants — mirror the inverter liquid tone language */
-  .fc-tank--ok{background:linear-gradient(180deg,rgba(80,240,150,.4),rgba(24,175,92,.66))}
-  .fc-tank--warn{background:linear-gradient(180deg,rgba(255,200,90,.34),rgba(220,160,40,.6))}
+    18%{opacity:.9}100%{transform:translateY(-46px) scale(1);opacity:0}}
+  /* CONTRAST SCRIM — translucent darkener over the whole card, above the liquid
+     but below the text, so text reads cleanly over both filled + empty zones
+     (mirrors the inverter card's frosted plate). */
+  .fc-card::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    border-radius:16px;background:linear-gradient(90deg,rgba(8,12,18,.46),rgba(8,12,18,.32))}
+  /* state variants — mirror the inverter liquid tone language, boosted opacity */
+  .fc-tank--ok{background:linear-gradient(90deg,rgba(24,175,92,.8),rgba(80,240,150,.6))}
+  .fc-tank--warn{background:linear-gradient(90deg,rgba(220,160,40,.74),rgba(255,200,90,.56))}
   .fc-tank--warn::before,.fc-tank--warn::after{
-    background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(255,210,120,.5),transparent 70%)}
-  .fc-tank--bad{background:linear-gradient(180deg,rgba(255,140,90,.36),rgba(200,90,40,.62))}
+    background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(255,215,130,.62),transparent 70%)}
+  .fc-tank--bad{background:linear-gradient(90deg,rgba(200,90,40,.76),rgba(255,140,90,.58))}
   .fc-tank--bad::before,.fc-tank--bad::after{
-    background:radial-gradient(ellipse 50% 100% at 50% 100%,rgba(255,160,110,.5),transparent 70%)}
+    background:radial-gradient(ellipse 100% 50% at 0% 50%,rgba(255,165,120,.62),transparent 70%)}
   @media (prefers-reduced-motion:reduce){
     .fc-tank::before,.fc-tank::after,.fc-liq-bubbles span{animation:none !important}
   }
