@@ -68,23 +68,35 @@
       <div class="rb-subtabs" role="tablist">
         <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Invoice generator</button>
         <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
+        <button type="button" class="rb-subtab" data-sub="customers" role="tab">Customers</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
-          <span class="rep-eyebrow">Your default rate</span>
-          <h3>Bill every customer at this $/kWh</h3>
-          <p>This is the rate used for any customer without their own rate set.
-             You can override it per customer below.</p>
+          <span class="rep-eyebrow">Your default billing</span>
+          <h3>Bill customers at a discount off the net rate</h3>
+          <p>Customers pay the <b>net rate</b> minus your <b>discount</b> — that's
+             their solar savings. Default is <b>10% off</b>. Applies to any
+             customer without their own override below.</p>
         </div>
         <div class="rb-gr-ctl">
-          <span class="rb-gr-dollar">$</span>
-          <input type="number" id="rbGrInput" min="0" max="5" step="0.001" placeholder="e.g. 0.185">
-          <span class="rb-gr-unit">/ kWh</span>
+          <label class="rb-gr-field">
+            <span class="rb-gr-lbl">Net rate</span>
+            <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
+              <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="0.184">
+              <span class="rb-gr-unit">/kWh</span></span>
+          </label>
+          <label class="rb-gr-field">
+            <span class="rb-gr-lbl">Discount</span>
+            <span class="rb-gr-inwrap">
+              <input type="number" id="rbGrDisc" min="0" max="99" step="1" placeholder="10">
+              <span class="rb-gr-unit">% off</span></span>
+          </label>
           <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save</button>
           <span class="rb-status" id="rbGrStatus"></span>
         </div>
+        <div class="rb-gr-eff" id="rbGrEff"></div>
       </div>
       <div class="rb-layout">
         <div class="rb-col-form">
@@ -116,10 +128,11 @@
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       </div><!-- /rbSubInvoice -->
-      <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
+      <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>
+      <div id="rbSubCustomers" class="rb-subpanel" style="display:none"></div>`;
   }
 
-  // ---- subtab switching (Invoice generator / Quarterly reports) --------------
+  // ---- subtab switching (Invoice generator / Quarterly reports / Customers) --
   let QUARTERLY_RENDERED = false;
   function wireSubtabs() {
     const tabs = Array.from(document.querySelectorAll(".rb-subtab"));
@@ -127,10 +140,12 @@
     tabs.forEach(btn => btn.onclick = () => {
       const sub = btn.getAttribute("data-sub");
       tabs.forEach(b => b.classList.toggle("on", b === btn));
-      const inv = $("#rbSubInvoice"), q = $("#rbSubQuarterly");
+      const inv = $("#rbSubInvoice"), q = $("#rbSubQuarterly"), c = $("#rbSubCustomers");
       if (inv) inv.style.display = sub === "invoice" ? "" : "none";
       if (q) q.style.display = sub === "quarterly" ? "" : "none";
+      if (c) c.style.display = sub === "customers" ? "" : "none";
       if (sub === "quarterly") renderQuarterly();
+      if (sub === "customers") renderCustomers();
     });
   }
 
@@ -293,6 +308,133 @@
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
   }
 
+  // ---- Customers subtab ------------------------------------------------------
+  // "This is where you edit customers" (offtakers). Each customer is one
+  // editable card: name, contact email, CC, which array + their share, and rate.
+  // Saving PATCHes only the changed fields to /subscriptions/{id}. No fabricated
+  // data — fields come straight from the saved subscription.
+  async function renderCustomers() {
+    const host = $("#rbSubCustomers");
+    if (!host) return;
+    host.innerHTML = `
+      <div class="rep-card rb-cust-head">
+        <span class="rep-eyebrow">Customers</span>
+        <h3>Your offtakers</h3>
+        <p>Edit each customer's details — their company name, contact email,
+           which array they're billed from, and their share. Changes save to the
+           customer used by both the Invoice generator and Quarterly reports.</p>
+      </div>
+      <div id="rbCustList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading customers…</div></div>`;
+    const list = $("#rbCustList");
+    try {
+      const [r, arrs] = await Promise.all([
+        fetch(API + "/subscriptions", { headers: authHeaders() }),
+        fetchArrays(),
+      ]);
+      if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
+      const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
+      if (!subs.length) {
+        list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">
+          No customers yet — add one in the <b>Invoice generator</b> tab, then edit them here.</div>`;
+        return;
+      }
+      list.innerHTML = subs.map(s => custCard(s, arrs)).join("");
+      list.querySelectorAll(".rb-cust").forEach(card => wireCustCard(card));
+    } catch (e) {
+      list.innerHTML = `<div class="empty">Couldn't load customers — refresh to retry.</div>`;
+    }
+  }
+
+  function custCard(s, arrs) {
+    const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
+    const manual = s.billing_model === "percent_of_array";
+    const arrayOpts = (arrs || []).map(a =>
+      `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+    return `
+      <div class="rep-card rb-cust" data-id="${s.id}">
+        <div class="rb-cust-top">
+          <div class="rb-cust-title">${esc(s.customer_name)}</div>
+          <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
+        </div>
+        <div class="rb-cust-grid">
+          <label class="rep-fld"><span class="rl">Company / customer name</span>
+            <input type="text" data-f="customer_name" value="${esc(s.customer_name || "")}" placeholder="e.g. Sunnybrook Apartments"></label>
+          <label class="rep-fld"><span class="rl">Contact email</span>
+            <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="customer@example.com"></label>
+          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
+            <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
+          ${manual ? `
+          <label class="rep-fld"><span class="rl">Array</span>
+            <select data-f="array_id">${arrayOpts || `<option value="">No arrays</option>`}</select></label>
+          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
+            <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
+          ` : ""}
+          <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
+            <input type="number" data-f="rate_per_kwh" min="0" max="5" step="0.001" value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="blank = your default rate">
+            <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
+        </div>
+        <div class="rb-cust-acts">
+          <button class="ao-btn ao-btn-primary rb-btn" data-cact="save" type="button">Save changes</button>
+          <span class="rb-status rb-cust-status"></span>
+        </div>
+      </div>`;
+  }
+
+  function wireCustCard(card) {
+    const save = card.querySelector('[data-cact="save"]');
+    if (save) save.onclick = () => saveCustCard(card);
+  }
+
+  async function saveCustCard(card) {
+    const id = card.getAttribute("data-id");
+    const st = card.querySelector(".rb-cust-status");
+    const get = f => card.querySelector(`[data-f="${f}"]`);
+    const body = {};
+
+    const name = get("customer_name") && get("customer_name").value.trim();
+    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Customer name can't be empty."; return; }
+    body.customer_name = name;
+
+    const email = get("client_email") ? get("client_email").value.trim() : "";
+    body.client_email = email;
+    if (get("cc_emails")) body.cc_emails = get("cc_emails").value.trim();
+
+    if (get("array_id")) {
+      const av = get("array_id").value;
+      if (av) body.array_id = Number(av);
+    }
+    if (get("allocation_pct")) {
+      const raw = get("allocation_pct").value.trim();
+      if (raw !== "") {
+        const n = Number(raw);
+        if (isNaN(n) || n <= 0 || n > 100) {
+          st.className = "rb-status rb-err"; st.textContent = "Share must be a percent between 0 and 100."; return;
+        }
+        body.allocation_pct = n / 100;   // backend wants a fraction in (0,1]
+      }
+    }
+    // rate: blank → null (clear → use default); number → set.
+    if (get("rate_per_kwh")) {
+      const raw = get("rate_per_kwh").value.trim();
+      if (raw === "") {
+        body.rate_per_kwh = null;
+      } else {
+        const n = Number(raw);
+        if (isNaN(n) || n < 0 || n > 5) {
+          st.className = "rb-status rb-err"; st.textContent = "Rate must be 0–5 $/kWh, or blank."; return;
+        }
+        body.rate_per_kwh = n;
+      }
+    }
+
+    const ok = await patch(id, body, st);
+    if (ok) {
+      st.className = "rb-status rb-ok"; st.textContent = "Saved.";
+      // keep the other tabs' lists fresh (name/rate show there too).
+      refreshList();
+    }
+  }
+
   // ---- upload + match --------------------------------------------------------
   function wireUpload() {
     const input = $("#rbFile");
@@ -311,31 +453,64 @@
     });
   }
 
-  // ---- global default rate ($/kWh) -------------------------------------------
+  // ---- global default billing (net rate + discount) --------------------------
   async function wireGlobalRate() {
-    const input = $("#rbGrInput");
+    const net = $("#rbGrNet");
+    const disc = $("#rbGrDisc");
     const save = $("#rbGrSave");
     const st = $("#rbGrStatus");
-    if (!input || !save) return;
-    // Load the current global rate.
+    const eff = $("#rbGrEff");
+    if (!net || !disc || !save) return;
+
+    let effNet = 0.18398, effDisc = 0.10;   // built-in fallbacks for the preview
+    function renderEff() {
+      const n = net.value.trim() === "" ? effNet : Number(net.value);
+      const d = disc.value.trim() === "" ? effDisc * 100 : Number(disc.value);
+      if (eff) {
+        if (isNaN(n) || isNaN(d)) { eff.textContent = ""; return; }
+        const rate = n * (1 - d / 100);
+        eff.innerHTML = `Customers pay <b>$${rate.toFixed(4)}/kWh</b> ` +
+          `(net $${n.toFixed(4)} − ${d.toFixed(0)}% off). ` +
+          `Blank = your defaults ($${effNet.toFixed(3)} net, ${(effDisc*100).toFixed(0)}% off).`;
+      }
+    }
+    // Load current globals (+ the effective defaults the backend would apply).
     try {
       const r = await fetch(API + "/global-rate", { headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
-      if (r.ok && data.default_billing_rate_per_kwh != null) {
-        input.value = data.default_billing_rate_per_kwh;
+      if (r.ok) {
+        if (data.effective_net_rate_per_kwh != null) effNet = data.effective_net_rate_per_kwh;
+        if (data.effective_discount_pct != null) effDisc = data.effective_discount_pct;
+        if (data.default_net_rate_per_kwh != null) net.value = data.default_net_rate_per_kwh;
+        else if (data.default_billing_rate_per_kwh != null) net.value = data.default_billing_rate_per_kwh;
+        if (data.default_discount_pct != null) disc.value = Math.round(data.default_discount_pct * 100);
       }
     } catch (e) { /* leave blank */ }
+    renderEff();
+    net.addEventListener("input", renderEff);
+    disc.addEventListener("input", renderEff);
+
     save.onclick = async () => {
-      const raw = input.value.trim();
-      let body;
-      if (raw === "") {
-        body = { default_billing_rate_per_kwh: null };   // clear → VT fallback
-      } else {
-        const n = Number(raw);
+      const body = {};
+      // net rate: blank clears (→ VT default)
+      const rawNet = net.value.trim();
+      if (rawNet === "") body.default_net_rate_per_kwh = null;
+      else {
+        const n = Number(rawNet);
         if (isNaN(n) || n < 0 || n > 5) {
-          st.className = "rb-status rb-err"; st.textContent = "Enter a rate between 0 and 5 ($/kWh), or blank to clear."; return;
+          st.className = "rb-status rb-err"; st.textContent = "Net rate must be 0–5 $/kWh, or blank to clear."; return;
         }
-        body = { default_billing_rate_per_kwh: n };
+        body.default_net_rate_per_kwh = n;
+      }
+      // discount: blank clears (→ 10% default); UI is whole-% → fraction
+      const rawDisc = disc.value.trim();
+      if (rawDisc === "") body.default_discount_pct = null;
+      else {
+        const d = Number(rawDisc);
+        if (isNaN(d) || d < 0 || d >= 100) {
+          st.className = "rb-status rb-err"; st.textContent = "Discount must be 0–99%, or blank for the 10% default."; return;
+        }
+        body.default_discount_pct = d / 100;
       }
       st.className = "rb-status rb-busy"; st.textContent = "Saving…";
       try {
@@ -346,10 +521,8 @@
         });
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
-          st.className = "rb-status rb-ok";
-          st.textContent = body.default_billing_rate_per_kwh == null
-            ? "Cleared — using the built-in default." : "Saved.";
-          await refreshList();   // re-price rows that use the default
+          st.className = "rb-status rb-ok"; st.textContent = "Saved.";
+          await refreshList();   // re-price rows that use the defaults
         } else {
           st.className = "rb-status rb-err";
           st.textContent = (data && data.detail) ? data.detail : "Couldn't save.";
@@ -441,9 +614,9 @@
             <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
             <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
-          <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
-            <input type="number" id="rbmRate" min="0" max="5" step="0.001" placeholder="blank = use my default">
-            <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
+          <label class="rep-fld"><span class="rl">Discount (% off net rate)</span>
+            <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
+            <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
           <label class="rep-fld"><span class="rl">Client email</span>
             <input type="email" id="rbmEmail" placeholder="customer@example.com"></label>
         </div>
@@ -512,8 +685,8 @@
     let rateNum = null;
     if (rateRaw !== "") {
       rateNum = Number(rateRaw);
-      if (isNaN(rateNum) || rateNum < 0 || rateNum > 5) {
-        st.className = "rb-status rb-err"; st.textContent = "Rate must be a number between 0 and 5 ($/kWh), or blank."; return;
+      if (isNaN(rateNum) || rateNum < 0 || rateNum >= 100) {
+        st.className = "rb-status rb-err"; st.textContent = "Discount must be a number 0–99 (% off), or blank."; return;
       }
     }
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
@@ -524,7 +697,7 @@
     fd.append("customer_name", name);
     fd.append("array_id", arrayId);
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
-    if (rateNum !== null) fd.append("rate_per_kwh", String(rateNum));
+    if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
     fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
     fd.append("send_mode", mode);
@@ -806,7 +979,7 @@
       list.innerHTML = subs.map(subCard).join("");
       list.querySelectorAll("[data-act]").forEach(b => b.onclick = onAction);
       // Rate inputs commit on change (not click) — wire them separately.
-      list.querySelectorAll("input.rb-rate-input[data-act='rate']").forEach(inp =>
+      list.querySelectorAll("input.rb-rate-input[data-act='discount']").forEach(inp =>
         inp.onchange = onRateChange);
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
@@ -828,7 +1001,10 @@
             <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
             <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
             <span class="rb-chip ${live ? "rb-chip-live" : ""}">${esc(MODE_LABEL[s.send_mode] || s.send_mode)}</span>
-            <span class="rb-chip rb-chip-rate">${s.rate_per_kwh != null ? "$" + Number(s.rate_per_kwh).toFixed(3) + "/kWh" : "default rate"}</span>
+            <span class="rb-chip rb-chip-rate">${
+              s.discount_pct != null ? Math.round(s.discount_pct * 100) + "% off"
+              : (s.rate_per_kwh != null ? "$" + Number(s.rate_per_kwh).toFixed(3) + "/kWh"
+              : "default discount")}</span>
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
           <div class="rb-sub-meta">
@@ -847,11 +1023,10 @@
             <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
           </div>
           <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
-          <label class="rb-rate-edit" title="Per-customer rate ($/kWh) — blank uses your default">
-            <span>$</span>
-            <input type="number" class="rb-rate-input" data-act="rate" min="0" max="5" step="0.001"
-              value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="default">
-            <span>/kWh</span>
+          <label class="rb-rate-edit" title="Per-customer discount (% off the net rate) — blank uses your default">
+            <input type="number" class="rb-rate-input" data-act="discount" min="0" max="99" step="1"
+              value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
+            <span>% off</span>
           </label>
           <button class="ao-btn rb-btn" data-act="test">Send test</button>
           <a class="ao-btn rb-btn" data-act="preview" href="#">Preview</a>
@@ -862,7 +1037,8 @@
       </div>`;
   }
 
-  // Per-customer rate committed inline (blank clears → use global default).
+  // Per-customer discount committed inline (blank clears → use global default).
+  // UI shows whole % off; backend stores a fraction in [0,1).
   async function onRateChange(e) {
     const inp = e.currentTarget;
     const row = inp.closest(".rb-sub");
@@ -872,14 +1048,14 @@
     const raw = inp.value.trim();
     let body;
     if (raw === "") {
-      body = { rate_per_kwh: null };
+      body = { discount_pct: null };
     } else {
-      const n = Number(raw);
-      if (isNaN(n) || n < 0 || n > 5) {
-        if (st) { st.className = "rb-status rb-err"; st.textContent = "Rate must be 0–5 $/kWh, or blank."; }
+      const d = Number(raw);
+      if (isNaN(d) || d < 0 || d >= 100) {
+        if (st) { st.className = "rb-status rb-err"; st.textContent = "Discount must be 0–99%, or blank."; }
         return;
       }
-      body = { rate_per_kwh: n };
+      body = { discount_pct: d / 100 };
     }
     const ok = await patch(id, body, st);
     if (ok) await refreshList();
@@ -889,7 +1065,7 @@
     e.preventDefault();
     const btn = e.currentTarget;
     const act = btn.getAttribute("data-act");
-    if (act === "rate") return;   // handled by onRateChange (change, not click)
+    if (act === "discount") return;   // handled by onRateChange (change, not click)
     const row = btn.closest(".rb-sub");
     const id = row && row.getAttribute("data-id");
     if (!id) return;

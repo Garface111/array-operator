@@ -281,6 +281,14 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:9px 11px; font:inherit; font-size:13.5px; text-align:right; }
 .rb-gr-ctl input:focus{ outline:none; border-color:rgba(94,194,255,.55);
   background:rgba(94,194,255,.05); }
+/* discount-model: two labeled fields + live effective-rate line */
+.rb-globalrate{ align-items:flex-start; }
+.rb-gr-field{ display:inline-flex; flex-direction:column; gap:4px; }
+.rb-gr-lbl{ font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.02em; }
+.rb-gr-inwrap{ display:inline-flex; align-items:center; gap:6px; }
+.rb-gr-eff{ flex-basis:100%; margin-top:10px; font-size:12px; color:var(--muted);
+  border-top:1px solid var(--line); padding-top:9px; }
+.rb-gr-eff b{ color:var(--good); }
 
 /* ---- per-customer rate chip + inline editor ---- */
 .rb-chip-rate{ background:rgba(94,194,255,.12); color:var(--sky); border-color:rgba(94,194,255,.3); }
@@ -291,7 +299,7 @@ body.sb-fs-lock{ overflow:hidden; }
   border:0; color:var(--ink); font:inherit; font-size:12.5px; text-align:right; padding:2px 0; }
 .rb-rate-edit input.rb-rate-input:focus{ outline:none; }
 
-/* ---- Reports subtabs (Invoice generator / Quarterly reports) ---- */
+/* ---- Reports subtabs (Invoice generator / Quarterly reports / Customers) ---- */
 .rb-subtabs{ display:flex; gap:8px; margin:4px 0 18px; border-bottom:1px solid var(--line); padding-bottom:0; }
 .rb-subtab{ background:transparent; border:0; border-bottom:2px solid transparent; color:var(--faint);
   font:inherit; font-size:14px; font-weight:600; padding:9px 14px 11px; cursor:pointer; margin-bottom:-1px; }
@@ -321,6 +329,23 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-q-chart-cap{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin-bottom:6px; }
 .rb-q-canvas{ width:100%; min-height:180px; }
 .rb-q-actions{ display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }
+
+/* ---- Customers subtab (edit offtakers) ---- */
+.rb-cust-head h3{ font-size:16px; margin:.2em 0 .15em; }
+.rb-cust-head p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:64ch; }
+.rb-cust{ margin-top:14px; max-width:none; }
+.rb-cust-top{ display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.rb-cust-title{ font-size:15px; font-weight:680; color:var(--ink); }
+.rb-cust-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; }
+@media(max-width:680px){ .rb-cust-grid{ grid-template-columns:1fr; } }
+.rb-cust-grid .rep-fld{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.rb-cust-grid .rep-fld .rl{ font-size:11.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.05em; }
+.rb-cust-grid input, .rb-cust-grid select{ width:100%; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:10px; color:var(--ink); padding:9px 11px; font:inherit; font-size:13.5px; }
+.rb-cust-grid select{ cursor:pointer; }
+.rb-cust-grid input:focus, .rb-cust-grid select:focus{ outline:none; border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
+.rb-cust-grid .rb-fld-hint{ font-size:11px; color:var(--faint); }
+.rb-cust-acts{ display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }
 
 /* ---- editable draft email (approval inbox) ---- */
 .rb-draft-email{ margin:14px 0 4px; display:flex; flex-direction:column; gap:6px; }
