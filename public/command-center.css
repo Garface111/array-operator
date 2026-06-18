@@ -305,6 +305,71 @@ body.sb-fs-lock{ overflow:hidden; }
   font:inherit; font-size:14px; font-weight:600; padding:9px 14px 11px; cursor:pointer; margin-bottom:-1px; }
 .rb-subtab:hover{ color:var(--muted); }
 .rb-subtab.on{ color:var(--ink); border-bottom-color:var(--good); }
+.rb-setup-link{ margin-left:auto; background:transparent; border:1px solid var(--line);
+  border-radius:8px; color:var(--muted); font:inherit; font-size:12.5px; font-weight:600;
+  padding:5px 12px; cursor:pointer; align-self:center; }
+.rb-setup-link:hover{ color:var(--ink); border-color:rgba(63,214,138,.5); }
+
+/* ---- first-run setup wizard ---- */
+.rb-wiz{ max-width:760px; margin:0 auto; }
+.rb-wiz-head{ position:relative; text-align:center; margin:8px 0 22px; }
+.rb-wiz-head h2{ font-size:24px; margin:.25em 0 .15em; color:var(--ink); }
+.rb-wiz-head p{ color:var(--muted); font-size:14px; }
+.rb-wiz-skip{ position:absolute; top:0; right:0; background:transparent; border:0;
+  color:var(--faint); font:inherit; font-size:12.5px; cursor:pointer; }
+.rb-wiz-skip:hover{ color:var(--muted); }
+.rb-wiz-steps{ display:flex; justify-content:center; gap:0; list-style:none; padding:0;
+  margin:0 0 24px; flex-wrap:wrap; }
+.rb-wiz-steps li{ display:flex; align-items:center; gap:8px; color:var(--faint);
+  font-size:13px; font-weight:600; padding:0 18px; position:relative; }
+.rb-wiz-steps li:not(:last-child)::after{ content:""; width:28px; height:1px;
+  background:var(--line); margin-left:14px; }
+.rb-wiz-steps li.on{ color:var(--ink); }
+.rb-wiz-steps li.done{ color:var(--good); }
+.rb-wiz-num{ display:inline-flex; align-items:center; justify-content:center; width:24px;
+  height:24px; border-radius:50%; background:rgba(255,255,255,.06); color:inherit;
+  font-size:12px; border:1px solid var(--line); }
+.rb-wiz-steps li.on .rb-wiz-num{ background:var(--good); color:#06140d; border-color:var(--good); }
+.rb-wiz-steps li.done .rb-wiz-num{ background:rgba(63,214,138,.15); border-color:rgba(63,214,138,.4); }
+.rb-wiz-card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px; }
+.rb-wiz-card h3{ font-size:18px; margin:0 0 .35em; color:var(--ink); }
+.rb-wiz-card > p{ color:var(--muted); font-size:13.5px; line-height:1.55; margin:0 0 18px; max-width:60ch; }
+.rb-wiz-hint{ font-size:12px; color:var(--faint); margin-top:14px !important; }
+.rb-wiz-arrays{ display:flex; flex-direction:column; gap:10px; }
+.rb-wiz-arr{ display:flex; align-items:center; gap:16px; background:rgba(255,255,255,.03);
+  border:1px solid var(--line); border-radius:12px; padding:12px 16px; }
+.rb-wiz-arr-main{ flex:1; display:flex; flex-direction:column; gap:2px; }
+.rb-wiz-arr-main b{ color:var(--ink); font-size:14.5px; }
+.rb-wiz-arr-sub{ font-size:11.5px; color:var(--faint); }
+.rb-wiz-yr{ display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted); }
+.rb-wiz-yr-input{ width:90px; background:rgba(255,255,255,.04); border:1px solid var(--line);
+  border-radius:8px; color:var(--ink); padding:7px 10px; font:inherit; font-size:13.5px; text-align:center; }
+.rb-wiz-arr-rate{ min-width:96px; text-align:right; font-size:13px; color:var(--good); font-weight:600; }
+.rb-wiz-rate{ display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end; }
+.rb-wiz-custs{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.rb-wiz-cust-row{ display:flex; justify-content:space-between; align-items:center;
+  background:rgba(63,214,138,.06); border:1px solid rgba(63,214,138,.2); border-radius:10px;
+  padding:9px 14px; font-size:13px; color:var(--ink); }
+.rb-wiz-cust-del{ background:transparent; border:0; color:var(--bad); font:inherit;
+  font-size:12px; cursor:pointer; }
+.rb-wiz-empty{ color:var(--faint); font-size:13px; font-style:italic; padding:8px 0; }
+.rb-wiz-cust-form{ display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:12px; padding:14px; }
+.rb-wiz-cust-form input, .rb-wiz-cust-form select{ background:rgba(255,255,255,.05);
+  border:1px solid var(--line); border-radius:8px; color:var(--ink); padding:8px 11px;
+  font:inherit; font-size:13px; }
+.rb-wiz-cust-form #rbWizCName{ flex:1; min-width:150px; }
+.rb-wiz-cust-form #rbWizCEmail{ flex:1; min-width:170px; }
+.rb-wiz-inwrap{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--faint); }
+.rb-wiz-inwrap input{ width:78px; }
+.rb-wiz-review{ display:flex; flex-direction:column; gap:12px; }
+.rb-wiz-rev-item{ display:flex; flex-direction:column; gap:2px; background:rgba(255,255,255,.03);
+  border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+.rb-wiz-rev-item .rl{ font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.02em; }
+.rb-wiz-rev-item b{ color:var(--ink); font-size:15px; }
+.rb-wiz-rev-item .sub{ font-size:12px; color:var(--faint); }
+.rb-wiz-nav{ display:flex; justify-content:space-between; align-items:center; margin-top:24px; gap:12px; }
+
 
 /* ---- Quarterly report panel ---- */
 .rb-q-head h3{ font-size:16px; margin:.2em 0 .15em; }

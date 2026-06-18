@@ -46,8 +46,28 @@
       el.innerHTML = signInPrompt();
       return;
     }
+    // First-run: if the owner has no customers yet, run the guided setup wizard
+    // (collect arrays' age, accept the rate, add customers) instead of the bare
+    // tab. Once set up — or if they reopen via the Setup link — show the tab.
+    if (!FORCE_TAB) {
+      try {
+        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
+        const st = await r.json().catch(() => ({}));
+        if (r.ok && st.ok && !st.has_customers) {
+          return renderWizard(st);
+        }
+      } catch (e) { /* fall through to the normal tab */ }
+    }
     el.innerHTML = shell();
     wireSubtabs();
+    const setupLink = $("#rbSetupLink");
+    if (setupLink) setupLink.onclick = async () => {
+      try {
+        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
+        const st = await r.json();
+        if (r.ok && st.ok) { FORCE_TAB = false; return renderWizard(st); }
+      } catch (e) {}
+    };
     wireUpload();
     wireGlobalRate();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
@@ -56,6 +76,9 @@
   }
   window.__aoLoadReports = load;
 
+  // When true, load() skips the wizard and shows the normal tab (Setup link / done).
+  let FORCE_TAB = false;
+
   function signInPrompt() {
     return `<div class="rep-card"><span class="rep-eyebrow">Reports</span>
       <h3>Sign in to set up automatic reports</h3>
@@ -63,12 +86,287 @@
       summaries on the schedule you choose. <a href="/accounts" style="color:var(--good)">Sign in</a> to get started.</p></div>`;
   }
 
+  // ===========================================================================
+  // FIRST-RUN SETUP WIZARD
+  // A guided, sequential flow so an owner enters everything needed to start
+  // sending reports: ① confirm arrays + age → ② accept the rate → ③ add
+  // customers → ④ review & finish. Backed by /setup-state, PATCH /arrays/{id},
+  // PUT /global-rate, POST /subscriptions. Lands in the normal tab when done.
+  // ===========================================================================
+  const WIZ_STEPS = ["Your arrays", "Your rate", "Your customers", "Review"];
+  let WIZ = null;   // { step, state(from setup-state), customers:[], rateDirty }
+
+  function renderWizard(setupState) {
+    WIZ = { step: 0, state: setupState, customers: [] };
+    drawWizard();
+  }
+
+  function thisYear() { return new Date().getFullYear(); }
+
+  function drawWizard() {
+    const el = root();
+    if (!el) return;
+    el.innerHTML = `
+      <div class="rb-wiz">
+        <div class="rb-wiz-head">
+          <span class="rep-eyebrow">Set up Reports</span>
+          <h2>Let's get you ready to send invoices</h2>
+          <p>A few quick steps and you'll be billing your offtakers automatically.</p>
+          <button type="button" class="rb-wiz-skip" id="rbWizSkip">Skip for now →</button>
+        </div>
+        <ol class="rb-wiz-steps">
+          ${WIZ_STEPS.map((s, i) => `<li class="${i === WIZ.step ? "on" : (i < WIZ.step ? "done" : "")}">
+            <span class="rb-wiz-num">${i < WIZ.step ? "✓" : (i + 1)}</span>${esc(s)}</li>`).join("")}
+        </ol>
+        <div class="rb-wiz-body" id="rbWizBody"></div>
+      </div>`;
+    $("#rbWizSkip").onclick = () => { FORCE_TAB = true; load(); };
+    [drawStepArrays, drawStepRate, drawStepCustomers, drawStepReview][WIZ.step]();
+  }
+
+  // ── Step ① arrays + age ────────────────────────────────────────────────────
+  function drawStepArrays() {
+    const body = $("#rbWizBody");
+    const arrays = WIZ.state.arrays || [];
+    if (!arrays.length) {
+      body.innerHTML = `<div class="rb-wiz-card">
+        <h3>No arrays detected yet</h3>
+        <p>Connect an array (or capture data via the extension) and it'll show up
+           here. You can still set your rate and add customers — come back to set
+           ages later.</p>
+        ${wizNav({ back: false, nextLabel: "Continue" })}</div>`;
+      wireWizNav();
+      return;
+    }
+    body.innerHTML = `<div class="rb-wiz-card">
+      <h3>Confirm your arrays</h3>
+      <p>How old is each array? This sets the correct blended rate — arrays past
+         ${WIZ.state.age_threshold_years || 11} years bill at a different rate.</p>
+      <div class="rb-wiz-arrays">
+        ${arrays.map(a => `
+          <div class="rb-wiz-arr" data-aid="${a.array_id}">
+            <div class="rb-wiz-arr-main">
+              <b>${esc(a.name)}</b>
+              <span class="rb-wiz-arr-sub">${a.provider ? esc(a.provider.toUpperCase()) : "utility —"}${a.region ? " · " + esc(a.region) : ""}</span>
+            </div>
+            <label class="rb-wiz-yr">Installed in
+              <input type="number" class="rb-wiz-yr-input" data-aid="${a.array_id}"
+                min="1990" max="${thisYear()}" placeholder="year"
+                value="${a.install_year != null ? a.install_year : ""}">
+            </label>
+            <span class="rb-wiz-arr-rate" data-aid="${a.array_id}">${
+              a.age_known ? "$" + Number(a.auto_net_rate).toFixed(4) + "/kWh" : "set year →"}</span>
+          </div>`).join("")}
+      </div>
+      <p class="rb-wiz-hint">Don't know the exact date? The year is enough.</p>
+      ${wizNav({ back: false, nextLabel: "Save & continue" })}</div>`;
+    wireWizNav(async () => {
+      // Persist any entered years.
+      const inputs = body.querySelectorAll(".rb-wiz-yr-input");
+      for (const inp of inputs) {
+        const yr = inp.value.trim();
+        if (yr === "") continue;
+        const n = Number(yr);
+        if (isNaN(n) || n < 1990 || n > thisYear()) continue;
+        await fetch(API + "/arrays/" + inp.getAttribute("data-aid"), {
+          method: "PATCH",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ install_year: n }),
+        });
+      }
+      // refresh state so later steps + rate reflect the saved ages
+      try {
+        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
+        const st = await r.json(); if (r.ok && st.ok) WIZ.state = st;
+      } catch (e) {}
+      return true;
+    });
+  }
+
+  // ── Step ② rate + discount ──────────────────────────────────────────────────
+  function drawStepRate() {
+    const body = $("#rbWizBody");
+    const g = WIZ.state.global || {};
+    const discPct = Math.round((g.effective_discount_pct != null ? g.effective_discount_pct : 0.10) * 100);
+    // Show the auto rate from the first array as the illustrative blended rate.
+    const a0 = (WIZ.state.arrays || [])[0];
+    const autoRate = a0 ? Number(a0.auto_net_rate) : null;
+    body.innerHTML = `<div class="rb-wiz-card">
+      <h3>Your billing rate</h3>
+      <p>Customers pay the <b>net rate</b> minus a <b>discount</b> — that discount
+         is the solar savings you pass on. We default the net rate automatically
+         from your utility's blended rate, and a <b>10% discount</b>.</p>
+      <div class="rb-wiz-rate">
+        <label class="rb-gr-field"><span class="rb-gr-lbl">Net rate (auto)</span>
+          <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
+            <input type="number" id="rbWizNet" min="0" max="5" step="0.001"
+              placeholder="${autoRate != null ? autoRate.toFixed(3) : "auto"}"
+              value="${g.default_net_rate_per_kwh != null ? g.default_net_rate_per_kwh : ""}">
+            <span class="rb-gr-unit">/kWh</span></span></label>
+        <label class="rb-gr-field"><span class="rb-gr-lbl">Discount</span>
+          <span class="rb-gr-inwrap">
+            <input type="number" id="rbWizDisc" min="0" max="99" step="1" value="${discPct}">
+            <span class="rb-gr-unit">% off</span></span></label>
+      </div>
+      <div class="rb-gr-eff" id="rbWizEff"></div>
+      <p class="rb-wiz-hint">Leave the net rate blank to use the auto rate from your
+         bills${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override per customer later.</p>
+      ${wizNav({ back: true, nextLabel: "Accept & continue" })}</div>`;
+    const net = $("#rbWizNet"), disc = $("#rbWizDisc"), eff = $("#rbWizEff");
+    function renderEff() {
+      const n = net.value.trim() === "" ? (autoRate || 0) : Number(net.value);
+      const d = disc.value.trim() === "" ? 10 : Number(disc.value);
+      if (!isNaN(n) && !isNaN(d) && n > 0) {
+        eff.innerHTML = `Customers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (net $${n.toFixed(4)} − ${d}% off).`;
+      } else { eff.textContent = ""; }
+    }
+    renderEff(); net.addEventListener("input", renderEff); disc.addEventListener("input", renderEff);
+    wireWizNav(async () => {
+      const bodyJson = {};
+      const rawNet = net.value.trim();
+      bodyJson.default_net_rate_per_kwh = rawNet === "" ? null : Number(rawNet);
+      const rawDisc = disc.value.trim();
+      bodyJson.default_discount_pct = rawDisc === "" ? null : Number(rawDisc) / 100;
+      await fetch(API + "/global-rate", {
+        method: "PUT",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify(bodyJson),
+      });
+      return true;
+    });
+  }
+
+  // ── Step ③ customers ─────────────────────────────────────────────────────────
+  function drawStepCustomers() {
+    const body = $("#rbWizBody");
+    const arrays = WIZ.state.arrays || [];
+    const rows = WIZ.customers.map((c, i) => `
+      <div class="rb-wiz-cust-row">
+        <span><b>${esc(c.customer_name)}</b> · ${esc(c.array_name)} · ${Math.round(c.allocation_pct * 100)}%${
+          c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : ""}</span>
+        <button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>
+      </div>`).join("");
+    body.innerHTML = `<div class="rb-wiz-card">
+      <h3>Add your customers (offtakers)</h3>
+      <p>Each customer is billed for their share of an array's production. Add as
+         many as you like — you can always add more later.</p>
+      <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No customers added yet.</div>`}</div>
+      <div class="rb-wiz-cust-form">
+        <input type="text" id="rbWizCName" placeholder="Customer name">
+        <select id="rbWizCArray">${arrays.map(a => `<option value="${a.array_id}" data-name="${esc(a.name)}">${esc(a.name)}</option>`).join("")}</select>
+        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCPct" min="0.01" max="100" step="0.01" placeholder="25"><span>% of array</span></span>
+        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCDisc" min="0" max="99" step="1" placeholder="default"><span>% off (optional)</span></span>
+        <input type="email" id="rbWizCEmail" placeholder="customer@email (optional)">
+        <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add customer</button>
+        <span class="rb-status" id="rbWizCStatus"></span>
+      </div>
+      ${wizNav({ back: true, nextLabel: WIZ.customers.length ? "Continue" : "Skip for now", nextId: "rbWizCustNext" })}</div>`;
+    if (!arrays.length) {
+      $("#rbWizCArray").innerHTML = `<option value="">No arrays — add one first</option>`;
+    }
+    body.querySelectorAll(".rb-wiz-cust-del").forEach(b => b.onclick = () => {
+      WIZ.customers.splice(Number(b.getAttribute("data-i")), 1); drawStepCustomers();
+    });
+    $("#rbWizCAdd").onclick = () => {
+      const st = $("#rbWizCStatus");
+      const name = $("#rbWizCName").value.trim();
+      const sel = $("#rbWizCArray");
+      const arrayId = sel.value;
+      const arrayName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].getAttribute("data-name") : "";
+      const pct = Number($("#rbWizCPct").value);
+      const discRaw = $("#rbWizCDisc").value.trim();
+      const email = $("#rbWizCEmail").value.trim();
+      if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the customer's name."; return; }
+      if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick an array."; return; }
+      if (isNaN(pct) || pct <= 0 || pct > 100) { st.className = "rb-status rb-err"; st.textContent = "Enter their share 0–100%."; return; }
+      let disc = null;
+      if (discRaw !== "") { const d = Number(discRaw); if (isNaN(d) || d < 0 || d >= 100) { st.className = "rb-status rb-err"; st.textContent = "Discount 0–99% or blank."; return; } disc = d / 100; }
+      WIZ.customers.push({ customer_name: name, array_id: arrayId, array_name: arrayName,
+        allocation_pct: pct / 100, discount_pct: disc, client_email: email || null });
+      drawStepCustomers();
+    };
+    wireWizNav();   // Continue just advances; customers are created at Review/Finish
+  }
+
+  // ── Step ④ review & finish ───────────────────────────────────────────────────
+  function drawStepReview() {
+    const body = $("#rbWizBody");
+    const g = WIZ.state.global || {};
+    const discPct = Math.round((g.effective_discount_pct != null ? g.effective_discount_pct : 0.10) * 100);
+    const arrays = WIZ.state.arrays || [];
+    const knownAges = arrays.filter(a => a.age_known).length;
+    body.innerHTML = `<div class="rb-wiz-card">
+      <h3>Review &amp; finish</h3>
+      <div class="rb-wiz-review">
+        <div class="rb-wiz-rev-item"><span class="rl">Arrays</span>
+          <b>${arrays.length} array${arrays.length === 1 ? "" : "s"}</b>
+          <span class="sub">${knownAges}/${arrays.length} with install year set</span></div>
+        <div class="rb-wiz-rev-item"><span class="rl">Default billing</span>
+          <b>${g.default_net_rate_per_kwh != null ? "$" + Number(g.default_net_rate_per_kwh).toFixed(4) + "/kWh net" : "auto net rate"} − ${discPct}% off</b>
+          <span class="sub">customers without their own rate</span></div>
+        <div class="rb-wiz-rev-item"><span class="rl">Customers</span>
+          <b>${WIZ.customers.length} to create</b>
+          <span class="sub">${WIZ.customers.map(c => esc(c.customer_name)).join(", ") || "none yet — you can add later"}</span></div>
+      </div>
+      <p class="rb-wiz-hint">Finishing creates your customers and opens the Reports tab. Nothing is emailed automatically — you review every draft before it sends.</p>
+      ${wizNav({ back: true, nextLabel: "Finish setup", nextId: "rbWizFinish" })}
+      <span class="rb-status" id="rbWizFinStatus"></span></div>`;
+    wireWizNav(async () => {
+      const st = $("#rbWizFinStatus");
+      st.className = "rb-status rb-busy"; st.textContent = "Creating your customers…";
+      let created = 0;
+      for (const c of WIZ.customers) {
+        const fd = new FormData();
+        fd.append("customer_name", c.customer_name);
+        fd.append("array_id", c.array_id);
+        fd.append("allocation_pct", String(c.allocation_pct));
+        if (c.discount_pct != null) fd.append("discount_pct", String(c.discount_pct));
+        fd.append("cadence", "monthly");
+        fd.append("delivery_mode", "approval");
+        fd.append("send_mode", c.client_email ? "to_both" : "to_me");
+        if (c.client_email) fd.append("client_email", c.client_email);
+        try {
+          const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
+          if (r.ok) created++;
+        } catch (e) {}
+      }
+      st.className = "rb-status rb-ok"; st.textContent = `Done — ${created} customer${created === 1 ? "" : "s"} ready.`;
+      FORCE_TAB = true;
+      setTimeout(() => load(), 600);
+      return false;   // don't auto-advance; load() takes over
+    });
+  }
+
+  // ── wizard nav helpers ───────────────────────────────────────────────────────
+  function wizNav({ back, nextLabel, nextId }) {
+    return `<div class="rb-wiz-nav">
+      ${back ? `<button type="button" class="ao-btn rb-btn" id="rbWizBack">← Back</button>` : "<span></span>"}
+      <button type="button" class="ao-btn ao-btn-primary rb-btn" id="${nextId || "rbWizNext"}">${esc(nextLabel || "Continue")}</button>
+    </div>`;
+  }
+
+  // beforeNext: optional async fn; return false to NOT auto-advance.
+  function wireWizNav(beforeNext) {
+    const back = $("#rbWizBack");
+    if (back) back.onclick = () => { if (WIZ.step > 0) { WIZ.step--; drawWizard(); } };
+    const nextBtn = $("#rbWizNext") || $("#rbWizCustNext") || $("#rbWizFinish");
+    if (nextBtn) nextBtn.onclick = async () => {
+      nextBtn.disabled = true;
+      let advance = true;
+      if (beforeNext) { try { advance = await beforeNext(); } catch (e) { advance = true; } }
+      nextBtn.disabled = false;
+      if (advance !== false && WIZ.step < WIZ_STEPS.length - 1) { WIZ.step++; drawWizard(); }
+    };
+  }
+
+
   function shell() {
     return `
       <div class="rb-subtabs" role="tablist">
         <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Invoice generator</button>
         <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
         <button type="button" class="rb-subtab" data-sub="customers" role="tab">Customers</button>
+        <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
