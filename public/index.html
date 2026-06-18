@@ -12,7 +12,6 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="command-center.css">
-<link rel="stylesheet" href="claims.css">
 <link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded last to override -->
 <link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
@@ -121,7 +120,6 @@
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
-    <a class="tab" id="tabClaims" href="#claims" role="tab">Claims</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
     <!-- Day/night toggle: flips to the NEPOOL-Operator light palette and persists. -->
     <button class="theme-toggle" id="themeToggle" type="button"
@@ -187,15 +185,6 @@
     <div id="trendsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div></div>
   </section>
 
-  <!-- ============================ TAB: CLAIMS ============================ -->
-  <!-- Automatic warranty claims. The agent opens a claim the moment an inverter
-       dies or faults, drafts the manufacturer email with peer-measured evidence,
-       and runs it through a lifecycle the owner controls. Rendered by claims.js
-       into #claimsRoot; send policy (manual/auto/auto+grace) is owner-set. -->
-  <section class="panel" id="panelClaims" role="tabpanel" aria-label="Claims">
-    <div id="claimsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Checking your fleet for warranty events…</div></div>
-  </section>
-
   <!-- ============================ TAB: REPORTS ============================ -->
   <section class="panel" id="panelReports" role="tabpanel" aria-label="Reports">
     <div class="section-h" style="margin-top:18px">
@@ -213,7 +202,6 @@
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
 <script src="command-center.js"></script>
-<script src="claims.js"></script>
 <script src="reports.js"></script>
 <script src="trends-core.js"></script>
 <script src="trends-view-bars.js"></script>
