@@ -193,11 +193,11 @@
     const autoRate = a0 ? Number(a0.auto_net_rate) : null;
     body.innerHTML = `<div class="rb-wiz-card">
       <h3>Your billing rate</h3>
-      <p>Customers pay the <b>net rate</b> minus a <b>discount</b> — that discount
-         is the solar savings you pass on. We default the net rate automatically
+      <p>Customers pay the <b>solar credit rate</b> minus a <b>discount</b> — that discount
+         is the solar savings you pass on. We default the solar credit rate automatically
          from your utility's blended rate, and a <b>10% discount</b>.</p>
       <div class="rb-wiz-rate">
-        <label class="rb-gr-field"><span class="rb-gr-lbl">Net rate (auto)</span>
+        <label class="rb-gr-field"><span class="rb-gr-lbl">Solar credit rate (auto)</span>
           <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
             <input type="number" id="rbWizNet" min="0" max="5" step="0.001"
               placeholder="${autoRate != null ? autoRate.toFixed(3) : "auto"}"
@@ -209,7 +209,7 @@
             <span class="rb-gr-unit">% off</span></span></label>
       </div>
       <div class="rb-gr-eff" id="rbWizEff"></div>
-      <p class="rb-wiz-hint">Leave the net rate blank to use the auto rate from your
+      <p class="rb-wiz-hint">Leave the solar credit rate blank to use the auto rate from your
          bills${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override per customer later.</p>
       ${wizNav({ back: true, nextLabel: "Accept & continue" })}</div>`;
     const net = $("#rbWizNet"), disc = $("#rbWizDisc"), eff = $("#rbWizEff");
@@ -217,7 +217,7 @@
       const n = net.value.trim() === "" ? (autoRate || 0) : Number(net.value);
       const d = disc.value.trim() === "" ? 10 : Number(disc.value);
       if (!isNaN(n) && !isNaN(d) && n > 0) {
-        eff.innerHTML = `Customers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (net $${n.toFixed(4)} − ${d}% off).`;
+        eff.innerHTML = `Customers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (credit $${n.toFixed(4)} − ${d}% off).`;
       } else { eff.textContent = ""; }
     }
     renderEff(); net.addEventListener("input", renderEff); disc.addEventListener("input", renderEff);
@@ -302,7 +302,7 @@
           <b>${arrays.length} array${arrays.length === 1 ? "" : "s"}</b>
           <span class="sub">${knownAges}/${arrays.length} with install year set</span></div>
         <div class="rb-wiz-rev-item"><span class="rl">Default billing</span>
-          <b>${g.default_net_rate_per_kwh != null ? "$" + Number(g.default_net_rate_per_kwh).toFixed(4) + "/kWh net" : "auto net rate"} − ${discPct}% off</b>
+          <b>${g.default_net_rate_per_kwh != null ? "$" + Number(g.default_net_rate_per_kwh).toFixed(4) + "/kWh credit" : "auto solar credit rate"} − ${discPct}% off</b>
           <span class="sub">customers without their own rate</span></div>
         <div class="rb-wiz-rev-item"><span class="rl">Customers</span>
           <b>${WIZ.customers.length} to create</b>
@@ -373,14 +373,14 @@
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
           <span class="rep-eyebrow">Your default billing</span>
-          <h3>Bill customers at a discount off the net rate</h3>
-          <p>Customers pay the <b>net rate</b> minus your <b>discount</b> — that's
+          <h3>Bill customers at a discount off the solar credit rate</h3>
+          <p>Customers pay the <b>solar credit rate</b> minus your <b>discount</b> — that's
              their solar savings. Default is <b>10% off</b>. Applies to any
              customer without their own override below.</p>
         </div>
         <div class="rb-gr-ctl">
           <label class="rb-gr-field">
-            <span class="rb-gr-lbl">Net rate</span>
+            <span class="rb-gr-lbl">Solar credit rate</span>
             <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
               <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="0.184">
               <span class="rb-gr-unit">/kWh</span></span>
@@ -768,8 +768,8 @@
         if (isNaN(n) || isNaN(d)) { eff.textContent = ""; return; }
         const rate = n * (1 - d / 100);
         eff.innerHTML = `Customers pay <b>$${rate.toFixed(4)}/kWh</b> ` +
-          `(net $${n.toFixed(4)} − ${d.toFixed(0)}% off). ` +
-          `Blank = your defaults ($${effNet.toFixed(3)} net, ${(effDisc*100).toFixed(0)}% off).`;
+          `(credit $${n.toFixed(4)} − ${d.toFixed(0)}% off). ` +
+          `Blank = your defaults ($${effNet.toFixed(3)} credit, ${(effDisc*100).toFixed(0)}% off).`;
       }
     }
     // Load current globals (+ the effective defaults the backend would apply).
@@ -796,7 +796,7 @@
       else {
         const n = Number(rawNet);
         if (isNaN(n) || n < 0 || n > 5) {
-          st.className = "rb-status rb-err"; st.textContent = "Net rate must be 0–5 $/kWh, or blank to clear."; return;
+          st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be 0–5 $/kWh, or blank to clear."; return;
         }
         body.default_net_rate_per_kwh = n;
       }
@@ -912,7 +912,7 @@
             <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
             <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
-          <label class="rep-fld"><span class="rl">Discount (% off net rate)</span>
+          <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
             <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
             <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
           <label class="rep-fld"><span class="rl">Client email</span>
@@ -1323,7 +1323,7 @@
             ${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
           </div>
           ${s.resolved_net_rate != null ? `<div class="rb-sub-rate" title="${esc(s.resolved_net_note || "")}">
-            Net rate <b>$${Number(s.resolved_net_rate).toFixed(4)}/kWh</b>
+            Solar credit rate <b>$${Number(s.resolved_net_rate).toFixed(4)}/kWh</b>
             ${s.resolved_discount_pct ? "− " + Math.round(s.resolved_discount_pct * 100) + "% = <b>$" + Number(s.resolved_effective_rate).toFixed(4) + "/kWh</b>" : ""}
             <span class="rb-rate-prov">${esc(rateSourceLabel(s.resolved_net_source))}</span>
           </div>` : ""}
@@ -1339,7 +1339,7 @@
             <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
           </div>
           <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
-          <label class="rb-rate-edit" title="Per-customer discount (% off the net rate) — blank uses your default">
+          <label class="rb-rate-edit" title="Per-customer discount (% off the solar credit rate) — blank uses your default">
             <input type="number" class="rb-rate-input" data-act="discount" min="0" max="99" step="1"
               value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
             <span>% off</span>
