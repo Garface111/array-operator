@@ -244,6 +244,27 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-cancel{ background:transparent; border:1px solid var(--line); color:var(--muted);
   padding:10px 16px; border-radius:10px; cursor:pointer; }
 
+/* ---- sample-spreadsheet hint (upload card) ---- */
+.rb-sample-hint{ margin:12px 0 0; font-size:12.5px; line-height:1.55; color:var(--faint); }
+.rb-sample-link{ color:var(--sky); font-weight:600; text-decoration:none; }
+.rb-sample-link:hover{ text-decoration:underline; }
+
+/* ---- add a customer manually ---- */
+.rb-manual-toggle{ margin-top:18px; display:flex; align-items:center; justify-content:space-between;
+  gap:16px; flex-wrap:wrap; }
+.rb-manual-toggle h3{ font-size:15.5px; }
+.rb-manual-toggle p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:46ch; }
+.rb-manual-toggle .rb-btn{ white-space:nowrap; }
+.rb-manual-form{ margin-top:18px; }
+.rb-mform-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:14px 0 4px; }
+.rb-mform-grid .rep-fld{ display:flex; flex-direction:column; gap:6px; }
+.rb-mform-grid input, .rb-mform-grid select{ width:100%; box-sizing:border-box;
+  background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:10px;
+  color:var(--ink); padding:9px 11px; font:inherit; font-size:13.5px; }
+.rb-mform-grid input:focus, .rb-mform-grid select:focus{ outline:none;
+  border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
+.rb-mform-grid select{ cursor:pointer; }
+
 .rb-listwrap{ margin-top:8px; }
 .rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
   background:linear-gradient(165deg,var(--card),var(--card2)); border:1px solid var(--line);

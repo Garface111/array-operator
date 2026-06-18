@@ -49,6 +49,7 @@
     el.innerHTML = shell();
     wireUpload();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
+    renderManual();           // "Add a customer manually" card (collapsed)
     await Promise.all([refreshInbox(), refreshList()]);
   }
   window.__aoLoadReports = load;
@@ -76,9 +77,14 @@
               <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
               <span class="rb-drop-sub">.xlsx — up to 8 MB</span>
             </label>
+            <p class="rb-sample-hint">Not sure what to upload?
+              <a href="/sample-billing.xlsx" download="sample-billing.xlsx" class="rb-sample-link">
+                Download a sample billing spreadsheet</a>, then drop it back here to
+              see exactly how matching works.</p>
             <div class="rb-status" id="rbStatus"></div>
           </div>
           <div id="rbPreview"></div>
+          <div id="rbManual"></div>
         </div>
         <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
@@ -136,6 +142,150 @@
     } catch (e) {
       status.className = "rb-status rb-err";
       status.textContent = "Network error while matching — try again.";
+    }
+  }
+
+  // ---- add a customer manually (no spreadsheet) ------------------------------
+  // Backend: POST /subscriptions with NO file → manual sub from
+  // customer_name + array_id + allocation_pct (percent_of_array model). The
+  // customer's invoice each cycle = allocation_pct × the array's generation.
+  let MANUAL_OPEN = false;
+  let ARRAYS = null;   // cached [{id,name,client_name}] for the array picker
+
+  async function fetchArrays() {
+    if (ARRAYS) return ARRAYS;
+    try {
+      const r = await fetch("/v1/array-owners/fleet-tree", { headers: authHeaders() });
+      if (!r.ok) return (ARRAYS = []);
+      const t = await r.json().catch(() => ({}));
+      // fleet-tree returns { columns: [{ array_id, array_name, ... }] } — map
+      // from that shape (NOT t.arrays / a.name, which never existed here).
+      ARRAYS = (t.columns || []).map(a => ({
+        id: a.array_id, name: a.array_name, client_name: a.client_name,
+      })).filter(a => a.id != null);
+    } catch (e) { ARRAYS = []; }
+    return ARRAYS;
+  }
+
+  function renderManual() {
+    const host = $("#rbManual");
+    if (!host) return;
+    if (!MANUAL_OPEN) {
+      host.innerHTML = `
+        <div class="rb-manual-toggle rep-card">
+          <div>
+            <span class="rep-eyebrow">No spreadsheet?</span>
+            <h3 style="margin:.2em 0 .15em">Add a customer manually</h3>
+            <p style="margin:0">Bill a customer for their share of an array's
+               generation — no workbook needed. Pick the array, set their %, done.</p>
+          </div>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbManualOpen" type="button">＋ Add a customer</button>
+        </div>`;
+      const b = $("#rbManualOpen");
+      if (b) b.onclick = () => { MANUAL_OPEN = true; renderManual(); };
+      return;
+    }
+    host.innerHTML = `
+      <div class="rep-card rb-manual-form">
+        <span class="rep-eyebrow">Add a customer · % of an array</span>
+        <h3>New customer</h3>
+        <div class="rb-mform-grid">
+          <label class="rep-fld"><span class="rl">Customer name</span>
+            <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
+          <label class="rep-fld"><span class="rl">Which array?</span>
+            <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
+          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
+            <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
+          <label class="rep-fld"><span class="rl">Client email</span>
+            <input type="email" id="rbmEmail" placeholder="customer@example.com"></label>
+        </div>
+        <div class="rb-controls">
+          <div class="rb-ctl">
+            <span class="rl">When a report is ready</span>
+            <div class="rb-seg rb-slider" id="rbmDelivery">
+              <button type="button" data-v="approval" class="on">Draft for my approval</button>
+              <button type="button" data-v="auto">Auto-send</button>
+            </div>
+          </div>
+          <div class="rb-ctl">
+            <span class="rl">Cadence</span>
+            <div class="rb-seg" id="rbmCadence">
+              <button type="button" data-v="monthly" class="on">Monthly</button>
+              <button type="button" data-v="quarterly">Quarterly</button>
+            </div>
+          </div>
+          <div class="rb-ctl">
+            <span class="rl">Send to</span>
+            <div class="rb-seg rb-slider" id="rbmMode">
+              <button type="button" data-v="to_me" class="on">To me</button>
+              <button type="button" data-v="to_client">To my client</button>
+              <button type="button" data-v="to_both">To both</button>
+            </div>
+          </div>
+        </div>
+        <div class="rb-actions">
+          <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add customer</button>
+          <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
+          <span class="rb-status" id="rbmStatus"></span>
+        </div>
+        <p class="rep-note">New customers send <b>to you</b> by default — move the slider
+           to “To my client” only when you're ready for them to receive it.</p>
+      </div>`;
+    wireSegments(host);
+    $("#rbmCancel").onclick = () => { MANUAL_OPEN = false; renderManual(); };
+    $("#rbmSave").onclick = saveManual;
+    // Populate the array picker.
+    fetchArrays().then(arrs => {
+      const sel = $("#rbmArray");
+      if (!sel) return;
+      if (!arrs.length) {
+        sel.innerHTML = `<option value="">No arrays yet — add one in the Arrays tab</option>`;
+        return;
+      }
+      sel.innerHTML = `<option value="">Choose an array…</option>` +
+        arrs.map(a => `<option value="${a.id}">${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+    });
+  }
+
+  async function saveManual() {
+    const st = $("#rbmStatus");
+    const name = $("#rbmName").value.trim();
+    const arrayId = $("#rbmArray").value;
+    const pctRaw = $("#rbmPct").value.trim();
+    const mode = segValue("rbmMode") || "to_me";
+    const clientEmail = $("#rbmEmail").value.trim();
+    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the customer's name."; return; }
+    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this customer is on."; return; }
+    const pctNum = Number(pctRaw);
+    if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
+      st.className = "rb-status rb-err"; st.textContent = "Enter their share as a percent between 0 and 100."; return;
+    }
+    if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
+      st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
+    }
+    st.className = "rb-status rb-busy"; st.textContent = "Adding customer…";
+    const fd = new FormData();                       // no file → manual path
+    fd.append("customer_name", name);
+    fd.append("array_id", arrayId);
+    fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
+    fd.append("cadence", segValue("rbmCadence") || "monthly");
+    fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
+    fd.append("send_mode", mode);
+    fd.append("client_email", clientEmail);
+    fd.append("formats", JSON.stringify(["pdf"]));
+    try {
+      const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        st.className = "rb-status rb-err";
+        st.textContent = (data && data.detail) ? data.detail : "Couldn't add (HTTP " + r.status + ").";
+        return;
+      }
+      MANUAL_OPEN = false;
+      renderManual();
+      await refreshList();
+    } catch (e) {
+      st.className = "rb-status rb-err"; st.textContent = "Network error while adding.";
     }
   }
 
