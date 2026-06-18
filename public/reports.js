@@ -988,6 +988,19 @@
 
   const MODE_LABEL = { to_me: "To me", to_client: "To client", to_both: "To both" };
 
+  // Human label for where the auto-resolved net rate came from.
+  function rateSourceLabel(src) {
+    return {
+      customer: "your override",
+      global: "your default",
+      auto_schedule: "auto · from GMP bills",
+      auto_schedule_provisional: "auto · provisional",
+      vt_default: "VT default",
+      legacy_flat_customer: "flat (override)",
+      legacy_flat_global: "flat (default)",
+    }[src] || (src || "");
+  }
+
   function subCard(s) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -1011,6 +1024,11 @@
             ${esc(s.cadence)} · ${esc(fmts)} · next ${esc(next)} · last sent ${esc(last)}
             ${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
           </div>
+          ${s.resolved_net_rate != null ? `<div class="rb-sub-rate" title="${esc(s.resolved_net_note || "")}">
+            Net rate <b>$${Number(s.resolved_net_rate).toFixed(4)}/kWh</b>
+            ${s.resolved_discount_pct ? "− " + Math.round(s.resolved_discount_pct * 100) + "% = <b>$" + Number(s.resolved_effective_rate).toFixed(4) + "/kWh</b>" : ""}
+            <span class="rb-rate-prov">${esc(rateSourceLabel(s.resolved_net_source))}</span>
+          </div>` : ""}
         </div>
         <div class="rb-sub-acts">
           <div class="rb-seg rb-slider rb-mini" data-act="delivery">
