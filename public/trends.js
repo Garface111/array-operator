@@ -26,6 +26,7 @@
   // Per-view accent hue — retints the switcher pill, ambient glow and frame so
   // each visualization feels like its own room while staying one family.
   const ACCENT = {
+    bars:      "#3fd68a",
     liquid:    "#3fd68a",
     spiral:    "#f5b942",
     ridgeline: "#5ec2ff",
@@ -217,7 +218,7 @@
 
     const views = c.listViews();
     let active = savedView();
-    if (!active || !c.getView(active)) active = (views[0] && views[0].key) || "liquid";
+    if (!active || !c.getView(active)) active = c.getView("bars") ? "bars" : ((views[0] && views[0].key) || "liquid");
 
     r.innerHTML = `
       ${statBand(d)}

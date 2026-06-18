@@ -219,4 +219,18 @@
   }
 
   window.AOBars = { mount };
+
+  // Register as a Trends-tab view so it appears in the switcher. The Trends
+  // registry passes prepped data; we read the fleet's 30-day daily series
+  // (prepped.dailyRecent) and render it as the daily bar graph.
+  if (C && C.registerView) {
+    C.registerView("bars", {
+      label: "Daily Generation", badge: "30d", order: 0.5,
+      describe: "Each day's fleet generation as a bar — the last 30 days of production at a glance.",
+      mount(container, prepped, core) {
+        const pts = (prepped && prepped.dailyRecent) || [];
+        return mount(container, { points: pts, period_label: "last 30 days" }, core);
+      },
+    });
+  }
 })();

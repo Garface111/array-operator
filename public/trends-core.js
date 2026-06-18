@@ -89,6 +89,7 @@
       monthly,                       // {"2025":[{month,kwh}]}
       peak,
       seasonal: data.seasonal_yoy || [],
+      dailyRecent: data.daily_recent || [],
       byArray: data.by_array || [],
       raw: data,
     };
