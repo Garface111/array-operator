@@ -71,7 +71,6 @@
     wireUpload();
     wireGlobalRate();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
-    renderManual();           // "Add a customer manually" card (collapsed)
     await Promise.all([refreshInbox(), refreshList()]);
   }
   window.__aoLoadReports = load;
@@ -363,7 +362,7 @@
   function shell() {
     return `
       <div class="rb-subtabs" role="tablist">
-        <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Invoice generator</button>
+        <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Offtaker Invoice Generator</button>
         <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
         <button type="button" class="rb-subtab" data-sub="customers" role="tab">Offtakers</button>
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
@@ -416,7 +415,6 @@
             <div class="rb-status" id="rbStatus"></div>
           </div>
           <div id="rbPreview"></div>
-          <div id="rbManual"></div>
         </div>
         <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
@@ -484,7 +482,7 @@
       const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
       const sel = $("#rbqCustomer");
       if (!subs.length) {
-        sel.innerHTML = `<option value="">No offtakers yet — add one in Invoice generator</option>`;
+        sel.innerHTML = `<option value="">No offtakers yet — add one in the Offtakers tab</option>`;
       } else {
         sel.innerHTML = subs.map(s =>
           `<option value="${s.id}">${esc(s.customer_name)}</option>`).join("");
@@ -614,15 +612,27 @@
   async function renderCustomers() {
     const host = $("#rbSubCustomers");
     if (!host) return;
+    // Route the manual-add form to this subtab + refresh the offtaker list on add.
+    MANUAL_HOST_ID = "rbCustManual";
+    MANUAL_AFTER_ADD = renderCustomers;
+    MANUAL_OPEN = false;
     host.innerHTML = `
       <div class="rep-card rb-cust-head">
-        <span class="rep-eyebrow">Offtakers</span>
-        <h3>Your offtakers</h3>
-        <p>Edit each offtaker's details — their company name, contact email,
-           which array they're billed from, and their share. Changes save to the
-           offtaker used by both the Invoice generator and Quarterly reports.</p>
+        <div class="rb-cust-head-row">
+          <div>
+            <span class="rep-eyebrow">Offtakers</span>
+            <h3>Your offtakers</h3>
+            <p>Edit each offtaker's details — their company name, contact email,
+               which array they're billed from, and their share. Changes save to the
+               offtaker used by both the Offtaker Invoice Generator and Quarterly reports.</p>
+          </div>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+        </div>
       </div>
+      <div id="rbCustManual"></div>
       <div id="rbCustList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading offtakers…</div></div>`;
+    const addBtn = $("#rbCustAdd");
+    if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
     const list = $("#rbCustList");
     try {
       const [r, arrs] = await Promise.all([
@@ -633,7 +643,7 @@
       const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
       if (!subs.length) {
         list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">
-          No offtakers yet — add one in the <b>Invoice generator</b> tab, then edit them here.</div>`;
+          No offtakers yet — click <b>＋ Add an offtaker</b> above to create your first one.</div>`;
         return;
       }
       list.innerHTML = subs.map(s => custCard(s, arrs)).join("");
@@ -867,6 +877,10 @@
   // customer's invoice each cycle = allocation_pct × the array's generation.
   let MANUAL_OPEN = false;
   let ARRAYS = null;   // cached [{id,name,client_name}] for the array picker
+  // Where the manual-add form mounts + what to refresh after a successful add.
+  // Defaults target the Offtakers subtab; back-compat with the old #rbManual mount.
+  let MANUAL_HOST_ID = "rbManual";
+  let MANUAL_AFTER_ADD = null;
 
   async function fetchArrays() {
     if (ARRAYS) return ARRAYS;
@@ -884,21 +898,10 @@
   }
 
   function renderManual() {
-    const host = $("#rbManual");
+    const host = $("#" + MANUAL_HOST_ID);
     if (!host) return;
     if (!MANUAL_OPEN) {
-      host.innerHTML = `
-        <div class="rb-manual-toggle rep-card">
-          <div>
-            <span class="rep-eyebrow">No spreadsheet?</span>
-            <h3 style="margin:.2em 0 .15em">Add an offtaker manually</h3>
-            <p style="margin:0">Bill an offtaker for their share of an array's
-               generation — no workbook needed. Pick the array, set their %, done.</p>
-          </div>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbManualOpen" type="button">＋ Add an offtaker</button>
-        </div>`;
-      const b = $("#rbManualOpen");
-      if (b) b.onclick = () => { MANUAL_OPEN = true; renderManual(); };
+      host.innerHTML = "";
       return;
     }
     host.innerHTML = `
@@ -916,7 +919,7 @@
             <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
             <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
           <label class="rep-fld"><span class="rl">Client email</span>
-            <input type="email" id="rbmEmail" placeholder="customer@example.com"></label>
+            <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
         </div>
         <div class="rb-controls">
           <div class="rb-ctl">
@@ -943,11 +946,11 @@
           </div>
         </div>
         <div class="rb-actions">
-          <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add customer</button>
+          <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add offtaker</button>
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
           <span class="rb-status" id="rbmStatus"></span>
         </div>
-        <p class="rep-note">New customers send <b>to you</b> by default — move the slider
+        <p class="rep-note">New offtakers send <b>to you</b> by default — move the slider
            to “To my client” only when you're ready for them to receive it.</p>
       </div>`;
     wireSegments(host);
@@ -990,7 +993,7 @@
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
       st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
     }
-    st.className = "rb-status rb-busy"; st.textContent = "Adding customer…";
+    st.className = "rb-status rb-busy"; st.textContent = "Adding offtaker…";
     const fd = new FormData();                       // no file → manual path
     fd.append("customer_name", name);
     fd.append("array_id", arrayId);
@@ -1011,7 +1014,8 @@
       }
       MANUAL_OPEN = false;
       renderManual();
-      await refreshList();
+      if (MANUAL_AFTER_ADD) await MANUAL_AFTER_ADD();
+      else await refreshList();
     } catch (e) {
       st.className = "rb-status rb-err"; st.textContent = "Network error while adding.";
     }
