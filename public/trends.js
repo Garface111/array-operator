@@ -1,15 +1,17 @@
 /* ============================================================================
  * Array Operator — Trends tab orchestrator (trends.js)
  *
- * Fetches the portfolio-wide production payload and renders:
- *   - the stat band (TTM / lifetime / latest YoY / est. savings)
- *   - a segmented VIEW SWITCHER (Liquid / Spiral / Ridgeline / Heat-Field)
- *   - the active visualization (mounted from the view registry in trends-core.js)
+ * Fetches the portfolio-wide production payload and renders the whole Trends
+ * tab as ONE crafted instrument:
+ *   - an animated count-up stat band (TTM / lifetime / latest YoY / savings)
+ *   - a segmented VIEW SWITCHER with a sliding indicator + per-view accent retint
+ *   - the active visualization (mounted from the registry in trends-core.js),
+ *     swapped with a calm crossfade
  *   - the by-array drill-down table
  *
  * The four visualizations live in trends-view-*.js and self-register on
- * window.AOTrends. This file owns layout + data + which view is active; it does
- * NOT know how any individual chart draws. Chosen view persists in localStorage.
+ * window.AOTrends. This file owns layout + data + which view is active + the
+ * shared "sublime layer"; it does NOT know how any individual chart draws.
  *
  * Source: GET /v1/array-owners/fleet-trends.   Contract: TRENDS-VIEWS-CONTRACT.md
  * ==========================================================================*/
@@ -19,6 +21,16 @@
   const API = "/v1/array-owners/fleet-trends";
   const VIEW_KEY = "ao_trends_view";
   const C = () => window.AOTrends;
+  const REDUCE = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Per-view accent hue — retints the switcher pill, ambient glow and frame so
+  // each visualization feels like its own room while staying one family.
+  const ACCENT = {
+    liquid:    "#3fd68a",
+    spiral:    "#f5b942",
+    ridgeline: "#5ec2ff",
+    heatfield: "#ffd479",
+  };
 
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function root() { return document.getElementById("trendsRoot"); }
@@ -27,6 +39,7 @@
 
   let _activeStop = null;   // cleanup fn for the currently-mounted view
   let _prepped = null;      // prepared data for the current payload
+  let _switching = false;
 
   function loading() {
     const r = root(); if (!r) return;
@@ -46,11 +59,37 @@
     if (_activeStop) { try { _activeStop(); } catch (e) {} _activeStop = null; }
   }
 
+  // ── animated count-up ──────────────────────────────────────────────────────
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  function countUp(el) {
+    const target = parseFloat(el.getAttribute("data-target"));
+    if (isNaN(target)) return;
+    const dec = parseInt(el.getAttribute("data-dec") || "0", 10);
+    const pre = el.getAttribute("data-pre") || "";
+    const suf = el.getAttribute("data-suf") || "";
+    const sign = el.getAttribute("data-sign") === "1";
+    const dur = 1100;
+    const fmt = v => {
+      const s = sign && v > 0 ? "+" : "";
+      const body = dec > 0
+        ? Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
+        : Math.round(Math.abs(v)).toLocaleString();
+      return pre + (v < 0 ? "-" : s) + body + suf;
+    };
+    if (REDUCE) { el.textContent = fmt(target); return; }
+    const t0 = performance.now();
+    (function tick(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(target * easeOut(p));
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = fmt(target);
+    })(t0);
+  }
+
   function statBand(d) {
     const c = C();
     const years = d.years || [];
     const latestYr = years.length ? Math.max(...years) : null;
-    // Latest fleet YoY — compare ONLY months present in BOTH latest & prior year.
     let latestYoY = null, yoyMonths = 0, prevYr = null;
     if (years.length >= 2) {
       prevYr = years[years.length - 2];
@@ -64,27 +103,45 @@
     const yoyTitle = yoyMonths > 0
       ? `${latestYr} vs ${prevYr}, same ${yoyMonths} month${yoyMonths === 1 ? "" : "s"}`
       : "year over year";
+    const stat = (k, valHtml, extra) =>
+      `<div class="tr-stat"${extra || ""}><span class="tr-glow"></span><div class="tr-k">${k}</div>${valHtml}</div>`;
+    const num = (target, { dec = 0, pre = "", suf = "", sign = false, cls = "" } = {}) =>
+      `<div class="tr-v ${cls}" data-target="${target}" data-dec="${dec}" data-pre="${pre}" data-suf="${suf}" data-sign="${sign ? 1 : 0}">${pre}0${suf}</div>`;
+    const dash = `<div class="tr-v">—</div>`;
     return `<div class="tr-stats">
-      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">TRAILING 12 MO</div><div class="tr-v">${c.fmt0(d.ttm_kwh)} kWh</div></div>
-      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">LIFETIME (FLEET)</div><div class="tr-v">${c.fmt0(d.lifetime_kwh)} kWh</div></div>
-      <div class="tr-stat" title="${yoyTitle}"><span class="tr-glow"></span><div class="tr-k">LATEST YOY</div><div class="tr-v ${latestYoY != null && latestYoY < 0 ? "neg" : "pos"}">${latestYoY == null ? "—" : (latestYoY >= 0 ? "+" : "") + latestYoY.toFixed(1) + "%"}</div></div>
-      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">EST. SAVINGS (12 MO)</div><div class="tr-v">${d.ttm_savings_usd == null ? "—" : "$" + c.fmt0(d.ttm_savings_usd)}</div></div>
+      ${stat("TRAILING 12 MO", d.ttm_kwh == null ? dash : num(d.ttm_kwh, { suf: " kWh" }))}
+      ${stat("LIFETIME (FLEET)", d.lifetime_kwh == null ? dash : num(d.lifetime_kwh, { suf: " kWh" }))}
+      ${stat("LATEST YOY", latestYoY == null ? dash : num(latestYoY, { dec: 1, suf: "%", sign: true, cls: latestYoY < 0 ? "neg" : "pos" }), ` title="${yoyTitle}"`)}
+      ${stat("EST. SAVINGS (12 MO)", d.ttm_savings_usd == null ? dash : num(d.ttm_savings_usd, { pre: "$" }))}
     </div>`;
   }
 
   function switcher(activeKey) {
     const views = C().listViews();
-    return `<div class="tr-switch" role="tablist" aria-label="Chart style">` + views.map(v =>
+    return `<div class="tr-switch" role="tablist" aria-label="Chart style">
+      <span class="tr-switch-ind" aria-hidden="true"></span>` + views.map(v =>
       `<button class="tr-seg ${v.key === activeKey ? "on" : ""}" data-view="${v.key}" role="tab" aria-selected="${v.key === activeKey}">
-        <span class="tr-seg-b">${C().esc(v.badge || "")}</span>${C().esc(v.label)}
+        <span class="tr-seg-b">${C().esc(v.badge || "")}</span><span class="tr-seg-lbl">${C().esc(v.label)}</span>
       </button>`).join("") + `</div>`;
+  }
+
+  // slide the indicator pill under the active segment
+  function moveIndicator() {
+    const sw = document.querySelector(".tr-switch");
+    const ind = document.querySelector(".tr-switch-ind");
+    const on = document.querySelector(".tr-seg.on");
+    if (!sw || !ind || !on) return;
+    const r = on.getBoundingClientRect(), pr = sw.getBoundingClientRect();
+    ind.style.width = r.width + "px";
+    ind.style.transform = `translateX(${r.left - pr.left - 4}px)`;
+    ind.style.opacity = "1";
   }
 
   function byArrayTable(byArray) {
     const c = C();
     if (!byArray || !byArray.length) return "";
-    const rows = byArray.map(a =>
-      `<tr><td class="tr-aname">${c.esc(a.name)}</td>
+    const rows = byArray.map((a, i) =>
+      `<tr style="--ri:${i}"><td class="tr-aname">${c.esc(a.name)}</td>
         <td class="tr-anum">${c.fmt0(a.lifetime_kwh)} kWh</td>
         <td class="tr-ayears">${(a.years || []).join(", ") || "—"}</td></tr>`).join("");
     return `<div class="tr-block">
@@ -97,18 +154,24 @@
     </div>`;
   }
 
-  function mountView(key) {
+  function applyAccent(key) {
+    const block = document.querySelector(".tr-chartblock");
+    if (block && ACCENT[key]) block.style.setProperty("--tr-accent", ACCENT[key]);
+  }
+
+  function doMount(key) {
     const c = C();
     const view = c.getView(key) || c.listViews()[0];
     if (!view) return;
     teardown();
-    // active state on segments
     document.querySelectorAll(".tr-seg").forEach(b => {
       const on = b.getAttribute("data-view") === view.key;
       b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
     });
+    moveIndicator();
+    applyAccent(view.key);
     const desc = document.getElementById("trViewDesc");
-    if (desc) desc.textContent = view.describe || "";
+    if (desc) { desc.textContent = view.describe || ""; }
     const host = document.getElementById("trChartHost");
     if (!host) return;
     host.innerHTML = "";
@@ -119,6 +182,30 @@
       host.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">This view hit an error. Try another style above.</div></div>`;
       if (window.console) console.error("trends view " + view.key + " failed", e);
     }
+  }
+
+  // crossfade: dim current out, swap, fade new in (calm, ~190ms each way)
+  function mountView(key, opts) {
+    opts = opts || {};
+    const host = document.getElementById("trChartHost");
+    const desc = document.getElementById("trViewDesc");
+    if (!host || opts.immediate || REDUCE) { doMount(key); fadeIn(host, desc); return; }
+    if (_switching) return;
+    _switching = true;
+    host.classList.add("tr-fading");
+    if (desc) desc.classList.add("tr-fading");
+    setTimeout(() => {
+      doMount(key);
+      fadeIn(host, desc);
+      _switching = false;
+    }, 190);
+  }
+  function fadeIn(host, desc) {
+    if (!host) return;
+    requestAnimationFrame(() => {
+      host.classList.remove("tr-fading");
+      if (desc) desc.classList.remove("tr-fading");
+    });
   }
 
   function render(d) {
@@ -134,7 +221,8 @@
 
     r.innerHTML = `
       ${statBand(d)}
-      <div class="tr-block tr-chartblock">
+      <div class="tr-block tr-chartblock" style="--tr-accent:${ACCENT[active] || "#3fd68a"}">
+        <span class="tr-ambient" aria-hidden="true"></span>
         <div class="tr-chart-head">
           ${switcher(active)}
         </div>
@@ -144,19 +232,32 @@
       ${byArrayTable(d.by_array)}
     `;
 
+    // animate the stat numbers up
+    r.querySelectorAll(".tr-v[data-target]").forEach(countUp);
+
     // wire switcher
     r.querySelectorAll(".tr-seg").forEach(btn => {
       btn.addEventListener("click", () => mountView(btn.getAttribute("data-view")));
     });
-    mountView(active);
+    // keep the indicator glued to the active segment on resize
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => moveIndicator());
+      const sw = r.querySelector(".tr-switch"); if (sw) ro.observe(sw);
+    } else {
+      window.addEventListener("resize", moveIndicator);
+    }
+
+    mountView(active, { immediate: true });
+    // indicator needs layout; nudge after paint + on web-font settle
+    requestAnimationFrame(moveIndicator);
+    setTimeout(moveIndicator, 220);
   }
 
   function load() {
     const s = session();
     if (!s) { empty("Sign in to see your fleet's multi-year production trends."); return; }
     if (!window.AOTrends || !C().listViews().length) {
-      // core/views not ready yet — retry shortly (script order safety)
-      return void setTimeout(load, 60);
+      return void setTimeout(load, 60);   // core/views not ready yet
     }
     loading();
     fetch(API, { headers: { Authorization: "Bearer " + s } })
