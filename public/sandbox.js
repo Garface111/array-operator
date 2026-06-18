@@ -658,6 +658,22 @@
     const peak = vals.length ? Math.max.apply(null, vals) : 0;
     return peak > 0 ? (peak / 4) * 1000 : null;
   }
+  // A vendor with NO instantaneous power feed (Fronius via Solar.web exposes only
+  // site-wide TotalPower, never per-inverter) leaves current_power_w == null on
+  // every inverter — distinct from a numeric 0 (SolarEdge/SMA/Chint at night).
+  // We must NOT paint those as the dead "not producing right now": they produced
+  // today, we simply have no live wattage. Surface today's REAL kWh instead.
+  function liveReadingMissing(inv){ return inv && inv.current_power_w == null; }
+  // Today's produced kWh from the daily series (last point, if it's today's date).
+  // Returns null when the series doesn't reach today.
+  function todayKwh(inv){
+    const d = inv && inv.daily;
+    if(!Array.isArray(d) || !d.length) return null;
+    const last = d[d.length - 1];
+    if(!last || last.date == null) return null;
+    const iso = new Date().toISOString().slice(0, 10);
+    return String(last.date).slice(0, 10) === iso ? (+last.kwh || 0) : null;
+  }
   function outputState(inv, statusCls){
     const realW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;
     // No real nameplate → estimate one from production history so we can still
@@ -692,7 +708,18 @@
     const maxKw = os.maxW != null ? (os.maxW / 1000) : null;
     let label;
     if(!os.reporting){
-      label = `<span class="sb-ob-idle">not producing right now</span>`;
+      // Distinguish "we have no live wattage feed for this vendor" (Fronius:
+      // current_power_w == null) from "live feed says ~0 right now" (genuinely
+      // idle). The former produced today — show its REAL kWh, never "not
+      // producing right now", which reads as dead next to live-feed siblings.
+      const tk = liveReadingMissing(inv) ? todayKwh(inv) : null;
+      if(tk != null && tk > 0){
+        label = `<b class="sb-ob-pct">${tk.toFixed(1)} kWh</b><span class="sb-ob-of">produced today · no live feed</span>`;
+      } else if(liveReadingMissing(inv)){
+        label = `<span class="sb-ob-idle">no live feed from this inverter</span>`;
+      } else {
+        label = `<span class="sb-ob-idle">not producing right now</span>`;
+      }
     } else if(os.pct != null){
       // Mark an estimated denominator honestly ("of ~est. max"); a real
       // nameplate stays the plain "of max · cur/max kW".
@@ -804,6 +831,7 @@
     let pct;
     if(sleeping) pct = 14;
     else if(os.pct != null) pct = Math.max(0, Math.min(100, os.pct));
+    else if(!os.reporting && liveReadingMissing(inv) && (todayKwh(inv) || 0) > 0) pct = 45;
     else pct = os.reporting ? 55 : 0;
     // bubbles: none when sleeping/fault/empty; capped at 6 (spec perf rule).
     let bubbles = "";
@@ -3516,14 +3544,12 @@
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
     trends:  { panel: "panelTrends",  tab: "tabTrends"  },
-    claims:  { panel: "panelClaims",  tab: "tabClaims"  },
     reports: { panel: "panelReports", tab: "tabReports" },
   };
   function tabFromHash(){
     const h = location.hash;
     if(h === "#account") return "account";
     if(h === "#trends")  return "trends";
-    if(h === "#claims")  return "claims";
     if(h === "#reports") return "reports";
     return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing
   }
@@ -3547,9 +3573,6 @@
       loadAccount();
     } else if(active === "trends"){
       if(window.__aoLoadTrends) window.__aoLoadTrends();
-    } else if(active === "claims"){
-      load();                                       // ensure the fleet is loaded so claims can reconcile
-      if(window.__claimsLoad) window.__claimsLoad();
     } else if(active === "reports"){
       loadReports();
     }
