@@ -1,0 +1,115 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body{margin:0;background:#0b1017;font-family:system-ui,Segoe UI,sans-serif;color:#eef2f7}
+  .wrap{padding:30px;display:flex;flex-direction:column;gap:22px}
+  .lbl{font-size:13px;color:#9fb0c3}
+  /* a fluid element = a positioned box; the SHARED canvas draws fluid into its rect */
+  .tank{position:relative;height:88px;border-radius:14px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+  .plate{position:absolute;inset:6px;border-radius:10px;background:rgba(11,16,23,.55);
+    backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+    display:flex;align-items:center;padding:0 18px;font-weight:800;font-size:22px;z-index:2}
+  #fluidCanvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:0}
+  .wrap{position:relative;z-index:1}
+  #fps{position:fixed;top:8px;right:12px;z-index:5;font-size:12px;color:#7ff0bb;background:#0008;padding:3px 8px;border-radius:6px}
+</style></head><body>
+<canvas id="fluidCanvas"></canvas>
+<div id="fps">…</div>
+<div class="wrap">
+  <div class="lbl">Top bar — horizontal energy fluid, 92% (green)</div>
+  <div class="tank" data-fill="0.92" data-tone="ok" data-dir="h"><div class="plate">92% FLEET HEALTHY · 12 arrays · 84 inverters</div></div>
+  <div class="lbl">Inverter card — vertical energy fluid, 70% (amber)</div>
+  <div class="tank" data-fill="0.70" data-tone="warn" data-dir="v" style="width:200px"><div class="plate" style="font-size:15px">String B · 4.1kW</div></div>
+  <div class="lbl">Inverter card — vertical, 38% (red/fault)</div>
+  <div class="tank" data-fill="0.38" data-tone="bad" data-dir="v" style="width:200px"><div class="plate" style="font-size:15px">String C · fault</div></div>
+</div>
+<script>
+const cv=document.getElementById('fluidCanvas'), gl=cv.getContext('webgl',{premultipliedAlpha:false,alpha:true});
+const vs=`attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+const fs=`precision highp float;
+uniform vec2 uRes; uniform float uTime;
+// up to 12 fluid rects packed as uniforms: rect(x,y,w,h) in px, fill, tone, dir
+uniform vec4 uRect[12]; uniform vec4 uMeta[12]; uniform int uCount;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));
+  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p*=2.03;a*=.5;}return v;}
+vec3 toneCol(float t, float lo){ // t:0 ok,1 warn,2 bad
+  vec3 ok1=vec3(.18,.84,.45),ok2=vec3(.09,.65,.34);
+  vec3 wa1=vec3(1.,.76,.25),wa2=vec3(.86,.62,.16);
+  vec3 ba1=vec3(1.,.55,.35),ba2=vec3(.78,.35,.16);
+  vec3 c1=t<.5?ok1:(t<1.5?wa1:ba1);
+  vec3 c2=t<.5?ok2:(t<1.5?wa2:ba2);
+  return mix(c2,c1,lo);
+}
+void main(){
+  vec2 frag=gl_FragCoord.xy; vec3 outc=vec3(0.); float outa=0.;
+  for(int k=0;k<12;k++){ if(k>=uCount)break;
+    vec4 r=uRect[k]; vec4 m=uMeta[k]; // m: fill, tone, dir(0=v,1=h), _
+    vec2 lp=(frag-r.xy)/r.zw;            // local 0..1 within rect (y up)
+    if(lp.x<0.||lp.x>1.||lp.y<0.||lp.y>1.) continue;
+    float fill=m.x, dir=m.z;
+    // coordinate along fill axis (a) and across (b)
+    float a = dir>.5 ? lp.x : lp.y;
+    float b = dir>.5 ? lp.y : lp.x;
+    // sloshing surface (Gerstner-ish sum of sines) at fill level
+    float surf = fill + 0.030*sin(b*11.+uTime*2.0) + 0.018*sin(b*21.-uTime*3.1) + 0.010*sin(b*37.+uTime*1.3);
+    float inside = smoothstep(surf+0.012, surf-0.012, a);
+    if(inside<=0.001) continue;
+    // internal turbulent flow
+    vec2 fp = dir>.5 ? vec2(lp.x*5.-uTime*.4, lp.y*4.) : vec2(lp.x*4., lp.y*5.-uTime*.4);
+    float flow = fbm(fp + vec2(uTime*.25,-uTime*.45));
+    vec3 col = toneCol(m.y, clamp(flow*.7+.45*(a/max(surf,.001)),0.,1.));
+    // bubbles drifting toward the leading edge of the fill axis
+    float bub=0.;
+    for(int i=0;i<6;i++){ float fi=float(i);
+      float across = hash(vec2(fi,1.+m.y));
+      float spd=0.12+0.10*hash(vec2(fi,2.));
+      float along=fract(hash(vec2(fi,3.))+uTime*spd)*surf;
+      float rad=0.018+0.014*hash(vec2(fi,4.));
+      vec2 bc = dir>.5 ? vec2(along,across) : vec2(across,along);
+      bub+=smoothstep(rad,0.,distance(lp,bc));
+    }
+    col+=bub*0.55;
+    // bright meniscus crest at the surface
+    col+=smoothstep(0.02,0.,abs(a-surf))*0.6;
+    outc=col; outa=inside*0.9;
+  }
+  gl_FragColor=vec4(outc*outa,outa);
+}`;
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o;}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+gl.linkProgram(pr);gl.useProgram(pr);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const lp=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(lp);gl.vertexAttribPointer(lp,2,gl.FLOAT,false,0,0);
+gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+const uRes=gl.getUniformLocation(pr,'uRes'),uTime=gl.getUniformLocation(pr,'uTime'),
+  uRect=gl.getUniformLocation(pr,'uRect'),uMeta=gl.getUniformLocation(pr,'uMeta'),uCount=gl.getUniformLocation(pr,'uCount');
+const toneN={ok:0,warn:1,bad:2};
+function collect(){ // read every .tank rect from the DOM
+  const dpr=Math.min(devicePixelRatio||1,2); const H=cv.height;
+  const els=[...document.querySelectorAll('.tank')]; const rect=[],meta=[];
+  els.slice(0,12).forEach(el=>{ const r=el.getBoundingClientRect();
+    rect.push(r.left*dpr, H-(r.bottom)*dpr, r.width*dpr, r.height*dpr);
+    meta.push(parseFloat(el.dataset.fill), toneN[el.dataset.tone]||0, el.dataset.dir==='h'?1:0, 0);
+  });
+  return {rect,meta,n:els.length};
+}
+let last=performance.now(),frames=0,fpsAcc=0;
+function resize(){const dpr=Math.min(devicePixelRatio||1,2);cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;}
+addEventListener('resize',resize);resize();
+function frame(t){
+  const {rect,meta,n}=collect();
+  gl.viewport(0,0,cv.width,cv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.uniform2f(uRes,cv.width,cv.height);gl.uniform1f(uTime,t/1000);
+  gl.uniform4fv(uRect,new Float32Array(rect.concat(new Array(Math.max(0,48-rect.length)).fill(0))));
+  gl.uniform4fv(uMeta,new Float32Array(meta.concat(new Array(Math.max(0,48-meta.length)).fill(0))));
+  gl.uniform1i(uCount,Math.min(n,12));
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  frames++;const now=performance.now();if(now-last>=500){fpsAcc=Math.round(frames*1000/(now-last));frames=0;last=now;
+    document.getElementById('fps').textContent=fpsAcc+' fps · '+n+' tanks · 1 draw call';}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>
