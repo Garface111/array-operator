@@ -1,163 +1,92 @@
 /* ============================================================================
- * Array Operator — Trends tab (trends.js)
+ * Array Operator — Trends tab orchestrator (trends.js)
  *
- * Paul Bozuwa's "macro-level tab for multi-year trend lines." Shows
- * PORTFOLIO-WIDE production: every array the owner has, summed, drawn as one
- * line per year over Jan–Dec so seasonality + year-over-year growth read at a
- * glance — plus a seasonal YoY strip and a per-array drill-down.
+ * Fetches the portfolio-wide production payload and renders:
+ *   - the stat band (TTM / lifetime / latest YoY / est. savings)
+ *   - a segmented VIEW SWITCHER (Liquid / Spiral / Ridgeline / Heat-Field)
+ *   - the active visualization (mounted from the view registry in trends-core.js)
+ *   - the by-array drill-down table
  *
- * Self-contained: exposes window.__aoLoadTrends(); sandbox.js's applyView()
- * calls it when the #trends tab is active. Same-origin /v1/* → Railway backend.
- * Dependency-free inline SVG chart (matches the app's no-build vanilla stack).
+ * The four visualizations live in trends-view-*.js and self-register on
+ * window.AOTrends. This file owns layout + data + which view is active; it does
+ * NOT know how any individual chart draws. Chosen view persists in localStorage.
  *
- * Source: GET /v1/array-owners/fleet-trends.
+ * Source: GET /v1/array-owners/fleet-trends.   Contract: TRENDS-VIEWS-CONTRACT.md
  * ==========================================================================*/
 (function () {
   "use strict";
 
   const API = "/v1/array-owners/fleet-trends";
-  const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
-
-  // 8 distinct hues so up to 8 years never share a color; latest = bold green.
-  const PALETTE = [
-    "#3fd68a", // good green — latest year (bold)
-    "#e6a23c", // amber
-    "#5aa9e6", // sky
-    "#c9772e", // wood
-    "#2bb6a8", // teal
-    "#9aa0aa", // slate
-    "#b07cf0", // violet
-    "#d4a017", // gold
-  ];
-
-  const esc = s => String(s == null ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const fmt0 = n => n == null ? "—"
-    : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
-  const kCompact = n => {
-    if (n == null) return "—";
-    const a = Math.abs(n);
-    if (a >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
-    if (a >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
-    return String(Math.round(n));
-  };
+  const VIEW_KEY = "ao_trends_view";
+  const C = () => window.AOTrends;
 
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function root() { return document.getElementById("trendsRoot"); }
+  function savedView() { try { return localStorage.getItem(VIEW_KEY); } catch (e) { return null; } }
+  function saveView(k) { try { localStorage.setItem(VIEW_KEY, k); } catch (e) {} }
 
-  /** Deterministic color: newest year = boldest palette entry. */
-  function yearColor(year, years) {
-    const desc = [...years].sort((a, b) => b - a);
-    const i = desc.indexOf(year);
-    return PALETTE[(i < 0 ? years.length : i) % PALETTE.length];
-  }
+  let _activeStop = null;   // cleanup fn for the currently-mounted view
+  let _prepped = null;      // prepared data for the current payload
 
   function loading() {
     const r = root(); if (!r) return;
     r.innerHTML = '<div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div>';
   }
-
   function empty(msg) {
     const r = root(); if (!r) return;
+    teardown();
     r.innerHTML = `<div class="tr-empty">
       <div class="tr-empty-ic" aria-hidden="true">📈</div>
       <div class="tr-empty-h">Not enough history yet</div>
-      <div class="tr-empty-p">${esc(msg || "Multi-year trends appear once your arrays have logged a few months of production. Connect your arrays on the Arrays tab to start building history.")}</div>
+      <div class="tr-empty-p">${C().esc(msg || "Multi-year trends appear once your arrays have logged a few months of production. Connect your arrays on the Arrays tab to start building history.")}</div>
     </div>`;
   }
 
-  // ── multi-year line chart (inline SVG) ─────────────────────────────────────
-  function lineChart(monthlyByYear, years) {
-    const VB_W = 760, VB_H = 320;
-    const PAD = { top: 18, right: 18, bottom: 28, left: 44 };
-    const plotW = VB_W - PAD.left - PAD.right;
-    const plotH = VB_H - PAD.top - PAD.bottom;
-
-    // peak across all years/months for the y-scale
-    let peak = 0;
-    years.forEach(y => (monthlyByYear[String(y)] || []).forEach(p => {
-      if (p.kwh > peak) peak = p.kwh;
-    }));
-    if (peak <= 0) peak = 1;
-    const niceTop = peak * 1.08;
-
-    const x = m => PAD.left + (plotW * (m - 1)) / 11;       // month 1..12
-    const y = v => PAD.top + plotH * (1 - v / niceTop);
-
-    // gridlines + y labels (4 steps)
-    let grid = "";
-    for (let i = 0; i <= 4; i++) {
-      const val = (niceTop * i) / 4;
-      const gy = y(val);
-      grid += `<line x1="${PAD.left}" y1="${gy}" x2="${VB_W - PAD.right}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>`;
-      grid += `<text x="${PAD.left - 6}" y="${gy + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${kCompact(val)}</text>`;
-    }
-    // month labels
-    let xlabels = "";
-    for (let m = 1; m <= 12; m++) {
-      xlabels += `<text x="${x(m)}" y="${VB_H - 8}" text-anchor="middle" font-size="9" fill="var(--faint)">${MONTHS[m - 1]}</text>`;
-    }
-    // one polyline per year (oldest first so latest draws on top)
-    const ordered = [...years].sort((a, b) => a - b);
-    let lines = "";
-    ordered.forEach(yr => {
-      const pts = (monthlyByYear[String(yr)] || []);
-      if (!pts.length) return;
-      const isLatest = yr === Math.max(...years);
-      const c = yearColor(yr, years);
-      const d = pts.map(p => `${x(p.month).toFixed(1)},${y(p.kwh).toFixed(1)}`).join(" ");
-      lines += `<polyline points="${d}" fill="none" stroke="${c}" stroke-width="${isLatest ? 2.6 : 1.5}" stroke-linejoin="round" stroke-linecap="round" opacity="${isLatest ? 1 : 0.85}"/>`;
-      pts.forEach(p => {
-        lines += `<circle cx="${x(p.month).toFixed(1)}" cy="${y(p.kwh).toFixed(1)}" r="${isLatest ? 2.6 : 1.8}" fill="${c}"/>`;
-      });
-    });
-
-    return `<svg viewBox="0 0 ${VB_W} ${VB_H}" class="tr-svg" role="img" aria-label="Monthly kWh by year">
-      ${grid}${lines}${xlabels}
-    </svg>`;
+  function teardown() {
+    if (_activeStop) { try { _activeStop(); } catch (e) {} _activeStop = null; }
   }
 
-  function legend(years) {
-    const desc = [...years].sort((a, b) => b - a);
-    return `<div class="tr-legend">` + desc.map(yr =>
-      `<span class="tr-leg"><span class="tr-dot" style="background:${yearColor(yr, years)}"></span>${yr}</span>`
-    ).join("") + `</div>`;
-  }
-
-  function seasonalGrid(seasonal) {
-    if (!seasonal || !seasonal.length) return "";
-    const cards = seasonal.map(s => {
-      const years = Object.keys(s.by_year).map(Number).sort((a, b) => b - a);
-      const latestYr = years[0];
-      const latestVal = s.by_year[String(latestYr)];
-      const d = s.latest_delta_pct;
-      let delta = "";
-      if (d != null) {
-        const up = d >= 0;
-        delta = `<span class="tr-delta ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${Math.abs(d).toFixed(1)}%</span>`;
-      } else {
-        delta = `<span class="tr-delta flat">—</span>`;
-      }
-      return `<div class="tr-scard">
-        <div class="tr-sm">${esc(s.label).toUpperCase()}</div>
-        <div class="tr-sv">${fmt0(latestVal)}</div>
-        ${delta}
-      </div>`;
-    }).join("");
-    return `<div class="tr-block">
-      <div class="tr-block-h">SEASONAL YEAR-OVER-YEAR</div>
-      <div class="tr-block-sub">Latest year's fleet total per month, with the change vs the prior year.</div>
-      <div class="tr-sgrid">${cards}</div>
+  function statBand(d) {
+    const c = C();
+    const years = d.years || [];
+    const latestYr = years.length ? Math.max(...years) : null;
+    // Latest fleet YoY — compare ONLY months present in BOTH latest & prior year.
+    let latestYoY = null, yoyMonths = 0, prevYr = null;
+    if (years.length >= 2) {
+      prevYr = years[years.length - 2];
+      const cur = d.monthly_by_year[String(latestYr)] || [];
+      const prev = d.monthly_by_year[String(prevYr)] || [];
+      const prevByMonth = {}; prev.forEach(p => prevByMonth[p.month] = p.kwh || 0);
+      let curSum = 0, prevSum = 0;
+      cur.forEach(p => { if (prevByMonth[p.month] != null) { curSum += (p.kwh || 0); prevSum += prevByMonth[p.month]; yoyMonths++; } });
+      if (prevSum > 0 && yoyMonths > 0) latestYoY = (100 * (curSum - prevSum) / prevSum);
+    }
+    const yoyTitle = yoyMonths > 0
+      ? `${latestYr} vs ${prevYr}, same ${yoyMonths} month${yoyMonths === 1 ? "" : "s"}`
+      : "year over year";
+    return `<div class="tr-stats">
+      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">TRAILING 12 MO</div><div class="tr-v">${c.fmt0(d.ttm_kwh)} kWh</div></div>
+      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">LIFETIME (FLEET)</div><div class="tr-v">${c.fmt0(d.lifetime_kwh)} kWh</div></div>
+      <div class="tr-stat" title="${yoyTitle}"><span class="tr-glow"></span><div class="tr-k">LATEST YOY</div><div class="tr-v ${latestYoY != null && latestYoY < 0 ? "neg" : "pos"}">${latestYoY == null ? "—" : (latestYoY >= 0 ? "+" : "") + latestYoY.toFixed(1) + "%"}</div></div>
+      <div class="tr-stat"><span class="tr-glow"></span><div class="tr-k">EST. SAVINGS (12 MO)</div><div class="tr-v">${d.ttm_savings_usd == null ? "—" : "$" + c.fmt0(d.ttm_savings_usd)}</div></div>
     </div>`;
+  }
+
+  function switcher(activeKey) {
+    const views = C().listViews();
+    return `<div class="tr-switch" role="tablist" aria-label="Chart style">` + views.map(v =>
+      `<button class="tr-seg ${v.key === activeKey ? "on" : ""}" data-view="${v.key}" role="tab" aria-selected="${v.key === activeKey}">
+        <span class="tr-seg-b">${C().esc(v.badge || "")}</span>${C().esc(v.label)}
+      </button>`).join("") + `</div>`;
   }
 
   function byArrayTable(byArray) {
+    const c = C();
     if (!byArray || !byArray.length) return "";
     const rows = byArray.map(a =>
-      `<tr><td class="tr-aname">${esc(a.name)}</td>
-        <td class="tr-anum">${fmt0(a.lifetime_kwh)} kWh</td>
-        <td class="tr-ayears">${(a.years || []).join(", ") || "—"}</td></tr>`
-    ).join("");
+      `<tr><td class="tr-aname">${c.esc(a.name)}</td>
+        <td class="tr-anum">${c.fmt0(a.lifetime_kwh)} kWh</td>
+        <td class="tr-ayears">${(a.years || []).join(", ") || "—"}</td></tr>`).join("");
     return `<div class="tr-block">
       <div class="tr-block-h">BY ARRAY</div>
       <div class="tr-block-sub">Lifetime production and the years on record for each array in your fleet.</div>
@@ -168,62 +97,67 @@
     </div>`;
   }
 
+  function mountView(key) {
+    const c = C();
+    const view = c.getView(key) || c.listViews()[0];
+    if (!view) return;
+    teardown();
+    // active state on segments
+    document.querySelectorAll(".tr-seg").forEach(b => {
+      const on = b.getAttribute("data-view") === view.key;
+      b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
+    });
+    const desc = document.getElementById("trViewDesc");
+    if (desc) desc.textContent = view.describe || "";
+    const host = document.getElementById("trChartHost");
+    if (!host) return;
+    host.innerHTML = "";
+    host.style.position = "relative";
+    saveView(view.key);
+    try { _activeStop = view.mount(host, _prepped, c) || null; }
+    catch (e) {
+      host.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">This view hit an error. Try another style above.</div></div>`;
+      if (window.console) console.error("trends view " + view.key + " failed", e);
+    }
+  }
+
   function render(d) {
+    const c = C();
     const r = root(); if (!r) return;
     const years = d.years || [];
     if (!years.length) { empty(); return; }
+    _prepped = c.prep(d);
 
-    const latestYr = Math.max(...years);
-    // latest fleet YoY (sum of seasonal latest deltas isn't right; derive from
-    // Latest fleet YoY — compare ONLY the months present in BOTH the latest and
-    // prior year (apples-to-apples). A partial current year (e.g. Jan–Jun) must
-    // not be compared against a full prior year, or the headline reads a scary
-    // false -47%. Null when there's no overlapping month.
-    let latestYoY = null;
-    let yoyMonths = 0;
-    if (years.length >= 2) {
-      const prevYr = years[years.length - 2];
-      const cur = d.monthly_by_year[String(latestYr)] || [];
-      const prev = d.monthly_by_year[String(prevYr)] || [];
-      const prevByMonth = {};
-      prev.forEach(p => { prevByMonth[p.month] = p.kwh || 0; });
-      let curSum = 0, prevSum = 0;
-      cur.forEach(p => {
-        if (prevByMonth[p.month] != null) {
-          curSum += (p.kwh || 0);
-          prevSum += prevByMonth[p.month];
-          yoyMonths++;
-        }
-      });
-      if (prevSum > 0 && yoyMonths > 0) latestYoY = (100 * (curSum - prevSum) / prevSum);
-    }
-    const yoyTitle = yoyMonths > 0
-      ? `${latestYr} vs ${years[years.length - 2]}, same ${yoyMonths} month${yoyMonths === 1 ? "" : "s"}`
-      : "year over year";
+    const views = c.listViews();
+    let active = savedView();
+    if (!active || !c.getView(active)) active = (views[0] && views[0].key) || "liquid";
 
     r.innerHTML = `
-      <div class="tr-stats">
-        <div class="tr-stat"><div class="tr-k">TRAILING 12 MO</div><div class="tr-v">${fmt0(d.ttm_kwh)} kWh</div></div>
-        <div class="tr-stat"><div class="tr-k">LIFETIME (FLEET)</div><div class="tr-v">${fmt0(d.lifetime_kwh)} kWh</div></div>
-        <div class="tr-stat" title="${yoyTitle}"><div class="tr-k">LATEST YOY</div><div class="tr-v ${latestYoY != null && latestYoY < 0 ? "neg" : "pos"}">${latestYoY == null ? "—" : (latestYoY >= 0 ? "+" : "") + latestYoY.toFixed(1) + "%"}</div></div>
-        <div class="tr-stat"><div class="tr-k">EST. SAVINGS (12 MO)</div><div class="tr-v">${d.ttm_savings_usd == null ? "—" : "$" + fmt0(d.ttm_savings_usd)}</div></div>
+      ${statBand(d)}
+      <div class="tr-block tr-chartblock">
+        <div class="tr-chart-head">
+          ${switcher(active)}
+        </div>
+        <div class="tr-view-desc" id="trViewDesc"></div>
+        <div class="tr-chart-host" id="trChartHost"></div>
       </div>
-
-      <div class="tr-block">
-        <div class="tr-block-h">MONTHLY KWH BY YEAR — WHOLE FLEET</div>
-        <div class="tr-block-sub">Each line is a year, Jan–Dec, summed across all your arrays.</div>
-        ${legend(years)}
-        ${lineChart(d.monthly_by_year || {}, years)}
-      </div>
-
-      ${seasonalGrid(d.seasonal_yoy)}
       ${byArrayTable(d.by_array)}
     `;
+
+    // wire switcher
+    r.querySelectorAll(".tr-seg").forEach(btn => {
+      btn.addEventListener("click", () => mountView(btn.getAttribute("data-view")));
+    });
+    mountView(active);
   }
 
   function load() {
     const s = session();
     if (!s) { empty("Sign in to see your fleet's multi-year production trends."); return; }
+    if (!window.AOTrends || !C().listViews().length) {
+      // core/views not ready yet — retry shortly (script order safety)
+      return void setTimeout(load, 60);
+    }
     loading();
     fetch(API, { headers: { Authorization: "Bearer " + s } })
       .then(res => {
@@ -234,6 +168,7 @@
       .then(render)
       .catch(err => {
         if (err && err.auth) { empty("Your session expired — sign in again to see trends."); return; }
+        teardown();
         const r = root();
         if (r) r.innerHTML = `<div class="tr-empty"><div class="tr-empty-ic">⚠️</div>
           <div class="tr-empty-h">Couldn't load trends</div>

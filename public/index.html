@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="claims.css">
 <link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded last to override -->
 <link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
+<link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <meta name="theme-color" content="#0a0e14">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
@@ -214,6 +215,11 @@
 <script src="command-center.js"></script>
 <script src="claims.js"></script>
 <script src="reports.js"></script>
+<script src="trends-core.js"></script>
+<script src="trends-view-liquid.js"></script>
+<script src="trends-view-spiral.js"></script>
+<script src="trends-view-ridgeline.js"></script>
+<script src="trends-view-heatfield.js"></script>
 <script src="trends.js"></script>
 <script>
   /* Day/night toggle wiring — persists choice in localStorage (ao_theme) and

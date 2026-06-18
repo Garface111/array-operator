@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Array Operator — Trends Concepts</title>
+<style>
+:root{
+  --bg:#0a0e14; --bg2:#0e131c; --ink:#eaf0f7; --muted:#8b97a8; --faint:#6b7686;
+  --gold:#f5b942; --gold2:#ffd479; --sky:#5ec2ff; --good:#3fd68a; --good2:#7ff0bb;
+  --warn:#ffb454; --bad:#ff6b6b; --line:rgba(255,255,255,.08);
+  --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.018);
+  --vio:#b07cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#0a0e14}
+body{
+  background:radial-gradient(1200px 700px at 75% -10%, #16202e 0%, var(--bg) 55%);
+  background-attachment:fixed; color:var(--ink);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden; padding-bottom:80px;
+}
+.wrap{max-width:min(1180px,94vw);margin:0 auto;padding:0 22px}
+.tnum{font-variant-numeric:tabular-nums}
+
+header.top{padding:34px 0 8px}
+.eyebrow{color:var(--good);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+h1.title{font-size:30px;font-weight:740;letter-spacing:-.02em;margin:10px 0 6px;
+  background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:14px;max-width:720px}
+
+/* stat band shared across concepts */
+.tr-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 8px}
+.tr-stat{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);
+  border-radius:18px;padding:16px 18px;position:relative;overflow:hidden}
+.tr-stat .tr-k{color:var(--muted);font-size:11.5px;font-weight:600;letter-spacing:.04em}
+.tr-stat .tr-v{font-size:27px;font-weight:760;letter-spacing:-.02em;margin-top:5px;font-variant-numeric:tabular-nums}
+.tr-stat .tr-v.pos{color:var(--good2)} .tr-stat .tr-v.neg{color:var(--bad)}
+.tr-stat .glow{position:absolute;right:-26px;top:-26px;width:110px;height:110px;border-radius:50%;
+  background:radial-gradient(circle at 40% 40%,rgba(63,214,138,.32),transparent 70%);pointer-events:none}
+
+section.concept{margin-top:30px;background:linear-gradient(170deg,var(--card),var(--card2));
+  border:1px solid var(--line);border-radius:24px;padding:22px 24px 26px;
+  box-shadow:0 30px 70px -36px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.02)}
+.chead{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.cbadge{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--bg);
+  background:linear-gradient(180deg,var(--good2),var(--good));padding:4px 10px;border-radius:999px}
+.ctitle{font-size:19px;font-weight:720;letter-spacing:-.01em}
+.cwhy{color:var(--muted);font-size:13px;margin-top:2px;max-width:780px}
+.chartbox{margin-top:16px;position:relative}
+.tr-legend{display:flex;gap:16px;flex-wrap:wrap;margin:8px 2px 2px}
+.tr-leg{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px}
+.tr-dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+svg{display:block;width:100%;height:auto;overflow:visible}
+canvas{display:block;width:100%;border-radius:14px}
+.cap{color:var(--faint);font-size:11.5px;margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Trends · concept gallery</div>
+    <h1 class="title">Four ways to make the fleet's production sing</h1>
+    <p class="sub">Same real data contract (<code>monthly_by_year</code>, <code>seasonal_yoy</code>, fleet totals) — four "go-crazy" presentations, all on the Array Operator brand. Live mock fleet: 7 arrays, 3 years of seasonal solar production.</p>
+  </header>
+
+  <div class="tr-stats" id="statband"></div>
+
+  <section class="concept">
+    <div class="chead"><div><span class="cbadge">A</span> <span class="ctitle">Liquid Energy</span></div></div>
+    <div class="cwhy">A living, flowing gradient fill for the current year — energy as fluid. Prior years are ghost ridgelines behind it. The surface gently undulates like sun on water; the leading edge has a bright meniscus glow.</div>
+    <div class="chartbox"><div class="tr-legend" id="legA"></div><canvas id="cvA" width="1860" height="660"></canvas></div>
+  </section>
+
+  <section class="concept">
+    <div class="chead"><div><span class="cbadge">B</span> <span class="ctitle">Solar Spiral</span></div></div>
+    <div class="cwhy">The climate-spiral lineage. Twelve months wrap a clock; each year is a glowing ring whose radius is that month's fleet kWh. Seasonality becomes a shape you can read in one glance — the summer bulge — and growth pushes each year's ring outward.</div>
+    <div class="chartbox"><canvas id="cvB" width="1860" height="760"></canvas></div>
+  </section>
+
+  <section class="concept">
+    <div class="chead"><div><span class="cbadge">C</span> <span class="ctitle">Energy Ridgeline</span></div></div>
+    <div class="cwhy">A joyplot. One luminous ridge per year, stacked back-to-front — summer peaks become a mountain range. Year-over-year growth reads as each ridge rising a little higher than the one behind it. Scales gracefully to a decade of history.</div>
+    <div class="chartbox"><canvas id="cvC" width="1860" height="660"></canvas></div>
+  </section>
+
+  <section class="concept">
+    <div class="chead"><div><span class="cbadge">D</span> <span class="ctitle">Production Heat-Field</span></div></div>
+    <div class="cwhy">The higher-dimensional read: a month × year grid where every cell glows with its production. Patterns jump out instantly — bright summer bands, the diagonal of fleet growth, any dark month an array went down. Hover-ready, dense, and calm.</div>
+    <div class="chartbox"><canvas id="cvD" width="1860" height="560"></canvas></div>
+  </section>
+
+  <p class="cap">Concept gallery · Array Operator · rendered against mock fleet data · all four share the live <code>/v1/array-owners/fleet-trends</code> contract</p>
+</div>
+
+<script>
+/* ===== mock fleet data shaped exactly like /v1/array-owners/fleet-trends ===== */
+// Seasonal solar curve (relative), peak in summer.
+const SEASON = [0.34,0.46,0.66,0.84,0.97,1.0,0.99,0.92,0.74,0.55,0.36,0.29];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function yearSeries(baseKwh, n){ // n months present
+  const out=[];
+  for(let m=1;m<=n;m++){
+    const jitter = 0.94 + 0.12*Math.sin(m*1.7+baseKwh);
+    out.push({month:m, kwh: Math.round(baseKwh*SEASON[m-1]*jitter)});
+  }
+  return out;
+}
+const DATA = {
+  years:[2024,2025,2026],
+  monthly_by_year:{
+    "2024": yearSeries(8200,12),
+    "2025": yearSeries(9450,12),
+    "2026": yearSeries(10600,7),   // partial current year (Jan–Jul)
+  },
+  ttm_kwh: 118400, lifetime_kwh: 327500, ttm_savings_usd: 21880,
+};
+DATA.latestYoY = 12.2;
+
+const COL = getComputedStyle(document.documentElement);
+const C = {
+  good: COL.getPropertyValue('--good').trim()||'#3fd68a',
+  good2: COL.getPropertyValue('--good2').trim()||'#7ff0bb',
+  gold: COL.getPropertyValue('--gold').trim()||'#f5b942',
+  gold2: COL.getPropertyValue('--gold2').trim()||'#ffd479',
+  sky: COL.getPropertyValue('--sky').trim()||'#5ec2ff',
+  vio: COL.getPropertyValue('--vio').trim()||'#b07cf0',
+  ink: COL.getPropertyValue('--ink').trim()||'#eaf0f7',
+  muted: COL.getPropertyValue('--muted').trim()||'#8b97a8',
+  faint: COL.getPropertyValue('--faint').trim()||'#6b7686',
+  line: 'rgba(255,255,255,.08)',
+};
+// year -> hue (newest = bold green)
+const YEARCOL = {2026:C.good, 2025:C.gold, 2024:C.sky, 2023:C.vio};
+const fmt0 = n => Math.round(n).toLocaleString();
+const kC = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':Math.round(n);
+
+/* stat band */
+(function(){
+  const el=document.getElementById('statband');
+  const cards=[
+    ['TRAILING 12 MO', fmt0(DATA.ttm_kwh)+' kWh',''],
+    ['LIFETIME (FLEET)', fmt0(DATA.lifetime_kwh)+' kWh',''],
+    ['LATEST YOY', (DATA.latestYoY>=0?'+':'')+DATA.latestYoY.toFixed(1)+'%', DATA.latestYoY>=0?'pos':'neg'],
+    ['EST. SAVINGS (12 MO)', '$'+fmt0(DATA.ttm_savings_usd),''],
+  ];
+  el.innerHTML = cards.map(c=>`<div class="tr-stat"><span class="glow"></span>
+    <div class="tr-k">${c[0]}</div><div class="tr-v ${c[2]}">${c[1]}</div></div>`).join('');
+})();
+
+function hexA(hex,a){ // hex -> rgba
+  const h=hex.replace('#',''); const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function setupHiDPI(cv){
+  const dpr=Math.max(1,Math.min(2.2,window.devicePixelRatio||1));
+  const w=cv.width, h=cv.height; // logical (set in attribute)
+  cv.style.aspectRatio = w+' / '+h;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+  return {ctx,w,h};
+}
+
+/* ===================== A · LIQUID ENERGY ===================== */
+(function(){
+  const cv=document.getElementById('cvA'); const {ctx,w,h}=setupHiDPI(cv);
+  const PAD={l:54,r:24,t:30,b:40};
+  const plotW=w-PAD.l-PAD.r, plotH=h-PAD.t-PAD.b;
+  const years=DATA.years;
+  let peak=0; years.forEach(y=>DATA.monthly_by_year[y].forEach(p=>peak=Math.max(peak,p.kwh)));
+  const top=peak*1.12;
+  const X=m=>PAD.l+plotW*(m-1)/11;
+  const Y=v=>PAD.t+plotH*(1-v/top);
+  // legend
+  document.getElementById('legA').innerHTML = [...years].sort((a,b)=>b-a).map(y=>
+    `<span class="tr-leg"><span class="tr-dot" style="background:${YEARCOL[y]}"></span>${y}${y===2026?' · live':''}</span>`).join('');
+
+  const cur=DATA.monthly_by_year[2026];
+  function smoothPath(pts){ // catmull-rom -> bezier on canvas
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+      const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
+      const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
+      ctx.bezierCurveTo(c1x,c1y,c2x,c2y,p2[0],p2[1]);
+    }
+  }
+  function frame(t){
+    ctx.clearRect(0,0,w,h);
+    // grid
+    ctx.lineWidth=1; ctx.font='11px system-ui';
+    for(let i=0;i<=4;i++){
+      const val=top*i/4, gy=Y(val);
+      ctx.strokeStyle=C.line; ctx.beginPath(); ctx.moveTo(PAD.l,gy); ctx.lineTo(w-PAD.r,gy); ctx.stroke();
+      ctx.fillStyle=C.faint; ctx.textAlign='right'; ctx.fillText(kC(val),PAD.l-8,gy+4);
+    }
+    ctx.textAlign='center';
+    for(let m=1;m<=12;m++){ ctx.fillStyle=C.faint; ctx.fillText(MONTHS[m-1][0],X(m),h-16); }
+
+    // ghost prior years
+    [2024,2025].forEach(y=>{
+      const pts=DATA.monthly_by_year[y].map(p=>[X(p.month),Y(p.kwh)]);
+      ctx.beginPath(); smoothPath(pts);
+      ctx.strokeStyle=hexA(YEARCOL[y],.55); ctx.lineWidth=2; ctx.stroke();
+    });
+
+    // liquid current-year body with animated wave displacement
+    const baseY=Y(0);
+    const surf=cur.map(p=>{
+      const x=X(p.month);
+      const wave=Math.sin(x*0.018 + t*0.0016)*4 + Math.sin(x*0.05 - t*0.0026)*2.2;
+      return [x, Y(p.kwh)+wave];
+    });
+    ctx.beginPath(); smoothPath(surf);
+    ctx.lineTo(surf[surf.length-1][0],baseY); ctx.lineTo(surf[0][0],baseY); ctx.closePath();
+    const g=ctx.createLinearGradient(0,PAD.t,0,baseY);
+    g.addColorStop(0,hexA(C.good2,.55)); g.addColorStop(.5,hexA(C.good,.32)); g.addColorStop(1,hexA(C.good,.04));
+    ctx.fillStyle=g; ctx.fill();
+    // second translucent wave layer for depth
+    const surf2=cur.map(p=>{const x=X(p.month);const wave=Math.sin(x*0.02 - t*0.0021)*5+6;return [x,Y(p.kwh)+wave];});
+    ctx.beginPath(); smoothPath(surf2);
+    ctx.lineTo(surf2[surf2.length-1][0],baseY); ctx.lineTo(surf2[0][0],baseY); ctx.closePath();
+    ctx.fillStyle=hexA(C.good,.10); ctx.fill();
+    // bright surface line + glow
+    ctx.save(); ctx.shadowColor=hexA(C.good,.8); ctx.shadowBlur=16;
+    ctx.beginPath(); smoothPath(surf); ctx.strokeStyle=C.good2; ctx.lineWidth=2.6; ctx.stroke();
+    ctx.restore();
+    // leading meniscus orb at last point
+    const last=surf[surf.length-1];
+    const pulse=1+0.18*Math.sin(t*0.005);
+    const rg=ctx.createRadialGradient(last[0],last[1],0,last[0],last[1],16*pulse);
+    rg.addColorStop(0,hexA(C.good2,.95)); rg.addColorStop(1,hexA(C.good,0));
+    ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(last[0],last[1],16*pulse,0,7); ctx.fill();
+    ctx.fillStyle=C.good2; ctx.beginPath(); ctx.arc(last[0],last[1],3.4,0,7); ctx.fill();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ===================== B · SOLAR SPIRAL ===================== */
+(function(){
+  const cv=document.getElementById('cvB'); const {ctx,w,h}=setupHiDPI(cv);
+  const cx=w/2, cy=h/2+6;
+  const years=DATA.years;
+  let peak=0; years.forEach(y=>DATA.monthly_by_year[y].forEach(p=>peak=Math.max(peak,p.kwh)));
+  const Rmin=70, Rmax=Math.min(w,h)/2-70;
+  const Rk=v=>Rmin+(Rmax-Rmin)*(v/(peak*1.05));
+  const ang=m=>(-Math.PI/2)+(m-1)/12*Math.PI*2;  // month 1 at top, clockwise
+
+  function frame(t){
+    ctx.clearRect(0,0,w,h);
+    // month spokes + labels + radial grid rings
+    ctx.lineWidth=1;
+    for(let i=1;i<=4;i++){ const r=Rmin+(Rmax-Rmin)*i/4;
+      ctx.strokeStyle=hexA('#ffffff',.05); ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke(); }
+    ctx.font='12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(let m=1;m<=12;m++){
+      const a=ang(m);
+      ctx.strokeStyle=hexA('#ffffff',.05);
+      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*Rmin,cy+Math.sin(a)*Rmin);
+      ctx.lineTo(cx+Math.cos(a)*(Rmax+6),cy+Math.sin(a)*(Rmax+6)); ctx.stroke();
+      const lr=Rmax+24; ctx.fillStyle=C.faint;
+      ctx.fillText(MONTHS[m-1].toUpperCase(),cx+Math.cos(a)*lr,cy+Math.sin(a)*lr);
+    }
+    // central sun
+    const pulse=1+0.08*Math.sin(t*0.004);
+    const sg=ctx.createRadialGradient(cx,cy,0,cx,cy,Rmin*pulse);
+    sg.addColorStop(0,hexA(C.gold2,.9)); sg.addColorStop(.6,hexA(C.gold,.25)); sg.addColorStop(1,hexA(C.gold,0));
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,Rmin*pulse,0,7); ctx.fill();
+
+    // each year a glowing ring (closed for full years, open arc for partial)
+    const drawAmt=Math.min(1,t/1400); // grow-in animation
+    years.forEach(y=>{
+      const pts=DATA.monthly_by_year[y];
+      const full=pts.length===12;
+      const col=YEARCOL[y]; const isLatest=y===2026;
+      const coords=pts.map(p=>{const a=ang(p.month);const r=Rk(p.kwh)*(0.4+0.6*drawAmt);
+        return [cx+Math.cos(a)*r, cy+Math.sin(a)*r];});
+      ctx.beginPath();
+      ctx.moveTo(coords[0][0],coords[0][1]);
+      const loop = full? [...coords, coords[0]] : coords;
+      // smooth closed-ish
+      for(let i=0;i<loop.length;i++){ const p=loop[i]; if(i===0)ctx.moveTo(p[0],p[1]); else ctx.lineTo(p[0],p[1]); }
+      ctx.save(); ctx.shadowColor=hexA(col,isLatest?.85:.4); ctx.shadowBlur=isLatest?16:8;
+      ctx.strokeStyle=col; ctx.lineWidth=isLatest?3:1.8; ctx.globalAlpha=isLatest?1:.78;
+      ctx.stroke(); ctx.restore(); ctx.globalAlpha=1;
+      // node dots
+      coords.forEach((p,i)=>{ ctx.fillStyle=col; ctx.globalAlpha=isLatest?1:.7;
+        ctx.beginPath(); ctx.arc(p[0],p[1],isLatest?3:1.8,0,7); ctx.fill(); });
+      ctx.globalAlpha=1;
+    });
+    // legend (top-left)
+    ctx.textAlign='left'; ctx.font='13px system-ui';
+    [...years].sort((a,b)=>b-a).forEach((y,i)=>{ const yy=30+i*22;
+      ctx.fillStyle=YEARCOL[y]; ctx.beginPath(); ctx.arc(24,yy-4,6,0,7); ctx.fill();
+      ctx.fillStyle=C.muted; ctx.fillText(y+(y===2026?'  · live':''),38,yy); });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ===================== C · ENERGY RIDGELINE ===================== */
+(function(){
+  const cv=document.getElementById('cvC'); const {ctx,w,h}=setupHiDPI(cv);
+  const PAD={l:64,r:30,t:36,b:40};
+  const plotW=w-PAD.l-PAD.r;
+  const years=[...DATA.years].sort((a,b)=>a-b); // oldest back
+  let peak=0; years.forEach(y=>DATA.monthly_by_year[y].forEach(p=>peak=Math.max(peak,p.kwh)));
+  const rowGap=(h-PAD.t-PAD.b)/years.length;
+  const ridgeH=rowGap*2.0; // overlap
+  const X=m=>PAD.l+plotW*(m-1)/11;
+  function smooth(pts){ ctx.moveTo(pts[0][0],pts[0][1]);
+    for(let i=0;i<pts.length-1;i++){const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+      ctx.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1]);}}
+  function frame(t){
+    ctx.clearRect(0,0,w,h);
+    const grow=Math.min(1,t/1300);
+    years.forEach((y,idx)=>{
+      const baseY=PAD.t+rowGap*(idx+0.7);
+      const col=YEARCOL[y]; const isLatest=y===2026;
+      const pts=DATA.monthly_by_year[y].map(p=>[X(p.month), baseY - (p.kwh/peak)*ridgeH*grow]);
+      // fill
+      ctx.beginPath(); smooth(pts);
+      ctx.lineTo(pts[pts.length-1][0],baseY); ctx.lineTo(pts[0][0],baseY); ctx.closePath();
+      const g=ctx.createLinearGradient(0,baseY-ridgeH,0,baseY);
+      g.addColorStop(0,hexA(col,.42)); g.addColorStop(1,hexA(col,.02));
+      ctx.fillStyle=g; ctx.fill();
+      // ridge line + glow
+      ctx.save(); ctx.shadowColor=hexA(col,isLatest?.8:.45); ctx.shadowBlur=isLatest?14:8;
+      ctx.beginPath(); smooth(pts); ctx.strokeStyle=isLatest?C.good2:col; ctx.lineWidth=isLatest?2.6:1.8; ctx.stroke();
+      ctx.restore();
+      // year label
+      ctx.fillStyle=isLatest?C.good2:C.muted; ctx.font=(isLatest?'700 ':'')+'14px system-ui'; ctx.textAlign='right';
+      ctx.fillText(y, PAD.l-12, baseY-2);
+    });
+    // month axis
+    ctx.font='11px system-ui'; ctx.textAlign='center'; ctx.fillStyle=C.faint;
+    for(let m=1;m<=12;m++) ctx.fillText(MONTHS[m-1][0], X(m), h-16);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ===================== D · PRODUCTION HEAT-FIELD ===================== */
+(function(){
+  const cv=document.getElementById('cvD'); const {ctx,w,h}=setupHiDPI(cv);
+  const years=[...DATA.years].sort((a,b)=>b-a); // newest top
+  const PAD={l:64,r:24,t:48,b:30};
+  const gridW=w-PAD.l-PAD.r, gridH=h-PAD.t-PAD.b;
+  const cw=gridW/12, ch=gridH/years.length;
+  let peak=0; years.forEach(y=>DATA.monthly_by_year[y].forEach(p=>peak=Math.max(peak,p.kwh)));
+  // green->gold heat ramp
+  function heat(f){ // 0..1
+    // blend deep green -> green -> gold -> bright
+    const stops=[[10,30,24],[63,214,138],[245,185,66],[255,212,121]];
+    const seg=f*(stops.length-1); const i=Math.min(stops.length-2,Math.floor(seg)); const tt=seg-i;
+    const a=stops[i],b=stops[i+1];
+    return `rgb(${a[0]+(b[0]-a[0])*tt|0},${a[1]+(b[1]-a[1])*tt|0},${a[2]+(b[2]-a[2])*tt|0})`;
+  }
+  function frame(t){
+    ctx.clearRect(0,0,w,h);
+    // month headers
+    ctx.font='11px system-ui'; ctx.textAlign='center'; ctx.fillStyle=C.faint; ctx.textBaseline='middle';
+    for(let m=1;m<=12;m++) ctx.fillText(MONTHS[m-1].toUpperCase(), PAD.l+cw*(m-0.5), PAD.t-18);
+    const appear=Math.min(1,t/1200);
+    years.forEach((y,ri)=>{
+      ctx.fillStyle=y===2026?C.good2:C.muted; ctx.font=(y===2026?'700 ':'')+'13px system-ui'; ctx.textAlign='right';
+      ctx.fillText(y, PAD.l-12, PAD.t+ch*(ri+0.5));
+      const series={}; DATA.monthly_by_year[y].forEach(p=>series[p.month]=p.kwh);
+      for(let m=1;m<=12;m++){
+        const x=PAD.l+cw*(m-1)+3, yy=PAD.t+ch*ri+3, cwi=cw-6, chi=ch-6;
+        const has=series[m]!=null;
+        if(!has){ ctx.fillStyle=hexA('#ffffff',.025); roundRect(ctx,x,yy,cwi,chi,9); ctx.fill(); continue; }
+        const f=series[m]/peak;
+        const shimmer=0.92+0.08*Math.sin(t*0.003 + m*0.6 + ri);
+        ctx.save();
+        ctx.shadowColor=hexA(heat(f),0.55*f); ctx.shadowBlur=18*f*shimmer;
+        ctx.fillStyle=heat(f); ctx.globalAlpha=(0.30+0.70*f)*appear;
+        roundRect(ctx,x,yy,cwi,chi,9); ctx.fill();
+        ctx.restore();
+        // value text on brighter cells
+        if(f>0.34){ ctx.globalAlpha=appear; ctx.fillStyle=f>0.62?'#0a0e14':C.ink;
+          ctx.font='600 12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText(kC(series[m]), x+cwi/2, yy+chi/2); ctx.globalAlpha=1; }
+      }
+    });
+    requestAnimationFrame(frame);
+  }
+  function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
