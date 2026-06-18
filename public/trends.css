@@ -65,3 +65,22 @@
   .tr-seg{padding:8px 10px;font-size:12px}
   .tr-seg .tr-seg-lbl{display:none}
 }
+
+/* ── Liquid Energy (view A) — tooltip refinements ────────────────────────── */
+.trv-liquid-tip{line-height:1.4}
+.trv-liquid-tip b{color:var(--good2);font-size:13px}
+.trv-liquid-tip .trv-liquid-sub{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+/* Solar Spiral (view B) — multi-row tooltip showing every present year at a month */
+.trv-spiral-tip{padding:7px 11px;line-height:1.2}
+.trv-spiral-tip-h{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:4px}
+.trv-spiral-tip-row{display:flex;align-items:center;gap:7px;font-variant-numeric:tabular-nums;
+  padding:1px 0}
+.trv-spiral-tip-row i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;display:inline-block}
+.trv-spiral-tip-row span{color:var(--muted);min-width:30px}
+.trv-spiral-tip-row b{color:var(--ink);font-weight:700;margin-left:auto}
+.trv-spiral-tip-row em{color:var(--faint);font-style:normal;font-size:10.5px}
+/* ── Energy Ridgeline (view C) ─────────────────────────────────────────── */
+.trv-ridgeline-ty{font-weight:700;font-variant-numeric:tabular-nums}
+/* ── Heat-Field (view D) ───────────────────────────────────────────── */
+.trv-heatfield-d{display:inline-block;margin-top:3px;font-size:11px;font-weight:600;letter-spacing:.01em}
