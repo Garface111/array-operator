@@ -391,6 +391,9 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-q-charts{ margin-top:16px; }
 .rb-q-charts h4{ font-size:15px; margin:0 0 10px; }
 .rb-q-chart{ margin-bottom:18px; }
+.rb-q-chart-wide .rb-q-chart-cap{ color:var(--good); font-weight:600; }
+.rb-q-chart-wide{ background:rgba(63,214,138,.04); border:1px solid rgba(63,214,138,.16);
+  border-radius:14px; padding:14px 14px 8px; }
 .rb-q-chart-cap{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin-bottom:6px; }
 .rb-q-canvas{ width:100%; min-height:180px; }
 .rb-q-actions{ display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }

@@ -545,26 +545,49 @@
       </div>
       <div class="rep-card rb-q-charts">
         <h4>Production report</h4>
+        <div class="rb-q-chart rb-q-chart-wide"><div class="rb-q-chart-cap">Daily Generation</div><div id="rbqBars" class="rb-q-canvas"></div></div>
         <div class="rb-q-chart"><div class="rb-q-chart-cap">Solar Spiral</div><div id="rbqSpiral" class="rb-q-canvas"></div></div>
-        <div class="rb-q-chart"><div class="rb-q-chart-cap">Energy Ridgeline</div><div id="rbqRidge" class="rb-q-canvas"></div></div>
       </div>
       <div class="rb-q-actions">
         <button class="ao-btn ao-btn-primary rb-btn" id="rbqDraft" type="button">Draft this report for review →</button>
         <span class="rb-status" id="rbqStatus"></span>
       </div>`;
 
-    // 2) mount the Trends visuals, reusing window.AOTrends (same as Trends tab).
-    mountQTrends();
+    // 2) mount the visuals: the daily-generation bar graph (default/primary,
+    //    from real DailyGeneration) + the Solar Spiral (multi-year flourish).
+    mountQTrends(subId);
 
     // 3) "Draft for review" reuses the existing per-subscription draft flow.
     const draftBtn = $("#rbqDraft");
     if (draftBtn) draftBtn.onclick = () => quarterlyDraft(subId);
   }
 
-  async function mountQTrends() {
+  async function mountQTrends(subId) {
+    const barsHost = $("#rbqBars"), spiralHost = $("#rbqSpiral");
+
+    // ── primary: DAILY GENERATION bar graph (real DailyGeneration, scaled to
+    //    this offtaker's share). This is the default chart owners want on a
+    //    monthly report. Never fabricated — honest empty when no daily rows.
+    if (barsHost && window.AOBars && subId) {
+      barsHost.style.position = "relative";
+      barsHost.innerHTML = `<div class="empty" style="padding:18px 0;color:var(--faint)">Loading daily generation…</div>`;
+      try {
+        const r = await fetch(API + "/subscriptions/" + subId + "/daily-series", { headers: authHeaders() });
+        const data = await r.json().catch(() => ({}));
+        barsHost.innerHTML = "";
+        const stop = window.AOBars.mount(barsHost, data || {});
+        if (stop) QTRENDS_STOPS.push(stop);
+        // caption the period if we have one
+        const cap = barsHost.parentElement && barsHost.parentElement.querySelector(".rb-q-chart-cap");
+        if (cap && data && data.period_label) cap.textContent = "Daily Generation · " + data.period_label;
+      } catch (e) {
+        barsHost.innerHTML = `<div class="empty" style="padding:18px 0;color:var(--faint)">Couldn't load daily generation.</div>`;
+      }
+    }
+
+    // ── secondary: Solar Spiral (multi-year fleet flourish, from /fleet-trends)
     const C = window.AOTrends;
-    const spiralHost = $("#rbqSpiral"), ridgeHost = $("#rbqRidge");
-    if (!C || !spiralHost || !ridgeHost) return;
+    if (!C || !spiralHost) return;
     try {
       if (!QTRENDS_DATA) {
         const r = await fetch("/v1/array-owners/fleet-trends", { headers: authHeaders() });
@@ -573,19 +596,17 @@
       }
       const prepped = C.prep(QTRENDS_DATA);
       if (!prepped.years || !prepped.years.length) {
-        spiralHost.innerHTML = ridgeHost.innerHTML =
-          `<div class="empty" style="padding:20px 0;color:var(--faint)">No production history to chart yet.</div>`;
+        spiralHost.innerHTML =
+          `<div class="empty" style="padding:20px 0;color:var(--faint)">No multi-year history to chart yet.</div>`;
         return;
       }
-      [["spiral", spiralHost], ["ridgeline", ridgeHost]].forEach(([key, host]) => {
-        const view = C.getView(key);
-        host.style.position = "relative";
-        if (!view) { host.innerHTML = `<div class="empty">${key} view unavailable.</div>`; return; }
-        try { const stop = view.mount(host, prepped, C); if (stop) QTRENDS_STOPS.push(stop); }
-        catch (e) { host.innerHTML = `<div class="empty">Chart error.</div>`; }
-      });
+      const view = C.getView("spiral");
+      spiralHost.style.position = "relative";
+      if (!view) { spiralHost.innerHTML = `<div class="empty">spiral view unavailable.</div>`; return; }
+      try { const stop = view.mount(spiralHost, prepped, C); if (stop) QTRENDS_STOPS.push(stop); }
+      catch (e) { spiralHost.innerHTML = `<div class="empty">Chart error.</div>`; }
     } catch (e) {
-      spiralHost.innerHTML = ridgeHost.innerHTML =
+      spiralHost.innerHTML =
         `<div class="empty" style="padding:20px 0;color:var(--faint)">Couldn't load production charts.</div>`;
     }
   }
