@@ -49,7 +49,7 @@
     el.innerHTML = shell();
     wireUpload();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
-    await refreshList();
+    await Promise.all([refreshInbox(), refreshList()]);
   }
   window.__aoLoadReports = load;
 
@@ -62,13 +62,14 @@
 
   function shell() {
     return `
+      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-layout">
         <div class="rb-col-form">
           <div class="rb-upload rep-card" id="rbUpload">
             <span class="rep-eyebrow">Step 1 · Match a spreadsheet</span>
             <h3>Drop a billing spreadsheet</h3>
-            <p>Any of your billing workbooks — we recognize the customer, rate, and
-               the latest billing period automatically, whatever the sheet is named.</p>
+            <p>Any of your billing workbooks — we recognize the customer, their
+               percentage of the array, and the latest billing period automatically.</p>
             <label class="rb-drop" id="rbDrop">
               <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
               <span class="rb-drop-ico">⬆</span>
@@ -82,8 +83,8 @@
         <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
       <div class="rb-listwrap">
-        <div class="cc-treedivider"><h3>Scheduled reports</h3>
-          <span>each customer's automatic invoice + summary, on its cadence</span></div>
+        <div class="cc-treedivider"><h3>Your customers</h3>
+          <span>each customer's percentage of the array · invoice + summary on its cadence</span></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>`;
   }
@@ -421,6 +422,7 @@
             <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
             <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
           </div>
+          <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
           <button class="ao-btn rb-btn" data-act="test">Send test</button>
           <a class="ao-btn rb-btn" data-act="preview" href="#">Preview</a>
           <button class="ao-btn rb-btn" data-act="toggle">${s.enabled ? "Pause" : "Resume"}</button>
@@ -461,6 +463,22 @@
       st.className = "rb-status rb-busy"; st.textContent = "Deleting…";
       await fetch(API + "/subscriptions/" + id, { method: "DELETE", headers: authHeaders() });
       await refreshList();
+      return;
+    }
+    if (act === "draft") {
+      st.className = "rb-status rb-busy"; st.textContent = "Drafting invoice for review…";
+      try {
+        const r = await fetch(API + "/subscriptions/" + id + "/draft", { method: "POST", headers: authHeaders() });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.ok) {
+          st.className = "rb-status rb-ok"; st.textContent = "Draft added to your approval inbox ↑";
+          await refreshInbox();
+          const wrap = $("#rbInboxWrap");
+          if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft.";
+        }
+      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
       return;
     }
     if (act === "preview") {
@@ -510,6 +528,130 @@
       }
       return r.ok;
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } return false; }
+  }
+
+  // ---- approval inbox (Paul's draft → review → approve & send) ---------------
+  async function refreshInbox() {
+    const wrap = $("#rbInboxWrap");
+    if (!wrap) return;
+    try {
+      const r = await fetch(API + "/drafts?status=pending", { headers: authHeaders() });
+      if (!r.ok) { wrap.innerHTML = ""; return; }
+      const drafts = (await r.json().catch(() => ({}))).drafts || [];
+      if (!drafts.length) { wrap.innerHTML = ""; return; }   // hide the section when empty
+      wrap.innerHTML = `
+        <div class="rb-inbox rep-card">
+          <div class="rb-inbox-h">
+            <span class="rep-eyebrow">Awaiting your approval</span>
+            <h3>${drafts.length} report${drafts.length === 1 ? "" : "s"} ready to review &amp; send</h3>
+            <p>Drafted from the latest billing period. Review the numbers, attach the
+               GMP invoice, then approve — nothing goes to a customer until you do.</p>
+          </div>
+          ${drafts.map(draftCard).join("")}
+        </div>`;
+      wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
+      wrap.querySelectorAll("input[type=file][data-gmp]").forEach(inp =>
+        inp.addEventListener("change", () => { if (inp.files[0]) attachGmp(inp.getAttribute("data-gmp"), inp.files[0]); }));
+    } catch (e) { wrap.innerHTML = ""; }
+  }
+
+  function draftCard(d) {
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const gmp = d.has_gmp_pdf
+      ? `<span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span>`
+      : `<label class="rb-gmp-attach">＋ Attach GMP invoice (PDF)
+           <input type="file" accept="application/pdf,.pdf" data-gmp="${d.id}" hidden></label>`;
+    return `
+      <div class="rb-draft" data-did="${d.id}">
+        <div class="rb-draft-top">
+          <div class="rb-draft-name">${esc(d.customer_name)}</div>
+          <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
+        </div>
+        <div class="rb-draft-grid">
+          <div><span class="rb-k">Array total</span><span class="rb-v">${fmt0(d.array_total_kwh)} kWh</span></div>
+          <div><span class="rb-k">This customer</span><span class="rb-v">${pct != null ? pct + "%" : "—"}</span></div>
+          <div><span class="rb-k">Their production</span><span class="rb-v">${fmt0(d.customer_kwh)} kWh</span></div>
+          <div><span class="rb-k">Amount</span><span class="rb-v rb-amt">${money(d.amount_usd)}</span></div>
+        </div>
+        <div class="rb-draft-gmp">${gmp}</div>
+        <div class="rb-draft-acts">
+          <button class="ao-btn ao-btn-primary rb-btn" data-dact="approve">Approve &amp; send</button>
+          <a class="ao-btn rb-btn" data-dact="preview" href="#">Preview invoice</a>
+          <button class="ao-btn rb-btn rb-danger" data-dact="dismiss">Dismiss</button>
+          <span class="rb-status rb-draft-status"></span>
+        </div>
+        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this customer's
+           delivery setting below, with the customer invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.</p>
+      </div>`;
+  }
+
+  async function attachGmp(draftId, file) {
+    const card = document.querySelector(`.rb-draft[data-did="${draftId}"]`);
+    const st = card && $(".rb-draft-status", card);
+    if (st) { st.className = "rb-status rb-busy"; st.textContent = "Attaching GMP invoice…"; }
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(API + "/drafts/" + draftId + "/gmp-invoice", { method: "POST", headers: authHeaders(), body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.ok) { await refreshInbox(); }
+      else if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Attach failed."; }
+    } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
+  }
+
+  async function onDraftAction(e) {
+    e.preventDefault();
+    const btn = e.currentTarget;
+    const act = btn.getAttribute("data-dact");
+    const card = btn.closest(".rb-draft");
+    const id = card && card.getAttribute("data-did");
+    if (!id) return;
+    const st = $(".rb-draft-status", card);
+
+    if (act === "preview") {
+      // Drafts share the subscription's preview; resolve the sub id via the draft.
+      return downloadDraftPreview(id, st);
+    }
+    if (act === "dismiss") {
+      if (!confirm("Dismiss this drafted report without sending?")) return;
+      st.className = "rb-status rb-busy"; st.textContent = "Dismissing…";
+      await fetch(API + "/drafts/" + id + "/dismiss", { method: "POST", headers: authHeaders() });
+      await refreshInbox();
+      return;
+    }
+    if (act === "approve") {
+      if (!confirm("Approve and send this report to the customer now?")) return;
+      st.className = "rb-status rb-busy"; st.textContent = "Sending…";
+      try {
+        const r = await fetch(API + "/drafts/" + id + "/approve", { method: "POST", headers: authHeaders() });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.ok) {
+          const to = (data.result && data.result.to || []).join(", ");
+          st.className = "rb-status rb-ok"; st.textContent = "Sent" + (to ? " to " + to : "") + ".";
+          setTimeout(refreshInbox, 900);
+        } else {
+          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Send failed.";
+        }
+      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+    }
+  }
+
+  async function downloadDraftPreview(draftId, st) {
+    // The draft's subscription preview is the same invoice; fetch via the sub.
+    st.className = "rb-status rb-busy"; st.textContent = "Building preview…";
+    try {
+      // get the draft to resolve its subscription_id
+      const dl = await fetch(API + "/drafts?status=all", { headers: authHeaders() });
+      const all = (await dl.json().catch(() => ({}))).drafts || [];
+      const d = all.find(x => String(x.id) === String(draftId));
+      if (!d) { st.className = "rb-status rb-err"; st.textContent = "Preview unavailable."; return; }
+      const r = await fetch(API + "/subscriptions/" + d.subscription_id + "/preview?kind=invoice&fmt=pdf", { headers: authHeaders() });
+      if (!r.ok) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; return; }
+      const url = URL.createObjectURL(await r.blob());
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      st.textContent = "";
+    } catch (e) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; }
   }
 
   // If the Reports tab is the active hash on first load, render immediately.

@@ -360,3 +360,35 @@ body.sb-fs-lock{ overflow:hidden; }
   .tr-sgrid{ grid-template-columns:repeat(3,1fr); }
 }
 
+/* ===================== APPROVAL INBOX (.rb-inbox / .rb-draft) =====================
+ * Paul's draft → review → approve & send. Drafted reports await the operator's
+ * approval; the GMP utility invoice can be attached before sending. */
+.rb-inbox-wrap{ margin-bottom:20px; }
+.rb-inbox{ border:1px solid var(--good,#3fd68a); box-shadow:0 0 0 1px rgba(63,214,138,.12), 0 8px 30px rgba(0,0,0,.18); }
+.rb-inbox-h{ margin-bottom:14px; }
+.rb-inbox-h h3{ margin:4px 0 2px; }
+.rb-inbox-h p{ font-size:13px; color:var(--faint); margin:0; max-width:62ch; line-height:1.55; }
+
+.rb-draft{ border:1px solid var(--line); border-radius:14px; padding:15px 17px; margin-top:12px; background:rgba(255,255,255,.018); }
+.rb-draft-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.rb-draft-name{ font-size:16px; font-weight:740; color:var(--ink); }
+.rb-draft-period{ font-size:12.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
+.rb-draft-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:13px 0; }
+.rb-draft-grid > div{ background:rgba(255,255,255,.02); border:1px solid var(--line); border-radius:10px; padding:9px 11px; display:flex; flex-direction:column; gap:3px; }
+.rb-draft-grid .rb-k{ font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); font-weight:650; }
+.rb-draft-grid .rb-v{ font-size:16px; font-weight:740; color:var(--ink); font-variant-numeric:tabular-nums; }
+.rb-draft-grid .rb-amt{ color:var(--good2,#3fd68a); }
+
+.rb-draft-gmp{ margin:6px 0 12px; }
+.rb-gmp-ok{ font-size:12.5px; color:var(--good2,#3fd68a); font-weight:600; }
+.rb-gmp-attach{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); cursor:pointer; border:1px dashed var(--line); border-radius:9px; padding:7px 12px; transition:border-color .15s, color .15s; }
+.rb-gmp-attach:hover{ border-color:var(--good,#3fd68a); color:var(--ink); }
+
+.rb-draft-acts{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rb-draft-note{ font-size:12px; color:var(--faint); margin:11px 0 0; line-height:1.5; }
+
+@media (max-width:640px){
+  .rb-draft-grid{ grid-template-columns:repeat(2,1fr); }
+}
+
+
