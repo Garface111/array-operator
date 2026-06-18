@@ -119,6 +119,7 @@
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
+    <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabClaims" href="#claims" role="tab">Claims</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
     <!-- Day/night toggle: flips to the NEPOOL-Operator light palette and persists. -->
@@ -171,6 +172,20 @@
 
   </section>
 
+  <!-- ============================ TAB: TRENDS ============================ -->
+  <!-- Portfolio-wide multi-year production trends (Paul Bozuwa's "macro-level
+       tab for multi-year trend lines"): total fleet kWh by year + seasonal
+       year-over-year across EVERY array, with a per-array drill-down below.
+       Rendered by trends.js (window.__aoLoadTrends) into #trendsRoot from
+       GET /v1/array-owners/fleet-trends. -->
+  <section class="panel" id="panelTrends" role="tabpanel" aria-label="Trends">
+    <div class="section-h" style="margin-top:18px">
+      <h2>Trends</h2>
+      <span class="hint">multi-year production across your whole fleet — seasonality and year-over-year at a glance</span>
+    </div>
+    <div id="trendsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div></div>
+  </section>
+
   <!-- ============================ TAB: CLAIMS ============================ -->
   <!-- Automatic warranty claims. The agent opens a claim the moment an inverter
        dies or faults, drafts the manufacturer email with peer-measured evidence,
@@ -199,6 +214,7 @@
 <script src="command-center.js"></script>
 <script src="claims.js"></script>
 <script src="reports.js"></script>
+<script src="trends.js"></script>
 <script>
   /* Day/night toggle wiring — persists choice in localStorage (ao_theme) and
      keeps the icon + the browser chrome color (meta theme-color) in sync. */

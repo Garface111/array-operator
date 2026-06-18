@@ -3515,12 +3515,14 @@
   const TABS = {
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
+    trends:  { panel: "panelTrends",  tab: "tabTrends"  },
     claims:  { panel: "panelClaims",  tab: "tabClaims"  },
     reports: { panel: "panelReports", tab: "tabReports" },
   };
   function tabFromHash(){
     const h = location.hash;
     if(h === "#account") return "account";
+    if(h === "#trends")  return "trends";
     if(h === "#claims")  return "claims";
     if(h === "#reports") return "reports";
     return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing
@@ -3543,6 +3545,8 @@
       if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
     } else if(active === "account"){
       loadAccount();
+    } else if(active === "trends"){
+      if(window.__aoLoadTrends) window.__aoLoadTrends();
     } else if(active === "claims"){
       load();                                       // ensure the fleet is loaded so claims can reconcile
       if(window.__claimsLoad) window.__claimsLoad();

@@ -310,3 +310,53 @@ body.sb-fs-lock{ overflow:hidden; }
   font-size:11.5px; color:#5a6b7b; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
 .rb-doc-badges{ display:flex; gap:6px; }
 .rb-doc-badge{ background:#e8f5ee; color:#0a7d4f; font-weight:700; font-size:10px; padding:3px 8px; border-radius:20px; }
+
+/* ============================ TRENDS TAB (.tr-*) ============================
+ * Portfolio-wide multi-year trends. Dark solarpunk tokens; mirrors the report
+ * card styling. Inline SVG chart, seasonal grid, per-array table. */
+.tr-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:8px 0 20px; }
+.tr-stat{ background:rgba(255,255,255,.018); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.tr-k{ font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--faint); font-weight:650; }
+.tr-v{ font-size:23px; font-weight:780; letter-spacing:-.02em; color:var(--ink); margin-top:5px; font-variant-numeric:tabular-nums; line-height:1.05; }
+.tr-v.pos{ color:var(--good2,#3fd68a); }
+.tr-v.neg{ color:var(--bad,#ff6b6b); }
+
+.tr-block{ background:rgba(255,255,255,.012); border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin-bottom:18px; }
+.tr-block-h{ font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.tr-block-sub{ font-size:12.5px; color:var(--faint); margin-top:3px; }
+
+.tr-legend{ display:flex; flex-wrap:wrap; gap:10px 16px; margin:12px 0 4px; }
+.tr-leg{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.tr-dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+
+.tr-svg{ width:100%; height:auto; display:block; margin-top:6px; }
+
+.tr-sgrid{ display:grid; grid-template-columns:repeat(6,1fr); gap:9px; margin-top:13px; }
+.tr-scard{ background:rgba(255,255,255,.02); border:1px solid var(--line); border-radius:11px; padding:9px 11px; }
+.tr-sm{ font-size:10px; letter-spacing:.05em; color:var(--faint); font-weight:650; }
+.tr-sv{ font-size:17px; font-weight:760; color:var(--ink); margin-top:2px; font-variant-numeric:tabular-nums; }
+.tr-delta{ display:inline-block; margin-top:4px; font-size:11px; font-weight:680; padding:2px 7px; border-radius:20px; font-variant-numeric:tabular-nums; }
+.tr-delta.up{ background:rgba(63,214,138,.13); color:var(--good2,#3fd68a); }
+.tr-delta.down{ background:rgba(255,107,107,.13); color:var(--bad,#ff6b6b); }
+.tr-delta.flat{ background:rgba(255,255,255,.05); color:var(--faint); }
+
+.tr-tablewrap{ border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:13px; }
+.tr-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.tr-table thead th{ text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); font-weight:650; padding:10px 14px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.02); }
+.tr-table td{ padding:10px 14px; color:var(--ink); border-bottom:1px solid rgba(255,255,255,.04); }
+.tr-table tbody tr:last-child td{ border-bottom:none; }
+.tr-aname{ font-weight:600; }
+.tr-anum{ text-align:right; font-variant-numeric:tabular-nums; }
+.tr-ayears{ color:var(--faint); font-variant-numeric:tabular-nums; }
+
+.tr-empty{ text-align:center; padding:54px 20px; color:var(--faint); }
+.tr-empty-ic{ font-size:30px; }
+.tr-empty-h{ font-size:16px; font-weight:720; color:var(--muted); margin-top:10px; }
+.tr-empty-p{ font-size:13px; line-height:1.6; max-width:46ch; margin:7px auto 0; }
+
+/* Mobile: stat row 2-up, seasonal 3-up. */
+@media (max-width:640px){
+  .tr-stats{ grid-template-columns:repeat(2,1fr); }
+  .tr-sgrid{ grid-template-columns:repeat(3,1fr); }
+}
+
