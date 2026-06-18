@@ -6,6 +6,12 @@
     --green-deep:#3fd68a;
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  /* Native form-control popups (dropdown <option> lists, date pickers, etc.)
+     must render dark to match the theme — without this, browsers paint the
+     option list white. color-scheme flips the native widget to dark; the
+     explicit option colors are a fallback for engines that honor them. */
+  select,option,optgroup,input,textarea{color-scheme:dark}
+  select option,select optgroup{background:#0e131c;color:#eaf0f7}
   html{scroll-behavior:smooth;background:#0a0e14}
   body{
     background:radial-gradient(1200px 700px at 75% -10%, #16202e 0%, var(--bg) 55%);

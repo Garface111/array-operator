@@ -110,6 +110,15 @@ html[data-theme="day"] .cl-fld textarea,
 html[data-theme="day"] .cl-grace input{
   background:#ffffff !important;color:var(--ink) !important;border-color:var(--line) !important;
 }
+/* Day mode: flip native popups back to light so option lists match the light
+   theme (overrides the global color-scheme:dark set in styles.css). */
+html[data-theme="day"] select,
+html[data-theme="day"] option,
+html[data-theme="day"] optgroup,
+html[data-theme="day"] input,
+html[data-theme="day"] textarea{ color-scheme:light; }
+html[data-theme="day"] select option,
+html[data-theme="day"] select optgroup{ background:#ffffff; color:var(--ink); }
 
 /* ── ghost / secondary buttons → white with warm border ───────────────────── */
 html[data-theme="day"] .acct-btn,
