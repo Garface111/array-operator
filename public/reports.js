@@ -1022,12 +1022,28 @@
 
   function draftCard(d) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
-    const gmp = d.has_gmp_pdf
+    const auto = !!d.auto_attach_gmp;
+    // Honest auto-attach status line (never implies a PDF exists when it doesn't).
+    const autoStatusText = {
+      ready: "✓ GMP bill found — it will attach automatically.",
+      pending: "GMP bill will attach automatically once it's captured (none yet).",
+      no_gmp: "No GMP account on this array yet — connect one to auto-attach.",
+    }[d.gmp_auto_status] || "";
+    const manualGmp = d.has_gmp_pdf
       ? `<span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span>`
       : `<label class="rb-gmp-attach">＋ Attach GMP invoice (PDF)
            <input type="file" accept="application/pdf,.pdf" data-gmp="${d.id}" hidden></label>`;
+    const gmp = `
+      <div class="rb-gmp-toggle-row">
+        <label class="rb-gmp-switch">
+          <input type="checkbox" data-dact="autogmp" ${auto ? "checked" : ""}>
+          <span>Auto-attach the GMP bill</span>
+        </label>
+        ${auto && autoStatusText ? `<span class="rb-gmp-auto-status rb-gmp-${esc(d.gmp_auto_status)}">${autoStatusText}</span>` : ""}
+      </div>
+      ${(!auto || d.gmp_auto_status !== "ready") ? `<div class="rb-gmp-manual">${manualGmp}</div>` : ""}`;
     return `
-      <div class="rb-draft" data-did="${d.id}">
+      <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
           <div class="rb-draft-name">${esc(d.customer_name)}</div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
@@ -1095,6 +1111,23 @@
     if (act === "preview") {
       // Drafts share the subscription's preview; resolve the sub id via the draft.
       return downloadDraftPreview(id, st);
+    }
+    if (act === "autogmp") {
+      // Per-customer auto-attach toggle. The draft carries subscription_id;
+      // PATCH the subscription, then refresh the inbox to update the status line.
+      const on = e.target.checked;
+      const subId = card.getAttribute("data-subid");
+      st.className = "rb-status rb-busy"; st.textContent = "Saving…";
+      try {
+        const r = await fetch(API + "/subscriptions/" + subId, {
+          method: "PATCH",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ auto_attach_gmp: on }),
+        });
+        if (r.ok) { st.textContent = ""; await refreshInbox(); }
+        else { st.className = "rb-status rb-err"; st.textContent = "Couldn't save."; }
+      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+      return;
     }
     if (act === "savemsg") {
       const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
