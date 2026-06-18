@@ -93,7 +93,7 @@
   // customers → ④ review & finish. Backed by /setup-state, PATCH /arrays/{id},
   // PUT /global-rate, POST /subscriptions. Lands in the normal tab when done.
   // ===========================================================================
-  const WIZ_STEPS = ["Your arrays", "Your rate", "Your customers", "Review"];
+  const WIZ_STEPS = ["Your arrays", "Your rate", "Your offtakers", "Review"];
   let WIZ = null;   // { step, state(from setup-state), customers:[], rateDirty }
 
   function renderWizard(setupState) {
@@ -132,7 +132,7 @@
       body.innerHTML = `<div class="rb-wiz-card">
         <h3>No arrays detected yet</h3>
         <p>Connect an array (or capture data via the extension) and it'll show up
-           here. You can still set your rate and add customers — come back to set
+           here. You can still set your rate and add offtakers — come back to set
            ages later.</p>
         ${wizNav({ back: false, nextLabel: "Continue" })}</div>`;
       wireWizNav();
@@ -193,7 +193,7 @@
     const autoRate = a0 ? Number(a0.auto_net_rate) : null;
     body.innerHTML = `<div class="rb-wiz-card">
       <h3>Your billing rate</h3>
-      <p>Customers pay the <b>solar credit rate</b> minus a <b>discount</b> — that discount
+      <p>Offtakers pay the <b>solar credit rate</b> minus a <b>discount</b> — that discount
          is the solar savings you pass on. We default the solar credit rate automatically
          from your utility's blended rate, and a <b>10% discount</b>.</p>
       <div class="rb-wiz-rate">
@@ -210,14 +210,14 @@
       </div>
       <div class="rb-gr-eff" id="rbWizEff"></div>
       <p class="rb-wiz-hint">Leave the solar credit rate blank to use the auto rate from your
-         bills${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override per customer later.</p>
+         bills${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override per offtaker later.</p>
       ${wizNav({ back: true, nextLabel: "Accept & continue" })}</div>`;
     const net = $("#rbWizNet"), disc = $("#rbWizDisc"), eff = $("#rbWizEff");
     function renderEff() {
       const n = net.value.trim() === "" ? (autoRate || 0) : Number(net.value);
       const d = disc.value.trim() === "" ? 10 : Number(disc.value);
       if (!isNaN(n) && !isNaN(d) && n > 0) {
-        eff.innerHTML = `Customers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (credit $${n.toFixed(4)} − ${d}% off).`;
+        eff.innerHTML = `Offtakers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (credit $${n.toFixed(4)} − ${d}% off).`;
       } else { eff.textContent = ""; }
     }
     renderEff(); net.addEventListener("input", renderEff); disc.addEventListener("input", renderEff);
@@ -247,17 +247,17 @@
         <button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>
       </div>`).join("");
     body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Add your customers (offtakers)</h3>
-      <p>Each customer is billed for their share of an array's production. Add as
+      <h3>Add your offtakers</h3>
+      <p>Each offtaker is billed for their share of an array's production. Add as
          many as you like — you can always add more later.</p>
-      <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No customers added yet.</div>`}</div>
+      <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No offtakers added yet.</div>`}</div>
       <div class="rb-wiz-cust-form">
-        <input type="text" id="rbWizCName" placeholder="Customer name">
+        <input type="text" id="rbWizCName" placeholder="Offtaker name">
         <select id="rbWizCArray">${arrays.map(a => `<option value="${a.array_id}" data-name="${esc(a.name)}">${esc(a.name)}</option>`).join("")}</select>
         <span class="rb-wiz-inwrap"><input type="number" id="rbWizCPct" min="0.01" max="100" step="0.01" placeholder="25"><span>% of array</span></span>
         <span class="rb-wiz-inwrap"><input type="number" id="rbWizCDisc" min="0" max="99" step="1" placeholder="default"><span>% off (optional)</span></span>
-        <input type="email" id="rbWizCEmail" placeholder="customer@email (optional)">
-        <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add customer</button>
+        <input type="email" id="rbWizCEmail" placeholder="offtaker@email (optional)">
+        <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add offtaker</button>
         <span class="rb-status" id="rbWizCStatus"></span>
       </div>
       ${wizNav({ back: true, nextLabel: WIZ.customers.length ? "Continue" : "Skip for now", nextId: "rbWizCustNext" })}</div>`;
@@ -276,7 +276,7 @@
       const pct = Number($("#rbWizCPct").value);
       const discRaw = $("#rbWizCDisc").value.trim();
       const email = $("#rbWizCEmail").value.trim();
-      if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the customer's name."; return; }
+      if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
       if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick an array."; return; }
       if (isNaN(pct) || pct <= 0 || pct > 100) { st.className = "rb-status rb-err"; st.textContent = "Enter their share 0–100%."; return; }
       let disc = null;
@@ -303,17 +303,17 @@
           <span class="sub">${knownAges}/${arrays.length} with install year set</span></div>
         <div class="rb-wiz-rev-item"><span class="rl">Default billing</span>
           <b>${g.default_net_rate_per_kwh != null ? "$" + Number(g.default_net_rate_per_kwh).toFixed(4) + "/kWh credit" : "auto solar credit rate"} − ${discPct}% off</b>
-          <span class="sub">customers without their own rate</span></div>
-        <div class="rb-wiz-rev-item"><span class="rl">Customers</span>
+          <span class="sub">offtakers without their own rate</span></div>
+        <div class="rb-wiz-rev-item"><span class="rl">Offtakers</span>
           <b>${WIZ.customers.length} to create</b>
           <span class="sub">${WIZ.customers.map(c => esc(c.customer_name)).join(", ") || "none yet — you can add later"}</span></div>
       </div>
-      <p class="rb-wiz-hint">Finishing creates your customers and opens the Reports tab. Nothing is emailed automatically — you review every draft before it sends.</p>
+      <p class="rb-wiz-hint">Finishing creates your offtakers and opens the Reports tab. Nothing is emailed automatically — you review every draft before it sends.</p>
       ${wizNav({ back: true, nextLabel: "Finish setup", nextId: "rbWizFinish" })}
       <span class="rb-status" id="rbWizFinStatus"></span></div>`;
     wireWizNav(async () => {
       const st = $("#rbWizFinStatus");
-      st.className = "rb-status rb-busy"; st.textContent = "Creating your customers…";
+      st.className = "rb-status rb-busy"; st.textContent = "Creating your offtakers…";
       let created = 0;
       for (const c of WIZ.customers) {
         const fd = new FormData();
@@ -330,7 +330,7 @@
           if (r.ok) created++;
         } catch (e) {}
       }
-      st.className = "rb-status rb-ok"; st.textContent = `Done — ${created} customer${created === 1 ? "" : "s"} ready.`;
+      st.className = "rb-status rb-ok"; st.textContent = `Done — ${created} offtaker${created === 1 ? "" : "s"} ready.`;
       FORCE_TAB = true;
       setTimeout(() => load(), 600);
       return false;   // don't auto-advance; load() takes over
@@ -365,7 +365,7 @@
       <div class="rb-subtabs" role="tablist">
         <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Invoice generator</button>
         <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
-        <button type="button" class="rb-subtab" data-sub="customers" role="tab">Customers</button>
+        <button type="button" class="rb-subtab" data-sub="customers" role="tab">Offtakers</button>
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
@@ -373,10 +373,10 @@
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
           <span class="rep-eyebrow">Your default billing</span>
-          <h3>Bill customers at a discount off the solar credit rate</h3>
-          <p>Customers pay the <b>solar credit rate</b> minus your <b>discount</b> — that's
+          <h3>Bill offtakers at a discount off the solar credit rate</h3>
+          <p>Offtakers pay the <b>solar credit rate</b> minus your <b>discount</b> — that's
              their solar savings. Default is <b>10% off</b>. Applies to any
-             customer without their own override below.</p>
+             offtaker without their own override below.</p>
         </div>
         <div class="rb-gr-ctl">
           <label class="rb-gr-field">
@@ -401,7 +401,7 @@
           <div class="rb-upload rep-card" id="rbUpload">
             <span class="rep-eyebrow">Step 1 · Match a spreadsheet</span>
             <h3>Drop a billing spreadsheet</h3>
-            <p>Any of your billing workbooks — we recognize the customer, their
+            <p>Any of your billing workbooks — we recognize the offtaker, their
                percentage of the array, and the latest billing period automatically.</p>
             <label class="rb-drop" id="rbDrop">
               <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
@@ -421,8 +421,8 @@
         <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
       <div class="rb-listwrap">
-        <div class="cc-treedivider"><h3>Your customers</h3>
-          <span>each customer's percentage of the array · invoice + summary on its cadence</span></div>
+        <div class="cc-treedivider"><h3>Your offtakers</h3>
+          <span>each offtaker's percentage of the array · invoice + summary on its cadence</span></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       </div><!-- /rbSubInvoice -->
@@ -466,10 +466,10 @@
       <div class="rep-card rb-q-head">
         <span class="rep-eyebrow">Quarterly reports</span>
         <h3>Quarterly performance report</h3>
-        <p>Pick a customer and a quarter — we build the produced-kWh invoice for
+        <p>Pick an offtaker and a quarter — we build the produced-kWh invoice for
            that quarter plus a visual production report, then you review and send it.</p>
         <div class="rb-q-controls">
-          <label class="rep-fld"><span class="rl">Customer</span>
+          <label class="rep-fld"><span class="rl">Offtaker</span>
             <select id="rbqCustomer"><option value="">Loading…</option></select></label>
           <label class="rep-fld"><span class="rl">Quarter</span>
             <select id="rbqQuarter"></select></label>
@@ -484,7 +484,7 @@
       const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
       const sel = $("#rbqCustomer");
       if (!subs.length) {
-        sel.innerHTML = `<option value="">No customers yet — add one in Invoice generator</option>`;
+        sel.innerHTML = `<option value="">No offtakers yet — add one in Invoice generator</option>`;
       } else {
         sel.innerHTML = subs.map(s =>
           `<option value="${s.id}">${esc(s.customer_name)}</option>`).join("");
@@ -493,7 +493,7 @@
       $("#rbqQuarter").onchange = renderQuarterlyBody;
       if (subs.length) renderQuarterlyBody();
     } catch (e) {
-      $("#rbqBody").innerHTML = `<div class="empty">Couldn't load customers — refresh to retry.</div>`;
+      $("#rbqBody").innerHTML = `<div class="empty">Couldn't load offtakers — refresh to retry.</div>`;
     }
   }
 
@@ -525,7 +525,7 @@
     } catch (e) { /* surfaced below */ }
 
     const cust = $("#rbqCustomer").selectedOptions[0]
-      ? $("#rbqCustomer").selectedOptions[0].textContent : "Customer";
+      ? $("#rbqCustomer").selectedOptions[0].textContent : "Offtaker";
     const srcLabel = math && math.kwh_source === "gmp_api" ? "GMP metered data"
       : math && math.kwh_source === "daily_csv" ? "your uploaded generation data"
       : "best available data";
@@ -543,7 +543,7 @@
           </div>
           <p class="rb-q-math">${fmt0(math.customer_kwh)} kWh × ${math.rate != null ? "$" + Number(math.rate).toFixed(3) : "—"}/kWh = <b>${money(math.amount_usd)}</b>
              <span class="rb-q-period">· latest period ${esc(math.period_start || "—")} → ${esc(math.period_end || "—")}</span></p>
-        ` : `<div class="rb-warn">No generation data yet for this customer's array — no fabricated numbers. Connect data or upload generation to build the quarter's invoice.</div>`}
+        ` : `<div class="rb-warn">No generation data yet for this offtaker's array — no fabricated numbers. Connect data or upload generation to build the quarter's invoice.</div>`}
       </div>
       <div class="rep-card rb-q-charts">
         <h4>Production report</h4>
@@ -616,13 +616,13 @@
     if (!host) return;
     host.innerHTML = `
       <div class="rep-card rb-cust-head">
-        <span class="rep-eyebrow">Customers</span>
+        <span class="rep-eyebrow">Offtakers</span>
         <h3>Your offtakers</h3>
-        <p>Edit each customer's details — their company name, contact email,
+        <p>Edit each offtaker's details — their company name, contact email,
            which array they're billed from, and their share. Changes save to the
-           customer used by both the Invoice generator and Quarterly reports.</p>
+           offtaker used by both the Invoice generator and Quarterly reports.</p>
       </div>
-      <div id="rbCustList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading customers…</div></div>`;
+      <div id="rbCustList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading offtakers…</div></div>`;
     const list = $("#rbCustList");
     try {
       const [r, arrs] = await Promise.all([
@@ -633,13 +633,13 @@
       const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
       if (!subs.length) {
         list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">
-          No customers yet — add one in the <b>Invoice generator</b> tab, then edit them here.</div>`;
+          No offtakers yet — add one in the <b>Invoice generator</b> tab, then edit them here.</div>`;
         return;
       }
       list.innerHTML = subs.map(s => custCard(s, arrs)).join("");
       list.querySelectorAll(".rb-cust").forEach(card => wireCustCard(card));
     } catch (e) {
-      list.innerHTML = `<div class="empty">Couldn't load customers — refresh to retry.</div>`;
+      list.innerHTML = `<div class="empty">Couldn't load offtakers — refresh to retry.</div>`;
     }
   }
 
@@ -655,10 +655,10 @@
           <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
         </div>
         <div class="rb-cust-grid">
-          <label class="rep-fld"><span class="rl">Company / customer name</span>
+          <label class="rep-fld"><span class="rl">Company / offtaker name</span>
             <input type="text" data-f="customer_name" value="${esc(s.customer_name || "")}" placeholder="e.g. Sunnybrook Apartments"></label>
           <label class="rep-fld"><span class="rl">Contact email</span>
-            <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="customer@example.com"></label>
+            <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="offtaker@example.com"></label>
           <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
             <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
           ${manual ? `
@@ -690,7 +690,7 @@
     const body = {};
 
     const name = get("customer_name") && get("customer_name").value.trim();
-    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Customer name can't be empty."; return; }
+    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Offtaker name can't be empty."; return; }
     body.customer_name = name;
 
     const email = get("client_email") ? get("client_email").value.trim() : "";
@@ -767,7 +767,7 @@
       if (eff) {
         if (isNaN(n) || isNaN(d)) { eff.textContent = ""; return; }
         const rate = n * (1 - d / 100);
-        eff.innerHTML = `Customers pay <b>$${rate.toFixed(4)}/kWh</b> ` +
+        eff.innerHTML = `Offtakers pay <b>$${rate.toFixed(4)}/kWh</b> ` +
           `(credit $${n.toFixed(4)} − ${d.toFixed(0)}% off). ` +
           `Blank = your defaults ($${effNet.toFixed(3)} credit, ${(effDisc*100).toFixed(0)}% off).`;
       }
@@ -851,7 +851,7 @@
         return;
       }
       status.className = "rb-status rb-ok";
-      status.textContent = "Recognized " + (m.customer.name || "a customer") +
+      status.textContent = "Recognized " + (m.customer.name || "an offtaker") +
         " (confidence " + Math.round((m.confidence || 0) * 100) + "%).";
       PENDING = { file, match: m };
       renderPreview(m);
@@ -891,11 +891,11 @@
         <div class="rb-manual-toggle rep-card">
           <div>
             <span class="rep-eyebrow">No spreadsheet?</span>
-            <h3 style="margin:.2em 0 .15em">Add a customer manually</h3>
-            <p style="margin:0">Bill a customer for their share of an array's
+            <h3 style="margin:.2em 0 .15em">Add an offtaker manually</h3>
+            <p style="margin:0">Bill an offtaker for their share of an array's
                generation — no workbook needed. Pick the array, set their %, done.</p>
           </div>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbManualOpen" type="button">＋ Add a customer</button>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbManualOpen" type="button">＋ Add an offtaker</button>
         </div>`;
       const b = $("#rbManualOpen");
       if (b) b.onclick = () => { MANUAL_OPEN = true; renderManual(); };
@@ -903,10 +903,10 @@
     }
     host.innerHTML = `
       <div class="rep-card rb-manual-form">
-        <span class="rep-eyebrow">Add a customer · % of an array</span>
-        <h3>New customer</h3>
+        <span class="rep-eyebrow">Add an offtaker · % of an array</span>
+        <h3>New offtaker</h3>
         <div class="rb-mform-grid">
-          <label class="rep-fld"><span class="rl">Customer name</span>
+          <label class="rep-fld"><span class="rl">Offtaker name</span>
             <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
           <label class="rep-fld"><span class="rl">Which array?</span>
             <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
@@ -974,8 +974,8 @@
     const rateRaw = $("#rbmRate").value.trim();
     const mode = segValue("rbmMode") || "to_me";
     const clientEmail = $("#rbmEmail").value.trim();
-    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the customer's name."; return; }
-    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this customer is on."; return; }
+    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
+    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this offtaker is on."; return; }
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
       st.className = "rb-status rb-err"; st.textContent = "Enter their share as a percent between 0 and 100."; return;
@@ -1027,7 +1027,7 @@
       <div class="rep-card rb-preview">
         <span class="rep-eyebrow">Step 2 · Confirm &amp; schedule</span>
         <div class="rb-matchgrid">
-          <div><span class="rb-k">Customer</span><span class="rb-v">${esc(m.customer.name || "—")}</span></div>
+          <div><span class="rb-k">Offtaker</span><span class="rb-v">${esc(m.customer.name || "—")}</span></div>
           <div><span class="rb-k">Billing model</span><span class="rb-v">${esc(MODEL_LABEL[m.billing_model] || m.billing_model)}</span></div>
           <div><span class="rb-k">Latest period</span><span class="rb-v">${esc(ci.period_start || "—")} → ${esc(ci.period_end || "—")}</span></div>
           <div><span class="rb-k">Generation</span><span class="rb-v">${fmt0(ci.kwh)} kWh</span></div>
@@ -1075,7 +1075,7 @@
         </div>
         <div class="rb-emails">
           <label class="rep-fld"><span class="rl">Client email</span>
-            <input type="email" id="rbClientEmail" placeholder="customer@example.com" value="${esc(m.customer.email || "")}"></label>
+            <input type="email" id="rbClientEmail" placeholder="offtaker@example.com" value="${esc(m.customer.email || "")}"></label>
           <label class="rep-fld"><span class="rl">Your email (operator)</span>
             <input type="email" id="rbOpEmail" placeholder="you@example.com"></label>
           <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
@@ -1132,7 +1132,7 @@
         <span class="ico">📄</span>
         <b>Your report appears here</b>
         <div>Drop a billing spreadsheet and we'll show the exact invoice &amp;
-        performance summary your customer receives — updating live as you set
+        performance summary your offtaker receives — updating live as you set
         the cadence, format, and recipient.</div>
       </div>`;
   }
@@ -1502,7 +1502,7 @@
             <span class="rep-eyebrow">Awaiting your approval</span>
             <h3>${drafts.length} report${drafts.length === 1 ? "" : "s"} ready to review &amp; send</h3>
             <p>Drafted from the latest billing period. Review the numbers, attach the
-               GMP invoice, then approve — nothing goes to a customer until you do.</p>
+               GMP invoice, then approve — nothing goes to an offtaker until you do.</p>
           </div>
           ${drafts.map(draftCard).join("")}
         </div>`;
@@ -1548,9 +1548,9 @@
         </div>
         <div class="rb-draft-gmp">${gmp}</div>
         <div class="rb-draft-email">
-          <span class="rl">Email to your customer (editable)</span>
+          <span class="rl">Email to your offtaker (editable)</span>
           <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
-            placeholder="Write the note your customer sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
+            placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
           <div class="rb-draft-email-row">
             <button class="ao-btn rb-btn" data-dact="savemsg" type="button">Save email</button>
             <span class="rb-draft-msg-hint">Saved with the report. The invoice${d.has_gmp_pdf ? " + GMP invoice are" : " is"} attached automatically.</span>
@@ -1562,8 +1562,8 @@
           <button class="ao-btn rb-btn rb-danger" data-dact="dismiss">Dismiss</button>
           <span class="rb-status rb-draft-status"></span>
         </div>
-        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this customer's
-           delivery setting below, with the customer invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
+        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this offtaker's
+           delivery setting below, with the offtaker invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
            <b>Nothing sends until you click Approve &amp; send.</b></p>
       </div>`;
   }
@@ -1644,7 +1644,7 @@
       return;
     }
     if (act === "approve") {
-      if (!confirm("Approve and send this report to the customer now?")) return;
+      if (!confirm("Approve and send this report to the offtaker now?")) return;
       st.className = "rb-status rb-busy"; st.textContent = "Sending…";
       try {
         const r = await fetch(API + "/drafts/" + id + "/approve", { method: "POST", headers: authHeaders() });
