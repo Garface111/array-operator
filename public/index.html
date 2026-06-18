@@ -142,10 +142,6 @@
   <!-- All business: one flat list of horizontal rows — identity, login & billing.
        Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
   <section class="panel" id="panelAccount" role="tabpanel" aria-label="Master Account">
-    <div class="section-h" style="margin-top:18px">
-      <h2>Master account</h2>
-      <span class="hint">your profile, login &amp; billing — all in one place</span>
-    </div>
     <div class="acct-list" id="acctList"><div class="empty">Loading your account…</div></div>
   </section>
 
@@ -178,19 +174,11 @@
        Rendered by trends.js (window.__aoLoadTrends) into #trendsRoot from
        GET /v1/array-owners/fleet-trends. -->
   <section class="panel" id="panelTrends" role="tabpanel" aria-label="Trends">
-    <div class="section-h" style="margin-top:18px">
-      <h2>Trends</h2>
-      <span class="hint">multi-year production across your whole fleet — seasonality and year-over-year at a glance</span>
-    </div>
     <div id="trendsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div></div>
   </section>
 
   <!-- ============================ TAB: REPORTS ============================ -->
   <section class="panel" id="panelReports" role="tabpanel" aria-label="Reports">
-    <div class="section-h" style="margin-top:18px">
-      <h2>Reports</h2>
-      <span class="hint">drop a billing spreadsheet — we match it and send invoices + summaries on your schedule</span>
-    </div>
     <!-- Filled by reports.js (window.__aoLoadReports): upload → match preview →
          schedule + recipient slider + format choice → subscriptions list. -->
     <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
