@@ -159,6 +159,13 @@
         ${warn}
         <div class="rb-controls">
           <div class="rb-ctl">
+            <span class="rl">When a report is ready</span>
+            <div class="rb-seg rb-slider" id="rbDelivery">
+              <button type="button" data-v="approval" class="on">Draft for my approval</button>
+              <button type="button" data-v="auto">Auto-send</button>
+            </div>
+          </div>
+          <div class="rb-ctl">
             <span class="rl">Cadence</span>
             <div class="rb-seg" id="rbCadence">
               <button type="button" data-v="monthly" class="on">Monthly</button>
@@ -350,6 +357,7 @@
     fd.append("file", PENDING.file);
     fd.append("customer_name", PENDING.match.customer.name || "");
     fd.append("cadence", segValue("rbCadence") || "monthly");
+    fd.append("delivery_mode", segValue("rbDelivery") || "approval");
     fd.append("send_mode", mode || "to_me");
     fd.append("client_email", clientEmail);
     fd.append("operator_email", $("#rbOpEmail").value.trim());
@@ -408,6 +416,7 @@
         <div class="rb-sub-main">
           <div class="rb-sub-name">${esc(s.customer_name)}
             <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
+            <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
             <span class="rb-chip ${live ? "rb-chip-live" : ""}">${esc(MODE_LABEL[s.send_mode] || s.send_mode)}</span>
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
@@ -417,6 +426,10 @@
           </div>
         </div>
         <div class="rb-sub-acts">
+          <div class="rb-seg rb-slider rb-mini" data-act="delivery">
+            <button type="button" data-v="approval" class="${s.delivery_mode !== "auto" ? "on" : ""}">Draft</button>
+            <button type="button" data-v="auto" class="${s.delivery_mode === "auto" ? "on" : ""}">Auto</button>
+          </div>
           <div class="rb-seg rb-slider rb-mini" data-act="mode">
             <button type="button" data-v="to_me" class="${s.send_mode === "to_me" ? "on" : ""}">Me</button>
             <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
@@ -449,6 +462,17 @@
       seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
       target.classList.add("on");
       await patch(id, { send_mode: mode }, st);
+      await refreshList();
+      return;
+    }
+    if (act === "delivery") {
+      const seg = btn;
+      const target = e.target.closest("button");
+      if (!target) return;
+      const dm = target.getAttribute("data-v");
+      seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      target.classList.add("on");
+      await patch(id, { delivery_mode: dm }, st);
       await refreshList();
       return;
     }
