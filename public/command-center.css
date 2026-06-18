@@ -291,6 +291,47 @@ body.sb-fs-lock{ overflow:hidden; }
   border:0; color:var(--ink); font:inherit; font-size:12.5px; text-align:right; padding:2px 0; }
 .rb-rate-edit input.rb-rate-input:focus{ outline:none; }
 
+/* ---- Reports subtabs (Invoice generator / Quarterly reports) ---- */
+.rb-subtabs{ display:flex; gap:8px; margin:4px 0 18px; border-bottom:1px solid var(--line); padding-bottom:0; }
+.rb-subtab{ background:transparent; border:0; border-bottom:2px solid transparent; color:var(--faint);
+  font:inherit; font-size:14px; font-weight:600; padding:9px 14px 11px; cursor:pointer; margin-bottom:-1px; }
+.rb-subtab:hover{ color:var(--muted); }
+.rb-subtab.on{ color:var(--ink); border-bottom-color:var(--good); }
+
+/* ---- Quarterly report panel ---- */
+.rb-q-head h3{ font-size:16px; margin:.2em 0 .15em; }
+.rb-q-head p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:60ch; }
+.rb-q-controls{ display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.rb-q-controls .rep-fld{ display:flex; flex-direction:column; gap:6px; min-width:200px; }
+.rb-q-controls select{ width:100%; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:10px; color:var(--ink); padding:9px 11px; font:inherit; font-size:13.5px; cursor:pointer; }
+.rb-q-invoice{ margin-top:16px; }
+.rb-q-inv-h{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.rb-q-inv-h h4{ font-size:15px; margin:0; }
+.rb-q-src{ font-size:11.5px; color:var(--faint); }
+.rb-q-stats{ display:flex; gap:26px; flex-wrap:wrap; margin:14px 0 6px; }
+.rb-q-stats .st{ display:flex; flex-direction:column; gap:2px; }
+.rb-q-stats .st b{ font-size:20px; color:var(--ink); }
+.rb-q-stats .st span{ font-size:11.5px; color:var(--faint); }
+.rb-q-math{ font-size:13px; color:var(--muted); margin:6px 0 0; }
+.rb-q-math .rb-q-period{ color:var(--faint); }
+.rb-q-charts{ margin-top:16px; }
+.rb-q-charts h4{ font-size:15px; margin:0 0 10px; }
+.rb-q-chart{ margin-bottom:18px; }
+.rb-q-chart-cap{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); margin-bottom:6px; }
+.rb-q-canvas{ width:100%; min-height:180px; }
+.rb-q-actions{ display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }
+
+/* ---- editable draft email (approval inbox) ---- */
+.rb-draft-email{ margin:14px 0 4px; display:flex; flex-direction:column; gap:6px; }
+.rb-draft-email .rl{ font-size:11.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.05em; }
+.rb-draft-msg{ width:100%; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:10px; color:var(--ink); padding:10px 12px;
+  font:inherit; font-size:13px; line-height:1.5; resize:vertical; min-height:96px; }
+.rb-draft-msg:focus{ outline:none; border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
+.rb-draft-email-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.rb-draft-msg-hint{ font-size:11.5px; color:var(--faint); }
+
 .rb-listwrap{ margin-top:8px; }
 .rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
   background:linear-gradient(165deg,var(--card),var(--card2)); border:1px solid var(--line);

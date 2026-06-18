@@ -47,6 +47,7 @@
       return;
     }
     el.innerHTML = shell();
+    wireSubtabs();
     wireUpload();
     wireGlobalRate();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
@@ -64,6 +65,11 @@
 
   function shell() {
     return `
+      <div class="rb-subtabs" role="tablist">
+        <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Invoice generator</button>
+        <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
+      </div>
+      <div id="rbSubInvoice" class="rb-subpanel">
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
@@ -108,7 +114,183 @@
         <div class="cc-treedivider"><h3>Your customers</h3>
           <span>each customer's percentage of the array · invoice + summary on its cadence</span></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
+      </div>
+      </div><!-- /rbSubInvoice -->
+      <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
+  }
+
+  // ---- subtab switching (Invoice generator / Quarterly reports) --------------
+  let QUARTERLY_RENDERED = false;
+  function wireSubtabs() {
+    const tabs = Array.from(document.querySelectorAll(".rb-subtab"));
+    if (!tabs.length) return;
+    tabs.forEach(btn => btn.onclick = () => {
+      const sub = btn.getAttribute("data-sub");
+      tabs.forEach(b => b.classList.toggle("on", b === btn));
+      const inv = $("#rbSubInvoice"), q = $("#rbSubQuarterly");
+      if (inv) inv.style.display = sub === "invoice" ? "" : "none";
+      if (q) q.style.display = sub === "quarterly" ? "" : "none";
+      if (sub === "quarterly") renderQuarterly();
+    });
+  }
+
+  // ---- Quarterly reports subtab ---------------------------------------------
+  // A per-customer quarterly performance report: the quarter's invoice math +
+  // the same Trends visuals (Solar Spiral + Energy Ridgeline) the Trends tab
+  // uses, reusing window.AOTrends so the charts can't drift from that tab.
+  let QTRENDS_STOPS = [];     // active chart cleanup fns
+  let QTRENDS_DATA = null;    // cached fleet-trends payload
+
+  function teardownQTrends() {
+    QTRENDS_STOPS.forEach(fn => { try { fn && fn(); } catch (e) {} });
+    QTRENDS_STOPS = [];
+  }
+
+  async function renderQuarterly() {
+    const host = $("#rbSubQuarterly");
+    if (!host) return;
+    host.innerHTML = `
+      <div class="rep-card rb-q-head">
+        <span class="rep-eyebrow">Quarterly reports</span>
+        <h3>Quarterly performance report</h3>
+        <p>Pick a customer and a quarter — we build the produced-kWh invoice for
+           that quarter plus a visual production report, then you review and send it.</p>
+        <div class="rb-q-controls">
+          <label class="rep-fld"><span class="rl">Customer</span>
+            <select id="rbqCustomer"><option value="">Loading…</option></select></label>
+          <label class="rep-fld"><span class="rl">Quarter</span>
+            <select id="rbqQuarter"></select></label>
+        </div>
+      </div>
+      <div id="rbqBody"></div>`;
+    // Populate quarter options (current + last 7 quarters).
+    fillQuarterOptions($("#rbqQuarter"));
+    // Populate customers from the existing subscriptions list.
+    try {
+      const r = await fetch(API + "/subscriptions", { headers: authHeaders() });
+      const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
+      const sel = $("#rbqCustomer");
+      if (!subs.length) {
+        sel.innerHTML = `<option value="">No customers yet — add one in Invoice generator</option>`;
+      } else {
+        sel.innerHTML = subs.map(s =>
+          `<option value="${s.id}">${esc(s.customer_name)}</option>`).join("");
+      }
+      sel.onchange = renderQuarterlyBody;
+      $("#rbqQuarter").onchange = renderQuarterlyBody;
+      if (subs.length) renderQuarterlyBody();
+    } catch (e) {
+      $("#rbqBody").innerHTML = `<div class="empty">Couldn't load customers — refresh to retry.</div>`;
+    }
+  }
+
+  function fillQuarterOptions(sel) {
+    if (!sel) return;
+    const now = new Date();
+    let y = now.getFullYear(), q = Math.floor(now.getMonth() / 3) + 1;
+    const opts = [];
+    for (let i = 0; i < 8; i++) {
+      opts.push(`<option value="${y}-Q${q}">Q${q} ${y}</option>`);
+      q--; if (q < 1) { q = 4; y--; }
+    }
+    sel.innerHTML = opts.join("");
+  }
+
+  async function renderQuarterlyBody() {
+    const body = $("#rbqBody");
+    const subId = $("#rbqCustomer") && $("#rbqCustomer").value;
+    const quarter = $("#rbqQuarter") && $("#rbqQuarter").value;
+    if (!body || !subId) return;
+    teardownQTrends();
+    body.innerHTML = `<div class="rep-card"><div class="empty" style="padding:18px 0;color:var(--faint)">Building report…</div></div>`;
+
+    // 1) the quarter's invoice math (real produced kWh × rate; never fabricated).
+    let math = null;
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/preview-math", { headers: authHeaders() });
+      if (r.ok) math = await r.json().catch(() => null);
+    } catch (e) { /* surfaced below */ }
+
+    const cust = $("#rbqCustomer").selectedOptions[0]
+      ? $("#rbqCustomer").selectedOptions[0].textContent : "Customer";
+    const srcLabel = math && math.kwh_source === "gmp_api" ? "GMP metered data"
+      : math && math.kwh_source === "daily_csv" ? "your uploaded generation data"
+      : "best available data";
+    const hasData = math && math.has_data;
+
+    body.innerHTML = `
+      <div class="rep-card rb-q-invoice">
+        <div class="rb-q-inv-h"><h4>${esc(cust)} · ${esc(quarter)}</h4>
+          <span class="rb-q-src">source: ${esc(srcLabel)}</span></div>
+        ${hasData ? `
+          <div class="rb-q-stats">
+            <div class="st"><b>${fmt0(math.customer_kwh)}</b><span>kWh produced</span></div>
+            <div class="st"><b>${math.rate != null ? "$" + Number(math.rate).toFixed(3) : "—"}</b><span>$/kWh${math.rate_source ? " · " + esc(math.rate_source) : ""}</span></div>
+            <div class="st"><b>${money(math.amount_usd)}</b><span>amount due</span></div>
+          </div>
+          <p class="rb-q-math">${fmt0(math.customer_kwh)} kWh × ${math.rate != null ? "$" + Number(math.rate).toFixed(3) : "—"}/kWh = <b>${money(math.amount_usd)}</b>
+             <span class="rb-q-period">· latest period ${esc(math.period_start || "—")} → ${esc(math.period_end || "—")}</span></p>
+        ` : `<div class="rb-warn">No generation data yet for this customer's array — no fabricated numbers. Connect data or upload generation to build the quarter's invoice.</div>`}
+      </div>
+      <div class="rep-card rb-q-charts">
+        <h4>Production report</h4>
+        <div class="rb-q-chart"><div class="rb-q-chart-cap">Solar Spiral</div><div id="rbqSpiral" class="rb-q-canvas"></div></div>
+        <div class="rb-q-chart"><div class="rb-q-chart-cap">Energy Ridgeline</div><div id="rbqRidge" class="rb-q-canvas"></div></div>
+      </div>
+      <div class="rb-q-actions">
+        <button class="ao-btn ao-btn-primary rb-btn" id="rbqDraft" type="button">Draft this report for review →</button>
+        <span class="rb-status" id="rbqStatus"></span>
       </div>`;
+
+    // 2) mount the Trends visuals, reusing window.AOTrends (same as Trends tab).
+    mountQTrends();
+
+    // 3) "Draft for review" reuses the existing per-subscription draft flow.
+    const draftBtn = $("#rbqDraft");
+    if (draftBtn) draftBtn.onclick = () => quarterlyDraft(subId);
+  }
+
+  async function mountQTrends() {
+    const C = window.AOTrends;
+    const spiralHost = $("#rbqSpiral"), ridgeHost = $("#rbqRidge");
+    if (!C || !spiralHost || !ridgeHost) return;
+    try {
+      if (!QTRENDS_DATA) {
+        const r = await fetch("/v1/array-owners/fleet-trends", { headers: authHeaders() });
+        if (!r.ok) throw new Error("trends fetch " + r.status);
+        QTRENDS_DATA = await r.json();
+      }
+      const prepped = C.prep(QTRENDS_DATA);
+      if (!prepped.years || !prepped.years.length) {
+        spiralHost.innerHTML = ridgeHost.innerHTML =
+          `<div class="empty" style="padding:20px 0;color:var(--faint)">No production history to chart yet.</div>`;
+        return;
+      }
+      [["spiral", spiralHost], ["ridgeline", ridgeHost]].forEach(([key, host]) => {
+        const view = C.getView(key);
+        host.style.position = "relative";
+        if (!view) { host.innerHTML = `<div class="empty">${key} view unavailable.</div>`; return; }
+        try { const stop = view.mount(host, prepped, C); if (stop) QTRENDS_STOPS.push(stop); }
+        catch (e) { host.innerHTML = `<div class="empty">Chart error.</div>`; }
+      });
+    } catch (e) {
+      spiralHost.innerHTML = ridgeHost.innerHTML =
+        `<div class="empty" style="padding:20px 0;color:var(--faint)">Couldn't load production charts.</div>`;
+    }
+  }
+
+  async function quarterlyDraft(subId) {
+    const st = $("#rbqStatus");
+    if (st) { st.className = "rb-status rb-busy"; st.textContent = "Drafting for review…"; }
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft", { method: "POST", headers: authHeaders() });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.ok) {
+        if (st) { st.className = "rb-status rb-ok"; st.textContent = "Added to your approval inbox (Invoice generator tab) — review, edit the email, then send."; }
+      } else {
+        if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft."; }
+      }
+    } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
   }
 
   // ---- upload + match --------------------------------------------------------
@@ -857,6 +1039,15 @@
           <div><span class="rb-k">Amount</span><span class="rb-v rb-amt">${money(d.amount_usd)}</span></div>
         </div>
         <div class="rb-draft-gmp">${gmp}</div>
+        <div class="rb-draft-email">
+          <span class="rl">Email to your customer (editable)</span>
+          <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
+            placeholder="Write the note your customer sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
+          <div class="rb-draft-email-row">
+            <button class="ao-btn rb-btn" data-dact="savemsg" type="button">Save email</button>
+            <span class="rb-draft-msg-hint">Saved with the report. The invoice${d.has_gmp_pdf ? " + GMP invoice are" : " is"} attached automatically.</span>
+          </div>
+        </div>
         <div class="rb-draft-acts">
           <button class="ao-btn ao-btn-primary rb-btn" data-dact="approve">Approve &amp; send</button>
           <a class="ao-btn rb-btn" data-dact="preview" href="#">Preview invoice</a>
@@ -864,8 +1055,18 @@
           <span class="rb-status rb-draft-status"></span>
         </div>
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this customer's
-           delivery setting below, with the customer invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.</p>
+           delivery setting below, with the customer invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
+           <b>Nothing sends until you click Approve &amp; send.</b></p>
       </div>`;
+  }
+
+  // A sensible pre-written note the operator edits before sending (Paul's
+  // "edit a pre-written email" ask). Mentions the period + amount.
+  function defaultDraftNote(d) {
+    const amt = d.amount_usd != null ? money(d.amount_usd) : "the amount due";
+    const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "your production";
+    const period = d.period_label || "the latest period";
+    return `Hi,\n\nAttached is your solar invoice for ${period}. Your array produced ${kwh} this period, for a total of ${amt}. The GMP source data and a production summary are attached so you can see exactly how it was calculated.\n\nThanks for going solar!`;
   }
 
   async function attachGmp(draftId, file) {
@@ -894,6 +1095,21 @@
     if (act === "preview") {
       // Drafts share the subscription's preview; resolve the sub id via the draft.
       return downloadDraftPreview(id, st);
+    }
+    if (act === "savemsg") {
+      const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
+      const note = ta ? ta.value : "";
+      st.className = "rb-status rb-busy"; st.textContent = "Saving email…";
+      try {
+        const r = await fetch(API + "/drafts/" + id, {
+          method: "PATCH",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ note }),
+        });
+        if (r.ok) { st.className = "rb-status rb-ok"; st.textContent = "Email saved."; }
+        else { st.className = "rb-status rb-err"; st.textContent = "Couldn't save email."; }
+      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+      return;
     }
     if (act === "dismiss") {
       if (!confirm("Dismiss this drafted report without sending?")) return;
