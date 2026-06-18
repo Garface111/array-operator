@@ -65,3 +65,8 @@
   .tr-seg{padding:8px 10px;font-size:12px}
   .tr-seg .tr-seg-lbl{display:none}
 }
+
+/* ── Liquid Energy (view A) — tooltip refinements ────────────────────────── */
+.trv-liquid-tip{line-height:1.4}
+.trv-liquid-tip b{color:var(--good2);font-size:13px}
+.trv-liquid-tip .trv-liquid-sub{display:block;color:var(--muted);font-size:11px;margin-top:2px}
