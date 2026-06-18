@@ -48,6 +48,7 @@
     }
     el.innerHTML = shell();
     wireUpload();
+    wireGlobalRate();
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
     renderManual();           // "Add a customer manually" card (collapsed)
     await Promise.all([refreshInbox(), refreshList()]);
@@ -64,6 +65,21 @@
   function shell() {
     return `
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
+      <div class="rb-globalrate rep-card" id="rbGlobalRate">
+        <div class="rb-gr-main">
+          <span class="rep-eyebrow">Your default rate</span>
+          <h3>Bill every customer at this $/kWh</h3>
+          <p>This is the rate used for any customer without their own rate set.
+             You can override it per customer below.</p>
+        </div>
+        <div class="rb-gr-ctl">
+          <span class="rb-gr-dollar">$</span>
+          <input type="number" id="rbGrInput" min="0" max="5" step="0.001" placeholder="e.g. 0.185">
+          <span class="rb-gr-unit">/ kWh</span>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save</button>
+          <span class="rb-status" id="rbGrStatus"></span>
+        </div>
+      </div>
       <div class="rb-layout">
         <div class="rb-col-form">
           <div class="rb-upload rep-card" id="rbUpload">
@@ -111,6 +127,53 @@
       const f = e.dataTransfer && e.dataTransfer.files[0];
       if (f) matchFile(f);
     });
+  }
+
+  // ---- global default rate ($/kWh) -------------------------------------------
+  async function wireGlobalRate() {
+    const input = $("#rbGrInput");
+    const save = $("#rbGrSave");
+    const st = $("#rbGrStatus");
+    if (!input || !save) return;
+    // Load the current global rate.
+    try {
+      const r = await fetch(API + "/global-rate", { headers: authHeaders() });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.default_billing_rate_per_kwh != null) {
+        input.value = data.default_billing_rate_per_kwh;
+      }
+    } catch (e) { /* leave blank */ }
+    save.onclick = async () => {
+      const raw = input.value.trim();
+      let body;
+      if (raw === "") {
+        body = { default_billing_rate_per_kwh: null };   // clear → VT fallback
+      } else {
+        const n = Number(raw);
+        if (isNaN(n) || n < 0 || n > 5) {
+          st.className = "rb-status rb-err"; st.textContent = "Enter a rate between 0 and 5 ($/kWh), or blank to clear."; return;
+        }
+        body = { default_billing_rate_per_kwh: n };
+      }
+      st.className = "rb-status rb-busy"; st.textContent = "Saving…";
+      try {
+        const r = await fetch(API + "/global-rate", {
+          method: "PUT",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify(body),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.ok) {
+          st.className = "rb-status rb-ok";
+          st.textContent = body.default_billing_rate_per_kwh == null
+            ? "Cleared — using the built-in default." : "Saved.";
+          await refreshList();   // re-price rows that use the default
+        } else {
+          st.className = "rb-status rb-err";
+          st.textContent = (data && data.detail) ? data.detail : "Couldn't save.";
+        }
+      } catch (e) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+    };
   }
 
   async function matchFile(file) {
@@ -196,6 +259,9 @@
             <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
             <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
+          <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
+            <input type="number" id="rbmRate" min="0" max="5" step="0.001" placeholder="blank = use my default">
+            <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
           <label class="rep-fld"><span class="rl">Client email</span>
             <input type="email" id="rbmEmail" placeholder="customer@example.com"></label>
         </div>
@@ -252,6 +318,7 @@
     const name = $("#rbmName").value.trim();
     const arrayId = $("#rbmArray").value;
     const pctRaw = $("#rbmPct").value.trim();
+    const rateRaw = $("#rbmRate").value.trim();
     const mode = segValue("rbmMode") || "to_me";
     const clientEmail = $("#rbmEmail").value.trim();
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the customer's name."; return; }
@@ -259,6 +326,13 @@
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
       st.className = "rb-status rb-err"; st.textContent = "Enter their share as a percent between 0 and 100."; return;
+    }
+    let rateNum = null;
+    if (rateRaw !== "") {
+      rateNum = Number(rateRaw);
+      if (isNaN(rateNum) || rateNum < 0 || rateNum > 5) {
+        st.className = "rb-status rb-err"; st.textContent = "Rate must be a number between 0 and 5 ($/kWh), or blank."; return;
+      }
     }
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
       st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
@@ -268,6 +342,7 @@
     fd.append("customer_name", name);
     fd.append("array_id", arrayId);
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
+    if (rateNum !== null) fd.append("rate_per_kwh", String(rateNum));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
     fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
     fd.append("send_mode", mode);
@@ -548,6 +623,9 @@
       }
       list.innerHTML = subs.map(subCard).join("");
       list.querySelectorAll("[data-act]").forEach(b => b.onclick = onAction);
+      // Rate inputs commit on change (not click) — wire them separately.
+      list.querySelectorAll("input.rb-rate-input[data-act='rate']").forEach(inp =>
+        inp.onchange = onRateChange);
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
     }
@@ -568,6 +646,7 @@
             <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
             <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
             <span class="rb-chip ${live ? "rb-chip-live" : ""}">${esc(MODE_LABEL[s.send_mode] || s.send_mode)}</span>
+            <span class="rb-chip rb-chip-rate">${s.rate_per_kwh != null ? "$" + Number(s.rate_per_kwh).toFixed(3) + "/kWh" : "default rate"}</span>
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
           <div class="rb-sub-meta">
@@ -586,6 +665,12 @@
             <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
           </div>
           <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
+          <label class="rb-rate-edit" title="Per-customer rate ($/kWh) — blank uses your default">
+            <span>$</span>
+            <input type="number" class="rb-rate-input" data-act="rate" min="0" max="5" step="0.001"
+              value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="default">
+            <span>/kWh</span>
+          </label>
           <button class="ao-btn rb-btn" data-act="test">Send test</button>
           <a class="ao-btn rb-btn" data-act="preview" href="#">Preview</a>
           <button class="ao-btn rb-btn" data-act="toggle">${s.enabled ? "Pause" : "Resume"}</button>
@@ -595,10 +680,34 @@
       </div>`;
   }
 
+  // Per-customer rate committed inline (blank clears → use global default).
+  async function onRateChange(e) {
+    const inp = e.currentTarget;
+    const row = inp.closest(".rb-sub");
+    const id = row && row.getAttribute("data-id");
+    if (!id) return;
+    const st = $(".rb-sub-status", row);
+    const raw = inp.value.trim();
+    let body;
+    if (raw === "") {
+      body = { rate_per_kwh: null };
+    } else {
+      const n = Number(raw);
+      if (isNaN(n) || n < 0 || n > 5) {
+        if (st) { st.className = "rb-status rb-err"; st.textContent = "Rate must be 0–5 $/kWh, or blank."; }
+        return;
+      }
+      body = { rate_per_kwh: n };
+    }
+    const ok = await patch(id, body, st);
+    if (ok) await refreshList();
+  }
+
   async function onAction(e) {
     e.preventDefault();
     const btn = e.currentTarget;
     const act = btn.getAttribute("data-act");
+    if (act === "rate") return;   // handled by onRateChange (change, not click)
     const row = btn.closest(".rb-sub");
     const id = row && row.getAttribute("data-id");
     if (!id) return;

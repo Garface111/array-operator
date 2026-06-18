@@ -265,6 +265,32 @@ body.sb-fs-lock{ overflow:hidden; }
   border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
 .rb-mform-grid select{ cursor:pointer; }
 
+/* ---- field hint (under an input) ---- */
+.rb-fld-hint{ font-size:11px; color:var(--faint); margin-top:3px; line-height:1.4; }
+
+/* ---- global default rate bar ---- */
+.rb-globalrate{ display:flex; align-items:center; justify-content:space-between;
+  gap:18px; flex-wrap:wrap; margin-bottom:16px; }
+.rb-globalrate .rb-gr-main h3{ font-size:15.5px; margin:.2em 0 .15em; }
+.rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:52ch; margin:0; }
+.rb-gr-ctl{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rb-gr-ctl .rb-gr-dollar{ color:var(--muted); font-weight:700; }
+.rb-gr-ctl .rb-gr-unit{ color:var(--faint); font-size:12.5px; }
+.rb-gr-ctl input{ width:96px; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:10px; color:var(--ink);
+  padding:9px 11px; font:inherit; font-size:13.5px; text-align:right; }
+.rb-gr-ctl input:focus{ outline:none; border-color:rgba(94,194,255,.55);
+  background:rgba(94,194,255,.05); }
+
+/* ---- per-customer rate chip + inline editor ---- */
+.rb-chip-rate{ background:rgba(94,194,255,.12); color:var(--sky); border-color:rgba(94,194,255,.3); }
+.rb-rate-edit{ display:inline-flex; align-items:center; gap:4px; font-size:11.5px;
+  color:var(--faint); background:rgba(255,255,255,.03); border:1px solid var(--line);
+  border-radius:9px; padding:3px 8px; }
+.rb-rate-edit input.rb-rate-input{ width:64px; box-sizing:border-box; background:transparent;
+  border:0; color:var(--ink); font:inherit; font-size:12.5px; text-align:right; padding:2px 0; }
+.rb-rate-edit input.rb-rate-input:focus{ outline:none; }
+
 .rb-listwrap{ margin-top:8px; }
 .rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
   background:linear-gradient(165deg,var(--card),var(--card2)); border:1px solid var(--line);
