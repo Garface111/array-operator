@@ -1295,7 +1295,7 @@
         <div class="sb-col${isOpen?' expanded':''}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(col.vendor||"")}">
           <!-- ARRAY CARD — mirrors the inverter card's design, scaled to the array.
                Whole card is the expand affordance; the ⠿ grip reorders it. -->
-          <div class="sb-array sb-array--card ${aSleeping?'sleep':''}" data-tone="${aCardTone}">
+          <div class="sb-array sb-array--card ${aSleeping?'sleep':''}${(col.source_status&&col.source_status.state==='stale')?' sb-array--srcout':''}" data-tone="${aCardTone}">
             <span class="sb-drag" draggable="true" role="button" title="Drag this grip to reorder the array">⠿</span>
             ${arrayLiquidLayer(col, aOs, h.tone)}
             <div class="sb-array-plate">

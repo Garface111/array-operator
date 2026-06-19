@@ -222,6 +222,7 @@ window.FleetStore = (function(){
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
+      source_status: a.source_status || null,  // vendor-side data freshness → outage banner
       inverters: a.inverters.map(i => ({
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
@@ -558,6 +559,9 @@ window.FleetStore = (function(){
       // Server-computed sun-up flag (real solar elevation) — gates the card's
       // calm "Sleeping" night state on (night AND zero output), never zero alone.
       is_daylight: c.is_daylight !== false,
+      // Source-data freshness {state:ok|stale|none,last_report,age_hours}. Carried
+      // through so the card can flag a VENDOR-side reporting outage (not ours).
+      source_status: c.source_status || null,
       inverters: (c.inverters||[]).map(inv => ({
         id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
