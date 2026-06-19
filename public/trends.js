@@ -47,6 +47,8 @@
   let _activeStops = [];    // cleanup fns for every mounted view (stacked column)
   let _prepped = null;      // prepared data for the current payload
   let _switching = false;
+  let _arrayId = null;      // current per-array filter scope (null = whole fleet)
+  let _fleetArrays = [];    // full array list for the filter dropdown (kept across scopes)
 
   function loading() {
     const r = root(); if (!r) return;
@@ -298,11 +300,58 @@
     });
   }
 
+  // Per-array filter bar: a dropdown to scope every chart to one array (or the
+  // whole fleet). The option list always comes from the full fleet (_fleetArrays
+  // kept across scopes) so you can switch freely. Only shown when 2+ arrays.
+  function filterBar() {
+    const c = C();
+    if (!_fleetArrays || _fleetArrays.length < 2) return "";
+    const opts = [`<option value=""${_arrayId == null ? " selected" : ""}>All arrays (fleet)</option>`]
+      .concat(_fleetArrays.map(a => {
+        const dead = (a.lifetime_kwh || 0) <= 0;
+        const label = c.esc(a.name) + (dead ? " (no data yet)" : "");
+        return `<option value="${a.array_id}"${String(_arrayId) === String(a.array_id) ? " selected" : ""}>${label}</option>`;
+      }))
+      .join("");
+    const scopedName = _arrayId != null
+      ? (_fleetArrays.find(a => String(a.array_id) === String(_arrayId)) || {}).name
+      : null;
+    return `<div class="tr-filter">
+      <label class="tr-filter-lbl" for="trArraySel">Showing</label>
+      <div class="tr-select-wrap">
+        <select id="trArraySel" class="tr-select" aria-label="Filter trends by array">${opts}</select>
+      </div>
+      ${scopedName ? `<span class="tr-filter-scope">one array</span>` : `<span class="tr-filter-scope">${_fleetArrays.length} arrays combined</span>`}
+    </div>`;
+  }
+
   function render(d) {
     const c = C();
     const r = root(); if (!r) return;
+    // Keep the full fleet array list for the filter dropdown (it stays complete
+    // even when the payload is scoped to one array). Only refresh it when we're
+    // looking at the whole fleet, since a scoped payload still returns full
+    // by_array — but guard anyway.
+    if (Array.isArray(d.by_array) && d.by_array.length) _fleetArrays = d.by_array;
+    _arrayId = d.selected_array_id != null ? d.selected_array_id : null;
+
     const years = d.years || [];
-    if (!years.length) { empty(); return; }
+    // A scoped array with no data shouldn't blow away the filter — show an
+    // inline empty state but keep the dropdown so the user can switch back.
+    if (!years.length) {
+      teardown();
+      const scopedName = _arrayId != null
+        ? ((_fleetArrays.find(a => String(a.array_id) === String(_arrayId)) || {}).name || "this array")
+        : null;
+      if (_arrayId != null) {
+        r.innerHTML = `${filterBar()}
+          <div class="tr-empty"><div class="tr-empty-ic" aria-hidden="true">📈</div>
+          <div class="tr-empty-h">No production history for ${c.esc(scopedName)} yet</div>
+          <div class="tr-empty-p">This array hasn't logged generation we can chart. Pick another array or “All arrays” above.</div></div>`;
+        wireFilter(d);
+      } else { empty(); }
+      return;
+    }
     _prepped = c.prep(d);
     teardown();
 
@@ -334,11 +383,14 @@
     }).join("");
 
     r.innerHTML = `
+      ${filterBar()}
       ${statBand(d)}
       ${freshnessLine(d)}
       ${blocks}
       ${byArrayTable(d.by_array)}
     `;
+
+    wireFilter(d);
 
     // animate the stat numbers up
     r.querySelectorAll(".tr-v[data-target]").forEach(countUp);
@@ -362,14 +414,26 @@
     }
   }
 
-  function load() {
+  // Wire the array-filter dropdown: on change, re-fetch scoped to that array.
+  function wireFilter(d) {
+    const sel = document.getElementById("trArraySel");
+    if (!sel) return;
+    sel.addEventListener("change", () => {
+      const v = sel.value;
+      load(v === "" ? null : v);
+    });
+  }
+
+  function load(arrayId) {
     const s = session();
     if (!s) { empty("Sign in to see your fleet's multi-year production trends."); return; }
     if (!window.AOTrends || !C().listViews().length) {
-      return void setTimeout(load, 60);   // core/views not ready yet
+      return void setTimeout(() => load(arrayId), 60);   // core/views not ready yet
     }
+    if (arrayId !== undefined) _arrayId = arrayId;  // explicit scope (incl. null = fleet)
     loading();
-    fetch(API, { headers: { Authorization: "Bearer " + s } })
+    const url = _arrayId != null ? `${API}?array_id=${encodeURIComponent(_arrayId)}` : API;
+    fetch(url, { headers: { Authorization: "Bearer " + s } })
       .then(res => {
         if (res.status === 401 || res.status === 403) { const e = new Error("auth"); e.auth = true; throw e; }
         if (!res.ok) throw new Error("http " + res.status);
