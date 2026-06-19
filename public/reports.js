@@ -198,24 +198,25 @@
     const autoRate = a0 ? Number(a0.auto_net_rate) : null;
     body.innerHTML = `<div class="rb-wiz-card">
       <h3>Your billing rate</h3>
-      <p>Offtakers pay the <b>solar credit rate</b> minus a <b>discount</b> — that discount
-         is the solar savings you pass on. We default the solar credit rate automatically
-         from your utility's blended rate, and a <b>10% discount</b>.</p>
+      <p>The rate that will be used is <b>the rate that's on your current bill</b> —
+         we read that solar credit rate automatically from your utility, so you don't
+         need to enter it. Just enter the <b>discount rate from your contract with the
+         offtaker</b> — that's the solar savings you pass on (we default it to 10%).</p>
       <div class="rb-wiz-rate">
-        <label class="rb-gr-field"><span class="rb-gr-lbl">Solar credit rate (auto)</span>
+        <label class="rb-gr-field"><span class="rb-gr-lbl">Solar credit rate (from your bill)</span>
           <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
             <input type="number" id="rbWizNet" min="0" max="5" step="0.001"
               placeholder="${autoRate != null ? autoRate.toFixed(3) : "auto"}"
               value="${g.default_net_rate_per_kwh != null ? g.default_net_rate_per_kwh : ""}">
             <span class="rb-gr-unit">/kWh</span></span></label>
-        <label class="rb-gr-field"><span class="rb-gr-lbl">Discount</span>
+        <label class="rb-gr-field"><span class="rb-gr-lbl">Discount (from your offtaker contract)</span>
           <span class="rb-gr-inwrap">
             <input type="number" id="rbWizDisc" min="0" max="99" step="1" value="${discPct}">
             <span class="rb-gr-unit">% off</span></span></label>
       </div>
       <div class="rb-gr-eff" id="rbWizEff"></div>
-      <p class="rb-wiz-hint">Leave the solar credit rate blank to use the auto rate from your
-         bills${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override per offtaker later.</p>
+      <p class="rb-wiz-hint">Leave the solar credit rate blank to use the rate from your
+         bill${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override the discount per offtaker later.</p>
       ${wizNav({ back: true, nextLabel: "Accept & continue" })}</div>`;
     const net = $("#rbWizNet"), disc = $("#rbWizDisc"), eff = $("#rbWizEff");
     function renderEff() {
