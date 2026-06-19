@@ -27,11 +27,17 @@
   // each visualization feels like its own room while staying one family.
   const ACCENT = {
     bars:      "#3fd68a",
+    monthly:   "#3fd68a",
     liquid:    "#3fd68a",
     spiral:    "#f5b942",
     ridgeline: "#5ec2ff",
     heatfield: "#ffd479",
   };
+
+  // Views that need 2+ years of history to be meaningful (decorative multi-year
+  // art). With a single year they render near-empty, so we caption them honestly
+  // rather than letting them look broken.
+  const MULTIYEAR_VIEWS = { liquid: 1, spiral: 1, ridgeline: 1, heatfield: 1 };
 
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function root() { return document.getElementById("trendsRoot"); }
@@ -88,6 +94,29 @@
     })(t0);
   }
 
+  // Data-freshness + coverage line — a power user wants to know "through when,
+  // and how many arrays are actually reporting" before trusting the numbers.
+  function freshnessLine(d) {
+    const c = C();
+    const daily = d.daily_recent || [];
+    let lastDay = null;
+    for (const pt of daily) { if (pt && pt.day) lastDay = pt.day; }
+    const arrays = d.by_array || [];
+    const reporting = arrays.filter(a => (a.lifetime_kwh || 0) > 0).length;
+    const total = arrays.length;
+    const parts = [];
+    if (lastDay) {
+      const dt = new Date(lastDay + "T00:00:00");
+      const ago = Math.round((Date.now() - dt.getTime()) / 86400000);
+      const when = dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      parts.push(`Through <b>${c.esc(when)}</b>${ago > 1 ? ` (${ago}d ago)` : ago === 1 ? " (yesterday)" : " (today)"}`);
+    }
+    if (total) parts.push(`<b>${reporting}</b>/${total} array${total === 1 ? "" : "s"} reporting`);
+    if (!parts.length) return "";
+    return `<div class="tr-fresh">${parts.join(" · ")}
+      <button class="tr-export" id="trExport" type="button" title="Download monthly + daily production as CSV">↓ Export CSV</button></div>`;
+  }
+
   function statBand(d) {
     const c = C();
     const years = d.years || [];
@@ -102,20 +131,66 @@
       cur.forEach(p => { if (prevByMonth[p.month] != null) { curSum += (p.kwh || 0); prevSum += prevByMonth[p.month]; yoyMonths++; } });
       if (prevSum > 0 && yoyMonths > 0) latestYoY = (100 * (curSum - prevSum) / prevSum);
     }
+    // Best single month on record (a real, satisfying number even with 1 year).
+    let bestKwh = null, bestLabel = "";
+    const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    for (const y of years) {
+      for (const p of (d.monthly_by_year[String(y)] || [])) {
+        if (bestKwh == null || (p.kwh || 0) > bestKwh) { bestKwh = p.kwh || 0; bestLabel = `${MON[p.month - 1]} ${y}`; }
+      }
+    }
+    // Implied blended rate behind the savings number, for the tooltip.
+    const rate = (d.ttm_savings_usd && d.ttm_kwh) ? (d.ttm_savings_usd / d.ttm_kwh) : null;
     const yoyTitle = yoyMonths > 0
       ? `${latestYr} vs ${prevYr}, same ${yoyMonths} month${yoyMonths === 1 ? "" : "s"}`
-      : "year over year";
+      : "Year-over-year appears once you have two years of history";
+    const savTitle = rate ? `≈ $${rate.toFixed(3)}/kWh blended rate × trailing-12-mo kWh` : "Estimated value of the energy produced";
+
     const stat = (k, valHtml, extra) =>
       `<div class="tr-stat"${extra || ""}><span class="tr-glow"></span><div class="tr-k">${k}</div>${valHtml}</div>`;
     const num = (target, { dec = 0, pre = "", suf = "", sign = false, cls = "" } = {}) =>
       `<div class="tr-v ${cls}" data-target="${target}" data-dec="${dec}" data-pre="${pre}" data-suf="${suf}" data-sign="${sign ? 1 : 0}">${pre}0${suf}</div>`;
-    const dash = `<div class="tr-v">—</div>`;
+    const dash = `<div class="tr-v tr-v-dim">—</div>`;
+    const txt = (s, cls) => `<div class="tr-v ${cls || ""}">${s}</div>`;
+
+    // 4th tile is adaptive: show real YoY when we have 2+ years; otherwise show
+    // BEST MONTH (a meaningful number) instead of a confusing "—".
+    const fourth = latestYoY != null
+      ? stat("LATEST YOY", num(latestYoY, { dec: 1, suf: "%", sign: true, cls: latestYoY < 0 ? "neg" : "pos" }), ` title="${yoyTitle}"`)
+      : stat("BEST MONTH", (bestKwh != null
+          ? `<div class="tr-v">${c.fmt0(bestKwh)}<span class="tr-v-unit"> kWh</span></div><div class="tr-v-sub">${c.esc(bestLabel)}</div>`
+          : dash));
+
     return `<div class="tr-stats">
-      ${stat("TRAILING 12 MO", d.ttm_kwh == null ? dash : num(d.ttm_kwh, { suf: " kWh" }))}
+      ${stat("TRAILING 12 MO", d.ttm_kwh == null ? dash : `${num(d.ttm_kwh, { suf: " kWh" })}`)}
       ${stat("LIFETIME (FLEET)", d.lifetime_kwh == null ? dash : num(d.lifetime_kwh, { suf: " kWh" }))}
-      ${stat("LATEST YOY", latestYoY == null ? dash : num(latestYoY, { dec: 1, suf: "%", sign: true, cls: latestYoY < 0 ? "neg" : "pos" }), ` title="${yoyTitle}"`)}
-      ${stat("EST. SAVINGS (12 MO)", d.ttm_savings_usd == null ? dash : num(d.ttm_savings_usd, { pre: "$" }))}
+      ${stat("EST. VALUE (12 MO)", d.ttm_savings_usd == null ? dash : num(d.ttm_savings_usd, { pre: "$" }), ` title="${savTitle}"`)}
+      ${fourth}
     </div>`;
+  }
+
+  // Build a CSV of monthly + daily production and trigger a download.
+  function exportCsv(d) {
+    const rows = [["section", "period", "kwh"]];
+    const years = (d.years || []).slice().sort((a, b) => a - b);
+    const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    for (const y of years) {
+      for (const p of (d.monthly_by_year[String(y)] || [])) {
+        rows.push(["monthly", `${y}-${String(p.month).padStart(2, "0")} (${MON[p.month - 1]} ${y})`, p.kwh]);
+      }
+    }
+    for (const pt of (d.daily_recent || [])) rows.push(["daily", pt.day, pt.kwh]);
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v == null ? "" : v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `array-operator-production-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function switcher(activeKey) {
@@ -142,16 +217,29 @@
   function byArrayTable(byArray) {
     const c = C();
     if (!byArray || !byArray.length) return "";
-    const rows = byArray.map((a, i) =>
-      `<tr style="--ri:${i}"><td class="tr-aname">${c.esc(a.name)}</td>
-        <td class="tr-anum">${c.fmt0(a.lifetime_kwh)} kWh</td>
-        <td class="tr-ayears">${(a.years || []).join(", ") || "—"}</td></tr>`).join("");
+    // Default sort: most production first (a power user scans top performers).
+    const rows = byArray.slice().sort((a, b) => (b.lifetime_kwh || 0) - (a.lifetime_kwh || 0));
+    const total = rows.reduce((s, a) => s + (a.lifetime_kwh || 0), 0) || 1;
+    const body = rows.map((a, i) => {
+      const kwh = a.lifetime_kwh || 0;
+      const share = Math.round((kwh / total) * 100);
+      const yrs = (a.years || []).join(", ");
+      const dead = kwh <= 0;
+      const status = dead
+        ? `<span class="tr-astat tr-astat-none" title="No production on record yet — newly connected, or awaiting its first data pull">no data yet</span>`
+        : `<span class="tr-astat tr-astat-ok">${share}% of fleet</span>`;
+      return `<tr style="--ri:${i}" class="${dead ? "tr-arow-dim" : ""}">
+        <td class="tr-aname">${c.esc(a.name)}</td>
+        <td class="tr-anum">${dead ? "—" : c.fmt0(kwh) + " kWh"}</td>
+        <td>${status}</td>
+        <td class="tr-ayears">${yrs || "—"}</td></tr>`;
+    }).join("");
     return `<div class="tr-block">
       <div class="tr-block-h">BY ARRAY</div>
-      <div class="tr-block-sub">Lifetime production and the years on record for each array in your fleet.</div>
+      <div class="tr-block-sub">Lifetime production, share of fleet, and the years on record for each array — most productive first.</div>
       <div class="tr-tablewrap"><table class="tr-table">
-        <thead><tr><th>Array</th><th class="tr-anum">Lifetime</th><th>Years</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead><tr><th>Array</th><th class="tr-anum">Lifetime</th><th>Share</th><th>Years</th></tr></thead>
+        <tbody>${body}</tbody>
       </table></div>
     </div>`;
   }
@@ -218,30 +306,46 @@
     _prepped = c.prep(d);
     teardown();
 
-    const views = c.listViews();   // ordered: bars, liquid, spiral, heatfield…
+    const views = c.listViews();   // ordered: bars, monthly, liquid, spiral, heatfield…
+    const singleYear = years.length < 2;
 
     // Stat band + ONE block per visualization, stacked in a column. Each block
     // carries its own accent + ambient glow + title/description, and hosts its
     // own canvas. No switcher, no tabbing — the operator scrolls the column.
-    const blocks = views.map(v => `
-      <div class="tr-block tr-chartblock tr-stacked" style="--tr-accent:${ACCENT[v.key] || "#3fd68a"}">
+    // Multi-year art is captioned honestly when there's <2 years of history so
+    // a near-empty chart reads as "needs more history", not "broken".
+    const blocks = views.map(v => {
+      const needsYears = singleYear && MULTIYEAR_VIEWS[v.key];
+      const note = needsYears
+        ? `<div class="tr-needyears">Fills in once you have a second year of history — comparing years is what this view is for.</div>`
+        : "";
+      return `
+      <div class="tr-block tr-chartblock tr-stacked${needsYears ? " tr-dimmed" : ""}" style="--tr-accent:${ACCENT[v.key] || "#3fd68a"}">
         <span class="tr-ambient" aria-hidden="true"></span>
         <div class="tr-stack-head">
-          <span class="tr-stack-badge">${c.esc(v.badge || "")}</span>
+          <span class="tr-stack-dot" aria-hidden="true"></span>
           <h3 class="tr-stack-title">${c.esc(v.label)}</h3>
+          ${needsYears ? `<span class="tr-stack-tag">needs 2+ years</span>` : ""}
         </div>
         <div class="tr-view-desc">${c.esc(v.describe || "")}</div>
+        ${note}
         <div class="tr-chart-host" id="trHost_${v.key}"></div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
 
     r.innerHTML = `
       ${statBand(d)}
+      ${freshnessLine(d)}
       ${blocks}
       ${byArrayTable(d.by_array)}
     `;
 
     // animate the stat numbers up
     r.querySelectorAll(".tr-v[data-target]").forEach(countUp);
+
+    // wire the CSV export
+    const ex = document.getElementById("trExport");
+    if (ex) ex.addEventListener("click", () => exportCsv(d));
 
     // mount every view into its own host
     for (const v of views) {
