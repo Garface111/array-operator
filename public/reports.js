@@ -313,8 +313,9 @@
       try {
         const fd0 = new FormData(); fd0.append("file", f);
         const mr = await fetch(API + "/match", { method: "POST", headers: authHeaders(), body: fd0 });
-        const m = await mr.json().catch(() => ({}));
-        if (!mr.ok || !m.matched) {
+        const mdata = await mr.json().catch(() => ({}));
+        const m = mdata.match;   // /match nests the result under `match`
+        if (!mr.ok || !mdata.ok || !m || !m.matched) {
           st.className = "rb-status rb-err";
           st.textContent = "Couldn't recognize that workbook — try the typed form above.";
           return;
