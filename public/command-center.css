@@ -483,6 +483,15 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-more-row{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .rb-more-lbl{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
   color:var(--faint); }
+/* Source-data outage banner on an array card — makes it explicit the data gap
+   is at the vendor/source, not Array Operator. Amber = attention, not failure. */
+.sb-srcout{ display:flex; align-items:flex-start; gap:8px; margin:8px 0 4px;
+  padding:8px 11px; border-radius:10px;
+  background:linear-gradient(180deg,rgba(245,158,11,.16),rgba(245,158,11,.08));
+  border:1px solid rgba(245,158,11,.4); }
+.sb-srcout-ic{ color:#f5b942; font-size:13px; line-height:1.5; flex:none; }
+.sb-srcout-txt{ font-size:11.5px; line-height:1.45; color:var(--muted); }
+.sb-srcout-txt b{ color:#ffce72; font-weight:700; display:block; margin-bottom:1px; }
 /* offtaker details folded into the Edit panel */
 .rb-more-details{ display:flex; flex-direction:column; gap:9px; width:100%;
   padding-top:11px; border-top:1px dashed var(--line); }

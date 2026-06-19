@@ -1149,7 +1149,33 @@
       return;
     }
 
-    const expanded = getExpandedSet();   // which arrays have their inverter comb open
+    // Source-data freshness banner for an array card. When the array's vendor
+  // portal stopped receiving data from the site (backend source_status.state ===
+  // "stale"), show an amber banner that makes the OWNERSHIP of the outage explicit:
+  // it's the source/vendor that lost the data feed, NOT Array Operator. Renders ""
+  // when data is fresh ("ok") or there's no live feed at all ("none").
+  function fmtAge(h){
+    if(h == null) return "";
+    if(h < 1) return "under an hour ago";
+    if(h < 48) return `${Math.round(h)} hour${Math.round(h)===1?"":"s"} ago`;
+    return `${Math.round(h/24)} day${Math.round(h/24)===1?"":"s"} ago`;
+  }
+  function sourceStatusHTML(col){
+    const ss = col && col.source_status;
+    if(!ss || ss.state !== "stale") return "";
+    const vlabel = col.vendor ? (BRAND[col.vendor] || col.vendor)
+      : (Array.isArray(col.vendors) && col.vendors.length ? (BRAND[col.vendors[0]]||col.vendors[0]) : "the monitoring portal");
+    const age = fmtAge(ss.age_hours);
+    const ageTxt = age ? ` ${age}` : "";
+    return `<div class="sb-srcout" role="status"
+      title="This is a data outage at the source (${esc(String(vlabel))}), not in Array Operator. We'll show live data again as soon as ${esc(String(vlabel))} resumes reporting.">
+      <span class="sb-srcout-ic" aria-hidden="true">⚠</span>
+      <span class="sb-srcout-txt"><b>${esc(String(vlabel))} stopped reporting${ageTxt}.</b>
+      This is a data outage at the source — not Array Operator. Live data resumes automatically when ${esc(String(vlabel))} reconnects.</span>
+    </div>`;
+  }
+
+  const expanded = getExpandedSet();   // which arrays have their inverter comb open
     const expandAllDefault = !hasExpandPref();  // first visit → reveal every inverter
     const columns = cols.map(col => {
       const isOpen = expandAllDefault || expanded.has(String(col.array_id));
@@ -1257,6 +1283,10 @@
       // the whole-card tint mirrors the inverter card: amber on a live anomaly the
       // 14-day health hasn't caught yet, else the calm aggregate output tone.
       const aCardTone = (h.tone === "ok" && aLs.key === "dark") ? "warn" : aOs.tone;
+      // Source-data freshness banner: when the VENDOR portal (e.g. SolarEdge)
+      // stopped receiving data from this site, say so plainly — it's a source-
+      // side outage, not our system. Renders nothing when data is fresh.
+      const srcStatusBanner = sourceStatusHTML(col);
       // where the array's data comes from: a single clickable vendor brand-link
       // when single-vendor, else the mixed chip + origin portal links beneath.
       const srcLinks = col.vendor ? brandLinkHTML(col) : (brandChip + originLinksHTML(col));
@@ -1274,6 +1304,7 @@
                 ${sizePill}
               </div>
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
+              ${srcStatusBanner}
               ${arrayGraph(sortedInvs, col.daily)}
               ${aNowChip}
               ${arrayOutputBar(aOs)}
