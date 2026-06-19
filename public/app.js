@@ -700,6 +700,14 @@ function updateGmpGate(session){
     })
     .catch(() => { /* never block the dashboard on the gate */ });
 }
+// Expose for sandbox.js to re-check the gate after a GMP capture lands.
+try {
+  window.updateGmpGate = updateGmpGate;
+  window.__aoRefreshGmpGate = function(){
+    let s = null; try { s = localStorage.getItem("so_session"); } catch(e){}
+    updateGmpGate(s);
+  };
+} catch(e){}
 
 function renderFromSession(){
   let session = null;

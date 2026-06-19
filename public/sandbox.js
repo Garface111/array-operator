@@ -123,7 +123,30 @@
       return;
     }
     const hdr = { "Content-Type":"application/json", "Authorization":"Bearer "+session };
-    if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Got your ${esc(BRAND[d.provider]||d.provider)} account — bringing your inverters in…`; }
+    if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Got your ${esc(BRAND[d.provider]||d.provider)} account — bringing your data in…`; }
+    // ── GMP/VEC/WEC BILL-SYNC broadcast ──────────────────────────────────────
+    // The bill-capture script (content.js → /v1/sync) already created the utility
+    // accounts + queued the bill pull SERVER-SIDE; it broadcasts SO_CAPTURE_LANDED
+    // with an accountCount but NO accounts[] (and no kind:"utility_meter"). That's
+    // a SUCCESS for connecting GMP — not a failure. Recognize it, refresh, and let
+    // the live-usage capture (which DOES carry accounts[]) flow through below.
+    const isMeterProvider = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
+    const hasAccounts = Array.isArray(d.accounts) && d.accounts.length > 0;
+    if(isMeterProvider && !hasAccounts && d.ok !== false && d.kind !== "utility_meter"){
+      const nAcct = (typeof d.accountCount === "number") ? d.accountCount : 0;
+      if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Connected your ${esc(BRAND[d.provider]||d.provider)} account${nAcct===1?"":"s"} — syncing your bills…`; }
+      try {
+        if(window.FleetStore && FleetStore.refetch){ await FleetStore.refetch(); }
+      } catch(e){}
+      try { if(typeof updateGmpGate === "function") updateGmpGate(getSession()); } catch(e){}
+      try { if(window.__aoRefreshGmpGate) window.__aoRefreshGmpGate(); } catch(e){}
+      closeAddModal();
+      if(typeof toast === "function"){
+        toast(nAcct ? `Connected ${nAcct} ${esc(BRAND[d.provider]||d.provider)} account${nAcct===1?"":"s"} — your bills are syncing in.` : `Connected your ${esc(BRAND[d.provider]||d.provider)} account — your bills are syncing in.`, "ok");
+      }
+      load();
+      return;
+    }
     try{
       let r, data;
       if(d.provider === "solaredge" && d.apiKey){
@@ -132,13 +155,17 @@
       } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint") && Array.isArray(d.sites) && d.sites.length){
         r = await fetch("/v1/array-owners/inverter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
-      } else if((d.provider === "gmp" || d.provider === "vec" || d.provider === "wec") && Array.isArray(d.accounts) && d.accounts.length){
+      } else if(isMeterProvider && hasAccounts){
         // Utility-meter capture (GMP server-pull + VEC/WEC client-pull) all land
         // as a per-account daily[] payload → the one proven utility-meter endpoint.
         r = await fetch("/v1/array-owners/utility-meter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, accounts: d.accounts }) });
       } else {
-        if(note){ note.className = "sb-note err"; note.textContent = `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
+        // Honest, provider-appropriate message: GMP/VEC/WEC are utility METERS,
+        // not inverters. Only reaches here when we truly got nothing usable.
+        if(note){ note.className = "sb-note err"; note.textContent = isMeterProvider
+          ? `We reached ${BRAND[d.provider]||d.provider} but couldn't read your account yet — make sure you're signed in there, then try again.`
+          : `We reached ${BRAND[d.provider]||d.provider} but couldn't read your inverters — make sure you're signed in there, then try again.`; }
         return;
       }
       data = {}; try { data = await r.json(); } catch(e){}
