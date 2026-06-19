@@ -191,7 +191,7 @@
         </div>
         </div>
       </div>
-      <div class="fc-note">${esc(simNote)}</div>`;
+      ${MODEL.simulated ? `<div class="fc-note">${esc(simNote)}</div>` : ``}`;
 
     // Wire the relocated Alerts button (moved here from the sandbox head). The
     // settings modal lives in sandbox.js and is exposed as window.__sbOpenAlerts.
