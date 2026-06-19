@@ -38,7 +38,7 @@
   function savedView() { try { return localStorage.getItem(VIEW_KEY); } catch (e) { return null; } }
   function saveView(k) { try { localStorage.setItem(VIEW_KEY, k); } catch (e) {} }
 
-  let _activeStop = null;   // cleanup fn for the currently-mounted view
+  let _activeStops = [];    // cleanup fns for every mounted view (stacked column)
   let _prepped = null;      // prepared data for the current payload
   let _switching = false;
 
@@ -57,7 +57,8 @@
   }
 
   function teardown() {
-    if (_activeStop) { try { _activeStop(); } catch (e) {} _activeStop = null; }
+    for (const stop of _activeStops) { try { stop(); } catch (e) {} }
+    _activeStops = [];
   }
 
   // ── animated count-up ──────────────────────────────────────────────────────
@@ -215,43 +216,46 @@
     const years = d.years || [];
     if (!years.length) { empty(); return; }
     _prepped = c.prep(d);
+    teardown();
 
-    const views = c.listViews();
-    let active = savedView();
-    if (!active || !c.getView(active)) active = c.getView("bars") ? "bars" : ((views[0] && views[0].key) || "liquid");
+    const views = c.listViews();   // ordered: bars, liquid, spiral, heatfield…
+
+    // Stat band + ONE block per visualization, stacked in a column. Each block
+    // carries its own accent + ambient glow + title/description, and hosts its
+    // own canvas. No switcher, no tabbing — the operator scrolls the column.
+    const blocks = views.map(v => `
+      <div class="tr-block tr-chartblock tr-stacked" style="--tr-accent:${ACCENT[v.key] || "#3fd68a"}">
+        <span class="tr-ambient" aria-hidden="true"></span>
+        <div class="tr-stack-head">
+          <span class="tr-stack-badge">${c.esc(v.badge || "")}</span>
+          <h3 class="tr-stack-title">${c.esc(v.label)}</h3>
+        </div>
+        <div class="tr-view-desc">${c.esc(v.describe || "")}</div>
+        <div class="tr-chart-host" id="trHost_${v.key}"></div>
+      </div>`).join("");
 
     r.innerHTML = `
       ${statBand(d)}
-      <div class="tr-block tr-chartblock" style="--tr-accent:${ACCENT[active] || "#3fd68a"}">
-        <span class="tr-ambient" aria-hidden="true"></span>
-        <div class="tr-chart-head">
-          ${switcher(active)}
-        </div>
-        <div class="tr-view-desc" id="trViewDesc"></div>
-        <div class="tr-chart-host" id="trChartHost"></div>
-      </div>
+      ${blocks}
       ${byArrayTable(d.by_array)}
     `;
 
     // animate the stat numbers up
     r.querySelectorAll(".tr-v[data-target]").forEach(countUp);
 
-    // wire switcher
-    r.querySelectorAll(".tr-seg").forEach(btn => {
-      btn.addEventListener("click", () => mountView(btn.getAttribute("data-view")));
-    });
-    // keep the indicator glued to the active segment on resize
-    if (window.ResizeObserver) {
-      const ro = new ResizeObserver(() => moveIndicator());
-      const sw = r.querySelector(".tr-switch"); if (sw) ro.observe(sw);
-    } else {
-      window.addEventListener("resize", moveIndicator);
+    // mount every view into its own host
+    for (const v of views) {
+      const host = document.getElementById("trHost_" + v.key);
+      if (!host) continue;
+      host.style.position = "relative";
+      try {
+        const stop = v.mount(host, _prepped, c);
+        if (stop) _activeStops.push(stop);
+      } catch (e) {
+        host.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">This view hit an error.</div></div>`;
+        if (window.console) console.error("trends view " + v.key + " failed", e);
+      }
     }
-
-    mountView(active, { immediate: true });
-    // indicator needs layout; nudge after paint + on web-font settle
-    requestAnimationFrame(moveIndicator);
-    setTimeout(moveIndicator, 220);
   }
 
   function load() {

@@ -37,6 +37,14 @@
 .tr-chartblock>*{position:relative;z-index:1}
 @keyframes tr-breathe{0%,100%{opacity:.62}50%{opacity:1}}
 .tr-chart-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* stacked-column view headers (all four visualizations shown at once) */
+.tr-stacked{margin-top:22px}
+.tr-stack-head{display:flex;align-items:center;gap:10px}
+.tr-stack-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;
+  padding:0 7px;border-radius:7px;font-size:11px;font-weight:800;letter-spacing:.02em;
+  color:var(--tr-accent);background:color-mix(in srgb, var(--tr-accent) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--tr-accent) 40%, transparent)}
+.tr-stack-title{margin:0;font-size:16px;font-weight:700;color:var(--ink)}
 .tr-switch{position:relative;display:inline-flex;gap:2px;background:rgba(255,255,255,.04);
   border:1px solid var(--line);border-radius:14px;padding:4px}
 /* sliding indicator pill (lives behind the segments) */
