@@ -55,6 +55,26 @@
 
   /* ── Comfortable tap targets on the common controls ────────────────────── */
   .cc-btn, .sb-togglebtn, .btn-primary-lg { min-height: 42px; }
+
+  /* ── Trends: the BY-ARRAY table must scroll INSIDE its wrap, never push the
+     page sideways. The wrap is overflow-x:auto already; pin it to the viewport
+     width and let the table keep its natural column widths + scroll. ───────── */
+  #trendsRoot, #panelTrends { max-width: 100%; overflow-x: hidden; }
+  .tr-tablewrap { max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .tr-table { min-width: 460px; }            /* keep columns readable; wrap scrolls */
+  .tr-table th, .tr-table td { padding: 10px 12px; }
+
+  /* ── Embedded fleet HERO stat plate (the "88% fleet healthy" + counts + $/mo
+     block on the landing demo + command center). On desktop .fc-plate is a
+     no-wrap flex row → the right-hand counts/$ clipped off-screen on a phone.
+     Stack it vertically and let the counts wrap. ─────────────────────────── */
+  .fc-plate { flex-direction: column; align-items: stretch; gap: 12px;
+              padding: 14px 16px; }
+  .fc-plate * { min-width: 0; max-width: 100%; }
+  .fc-stats { font-size: 13.5px; }
+  .fc-stat b { font-size: 17px; }
+  .fc-health-num { font-size: 40px; }
+  .fc-right { align-items: flex-start; }
 }
 
 /* Extra squeeze for the smallest phones. */
