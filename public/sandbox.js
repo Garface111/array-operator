@@ -1002,6 +1002,9 @@
       return new Set(Array.isArray(a) ? a.map(String) : []);
     } catch(e){ return new Set(); }
   }
+  function hasExpandPref(){
+    try { return localStorage.getItem(EXPAND_KEY) != null; } catch(e){ return false; }
+  }
   function saveExpandedSet(set){
     try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...set])); } catch(e){}
   }
@@ -1020,13 +1023,13 @@
     try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
   }
 
-  // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array, the
-  // glanceable whole-fleet picture) vs "canvas" (the interactive tree the owner
-  // drills into). Persisted; DEFAULT grid so the zoomed-out glance leads. ----
+  // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
+  // "canvas" (the interactive tree). Persisted; DEFAULT canvas so the owner lands
+  // on the zoomed-out tree with every inverter revealed (quick whole-fleet picture). ----
   const VIEWMODE_KEY = "ao_sandbox_viewmode";
   function getViewMode(){
-    try { return localStorage.getItem(VIEWMODE_KEY) === "canvas" ? "canvas" : "grid"; }
-    catch(e){ return "grid"; }
+    try { return localStorage.getItem(VIEWMODE_KEY) === "grid" ? "grid" : "canvas"; }
+    catch(e){ return "canvas"; }
   }
   function setViewMode(m){
     try { localStorage.setItem(VIEWMODE_KEY, m === "canvas" ? "canvas" : "grid"); } catch(e){}
@@ -1147,8 +1150,9 @@
     }
 
     const expanded = getExpandedSet();   // which arrays have their inverter comb open
+    const expandAllDefault = !hasExpandPref();  // first visit → reveal every inverter
     const columns = cols.map(col => {
-      const isOpen = expanded.has(String(col.array_id));
+      const isOpen = expandAllDefault || expanded.has(String(col.array_id));
       const invs = col.inverters || [];
       // tier-2 chip:
       //  - single vendor → ONE merged, vendor-colored, clickable brand pill that
