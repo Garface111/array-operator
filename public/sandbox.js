@@ -1168,10 +1168,10 @@
     const age = fmtAge(ss.age_hours);
     const ageTxt = age ? ` ${age}` : "";
     return `<div class="sb-srcout" role="status"
-      title="This is a data outage at the source (${esc(String(vlabel))}), not in Array Operator. We'll show live data again as soon as ${esc(String(vlabel))} resumes reporting.">
+      title="This is a data outage at the source (${esc(String(vlabel))}), not in Array Operator. The time below is when ${esc(String(vlabel))}'s INVERTER monitoring last reported — your utility's meter clock (e.g. GMP) tracks a different feed and may differ. We'll show live data again as soon as ${esc(String(vlabel))} resumes reporting.">
       <span class="sb-srcout-ic" aria-hidden="true">⚠</span>
-      <span class="sb-srcout-txt"><b>${esc(String(vlabel))} stopped reporting${ageTxt}.</b>
-      This is a data outage at the source — not Array Operator. Live data resumes automatically when ${esc(String(vlabel))} reconnects.</span>
+      <span class="sb-srcout-txt"><b>${esc(String(vlabel))} inverter monitoring last reported${ageTxt}.</b>
+      This is a data outage at the source — not Array Operator. (This is the inverter feed; your utility meter, e.g. GMP, tracks separately and may show a different time.) Live data resumes automatically when ${esc(String(vlabel))} reconnects.</span>
     </div>`;
   }
 
