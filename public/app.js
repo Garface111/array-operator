@@ -675,6 +675,7 @@ function updateGmpGate(session){
           (s.unlinked_accounts === 1 ? "it isn't" : "they aren't") +
           " linked to an array yet — so their bills can't flow in. <b>You're not done yet.</b>";
         cta.textContent = "Link accounts →";
+        cta.onclick = null;
         cta.setAttribute("href", "#account");
       } else {
         gate.classList.remove("almost");
@@ -682,7 +683,18 @@ function updateGmpGate(session){
         title.textContent = "Connect GMP to finish setting up";
         sub.innerHTML = "Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b>";
         cta.textContent = "Connect GMP →";
-        cta.setAttribute("href", "/onboarding#connect-gmp");
+        // Launch the REAL connect flow: opens greenmountainpower.com in a new tab
+        // and the extension grabs the bills. NO detour back to onboarding.
+        cta.removeAttribute("href");
+        cta.setAttribute("role", "button");
+        cta.style.cursor = "pointer";
+        cta.onclick = (e) => {
+          e.preventDefault();
+          // Make sure we're on the Arrays tab (where the sandbox + modal live).
+          if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
+          if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
+          else { location.href = "/onboarding#connect-gmp"; }  // defensive fallback
+        };
       }
       gate.hidden = false;
     })

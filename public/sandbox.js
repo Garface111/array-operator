@@ -2629,6 +2629,24 @@
     if(btn) btn.onclick = openAddArrayModal;
   }
 
+  // Global hook so the GMP-onboarding gate banner (app.js) can launch the REAL
+  // connect flow directly — open the Add-array modal and, when the extension is
+  // present, immediately fire the GMP portal login (opens greenmountainpower.com
+  // in a new tab; the extension captures + lands the bills here). No detour back
+  // to /onboarding. When the extension isn't installed yet, the modal shows the
+  // "add the free helper" step instead, which is the correct next action.
+  window.__aoConnectGmp = function(){
+    openAddArrayModal();
+    // Give the modal a tick to render, then either launch GMP or surface install.
+    setTimeout(() => {
+      if(EXT_PRESENT){
+        try { openPortalLogin("gmp"); } catch(e){}
+      }
+      // If the extension isn't present, openAddArrayModal already rendered the
+      // "add the 1-click helper" path — leave it so the owner installs it first.
+    }, 60);
+  };
+
   /* ---- 'Reset layout' — snap inverters back to their discovered grouping.
    * Goes through the store (which persists to the server when live). ---- */
   function wireResetButton(host){
