@@ -453,6 +453,14 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-chip-live{ background:rgba(94,194,255,.16); color:var(--sky); }
 .rb-chip-off{ background:rgba(255,107,107,.14); color:var(--bad); }
 .rb-sub-acts{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+/* collapsible per-offtaker controls (Edit toggle reveals .rb-sub-more) */
+.rb-edit-toggle{ font-weight:600; }
+.rb-sub-more{ flex-basis:100%; display:flex; flex-direction:column; gap:10px;
+  margin-top:10px; padding-top:11px; border-top:1px solid var(--line); }
+.rb-sub-more[hidden]{ display:none; }
+.rb-more-row{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.rb-more-lbl{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--faint); }
 .rb-mini button{ padding:6px 10px; font-size:11.5px; }
 .rb-btn{ background:rgba(255,255,255,.05); border:1px solid var(--line); color:var(--ink);
   padding:7px 12px; border-radius:9px; font-size:12.5px; cursor:pointer; text-decoration:none; }

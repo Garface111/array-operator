@@ -371,7 +371,6 @@
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
-          <span class="rep-eyebrow">Your default billing</span>
           <h3>Bill offtakers at a discount off the solar credit rate</h3>
           <p>Offtakers pay the <b>solar credit rate</b> minus your <b>discount</b> — that's
              their solar savings. Default is <b>10% off</b>. Applies to any
@@ -447,10 +446,9 @@
 
   // ---- Quarterly reports subtab ---------------------------------------------
   // A per-customer quarterly performance report: the quarter's invoice math +
-  // the same Trends visuals (Solar Spiral + Energy Ridgeline) the Trends tab
-  // uses, reusing window.AOTrends so the charts can't drift from that tab.
+  // the real daily-generation bar graph (the chart a customer actually reads),
+  // reusing window.AOBars so it can't drift from the Trends tab's bar chart.
   let QTRENDS_STOPS = [];     // active chart cleanup fns
-  let QTRENDS_DATA = null;    // cached fleet-trends payload
 
   function teardownQTrends() {
     QTRENDS_STOPS.forEach(fn => { try { fn && fn(); } catch (e) {} });
@@ -462,7 +460,6 @@
     if (!host) return;
     host.innerHTML = `
       <div class="rep-card rb-q-head">
-        <span class="rep-eyebrow">Quarterly reports</span>
         <h3>Quarterly performance report</h3>
         <p>Pick an offtaker and a quarter — we build the produced-kWh invoice for
            that quarter plus a visual production report, then you review and send it.</p>
@@ -546,15 +543,14 @@
       <div class="rep-card rb-q-charts">
         <h4>Production report</h4>
         <div class="rb-q-chart rb-q-chart-wide"><div class="rb-q-chart-cap">Daily Generation</div><div id="rbqBars" class="rb-q-canvas"></div></div>
-        <div class="rb-q-chart"><div class="rb-q-chart-cap">Solar Spiral</div><div id="rbqSpiral" class="rb-q-canvas"></div></div>
       </div>
       <div class="rb-q-actions">
         <button class="ao-btn ao-btn-primary rb-btn" id="rbqDraft" type="button">Draft this report for review →</button>
         <span class="rb-status" id="rbqStatus"></span>
       </div>`;
 
-    // 2) mount the visuals: the daily-generation bar graph (default/primary,
-    //    from real DailyGeneration) + the Solar Spiral (multi-year flourish).
+    // 2) mount the daily-generation bar graph (real DailyGeneration, the chart
+    //    the offtaker reads on their report).
     mountQTrends(subId);
 
     // 3) "Draft for review" reuses the existing per-subscription draft flow.
@@ -563,11 +559,11 @@
   }
 
   async function mountQTrends(subId) {
-    const barsHost = $("#rbqBars"), spiralHost = $("#rbqSpiral");
+    const barsHost = $("#rbqBars");
 
-    // ── primary: DAILY GENERATION bar graph (real DailyGeneration, scaled to
-    //    this offtaker's share). This is the default chart owners want on a
-    //    monthly report. Never fabricated — honest empty when no daily rows.
+    // DAILY GENERATION bar graph (real DailyGeneration, scaled to this
+    // offtaker's share) — the one chart a customer actually reads on a
+    // monthly/quarterly report. Never fabricated; honest empty when no rows.
     if (barsHost && window.AOBars && subId) {
       barsHost.style.position = "relative";
       barsHost.innerHTML = `<div class="empty" style="padding:18px 0;color:var(--faint)">Loading daily generation…</div>`;
@@ -577,37 +573,11 @@
         barsHost.innerHTML = "";
         const stop = window.AOBars.mount(barsHost, data || {});
         if (stop) QTRENDS_STOPS.push(stop);
-        // caption the period if we have one
         const cap = barsHost.parentElement && barsHost.parentElement.querySelector(".rb-q-chart-cap");
         if (cap && data && data.period_label) cap.textContent = "Daily Generation · " + data.period_label;
       } catch (e) {
         barsHost.innerHTML = `<div class="empty" style="padding:18px 0;color:var(--faint)">Couldn't load daily generation.</div>`;
       }
-    }
-
-    // ── secondary: Solar Spiral (multi-year fleet flourish, from /fleet-trends)
-    const C = window.AOTrends;
-    if (!C || !spiralHost) return;
-    try {
-      if (!QTRENDS_DATA) {
-        const r = await fetch("/v1/array-owners/fleet-trends", { headers: authHeaders() });
-        if (!r.ok) throw new Error("trends fetch " + r.status);
-        QTRENDS_DATA = await r.json();
-      }
-      const prepped = C.prep(QTRENDS_DATA);
-      if (!prepped.years || !prepped.years.length) {
-        spiralHost.innerHTML =
-          `<div class="empty" style="padding:20px 0;color:var(--faint)">No multi-year history to chart yet.</div>`;
-        return;
-      }
-      const view = C.getView("spiral");
-      spiralHost.style.position = "relative";
-      if (!view) { spiralHost.innerHTML = `<div class="empty">spiral view unavailable.</div>`; return; }
-      try { const stop = view.mount(spiralHost, prepped, C); if (stop) QTRENDS_STOPS.push(stop); }
-      catch (e) { spiralHost.innerHTML = `<div class="empty">Chart error.</div>`; }
-    } catch (e) {
-      spiralHost.innerHTML =
-        `<div class="empty" style="padding:20px 0;color:var(--faint)">Couldn't load production charts.</div>`;
     }
   }
 
@@ -641,7 +611,6 @@
       <div class="rep-card rb-cust-head">
         <div class="rb-cust-head-row">
           <div>
-            <span class="rep-eyebrow">Offtakers</span>
             <h3>Your offtakers</h3>
             <p>Edit each offtaker's details — their company name, contact email,
                which array they're billed from, and their share. Changes save to the
@@ -1337,10 +1306,6 @@
             <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
             <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
             <span class="rb-chip ${live ? "rb-chip-live" : ""}">${esc(MODE_LABEL[s.send_mode] || s.send_mode)}</span>
-            <span class="rb-chip rb-chip-rate">${
-              s.discount_pct != null ? Math.round(s.discount_pct * 100) + "% off"
-              : (s.rate_per_kwh != null ? "$" + Number(s.rate_per_kwh).toFixed(3) + "/kWh"
-              : "default discount")}</span>
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
           <div class="rb-sub-meta">
@@ -1354,26 +1319,35 @@
           </div>` : ""}
         </div>
         <div class="rb-sub-acts">
-          <div class="rb-seg rb-slider rb-mini" data-act="delivery">
-            <button type="button" data-v="approval" class="${s.delivery_mode !== "auto" ? "on" : ""}">Draft</button>
-            <button type="button" data-v="auto" class="${s.delivery_mode === "auto" ? "on" : ""}">Auto</button>
-          </div>
-          <div class="rb-seg rb-slider rb-mini" data-act="mode">
-            <button type="button" data-v="to_me" class="${s.send_mode === "to_me" ? "on" : ""}">Me</button>
-            <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
-            <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
-          </div>
           <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
-          <label class="rb-rate-edit" title="Per-customer discount (% off the solar credit rate) — blank uses your default">
-            <input type="number" class="rb-rate-input" data-act="discount" min="0" max="99" step="1"
-              value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
-            <span>% off</span>
-          </label>
-          <button class="ao-btn rb-btn" data-act="test">Send test</button>
           <a class="ao-btn rb-btn" data-act="preview" href="#">Preview</a>
-          <button class="ao-btn rb-btn" data-act="toggle">${s.enabled ? "Pause" : "Resume"}</button>
-          <button class="ao-btn rb-btn rb-danger" data-act="delete">Delete</button>
+          <button class="ao-btn rb-btn rb-edit-toggle" data-act="edit" aria-expanded="false">Edit ⌄</button>
           <span class="rb-status rb-sub-status"></span>
+          <div class="rb-sub-more" hidden>
+            <div class="rb-more-row">
+              <span class="rb-more-lbl">Delivery</span>
+              <div class="rb-seg rb-slider rb-mini" data-act="delivery">
+                <button type="button" data-v="approval" class="${s.delivery_mode !== "auto" ? "on" : ""}">Draft</button>
+                <button type="button" data-v="auto" class="${s.delivery_mode === "auto" ? "on" : ""}">Auto</button>
+              </div>
+              <span class="rb-more-lbl">Send to</span>
+              <div class="rb-seg rb-slider rb-mini" data-act="mode">
+                <button type="button" data-v="to_me" class="${s.send_mode === "to_me" ? "on" : ""}">Me</button>
+                <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
+                <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
+              </div>
+              <label class="rb-rate-edit" title="Per-offtaker discount (% off the solar credit rate) — blank uses your default">
+                <input type="number" class="rb-rate-input" data-act="discount" min="0" max="99" step="1"
+                  value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
+                <span>% off</span>
+              </label>
+            </div>
+            <div class="rb-more-row">
+              <button class="ao-btn rb-btn" data-act="test">Send test</button>
+              <button class="ao-btn rb-btn" data-act="toggle">${s.enabled ? "Pause" : "Resume"}</button>
+              <button class="ao-btn rb-btn rb-danger" data-act="delete">Delete</button>
+            </div>
+          </div>
         </div>
       </div>`;
   }
@@ -1411,6 +1385,17 @@
     const id = row && row.getAttribute("data-id");
     if (!id) return;
     const st = $(".rb-sub-status", row);
+
+    if (act === "edit") {
+      // Expand/collapse the per-offtaker controls (delivery, send-to, discount,
+      // test/pause/delete). Purely local — no fetch, no list refresh.
+      const more = $(".rb-sub-more", row);
+      if (!more) return;
+      const open = more.hasAttribute("hidden");
+      if (open) { more.removeAttribute("hidden"); btn.textContent = "Close ⌃"; btn.setAttribute("aria-expanded", "true"); }
+      else { more.setAttribute("hidden", ""); btn.textContent = "Edit ⌄"; btn.setAttribute("aria-expanded", "false"); }
+      return;
+    }
 
     if (act === "mode") {
       const seg = btn; // wrapper has data-act=mode; actual click target is a button inside
