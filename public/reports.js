@@ -105,6 +105,9 @@
     WIZ = { step: 0, state: setupState, customers: [] };
     drawWizard();
   }
+  // Test/QA hook: jump to a wizard step (no-op if the wizard isn't active).
+  try { window.__rbWizGoto = (n) => { if (WIZ) { WIZ.step = n; drawWizard(); } }; } catch (e) {}
+  try { window.__rbRenderWizard = (s) => renderWizard(s); } catch (e) {}
 
   function thisYear() { return new Date().getFullYear(); }
 
@@ -250,7 +253,10 @@
       <div class="rb-wiz-cust-row">
         <span><b>${esc(c.customer_name)}</b> · ${c.from_upload
           ? "from spreadsheet ✓"
-          : esc(c.array_name) + " · " + Math.round(c.allocation_pct * 100) + "%" + (c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : "")}</span>
+          : (Array.isArray(c.allocations) && c.allocations.length
+              ? c.allocations.map(al => esc(al.array_name) + " " + Math.round(al.allocation_pct * 100) + "%").join(" · ")
+              : esc(c.array_name) + " · " + Math.round(c.allocation_pct * 100) + "%")
+            + (c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : "")}</span>
         ${c.from_upload
           ? `<span class="rb-wiz-cust-saved">added</span>`
           : `<button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>`}
@@ -262,8 +268,16 @@
       <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No offtakers added yet.</div>`}</div>
       <div class="rb-wiz-cust-form">
         <input type="text" id="rbWizCName" placeholder="Offtaker name">
-        <select id="rbWizCArray">${arrays.map(a => `<option value="${a.array_id}" data-name="${esc(a.name)}">${esc(a.name)}</option>`).join("")}</select>
-        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCPct" min="0.01" max="100" step="0.01" placeholder="25"><span>% of array</span></span>
+        <div class="rb-wiz-arraysel" id="rbWizCArrays">
+          <div class="rb-wiz-arraysel-lbl">Which arrays does this offtaker own a share of?</div>
+          ${arrays.length ? arrays.map(a => `
+            <label class="rb-wiz-asrow" data-aid="${a.array_id}">
+              <input type="checkbox" class="rb-wiz-acheck" data-aid="${a.array_id}" data-name="${esc(a.name)}">
+              <span class="rb-wiz-aname">${esc(a.name)}</span>
+              <span class="rb-wiz-apct-wrap"><input type="number" class="rb-wiz-apct" data-aid="${a.array_id}"
+                min="0.01" max="100" step="0.01" placeholder="100" disabled><span>% of array</span></span>
+            </label>`).join("") : `<div class="rb-wiz-empty">No arrays — add one first.</div>`}
+        </div>
         <span class="rb-wiz-inwrap"><input type="number" id="rbWizCDisc" min="0" max="99" step="1" placeholder="default"><span>% off (optional)</span></span>
         <input type="email" id="rbWizCEmail" placeholder="offtaker@email (optional)">
         <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add offtaker</button>
@@ -285,22 +299,42 @@
     body.querySelectorAll(".rb-wiz-cust-del").forEach(b => b.onclick = () => {
       WIZ.customers.splice(Number(b.getAttribute("data-i")), 1); drawStepCustomers();
     });
+    // Enable/disable each array's % input with its checkbox.
+    body.querySelectorAll(".rb-wiz-acheck").forEach(cb => cb.onchange = () => {
+      const row = cb.closest(".rb-wiz-asrow");
+      const pctInp = row ? row.querySelector(".rb-wiz-apct") : null;
+      if (pctInp) { pctInp.disabled = !cb.checked; if (cb.checked) pctInp.focus(); }
+    });
     $("#rbWizCAdd").onclick = () => {
       const st = $("#rbWizCStatus");
       const name = $("#rbWizCName").value.trim();
-      const sel = $("#rbWizCArray");
-      const arrayId = sel.value;
-      const arrayName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].getAttribute("data-name") : "";
-      const pct = Number($("#rbWizCPct").value);
       const discRaw = $("#rbWizCDisc").value.trim();
       const email = $("#rbWizCEmail").value.trim();
       if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
-      if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick an array."; return; }
-      if (isNaN(pct) || pct <= 0 || pct > 100) { st.className = "rb-status rb-err"; st.textContent = "Enter their share 0–100%."; return; }
+      // Collect checked arrays + their ownership %.
+      const allocations = [];
+      let bad = false;
+      body.querySelectorAll(".rb-wiz-acheck").forEach(cb => {
+        if (!cb.checked) return;
+        const row = cb.closest(".rb-wiz-asrow");
+        const pctInp = row.querySelector(".rb-wiz-apct");
+        const pct = Number(pctInp.value);
+        if (isNaN(pct) || pct <= 0 || pct > 100) { bad = true; return; }
+        allocations.push({
+          array_id: cb.getAttribute("data-aid"),
+          array_name: cb.getAttribute("data-name"),
+          allocation_pct: pct / 100,
+        });
+      });
+      if (!allocations.length) { st.className = "rb-status rb-err"; st.textContent = "Check at least one array and set its %."; return; }
+      if (bad) { st.className = "rb-status rb-err"; st.textContent = "Each checked array needs a share 0–100%."; return; }
       let disc = null;
       if (discRaw !== "") { const d = Number(discRaw); if (isNaN(d) || d < 0 || d >= 100) { st.className = "rb-status rb-err"; st.textContent = "Discount 0–99% or blank."; return; } disc = d / 100; }
-      WIZ.customers.push({ customer_name: name, array_id: arrayId, array_name: arrayName,
-        allocation_pct: pct / 100, discount_pct: disc, client_email: email || null });
+      WIZ.customers.push({ customer_name: name, allocations,
+        // back-compat fields for the single-array display/finish path:
+        array_id: allocations[0].array_id, array_name: allocations[0].array_name,
+        allocation_pct: allocations[0].allocation_pct,
+        discount_pct: disc, client_email: email || null });
       drawStepCustomers();
     };
     // Spreadsheet path in the wizard: match + create the workbook sub immediately
@@ -375,8 +409,14 @@
         if (c.from_upload) { created++; continue; }  // workbook subs already created on upload
         const fd = new FormData();
         fd.append("customer_name", c.customer_name);
-        fd.append("array_id", c.array_id);
-        fd.append("allocation_pct", String(c.allocation_pct));
+        if (Array.isArray(c.allocations) && c.allocations.length > 1) {
+          // Multi-array: send the allocations list (array_id + pct each).
+          fd.append("array_allocations", JSON.stringify(
+            c.allocations.map(al => ({ array_id: Number(al.array_id), allocation_pct: al.allocation_pct }))));
+        } else {
+          fd.append("array_id", c.array_id);
+          fd.append("allocation_pct", String(c.allocation_pct));
+        }
         if (c.discount_pct != null) fd.append("discount_pct", String(c.discount_pct));
         fd.append("cadence", "monthly");
         fd.append("delivery_mode", "approval");

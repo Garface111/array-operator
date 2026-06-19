@@ -369,6 +369,18 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-wiz-arr-rate{ min-width:96px; text-align:right; font-size:13px; color:var(--good); font-weight:600; }
 .rb-wiz-rate{ display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end; }
 .rb-wiz-custs{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+/* Multi-array picker in step 3: checkbox per array + its own ownership %. */
+.rb-wiz-arraysel{ display:flex; flex-direction:column; gap:6px; width:100%;
+  border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  background:rgba(255,255,255,.02); }
+.rb-wiz-arraysel-lbl{ font-size:12px; color:var(--muted); margin-bottom:2px; }
+.rb-wiz-asrow{ display:flex; align-items:center; gap:10px; padding:5px 2px; }
+.rb-wiz-asrow input[type=checkbox]{ width:16px; height:16px; flex:none; accent-color:var(--good); }
+.rb-wiz-aname{ flex:1; font-size:13.5px; color:var(--ink); }
+.rb-wiz-apct-wrap{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+.rb-wiz-apct{ width:64px; background:rgba(255,255,255,.04); border:1px solid var(--line);
+  border-radius:7px; color:var(--ink); padding:5px 8px; font:inherit; font-size:13px; text-align:center; }
+.rb-wiz-apct:disabled{ opacity:.4; }
 .rb-wiz-cust-row{ display:flex; justify-content:space-between; align-items:center;
   background:rgba(63,214,138,.06); border:1px solid rgba(63,214,138,.2); border-radius:10px;
   padding:9px 14px; font-size:13px; color:var(--ink); }
