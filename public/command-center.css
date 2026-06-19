@@ -256,6 +256,28 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-manual-toggle p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:46ch; }
 .rb-manual-toggle .rb-btn{ white-space:nowrap; }
 .rb-manual-form{ margin-top:18px; }
+/* unified Add-an-offtaker panel (Type it in / Upload a spreadsheet tabs) */
+.rb-add-head{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.rb-add-head h3{ margin:0; }
+.rb-add-tabs{ display:inline-flex; gap:2px; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:12px; padding:3px; }
+.rb-add-tabs button{ background:transparent; border:0; color:var(--muted); cursor:pointer;
+  font-size:12.5px; font-weight:600; padding:6px 13px; border-radius:9px; }
+.rb-add-tabs button.on{ background:rgba(63,214,138,.16); color:var(--good); }
+.rb-add-head .rb-cancel{ margin-left:auto; }
+.rb-add-sub{ color:var(--faint); font-size:12.5px; margin:8px 2px 14px; }
+/* wizard spreadsheet path */
+.rb-wiz-upload{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);
+  display:flex; flex-direction:column; gap:7px; }
+.rb-wiz-or{ font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--faint); align-self:center; }
+.rb-wiz-uplabel{ display:block; cursor:pointer; font-size:13px; color:var(--muted);
+  background:rgba(255,255,255,.03); border:1px dashed var(--line); border-radius:10px;
+  padding:12px 14px; line-height:1.5; }
+.rb-wiz-uplabel:hover{ border-color:rgba(63,214,138,.5); }
+.rb-wiz-uplabel b{ color:var(--ink); }
+.rb-wiz-cust-saved{ font-size:11.5px; font-weight:700; color:var(--good);
+  background:rgba(63,214,138,.1); border-radius:999px; padding:2px 9px; }
 .rb-mform-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:14px 0 4px; }
 .rb-mform-grid .rep-fld{ display:flex; flex-direction:column; gap:6px; }
 .rb-mform-grid input, .rb-mform-grid select{ width:100%; box-sizing:border-box;

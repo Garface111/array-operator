@@ -68,17 +68,15 @@
         if (r.ok && st.ok) { FORCE_TAB = false; return renderWizard(st); }
       } catch (e) {}
     };
-    wireUpload();
     wireGlobalRate();
-    // "＋ Add an offtaker" lives in the list header now (Offtakers subtab merged
-    // into the Invoice Generator). The manual-add form mounts inline + refreshes
-    // the offtaker list on save.
+    // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
+    // spreadsheet); the upload zone + live doc-preview live inside that panel
+    // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
     MANUAL_HOST_ID = "rbCustManual";
     MANUAL_AFTER_ADD = refreshList;
     MANUAL_OPEN = false;
     const addBtn = $("#rbCustAdd");
     if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
-    renderDoc();              // right pane starts as the "drop a sheet" placeholder
     await Promise.all([refreshInbox(), refreshList()]);
   }
   window.__aoLoadReports = load;
@@ -249,9 +247,12 @@
     const arrays = WIZ.state.arrays || [];
     const rows = WIZ.customers.map((c, i) => `
       <div class="rb-wiz-cust-row">
-        <span><b>${esc(c.customer_name)}</b> · ${esc(c.array_name)} · ${Math.round(c.allocation_pct * 100)}%${
-          c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : ""}</span>
-        <button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>
+        <span><b>${esc(c.customer_name)}</b> · ${c.from_upload
+          ? "from spreadsheet ✓"
+          : esc(c.array_name) + " · " + Math.round(c.allocation_pct * 100) + "%" + (c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : "")}</span>
+        ${c.from_upload
+          ? `<span class="rb-wiz-cust-saved">added</span>`
+          : `<button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>`}
       </div>`).join("");
     body.innerHTML = `<div class="rb-wiz-card">
       <h3>Add your offtakers</h3>
@@ -266,6 +267,15 @@
         <input type="email" id="rbWizCEmail" placeholder="offtaker@email (optional)">
         <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add offtaker</button>
         <span class="rb-status" id="rbWizCStatus"></span>
+      </div>
+      <div class="rb-wiz-upload">
+        <span class="rb-wiz-or">— or —</span>
+        <label class="rb-wiz-uplabel">
+          <input type="file" id="rbWizFile" accept=".xlsx,.xls" hidden>
+          <b>Already bill in your own spreadsheet?</b> Upload it and we'll keep
+          invoicing in that exact format. <span class="rb-sample-link">Choose a file…</span>
+        </label>
+        <span class="rb-status" id="rbWizUpStatus"></span>
       </div>
       ${wizNav({ back: true, nextLabel: WIZ.customers.length ? "Continue" : "Skip for now", nextId: "rbWizCustNext" })}</div>`;
     if (!arrays.length) {
@@ -291,6 +301,43 @@
       WIZ.customers.push({ customer_name: name, array_id: arrayId, array_name: arrayName,
         allocation_pct: pct / 100, discount_pct: disc, client_email: email || null });
       drawStepCustomers();
+    };
+    // Spreadsheet path in the wizard: match + create the workbook sub immediately
+    // (wizard defaults: monthly · draft for approval · to me), then list it.
+    const upFile = $("#rbWizFile");
+    if (upFile) upFile.onchange = async () => {
+      const f = upFile.files[0];
+      if (!f) return;
+      const st = $("#rbWizUpStatus");
+      st.className = "rb-status rb-busy"; st.textContent = "Reading " + f.name + "…";
+      try {
+        const fd0 = new FormData(); fd0.append("file", f);
+        const mr = await fetch(API + "/match", { method: "POST", headers: authHeaders(), body: fd0 });
+        const m = await mr.json().catch(() => ({}));
+        if (!mr.ok || !m.matched) {
+          st.className = "rb-status rb-err";
+          st.textContent = "Couldn't recognize that workbook — try the typed form above.";
+          return;
+        }
+        const fd = new FormData();
+        fd.append("file", f);
+        fd.append("customer_name", (m.customer && m.customer.name) || f.name.replace(/\.xl\w+$/i, ""));
+        fd.append("cadence", "monthly");
+        fd.append("delivery_mode", "approval");
+        fd.append("send_mode", "to_me");
+        if (m.customer && m.customer.email) fd.append("client_email", m.customer.email);
+        fd.append("formats", JSON.stringify(["pdf"]));
+        const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) {
+          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) || "Couldn't save that workbook.";
+          return;
+        }
+        WIZ.customers.push({ customer_name: (m.customer && m.customer.name) || f.name, from_upload: true });
+        drawStepCustomers();
+      } catch (e) {
+        st.className = "rb-status rb-err"; st.textContent = "Network error reading that file.";
+      }
     };
     wireWizNav();   // Continue just advances; customers are created at Review/Finish
   }
@@ -323,6 +370,7 @@
       st.className = "rb-status rb-busy"; st.textContent = "Creating your offtakers…";
       let created = 0;
       for (const c of WIZ.customers) {
+        if (c.from_upload) { created++; continue; }  // workbook subs already created on upload
         const fd = new FormData();
         fd.append("customer_name", c.customer_name);
         fd.append("array_id", c.array_id);
@@ -400,29 +448,6 @@
           <span class="rb-status" id="rbGrStatus"></span>
         </div>
         <div class="rb-gr-eff" id="rbGrEff"></div>
-      </div>
-      <div class="rb-layout">
-        <div class="rb-col-form">
-          <div class="rb-upload rep-card" id="rbUpload">
-            <span class="rep-eyebrow">Step 1 · Match a spreadsheet</span>
-            <h3>Drop a billing spreadsheet</h3>
-            <p>Any of your billing workbooks — we recognize the offtaker, their
-               percentage of the array, and the latest billing period automatically.</p>
-            <label class="rb-drop" id="rbDrop">
-              <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
-              <span class="rb-drop-ico">⬆</span>
-              <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
-              <span class="rb-drop-sub">.xlsx — up to 8 MB</span>
-            </label>
-            <p class="rb-sample-hint">Not sure what to upload?
-              <a href="/sample-billing.xlsx" download="sample-billing.xlsx" class="rb-sample-link">
-                Download a sample billing spreadsheet</a>, then drop it back here to
-              see exactly how matching works.</p>
-            <div class="rb-status" id="rbStatus"></div>
-          </div>
-          <div id="rbPreview"></div>
-        </div>
-        <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
@@ -809,6 +834,8 @@
     return ARRAYS;
   }
 
+  let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
+
   function renderManual() {
     const host = $("#" + MANUAL_HOST_ID);
     if (!host) return;
@@ -817,68 +844,114 @@
       return;
     }
     host.innerHTML = `
-      <div class="rep-card rb-manual-form">
-        <span class="rep-eyebrow">Add an offtaker · % of an array</span>
-        <h3>New offtaker</h3>
-        <div class="rb-mform-grid">
-          <label class="rep-fld"><span class="rl">Offtaker name</span>
-            <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-          <label class="rep-fld"><span class="rl">Which array?</span>
-            <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
-          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
-          <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
-            <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
-            <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
-          <label class="rep-fld"><span class="rl">Client email</span>
-            <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
-        </div>
-        <div class="rb-controls">
-          <div class="rb-ctl">
-            <span class="rl">When a report is ready</span>
-            <div class="rb-seg rb-slider" id="rbmDelivery">
-              <button type="button" data-v="approval" class="on">Draft for my approval</button>
-              <button type="button" data-v="auto">Auto-send</button>
-            </div>
+      <div class="rep-card rb-manual-form rb-add-panel">
+        <div class="rb-add-head">
+          <h3>New offtaker</h3>
+          <div class="rb-add-tabs" role="tablist">
+            <button type="button" data-addmode="manual" class="${ADD_MODE === "manual" ? "on" : ""}">Type it in</button>
+            <button type="button" data-addmode="upload" class="${ADD_MODE === "upload" ? "on" : ""}">Upload a spreadsheet</button>
           </div>
-          <div class="rb-ctl">
-            <span class="rl">Cadence</span>
-            <div class="rb-seg" id="rbmCadence">
-              <button type="button" data-v="monthly" class="on">Monthly</button>
-              <button type="button" data-v="quarterly">Quarterly</button>
-            </div>
-          </div>
-          <div class="rb-ctl">
-            <span class="rl">Send to</span>
-            <div class="rb-seg rb-slider" id="rbmMode">
-              <button type="button" data-v="to_me" class="on">To me</button>
-              <button type="button" data-v="to_client">To my client</button>
-              <button type="button" data-v="to_both">To both</button>
-            </div>
-          </div>
-        </div>
-        <div class="rb-actions">
-          <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add offtaker</button>
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
-          <span class="rb-status" id="rbmStatus"></span>
         </div>
-        <p class="rep-note">New offtakers send <b>to you</b> by default — move the slider
-           to “To my client” only when you're ready for them to receive it.</p>
+        <p class="rb-add-sub">${ADD_MODE === "manual"
+          ? "Bill an offtaker for a share of an array's generation — no spreadsheet needed."
+          : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
+
+        <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
+          <div class="rb-mform-grid">
+            <label class="rep-fld"><span class="rl">Offtaker name</span>
+              <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
+            <label class="rep-fld"><span class="rl">Which array?</span>
+              <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
+            <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
+              <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
+            <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
+              <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
+              <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
+            <label class="rep-fld"><span class="rl">Client email</span>
+              <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
+          </div>
+          <div class="rb-controls">
+            <div class="rb-ctl">
+              <span class="rl">When a report is ready</span>
+              <div class="rb-seg rb-slider" id="rbmDelivery">
+                <button type="button" data-v="approval" class="on">Draft for my approval</button>
+                <button type="button" data-v="auto">Auto-send</button>
+              </div>
+            </div>
+            <div class="rb-ctl">
+              <span class="rl">Cadence</span>
+              <div class="rb-seg" id="rbmCadence">
+                <button type="button" data-v="monthly" class="on">Monthly</button>
+                <button type="button" data-v="quarterly">Quarterly</button>
+              </div>
+            </div>
+            <div class="rb-ctl">
+              <span class="rl">Send to</span>
+              <div class="rb-seg rb-slider" id="rbmMode">
+                <button type="button" data-v="to_me" class="on">To me</button>
+                <button type="button" data-v="to_client">To my client</button>
+                <button type="button" data-v="to_both">To both</button>
+              </div>
+            </div>
+          </div>
+          <div class="rb-actions">
+            <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add offtaker</button>
+            <span class="rb-status" id="rbmStatus"></span>
+          </div>
+          <p class="rep-note">New offtakers send <b>to you</b> by default — move the slider
+             to “To my client” only when you're ready for them to receive it.</p>
+        </div>
+
+        <div id="rbAddUpload" ${ADD_MODE === "upload" ? "" : "hidden"}>
+          <div class="rb-layout">
+            <div class="rb-col-form">
+              <div class="rb-upload" id="rbUpload">
+                <label class="rb-drop" id="rbDrop">
+                  <input type="file" id="rbFile" accept=".xlsx,.xls" hidden>
+                  <span class="rb-drop-ico">⬆</span>
+                  <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
+                  <span class="rb-drop-sub">.xlsx — up to 8 MB</span>
+                </label>
+                <p class="rb-sample-hint">Not sure what to upload?
+                  <a href="/sample-billing.xlsx" download="sample-billing.xlsx" class="rb-sample-link">
+                    Download a sample billing spreadsheet</a>, then drop it back here to
+                  see exactly how matching works.</p>
+                <div class="rb-status" id="rbStatus"></div>
+              </div>
+              <div id="rbPreview"></div>
+            </div>
+            <aside class="rb-col-doc" id="rbDocPane"></aside>
+          </div>
+        </div>
       </div>`;
-    wireSegments(host);
-    $("#rbmCancel").onclick = () => { MANUAL_OPEN = false; renderManual(); };
-    $("#rbmSave").onclick = saveManual;
-    // Populate the array picker.
-    fetchArrays().then(arrs => {
-      const sel = $("#rbmArray");
-      if (!sel) return;
-      if (!arrs.length) {
-        sel.innerHTML = `<option value="">No arrays yet — add one in the Arrays tab</option>`;
-        return;
-      }
-      sel.innerHTML = `<option value="">Choose an array…</option>` +
-        arrs.map(a => `<option value="${a.id}">${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+
+    // Tab switching within the add panel.
+    host.querySelectorAll(".rb-add-tabs button").forEach(b => b.onclick = () => {
+      ADD_MODE = b.getAttribute("data-addmode");
+      renderManual();
     });
+    $("#rbmCancel").onclick = () => { MANUAL_OPEN = false; PENDING = null; renderManual(); };
+
+    if (ADD_MODE === "manual") {
+      wireSegments(host);
+      $("#rbmSave").onclick = saveManual;
+      // Populate the array picker.
+      fetchArrays().then(arrs => {
+        const sel = $("#rbmArray");
+        if (!sel) return;
+        if (!arrs.length) {
+          sel.innerHTML = `<option value="">No arrays yet — add one in the Arrays tab</option>`;
+          return;
+        }
+        sel.innerHTML = `<option value="">Choose an array…</option>` +
+          arrs.map(a => `<option value="${a.id}">${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+      });
+    } else {
+      // Upload path: wire the dropzone + paint the live doc-preview placeholder.
+      wireUpload();
+      renderDoc();
+    }
   }
 
   async function saveManual() {
@@ -1168,10 +1241,12 @@
         return;
       }
       PENDING = null;
-      $("#rbPreview").innerHTML = "";
-      $("#rbStatus").textContent = "";
-      $("#rbFile").value = "";
-      await refreshList();
+      // Close the add panel and refresh the offtaker list (mirrors the manual
+      // path). The panel is the unified "Add an offtaker" surface now.
+      MANUAL_OPEN = false;
+      renderManual();
+      if (MANUAL_AFTER_ADD) await MANUAL_AFTER_ADD();
+      else await refreshList();
     } catch (e) {
       st.className = "rb-status rb-err"; st.textContent = "Network error while saving.";
     }
