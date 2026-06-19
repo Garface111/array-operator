@@ -3238,10 +3238,10 @@
    * rule: 10+ chars, a letter, a number). ------------------------------------ */
   function passwordRow(a){
     const hasPw = !!(a && a.has_password === true);
-    const stateTxt = hasPw ? "••••••••" : "Not set yet";
+    const stateTxt = hasPw ? "Password set ••••••••" : "No password yet";
     const subTxt = hasPw
-      ? "You sign in with your email and password."
-      : "Add a password so you can sign in without the emailed link.";
+      ? "You can sign in with your email and password, or the emailed link."
+      : "You currently sign in with the emailed magic link. Add a password to also sign in directly.";
     const btnLabel = hasPw ? "Change password" : "Set a password";
     const curField = hasPw ? `
           <label class="acct-pw-fld"><span class="acct-pw-lab">Current password</span>
@@ -3262,7 +3262,6 @@
           <div class="acct-pw-hint">At least 10 characters, including a letter and a number.</div>
           <div class="acct-pw-actions">
             <button class="acct-btn primary" id="pwSave" type="button">Save password</button>
-            <button class="acct-btn" id="pwCancel" type="button">Cancel</button>
           </div>
           <div class="acct-msg" id="pwMsg"></div>
         </div>
@@ -3295,8 +3294,6 @@
         const first = pwCurrent || pwNew; if(first) try{ first.focus(); }catch(e){}
       } else close();
     };
-    const cancel = document.getElementById("pwCancel");
-    if(cancel) cancel.onclick = close;
 
     // The only honest "view your password": reveal what you're typing (the stored
     // one is hashed and unrecoverable). Toggles both new + confirm together.
