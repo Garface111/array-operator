@@ -3352,7 +3352,10 @@
         const h = authHeaders();
         if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
         const url  = field === "company" ? "/v1/account/company-name" : "/v1/account/email";
-        const body = field === "company" ? { company_name: val } : { email: val };
+        // Backend models: UpdateCompanyName{name}, UpdateEmail{email}. The
+        // company endpoint wants `name` (not `company_name`) — sending the wrong
+        // key 422s, which was the "Couldn't save (HTTP 422)" bug.
+        const body = field === "company" ? { name: val } : { email: val };
         btn.disabled = true;
         if(msg){ msg.className = "acct-msg"; msg.textContent = "Saving…"; }
         try{
