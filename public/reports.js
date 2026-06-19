@@ -160,7 +160,7 @@
                 value="${a.install_year != null ? a.install_year : ""}">
             </label>
             <span class="rb-wiz-arr-rate" data-aid="${a.array_id}">${
-              a.age_known ? "$" + Number(a.auto_net_rate).toFixed(4) + "/kWh" : "set year →"}</span>
+              a.age_known ? "$" + Number(a.auto_net_rate).toFixed(4) + "/kWh" : ""}</span>
           </div>`).join("")}
       </div>
       <p class="rb-wiz-hint">Don't know the exact date? The year is enough.</p>
