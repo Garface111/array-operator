@@ -70,6 +70,14 @@
     };
     wireUpload();
     wireGlobalRate();
+    // "＋ Add an offtaker" lives in the list header now (Offtakers subtab merged
+    // into the Invoice Generator). The manual-add form mounts inline + refreshes
+    // the offtaker list on save.
+    MANUAL_HOST_ID = "rbCustManual";
+    MANUAL_AFTER_ADD = refreshList;
+    MANUAL_OPEN = false;
+    const addBtn = $("#rbCustAdd");
+    if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
     renderDoc();              // right pane starts as the "drop a sheet" placeholder
     await Promise.all([refreshInbox(), refreshList()]);
   }
@@ -364,7 +372,6 @@
       <div class="rb-subtabs" role="tablist">
         <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Offtaker Invoice Generator</button>
         <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
-        <button type="button" class="rb-subtab" data-sub="customers" role="tab">Offtakers</button>
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
@@ -418,13 +425,18 @@
         <aside class="rb-col-doc" id="rbDocPane"></aside>
       </div>
       <div class="rb-listwrap">
-        <div class="cc-treedivider"><h3>Your offtakers</h3>
-          <span>each offtaker's percentage of the array · invoice + summary on its cadence</span></div>
+        <div class="cc-treedivider rb-list-head">
+          <div>
+            <h3>Your offtakers</h3>
+            <span>each offtaker's percentage of the array · invoice + summary on its cadence</span>
+          </div>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+        </div>
+        <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       </div><!-- /rbSubInvoice -->
-      <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>
-      <div id="rbSubCustomers" class="rb-subpanel" style="display:none"></div>`;
+      <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
   }
 
   // ---- subtab switching (Invoice generator / Quarterly reports / Customers) --
@@ -435,12 +447,10 @@
     tabs.forEach(btn => btn.onclick = () => {
       const sub = btn.getAttribute("data-sub");
       tabs.forEach(b => b.classList.toggle("on", b === btn));
-      const inv = $("#rbSubInvoice"), q = $("#rbSubQuarterly"), c = $("#rbSubCustomers");
+      const inv = $("#rbSubInvoice"), q = $("#rbSubQuarterly");
       if (inv) inv.style.display = sub === "invoice" ? "" : "none";
       if (q) q.style.display = sub === "quarterly" ? "" : "none";
-      if (c) c.style.display = sub === "customers" ? "" : "none";
       if (sub === "quarterly") renderQuarterly();
-      if (sub === "customers") renderCustomers();
     });
   }
 
@@ -593,94 +603,6 @@
         if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft."; }
       }
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
-  }
-
-  // ---- Customers subtab ------------------------------------------------------
-  // "This is where you edit customers" (offtakers). Each customer is one
-  // editable card: name, contact email, CC, which array + their share, and rate.
-  // Saving PATCHes only the changed fields to /subscriptions/{id}. No fabricated
-  // data — fields come straight from the saved subscription.
-  async function renderCustomers() {
-    const host = $("#rbSubCustomers");
-    if (!host) return;
-    // Route the manual-add form to this subtab + refresh the offtaker list on add.
-    MANUAL_HOST_ID = "rbCustManual";
-    MANUAL_AFTER_ADD = renderCustomers;
-    MANUAL_OPEN = false;
-    host.innerHTML = `
-      <div class="rep-card rb-cust-head">
-        <div class="rb-cust-head-row">
-          <div>
-            <h3>Your offtakers</h3>
-            <p>Edit each offtaker's details — their company name, contact email,
-               which array they're billed from, and their share. Changes save to the
-               offtaker used by both the Offtaker Invoice Generator and Quarterly reports.</p>
-          </div>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
-        </div>
-      </div>
-      <div id="rbCustManual"></div>
-      <div id="rbCustList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading offtakers…</div></div>`;
-    const addBtn = $("#rbCustAdd");
-    if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
-    const list = $("#rbCustList");
-    try {
-      const [r, arrs] = await Promise.all([
-        fetch(API + "/subscriptions", { headers: authHeaders() }),
-        fetchArrays(),
-      ]);
-      if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
-      const subs = ((await r.json().catch(() => ({}))).subscriptions) || [];
-      if (!subs.length) {
-        list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">
-          No offtakers yet — click <b>＋ Add an offtaker</b> above to create your first one.</div>`;
-        return;
-      }
-      list.innerHTML = subs.map(s => custCard(s, arrs)).join("");
-      list.querySelectorAll(".rb-cust").forEach(card => wireCustCard(card));
-    } catch (e) {
-      list.innerHTML = `<div class="empty">Couldn't load offtakers — refresh to retry.</div>`;
-    }
-  }
-
-  function custCard(s, arrs) {
-    const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
-    const manual = s.billing_model === "percent_of_array";
-    const arrayOpts = (arrs || []).map(a =>
-      `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
-    return `
-      <div class="rep-card rb-cust" data-id="${s.id}">
-        <div class="rb-cust-top">
-          <div class="rb-cust-title">${esc(s.customer_name)}</div>
-          <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
-        </div>
-        <div class="rb-cust-grid">
-          <label class="rep-fld"><span class="rl">Company / offtaker name</span>
-            <input type="text" data-f="customer_name" value="${esc(s.customer_name || "")}" placeholder="e.g. Sunnybrook Apartments"></label>
-          <label class="rep-fld"><span class="rl">Contact email</span>
-            <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="offtaker@example.com"></label>
-          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
-            <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
-          ${manual ? `
-          <label class="rep-fld"><span class="rl">Array</span>
-            <select data-f="array_id">${arrayOpts || `<option value="">No arrays</option>`}</select></label>
-          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
-          ` : ""}
-          <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
-            <input type="number" data-f="rate_per_kwh" min="0" max="5" step="0.001" value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="blank = your default rate">
-            <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
-        </div>
-        <div class="rb-cust-acts">
-          <button class="ao-btn ao-btn-primary rb-btn" data-cact="save" type="button">Save changes</button>
-          <span class="rb-status rb-cust-status"></span>
-        </div>
-      </div>`;
-  }
-
-  function wireCustCard(card) {
-    const save = card.querySelector('[data-cact="save"]');
-    if (save) save.onclick = () => saveCustCard(card);
   }
 
   async function saveCustCard(card) {
@@ -1260,19 +1182,25 @@
     const list = $("#rbList");
     if (!list) return;
     try {
-      const r = await fetch(API + "/subscriptions", { headers: authHeaders() });
+      const [r, arrs] = await Promise.all([
+        fetch(API + "/subscriptions", { headers: authHeaders() }),
+        fetchArrays(),
+      ]);
       if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
       const data = await r.json().catch(() => ({}));
       const subs = (data && data.subscriptions) || [];
       if (!subs.length) {
-        list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No scheduled reports yet — upload a spreadsheet above to create one.</div>`;
+        list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
         return;
       }
-      list.innerHTML = subs.map(subCard).join("");
+      list.innerHTML = subs.map(s => subCard(s, arrs)).join("");
       list.querySelectorAll("[data-act]").forEach(b => b.onclick = onAction);
       // Rate inputs commit on change (not click) — wire them separately.
       list.querySelectorAll("input.rb-rate-input[data-act='discount']").forEach(inp =>
         inp.onchange = onRateChange);
+      // Per-offtaker "Save details" buttons (name/email/array/share/rate).
+      list.querySelectorAll('[data-cact="save"]').forEach(b =>
+        b.onclick = () => saveCustCard(b.closest(".rb-sub")));
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
     }
@@ -1293,12 +1221,16 @@
     }[src] || (src || "");
   }
 
-  function subCard(s) {
+  function subCard(s, arrs) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
     const last = s.last_sent_at ? new Date(s.last_sent_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never";
     const fmts = (s.formats || []).map(f => f.toUpperCase()).join(" + ");
     const live = s.send_mode !== "to_me";
+    const manual = s.billing_model === "percent_of_array";
+    const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
+    const arrayOpts = (arrs || []).map(a =>
+      `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
     return `
       <div class="rb-sub ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}">
         <div class="rb-sub-main">
@@ -1341,6 +1273,28 @@
                   value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
                 <span>% off</span>
               </label>
+            </div>
+            <div class="rb-more-details">
+              <span class="rb-more-lbl">Offtaker details</span>
+              <div class="rb-cust-grid">
+                <label class="rep-fld"><span class="rl">Company / offtaker name</span>
+                  <input type="text" data-f="customer_name" value="${esc(s.customer_name || "")}" placeholder="e.g. Sunnybrook Apartments"></label>
+                <label class="rep-fld"><span class="rl">Contact email</span>
+                  <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="offtaker@example.com"></label>
+                <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
+                  <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
+                ${manual ? `
+                <label class="rep-fld"><span class="rl">Array</span>
+                  <select data-f="array_id">${arrayOpts || `<option value="">No arrays</option>`}</select></label>
+                <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
+                  <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
+                ` : ""}
+                <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
+                  <input type="number" data-f="rate_per_kwh" min="0" max="5" step="0.001" value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="blank = your default rate">
+                  <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
+              </div>
+              <button class="ao-btn ao-btn-primary rb-btn" data-cact="save" type="button">Save details</button>
+              <span class="rb-status rb-cust-status"></span>
             </div>
             <div class="rb-more-row">
               <button class="ao-btn rb-btn" data-act="test">Send test</button>
