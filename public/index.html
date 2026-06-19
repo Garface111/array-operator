@@ -36,6 +36,28 @@
     background:linear-gradient(115deg,rgba(245,185,66,.10),rgba(94,194,255,.06) 55%,rgba(63,214,138,.05));
     box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
   .demo-banner[hidden]{display:none}
+  /* GMP-onboarding gate — amber "you're not done" bar for signed-in owners
+     who haven't connected GMP yet. Sits below the tab bar, above all panels. */
+  .gmp-gate{margin:14px 0 4px;border-radius:14px;overflow:hidden;
+    border:1px solid rgba(245,185,66,.42);
+    background:linear-gradient(115deg,rgba(245,185,66,.16),rgba(245,185,66,.05));
+    box-shadow:0 0 26px -8px rgba(245,185,66,.35)}
+  .gmp-gate[hidden]{display:none}
+  .gmp-gate-row{display:flex;align-items:center;gap:16px;padding:14px 18px;flex-wrap:wrap}
+  .gmp-gate-badge{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.14em;
+    color:#1a1008;background:var(--gold2,#f5b942);padding:5px 10px;border-radius:999px;white-space:nowrap}
+  .gmp-gate-copy{flex:1 1 320px;min-width:0;color:var(--muted);font-size:13px;line-height:1.45}
+  .gmp-gate-copy b{color:var(--ink);font-weight:750;display:inline}
+  .gmp-gate-copy b:first-child{display:block;font-size:14.5px;margin-bottom:2px}
+  .gmp-gate-cta{flex:0 0 auto;font-size:13.5px;font-weight:780;color:#1a1008;
+    background:var(--gold2,#f5b942);border-radius:10px;padding:10px 16px;text-decoration:none;
+    box-shadow:0 6px 18px -8px rgba(245,185,66,.7);white-space:nowrap;transition:transform .12s}
+  .gmp-gate-cta:hover{transform:translateY(-1px)}
+  /* When only the linking step remains, the bar goes green-ish (almost there). */
+  .gmp-gate.almost{border-color:rgba(63,214,138,.42);
+    background:linear-gradient(115deg,rgba(63,214,138,.15),rgba(63,214,138,.04));
+    box-shadow:0 0 26px -8px rgba(63,214,138,.32)}
+  .gmp-gate.almost .gmp-gate-badge,.gmp-gate.almost .gmp-gate-cta{background:var(--good2,#3fd68a)}
   /* hero: value prop (left) + pricing card (right) */
   .hero{display:flex;gap:28px;align-items:stretch;padding:26px 26px 22px;flex-wrap:wrap}
   .hero-main{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
@@ -140,6 +162,21 @@
     </a>
   </div>
 
+  <!-- GMP-ONBOARDING GATE — shown to signed-in owners until they connect GMP.
+       Onboarding is NOT complete without it: no GMP = no settlement data to
+       audit, reconcile, or bill. Driven by app.js via
+       GET /v1/array-owners/onboarding-status. Hidden by default. -->
+  <div class="gmp-gate" id="gmpGate" role="region" aria-label="Finish onboarding" hidden>
+    <div class="gmp-gate-row">
+      <span class="gmp-gate-badge" id="gmpGateBadge">STEP 2 OF 2</span>
+      <div class="gmp-gate-copy">
+        <b id="gmpGateTitle">Connect GMP to finish setting up</b>
+        <span id="gmpGateSub">Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b></span>
+      </div>
+      <a class="gmp-gate-cta" id="gmpGateCta" href="/onboarding#connect-gmp">Connect GMP →</a>
+    </div>
+  </div>
+
   <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
   <!-- All business: one flat list of horizontal rows — identity, login & billing.
        Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
@@ -203,6 +240,7 @@
 <script src="command-center.js"></script>
 <script src="reports.js"></script>
 <script src="trends-core.js"></script>
+<script src="trends-analytics.js"></script>
 <script src="trends-view-bars.js"></script>
 <script src="trends-view-monthly.js"></script>
 <script src="trends-view-liquid.js"></script>

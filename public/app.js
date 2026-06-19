@@ -649,6 +649,46 @@ function loadDashboard(){
   }
   renderFromSession();
 }
+// Drive the GMP-onboarding gate banner. A signed-in owner is NOT done until
+// GMP is connected AND ≥1 array is linked. next_step from the backend:
+//   connect_gmp   → amber "Connect GMP to finish setting up"
+//   link_accounts → green "almost there — link your captured GMP accounts"
+//   done          → hide the bar entirely.
+function updateGmpGate(session){
+  const gate = document.getElementById("gmpGate");
+  if(!gate) return;
+  if(!session){ gate.hidden = true; return; }
+  fetch("/v1/array-owners/onboarding-status", { headers: { Authorization: "Bearer " + session } })
+    .then(r => r.ok ? r.json() : null)
+    .then(s => {
+      if(!s || !s.ok || s.complete){ gate.hidden = true; return; }
+      const title = document.getElementById("gmpGateTitle");
+      const sub   = document.getElementById("gmpGateSub");
+      const badge = document.getElementById("gmpGateBadge");
+      const cta   = document.getElementById("gmpGateCta");
+      if(s.next_step === "link_accounts"){
+        gate.classList.add("almost");
+        badge.textContent = "ALMOST DONE";
+        title.textContent = "Link your GMP accounts to finish";
+        sub.innerHTML = "We captured " + s.unlinked_accounts + " GMP account" +
+          (s.unlinked_accounts === 1 ? "" : "s") + " but " +
+          (s.unlinked_accounts === 1 ? "it isn't" : "they aren't") +
+          " linked to an array yet — so their bills can't flow in. <b>You're not done yet.</b>";
+        cta.textContent = "Link accounts →";
+        cta.setAttribute("href", "#account");
+      } else {
+        gate.classList.remove("almost");
+        badge.textContent = "FINISH SETUP";
+        title.textContent = "Connect GMP to finish setting up";
+        sub.innerHTML = "Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b>";
+        cta.textContent = "Connect GMP →";
+        cta.setAttribute("href", "/onboarding#connect-gmp");
+      }
+      gate.hidden = false;
+    })
+    .catch(() => { /* never block the dashboard on the gate */ });
+}
+
 function renderFromSession(){
   let session = null;
   try { session = localStorage.getItem("so_session"); } catch(e){}
@@ -657,6 +697,10 @@ function renderFromSession(){
   // Big demo→signup conversion banner: shown ONLY to anonymous visitors, hidden
   // the instant a session exists so signed-in owners never see it.
   try { const db = document.getElementById("demoBanner"); if(db) db.hidden = !!session; } catch(e){}
+  // GMP-onboarding gate: a signed-in owner isn't DONE until GMP is connected.
+  // Poll the onboarding-status endpoint and show the "you're not done" bar until
+  // GMP is connected + at least one array is linked. Signed-out → always hidden.
+  try { updateGmpGate(session); } catch(e){}
   // Signed-in identity chip (top-right): show which account this session is in.
   // One lightweight /v1/account read fills the email; hidden when signed out or
   // if the session is stale (so it never claims an account we can't confirm).
