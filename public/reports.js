@@ -1541,30 +1541,25 @@
           <div class="rb-inbox-h">
             <span class="rep-eyebrow">Awaiting your approval</span>
             <h3>${drafts.length} report${drafts.length === 1 ? "" : "s"} ready to review &amp; send</h3>
-            <p>Drafted from the latest billing period. Review the numbers, attach the
-               GMP invoice, then approve — nothing goes to an offtaker until you do.</p>
+            <p>Drafted from the latest billing period. Review the numbers, then
+               approve — nothing goes to an offtaker until you do. The GMP bill
+               attaches automatically.</p>
           </div>
           ${drafts.map(draftCard).join("")}
         </div>`;
       wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-      wrap.querySelectorAll("input[type=file][data-gmp]").forEach(inp =>
-        inp.addEventListener("change", () => { if (inp.files[0]) attachGmp(inp.getAttribute("data-gmp"), inp.files[0]); }));
     } catch (e) { wrap.innerHTML = ""; }
   }
 
   function draftCard(d) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
-    const auto = !!d.auto_attach_gmp;
+    const auto = d.auto_attach_gmp !== false;   // ON by default
     // Honest auto-attach status line (never implies a PDF exists when it doesn't).
     const autoStatusText = {
       ready: "✓ GMP bill found — it will attach automatically.",
       pending: "GMP bill will attach automatically once it's captured (none yet).",
       no_gmp: "No GMP account on this array yet — connect one to auto-attach.",
     }[d.gmp_auto_status] || "";
-    const manualGmp = d.has_gmp_pdf
-      ? `<span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span>`
-      : `<label class="rb-gmp-attach">＋ Attach GMP invoice (PDF)
-           <input type="file" accept="application/pdf,.pdf" data-gmp="${d.id}" hidden></label>`;
     const gmp = `
       <div class="rb-gmp-toggle-row">
         <label class="rb-gmp-switch">
@@ -1573,7 +1568,7 @@
         </label>
         ${auto && autoStatusText ? `<span class="rb-gmp-auto-status rb-gmp-${esc(d.gmp_auto_status)}">${autoStatusText}</span>` : ""}
       </div>
-      ${(!auto || d.gmp_auto_status !== "ready") ? `<div class="rb-gmp-manual">${manualGmp}</div>` : ""}`;
+      ${d.has_gmp_pdf ? `<div class="rb-gmp-manual"><span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span></div>` : ""}`;
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
@@ -1615,20 +1610,6 @@
     const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "your production";
     const period = d.period_label || "the latest period";
     return `Hi,\n\nAttached is your solar invoice for ${period}. Your array produced ${kwh} this period, for a total of ${amt}. The GMP source data and a production summary are attached so you can see exactly how it was calculated.\n\nThanks for going solar!`;
-  }
-
-  async function attachGmp(draftId, file) {
-    const card = document.querySelector(`.rb-draft[data-did="${draftId}"]`);
-    const st = card && $(".rb-draft-status", card);
-    if (st) { st.className = "rb-status rb-busy"; st.textContent = "Attaching GMP invoice…"; }
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch(API + "/drafts/" + draftId + "/gmp-invoice", { method: "POST", headers: authHeaders(), body: fd });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok && data.ok) { await refreshInbox(); }
-      else if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Attach failed."; }
-    } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
   }
 
   async function onDraftAction(e) {
