@@ -400,6 +400,54 @@ window.FleetStore = (function(){
     });
   }
 
+  // Soft-delete ONE inverter (the owner's right-click "Delete inverter"). Mirrors
+  // deleteArray: optimistic local removal + backend DELETE, recorded as an UNDOABLE
+  // command (undo re-inserts locally at its old spot AND revives it server-side via
+  // the restore endpoint; redo re-deletes). Unlike createArray/deleteArray this is
+  // NOT a structural barrier — a single-inverter remove inverts exactly by stable
+  // id, so it can sit in the same history stack as drag moves.
+  function deleteInverter(invId){
+    const hit = findInv(invId);
+    if(!hit) return;                                       // nothing matched
+    const { a: from, i: removed } = hit;
+    const fromArrayId = from.id;
+    const fromPos = from.inverters.indexOf(removed);       // remember slot for undo
+    from.inverters.splice(fromPos, 1);
+    recompute(from);
+    notify();                                              // optimistic, sync cross-view update
+    if(isLive()){
+      apiDelete("/v1/array-owners/inverters/" + encodeURIComponent(invId))
+        .then(()=>refetch()).catch(()=>refetch());
+    }
+    pushHistory({
+      undo: () => {
+        const dest = findArray(fromArrayId);
+        if(dest && !dest.inverters.some(x => String(x.id) === String(invId))){
+          const at = Math.min(fromPos, dest.inverters.length);
+          dest.inverters.splice(at, 0, removed);
+          recompute(dest);
+        }
+        notify();
+        if(isLive()){
+          apiPost("/v1/array-owners/inverters/" + encodeURIComponent(invId) + "/restore")
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+      redo: () => {
+        const dest = findArray(fromArrayId);
+        if(dest){
+          dest.inverters = dest.inverters.filter(x => String(x.id) !== String(invId));
+          recompute(dest);
+        }
+        notify();
+        if(isLive()){
+          apiDelete("/v1/array-owners/inverters/" + encodeURIComponent(invId))
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+    });
+  }
+
   function resetLayout(){
     clearHistory();   // server regroups everything — a barrier
     if(isLive()){ apiPost("/v1/array-owners/layout/reset").then(()=>refetch()).catch(()=>refetch()); }
@@ -666,7 +714,7 @@ window.FleetStore = (function(){
     subscribe, load, refetch, startAutoRefresh,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
-    reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
+    reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,

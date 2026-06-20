@@ -1466,8 +1466,21 @@
       node.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" ") { e.preventDefault(); show(); } });
     });
 
-    // right-click an array card → small "Delete array" menu (persisted via FleetStore)
+    // right-click an inverter card → "Delete inverter"; else an array card →
+    // "Delete array". Inverter is checked FIRST because an .sb-inv lives inside an
+    // .sb-col, so closest(".sb-col") would also match — we want the more specific
+    // target to win. Both persist via FleetStore (optimistic + backend) and are undoable.
     host.addEventListener("contextmenu", e => {
+      const invCard = e.target.closest && e.target.closest(".sb-inv");
+      if(invCard && host.contains(invCard)){
+        e.preventDefault();
+        const invId = invCard.dataset.invId;
+        const nameEl = invCard.querySelector(".sb-inv-name");
+        const name = nameEl ? nameEl.textContent.trim()
+          : (invCard.dataset.name || "this inverter");
+        showInvCtxMenu(e.clientX, e.clientY, invId, name);
+        return;
+      }
       const col = e.target.closest && e.target.closest(".sb-col");
       if(!col || !host.contains(col)) return;        // not on an array card → native menu
       e.preventDefault();
@@ -2233,6 +2246,39 @@
     if(r.right > window.innerWidth) menu.style.left = Math.max(4, window.innerWidth - r.width - 4) + "px";
     if(r.bottom > window.innerHeight) menu.style.top = Math.max(4, window.innerHeight - r.height - 4) + "px";
     // dismissers (capture phase so they fire before anything stops propagation)
+    setTimeout(() => {
+      document.addEventListener("click", closeArrayCtxMenu, true);
+      document.addEventListener("keydown", _arrayCtxKey, true);
+      document.addEventListener("scroll", closeArrayCtxMenu, true);
+      document.addEventListener("contextmenu", _arrayCtxOther, true);
+    }, 0);
+  }
+
+  // right-click inverter context menu → "Delete inverter". Reuses the SAME menu
+  // DOM/dismiss machinery as the array menu (one .sb-ctxmenu at a time, appended to
+  // <body>, dismissed on outside click / Escape / scroll / another contextmenu).
+  // Confirming calls FleetStore.deleteInverter(id) — optimistic + backend DELETE,
+  // undoable via ↶ Undo / Ctrl-Cmd+Z (single-inverter delete is NOT a history barrier).
+  function showInvCtxMenu(x, y, id, name){
+    closeArrayCtxMenu();                               // only ever one menu
+    const menu = el(`<div class="sb-ctxmenu" role="menu">
+      <button type="button" class="sb-ctxmenu-del" role="menuitem">Delete inverter</button>
+    </div>`);
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+    menu.addEventListener("click", ev => ev.stopPropagation());
+    menu.querySelector(".sb-ctxmenu-del").onclick = () => {
+      if(confirm(`Delete inverter "${name}"? You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.`)){
+        FleetStore.deleteInverter(id);
+        toast(`Deleted "${name}" — press ↶ Undo (Ctrl/Cmd+Z) to bring it back.`, "ok");
+      }
+      closeArrayCtxMenu();
+    };
+    document.body.appendChild(menu);
+    // keep the menu inside the viewport if it would overflow the right/bottom edge
+    const r = menu.getBoundingClientRect();
+    if(r.right > window.innerWidth) menu.style.left = Math.max(4, window.innerWidth - r.width - 4) + "px";
+    if(r.bottom > window.innerHeight) menu.style.top = Math.max(4, window.innerHeight - r.height - 4) + "px";
     setTimeout(() => {
       document.addEventListener("click", closeArrayCtxMenu, true);
       document.addEventListener("keydown", _arrayCtxKey, true);
