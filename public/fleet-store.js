@@ -282,17 +282,38 @@ window.FleetStore = (function(){
    * MUTATIONS — update in-memory, notify SYNC, persist async when live
    * ==========================================================================*/
   const isLive = () => !!getSession();
+  // In-flight write tracking. A background refetch (auto-refresh, tab refocus)
+  // or a closely-following drag must NEVER re-ingest the server tree while a
+  // mutation (reassign/reorder/create/delete) is still in flight — doing so
+  // pulls STALE state and clobbers the optimistic local move, which is exactly
+  // the "inverters jump back to the wrong array" glitch. Every write bumps this;
+  // refetch() bails (and self-reschedules) while it's > 0.
+  let _pendingWrites = 0;
+  let _refetchQueued = false;
+  function _trackWrite(p){
+    _pendingWrites++;
+    const done = () => {
+      _pendingWrites = Math.max(0, _pendingWrites - 1);
+      // If a refetch was suppressed while writes were in flight, run it once the
+      // last write settles so we still converge on authoritative server state.
+      if(_pendingWrites === 0 && _refetchQueued){
+        _refetchQueued = false;
+        setTimeout(() => refetch(), 150);
+      }
+    };
+    return p.then(v => { done(); return v; }, e => { done(); throw e; });
+  }
   function apiPost(path, body){
     const s = getSession();
-    return fetch(path, { method:"POST",
+    return _trackWrite(fetch(path, { method:"POST",
       headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s },
       body: body!=null ? JSON.stringify(body) : "{}" })
-      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); });
+      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); }));
   }
   function apiDelete(path){
     const s = getSession();
-    return fetch(path, { method:"DELETE", headers:{ "Authorization":"Bearer "+s } })
-      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); });
+    return _trackWrite(fetch(path, { method:"DELETE", headers:{ "Authorization":"Bearer "+s } })
+      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); }));
   }
 
   function findArray(id){ return state.arrays.find(a => String(a.id)===String(id)); }
@@ -532,6 +553,10 @@ window.FleetStore = (function(){
 
   function refetch(){
     const s = getSession(); if(!s) return Promise.resolve();
+    // Never overwrite local state while a write is in flight — defer until the
+    // last one settles (see _trackWrite). This is what stops a background pull
+    // from clobbering an optimistic reassign and snapping inverters back.
+    if(_pendingWrites > 0){ _refetchQueued = true; return Promise.resolve(); }
     return fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+s } })
       .then(r => {
         if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
