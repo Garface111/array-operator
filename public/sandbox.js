@@ -3844,17 +3844,15 @@
   const TABS = {
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
-    audit:   { panel: "panelAudit",   tab: "tabAudit"   },
     trends:  { panel: "panelTrends",  tab: "tabTrends"  },
     reports: { panel: "panelReports", tab: "tabReports" },
   };
   function tabFromHash(){
     const h = location.hash;
     if(h === "#account") return "account";
-    if(h === "#audit")   return "audit";
     if(h === "#trends")  return "trends";
     if(h === "#reports") return "reports";
-    return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing
+    return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing/#audit
   }
 
   let _firstApply = true;
@@ -3876,8 +3874,6 @@
       loadAccount();
     } else if(active === "trends"){
       if(window.__aoLoadTrends) window.__aoLoadTrends();
-    } else if(active === "audit"){
-      if(window.__aoLoadAudit) window.__aoLoadAudit();
     } else if(active === "reports"){
       loadReports();
     }

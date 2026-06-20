@@ -142,7 +142,6 @@
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
-    <a class="tab" id="tabAudit" href="#audit" role="tab">Audit</a>
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Reports</a>
     <!-- Day/night toggle: flips to the NEPOOL-Operator light palette and persists. -->
@@ -223,14 +222,7 @@
     <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
   </section>
 
-  <!-- ============================ TAB: AUDIT ============================ -->
-  <!-- The settlement auditor's owner-facing view: does each array's metered
-       production reconcile to what the utility settled? Fleet summary cards +
-       per-array verdicts. Rendered by audit.js (window.__aoLoadAudit) into
-       #auditRoot from GET /v1/array-owners/fleet-audit. -->
-  <section class="panel" id="panelAudit" role="tabpanel" aria-label="Audit">
-    <div id="auditRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading audit…</div></div>
-  </section>
+  <!-- ============================ TAB: AUDIT (removed) ============================ -->
 
 </div>
 
