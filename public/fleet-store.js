@@ -509,6 +509,39 @@ window.FleetStore = (function(){
   }
 
   let _loading = false;
+  // ── background auto-refresh ────────────────────────────────────────────────
+  // Without this, an open sandbox NEVER re-pulls the tree, so a source-outage
+  // banner (source_status.state === "stale") would linger forever after the
+  // vendor's feed comes back — the data is fresh server-side but the page still
+  // shows the old snapshot. A gentle periodic refetch re-ingests the authoritative
+  // tree, flipping source_status back to "ok" and clearing the banner on its own.
+  // Guards: only when live + tab visible + the user isn't mid-drag / mid-edit
+  // (so a refresh-driven re-render never yanks the canvas out from under them).
+  const AUTO_REFRESH_MS = 5 * 60 * 1000;   // 5 min — well under the 6h stale window
+  let _autoTimer = null;
+  function _userBusy(){
+    try {
+      return !!document.querySelector(
+        ".dragging-active, .inv-dragging-active, .sb-editing, [contenteditable='true']:focus"
+      );
+    } catch(e){ return false; }
+  }
+  function startAutoRefresh(){
+    if(_autoTimer) return;                 // already running
+    _autoTimer = setInterval(() => {
+      if(!isLive()) return;                // demo/anon: nothing to refresh
+      if(document.hidden) return;          // tab backgrounded — skip, refresh on return
+      if(_userBusy()) return;              // don't interrupt a drag/edit
+      refetch();                           // re-ingest → notify → views re-render
+    }, AUTO_REFRESH_MS);
+    // Also refresh the moment the tab is brought back to the foreground, so a
+    // recovered source clears promptly instead of waiting for the next tick.
+    try {
+      document.addEventListener("visibilitychange", () => {
+        if(!document.hidden && isLive() && !_userBusy()) refetch();
+      });
+    } catch(e){}
+  }
   function load(){
     if(state.loaded || _loading) return;     // single shared bootstrap — both views may call it
     _loading = true;
@@ -534,6 +567,7 @@ window.FleetStore = (function(){
           // Empty means "you haven't connected/added anything yet" (honest empty
           // state), NEVER the fake 100-array demo — that's only for anon visitors.
           ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
+          startAutoRefresh();   // keep the open tree fresh (clears recovered-source banners)
         })
         .catch((err) => {
           if(err && err.auth){ onAuthExpired(); return; }
@@ -629,7 +663,7 @@ window.FleetStore = (function(){
 
   // ---- public API ----
   return {
-    subscribe, load, refetch,
+    subscribe, load, refetch, startAutoRefresh,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, resetLayout,
