@@ -876,8 +876,22 @@
     return ARRAYS;
   }
 
-  let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
+  // GMP utility accounts (offtaker ↔ utility-bill binding). Each carries a
+  // summary of the bills we hold so the picker shows whether a paper bill is on
+  // file. Offtaker invoices read these bills ONLY — never vendor/inverter data.
+  let UTIL_ACCTS = null;
+  async function fetchUtilityAccounts() {
+    if (UTIL_ACCTS) return UTIL_ACCTS;
+    try {
+      const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
+      if (!r.ok) return (UTIL_ACCTS = []);
+      const d = await r.json().catch(() => ({}));
+      UTIL_ACCTS = (d.utility_accounts || []).filter(a => a.utility_account_id != null);
+    } catch (e) { UTIL_ACCTS = []; }
+    return UTIL_ACCTS;
+  }
 
+  let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
   function renderManual() {
     const host = $("#" + MANUAL_HOST_ID);
     if (!host) return;
@@ -896,15 +910,16 @@
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
         </div>
         <p class="rb-add-sub">${ADD_MODE === "manual"
-          ? "Bill an offtaker for a share of an array's generation — no spreadsheet needed."
+          ? "Bill an offtaker for a share of an array's production — billed <b>only</b> from the GMP utility bill you select below (the paper bill), never from inverter data."
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
           <div class="rb-mform-grid">
             <label class="rep-fld"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Which array?</span>
-              <select id="rbmArray"><option value="">Loading arrays…</option></select></label>
+            <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
+              <select id="rbmUtility"><option value="">Loading utility bills…</option></select>
+              <span class="rb-fld-hint">Offtaker invoices are generated from this GMP account's utility bills only.</span></label>
             <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
               <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
@@ -978,16 +993,23 @@
     if (ADD_MODE === "manual") {
       wireSegments(host);
       $("#rbmSave").onclick = saveManual;
-      // Populate the array picker.
-      fetchArrays().then(arrs => {
-        const sel = $("#rbmArray");
+      // Populate the GMP utility-bill picker. Offtakers bind to a GMP account;
+      // their invoice is generated from THAT account's utility bills only.
+      fetchUtilityAccounts().then(accts => {
+        const sel = $("#rbmUtility");
         if (!sel) return;
-        if (!arrs.length) {
-          sel.innerHTML = `<option value="">No arrays yet — add one in the Arrays tab</option>`;
+        if (!accts.length) {
+          sel.innerHTML = `<option value="">No GMP utility bills yet — connect GMP first</option>`;
           return;
         }
-        sel.innerHTML = `<option value="">Choose an array…</option>` +
-          arrs.map(a => `<option value="${a.id}">${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+        sel.innerHTML = `<option value="">Choose a GMP utility bill…</option>` +
+          accts.map(a => {
+            const label = a.nickname || (a.array_name ? a.array_name : ("GMP " + a.account_number));
+            const billNote = a.has_bill
+              ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}`
+              : "no bill on file yet";
+            return `<option value="${a.utility_account_id}">${esc(label)} · acct ${esc(a.account_number)} (${esc(billNote)})</option>`;
+          }).join("");
       });
     } else {
       // Upload path: wire the dropzone + paint the live doc-preview placeholder.
@@ -999,13 +1021,13 @@
   async function saveManual() {
     const st = $("#rbmStatus");
     const name = $("#rbmName").value.trim();
-    const arrayId = $("#rbmArray").value;
+    const utilityId = $("#rbmUtility").value;
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
     const mode = segValue("rbmMode") || "to_me";
     const clientEmail = $("#rbmEmail").value.trim();
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
-    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this offtaker is on."; return; }
+    if (!utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which GMP utility bill connects to this offtaker."; return; }
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
       st.className = "rb-status rb-err"; st.textContent = "Enter their share as a percent between 0 and 100."; return;
@@ -1023,7 +1045,7 @@
     st.className = "rb-status rb-busy"; st.textContent = "Adding offtaker…";
     const fd = new FormData();                       // no file → manual path
     fd.append("customer_name", name);
-    fd.append("array_id", arrayId);
+    fd.append("utility_account_id", utilityId);          // offtaker ↔ utility bill (utility data ONLY)
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
     if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
