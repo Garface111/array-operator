@@ -740,6 +740,7 @@
   .sb-inv.sleep .sb-ob-pct,.sb-inv.sleep .sb-ob-idle{color:#9aa8e0}
   .sb-inv.sleep .sb-inv-alert{color:#aab4e8 !important;background:rgba(120,135,210,.14) !important}
   .sb-inv.sleep .sb-spark polyline,.sb-inv.sleep svg polyline{stroke:#5a6790 !important;opacity:.6}
+  .sb-inv.sleep .sb-inv-spark rect,.sb-inv.sleep svg.sb-inv-spark rect{fill:#5a6790 !important;opacity:.6}
   @media (prefers-reduced-motion:reduce){
     .sb-liquid,.sb-liquid::before,.sb-liquid::after,.sb-liq-bubbles span,
     .sb-liq-stars span,.sb-liquid--sleep{animation:none !important}
@@ -1010,6 +1011,27 @@
   .sb-resetbtn:hover{border-color:rgba(94,194,255,.5);color:var(--sky);background:rgba(94,194,255,.07)}
   .sb-resetbtn:active{transform:translateY(1px)}
   .sb-foot-note{display:block;margin-top:5px;color:var(--faint);font-size:11.5px}
+
+  /* ===== Vendor⇄Utility data-stream slider (sandbox header) ===== */
+  .sb-streamtoggle{display:inline-flex;align-items:center;gap:0;margin-left:12px;
+    padding:3px;border:1px solid var(--line);border-radius:12px;
+    background:rgba(255,255,255,.03)}
+  .sb-stream-cap{font-size:11px;font-weight:650;color:var(--faint);
+    text-transform:uppercase;letter-spacing:.04em;padding:0 9px 0 6px}
+  .sb-stream-seg{border:0;background:transparent;color:var(--muted);
+    font-size:12.5px;font-weight:680;padding:7px 14px;border-radius:9px;cursor:pointer;
+    white-space:nowrap;transition:background .15s,color .15s}
+  .sb-stream-seg:hover{color:var(--sky)}
+  /* vendor side = green (inverter telemetry); utility side = blue (meter) */
+  .sb-stream-seg#sbStreamVendor.on{background:rgba(74,222,128,.16);color:var(--good)}
+  .sb-stream-seg#sbStreamUtility.on{background:rgba(91,141,239,.18);color:#9cc0ff}
+
+  /* Utility stream: collapse the (vendor-only) inverter comb + its expand button —
+     there is no per-inverter meter data, so the array card alone tells the meter
+     story. The array graph swaps to the utility series in JS. */
+  .sb-canvas.sb-stream-utility .sb-comb{display:none !important}
+  .sb-canvas.sb-stream-utility .sb-inv-toggle{display:none}
+  .sb-canvas.sb-stream-utility .sb-array-src{opacity:.55}
 
   /* ===== Add-array modal (dark skin) ===== */
   .sb-ov{position:fixed;inset:0;z-index:9999;display:none;overflow:auto;padding:6vh 16px;

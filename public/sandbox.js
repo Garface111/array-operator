@@ -530,21 +530,29 @@
     return `<div class="sb-pi"><div class="sb-pi-bar ${cls}" style="width:${pct}%"></div><span class="${cls}">${pi.toFixed(2)}</span></div>`;
   }
 
-  // Mini output graph for an inverter card: an SVG area-line of its daily kWh
+  // Mini output graph for an inverter card: an SVG BAR chart of its daily kWh
   // series (real backend telemetry for signed-in owners; synthetic for the demo
-  // fleet). Zero-output days get a red dot so a dead/quiet streak reads instantly.
-  // Returns "" when there's no series (then the card shows a "no history yet" note).
+  // fleet) — one bar per day. Zero-output days get a red dot at the baseline so a
+  // dead/quiet streak reads instantly. Returns "" when there's no series (then the
+  // card shows a "no history yet" note).
   function invSpark(daily, statusCls){
     if(!Array.isArray(daily) || daily.length < 2) return "";
     const w = 132, h = 34, pad = 3;
     const vals = daily.map(d => Math.max(0, +d.kwh || 0));
     const max = Math.max(...vals, 0.001);
-    const stroke = statusCls === "bad" ? "var(--bad)" : statusCls === "warn" ? "var(--warn)" : "var(--good)";
-    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
-    const Y = v => h-pad - (v/max)*(h-2*pad);
-    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
-    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="1.8" fill="var(--bad)"/>` : "").join("");
+    const fill = statusCls === "bad" ? "var(--bad)" : statusCls === "warn" ? "var(--warn)" : "var(--good)";
+    const baseY = h - pad;
+    const slot = (w - 2*pad) / vals.length;
+    const gap = Math.min(1.4, slot * 0.22);
+    const bw = Math.max(0.8, slot - gap);
+    const bars = vals.map((v,i)=>{
+      const x = pad + i*slot + gap/2;
+      if(v === 0){
+        return `<circle cx="${(x+bw/2).toFixed(1)}" cy="${baseY.toFixed(1)}" r="1.6" fill="var(--bad)"/>`;
+      }
+      const bh = Math.max(0.8, (v/max)*(h-2*pad));
+      return `<rect x="${x.toFixed(1)}" y="${(baseY-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="0.5" fill="${fill}"/>`;
+    }).join("");
     // time scale: label the oldest (left), a midpoint, and the newest (right) day
     const last = daily.length - 1, mid = Math.floor(last/2);
     const lo = _sparkTimeLabel(daily[0].date, last, 0);
@@ -553,9 +561,7 @@
     const axis = `<div class="sb-spark-axis"><span>${esc(lo)}</span><span>${esc(mp)}</span><span>${esc(hi)}</span></div>`;
     return `<div class="sb-spark-wrap">
       <svg class="sb-inv-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-        <polygon points="${area}" fill="${stroke}" opacity="0.12"/>
-        <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-        ${zeros}
+        ${bars}
       </svg>${axis}</div>`;
   }
   // A short time-axis label for one point in the daily series. Real data carries
@@ -653,11 +659,18 @@
     const totalKwh = vals.reduce((s,v)=>s+v,0);
     const w = 300, h = 56, pad = 4;
     const max = Math.max(...vals, 0.001);
-    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
-    const Y = v => h-pad - (v/max)*(h-2*pad);
-    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
-    const zeros = vals.map((v,i)=> v===0 ? `<circle cx="${X(i).toFixed(1)}" cy="${(h-pad).toFixed(1)}" r="2" fill="var(--bad)"/>` : "").join("");
+    const baseY = h - pad;
+    const slot = (w - 2*pad) / vals.length;
+    const gap = Math.min(2, slot * 0.22);
+    const bw = Math.max(1, slot - gap);
+    const bars = vals.map((v,i)=>{
+      const x = pad + i*slot + gap/2;
+      if(v === 0){
+        return `<circle cx="${(x+bw/2).toFixed(1)}" cy="${baseY.toFixed(1)}" r="2" fill="var(--bad)"/>`;
+      }
+      const bh = Math.max(1, (v/max)*(h-2*pad));
+      return `<rect x="${x.toFixed(1)}" y="${(baseY-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="0.7" fill="${stroke}"/>`;
+    }).join("");
     const last = dates.length-1, mid = Math.floor(last/2);
     const lo = _sparkTimeLabel(dates[0], last, 0);
     const mp = _sparkTimeLabel(dates[mid], last, mid);
@@ -669,9 +682,7 @@
         <span class="sb-ag-total">${totalLbl}</span>
       </div>
       <svg class="sb-ag-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-        <polygon points="${area}" fill="${stroke}" opacity="0.13"/>
-        <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
-        ${zeros}
+        ${bars}
       </svg>
       <div class="sb-spark-axis"><span>${esc(lo)}</span><span>${esc(mp)}</span><span>${esc(hi)}</span></div>
     </div>`;
@@ -1558,16 +1569,21 @@
     if(vals.length < 2) return "";
     const w = 100, h = 26, pad = 2;
     const max = Math.max(...vals, 0.001);
-    // utility stream → blue stroke; vendor stream → health-tinted as before.
-    const stroke = stream === "utility" ? "var(--util, #5b8def)"
+    // utility stream → blue; vendor stream → health-tinted as before.
+    const fill = stream === "utility" ? "var(--util, #5b8def)"
       : tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--good)";
-    const X = i => pad + (i/(vals.length-1))*(w-2*pad);
-    const Y = v => h-pad - (v/max)*(h-2*pad);
-    const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
-    const area = `${X(0).toFixed(1)},${(h-pad).toFixed(1)} ${line} ${X(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
+    const baseY = h - pad;
+    const slot = (w - 2*pad) / vals.length;
+    const gap = Math.min(1, slot * 0.2);
+    const bw = Math.max(0.6, slot - gap);
+    const bars = vals.map((v,i)=>{
+      if(v === 0) return "";
+      const x = pad + i*slot + gap/2;
+      const bh = Math.max(0.6, (v/max)*(h-2*pad));
+      return `<rect x="${x.toFixed(1)}" y="${(baseY-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${fill}"/>`;
+    }).join("");
     return `<svg class="sb-tile-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-      <polygon points="${area}" fill="${stroke}" opacity="0.13"/>
-      <polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round"/>
+      ${bars}
     </svg>`;
   }
 
