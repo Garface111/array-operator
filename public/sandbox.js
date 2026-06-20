@@ -926,47 +926,6 @@
       ? `<span class="sb-brand sb-inv-brand ${esc(vendor)}">${esc(BRAND[vendor])}</span>` : "";
   }
 
-  // ── DEBUG: per-array data-source tag ──────────────────────────────────────
-  // A compact, always-visible chip stating WHERE each array's data comes from so
-  // a mis-sourced/empty array is obvious at a glance while debugging. Built purely
-  // from fields the fleet-tree already returns — no backend change. Shows:
-  //   • vendor(s): inverter-telemetry source(s) (SolarEdge/Fronius/…), or "no inverters"
-  //   • V/U: which daily-generation STREAMS carry data — V=vendor, U=utility(meter)
-  //   • inverter_source ("live") + source freshness state (ok/stale/dark/none)
-  function sourceDebugTag(col){
-    const parts = [];
-    // Vendor / inverter telemetry source
-    if(col.vendor){
-      parts.push(BRAND[col.vendor] || col.vendor);
-    } else if(Array.isArray(col.vendors) && col.vendors.length){
-      parts.push((col.vendors.map(v => BRAND[v] || v)).join("+"));
-    } else {
-      parts.push("no inverters");
-    }
-    // Which production streams actually have data
-    const ds = col.daily_split || {};
-    const sv = ds.has_vendor ? "V✓" : "V✗";
-    const su = ds.has_utility ? "U✓" : "U✗";
-    parts.push(sv + " " + su);
-    // Live inverter telemetry + source freshness
-    if(col.inverter_source === "live") parts.push("live");
-    const st = col.source_status && col.source_status.state;
-    if(st) parts.push(st);
-    const n = col.inverter_count;
-    if(n != null) parts.push(n + " inv");
-    const txt = parts.join(" · ");
-    // Tone: red when no data stream at all, amber when a source feed is stale/dark.
-    const dead = !ds.has_vendor && !ds.has_utility;
-    const stale = st === "stale" || st === "dark";
-    const tone = dead ? "#b4361f" : (stale ? "#9a6a00" : "#5a6b7a");
-    const bg   = dead ? "#fdecea" : (stale ? "#fbf3e0" : "#eef2f5");
-    return `<div class="sb-src-debug" title="Data source (debug): ${esc(txt)}" ` +
-      `style="margin:4px 0 2px;font:600 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;` +
-      `letter-spacing:.2px;color:${tone};background:${bg};border-radius:6px;padding:2px 6px;` +
-      `display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">` +
-      `src: ${esc(txt)}</div>`;
-  }
-
   // ── ARRAY-LEVEL mirrors of the inverter card's live axes ────────────────────
   // The array card is the inverter card's bigger sibling: SAME construction
   // (liquid fill behind a frosted plate, production graph, NOW chip, output bar,
@@ -1447,7 +1406,6 @@
                 ${sizePill}
               </div>
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
-              ${sourceDebugTag(col)}
               ${srcStatusBanner}
               ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
