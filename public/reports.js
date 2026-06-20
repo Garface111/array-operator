@@ -97,7 +97,6 @@
     const _prevRefresh = window.__aoRefreshGmpGate;
     window.__aoRefreshGmpGate = function(){
       try { if (_prevRefresh) _prevRefresh(); } catch(e){}
-      UTIL_ACCTS = null;                       // bust the picker cache
       try { refreshGmpBillsStatus(); } catch(e){}
     };
   } catch(e){}
@@ -293,7 +292,6 @@
       const _prev = window.__aoRefreshGmpGate;
       window.__aoRefreshGmpGate = function(){
         try { if (_prev) _prev(); } catch(e){}
-        UTIL_ACCTS = null;
         if ($("#rbWizGmpStatus")) paintGmp();
       };
     } catch(e){}
@@ -973,16 +971,18 @@
   // GMP utility accounts (offtaker ↔ utility-bill binding). Each carries a
   // summary of the bills we hold so the picker shows whether a paper bill is on
   // file. Offtaker invoices read these bills ONLY — never vendor/inverter data.
-  let UTIL_ACCTS = null;
+  // NOTE: we deliberately DO NOT cache. A previous version cached the result in
+  // a module var, but an empty list ([]) is truthy in JS, so once a pre-connect
+  // fetch cached [], every reopen returned the stale empty list forever and the
+  // dropdown never populated after GMP was connected. Always fetch fresh — the
+  // list is tiny and this endpoint is cheap.
   async function fetchUtilityAccounts() {
-    if (UTIL_ACCTS) return UTIL_ACCTS;
     try {
       const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
-      if (!r.ok) return (UTIL_ACCTS = []);
+      if (!r.ok) return [];
       const d = await r.json().catch(() => ({}));
-      UTIL_ACCTS = (d.utility_accounts || []).filter(a => a.utility_account_id != null);
-    } catch (e) { UTIL_ACCTS = []; }
-    return UTIL_ACCTS;
+      return (d.utility_accounts || []).filter(a => a.utility_account_id != null);
+    } catch (e) { return []; }
   }
 
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
