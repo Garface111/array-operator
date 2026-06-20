@@ -1135,6 +1135,32 @@
     try { localStorage.setItem(STREAM_KEY, s === "utility" ? "utility" : "vendor"); } catch(e){}
   }
 
+  // Route arrays to the currently-selected stream: an array shows in the VENDOR
+  // view when its data comes from inverter telemetry, and in the UTILITY view
+  // when it comes from the utility meter. An array carrying BOTH feeds appears in
+  // either view (the data is integrated underneath; this just sources what's
+  // shown). Classification uses the same fleet-tree fields as the debug tag:
+  //   vendor  ⇐ daily_split.has_vendor, or any inverters/vendor on the array
+  //   utility ⇐ daily_split.has_utility
+  // Defensive: if a stream would end up empty (e.g. data hasn't been classified
+  // yet), fall back to showing ALL arrays so the canvas is never blank by filter.
+  function arrayHasStream(col, stream){
+    const ds = col.daily_split || {};
+    if(stream === "utility") return !!ds.has_utility;
+    // vendor
+    if(ds.has_vendor) return true;
+    if(col.vendor) return true;
+    if(Array.isArray(col.vendors) && col.vendors.length) return true;
+    if(Array.isArray(col.inverters) && col.inverters.length) return true;
+    return false;
+  }
+  function filterColsByStream(cols){
+    const stream = getStream();
+    const kept = cols.filter(c => arrayHasStream(c, stream));
+    // Never blank the view purely because nothing classified into this stream.
+    return kept.length ? kept : cols;
+  }
+
   // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
   // "canvas" (the interactive tree). Persisted; DEFAULT canvas so the owner lands
   // on the zoomed-out tree with every inverter revealed (quick whole-fleet picture). ----
@@ -1205,7 +1231,7 @@
   function render(tree){
     const host = document.getElementById("sandbox");
     if(!host) return;
-    const cols = applyOrder(tree.columns || []);
+    const cols = filterColsByStream(applyOrder(tree.columns || []));
     if(!cols.length){
       host.innerHTML =
         `<div class="sb-head"><div>
@@ -1232,7 +1258,7 @@
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
           </div>
-          <div class="sb-streamtoggle" role="group" aria-label="Data source stream" title="Both sources are integrated underneath — this just chooses which feed each array shows: the inverter VENDOR telemetry, or the UTILITY meter (GMP).">
+          <div class="sb-streamtoggle" role="group" aria-label="Data source stream" title="Routes each array to its data source: VENDOR shows arrays fed by inverter telemetry; UTILITY shows arrays fed by the utility meter (GMP). Both feeds stay integrated underneath — this just chooses which source view you're in.">
             <span class="sb-stream-cap">Showing</span>
             <button class="sb-stream-seg ${getStream()==="vendor"?"on":""}" id="sbStreamVendor" type="button" aria-pressed="${getStream()==="vendor"}">Vendor data</button>
             <button class="sb-stream-seg ${getStream()==="utility"?"on":""}" id="sbStreamUtility" type="button" aria-pressed="${getStream()==="utility"}">Utility data</button>
@@ -1539,9 +1565,9 @@
   // Sorted worst-first so problems surface top-left. Click a tile → drill into that
   // array on the canvas (focused + expanded). The whole fleet, understood at a glance.
   function renderGrid(host, head){
-    const cols = (window.FleetStore && FleetStore.toColumns)
+    const cols = filterColsByStream((window.FleetStore && FleetStore.toColumns)
       ? (FleetStore.toColumns().columns || [])
-      : [];
+      : []);
     // compute health once, sort worst-first (crit → warn → ok), then by $ at stake
     const rank = { bad:0, warn:1, ok:2 };
     const tiles = cols.map(col => ({ col, h: arrayHealth(col) }))
