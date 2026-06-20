@@ -147,7 +147,7 @@
   // customers → ④ review & finish. Backed by /setup-state, PATCH /arrays/{id},
   // PUT /global-rate, POST /subscriptions. Lands in the normal tab when done.
   // ===========================================================================
-  const WIZ_STEPS = ["Your arrays", "Your rate", "Your offtakers", "Review"];
+  const WIZ_STEPS = ["Your arrays", "GMP utility bills", "Your rate", "Your offtakers", "Review"];
   let WIZ = null;   // { step, state(from setup-state), customers:[], rateDirty }
 
   function renderWizard(setupState) {
@@ -178,7 +178,7 @@
         <div class="rb-wiz-body" id="rbWizBody"></div>
       </div>`;
     $("#rbWizSkip").onclick = () => { FORCE_TAB = true; load(); };
-    [drawStepArrays, drawStepRate, drawStepCustomers, drawStepReview][WIZ.step]();
+    [drawStepArrays, drawStepGmp, drawStepRate, drawStepCustomers, drawStepReview][WIZ.step]();
   }
 
   // ── Step ① arrays + age ────────────────────────────────────────────────────
@@ -240,7 +240,66 @@
     });
   }
 
-  // ── Step ② rate + discount ──────────────────────────────────────────────────
+  // ── Step ② GMP utility bills ─────────────────────────────────────────────────
+  // Offtakers are billed EXCLUSIVELY from GMP utility bills, so connecting GMP is
+  // a first-class setup step (not buried in a banner). Shows live status from
+  // /utility-accounts and launches the real connect flow (window.__aoConnectGmp).
+  async function drawStepGmp() {
+    const body = $("#rbWizBody");
+    body.innerHTML = `<div class="rb-wiz-card">
+      <h3>Connect your GMP utility bills</h3>
+      <p>Offtaker invoices are generated <b>only</b> from your Green Mountain Power
+         utility bills — never from inverter data. Connect GMP once and your bills
+         flow in automatically, ready to link to each offtaker.</p>
+      <div id="rbWizGmpStatus" class="rb-wiz-gmp-status">
+        <div class="empty" style="color:var(--faint)">Checking your GMP connection…</div>
+      </div>
+      <div class="rb-wiz-gmp-actions">
+        <button type="button" class="ao-btn ao-btn-primary rb-btn" id="rbWizGmpConnect">🔗 Link GMP utility bills</button>
+      </div>
+      ${wizNav({ back: true, nextLabel: "Continue" })}
+      <p class="rb-wiz-hint">You can connect GMP now or skip and do it later — but
+         offtaker invoices won't send until a GMP bill is linked.</p></div>`;
+    wireWizNav();
+    const connectBtn = $("#rbWizGmpConnect");
+    if (connectBtn) connectBtn.onclick = () => {
+      if (window.__aoConnectGmp) window.__aoConnectGmp();
+      else location.hash = "#arrays";
+    };
+    // Live status — re-checks after a capture lands (we hook __aoRefreshGmpGate).
+    async function paintGmp() {
+      const host = $("#rbWizGmpStatus");
+      if (!host) return;
+      let accts = [];
+      try {
+        const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
+        if (r.ok) { const d = await r.json().catch(() => ({})); accts = d.utility_accounts || []; }
+      } catch (e) {}
+      const withBills = accts.filter(a => a.has_bill);
+      if (!accts.length) {
+        host.innerHTML = `<div class="rb-wiz-gmp-none">No GMP utility bills connected yet — click the button below to link them.</div>`;
+      } else if (!withBills.length) {
+        host.innerHTML = `<div class="rb-wiz-gmp-some">${accts.length} GMP account${accts.length === 1 ? "" : "s"} connected — open GMP once more so the extension captures the bills.</div>`;
+      } else {
+        host.innerHTML = `<div class="rb-wiz-gmp-ok">✓ ${withBills.length} GMP utility bill source${withBills.length === 1 ? "" : "s"} connected and ready to link.</div>
+          <ul class="rb-wiz-gmp-list">${accts.slice(0, 8).map(a =>
+            `<li>${esc(a.nickname || a.array_name || ("GMP " + a.account_number))}
+              <span class="sub">${a.has_bill ? (a.bill_count + " bill" + (a.bill_count === 1 ? "" : "s") + " · latest " + (a.latest_period_label || "—")) : "no bill yet"}</span></li>`).join("")}</ul>`;
+      }
+    }
+    paintGmp();
+    // Refresh when a GMP capture lands while the owner is on this step.
+    try {
+      const _prev = window.__aoRefreshGmpGate;
+      window.__aoRefreshGmpGate = function(){
+        try { if (_prev) _prev(); } catch(e){}
+        UTIL_ACCTS = null;
+        if ($("#rbWizGmpStatus")) paintGmp();
+      };
+    } catch(e){}
+  }
+
+  // ── Step ③ rate + discount ──────────────────────────────────────────────────
   function drawStepRate() {
     const body = $("#rbWizBody");
     const g = WIZ.state.global || {};
@@ -297,14 +356,11 @@
   // ── Step ③ customers ─────────────────────────────────────────────────────────
   function drawStepCustomers() {
     const body = $("#rbWizBody");
-    const arrays = WIZ.state.arrays || [];
     const rows = WIZ.customers.map((c, i) => `
       <div class="rb-wiz-cust-row">
         <span><b>${esc(c.customer_name)}</b> · ${c.from_upload
           ? "from spreadsheet ✓"
-          : (Array.isArray(c.allocations) && c.allocations.length
-              ? c.allocations.map(al => esc(al.array_name) + " " + Math.round(al.allocation_pct * 100) + "%").join(" · ")
-              : esc(c.array_name) + " · " + Math.round(c.allocation_pct * 100) + "%")
+          : (esc(c.utility_name || "GMP bill") + " · " + Math.round(c.allocation_pct * 100) + "%")
             + (c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : "")}</span>
         ${c.from_upload
           ? `<span class="rb-wiz-cust-saved">added</span>`
@@ -312,21 +368,16 @@
       </div>`).join("");
     body.innerHTML = `<div class="rb-wiz-card">
       <h3>Add your offtakers</h3>
-      <p>Each offtaker is billed for their share of an array's production. Add as
-         many as you like — you can always add more later.</p>
+      <p>Each offtaker is billed for their share of a <b>GMP utility bill</b> —
+         their invoices come only from that bill. Add as many as you like.</p>
       <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No offtakers added yet.</div>`}</div>
       <div class="rb-wiz-cust-form">
         <input type="text" id="rbWizCName" placeholder="Offtaker name">
-        <div class="rb-wiz-arraysel" id="rbWizCArrays">
-          <div class="rb-wiz-arraysel-lbl">Which arrays does this offtaker own a share of?</div>
-          ${arrays.length ? arrays.map(a => `
-            <label class="rb-wiz-asrow" data-aid="${a.array_id}">
-              <input type="checkbox" class="rb-wiz-acheck" data-aid="${a.array_id}" data-name="${esc(a.name)}">
-              <span class="rb-wiz-aname">${esc(a.name)}</span>
-              <span class="rb-wiz-apct-wrap"><input type="number" class="rb-wiz-apct" data-aid="${a.array_id}"
-                min="0.01" max="100" step="0.01" placeholder="100" disabled><span>% of array</span></span>
-            </label>`).join("") : `<div class="rb-wiz-empty">No arrays — add one first.</div>`}
+        <div class="rb-wiz-arraysel" id="rbWizCUtil">
+          <div class="rb-wiz-arraysel-lbl">Which GMP utility bill is this offtaker's?</div>
+          <select id="rbWizCUtilSel"><option value="">Loading GMP utility bills…</option></select>
         </div>
+        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCPct" min="0.01" max="100" step="0.01" placeholder="100"><span>% of the array</span></span>
         <span class="rb-wiz-inwrap"><input type="number" id="rbWizCDisc" min="0" max="99" step="1" placeholder="default"><span>% off (optional)</span></span>
         <input type="email" id="rbWizCEmail" placeholder="offtaker@email (optional)">
         <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add offtaker</button>
@@ -342,47 +393,42 @@
         <span class="rb-status" id="rbWizUpStatus"></span>
       </div>
       ${wizNav({ back: true, nextLabel: WIZ.customers.length ? "Continue" : "Skip for now", nextId: "rbWizCustNext" })}</div>`;
-    if (!arrays.length) {
-      $("#rbWizCArray").innerHTML = `<option value="">No arrays — add one first</option>`;
-    }
+    // Populate the GMP utility-bill picker (offtakers bind to a GMP bill).
+    fetchUtilityAccounts().then(accts => {
+      const sel = $("#rbWizCUtilSel");
+      if (!sel) return;
+      if (!accts.length) {
+        sel.innerHTML = `<option value="">No GMP utility bills yet — connect on the previous step</option>`;
+        return;
+      }
+      sel.innerHTML = `<option value="">Choose a GMP utility bill…</option>` +
+        accts.map(a => {
+          const label = a.nickname || a.array_name || ("GMP " + a.account_number);
+          const note = a.has_bill ? (a.bill_count + " bill" + (a.bill_count === 1 ? "" : "s")) : "no bill yet";
+          return `<option value="${a.utility_account_id}" data-name="${esc(label)}">${esc(label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
+        }).join("");
+    });
     body.querySelectorAll(".rb-wiz-cust-del").forEach(b => b.onclick = () => {
       WIZ.customers.splice(Number(b.getAttribute("data-i")), 1); drawStepCustomers();
-    });
-    // Enable/disable each array's % input with its checkbox.
-    body.querySelectorAll(".rb-wiz-acheck").forEach(cb => cb.onchange = () => {
-      const row = cb.closest(".rb-wiz-asrow");
-      const pctInp = row ? row.querySelector(".rb-wiz-apct") : null;
-      if (pctInp) { pctInp.disabled = !cb.checked; if (cb.checked) pctInp.focus(); }
     });
     $("#rbWizCAdd").onclick = () => {
       const st = $("#rbWizCStatus");
       const name = $("#rbWizCName").value.trim();
+      const sel = $("#rbWizCUtilSel");
+      const utilId = sel ? sel.value : "";
+      const utilName = sel && sel.selectedOptions[0] ? (sel.selectedOptions[0].getAttribute("data-name") || "") : "";
+      const pctRaw = $("#rbWizCPct").value.trim();
       const discRaw = $("#rbWizCDisc").value.trim();
       const email = $("#rbWizCEmail").value.trim();
       if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
-      // Collect checked arrays + their ownership %.
-      const allocations = [];
-      let bad = false;
-      body.querySelectorAll(".rb-wiz-acheck").forEach(cb => {
-        if (!cb.checked) return;
-        const row = cb.closest(".rb-wiz-asrow");
-        const pctInp = row.querySelector(".rb-wiz-apct");
-        const pct = Number(pctInp.value);
-        if (isNaN(pct) || pct <= 0 || pct > 100) { bad = true; return; }
-        allocations.push({
-          array_id: cb.getAttribute("data-aid"),
-          array_name: cb.getAttribute("data-name"),
-          allocation_pct: pct / 100,
-        });
-      });
-      if (!allocations.length) { st.className = "rb-status rb-err"; st.textContent = "Check at least one array and set its %."; return; }
-      if (bad) { st.className = "rb-status rb-err"; st.textContent = "Each checked array needs a share 0–100%."; return; }
+      if (!utilId) { st.className = "rb-status rb-err"; st.textContent = "Pick which GMP utility bill is theirs."; return; }
+      const pct = Number(pctRaw);
+      if (isNaN(pct) || pct <= 0 || pct > 100) { st.className = "rb-status rb-err"; st.textContent = "Enter their share 0–100%."; return; }
       let disc = null;
       if (discRaw !== "") { const d = Number(discRaw); if (isNaN(d) || d < 0 || d >= 100) { st.className = "rb-status rb-err"; st.textContent = "Discount 0–99% or blank."; return; } disc = d / 100; }
-      WIZ.customers.push({ customer_name: name, allocations,
-        // back-compat fields for the single-array display/finish path:
-        array_id: allocations[0].array_id, array_name: allocations[0].array_name,
-        allocation_pct: allocations[0].allocation_pct,
+      WIZ.customers.push({ customer_name: name,
+        utility_account_id: utilId, utility_name: utilName,
+        allocation_pct: pct / 100,
         discount_pct: disc, client_email: email || null });
       drawStepCustomers();
     };
@@ -458,14 +504,9 @@
         if (c.from_upload) { created++; continue; }  // workbook subs already created on upload
         const fd = new FormData();
         fd.append("customer_name", c.customer_name);
-        if (Array.isArray(c.allocations) && c.allocations.length > 1) {
-          // Multi-array: send the allocations list (array_id + pct each).
-          fd.append("array_allocations", JSON.stringify(
-            c.allocations.map(al => ({ array_id: Number(al.array_id), allocation_pct: al.allocation_pct }))));
-        } else {
-          fd.append("array_id", c.array_id);
-          fd.append("allocation_pct", String(c.allocation_pct));
-        }
+        // Offtaker ↔ GMP utility bill (utility data only).
+        fd.append("utility_account_id", String(c.utility_account_id));
+        fd.append("allocation_pct", String(c.allocation_pct));
         if (c.discount_pct != null) fd.append("discount_pct", String(c.discount_pct));
         fd.append("cadence", "monthly");
         fd.append("delivery_mode", "approval");
