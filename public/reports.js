@@ -77,9 +77,58 @@
     MANUAL_OPEN = false;
     const addBtn = $("#rbCustAdd");
     if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
-    await Promise.all([refreshInbox(), refreshList()]);
+    // "Link GMP utility bills" — launches the REAL GMP connect flow (opens
+    // greenmountainpower.com; the extension captures + lands the bills here).
+    // Offtaker invoices bill from these utility bills only, so this is how the
+    // operator gets bills to link an offtaker to. Reuses the same flow as the
+    // onboarding gate's "Connect GMP" CTA (window.__aoConnectGmp).
+    const linkGmpBtn = $("#rbLinkGmp");
+    if (linkGmpBtn) linkGmpBtn.onclick = () => {
+      if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
+      else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
+    };
+    await Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus()]);
   }
   window.__aoLoadReports = load;
+  // Let a GMP capture landing (sandbox.js fires __aoRefreshGmpGate) also refresh
+  // the bills status + the offtaker utility-bill picker, so the operator sees the
+  // bills appear without a manual reload.
+  try {
+    const _prevRefresh = window.__aoRefreshGmpGate;
+    window.__aoRefreshGmpGate = function(){
+      try { if (_prevRefresh) _prevRefresh(); } catch(e){}
+      UTIL_ACCTS = null;                       // bust the picker cache
+      try { refreshGmpBillsStatus(); } catch(e){}
+    };
+  } catch(e){}
+
+  // Show whether GMP utility bills are connected (and how many), with a direct
+  // link to connect when none are present — answers "why is the dropdown empty?"
+  async function refreshGmpBillsStatus() {
+    const host = $("#rbGmpBillsStatus");
+    if (!host) return;
+    let accts = [];
+    try {
+      const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
+      if (r.ok) { const d = await r.json().catch(() => ({})); accts = d.utility_accounts || []; }
+    } catch (e) { /* leave empty */ }
+    const withBills = accts.filter(a => a.has_bill);
+    if (!accts.length) {
+      host.innerHTML = `<div class="rb-gmp-empty">
+        <span>No GMP utility bills connected yet — offtaker invoices bill from GMP utility bills, so connect GMP to link them.</span>
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button">Link GMP utility bills →</a></div>`;
+      const a = $("#rbGmpInlineLink");
+      if (a) a.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+    } else if (!withBills.length) {
+      host.innerHTML = `<div class="rb-gmp-empty">
+        <span>${accts.length} GMP account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open GMP once more so the extension captures them.</span>
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button">Open GMP →</a></div>`;
+      const a = $("#rbGmpInlineLink");
+      if (a) a.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+    } else {
+      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} GMP utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
+    }
+  }
 
   // When true, load() skips the wizard and shows the normal tab (Setup link / done).
   let FORCE_TAB = false;
@@ -497,8 +546,12 @@
             <h3>Your offtakers</h3>
             <span>each offtaker's percentage of the array · invoice + summary on its cadence</span>
           </div>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+          <div class="rb-head-actions">
+            <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
+            <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+          </div>
         </div>
+        <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
@@ -998,8 +1051,20 @@
       fetchUtilityAccounts().then(accts => {
         const sel = $("#rbmUtility");
         if (!sel) return;
+        const fld = sel.closest(".rep-fld");
         if (!accts.length) {
-          sel.innerHTML = `<option value="">No GMP utility bills yet — connect GMP first</option>`;
+          sel.innerHTML = `<option value="">No GMP utility bills yet — link GMP first</option>`;
+          // Make the empty state ACTIONABLE: drop a Link-GMP button right here so
+          // the operator can connect without hunting for it.
+          if (fld && !fld.querySelector(".rbm-link-gmp")) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "ao-btn rb-btn rbm-link-gmp";
+            btn.textContent = "🔗 Link GMP utility bills";
+            btn.style.marginTop = "6px";
+            btn.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+            fld.appendChild(btn);
+          }
           return;
         }
         sel.innerHTML = `<option value="">Choose a GMP utility bill…</option>` +

@@ -191,6 +191,14 @@ body.sb-fs-lock{ overflow:hidden; }
 /* left cluster (Overview / Tree-view + Show-all) floats top-LEFT */
 .sb-head-left{ position:absolute; top:0; left:0; pointer-events:none; }
 .sb-head-left .sb-head-btns{ pointer-events:auto; }
+/* the Vendor⇄Utility slider sits in sb-head-left but OUTSIDE sb-head-btns, so it
+   needs its own pointer-events re-enable or the parent's none swallows its clicks.
+   position+z-index guarantee it stacks ABOVE the canvas/viewport (which can form
+   its own stacking context via transform) so nothing can cover it. */
+.sb-head-left .sb-streamtoggle{ pointer-events:auto !important; position:relative; z-index:8;
+  background:rgba(8,12,18,.6); -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px);
+  margin-top:8px; margin-left:0; }
+.sb-head-left .sb-streamtoggle .sb-stream-seg{ pointer-events:auto !important; }
 .sb-head-actions{ position:absolute; top:0; right:0; pointer-events:auto; align-items:flex-end; gap:9px; }
 /* frosted clusters so buttons + legend stay legible over the fleet behind them */
 .sb-head-btns{ background:rgba(8,12,18,.6); -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px); border:1px solid var(--line); border-radius:13px; padding:6px; }
@@ -528,6 +536,20 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:7px 12px; border-radius:9px; font-size:12.5px; cursor:pointer; text-decoration:none; }
 .rb-btn:hover{ background:rgba(255,255,255,.09); }
 .rb-danger{ color:var(--bad); }
+
+/* head-action cluster: Link GMP utility bills + Add an offtaker */
+.rb-head-actions{ display:flex; align-items:center; gap:8px; flex:none; align-self:center; flex-wrap:wrap; justify-content:flex-end; }
+.rb-head-actions > button{ white-space:nowrap; }
+/* GMP-bills connection status under the offtakers header */
+.rb-gmpbills-status{ margin:10px 0 4px; }
+.rb-gmpbills-status:empty{ display:none; }
+.rb-gmp-empty{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:rgba(252,166,23,.08); border:1px solid rgba(252,166,23,.35);
+  color:var(--ink); padding:9px 12px; border-radius:10px; font-size:12.5px; }
+.rb-gmp-ok{ color:var(--good,#4caf50); font-size:12.5px; padding:4px 2px; }
+.rb-gmp-inline-link{ color:var(--accent,#FCA617); font-weight:600; cursor:pointer; white-space:nowrap; text-decoration:none; }
+.rb-gmp-inline-link:hover{ text-decoration:underline; }
+@media(max-width:640px){ .rb-head-actions{ width:100%; justify-content:flex-start; } }
 
 /* ---- two-column reports layout: form (left) + live document preview (right) ---- */
 .rb-layout{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }
