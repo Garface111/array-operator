@@ -969,6 +969,15 @@
     if(os.reporting) return { key:"producing", label:"Producing", tone:"ok" };
     if(col.is_daylight === false)
       return { key:"idle", label:"Idle", tone:"idle", title:"The sun is down — the array is resting." };
+    // PRODUCED-TODAY guard (the live-feed whack-a-mole fix): the instantaneous
+    // live reading is ~0 or absent, but the array's OWN daily history shows it
+    // generated energy today. That's a flaky/late live feed, NOT a dead array —
+    // so don't paint it "Not producing". Show it produced today (calm green) and
+    // let the live number catch up. Server-computed col.produced_today_kwh is the
+    // source of truth (independent of the jittery instantaneous feed).
+    if(col.produced_today_kwh != null && col.produced_today_kwh > 0)
+      return { key:"produced_today", label:"Produced today", tone:"ok",
+               title:`Generated ${(+col.produced_today_kwh).toFixed(1)} kWh today — the live feed is updating.` };
     if(healthTone !== "ok" || liveAnoms > 0)
       return { key:"dark", label:"Not producing", tone:"warn",
                title:"This array isn't producing while the sun is up." };
@@ -979,13 +988,20 @@
   // Array output bar — mirrors outputBar(), but the % is the array's AVERAGE
   // production level (combined current ÷ combined rated max). Carries the same
   // data-curw/data-maxw so the live ticker breathes it in place like an inverter.
-  function arrayOutputBar(os){
+  function arrayOutputBar(os, col){
     const fmt = v => v >= 100 ? Math.round(v) : (Math.round(v * 10) / 10);
     const curKw = os.curW != null ? os.curW / 1000 : null;
     const maxKw = os.maxW != null ? os.maxW / 1000 : null;
     let label;
     if(!os.reporting){
-      label = `<span class="sb-ob-idle">array not producing right now</span>`;
+      // Live≈0 but the array generated energy today (flaky/late live feed) →
+      // surface today's REAL kWh instead of a misleading "not producing".
+      const tk = col && col.produced_today_kwh;
+      if(tk != null && tk > 0){
+        label = `<b class="sb-ob-pct">${(+tk).toFixed(1)} kWh</b><span class="sb-ob-of">produced today · live feed updating</span>`;
+      } else {
+        label = `<span class="sb-ob-idle">array not producing right now</span>`;
+      }
     } else if(os.pct != null){
       const ofTxt = os.estimated
         ? `<span title="No rated nameplate from this vendor — combined max estimated from peak production.">of ~est · <b class="sb-ob-cur">${fmt(curKw)}</b>/~${fmt(maxKw)} kW</span>`
@@ -1432,7 +1448,7 @@
               ${srcStatusBanner}
               ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
-              ${arrayOutputBar(aOs)}
+              ${arrayOutputBar(aOs, col)}
               ${aHealthBadge}
               <div class="sb-array-src">${srcLinks}</div>
               <button class="sb-inv-toggle" type="button" aria-expanded="${isOpen?'true':'false'}"

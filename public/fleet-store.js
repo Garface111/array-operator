@@ -223,6 +223,10 @@ window.FleetStore = (function(){
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
       source_status: a.source_status || null,  // vendor-side data freshness → outage banner
+      // Server-computed array live power + today's kWh (forwarded so the card
+      // reads ONE authoritative number and can show "produced today" when live≈0).
+      current_power_w: (a.current_power_w != null ? a.current_power_w : null),
+      produced_today_kwh: (a.produced_today_kwh != null ? a.produced_today_kwh : null),
       inverters: a.inverters.map(i => ({
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
@@ -669,6 +673,12 @@ window.FleetStore = (function(){
       // Source-data freshness {state:ok|stale|none,last_report,age_hours}. Carried
       // through so the card can flag a VENDOR-side reporting outage (not ours).
       source_status: c.source_status || null,
+      // Server-computed ARRAY live power (W, sum of live inverters; null = no live
+      // feed) + today's generated kWh from daily history. The card uses the latter
+      // to show "produced today" instead of "not producing" when live≈0 (a flaky
+      // instantaneous feed must not make a healthy array read IDLE).
+      current_power_w: (c.current_power_w != null ? c.current_power_w : null),
+      produced_today_kwh: (c.produced_today_kwh != null ? c.produced_today_kwh : null),
       inverters: (c.inverters||[]).map(inv => ({
         id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
