@@ -709,6 +709,71 @@ try {
   };
 } catch(e){}
 
+// ── Cancelled-account lockout ──────────────────────────────────────────────
+// A cancelled account (subscription_status "cancelled"/"canceled" + active===false)
+// must NOT be able to use the dashboard — otherwise cancelling appears to do
+// nothing. This renders a full-viewport overlay that covers EVERY tab/panel and
+// blocks interaction. Data is preserved server-side; reactivation is a human step.
+// Mirrors the NEPOOL Operator React SPA's CancelledGate for product parity.
+function aoIsCancelled(a){
+  if(!a) return false;
+  const st = String(a.subscription_status || a.status || "").toLowerCase();
+  return a.active === false && (st === "cancelled" || st === "canceled");
+}
+function aoShowCancelledGate(){
+  if(document.getElementById("aoCancelledGate")) return;   // already shown
+  const SUPPORT = "admin@solaroperator.org";
+  const el = document.createElement("div");
+  el.id = "aoCancelledGate";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-label", "Account cancelled");
+  el.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
+    "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
+    "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+  el.innerHTML =
+    '<div style="width:100%;max-width:440px;background:#fff;color:#16202b;' +
+      'border-radius:18px;padding:34px 30px;text-align:center;' +
+      'box-shadow:0 30px 90px rgba(0,0,0,.5);font-family:inherit;">' +
+      '<div style="margin:0 auto 18px;width:56px;height:56px;border-radius:999px;' +
+        'background:#eef1f4;display:flex;align-items:center;justify-content:center;">' +
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6b7785" ' +
+          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
+          '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
+      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
+        'Your account is cancelled</h1>' +
+      '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
+        "This account has been cancelled, so the dashboard and automatic data " +
+        "pulls are turned off. You won't be charged.</p>" +
+      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
+        "Your data is safe — we haven't deleted anything. Want to come back? " +
+        "Just let us know and we'll reactivate it.</p>" +
+      '<a href="mailto:' + SUPPORT + '?subject=Reactivate%20my%20account" ' +
+        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;' +
+        'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
+        'text-decoration:none;">Email us to reactivate →</a>' +
+      '<button type="button" id="aoCancelledSignOut" ' +
+        'style="margin-top:18px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
+        'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
+    '</div>';
+  document.body.appendChild(el);
+  // Kill scrolling/interaction with anything behind the gate.
+  try { document.body.style.overflow = "hidden"; } catch(e){}
+  const out = document.getElementById("aoCancelledSignOut");
+  if(out) out.addEventListener("click", () => {
+    try { localStorage.removeItem("so_session"); } catch(e){}
+    location.href = "/login";
+  });
+}
+// Expose so sandbox.js (the #account tab) and any other surface can trigger it
+// from their own /v1/account reads without duplicating the logic.
+try {
+  window.aoIsCancelled = aoIsCancelled;
+  window.aoShowCancelledGate = aoShowCancelledGate;
+} catch(e){}
+
 function renderFromSession(){
   let session = null;
   try { session = localStorage.getItem("so_session"); } catch(e){}
@@ -734,6 +799,7 @@ function renderFromSession(){
         fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
           .then(r => r.ok ? r.json() : null)
           .then(a => {
+            if(a && aoIsCancelled(a)){ aoShowCancelledGate(); }
             if(a && a.email && whoEmail){
               whoEmail.textContent = a.email;
               whoEmail.dataset.real = "1";

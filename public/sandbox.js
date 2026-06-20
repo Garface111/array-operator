@@ -580,8 +580,29 @@
   // not a grid of per-inverter minis. Tone tracks the array's live output vs its
   // combined rated capacity (green at/near max → amber → orange → idle when nothing
   // is reporting). Days where the whole array made nothing get a red dot.
-  function arrayGraph(sortedInvs, arrayDaily){
-    if(!sortedInvs || !sortedInvs.length) return "";
+  function arrayGraph(sortedInvs, arrayDaily, col, stream){
+    stream = stream || "vendor";
+    const split = (col && col.daily_split) || null;
+    // ── UTILITY stream: show the meter's settled generation for this array. There
+    // is no per-inverter meter data, so this reads the array-level utility series
+    // straight from the backend split. ──
+    if(stream === "utility"){
+      const useries = (split && Array.isArray(split.utility)) ? split.utility : [];
+      const byDate = new Map();
+      useries.forEach(d => { if(d && d.date != null) byDate.set(d.date, Math.max(0, +d.kwh || 0)); });
+      return _renderArraySeries(byDate, "Utility meter · last %d days",
+        "var(--util, #5b8def)",
+        "no utility-meter data yet — connect GMP to see settled generation");
+    }
+    if(!sortedInvs || !sortedInvs.length){
+      // No inverters, but the array may still carry vendor-side history (csv/
+      // extension at the array level) — fall back to the vendor split series.
+      const vseries = (split && Array.isArray(split.vendor)) ? split.vendor : (arrayDaily || []);
+      const byDate = new Map();
+      vseries.forEach(d => { if(d && d.date != null) byDate.set(d.date, Math.max(0, +d.kwh || 0)); });
+      if(byDate.size < 2) return "";
+      return _renderArraySeries(byDate, "Array production · last %d days", "var(--good)", "");
+    }
     // aggregate daily kWh across all inverters, keyed by date
     const byDate = new Map();
     sortedInvs.forEach(inv => {
@@ -609,8 +630,14 @@
     });
     const tone = (anyReporting && maxW) ? pctTone(Math.max(0, Math.min(100, Math.round((curW/maxW)*100)))) : "idle";
     const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "#ffb454" : tone === "idle" ? "var(--faint)" : "var(--good)";
+    return _renderArraySeries(byDate, "Array production · last %d days", stroke, "");
+  }
 
-    // sort the summed series by date (ISO sorts naturally; demo "d-N" handled too)
+  // Shared renderer for the array-level daily series (used by both vendor and
+  // utility streams). `byDate` = Map(dateISO → kWh). `labelTmpl` has a %d for the
+  // day count. `emptyMsg` (when non-empty) renders instead of the "history
+  // building" note — used to explain a stream that simply has no data yet.
+  function _renderArraySeries(byDate, labelTmpl, stroke, emptyMsg){
     const sortKey = s => {
       if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
       const m = String(s).match(/d-?(\d+)/);
@@ -618,8 +645,9 @@
     };
     const dates = [...byDate.keys()].sort((a,b)=> sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0);
     if(dates.length < 2){
-      return `<div class="sb-ag"><div class="sb-ag-k">Array production · last 14 days</div>
-        <div class="sb-ag-nodata">history building — graph appears once 2+ days are stored</div></div>`;
+      const msg = emptyMsg || "history building — graph appears once 2+ days are stored";
+      return `<div class="sb-ag"><div class="sb-ag-k">${esc(labelTmpl.replace("· last %d days","").trim())}</div>
+        <div class="sb-ag-nodata">${esc(msg)}</div></div>`;
     }
     const vals = dates.map(d => byDate.get(d));
     const totalKwh = vals.reduce((s,v)=>s+v,0);
@@ -637,7 +665,7 @@
     const totalLbl = totalKwh >= 1000 ? `${(totalKwh/1000).toFixed(1)} MWh` : `${Math.round(totalKwh)} kWh`;
     return `<div class="sb-ag">
       <div class="sb-ag-head">
-        <span class="sb-ag-k">Array production · last ${dates.length} days</span>
+        <span class="sb-ag-k">${esc(labelTmpl.replace("%d", String(dates.length)))}</span>
         <span class="sb-ag-total">${totalLbl}</span>
       </div>
       <svg class="sb-ag-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
@@ -1050,6 +1078,22 @@
     try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
   }
 
+  // ---- DATA-STREAM selector (Ford's dad's ask): the sandbox INTEGRATES vendor +
+  // utility data, but the slider lets the owner VIEW one source stream at a time.
+  //   "vendor"  → inverter telemetry (SolarEdge/Fronius/SMA/CHINT/extension). The
+  //               per-inverter comb + the array graph show vendor production.
+  //   "utility" → the utility meter's settled generation (GMP). The array graph
+  //               shows the meter stream; the inverter comb (a vendor-only concept)
+  //               collapses. Persisted under STREAM_KEY; DEFAULT vendor. ----
+  const STREAM_KEY = "ao_sandbox_stream";
+  function getStream(){
+    try { return localStorage.getItem(STREAM_KEY) === "utility" ? "utility" : "vendor"; }
+    catch(e){ return "vendor"; }
+  }
+  function setStream(s){
+    try { localStorage.setItem(STREAM_KEY, s === "utility" ? "utility" : "vendor"); } catch(e){}
+  }
+
   // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
   // "canvas" (the interactive tree). Persisted; DEFAULT canvas so the owner lands
   // on the zoomed-out tree with every inverter revealed (quick whole-fleet picture). ----
@@ -1146,6 +1190,11 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
+          </div>
+          <div class="sb-streamtoggle" role="group" aria-label="Data source stream" title="Both sources are integrated underneath — this just chooses which feed each array shows: the inverter VENDOR telemetry, or the UTILITY meter (GMP).">
+            <span class="sb-stream-cap">Showing</span>
+            <button class="sb-stream-seg ${getStream()==="vendor"?"on":""}" id="sbStreamVendor" type="button" aria-pressed="${getStream()==="vendor"}">Vendor data</button>
+            <button class="sb-stream-seg ${getStream()==="utility"?"on":""}" id="sbStreamUtility" type="button" aria-pressed="${getStream()==="utility"}">Utility data</button>
           </div>
         </div>
         <div class="sb-head-actions">
@@ -1332,7 +1381,7 @@
               </div>
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
               ${srcStatusBanner}
-              ${arrayGraph(sortedInvs, col.daily)}
+              ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
               ${arrayOutputBar(aOs)}
               ${aHealthBadge}
@@ -1352,7 +1401,7 @@
         </div>`;
     }).join("");
 
-    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()}">${columns}</div></div>
+    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()} sb-stream-${getStream()}">${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
     host.classList.remove("sb-mode-grid");
 
@@ -1381,6 +1430,7 @@
 
     wireFullscreen(host);
     wireOrient(host);
+    wireStreamToggle(host);  // Vendor⇄Utility data-stream slider
     wireViewMode(host);   // ⊞ Overview ↔ ⌗ Tree-view toggle
     wireShowAll(host);    // ⊟ Show all arrays (visible only when drilled into a subset)
     wireAlerts(host);     // 🔔 inverter email alert settings
@@ -1405,22 +1455,34 @@
   // A tiny tile sparkline (no axis) of an array's summed daily production, tinted
   // by the array's worst health. Pure inline SVG — cheap to draw 100+ of.
   function tileSpark(col, tone){
-    const invs = col.inverters || [];
-    if(!invs.length) return "";
-    // sum daily kWh across the array's inverters into one series
-    const byDay = {};
-    let order = [];
-    for(const inv of invs){
-      for(const d of (inv.daily || [])){
-        if(!(d.date in byDay)){ byDay[d.date] = 0; order.push(d.date); }
-        byDay[d.date] += Math.max(0, +d.kwh || 0);
+    const stream = getStream();
+    const split = col.daily_split || null;
+    // Stream-aware: in utility mode draw the meter series; in vendor mode sum the
+    // per-inverter daily (falling back to the vendor split for inverter-less arrays).
+    let series = [];
+    if(stream === "utility"){
+      series = (split && Array.isArray(split.utility)) ? split.utility : [];
+    } else {
+      const invs = col.inverters || [];
+      if(invs.length){
+        const byDay = {}; const order = [];
+        for(const inv of invs){
+          for(const d of (inv.daily || [])){
+            if(!(d.date in byDay)){ byDay[d.date] = 0; order.push(d.date); }
+            byDay[d.date] += Math.max(0, +d.kwh || 0);
+          }
+        }
+        series = order.map(dt => ({ date: dt, kwh: byDay[dt] }));
       }
+      if(series.length < 2 && split && Array.isArray(split.vendor)) series = split.vendor;
     }
-    const vals = order.map(dt => byDay[dt]);
+    const vals = series.map(d => Math.max(0, +d.kwh || 0));
     if(vals.length < 2) return "";
     const w = 100, h = 26, pad = 2;
     const max = Math.max(...vals, 0.001);
-    const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--good)";
+    // utility stream → blue stroke; vendor stream → health-tinted as before.
+    const stroke = stream === "utility" ? "var(--util, #5b8def)"
+      : tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--good)";
     const X = i => pad + (i/(vals.length-1))*(w-2*pad);
     const Y = v => h-pad - (v/max)*(h-2*pad);
     const line = vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
@@ -1486,6 +1548,7 @@
 
     wireFullscreen(host);
     wireViewMode(host);
+    wireStreamToggle(host);  // Vendor⇄Utility slider (also lives in grid header)
     wireShowAll(host);
     wireAlerts(host);
     wireUndoRedo(host);
@@ -2517,6 +2580,41 @@
     };
   }
 
+  // Vendor⇄Utility data-stream toggle. Flips the persisted stream and re-renders;
+  // render() applies sb-stream-<stream> to the canvas (CSS collapses the inverter
+  // comb in utility mode) and arrayGraph() draws the chosen source's series.
+  //
+  // Robustness: instead of per-button onclick (which a transparent canvas/pan
+  // overlay floating over the header can intercept before the click lands, and
+  // which is lost every re-render), we install ONE document-level listener in the
+  // CAPTURE phase. Capture fires before any bubbling handler can stopPropagation,
+  // and delegation by id survives the buttons being re-created on each render.
+  let _streamWired = false;
+  function applyStream(s){
+    if(getStream() === s) return;
+    setStream(s);
+    renderFromStore();
+    requestAnimationFrame(() => fitView(document.getElementById("sandbox")));
+  }
+  function wireStreamToggle(host){
+    // Reflect current state on the freshly-rendered buttons (the listener below
+    // does the actual switching, installed once).
+    const vBtn = host.querySelector("#sbStreamVendor");
+    const uBtn = host.querySelector("#sbStreamUtility");
+    if(vBtn) vBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); applyStream("vendor"); };
+    if(uBtn) uBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); applyStream("utility"); };
+    if(_streamWired) return;
+    _streamWired = true;
+    // Capture-phase, document-level — beats any overlay that eats bubbling clicks.
+    document.addEventListener("click", (e) => {
+      const seg = e.target.closest && e.target.closest(".sb-stream-seg");
+      if(!seg) return;
+      e.preventDefault();
+      e.stopPropagation();
+      applyStream(seg.id === "sbStreamUtility" ? "utility" : "vendor");
+    }, true);
+  }
+
   // "Show all inverters" — open (or, when all are already open, collapse) EVERY
   // array's inverter comb in one click. Mirrors toggleArray's persisted-set logic
   // but batches the write + a single connector redraw + one re-fit so it stays
@@ -3205,11 +3303,82 @@
       rowStatic("Payment method",
         `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
         null,
-        `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`);
+        `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
+      cancelRow(a);
 
     wireAcctEdits();
     wirePasswordRow();
     wireAutoRefreshRow();
+    wireCancelRow();
+  }
+
+  /* ---- Danger zone: cancel the account.
+   * Shown ONLY while trialing (mirrors the NEPOOL React DangerZoneCard gating).
+   * Cancelling during a trial is free + immediate: POST /v1/onboarding/cancel-trial
+   * flips the tenant to cancelled/active=false, after which the full-page
+   * cancelled gate (app.js) takes over on the next load. Post-trial accounts
+   * manage cancellation through the Stripe billing portal (Payment method row),
+   * so we don't show a separate cancel button for them. ---------------------- */
+  function cancelRow(a){
+    const st = String((a && (a.subscription_status || a.status)) || "").toLowerCase();
+    const onTrial = (a && (a.on_trial === true || a.trial === true)) || st === "trialing";
+    if(!onTrial) return "";
+    return `<div class="acct-row" id="rowCancel">
+      <div class="r-k" style="color:#b4361f;">Cancel account</div>
+      <div class="r-v">
+        <span>Cancel during your trial — you won't be charged.</span>
+        <span class="r-sub">Your data is kept; the dashboard turns off. This can't be undone from here.</span>
+        <div class="acct-msg" id="cancelMsg"></div>
+        <div id="cancelConfirm" style="display:none;margin-top:8px;">
+          <button class="acct-btn" id="cancelKeep" type="button">Keep my account</button>
+          <button class="acct-btn" id="cancelYes" type="button"
+            style="background:#b4361f;border-color:#b4361f;color:#fff;">Yes, cancel my account</button>
+        </div>
+      </div>
+      <div class="r-a">
+        <button class="acct-btn" id="cancelStart" type="button"
+          style="color:#b4361f;border-color:#e6b3a8;">Cancel my account</button>
+      </div>
+    </div>`;
+  }
+
+  function wireCancelRow(){
+    const start   = document.getElementById("cancelStart");
+    const confirm = document.getElementById("cancelConfirm");
+    const keep    = document.getElementById("cancelKeep");
+    const yes     = document.getElementById("cancelYes");
+    const msg     = document.getElementById("cancelMsg");
+    if(!start || !confirm) return;
+    start.addEventListener("click", () => {
+      start.style.display = "none";
+      confirm.style.display = "";
+    });
+    if(keep) keep.addEventListener("click", () => {
+      confirm.style.display = "none";
+      start.style.display = "";
+      if(msg){ msg.className = "acct-msg"; msg.textContent = ""; }
+    });
+    if(yes) yes.addEventListener("click", async () => {
+      const h = authHeaders();
+      if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Please sign in again."; } return; }
+      yes.disabled = true; if(keep) keep.disabled = true;
+      yes.textContent = "Cancelling…";
+      try{
+        const r = await fetch("/v1/onboarding/cancel-trial", { method: "POST", headers: h });
+        const d = await r.json().catch(() => ({}));
+        if(r.ok && (d.ok || d.ok === undefined)){
+          // Backend flipped the tenant to cancelled — hand off to the full-page gate.
+          if(window.aoShowCancelledGate){ window.aoShowCancelledGate(); }
+          else { try { localStorage.removeItem("so_session"); } catch(e){} location.href = "/login"; }
+        } else {
+          if(msg){ msg.className = "acct-msg err"; msg.textContent = (d && d.detail) ? d.detail : `Couldn't cancel (HTTP ${r.status}).`; }
+          yes.disabled = false; if(keep) keep.disabled = false; yes.textContent = "Yes, cancel my account";
+        }
+      }catch(e){
+        if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't reach the server — try again."; }
+        yes.disabled = false; if(keep) keep.disabled = false; yes.textContent = "Yes, cancel my account";
+      }
+    });
   }
 
   /* ---- Auto-refresh row: manage the EnergyAgent extension's hourly auto-login
@@ -3588,6 +3757,9 @@
       if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
       if(!r.ok) throw new Error("account " + r.status);
       _account = await r.json();
+      if(window.aoIsCancelled && window.aoIsCancelled(_account)){
+        try { window.aoShowCancelledGate(); } catch(e){}
+      }
       renderAccountList(_account);
     }catch(e){
       list.innerHTML = `<div class="empty">Couldn't load your account right now — please refresh.</div>`;
@@ -3666,6 +3838,9 @@
   document.addEventListener("DOMContentLoaded", applyView);
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
+  // QA/debug hook: render a fleet-tree payload directly (used by the offline
+  // visual-QA harness to exercise the Vendor⇄Utility slider without hitting prod).
+  window.__sbRenderTree = render;
   // expose the alerts settings modal so it can be opened from the top-bar
   // Fleet Commander button (moved out of the sandbox head, May 2026).
   window.__sbOpenAlerts = openAlertsModal;
