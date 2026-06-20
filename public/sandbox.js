@@ -1094,30 +1094,30 @@
     try { localStorage.setItem(STREAM_KEY, s === "utility" ? "utility" : "vendor"); } catch(e){}
   }
 
-  // Route arrays to the currently-selected stream: an array shows in the VENDOR
-  // view when its data comes from inverter telemetry, and in the UTILITY view
-  // when it comes from the utility meter. An array carrying BOTH feeds appears in
-  // either view (the data is integrated underneath; this just sources what's
-  // shown). Classification uses the same fleet-tree fields as the debug tag:
-  //   vendor  ⇐ daily_split.has_vendor, or any inverters/vendor on the array
-  //   utility ⇐ daily_split.has_utility
-  // Defensive: if a stream would end up empty (e.g. data hasn't been classified
-  // yet), fall back to showing ALL arrays so the canvas is never blank by filter.
-  function arrayHasStream(col, stream){
+  // Each array belongs to EXACTLY ONE section, by where its data comes from:
+  //   • VENDOR  — data from inverter telemetry (SolarEdge/Fronius/SMA/Chint/…):
+  //               the array has inverters / a vendor on it / a vendor daily stream.
+  //   • UTILITY — data from the utility meter (GMP/VEC/SmartHub): a utility daily
+  //               stream and NO inverter/vendor source.
+  // Strict + mutually exclusive: a vendor-sourced array shows ONLY in the vendor
+  // view, a utility-sourced array shows ONLY in the utility view. No array appears
+  // in both, and there is no "show everything" fallback.
+  function arrayStream(col){
     const ds = col.daily_split || {};
-    if(stream === "utility") return !!ds.has_utility;
-    // vendor
-    if(ds.has_vendor) return true;
-    if(col.vendor) return true;
-    if(Array.isArray(col.vendors) && col.vendors.length) return true;
-    if(Array.isArray(col.inverters) && col.inverters.length) return true;
-    return false;
+    const hasVendor =
+      !!ds.has_vendor ||
+      !!col.vendor ||
+      (Array.isArray(col.vendors) && col.vendors.length > 0) ||
+      (Array.isArray(col.inverters) && col.inverters.length > 0);
+    if(hasVendor) return "vendor";
+    if(ds.has_utility) return "utility";
+    // No classified source at all → treat as utility (meter-only arrays that
+    // haven't synced a daily row yet have no inverters, so they're not vendor).
+    return "utility";
   }
   function filterColsByStream(cols){
     const stream = getStream();
-    const kept = cols.filter(c => arrayHasStream(c, stream));
-    // Never blank the view purely because nothing classified into this stream.
-    return kept.length ? kept : cols;
+    return cols.filter(c => arrayStream(c) === stream);
   }
 
   // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
@@ -1190,8 +1190,31 @@
   function render(tree){
     const host = document.getElementById("sandbox");
     if(!host) return;
-    const cols = filterColsByStream(applyOrder(tree.columns || []));
+    const allCols = applyOrder(tree.columns || []);
+    const cols = filterColsByStream(allCols);
     if(!cols.length){
+      // Distinguish "no arrays at all" from "this source section is empty but the
+      // other has arrays" — so the toggle stays visible and the message is honest.
+      const stream = getStream();
+      const other = stream === "vendor" ? "utility" : "vendor";
+      const otherCount = allCols.filter(c => arrayStream(c) === other).length;
+      if(allCols.length && otherCount){
+        const here = stream === "vendor" ? "Vendor data" : "Utility data";
+        const there = other === "vendor" ? "Vendor data" : "Utility data";
+        host.innerHTML =
+          `<div class="sb-head">
+            <div class="sb-head-left"><div class="sb-streamtoggle" role="group" aria-label="Data source stream" title="Each array shows only in the section matching its data source.">
+              <span class="sb-stream-cap">Showing</span>
+              <button class="sb-stream-seg ${stream==="vendor"?"on":""}" id="sbStreamVendor" type="button" aria-pressed="${stream==="vendor"}">Vendor data</button>
+              <button class="sb-stream-seg ${stream==="utility"?"on":""}" id="sbStreamUtility" type="button" aria-pressed="${stream==="utility"}">Utility data</button>
+            </div></div>
+          </div>
+          <div class="sb-empty">No arrays get their data from a ${esc(here.toLowerCase().replace(" data",""))} source. ` +
+          `${otherCount} array${otherCount===1?" is":"s are"} under <b>${esc(there)}</b> — switch above to see ${otherCount===1?"it":"them"}.</div>`;
+        wireStreamToggle(host);
+        renderCards();
+        return;
+      }
       host.innerHTML =
         `<div class="sb-head"><div>
            <div class="sb-tiers"><span class="sb-tier-tag b">Your fleet</span></div>
