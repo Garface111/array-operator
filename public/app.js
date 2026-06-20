@@ -722,12 +722,11 @@ function aoIsCancelled(a){
 }
 function aoShowCancelledGate(){
   if(document.getElementById("aoCancelledGate")) return;   // already shown
-  const SUPPORT = "admin@solaroperator.org";
   const el = document.createElement("div");
   el.id = "aoCancelledGate";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-modal", "true");
-  el.setAttribute("aria-label", "Account cancelled");
+  el.setAttribute("aria-label", "Subscription cancelled");
   el.style.cssText =
     "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
     "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
@@ -743,19 +742,21 @@ function aoShowCancelledGate(){
           '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
           '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
       '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
-        'Your account is cancelled</h1>' +
+        'Your subscription is cancelled</h1>' +
       '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
-        "This account has been cancelled, so the dashboard and automatic data " +
-        "pulls are turned off. You won't be charged.</p>" +
+        "Your dashboard and automatic data pulls are turned off. Start your " +
+        "subscription again to pick up right where you left off.</p>" +
       '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
-        "Your data is safe — we haven't deleted anything. Want to come back? " +
-        "Just let us know and we'll reactivate it.</p>" +
-      '<a href="mailto:' + SUPPORT + '?subject=Reactivate%20my%20account" ' +
-        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;' +
+        "Your data is safe — we haven't deleted anything.</p>" +
+      '<button type="button" id="aoReactivateBtn" ' +
+        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;border:none;' +
         'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
-        'text-decoration:none;">Email us to reactivate →</a>' +
+        'cursor:pointer;">Start my subscription →</button>' +
+      '<div id="aoReactivateMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
+      '<p style="margin:14px 0 0;font-size:12px;color:#9aa6b2;">' +
+        "Billing starts today — your free trial has already been used. Cancel anytime.</p>" +
       '<button type="button" id="aoCancelledSignOut" ' +
-        'style="margin-top:18px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
+        'style="margin-top:16px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
         'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
     '</div>';
   document.body.appendChild(el);
@@ -765,6 +766,31 @@ function aoShowCancelledGate(){
   if(out) out.addEventListener("click", () => {
     try { localStorage.removeItem("so_session"); } catch(e){}
     location.href = "/login";
+  });
+  // Reactivate: start a fresh PAID subscription (no trial). POST /v1/account/reactivate
+  // returns a Stripe Checkout (setup) URL; the webhook then creates the subscription
+  // and flips the tenant back to active.
+  const reBtn = document.getElementById("aoReactivateBtn");
+  const reMsg = document.getElementById("aoReactivateMsg");
+  if(reBtn) reBtn.addEventListener("click", async () => {
+    let session = null;
+    try { session = localStorage.getItem("so_session"); } catch(e){}
+    if(!session){ if(reMsg) reMsg.textContent = "Please sign in again."; return; }
+    reBtn.disabled = true; reBtn.textContent = "Opening secure checkout…";
+    if(reMsg) reMsg.textContent = "";
+    try{
+      const r = await fetch("/v1/account/reactivate", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + session },
+      });
+      const d = await r.json().catch(() => ({}));
+      if(r.ok && d.checkout_url){ location.href = d.checkout_url; return; }
+      if(reMsg) reMsg.textContent = (d && d.detail) ? d.detail : ("Couldn't start checkout (HTTP " + r.status + ").");
+      reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
+    }catch(e){
+      if(reMsg) reMsg.textContent = "Couldn't reach the server — try again.";
+      reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
+    }
   });
 }
 // Expose so sandbox.js (the #account tab) and any other surface can trigger it
