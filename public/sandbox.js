@@ -1253,6 +1253,7 @@
     }, 1400);
   }
   let _freshPollOn = false;
+  let _revealedFresh = false;     // one-shot: animate the fleet in once per fresh window
   function startFreshPoll(){
     if(_freshPollOn) return;
     if(!(window.FleetStore && FleetStore.refetch && FleetStore.focusColumns)) return;
@@ -1264,9 +1265,7 @@
         const cols = (FleetStore.focusColumns().columns) || [];
         if(cols.length){
           _freshPollOn = false;
-          try{ sessionStorage.removeItem(FRESH_KEY); }catch(e){}   // arrived — stop watching
-          renderFromStore();
-          revealArrays();
+          renderFromStore();   // populated render fires the one-shot reveal itself
           return;
         }
         setTimeout(tick, 3000);
@@ -1401,7 +1400,11 @@
   }
 
   const expanded = getExpandedSet();   // which arrays have their inverter comb open
-    const expandAllDefault = !hasExpandPref();  // first visit → reveal every inverter
+    // First login (fresh from onboarding) OR a never-customized fleet → open every
+    // inverter comb so the new owner sees their WHOLE fleet at once. freshWindowActive()
+    // wins over a stale ao_array_expanded pref (set by any prior collapse in this
+    // browser) so a just-onboarded owner always lands on the full, expanded view.
+    const expandAllDefault = freshWindowActive() || !hasExpandPref();
     const columns = cols.map(col => {
       const isOpen = expandAllDefault || expanded.has(String(col.array_id));
       const invs = col.inverters || [];
@@ -1612,6 +1615,10 @@
     renderCards();        // recreate free + fixed owner cards from localStorage (idempotent)
     drawFleetConnectors(host); // SVG converging feeders → trunk → array (replaces the comb bus)
     refreshWeather(host); // live Open-Meteo pull for arrays with coords; synthetic otherwise
+    // First-visit reveal: when a just-onboarded owner's fleet first paints — whether
+    // the arrays were already present OR just arrived via the fast poll — animate the
+    // (now expanded) columns in, exactly once per fresh window.
+    if(freshWindowActive() && !_revealedFresh){ _revealedFresh = true; revealArrays(); }
   }
 
   // A tiny tile sparkline (no axis) of an array's summed daily production, tinted
