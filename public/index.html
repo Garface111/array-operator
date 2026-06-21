@@ -172,6 +172,11 @@
       <span class="whoami-dot" aria-hidden="true"></span>
       <span class="whoami-email" id="whoamiEmail">…</span>
     </a>
+    <!-- Sign out — visible only when signed in (toggled by renderFromSession in
+         app.js). href="/login" is a no-JS fallback; the handler clears the
+         session + cached fleet tree first, then redirects. -->
+    <a class="tab tab-signout" id="tabSignOut" href="/login" role="button"
+       title="Sign out of this account" style="display:none">Sign out</a>
   </div>
 
   <!-- GMP-ONBOARDING GATE — shown to signed-in owners until they connect GMP.

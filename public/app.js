@@ -822,10 +822,7 @@ function aoShowCancelledGate(){
   // Kill scrolling/interaction with anything behind the gate.
   try { document.body.style.overflow = "hidden"; } catch(e){}
   const out = document.getElementById("aoCancelledSignOut");
-  if(out) out.addEventListener("click", () => {
-    try { localStorage.removeItem("so_session"); } catch(e){}
-    location.href = "/login";
-  });
+  if(out) out.addEventListener("click", () => { aoSignOut(); });
   // Reactivate: start a fresh PAID subscription (no trial). POST /v1/account/reactivate
   // returns a Stripe Checkout (setup) URL; the webhook then creates the subscription
   // and flips the tenant back to active.
@@ -858,6 +855,28 @@ try {
   window.aoIsCancelled = aoIsCancelled;
   window.aoShowCancelledGate = aoShowCancelledGate;
 } catch(e){}
+
+// Canonical sign-out — clear the session token AND this session's cached fleet
+// tree (so a shared browser never shows the previous owner's arrays after
+// logout), then return to /login. Exposed on window so every surface (the header
+// chip, the #account tab in sandbox.js, the cancelled gate) tears down the SAME
+// way instead of a partial localStorage.removeItem that leaves cached data behind.
+function aoSignOut(){
+  let s = null;
+  try { s = localStorage.getItem("so_session"); } catch(e){}
+  try { localStorage.removeItem("so_session"); } catch(e){}
+  try {
+    if(s) localStorage.removeItem("ao_fleet_cache:" + s.slice(0, 12));
+    // Sweep any stray fleet-cache entries (other sessions on this browser) so no
+    // signed-in fleet data lingers in localStorage after logout.
+    for(let i = localStorage.length - 1; i >= 0; i--){
+      const k = localStorage.key(i);
+      if(k && k.indexOf("ao_fleet_cache:") === 0) localStorage.removeItem(k);
+    }
+  } catch(e){}
+  location.href = "/login";
+}
+try { window.aoSignOut = aoSignOut; } catch(e){}
 
 function renderFromSession(){
   let session = null;
@@ -895,6 +914,19 @@ function renderFromSession(){
           .catch(() => { who.style.display = "none"; });
       } else {
         who.style.display = "none";
+      }
+    }
+  } catch(e){}
+  // Sign-out control (top-right, just past the identity chip): visible whenever a
+  // session token exists — you can always sign out, even if the token turns out
+  // stale. Wired ONCE to the canonical aoSignOut (clears token + cached tree).
+  try {
+    const so = document.getElementById("tabSignOut");
+    if(so){
+      so.style.display = session ? "" : "none";
+      if(!so._wired){
+        so._wired = 1;
+        so.addEventListener("click", (e) => { e.preventDefault(); aoSignOut(); });
       }
     }
   } catch(e){}
