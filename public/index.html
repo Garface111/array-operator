@@ -288,5 +288,62 @@
     });
   })();
 </script>
+<!-- Always-building feature-suggestion widget (CC 2026-06-21). Subtle fixed pill
+     -> small panel -> POST /v1/feature-suggestion (a Claude Code agent reviews). -->
+<style>
+  #fsWrap{position:fixed;left:16px;bottom:16px;z-index:9000;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+  #fsBtn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4);transition:color .15s,border-color .15s}
+  #fsBtn:hover{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896)}
+  #fsBtn .fsdot{color:var(--good,#34d896)}
+  #fsPanel{display:none;width:320px;max-width:calc(100vw - 32px);margin-top:10px;border:1px solid var(--line,#243530);background:var(--card,#15201c);border-radius:14px;padding:14px;box-shadow:0 8px 30px -8px rgba(0,0,0,.55)}
+  #fsPanel.open{display:block}
+  #fsPanel h4{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--ink,#e8f1ec)}
+  #fsPanel p{margin:0 0 10px;font-size:12px;color:var(--muted,#8aa89b)}
+  #fsText{width:100%;box-sizing:border-box;min-height:78px;resize:vertical;border:1px solid var(--line,#243530);background:var(--bg,#0c1311);color:var(--ink,#e8f1ec);border-radius:10px;padding:9px;font:13px/1.4 inherit}
+  #fsRow{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px}
+  #fsCancel{cursor:pointer;background:none;border:none;color:var(--muted,#8aa89b);font-size:12.5px;padding:6px}
+  #fsSend{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:600}
+  #fsSend:hover{background:rgba(52,216,150,.08)}
+  #fsMsg{font-size:12px;margin-top:8px;min-height:1em}
+</style>
+<div id="fsWrap">
+  <div id="fsPanel" role="dialog" aria-label="Suggest a feature">
+    <h4>We're always building.</h4>
+    <p>Suggest a feature — a Claude Code agent reviews every idea.</p>
+    <textarea id="fsText" placeholder="What would make Array Operator better for you?"></textarea>
+    <div id="fsMsg"></div>
+    <div id="fsRow">
+      <button id="fsCancel" type="button">Cancel</button>
+      <button id="fsSend" type="button">Send &rarr;</button>
+    </div>
+  </div>
+  <button id="fsBtn" type="button" aria-expanded="false"><span class="fsdot">&#10022;</span> Suggest a feature</button>
+</div>
+<script>
+(function(){
+  var btn=document.getElementById("fsBtn"), panel=document.getElementById("fsPanel"),
+      txt=document.getElementById("fsText"), send=document.getElementById("fsSend"),
+      cancel=document.getElementById("fsCancel"), msg=document.getElementById("fsMsg");
+  if(!btn) return;
+  function open(o){ panel.classList.toggle("open", o); btn.setAttribute("aria-expanded", o?"true":"false"); if(o){ msg.textContent=""; setTimeout(function(){ txt.focus(); }, 30); } }
+  btn.onclick=function(){ open(!panel.classList.contains("open")); };
+  cancel.onclick=function(){ open(false); };
+  send.onclick=function(){
+    var t=(txt.value||"").trim();
+    if(!t){ msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Type a suggestion first."; return; }
+    send.disabled=true; msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Sending...";
+    var h={"Content-Type":"application/json"};
+    try{ var sess=localStorage.getItem("so_session"); if(sess) h["Authorization"]="Bearer "+sess; }catch(e){}
+    fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify({text:t})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){
+        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — sent to our build agent for review."; txt.value=""; setTimeout(function(){ open(false); }, 2200); }
+        else { msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't send just now — try again in a moment."; }
+        send.disabled=false;
+      })
+      .catch(function(){ msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't reach us — check your connection."; send.disabled=false; });
+  };
+})();
+</script>
 </body>
 </html>
