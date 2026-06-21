@@ -709,6 +709,65 @@ try {
   };
 } catch(e){}
 
+// -- Trial card-capture nudge ------------------------------------------------
+// Quiet, dismissible bar for a signed-in trialing owner with NO card on file,
+// within ~7 days of trial end. Surfaces the deferred-billing reminder in the UI
+// so engaged owners can add a card at the moment of intent. Dismiss hides it; it
+// reappears ONCE when the trial turns urgent (<=2 days). Never nags daily.
+function updateTrialNudge(session){
+  const bar = document.getElementById("trialNudge");
+  if(!bar) return;
+  if(!session){ bar.hidden = true; return; }
+  fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+    .then(r => r.ok ? r.json() : null)
+    .then(a => {
+      if(!a){ bar.hidden = true; return; }
+      try { if(window.aoIsCancelled && window.aoIsCancelled(a)){ bar.hidden = true; return; } } catch(e){}
+      const hasCard = a.has_payment_method === true;
+      const ends = a.trial_ends_at ? new Date(a.trial_ends_at) : null;
+      if(hasCard || !ends || isNaN(ends.getTime())){ bar.hidden = true; return; }
+      const days = Math.ceil((ends.getTime() - Date.now()) / 86400000);
+      if(days < 0 || days > 7){ bar.hidden = true; return; }
+      const tier = days <= 2 ? "urgent" : "soft";
+      let dis = null;
+      try { dis = JSON.parse(localStorage.getItem("ao_trialnudge_dismiss") || "null"); } catch(e){}
+      if(dis && dis.ends === a.trial_ends_at){
+        if(dis.tier === "urgent"){ bar.hidden = true; return; }
+        if(tier === "soft"){ bar.hidden = true; return; }
+      }
+      const when = days <= 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
+      const copy = document.getElementById("trialNudgeCopy");
+      if(copy){
+        copy.innerHTML = (tier === "urgent")
+          ? "<b>Your free trial ends " + when + ".</b> Add a card to keep your reports running."
+          : "Your free trial ends " + when + ". Add a card whenever you're ready to keep your reports running after it.";
+      }
+      bar.classList.toggle("urgent", tier === "urgent");
+      const cta = document.getElementById("trialNudgeCta");
+      if(cta){
+        cta.onclick = function(e){
+          e.preventDefault();
+          cta.textContent = "Opening...";
+          fetch("/v1/account/add-payment-method", { method:"POST",
+            headers: { "Content-Type":"application/json", Authorization: "Bearer " + session }, body: "{}" })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { const u = d && (d.checkout_url || d.url); if(u){ window.location = u; } else { cta.textContent = "Add a card"; } })
+            .catch(() => { cta.textContent = "Add a card"; });
+        };
+      }
+      const x = document.getElementById("trialNudgeX");
+      if(x){
+        x.onclick = function(){
+          try { localStorage.setItem("ao_trialnudge_dismiss", JSON.stringify({ ends: a.trial_ends_at, tier: tier })); } catch(e){}
+          bar.hidden = true;
+        };
+      }
+      bar.hidden = false;
+    })
+    .catch(() => { /* never block the dashboard on the nudge */ });
+}
+try { window.updateTrialNudge = updateTrialNudge; } catch(e){}
+
 // ── Cancelled-account lockout ──────────────────────────────────────────────
 // A cancelled account (subscription_status "cancelled"/"canceled" + active===false)
 // must NOT be able to use the dashboard — otherwise cancelling appears to do
@@ -812,6 +871,7 @@ function renderFromSession(){
   // Poll the onboarding-status endpoint and show the "you're not done" bar until
   // GMP is connected + at least one array is linked. Signed-out → always hidden.
   try { updateGmpGate(session); } catch(e){}
+  try { updateTrialNudge(session); } catch(e){}
   // Signed-in identity chip (top-right): show which account this session is in.
   // One lightweight /v1/account read fills the email; hidden when signed out or
   // if the session is stale (so it never claims an account we can't confirm).

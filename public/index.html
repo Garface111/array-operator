@@ -58,6 +58,19 @@
     background:linear-gradient(115deg,rgba(63,214,138,.15),rgba(63,214,138,.04));
     box-shadow:0 0 26px -8px rgba(63,214,138,.32)}
   .gmp-gate.almost .gmp-gate-badge,.gmp-gate.almost .gmp-gate-cta{background:var(--good2,#3fd68a)}
+  /* Trial card-capture nudge — deliberately quiet. A signed-in trialing owner
+     with no card on file, within ~7 days of trial end. Dismissible; reappears
+     once when it turns urgent (<=2 days). Shown by app.js updateTrialNudge. */
+  .trial-nudge{margin:12px 0 4px;border-radius:12px;border:1px solid var(--line);background:var(--card);overflow:hidden}
+  .trial-nudge[hidden]{display:none}
+  .trial-nudge-row{display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap}
+  .trial-nudge-copy{flex:1 1 280px;min-width:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+  .trial-nudge-copy b{color:var(--ink);font-weight:650}
+  .trial-nudge-cta{flex:0 0 auto;font-size:12.5px;font-weight:650;color:var(--good,#3fd68a);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;text-decoration:none;cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s}
+  .trial-nudge-cta:hover{border-color:var(--good,#3fd68a)}
+  .trial-nudge-x{flex:0 0 auto;cursor:pointer;color:var(--muted);opacity:.55;font-size:16px;line-height:1;background:none;border:none;padding:4px 6px;transition:opacity .12s}
+  .trial-nudge-x:hover{opacity:1}
+  .trial-nudge.urgent{border-left:2px solid var(--gold2,#f5b942)}
   /* hero: value prop (left) + pricing card (right) */
   .hero{display:flex;gap:28px;align-items:stretch;padding:26px 26px 22px;flex-wrap:wrap}
   .hero-main{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
@@ -173,6 +186,16 @@
         <span id="gmpGateSub">Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b></span>
       </div>
       <a class="gmp-gate-cta" id="gmpGateCta" role="button" style="cursor:pointer">Connect GMP →</a>
+    </div>
+  </div>
+
+  <!-- Trial card-capture nudge — quiet, dismissible. app.js updateTrialNudge shows
+       it for a trialing owner with no card on file as trial end nears. -->
+  <div class="trial-nudge" id="trialNudge" role="region" aria-label="Trial ending" hidden>
+    <div class="trial-nudge-row">
+      <div class="trial-nudge-copy" id="trialNudgeCopy"></div>
+      <a class="trial-nudge-cta" id="trialNudgeCta" role="button">Add a card</a>
+      <button class="trial-nudge-x" id="trialNudgeX" aria-label="Dismiss" title="Dismiss">×</button>
     </div>
   </div>
 
