@@ -891,6 +891,20 @@ function renderFromSession(){
   // GMP is connected + at least one array is linked. Signed-out → always hidden.
   try { updateGmpGate(session); } catch(e){}
   try { updateTrialNudge(session); } catch(e){}
+  // Onboarding GMP handoff: an owner who chose 'Log in with Green Mountain
+  // Power' in onboarding lands here signed in; auto-open the proven GMP connect.
+  try {
+    if(session && localStorage.getItem("ao_pending_gmp_connect") === "1"){
+      localStorage.removeItem("ao_pending_gmp_connect");
+      if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
+      let _t = 0;
+      const _launchGmp = () => {
+        if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
+        else if(_t++ < 20){ setTimeout(_launchGmp, 300); }
+      };
+      setTimeout(_launchGmp, 600);
+    }
+  } catch(e){}
   // Signed-in identity chip (top-right): show which account this session is in.
   // One lightweight /v1/account read fills the email; hidden when signed out or
   // if the session is stale (so it never claims an account we can't confirm).

@@ -407,6 +407,17 @@ function onCaptureFailed(d){
   if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">${label} didn't connect: ${(d && d.reason)||"unknown error"}. Make sure you're signed in on the portal tab, then click the login button again.</div>`;
 }
 
+// Utility path: owners who track production via their Green Mountain Power
+// bills rather than an inverter portal. GMP bills attach server-side and need
+// the signed-in session, so we create the account first (email step), then hand
+// off to the dashboard's proven GMP connect (window.__aoConnectGmp) on load.
+function startGmpPath(){
+  state.gmpPath = true;
+  state.realSites = false;
+  state.sites = [];
+  go(2);
+}
+
 const stepper = document.getElementById("stepper");
 const main = document.getElementById("main");
 
@@ -534,6 +545,12 @@ function connectScreen(){
     ${fieldsHtml}
     ${noteHtml}
 
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">No inverter portal? Connect your utility instead</div>
+      <div class="s">If you track your arrays through your <b>Green Mountain Power</b> bills rather than an inverter monitoring portal, log in with GMP and we'll bring in each array's solar production automatically.</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="startGmpPath()">Log in with Green Mountain Power →</button>
+    </div>
+
     <div id="scanArea"></div>
 
     <div class="row">
@@ -546,6 +563,7 @@ function connectScreen(){
 function selectVendor(code){
   const v = vendorByCode(code);
   if(!v.available) return;
+  state.gmpPath = false;
   state.vendor = code;
   render(); syncConnect();
 }
@@ -639,7 +657,24 @@ function demoSites(){
   ];
 }
 
+function gmpScreen(){
+  return `<div class="card animate">
+    <h1>Log in with Green Mountain Power</h1>
+    <p class="lede">No inverter portal needed — we bring in each array's solar production straight from your Green Mountain Power bills. First, your email starts your free 14-day trial (no card); then you'll sign into GMP and we read it automatically.</p>
+    <label class="fld" id="emailFld" style="margin-top:1.5rem">
+      <span class="lab">Where should we send your reports?</span>
+      <span class="hint">Your email is your login. Free 14-day trial — no card needed.</span>
+      <input type="email" id="email" placeholder="you@example.com" value="${state.email||''}" oninput="state.email=this.value;syncClaim()">
+    </label>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="go(1)">← Back</button>
+      <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Create my account &amp; connect GMP →</button>
+    </div>
+  </div>`;
+}
+
 function arraysScreen(){
+  if(state.gmpPath) return gmpScreen();
   const n = state.sites.length;
   const v = vendorByCode(state.vendor);
   const real = state.realSites;
@@ -763,7 +798,7 @@ function doneScreen(){
     cardCta = `<button class="btn btn-primary btn-lg" onclick="finish()">Try again →</button>`;
   } else if(signedIn){
     // Same-origin session is stashed — go straight in (no new tab, no magic link).
-    cardCta = `<button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
+    cardCta = `<button class="btn btn-primary btn-lg" onclick="goDashboard()">${state.gmpPath ? "Open dashboard &amp; connect GMP →" : "Open my dashboard →"}</button>
        <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
        <div class="helper" id="cardNote" style="text-align:center">Optional now — you're only billed for the kWh your arrays generate, and never until the trial ends.</div>`;
   } else {
@@ -832,6 +867,7 @@ async function finish(){
           // reads (so_session). The "Open my dashboard" CTA then lands them
           // already signed in — no email magic-link detour.
           try{ localStorage.setItem("so_session", compData.session_token); }catch(e){}
+          if(state.gmpPath){ try{ localStorage.setItem("ao_pending_gmp_connect","1"); }catch(e){} }
         }
       }catch(e){ /* session is a bonus; magic-link email is the fallback */ }
       // Attach the real credential now using the freshly-minted session — so
@@ -948,7 +984,7 @@ function burst(){
 function render(){
   if(step===0) main.innerHTML = welcomeScreen();
   else if(step===1){ main.innerHTML = connectScreen(); syncConnect(); }
-  else if(step===2){ main.innerHTML = arraysScreen(); cascadeArrays(); }
+  else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else { cascadeArrays(); } }
   else if(step===3) main.innerHTML = doneScreen();
 }
 
