@@ -1224,8 +1224,8 @@
   function freshWindowActive(){
     try{
       let until = Number(sessionStorage.getItem(FRESH_KEY) || 0);
-      if(!until && new URLSearchParams(location.search).get("fresh") === "1"){
-        until = Date.now() + 75000;               // 75s from the first fresh paint
+      if((!until || Date.now() >= until) && new URLSearchParams(location.search).get("fresh") === "1"){
+        until = Date.now() + 75000;               // a fresh arrival (re)opens the 75s window
         sessionStorage.setItem(FRESH_KEY, String(until));
       }
       return !!until && Date.now() < until;
