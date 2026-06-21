@@ -386,8 +386,21 @@
       ${filterBar()}
       ${statBand(d)}
       ${freshnessLine(d)}
+      <div id="rpHost" class="rp-host"></div>
       <div id="anHost" class="an-host"></div>
-      ${blocks}
+      <div class="tr-advanced">
+        <button id="trAdvToggle" class="tr-adv-btn" type="button" aria-expanded="false">
+          <span class="tr-adv-left">
+            <span class="tr-adv-ic" aria-hidden="true">✦</span>
+            <span class="tr-adv-txt">
+              <span class="tr-adv-t">Advanced visualizations</span>
+              <span class="tr-adv-hint">experimental ways to see your production — spirals, ridgelines, heat fields &amp; more</span>
+            </span>
+          </span>
+          <span class="tr-adv-chev" aria-hidden="true">▸</span>
+        </button>
+        <div id="trAdvPanel" class="tr-adv-panel" hidden>${blocks}</div>
+      </div>
       ${byArrayTable(d.by_array)}
     `;
 
@@ -400,8 +413,20 @@
     const ex = document.getElementById("trExport");
     if (ex) ex.addEventListener("click", () => exportCsv(d));
 
-    // Mount the keystone Production Analytics surface as the LEAD instrument,
-    // above the existing visualization stack (which is untouched).
+    // Professional REPORT — the headline of the tab: daily-output bar, YoY-growth
+    // (graph #2), this-year-vs-last-year line, every one with LABELED AXES.
+    const rpHost = document.getElementById("rpHost");
+    if (rpHost && window.AOReport) {
+      try {
+        const stop = window.AOReport.mount(rpHost, d, c);
+        if (stop) _activeStops.push(stop);
+      } catch (e) {
+        rpHost.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">Report charts hit an error.</div></div>`;
+        if (window.console) console.error("report surface failed", e);
+      }
+    }
+
+    // Production Analytics interactive explorer (preserved concurrent-thread work).
     const anHost = document.getElementById("anHost");
     if (anHost && window.AOAnalytics) {
       try {
@@ -413,19 +438,46 @@
       }
     }
 
-    // mount every view into its own host
-    for (const v of views) {
-      const host = document.getElementById("trHost_" + v.key);
-      if (!host) continue;
-      host.style.position = "relative";
-      try {
-        const stop = v.mount(host, _prepped, c);
-        if (stop) _activeStops.push(stop);
-      } catch (e) {
-        host.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">This view hit an error.</div></div>`;
-        if (window.console) console.error("trends view " + v.key + " failed", e);
+    // Advanced (experimental) visualizations live behind a toggle now — mounted
+    // LAZILY the first time it's expanded so their animation loops never run hidden.
+    wireAdvanced(views);
+  }
+
+  // Reveal + lazily mount the experimental art views on first expand.
+  function wireAdvanced(views) {
+    const btn = document.getElementById("trAdvToggle");
+    const panel = document.getElementById("trAdvPanel");
+    if (!btn || !panel) return;
+    let mounted = false;
+    btn.addEventListener("click", () => {
+      const opening = panel.hasAttribute("hidden");
+      if (opening) {
+        panel.removeAttribute("hidden");
+        btn.setAttribute("aria-expanded", "true");
+        btn.classList.add("open");
+        if (!mounted) {
+          mounted = true;
+          for (const v of views) {
+            const host = document.getElementById("trHost_" + v.key);
+            if (!host) continue;
+            host.style.position = "relative";
+            try {
+              const stop = v.mount(host, _prepped, C());
+              if (stop) _activeStops.push(stop);
+            } catch (e) {
+              host.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">This view hit an error.</div></div>`;
+              if (window.console) console.error("trends view " + v.key + " failed", e);
+            }
+          }
+        }
+        // bring the freshly-revealed panel into view
+        try { panel.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "nearest" }); } catch (e) {}
+      } else {
+        panel.setAttribute("hidden", "");
+        btn.setAttribute("aria-expanded", "false");
+        btn.classList.remove("open");
       }
-    }
+    });
   }
 
   // Wire the array-filter dropdown: on change, re-fetch scoped to that array.

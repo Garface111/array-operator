@@ -137,7 +137,7 @@
   // ── chart drawing: a grouped/comparison bar chart ───────────────────────────
   // series = [{label, kwh, sub}], cmp = optional [{kwh}] aligned by index.
   function drawBars(ctx, w, h, series, cmp, accent, hoverIdx) {
-    const padL = 46, padR = 12, padT = 16, padB = 28;
+    const padL = 54, padR = 12, padT = 16, padB = 28;
     const plotW = w - padL - padR, plotH = h - padT - padB;
     let peak = 1;
     series.forEach(s => { if (s.kwh > peak) peak = s.kwh; });
@@ -155,6 +155,11 @@
       ctx.fillStyle = "#6b7686"; ctx.textAlign = "right";
       ctx.fillText(kCompact(yv), padL-8, y);
     }
+    // Y-axis unit title (rotated) — every chart carries a labeled axis.
+    ctx.save();
+    ctx.fillStyle = "#8b97a8"; ctx.font = "600 11px system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.translate(12, padT + plotH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("kWh", 0, 0);
+    ctx.restore();
     const n = series.length || 1;
     const slot = plotW / n;
     const hasCmp = cmp && cmp.some(c => c && c.kwh > 0);
@@ -388,7 +393,7 @@
     cvs.cv.addEventListener("mousemove", (ev) => {
       const r = cvs.cv.getBoundingClientRect();
       const x = ev.clientX - r.left;
-      const padL = 46, padR = 12;
+      const padL = 54, padR = 12;
       const plotW = cvs.w - padL - padR;
       const n = curSeries.length || 1;
       const slot = plotW / n;
