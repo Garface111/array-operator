@@ -719,7 +719,7 @@ function doneScreen(){
   const created = !!state.onboardingToken && !existing;
   const signedIn = created && !!state.sessionToken;
   const trialLine = existing
-    ? `You already have an Array Operator account. We just emailed <b>${state.email}</b> a secure sign-in link to open your dashboard.`
+    ? `You already have an Array Operator account. We just emailed <b>${state.email}</b> a secure sign-in link — open it to pick up right where you left off.`
     : (!created
     ? `We couldn't reach our servers just now, so your account isn't created yet. No problem — your details and key were not stored. Try again in a moment.`
     : (signedIn
@@ -862,9 +862,12 @@ async function finish(){
       state.existing = true;
       state.onboardingToken = "exists";
       try{
+        // Product-SCOPED: this is the Array Operator signup, so the sign-in link
+        // must resolve the owner's AO account (and reactivate IT if deactivated),
+        // never cross-leak to a NEPOOL account they may also own on this email.
         await fetch(`${API_BASE}/v1/auth/request`, {
           method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ email: state.email.trim() })
+          body: JSON.stringify({ email: state.email.trim(), product: "array_operator" })
         });
       }catch(e){ /* link send is best-effort; copy still routes them to sign in */ }
     }
