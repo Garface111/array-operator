@@ -376,6 +376,14 @@
   /* ── PINNED FLEET COMMANDER — whole-fleet health at a glance, centered in the
      same content column as the sandbox below it. ── */
   #fleetCommander{width:100%;max-width:100%;margin:6px 0 4px}
+  /* Fleet-health CARD living INSIDE the sandbox canvas as its first card (panning
+     + zooming with the scene). Horizontal/stacked orient → a full-width banner
+     card at the top of the scene, above the stacked arrays. Vertical orient →
+     a card-column on the left. */
+  .sb-fleet-col{flex:0 0 auto;align-self:stretch;box-sizing:border-box}
+  .sb-fleet-col #fleetCommander{margin:0;width:100%}
+  .sb-canvas.sb-orient-horizontal .sb-fleet-col{width:100%;max-width:1180px}
+  .sb-canvas.sb-orient-vertical .sb-fleet-col{align-self:flex-start;min-width:380px;max-width:460px}
   /* The CARD is the bottom layer = the tank container (holds the liquid). It no
      longer lays out content directly; .fc-plate does. */
   .fc-card{position:relative;overflow:hidden;padding:5px;border-radius:16px;

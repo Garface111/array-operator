@@ -505,6 +505,11 @@ Thank you,
   else document.addEventListener("DOMContentLoaded", applyTriageState);
 
   window.__ccLoad = () => FleetStore.load();
+  // Expose the commander render so sandbox.js can (re)fill the in-canvas fleet
+  // card after every canvas rebuild — the card now lives INSIDE .sb-canvas (a
+  // card in the scene), so the rebuild would otherwise leave the #fleetCommander
+  // placeholder empty. render() finds #fleetCommander by id wherever it lives.
+  window.__ccRender = render;
   FleetStore.subscribe(onStore);
   // tick the "updated Ns ago" label once a second (cheap, text-only)
   setInterval(() => { const a = document.getElementById("ccAsof"); if(a) a.innerHTML = asofText(); }, 1000);

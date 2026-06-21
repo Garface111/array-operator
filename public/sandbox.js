@@ -1553,9 +1553,17 @@
         </div>`;
     }).join("");
 
-    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()} sb-stream-${getStream()}">${columns}</div></div>
+    // Fleet-health CARD lives INSIDE the canvas as the FIRST card — it pans and
+    // zooms with the scene (a card in the sandbox), above the stacked arrays.
+    // command-center.js owns its content and renders into #fleetCommander by id;
+    // we (re)trigger that fill right after the canvas rebuild below.
+    const fleetCard = `<div class="sb-fleet-col" aria-label="Fleet health at a glance"><section id="fleetCommander"></section></div>`;
+    host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()} sb-stream-${getStream()}">${fleetCard}${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
     host.classList.remove("sb-mode-grid");
+    // Fill the in-canvas fleet card (no-op if command-center hasn't loaded yet;
+    // its own store subscription will fill it once the model is ready).
+    try { if(window.__ccRender) window.__ccRender(); } catch(e){}
 
     // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
