@@ -230,6 +230,15 @@ const VENDORS = [
     fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
              hint:"The one key that unlocks every site on your account.",
              ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="https://monitoring.solaredge.com" target="_blank" rel="noopener">Open the SolarEdge portal →</a>`}] },
+  { code:"enphase", label:"Enphase", meta:"Enlighten", available:true, discover:false,
+    note:"Enphase connects through the Enlighten developer API — paste your Enphase app key + client ID/secret and your System ID. We're in final verification against live Enphase accounts, and a one-click owner sign-in is on the way.",
+    fields:[
+      {name:"api_key", label:"Enphase API key", secret:true,
+       help:`From the <a href="https://developer-v4.enphase.com" target="_blank" rel="noopener">Enphase developer portal →</a> your app's <b>API key</b>.`},
+      {name:"client_id", label:"App Client ID"},
+      {name:"client_secret", label:"App Client Secret", secret:true},
+      {name:"system_id", label:"System ID", hint:"Your Enlighten system ID."},
+    ] },
   { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
     note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
     fields:[
