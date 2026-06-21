@@ -1214,6 +1214,67 @@
     if(foot) foot.innerHTML = DEFAULT_FOOT_HTML;
   }
 
+  // ── First-visit live reveal ────────────────────────────────────────────────
+  // Arriving from onboarding (?fresh=1), a just-connected owner's arrays may still
+  // be landing via async extension capture. Instead of the static empty invite,
+  // show a "watching" state and ACCELERATE the refetch (~every 3s for ~60s) so the
+  // arrays appear within seconds, then animate them in — the payoff is watching your
+  // own fleet populate, not a punchlist. Backed by the real FleetStore.refetch.
+  const FRESH_KEY = "ao_fresh_until";
+  function freshWindowActive(){
+    try{
+      let until = Number(sessionStorage.getItem(FRESH_KEY) || 0);
+      if(!until && new URLSearchParams(location.search).get("fresh") === "1"){
+        until = Date.now() + 75000;               // 75s from the first fresh paint
+        sessionStorage.setItem(FRESH_KEY, String(until));
+      }
+      return !!until && Date.now() < until;
+    }catch(e){ return false; }
+  }
+  function ensureRevealStyle(){
+    if(document.getElementById("sbRevealStyle")) return;
+    const st = document.createElement("style");
+    st.id = "sbRevealStyle";
+    st.textContent =
+      "@keyframes sbArrive{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}" +
+      "#sandbox.sb-arrive .sb-col{animation:sbArrive .5s cubic-bezier(.22,1,.36,1) both}" +
+      "@media (prefers-reduced-motion:reduce){#sandbox.sb-arrive .sb-col{animation:none}}";
+    document.head.appendChild(st);
+  }
+  function revealArrays(){
+    const host = document.getElementById("sandbox");
+    if(!host) return;
+    ensureRevealStyle();
+    host.classList.add("sb-arrive");
+    host.querySelectorAll(".sb-col").forEach((c, i) => { c.style.animationDelay = Math.min(i * 0.07, 0.42) + "s"; });
+    setTimeout(() => {
+      host.classList.remove("sb-arrive");
+      host.querySelectorAll(".sb-col").forEach(c => { c.style.animationDelay = ""; });
+    }, 1400);
+  }
+  let _freshPollOn = false;
+  function startFreshPoll(){
+    if(_freshPollOn) return;
+    if(!(window.FleetStore && FleetStore.refetch && FleetStore.focusColumns)) return;
+    _freshPollOn = true;
+    let tries = 0;
+    const tick = () => {
+      if(tries++ > 20 || !freshWindowActive()){ _freshPollOn = false; return; }
+      Promise.resolve(FleetStore.refetch()).then(() => {
+        const cols = (FleetStore.focusColumns().columns) || [];
+        if(cols.length){
+          _freshPollOn = false;
+          try{ sessionStorage.removeItem(FRESH_KEY); }catch(e){}   // arrived — stop watching
+          renderFromStore();
+          revealArrays();
+          return;
+        }
+        setTimeout(tick, 3000);
+      }).catch(() => setTimeout(tick, 3000));
+    };
+    setTimeout(tick, 2500);
+  }
+
   function render(tree){
     const host = document.getElementById("sandbox");
     if(!host) return;
@@ -1242,16 +1303,28 @@
         renderCards();
         return;
       }
-      host.innerHTML =
+      const _head =
         `<div class="sb-head"><div>
            <div class="sb-tiers"><span class="sb-tier-tag b">Your fleet</span></div>
-           <div class="sb-sub">Your live fleet tree is ready for its first array.</div>
+           <div class="sb-sub">${freshWindowActive() ? "Watching for your arrays…" : "Your live fleet tree is ready for its first array."}</div>
          </div>
          <div class="sb-head-actions"><div class="sb-head-btns">
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
-         </div></div></div>
-         <div class="sb-empty">Connect your first inverter or utility and it lands here on its own — live, per-inverter, in dollars. No spreadsheets, no refresh. Hit <b>+ Add array</b> to start.</div>`;
+         </div></div></div>`;
+      if(freshWindowActive()){
+        // Just came from onboarding — their connect is landing. Watch + reveal.
+        host.innerHTML = _head +
+          `<div class="sb-empty"><span class="sb-spin"></span> Finishing the connection — sign into your monitoring portal in the other tab and your arrays appear here on their own, no refresh.</div>`;
+        wireAddButton(host);
+        wireNewArrayButton(host);
+        wireCardButton(host);
+        renderCards();
+        startFreshPoll();
+        return;
+      }
+      host.innerHTML = _head +
+        `<div class="sb-empty">Connect your first inverter or utility and it lands here on its own — live, per-inverter, in dollars. No spreadsheets, no refresh. Hit <b>+ Add array</b> to start.</div>`;
       wireAddButton(host);
       wireNewArrayButton(host);
       wireCardButton(host); // "+ Card" menu (Note / Data)
