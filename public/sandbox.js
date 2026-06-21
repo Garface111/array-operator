@@ -1245,13 +1245,13 @@
       host.innerHTML =
         `<div class="sb-head"><div>
            <div class="sb-tiers"><span class="sb-tier-tag b">Your fleet</span></div>
-           <div class="sb-sub">Nothing connected yet — add your first array to build your live fleet tree.</div>
+           <div class="sb-sub">Your live fleet tree is ready for its first array.</div>
          </div>
          <div class="sb-head-actions"><div class="sb-head-btns">
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>
-         <div class="sb-empty">No arrays connected yet — hit <b>+ Add array</b> to bring your inverters in.</div>`;
+         <div class="sb-empty">Connect your first inverter or utility and it lands here on its own — live, per-inverter, in dollars. No spreadsheets, no refresh. Hit <b>+ Add array</b> to start.</div>`;
       wireAddButton(host);
       wireNewArrayButton(host);
       wireCardButton(host); // "+ Card" menu (Note / Data)
