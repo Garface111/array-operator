@@ -888,6 +888,98 @@
              title:"Not producing right now — but its peers aren't either, so nothing's wrong." };
   }
 
+  // ── CONDENSED 4-STATE — one honest word per inverter (Ford's redesign) ──────
+  // The NOW chip + the 14-day HEALTH badge collapse into ONE label, exactly four:
+  //   producing · error · sleeping · offline
+  // Precedence ERROR → SLEEPING → PRODUCING → OFFLINE, so a daytime fault that
+  // zeroes output stays "error" and never masquerades as "sleeping".
+  function fourState(inv, peers, isDaylight, statusCls, sleeping){
+    // ERROR: the 14-day peer verdict is flagged (underperforming/comm_gap → warn,
+    // dead/fault → bad), OR a live anomaly — dark right now while ≥2 daylight
+    // siblings produce. Either way it is making less than it should (a real loss).
+    const lv = liveVerdict(inv, peers, isDaylight);
+    if(statusCls === "bad" || statusCls === "warn" || lv === "dark")
+      return { key:"error", word:"Error", tone:"bad",
+               title: inv.diagnosis || "Flagged — producing less than it should." };
+    // SLEEPING: sun-down rest (never an alarm).
+    if(sleeping) return { key:"sleeping", word:"Sleeping", tone:"sleep",
+                          title:"Resting — the sun is down." };
+    // PRODUCING: a real live reading above the floor.
+    if(outputState(inv, "ok").reporting)
+      return { key:"producing", word:"Producing", tone:"ok", title:"Making power now." };
+    // OFFLINE: daylight, but no usable live signal (telemetry gap / not reporting).
+    return { key:"offline", word:"Offline", tone:"info",
+             title:"No live signal from this inverter right now." };
+  }
+
+  // Instantaneous capacity factor = current W / nameplate W (estimated nameplate
+  // when the vendor gives none). The building block for the peer-relative %.
+  function liveCapFactor(i){
+    const npW = (i.nameplate_kw != null) ? i.nameplate_kw * 1000 : estNameplateW(i);
+    const w = i.current_power_w;
+    if(npW == null || npW <= 0 || w == null) return null;
+    return w / npW;
+  }
+  // PEER-RELATIVE LIVE PERFORMANCE — the honest "vs the platonic ideal" number.
+  // There is no irradiance/clear-sky model, so the ideal is the COHORT: this
+  // inverter's capacity factor vs its siblings' MEDIAN capacity factor, RIGHT NOW.
+  // Peers share the same sky + instant, so weather and time-of-day cancel out —
+  // what's left is the real, controllable loss (soiling, shade, a failing string).
+  //   kind:"peer" → 100% = pulling its fair share; <100% = unexplained real loss.
+  //   kind:"solo" → no producing sibling to compare against → fall back to raw
+  //                 capacity factor of rated max, labelled honestly (NEVER passed
+  //                 off as weather-adjusted).
+  function peerPerf(inv, peers){
+    const me = liveCapFactor(inv);
+    if(me == null) return null;
+    const others = peers
+      .filter(p => p.inverter_id !== inv.inverter_id)
+      .map(liveCapFactor).filter(v => v != null && v > 0.02);
+    if(!others.length) return { kind:"solo", pct: Math.round(Math.max(0, Math.min(150, me*100))) };
+    others.sort((a, b) => a - b);
+    const med = others[Math.floor(others.length/2)];
+    if(med <= 0) return { kind:"solo", pct: Math.round(Math.max(0, Math.min(150, me*100))) };
+    return { kind:"peer", pct: Math.round((me/med)*100), cohort: others.length };
+  }
+  // The big headline block under the state chip: the % (peer-relative) + production.
+  // Only a PRODUCING inverter shows a %; the other states show an honest one-liner.
+  function perfBlock(inv, peers, st){
+    const curW  = inv.current_power_w;
+    const curKw = curW != null ? (curW/1000) : null;
+    const nowKw = curKw != null ? `${curKw.toFixed(1)} kW now` : "";
+    if(st.key === "producing"){
+      const pp = peerPerf(inv, peers);
+      if(pp && pp.kind === "peer"){
+        const tone = pp.pct < 80 ? "bad" : pp.pct < 92 ? "warn" : "ok";
+        const sub  = pp.pct < 92  ? `${Math.max(0, 100 - pp.pct)}% below its siblings`
+                   : pp.pct > 110 ? "ahead of its siblings"
+                   : "pulling its fair share";
+        return `<div class="sb-perf ${tone}">
+          <div class="sb-perf-main"><b class="sb-perf-pct">${pp.pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of fair share</span></div>
+          ${nowKw?`<div class="sb-perf-prod">${nowKw}</div>`:""}
+          <div class="sb-perf-sub">${esc(sub)}</div>
+          <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${Math.max(0, Math.min(100, pp.pct))}%"></div></div>
+        </div>`;
+      }
+      if(pp && pp.kind === "solo"){
+        return `<div class="sb-perf ok">
+          <div class="sb-perf-main"><b class="sb-perf-pct">${pp.pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of rated max</span></div>
+          ${nowKw?`<div class="sb-perf-prod">${nowKw}</div>`:""}
+          <div class="sb-perf-sub" title="No sibling inverter to compare against — raw capacity factor, not weather-adjusted.">no peer to compare</div>
+          <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${Math.max(0, Math.min(100, pp.pct))}%"></div></div>
+        </div>`;
+      }
+      return `<div class="sb-perf ok"><div class="sb-perf-main"><b class="sb-perf-pct">${curKw!=null?curKw.toFixed(1):"—"}</b><span class="sb-perf-unit">kW now</span></div></div>`;
+    }
+    // Non-producing states: an honest line, no %.
+    const tk = liveReadingMissing(inv) ? todayKwh(inv) : null;
+    let sub;
+    if(st.key === "sleeping") sub = (tk != null && tk > 0) ? `${tk.toFixed(1)} kWh produced today` : "resting until sunrise";
+    else if(st.key === "error") sub = inv.diagnosis || (nowKw ? `only ${nowKw}` : "producing less than it should");
+    else sub = liveReadingMissing(inv) ? (tk != null && tk > 0 ? `${tk.toFixed(1)} kWh today · no live feed` : "no live feed from this inverter") : "no live signal right now";
+    return `<div class="sb-perf ${st.tone}"><div class="sb-perf-sub sb-perf-sub--lone">${esc(sub)}</div></div>`;
+  }
+
   function liquidLayer(inv, statusCls, isDaylight){
     const st = liquidState(inv, statusCls, isDaylight);
     const sleeping = st === "sleep";
@@ -1447,22 +1539,18 @@
         //    longer second-guesses the live reading; that was the source of the
         //    "All good on a dark inverter" contradiction.
         //  • NOW chip — the instantaneous liveness state (liveState), peer-checked.
-        const isAlert = sCls !== "ok";
-        const isMonitoring = inv.status === "monitoring";
-        const healthLabel = isMonitoring ? "Monitoring"
-          : isAlert ? (STATUS_LABEL[inv.status] || inv.status || "Needs a look") : "All good";
-        const healthTitle = isMonitoring
-          ? "Gathering data — not enough history yet to compare this inverter against its neighbors."
-          : "Health over the last 14 days vs its peers.";
-        const healthBadge = `<div class="sb-inv-alert ${sCls}" title="${esc(healthTitle)}">${esc(healthLabel)}</div>`;
-        const ls = liveState(inv, sortedInvs, col.is_daylight, sleeping);
-        const nowChip = `<div class="sb-inv-now ${ls.tone}"${ls.title?` title="${esc(ls.title)}"`:""}><span class="sb-now-dot"></span>${esc(ls.label)}</div>`;
-        // The whole-card tint: a live anomaly (dark while peers produce) edges the
-        // card amber so it reads as needing a look even before 14-day health flags
-        // it; otherwise the calm output tone drives it.
-        const cardTone = (!isAlert && ls.key === "dark") ? "warn" : obTone;
+        // ── ONE honest state word (Ford's redesign): the live NOW chip + the
+        // 14-day HEALTH badge collapse into a SINGLE four-state label —
+        // producing / error / sleeping / offline. The vendor badge is gone from
+        // the inverter card (it stays on the array card).
+        const st4 = fourState(inv, sortedInvs, col.is_daylight, sCls, sleeping);
+        const stateChip = `<div class="sb-state ${st4.tone}"${st4.title?` title="${esc(st4.title)}"`:""}><span class="sb-now-dot"></span>${esc(st4.word)}</div>`;
+        // Whole-card tint: error → alarming; otherwise the calm live output tone.
+        const cardTone = st4.key === "error" ? "bad" : obTone;
+        // Cards are FIRM in place — not draggable until the owner picks "Move" from
+        // the right-click menu (which sets draggable + .sb-movable). Re-locks on drop.
         return `
-          <div class="sb-inv ${sCls}${sleeping?' sleep':''}" tabindex="0" draggable="true" data-tone="${cardTone}"
+          <div class="sb-inv ${sCls}${sleeping?' sleep':''} st-${st4.key}" tabindex="0" data-tone="${cardTone}"
                data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
                data-name="${esc(inv.name)}" data-status="${esc(inv.status)}"
                data-diag="${esc(inv.diagnosis||"")}" data-model="${esc(inv.model||"")}"
@@ -1479,10 +1567,8 @@
                 ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
               </div>
               ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
-              ${nowChip}
-              ${outputBar(inv, sCls)}
-              ${healthBadge}
-              ${brandHTML(inv.vendor)}
+              ${stateChip}
+              ${perfBlock(inv, sortedInvs, st4)}
             </div>
           </div>`;
       }).join("")
@@ -1589,7 +1675,7 @@
         const nameEl = invCard.querySelector(".sb-inv-name");
         const name = nameEl ? nameEl.textContent.trim()
           : (invCard.dataset.name || "this inverter");
-        showInvCtxMenu(e.clientX, e.clientY, invId, name);
+        showInvCtxMenu(e.clientX, e.clientY, invId, name, invCard);
         return;
       }
       const col = e.target.closest && e.target.closest(".sb-col");
@@ -2379,14 +2465,27 @@
   // <body>, dismissed on outside click / Escape / scroll / another contextmenu).
   // Confirming calls FleetStore.deleteInverter(id) — optimistic + backend DELETE,
   // undoable via ↶ Undo / Ctrl-Cmd+Z (single-inverter delete is NOT a history barrier).
-  function showInvCtxMenu(x, y, id, name){
+  function showInvCtxMenu(x, y, id, name, node){
     closeArrayCtxMenu();                               // only ever one menu
     const menu = el(`<div class="sb-ctxmenu" role="menu">
+      <button type="button" class="sb-ctxmenu-move" role="menuitem">Move inverter</button>
       <button type="button" class="sb-ctxmenu-del" role="menuitem">Delete inverter</button>
     </div>`);
     menu.style.left = x + "px";
     menu.style.top = y + "px";
     menu.addEventListener("click", ev => ev.stopPropagation());
+    // "Move" unlocks dragging for THIS card only (cards are firm by default). The
+    // card becomes draggable + lifts (.sb-movable); wireInvDrag re-locks on drop.
+    const moveBtn = menu.querySelector(".sb-ctxmenu-move");
+    if(moveBtn) moveBtn.onclick = () => {
+      if(node){
+        node.setAttribute("draggable", "true");
+        node.classList.add("sb-movable");
+        if(node.focus) node.focus();
+        toast(`"${name}" is unlocked — drag it to its new spot, then release to drop.`, "ok");
+      }
+      closeArrayCtxMenu();
+    };
     menu.querySelector(".sb-ctxmenu-del").onclick = () => {
       if(confirm(`Delete inverter "${name}"? You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.`)){
         FleetStore.deleteInverter(id);
@@ -3137,6 +3236,8 @@
       });
       card.addEventListener("dragend", () => {
         card.classList.remove("inv-dragging");
+        card.classList.remove("sb-movable");        // re-lock — firm in place again
+        card.removeAttribute("draggable");
         host.classList.remove("inv-dragging-active");
         host.querySelectorAll(".sb-teeth.inv-drop").forEach(t => t.classList.remove("inv-drop"));
         const col = card.closest(".sb-col");

@@ -628,9 +628,9 @@
     stroke-dasharray:5 26;filter:drop-shadow(0 0 6px rgba(63,214,138,.85));animation:moterise 3s linear infinite}
   @keyframes moterise{to{stroke-dashoffset:-31}}
   .sb-teeth{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding-top:0;position:relative}
-  .sb-inv{flex:0 0 auto;width:152px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
+  .sb-inv{flex:0 0 auto;width:172px;border-radius:12px;border:1px solid var(--line);cursor:pointer;
     background:linear-gradient(165deg,var(--card),var(--card2));padding:0;text-align:left;position:relative;
-    overflow:hidden;content-visibility:auto;contain-intrinsic-size:248px;
+    overflow:hidden;content-visibility:auto;contain-intrinsic-size:272px;
     display:flex;flex-direction:column;
     transition:transform .12s,border-color .12s,box-shadow .12s}
   /* inverter cards sit ABOVE the SVG feeder wires */
@@ -702,6 +702,40 @@
   @media (prefers-reduced-motion:reduce){.sb-inv-now .sb-now-dot{animation:none}}
   /* sleeping card calms the NOW chip too (matches the alert/text treatment) */
   .sb-inv.sleep .sb-inv-now{color:#aab4e8 !important}
+
+  /* ── REDESIGN: one 4-state chip + big peer-relative performance (Ford) ── */
+  /* The single honest state word — producing / error / sleeping / offline. */
+  .sb-state{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;white-space:nowrap;
+    font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    margin:7px 0 1px;padding:3px 10px 3px 8px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}
+  .sb-state .sb-now-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .sb-state.ok{color:var(--good)}
+  .sb-state.bad{color:var(--bad);background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
+  .sb-state.info{color:#8fb4e8;background:rgba(120,160,230,.10);border-color:rgba(120,160,230,.26)}
+  .sb-state.sleep{color:#aab4e8;background:rgba(120,135,210,.12);border-color:rgba(120,135,210,.26)}
+  .sb-state.ok .sb-now-dot{animation:sb-now-pulse 2.4s ease-in-out infinite}
+  .sb-state.bad .sb-now-dot{animation:sb-now-pulse 1.5s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.sb-state .sb-now-dot{animation:none}}
+  .sb-inv.sleep .sb-state{color:#aab4e8 !important}
+  /* the big headline: peer-relative % (large) + production kW (prominent) + bar */
+  .sb-perf{margin-top:8px}
+  .sb-perf-main{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap}
+  .sb-perf-pct{font-size:27px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .sb-perf-sym{font-size:16px;font-weight:800;margin-left:1px}
+  .sb-perf-unit{font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .sb-perf-prod{font-size:15px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:3px;line-height:1.1}
+  .sb-perf-sub{font-size:10.5px;font-weight:600;color:var(--muted);margin:3px 0 6px;line-height:1.3}
+  .sb-perf-sub--lone{margin:7px 0 2px;color:var(--faint);font-style:italic}
+  .sb-perf.ok   .sb-perf-pct{color:var(--good)}   .sb-perf.ok   .sb-ob-fill{background:linear-gradient(90deg,#2fae6e,var(--good))}
+  .sb-perf.warn .sb-perf-pct{color:#ffb454}        .sb-perf.warn .sb-ob-fill{background:linear-gradient(90deg,#e8932f,#ffb454)}
+  .sb-perf.bad  .sb-perf-pct{color:#ff8a3d}        .sb-perf.bad  .sb-ob-fill{background:linear-gradient(90deg,#ff6a2c,#ff8a3d)}
+  .sb-perf.sleep .sb-perf-pct,.sb-perf.info .sb-perf-pct{color:var(--faint)}
+  .sb-inv.sleep .sb-perf-pct,.sb-inv.sleep .sb-perf-prod{color:#9aa8e0}
+  /* a card unlocked for moving (right-click → Move) lifts + shows a grab outline */
+  .sb-inv.sb-movable{cursor:grab;border-color:var(--good) !important;
+    box-shadow:0 0 0 1px var(--good),0 14px 30px -16px rgba(0,0,0,.9);transform:translateY(-3px)}
+  .sb-inv.sb-movable:active{cursor:grabbing}
 
   /* ───────────────  LIQUID-FILL ENERGY LAYER (design spec)  ─────────────── */
   /* The frosted plate holds ALL the card content above the liquid (z-index 3),
