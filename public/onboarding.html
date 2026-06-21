@@ -626,11 +626,17 @@ function arraysScreen(){
     : (v.discover
         ? `Here's a preview of how your fleet will appear. Connect on the next step and your real sites take their place — already watched, already valued.`
         : `Your ${v.label} ${n===1?"array is":"arrays are"} ready to connect — already watched, already valued. Add more brands or sites anytime from your dashboard.`);
+  // Peak can be absent/null/0 even when a $ estimate exists — never interpolate
+  // it raw (that rendered a literal "null kW across N sites"). Drop the kW clause
+  // unless we have a real positive figure.
+  const heroKw = Number(state.totals && state.totals.peak_power_kw) > 0
+    ? `${Number(state.totals.peak_power_kw).toFixed(1)} kW across ${n} ${n===1?"site":"sites"} · `
+    : `across ${n} ${n===1?"site":"sites"} · `;
   const valueHero = real && state.totals && state.totals.annual_value_usd>0
     ? `<div class="valuehero" id="valuehero">
          <div class="vh-lab">Estimated value your ${n===1?"array generates":"arrays generate"} a year</div>
          <div class="vh-big" id="vhBig">$0</div>
-         <div class="vh-sub">${state.totals.peak_power_kw} kW across ${n} ${n===1?"site":"sites"} · energy offset + renewable credits · we pin the exact figure once you're live</div>
+         <div class="vh-sub">${heroKw}energy offset + renewable credits · we pin the exact figure once you're live</div>
        </div>`
     : "";
   return `<div class="card animate">
