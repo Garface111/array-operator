@@ -386,6 +386,7 @@
       ${filterBar()}
       ${statBand(d)}
       ${freshnessLine(d)}
+      <div id="anHost" class="an-host"></div>
       ${blocks}
       ${byArrayTable(d.by_array)}
     `;
@@ -398,6 +399,19 @@
     // wire the CSV export
     const ex = document.getElementById("trExport");
     if (ex) ex.addEventListener("click", () => exportCsv(d));
+
+    // Mount the keystone Production Analytics surface as the LEAD instrument,
+    // above the existing visualization stack (which is untouched).
+    const anHost = document.getElementById("anHost");
+    if (anHost && window.AOAnalytics) {
+      try {
+        const stop = window.AOAnalytics.mount(anHost, d, c);
+        if (stop) _activeStops.push(stop);
+      } catch (e) {
+        anHost.innerHTML = `<div class="tr-empty"><div class="tr-empty-p">Analytics hit an error.</div></div>`;
+        if (window.console) console.error("analytics surface failed", e);
+      }
+    }
 
     // mount every view into its own host
     for (const v of views) {
