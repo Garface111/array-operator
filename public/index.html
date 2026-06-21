@@ -217,13 +217,12 @@
        table, no sub-headers — just the at-a-glance health + the canvas. -->
   <section class="panel" id="panelArrays" role="tabpanel" aria-label="Arrays">
 
-    <!-- PINNED FLEET COMMANDER — whole-fleet health in one glance. Rendered by
-         command-center.js into #fleetCommander. -->
-    <section id="fleetCommander" aria-label="Fleet health at a glance"></section>
-
-    <!-- SANDBOX — the live fleet tree, almost full-screen. Rendered by sandbox.js
-         into #sandbox. Glance at the most zoomed-out view = perfect understanding. -->
+    <!-- SANDBOX — the live fleet tree, almost full-screen. The pinned fleet
+         commander (whole-fleet health at a glance) now sits INSIDE the sandbox,
+         pinned above the stacked arrays, as the at-a-glance summary header.
+         Rendered by JS: command-center.js → #fleetCommander, sandbox.js → #sandbox. -->
     <section id="sbWrap" class="sb-fullscreen">
+      <section id="fleetCommander" aria-label="Fleet health at a glance"></section>
       <div id="sandbox"></div>
     </section>
 
