@@ -239,6 +239,20 @@ const VENDORS = [
       {name:"client_secret", label:"App Client Secret", secret:true},
       {name:"system_id", label:"System ID", hint:"Your Enlighten system ID."},
     ] },
+  { code:"solis", label:"Solis", meta:"SolisCloud", available:true, discover:false,
+    note:"Solis connects through the SolisCloud Platform API. In SolisCloud, open API Management and request an API key (KeyId + KeySecret), then paste them here. We're in final verification against live Solis accounts.",
+    fields:[
+      {name:"key_id", label:"SolisCloud KeyId"},
+      {name:"key_secret", label:"SolisCloud KeySecret", secret:true},
+      {name:"station_id", label:"Station ID (optional)"},
+    ] },
+  { code:"tigo", label:"Tigo", meta:"Energy Intelligence", available:true, discover:false,
+    note:"Tigo connects with your Energy Intelligence (EI) login — the API needs a Premium data subscription on your Tigo account. We're in final verification against live Tigo accounts.",
+    fields:[
+      {name:"username", label:"Tigo EI username"},
+      {name:"password", label:"Tigo EI password", secret:true},
+      {name:"system_id", label:"System ID (optional)"},
+    ] },
   { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
     note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
     fields:[
