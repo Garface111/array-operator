@@ -78,6 +78,7 @@
    * into their monitoring portal the way they already do; the extension reads
    * their inverters and lands them here, and we attach to their account. */
   let EXT_PRESENT = false;
+  let _vaultStatusCache = null;  // populated lazily by wireAutoLoginHints()
   const EXT_STORE_URL = "https://chromewebstore.google.com/detail/solar-operator-sync/ocohbimolfpnkjcjhiodopjjlhclinpl";
   // Portal URLs per vendor for the one-click login.
   const PORTAL_URL = {
@@ -1489,6 +1490,15 @@
     </div>`;
   }
 
+  // Auto-login hint: a subtle inline banner on extension-captured array cards
+  // when the owner hasn't saved vault credentials yet. Async-filled by
+  // wireAutoLoginHints() after the canvas renders.
+  const _EXT_VAULT_VENDORS = new Set(["fronius","sma","chint"]);
+  function autoLoginHintHTML(vendor){
+    if(!vendor || !_EXT_VAULT_VENDORS.has(vendor)) return "";
+    return `<div class="sb-autologin-hint" data-vendor="${esc(vendor)}" aria-live="polite"></div>`;
+  }
+
   const expanded = getExpandedSet();   // which arrays have their inverter comb open
     // First login (fresh from onboarding) OR a never-customized fleet → open every
     // inverter comb so the new owner sees their WHOLE fleet at once. freshWindowActive()
@@ -1617,6 +1627,7 @@
               </div>
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
               ${srcStatusBanner}
+              ${autoLoginHintHTML(col.vendor||"")}
               ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
               ${arrayOutputBar(aOs, col)}
@@ -1648,6 +1659,7 @@
     // Fill the in-canvas fleet card (no-op if command-center hasn't loaded yet;
     // its own store subscription will fill it once the model is ready).
     try { if(window.__ccRender) window.__ccRender(); } catch(e){}
+    wireAutoLoginHints().catch(()=>{});  // fill vault-not-set hints on extension-captured arrays
 
     // click/keyboard → detail line + rich detail card
     host.querySelectorAll(".sb-inv").forEach(node => {
@@ -3775,6 +3787,39 @@
     const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
   });
 
+  // Fill the auto-login hint placeholders on every extension-captured array card.
+  // Runs after each canvas render; cached so vault is only queried once per session
+  // (invalidated by vault save so the hints disappear immediately after credentials are saved).
+  async function wireAutoLoginHints(){
+    if(!EXT_PRESENT) return;
+    if(!_vaultStatusCache){
+      const resp = await vaultOp("status");
+      if(resp && resp.ok) _vaultStatusCache = resp.status || {};
+      else return;
+    }
+    document.querySelectorAll(".sb-autologin-hint[data-vendor]").forEach(el => {
+      const vendor = el.dataset.vendor;
+      if(!vendor || !_EXT_VAULT_VENDORS.has(vendor)) return;
+      const st = (_vaultStatusCache[vendor]) || { hasCreds:false };
+      if(st.hasCreds){ el.innerHTML = ""; el.style.display = "none"; return; }
+      if(el.innerHTML) return;  // already filled this render
+      const label = (typeof BRAND !== "undefined" && BRAND[vendor]) || vendor;
+      el.style.display = "";
+      el.innerHTML =
+        `<span class="sb-al-ic" aria-hidden="true">⚡</span>` +
+        `<span>Save your <b>${esc(label)}</b> login for hands-free live updates — ` +
+        `<a href="#account" class="sb-al-link">set up auto-login →</a></span>`;
+      el.querySelector(".sb-al-link").addEventListener("click", e => {
+        e.preventDefault();
+        location.hash = "#account";
+        setTimeout(() => {
+          const row = document.getElementById("rowAutoRefresh");
+          if(row) row.scrollIntoView({ behavior:"smooth", block:"center" });
+        }, 120);
+      });
+    });
+  }
+
   function autoRefreshRow(){
     return `<div class="acct-row" id="rowAutoRefresh">
       <div class="r-k">Auto-refresh</div>
@@ -3835,11 +3880,13 @@
         const r = await vaultOp("set", { vendor, username:u, password:p });
         saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
         passEl.value = "";
-        setTimeout(wireAutoRefreshRow, 800);
+        _vaultStatusCache = null;  // force re-check so hints disappear on the next render
+        setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
       if(clearBtn) clearBtn.addEventListener("click", async () => {
         await vaultOp("clear", { vendor });
-        wireAutoRefreshRow();
+        _vaultStatusCache = null;
+        wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
       });
       if(optEl) optEl.addEventListener("change", async () => {
         await vaultOp("optout", { vendor, optedOut: optEl.checked });

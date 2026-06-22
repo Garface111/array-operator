@@ -789,3 +789,10 @@ html[data-theme="day"] .sb-array--srcout{
   border-color:rgba(217,119,6,.7) !important;
   box-shadow:0 0 0 1px rgba(217,119,6,.4), 0 8px 22px -10px rgba(217,119,6,.42) !important;
 }
+
+/* Auto-login hint → blue tint in day mode */
+html[data-theme="day"] .sb-autologin-hint{
+  background:rgba(37,99,235,.06) !important;border-color:rgba(37,99,235,.22) !important;
+  color:#334155 !important;
+}
+html[data-theme="day"] .sb-autologin-hint a.sb-al-link{color:#1d4ed8 !important;}

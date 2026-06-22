@@ -539,6 +539,14 @@ body.sb-fs-lock{ overflow:hidden; }
   filter:drop-shadow(0 0 5px rgba(245,158,11,.6)); }
 .sb-srcout-txt{ font-size:12px; line-height:1.5; color:#f4e3c4; }
 .sb-srcout-txt b{ color:#ffd479; font-weight:800; display:block; margin-bottom:2px; font-size:12.5px; }
+/* Auto-login hint — subtle tip on extension-captured arrays when vault creds not saved yet */
+.sb-autologin-hint{ display:flex; align-items:flex-start; gap:8px; margin:8px 0 4px;
+  padding:8px 11px; border-radius:9px; font-size:11.5px; line-height:1.45;
+  background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.22); color:var(--fg2); }
+.sb-autologin-hint:empty{ display:none; }
+.sb-al-ic{ flex:none; font-size:13px; line-height:1.4; }
+.sb-autologin-hint a.sb-al-link{ color:var(--good2); text-decoration:none; white-space:nowrap; }
+.sb-autologin-hint a.sb-al-link:hover{ text-decoration:underline; }
 /* whole-card emphasis when the source feed is dark — an unmistakable amber frame
    + a top "SOURCE OFFLINE" ribbon so it can't be missed at a glance. */
 .sb-array--srcout{ border-color:rgba(245,158,11,.65) !important;
