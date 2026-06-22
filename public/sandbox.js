@@ -3065,26 +3065,34 @@
     // Suppress OS middle-click autoscroll so a middle-drag can pan instead.
     vp.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); });
     let panning=false, captured=false, pid=null, sx=0, sy=0, pinch=null;
+    let _panStartX=0, _panStartY=0;
+    const _PAN_THRESHOLD = 5;  // px of movement before committing to a pan gesture
     vp.addEventListener("pointerdown", e => {
       const onControl = e.target.closest("button,a,input");
       // MIDDLE button pans from ANYWHERE. LEFT button pans from the whole canvas
-      // EXCEPT the things you grab to rearrange: inverter cards (.sb-inv), the
-      // array reorder grip (.sb-drag), and empty-array drop zones. The array BODY
-      // now pans (only its ⠿ grip reorders), so a packed fleet is movable.
+      // EXCEPT the reorder grip (.sb-drag) and empty-array drop zones. Inverter
+      // cards (.sb-inv) now ALSO pan — a movement threshold below distinguishes
+      // a drag-to-pan from a tap-to-select so click still works.
       if(e.button === 1){
         if(onControl) return;
         e.preventDefault();
-      } else if(e.button !== 0 || onControl || e.target.closest(".sb-inv,.sb-drag,.sb-comb-empty")){
+      } else if(e.button !== 0 || onControl || e.target.closest(".sb-drag,.sb-comb-empty")){
         return;
       }
       panning=true; captured=false; pid=e.pointerId; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
+      _panStartX=e.clientX; _panStartY=e.clientY;
     });
     vp.addEventListener("pointermove", e => {
       if(pinch) return;
       if(!panning) return;
-      // Defer pointer capture until the first real move, so a plain click still
-      // reaches the element underneath (e.g. click an array name to rename it).
-      if(!captured){ captured=true; vp.classList.add("panning"); try{ vp.setPointerCapture(pid); }catch(_){} }
+      // Require a minimum drag distance before committing to a pan — this keeps
+      // a plain click on an inverter card firing the click event normally, while
+      // a deliberate drag pans the canvas instead.
+      if(!captured){
+        const dx=e.clientX-_panStartX, dy=e.clientY-_panStartY;
+        if(dx*dx+dy*dy < _PAN_THRESHOLD*_PAN_THRESHOLD) return;
+        captured=true; vp.classList.add("panning"); try{ vp.setPointerCapture(pid); }catch(_){}
+      }
       _view.x = e.clientX - sx; _view.y = e.clientY - sy; applyCanvasView(host);
     });
     const end = () => { panning=false; captured=false; vp.classList.remove("panning"); };
