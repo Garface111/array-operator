@@ -382,7 +382,10 @@
      a card-column on the left. */
   .sb-fleet-col{flex:0 0 auto;align-self:stretch;box-sizing:border-box}
   .sb-fleet-col #fleetCommander{margin:0;width:100%}
-  .sb-canvas.sb-orient-horizontal .sb-fleet-col{width:100%;max-width:1180px}
+  /* Full-width banner: stretch to the fleet's content width (the widest array row)
+     so it spans the default sandbox view instead of stopping short at a fixed cap.
+     align-self:stretch (above) sizes it to the canvas; no max-width clamp. */
+  .sb-canvas.sb-orient-horizontal .sb-fleet-col{width:100%;max-width:none}
   .sb-canvas.sb-orient-vertical .sb-fleet-col{align-self:flex-start;min-width:380px;max-width:460px}
   /* The CARD is the bottom layer = the tank container (holds the liquid). It no
      longer lays out content directly; .fc-plate does. */
