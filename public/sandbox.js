@@ -628,15 +628,13 @@
         byDate.set(d.date, Math.max(byDate.get(d.date) || 0, Math.max(0, +d.kwh || 0)));
       });
     }
-    // array-level live tone: combined current vs combined nameplate
-    let curW = 0, maxW = 0, anyReporting = false;
-    sortedInvs.forEach(inv => {
-      if(inv.nameplate_kw != null) maxW += inv.nameplate_kw * 1000;
-      if(inv.current_power_w != null){ curW += inv.current_power_w; anyReporting = true; }
-    });
-    const tone = (anyReporting && maxW) ? pctTone(Math.max(0, Math.min(100, Math.round((curW/maxW)*100)))) : "idle";
-    const stroke = tone === "bad" ? "var(--bad)" : tone === "warn" ? "#ffb454" : tone === "idle" ? "var(--faint)" : "var(--good)";
-    return _renderArraySeries(byDate, "Array production · last %d days", stroke, "");
+    // The 7-day PRODUCTION HISTORY is just data — color it the healthy brand
+    // color (var(--good): blue in day, green at night), NOT the array's CURRENT
+    // live tone. Tinting past production red because the array happens to be
+    // asleep/idle right now (e.g. nighttime, 0% of nameplate) was misleading —
+    // live health is already shown by the state pill + OUTPUT NOW bar + card
+    // tone. Zero-output DAYS still flag individually as a red dot (in the renderer).
+    return _renderArraySeries(byDate, "Array production · last %d days", "var(--good)", "");
   }
 
   // Shared renderer for the array-level daily series (used by both vendor and
