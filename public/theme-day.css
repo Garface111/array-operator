@@ -649,3 +649,15 @@ html[data-theme="day"] .tr-chartblock{--tr-accent:#2563eb !important}
 html[data-theme="day"] .tr-stack-dot{background:#2563eb !important;box-shadow:0 0 8px rgba(37,99,235,.5) !important}
 /* analytics toggle "on" state (green-400) → blue */
 html[data-theme="day"] .an-g.on{background:#2563eb !important;color:#ffffff !important;box-shadow:0 0 0 1px rgba(37,99,235,.3) !important}
+
+/* trends chart hover tooltip: the dark theme hardcodes a near-black bg while
+   its text uses var(--ink) — dark-on-dark on the light skin. Flip to a white
+   card so the (now-dark) ink/muted text reads. */
+html[data-theme="day"] .rp-tip{
+  background:#ffffff !important;border-color:var(--line) !important;
+  box-shadow:0 14px 36px -16px rgba(15,23,42,.30) !important;
+}
+/* positive value/sub in the tooltip was sky-500 (too light) → sky-700 */
+html[data-theme="day"] .rp-tip-v.pos,
+html[data-theme="day"] .rp-tip-sub.pos,
+html[data-theme="day"] .rp-tip-row b.pos{color:#0369a1 !important}
