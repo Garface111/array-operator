@@ -792,17 +792,17 @@
         body.allocation_pct = n / 100;   // backend wants a fraction in (0,1]
       }
     }
-    // rate: blank → null (clear → use default); number → set.
-    if (get("rate_per_kwh")) {
-      const raw = get("rate_per_kwh").value.trim();
+    // discount: blank → null (clear → use the default 10% off); whole % → fraction.
+    if (get("discount_pct")) {
+      const raw = get("discount_pct").value.trim();
       if (raw === "") {
-        body.rate_per_kwh = null;
+        body.discount_pct = null;
       } else {
         const n = Number(raw);
-        if (isNaN(n) || n < 0 || n > 5) {
-          st.className = "rb-status rb-err"; st.textContent = "Rate must be 0–5 $/kWh, or blank."; return;
+        if (isNaN(n) || n < 0 || n >= 100) {
+          st.className = "rb-status rb-err"; st.textContent = "Discount must be 0–99 (% off), or blank."; return;
         }
-        body.rate_per_kwh = n;
+        body.discount_pct = n / 100;   // backend stores a fraction in [0,1)
       }
     }
     // starting invoice #: blank → null (clear, back to date-based); whole number → set/seed.
@@ -1640,11 +1640,6 @@
                 <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
                 <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
               </div>
-              <label class="rb-rate-edit" title="Per-offtaker discount (% off the solar credit rate) — blank uses your default">
-                <input type="number" class="rb-rate-input" data-act="discount" min="0" max="99" step="1"
-                  value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="default">
-                <span>% off</span>
-              </label>
             </div>
             <div class="rb-more-details">
               <span class="rb-more-lbl">Offtaker details</span>
@@ -1661,9 +1656,9 @@
                 <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
                   <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
                 ` : ""}
-                <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
-                  <input type="number" data-f="rate_per_kwh" min="0" max="5" step="0.001" value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="blank = your default rate">
-                  <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
+                <label class="rep-fld"><span class="rl">Discount (% off the solar credit rate)</span>
+                  <input type="number" data-f="discount_pct" min="0" max="99" step="1" value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="e.g. 10">
+                  <span class="rb-fld-hint">Blank = your default discount (10% off).</span></label>
                 <label class="rep-fld"><span class="rl">Starting invoice #</span>
                   <input type="number" data-f="invoice_number_start" min="0" step="1" value="${s.invoice_number_start != null ? s.invoice_number_start : ""}" placeholder="e.g. 1001">
                   <span class="rb-fld-hint">${s.invoice_number_next != null ? "Next invoice will be #" + s.invoice_number_next + ". " : ""}Array Operator adds 1 after each send. Blank = date-based.</span></label>
