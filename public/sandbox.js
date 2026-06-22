@@ -1207,8 +1207,11 @@
   //               collapses. Persisted under STREAM_KEY; DEFAULT vendor. ----
   const STREAM_KEY = "ao_sandbox_stream";
   function getStream(){
-    try { return localStorage.getItem(STREAM_KEY) === "utility" ? "utility" : "vendor"; }
-    catch(e){ return "vendor"; }
+    // The Vendor/Utility data-source slider was removed (Ford's ask) — the sandbox
+    // shows the integrated fleet, so the stream is LOCKED to "vendor": inverter
+    // combs stay visible and a previously-persisted "utility" can't strand an owner
+    // in the meter-only view they could no longer switch out of.
+    return "vendor";
   }
   function setStream(s){
     try { localStorage.setItem(STREAM_KEY, s === "utility" ? "utility" : "vendor"); } catch(e){}
@@ -1236,8 +1239,10 @@
     return "utility";
   }
   function filterColsByStream(cols){
-    const stream = getStream();
-    return cols.filter(c => arrayStream(c) === stream);
+    // Slider removed — show the INTEGRATED fleet (every array, regardless of data
+    // source) in one view; no longer filter by stream. Thin pass-through so callers
+    // and the now-unreachable source-split branches keep working unchanged.
+    return cols;
   }
 
   // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
@@ -1431,11 +1436,6 @@
           <div class="sb-head-btns">
             <button class="sb-resetbtn sb-viewmode-btn" id="sbViewMode" type="button" title="Switch between the fleet OVERVIEW grid and the interactive tree">${getViewMode()==="grid" ? "⌗ Tree view" : "⊞ Overview"}</button>
             <button class="sb-resetbtn sb-showall" id="sbShowAll" type="button" title="Back to the fleet overview grid (you drilled into a single array)" hidden>⊞ All arrays</button>
-          </div>
-          <div class="sb-streamtoggle" role="group" aria-label="Data source stream" title="Routes each array to its data source: VENDOR shows arrays fed by inverter telemetry; UTILITY shows arrays fed by the utility meter (GMP). Both feeds stay integrated underneath — this just chooses which source view you're in.">
-            <span class="sb-stream-cap">Showing</span>
-            <button class="sb-stream-seg ${getStream()==="vendor"?"on":""}" id="sbStreamVendor" type="button" aria-pressed="${getStream()==="vendor"}">Vendor data</button>
-            <button class="sb-stream-seg ${getStream()==="utility"?"on":""}" id="sbStreamUtility" type="button" aria-pressed="${getStream()==="utility"}">Utility data</button>
           </div>
         </div>
         <div class="sb-head-actions">
