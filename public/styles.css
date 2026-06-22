@@ -850,13 +850,17 @@
     .sb-canvas.sb-orient-horizontal .sb-array{width:auto;flex:none}
     .sb-array-body{flex-direction:column}
     .sb-array .sb-alert{flex-basis:auto;align-self:auto}
-    /* expanded inverter comb: a readable grid, never an 80px row */
+    /* expanded inverter comb: a FULL-WIDTH block (override the horizontal-orient
+       flex, which would shrink the grid to content → collapse it to 1 column) */
     .sb-comb,
-    .sb-canvas.sb-orient-horizontal .sb-col.expanded .sb-comb{margin-top:12px;align-self:stretch}
+    .sb-canvas.sb-orient-horizontal .sb-col.expanded .sb-comb{display:block !important;
+      width:100%;margin-top:12px;align-self:stretch}
+    /* EVERY inverter in a uniform 2-column grid under its array (exactly 2 cols,
+       items shrink to 0 so content never forces a column to grow or collapse) */
     .sb-teeth,
-    .sb-canvas.sb-orient-horizontal .sb-teeth{display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
-      gap:12px;flex-wrap:wrap;justify-content:stretch}
+    .sb-canvas.sb-orient-horizontal .sb-teeth{display:grid !important;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;width:100%;justify-content:stretch}
     .sb-inv{width:auto !important;min-width:0;contain-intrinsic-size:auto}
     /* thumb-friendly, readable type on the cards */
     .sb-perf-pct{font-size:30px}
