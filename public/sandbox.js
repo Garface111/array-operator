@@ -3024,6 +3024,10 @@
   function wirePanZoom(host){
     const vp = host.querySelector(".sb-viewport");
     if(!vp) return;
+    // MOBILE (see @media max-width:600px): the fleet is a normal VERTICAL SCROLL,
+    // not a pan/zoom canvas — skip all pan/zoom wiring so a touch-drag never
+    // captures the pointer and fights native scrolling on a phone.
+    if(window.matchMedia && window.matchMedia("(max-width:600px)").matches) return;
     if(!_fitDone){ _fitDone = true; requestAnimationFrame(() => fitView(host)); }  // fit once layout settles
     else applyCanvasView(host);                         // keep the user's view across re-renders
     vp.addEventListener("wheel", e => {

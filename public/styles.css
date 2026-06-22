@@ -829,14 +829,46 @@
   .sb-skeleton span:nth-child(2){opacity:.7} .sb-skeleton span:nth-child(3){opacity:.45}
   @keyframes sbshimmer{to{background-position:-200% 0}}
 
-  @media(max-width:720px){
-    .sb-inv{width:80px}
-  }
-  /* narrow viewports: the array card's two inner columns stack vertically */
-  @media(max-width:560px){
-    .sb-col{min-width:260px}
+  /* ═══ MOBILE OVERHAUL: the desktop pan/zoom canvas + tiny 80px "teeth" are
+     unusable on a phone. On small screens we DROP the pan/zoom and lay the fleet
+     out as a clean, readable VERTICAL SCROLL — full-width array cards, each with
+     its inverter cards in a 2-up (1-up on the narrowest) grid. ═══ */
+  @media(max-width:600px){
+    /* viewport: stop being a fixed-height pan surface; flow in normal page scroll */
+    .sb-viewport{overflow:visible;height:auto;min-height:0;cursor:default;
+      touch-action:auto;border-radius:0;background:none}
+    /* canvas: kill the pan/zoom transform + max-content width; stack down the page */
+    .sb-canvas,
+    .sb-canvas.sb-orient-horizontal,
+    .sb-canvas.sb-orient-vertical{transform:none !important;width:auto !important;
+      flex-direction:column;align-items:stretch;gap:18px;padding:6px 2px 48px}
+    /* each array = a full-width card */
+    .sb-col,
+    .sb-canvas.sb-orient-horizontal .sb-col{min-width:0;max-width:none;width:100%;
+      flex-direction:column;align-items:stretch;gap:0}
+    .sb-array,.sb-array--card,
+    .sb-canvas.sb-orient-horizontal .sb-array{width:auto;flex:none}
     .sb-array-body{flex-direction:column}
     .sb-array .sb-alert{flex-basis:auto;align-self:auto}
+    /* expanded inverter comb: a readable grid, never an 80px row */
+    .sb-comb,
+    .sb-canvas.sb-orient-horizontal .sb-col.expanded .sb-comb{margin-top:12px;align-self:stretch}
+    .sb-teeth,
+    .sb-canvas.sb-orient-horizontal .sb-teeth{display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+      gap:12px;flex-wrap:wrap;justify-content:stretch}
+    .sb-inv{width:auto !important;min-width:0;contain-intrinsic-size:auto}
+    /* thumb-friendly, readable type on the cards */
+    .sb-perf-pct{font-size:30px}
+    .sb-state{font-size:11.5px;padding:4px 11px}
+    .sb-inv-name{font-size:13px}
+    .sb-array-name{font-size:18px}
+    /* a clear full-width tap target to expand/collapse an array */
+    .sb-inv-toggle{padding:11px 12px}
+    /* header + toolbar wrap tidily instead of overflowing the screen */
+    .sb-head{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+    .sb-head-actions{flex-direction:row;flex-wrap:wrap;align-items:center;align-self:stretch;gap:10px}
+    .sb-head-btns{flex-wrap:wrap}
   }
 
   /* ===== VIEW TABS (NEPOOL-style pill/underline, dark skin) ===== */
