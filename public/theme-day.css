@@ -712,3 +712,24 @@ html[data-theme="day"] .sb-array-k{color:#0369a1 !important}
 /* per-array data-source brand chip + spec nameplates on a clean slate fill */
 html[data-theme="day"] .sb-inv-plate,
 html[data-theme="day"] .sb-array-plate .sb-inv-now{backdrop-filter:none !important}
+
+/* ── Professional SANDBOX CANVAS background (Ford, template = NEPOOL operator
+   sandbox). The NEPOOL board is a soft light gradient + two blurred ambient
+   glow blobs + a dot grid. Translate that to AO's day "utility blue" palette:
+   an off-white canvas with a faint blue dot grid and soft blue/cyan ambient
+   glows, so the fleet reads as a calm professional control-room board instead
+   of a flat slate panel. (#sbWrap = the framed card; .sb-viewport = the pannable
+   canvas; the dot grid sits on the fixed viewport so it doesn't drift on pan.) */
+html[data-theme="day"] #sbWrap{
+  background:linear-gradient(180deg,#ffffff,#f5f8fe) !important;border-color:var(--line) !important;
+}
+html[data-theme="day"] .sb-viewport{
+  background-color:#f7faff !important;
+  background-image:
+    radial-gradient(58% 55% at 84% -8%, rgba(59,130,246,.15), rgba(59,130,246,0) 70%),
+    radial-gradient(52% 55% at -6% 112%, rgba(14,165,233,.13), rgba(14,165,233,0) 70%),
+    radial-gradient(rgba(37,99,235,.11) 1.1px, transparent 1.3px) !important;
+  background-size:auto, auto, 24px 24px !important;
+  background-position:0 0, 0 0, 0 0 !important;
+  background-attachment:local, local, local !important;
+}
