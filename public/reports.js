@@ -557,10 +557,10 @@
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
           <h3>Your invoice template</h3>
-          <p>Upload your own invoice and every offtaker invoice will reproduce your exact format — PDF, Word, HTML, or an image.</p>
+          <p>Upload your own invoice and every offtaker invoice will reproduce your exact format — PDF, Word, HTML, an image, or an Excel workbook (we'll find the invoice sheet inside it).</p>
         </div>
         <div class="rb-tpl-ctl">
-          <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg" hidden>
+          <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls,.xlsm" hidden>
           <button class="ao-btn ao-btn-primary rb-btn" id="rbTplPick" type="button">⬆ Upload template</button>
           <span class="rb-tpl-status" id="rbTplStatus">Checking…</span>
           <button class="ao-btn rb-btn" id="rbTplView" type="button" hidden>View</button>
