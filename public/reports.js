@@ -549,41 +549,14 @@
     return `
       <div class="rb-subtabs" role="tablist">
         <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Offtaker Invoice Generator</button>
-        <button type="button" class="rb-subtab" data-sub="quarterly" role="tab">Quarterly reports</button>
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
-      <div class="rb-globalrate rep-card" id="rbGlobalRate">
-        <div class="rb-gr-main">
-          <h3>Bill offtakers at a discount off the solar credit rate</h3>
-          <p>Offtakers pay the <b>solar credit rate</b> minus your <b>discount</b> — that's
-             their solar savings. Default is <b>10% off</b>. Applies to any
-             offtaker without their own override below.</p>
-        </div>
-        <div class="rb-gr-ctl">
-          <label class="rb-gr-field">
-            <span class="rb-gr-lbl">Solar credit rate</span>
-            <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
-              <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="0.184">
-              <span class="rb-gr-unit">/kWh</span></span>
-          </label>
-          <label class="rb-gr-field">
-            <span class="rb-gr-lbl">Discount</span>
-            <span class="rb-gr-inwrap">
-              <input type="number" id="rbGrDisc" min="0" max="99" step="1" placeholder="10">
-              <span class="rb-gr-unit">% off</span></span>
-          </label>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save</button>
-          <span class="rb-status" id="rbGrStatus"></span>
-        </div>
-        <div class="rb-gr-eff" id="rbGrEff"></div>
-      </div>
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
           <div>
             <h3>Your offtakers</h3>
-            <span>each offtaker's percentage of the array · invoice + summary on its cadence</span>
           </div>
           <div class="rb-head-actions">
             <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
