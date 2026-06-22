@@ -1187,11 +1187,12 @@
   // each array; horizontal = arrays stacked on the LEFT, inverters spread out to
   // the RIGHT of their array). Persisted under ORIENT_KEY; DEFAULT horizontal. ----
   function getOrient(){
-    try {
-      const v = localStorage.getItem(ORIENT_KEY);
-      // default to horizontal when the owner hasn't explicitly chosen vertical
-      return v === "vertical" ? "vertical" : "horizontal";
-    } catch(e){ return "horizontal"; }
+    // Orientation is LOCKED to horizontal — arrays in a column on the LEFT, each
+    // array's inverters spreading to the RIGHT. The layout toggle was removed
+    // (Ford's ask: one canonical view), so this no longer reads ORIENT_KEY — a
+    // previously-persisted "vertical" can't strand an owner in a view they can no
+    // longer switch out of.
+    return "horizontal";
   }
   function setOrient(o){
     try { localStorage.setItem(ORIENT_KEY, o === "horizontal" ? "horizontal" : "vertical"); } catch(e){}
@@ -1442,7 +1443,6 @@
             <button class="sb-resetbtn" id="sbUndo" type="button" title="Undo the last inverter move (Ctrl/Cmd+Z)" disabled>↶ Undo</button>
             <button class="sb-resetbtn" id="sbRedo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷ Redo</button>
             <button class="sb-resetbtn" id="sbFullscreen" type="button" title="Expand the fleet tree to full screen">⛶ Full screen</button>
-            <button class="sb-resetbtn" id="sbOrient" type="button" title="Switch between stacked (arrays side-by-side) and horizontal (arrays on the left, inverters spreading right) layout">⬌ Horizontal</button>
             <button class="sb-resetbtn" id="sbExpandAll" type="button" title="Open every array's inverter list at once (click again to collapse them all)">⊕ Show all inverters</button>
             <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
             <button class="sb-resetbtn" id="sbReset" type="button" title="Snap every inverter back to its discovered vendor grouping on the server">Reset layout</button>
