@@ -63,9 +63,12 @@
     function redraw(){ if(!ctx) return; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); if(drawFn) drawFn(ctx,w,h); }
     let ro=null;
     if(window.ResizeObserver){ ro=new ResizeObserver(fit); ro.observe(host); } else window.addEventListener("resize",fit);
+    // Repaint on a night⇄day toggle: the drawFns read the theme colors live, but the
+    // canvas is a static raster, so it must be told to redraw when the theme flips.
+    window.addEventListener("ao-theme-change", redraw);
     fit();
     return { cv, ctx, get w(){return w;}, get h(){return h;}, set draw(fn){ drawFn=fn; redraw(); }, redraw,
-             destroy(){ if(ro) ro.disconnect(); else window.removeEventListener("resize",fit); } };
+             destroy(){ window.removeEventListener("ao-theme-change", redraw); if(ro) ro.disconnect(); else window.removeEventListener("resize",fit); } };
   }
   function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,Math.abs(h)/2); if(r<0)r=0;
     ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);

@@ -279,6 +279,9 @@
       if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
       if (meta) meta.setAttribute("content", day ? "#f6f8fb" : "#0a0e14");
       var fav = document.getElementById("favicon"); if (fav) fav.href = day ? "favicon-day.svg" : "favicon.svg";
+      // Tell canvas-based charts (Trends) to repaint into the new palette — a <canvas>
+      // is a static raster and won't pick up CSS-variable colors on its own.
+      try { window.dispatchEvent(new Event("ao-theme-change")); } catch(e){}
     }
     var day = read();
     apply(day);

@@ -51,10 +51,29 @@
   }
   function hexA(hex, a) {
     if (!hex || hex[0] !== "#") return hex || "rgba(63,214,138," + a + ")";
-    const h = hex.replace("#",""); 
+    const h = hex.replace("#","");
     const r = parseInt(h.substr(0,2),16), g = parseInt(h.substr(2,2),16), b = parseInt(h.substr(4,2),16);
     return `rgba(${r},${g},${b},${a})`;
   }
+
+  // ── theme ───────────────────────────────────────────────────────────────────
+  // This surface was authored on the night (dark) skin: white gridlines, near-white
+  // labels, emerald bars. On the day skin those gridlines/labels vanish on white and
+  // the green clashes with the utility-blue palette. Everything below resolves LIVE
+  // at draw time, so a redraw (hover OR a night⇄day toggle) repaints in the right
+  // colors without rebuilding anything.
+  const isDay = () => document.documentElement.getAttribute("data-theme") === "day";
+  const ACC_NIGHT = { day:"#5ec2ff", month:"#3fd68a", year:"#f5b942", lifetime:"#7ff0bb" };
+  const ACC_DAY   = { day:"#0ea5e9", month:"#2563eb", year:"#d97706", lifetime:"#0891b2" };
+  const accentFor = (g) => (isDay() ? ACC_DAY : ACC_NIGHT)[g] || (isDay() ? ACC_DAY.month : ACC_NIGHT.month);
+  const C = {
+    grid:   () => isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.06)",
+    ghost:  () => isDay() ? "rgba(15,23,42,.10)" : "rgba(255,255,255,.16)",
+    ylab:   () => isDay() ? "#64748b" : "#6b7686",
+    axis:   () => isDay() ? "#475569" : "#8b97a8",
+    xlab:   () => isDay() ? "#64748b" : "#8b97a8",
+    xlabOn: () => isDay() ? "#0f172a" : "#eaf0f7",
+  };
 
   // ── data shaping ───────────────────────────────────────────────────────────
   // Build the canonical structures every granularity needs from the raw payload.
@@ -150,14 +169,14 @@
     for (let i=0;i<=lines;i++){
       const yv = peak * i/lines;
       const y = padT + plotH - (yv/peak)*plotH;
-      ctx.strokeStyle = "rgba(255,255,255,.06)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = C.grid(); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
-      ctx.fillStyle = "#6b7686"; ctx.textAlign = "right";
+      ctx.fillStyle = C.ylab(); ctx.textAlign = "right";
       ctx.fillText(kCompact(yv), padL-8, y);
     }
     // Y-axis unit title (rotated) — every chart carries a labeled axis.
     ctx.save();
-    ctx.fillStyle = "#8b97a8"; ctx.font = "600 11px system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = C.axis(); ctx.font = "600 11px system-ui, sans-serif"; ctx.textAlign = "center";
     ctx.translate(12, padT + plotH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("kWh", 0, 0);
     ctx.restore();
     const n = series.length || 1;
@@ -171,7 +190,7 @@
         const cv = cmp[i].kwh || 0;
         const ch = (cv/peak)*plotH;
         const cxb = cx - barW*0.6;
-        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillStyle = C.ghost();
         roundRect(ctx, cxb - barW/2, padT+plotH-ch, barW, ch, 3); ctx.fill();
       }
       const v = s.kwh || 0;
@@ -179,16 +198,18 @@
       const xb = hasCmp ? cx + barW*0.6 : cx;
       const on = i === hoverIdx;
       const g = ctx.createLinearGradient(0, padT+plotH-bh, 0, padT+plotH);
-      g.addColorStop(0, on ? "#ffffff" : accent);
-      g.addColorStop(1, hexA(accent, on ? 0.65 : 0.42));
+      // day: white top is invisible on a light canvas, so brighten via a solid
+      // accent + higher opacity instead; night keeps the white-cap highlight.
+      g.addColorStop(0, on ? (isDay() ? accent : "#ffffff") : accent);
+      g.addColorStop(1, hexA(accent, on ? (isDay() ? 0.9 : 0.65) : (isDay() ? 0.55 : 0.42)));
       ctx.fillStyle = g;
-      ctx.shadowColor = hexA(accent, 0.5); ctx.shadowBlur = on ? 16 : 8;
+      ctx.shadowColor = hexA(accent, isDay() ? 0.28 : 0.5); ctx.shadowBlur = on ? (isDay() ? 8 : 16) : (isDay() ? 3 : 8);
       roundRect(ctx, xb - barW/2, padT+plotH-bh, barW, Math.max(bh,1.5), 3); ctx.fill();
       ctx.shadowBlur = 0;
       // x label (skip some when crowded)
       const everyN = n > 16 ? Math.ceil(n/12) : 1;
       if (i % everyN === 0 || on) {
-        ctx.fillStyle = on ? "#eaf0f7" : "#8b97a8";
+        ctx.fillStyle = on ? C.xlabOn() : C.xlab();
         ctx.textAlign = "center"; ctx.font = (on?"600 ":"")+"11px system-ui, sans-serif";
         ctx.fillText(s.label, cx, h - padB + 14);
       }
@@ -206,7 +227,6 @@
   // ── the surface ─────────────────────────────────────────────────────────────
   function mount(host, payload, core) {
     const S = shape(payload);
-    const accentFor = { day:"#5ec2ff", month:"#3fd68a", year:"#f5b942", lifetime:"#7ff0bb" };
 
     // available granularities (don't offer Day if we have no daily data)
     const grans = [];
@@ -269,11 +289,11 @@
     chartHost.appendChild(tip);
 
     let hoverIdx = -1;
-    let curSeries = [], curCmp = null, curAccent = "#3fd68a";
+    let curSeries = [], curCmp = null, curAccent = accentFor("month");
 
     // ----- series builders per granularity -----
     function buildSeries() {
-      const accent = accentFor[gran] || "#3fd68a";
+      const accent = accentFor(gran);
       let series = [], cmp = null, periodLabel = "", cmpLabel = "";
       if (gran === "year") {
         series = S.annual.map(a => ({ label: String(a.year), kwh: a.kwh, sub: `${a.year}` }));
@@ -386,7 +406,7 @@
       // compare toggle only meaningful for month/day
       el.querySelector(".an-cmp").style.visibility = (gran==="month"||gran==="day") ? "visible" : "hidden";
       renderDelta(b);
-      cvs.draw = (ctx,w,h) => drawBars(ctx,w,h, curSeries, curCmp, curAccent, hoverIdx);
+      cvs.draw = (ctx,w,h) => drawBars(ctx,w,h, curSeries, curCmp, accentFor(gran), hoverIdx);
     }
 
     // ----- hover tooltip -----
@@ -520,8 +540,15 @@
     renderEnv();
     renderRecords();
 
+    // Repaint into the new palette on a night⇄day toggle. The chart is a static
+    // canvas raster, so without this it keeps the previous theme's colors until a
+    // hover forces a redraw. renderChart() refreshes the accent + repaints.
+    const onThemeChange = () => { try { renderChart(); } catch (e) {} };
+    window.addEventListener("ao-theme-change", onThemeChange);
+
     // cleanup
     return function stop() {
+      window.removeEventListener("ao-theme-change", onThemeChange);
       try { cvs.destroy(); } catch(e){}
       try { el.remove(); } catch(e){}
     };
