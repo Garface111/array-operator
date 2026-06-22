@@ -21,11 +21,18 @@
   const MUTED = () => css("--muted", "#8b97a8");
   const FAINT = () => css("--faint", "#6b7686");
   const GOOD = () => css("--good", "#3fd68a");
-  const GOLD2 = () => css("--gold2", "#ffd479");
   const BAD = () => css("--bad", "#ff6b6b");
-  const GRID = "rgba(255,255,255,.07)";
-  const AXIS = "rgba(255,255,255,.20)";
-  const HALO = "rgba(7,11,17,.88)";
+  // Grid/axis/halo are theme-aware: on the light (day) skin a white grid is
+  // invisible and a near-black halo makes the YoY line + % labels read muddy,
+  // so flip to dark-on-light grid/axis and a WHITE halo (the page cut-out).
+  const isDay = () => document.documentElement.getAttribute("data-theme") === "day";
+  const GRID = () => isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.07)";
+  const AXIS = () => isDay() ? "rgba(15,23,42,.22)" : "rgba(255,255,255,.20)";
+  const HALO = () => isDay() ? "rgba(255,255,255,.95)" : "rgba(7,11,17,.88)";
+  // YoY-line/label accent. The day theme repoints --gold2 to a deep brown
+  // (#b45309) for "deep warn" chrome — too dark/muddy as a chart line + labels —
+  // so use a clean, vivid amber in day; keep the light gold at night.
+  const GOLD2 = () => isDay() ? "#e08008" : "#ffd479";
 
   function fmt0(n){ return n==null?"—":Number(n).toLocaleString(undefined,{maximumFractionDigits:0}); }
   function kCompact(n){ if(n==null) return "—"; const a=Math.abs(n);
@@ -100,7 +107,7 @@
       // left gridlines + kWh ticks
       ctx.font="11px "+FONT; ctx.textBaseline="middle";
       for(let i=0;i<=4;i++){ const v=kwhMax*i/4, y=kToY(v);
-        ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x0+plotW,y); ctx.stroke();
+        ctx.strokeStyle=GRID(); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x0+plotW,y); ctx.stroke();
         ctx.fillStyle=FAINT(); ctx.textAlign="right"; ctx.fillText(kCompact(v), x0-9, y); }
       // right % ticks
       for(let i=-2;i<=2;i++){ const v=pctMag*i/2, y=pToY(v);
@@ -109,7 +116,7 @@
       const yz=pToY(0); ctx.strokeStyle=hexA(GOLD2(),0.28); ctx.setLineDash([4,4]); ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(x0,yz); ctx.lineTo(x0+plotW,yz); ctx.stroke(); ctx.setLineDash([]);
       // axis frame (both verticals + baseline)
-      ctx.strokeStyle=AXIS; ctx.lineWidth=1.25; ctx.beginPath();
+      ctx.strokeStyle=AXIS(); ctx.lineWidth=1.25; ctx.beginPath();
       ctx.moveTo(x0,y0); ctx.lineTo(x0,y0+plotH); ctx.lineTo(x0+plotW,y0+plotH); ctx.lineTo(x0+plotW,y0); ctx.stroke();
 
       // BARS — monthly production (left axis), drawn first
@@ -127,19 +134,19 @@
       // reads clearly OVER the bars and is never hidden behind them.
       const pts = data.map((d,i)=> d.pct==null?null:[cx(i), pToY(d.pct)]);
       ctx.lineJoin="round"; ctx.lineCap="round";
-      ctx.strokeStyle=HALO; ctx.lineWidth=6; strokeSegs(ctx, pts);          // halo
+      ctx.strokeStyle=HALO(); ctx.lineWidth=6; strokeSegs(ctx, pts);          // halo
       ctx.strokeStyle=GOLD2(); ctx.lineWidth=2.75; ctx.shadowColor=hexA(GOLD2(),0.55); ctx.shadowBlur=8;
       strokeSegs(ctx, pts); ctx.shadowBlur=0;                                // bright line
       pts.forEach((p,i)=>{ if(!p) return; const on=i===hover; const d=data[i];
-        ctx.fillStyle=HALO; ctx.beginPath(); ctx.arc(p[0],p[1], on?6.5:5, 0,7); ctx.fill();
+        ctx.fillStyle=HALO(); ctx.beginPath(); ctx.arc(p[0],p[1], on?6.5:5, 0,7); ctx.fill();
         ctx.fillStyle=GOLD2(); ctx.beginPath(); ctx.arc(p[0],p[1], on?4.5:3.2, 0,7); ctx.fill();
         // % value label above each marker (so "May +5%" reads at a glance)
         ctx.font="600 10.5px "+FONT; ctx.textAlign="center"; ctx.textBaseline="bottom";
-        ctx.fillStyle=HALO; for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) ctx.fillText((d.pct>=0?"+":"")+Math.round(d.pct)+"%", p[0]+dx, p[1]-9+dy);
+        ctx.fillStyle=HALO(); for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) ctx.fillText((d.pct>=0?"+":"")+Math.round(d.pct)+"%", p[0]+dx, p[1]-9+dy);
         ctx.fillStyle=GOLD2(); ctx.fillText((d.pct>=0?"+":"")+Math.round(d.pct)+"%", p[0], p[1]-9); });
 
       // hover guideline
-      if(hover>=0){ const x=cx(hover); ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      if(hover>=0){ const x=cx(hover); ctx.strokeStyle=GRID(); ctx.lineWidth=1; ctx.setLineDash([3,3]);
         ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,y0+plotH); ctx.stroke(); ctx.setLineDash([]); }
 
       // ── axis titles ──
@@ -179,9 +186,9 @@
       const yToPx=v=>y0+plotH-(v/ymax)*plotH;
       ctx.font="11px "+FONT; ctx.textBaseline="middle";
       for(let i=0;i<=4;i++){ const v=ymax*i/4,y=yToPx(v);
-        ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x0+plotW,y); ctx.stroke();
+        ctx.strokeStyle=GRID(); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x0+plotW,y); ctx.stroke();
         ctx.fillStyle=FAINT(); ctx.textAlign="right"; ctx.fillText(kCompact(v), x0-9, y); }
-      ctx.strokeStyle=AXIS; ctx.lineWidth=1.25; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y0+plotH); ctx.lineTo(x0+plotW,y0+plotH); ctx.stroke();
+      ctx.strokeStyle=AXIS(); ctx.lineWidth=1.25; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y0+plotH); ctx.lineTo(x0+plotW,y0+plotH); ctx.stroke();
       const slot=plotW/pts.length, bw=Math.min(slot*0.62,26);
       pts.forEach((p,i)=>{ const v=p.kwh||0,x=x0+slot*i+slot/2,bh=(v/ymax)*plotH,on=i===hover;
         const g=ctx.createLinearGradient(0,y0+plotH-bh,0,y0+plotH); g.addColorStop(0,on?"#fff":GOOD()); g.addColorStop(1,hexA(GOOD(),on?0.7:0.42));
