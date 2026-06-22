@@ -2006,8 +2006,11 @@
   async function previewDraftInvoice(subId, st, win) {
     // Stream the invoice PDF for this draft's subscription into the pre-opened tab
     // (opened synchronously by the click so it isn't popup-blocked).
-    st.className = "rb-status rb-busy"; st.textContent = "Building preview…";
-    function fail(msg) { if (win && !win.closed) win.close(); st.className = "rb-status rb-err"; st.textContent = msg; }
+    // st (the card's status span) can be null if the card re-rendered between the
+    // click and here — guard every write so it never throws (Sentry PYTHON-FASTAPI-4).
+    const setSt = (cls, txt) => { if (st) { st.className = cls; st.textContent = txt; } };
+    setSt("rb-status rb-busy", "Building preview…");
+    function fail(msg) { if (win && !win.closed) win.close(); setSt("rb-status rb-err", msg); }
     if (!subId) return fail("Preview unavailable.");
     try {
       const r = await fetch(API + "/subscriptions/" + subId + "/preview?kind=invoice&fmt=pdf", { headers: authHeaders() });
@@ -2015,7 +2018,7 @@
       const url = URL.createObjectURL(await r.blob());
       if (win && !win.closed) win.location = url; else window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      st.textContent = "";
+      if (st) st.textContent = "";
     } catch (e) { fail("Preview failed."); }
   }
 
