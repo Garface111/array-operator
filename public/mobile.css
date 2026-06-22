@@ -16,9 +16,16 @@
             position: sticky; top: 0; z-index: 40; flex-wrap: wrap; }
   .tab { font-size: 11px; letter-spacing: -.1px; padding: 11px 2px;
          line-height: 1.1; min-height: 42px; }
-  /* Identity chip: full-width strip under the tabs so the email isn't clipped. */
-  .tab.tab-whoami { flex: 1 0 100%; max-width: none; margin-left: 0; margin-top: 4px;
-                    justify-content: center; min-height: 0; }
+  /* Identity chip + Sign out share ONE tidy row under the tabs (was: the email on
+     its own full-width line with an orphaned Sign out below → sprawled + looked
+     unfinished as it rode the sticky bar). Email grows + truncates; Sign out is a
+     compact pill at the end. */
+  .tab.tab-whoami { flex: 1 1 auto; min-width: 0; max-width: none; margin-left: 0;
+                    margin-top: 5px; justify-content: flex-start; min-height: 0;
+                    padding: 7px 12px; }
+  .tab.tab-signout { flex: 0 0 auto; margin-top: 5px; padding: 7px 13px; min-height: 0;
+                     border: 1px solid var(--line); border-radius: 999px;
+                     background: var(--card); }
 
   /* ── Portfolio command center ──────────────────────────────────────────── */
   #commandCenter { margin-top: 12px; }
