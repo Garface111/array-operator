@@ -792,6 +792,20 @@
         body.allocation_pct = n / 100;   // backend wants a fraction in (0,1]
       }
     }
+    // solar credit rate ($/kWh): blank → null (auto-derive from the GMP bill);
+    // positive number → per-offtaker override that wins over bill/reference rate.
+    if (get("net_rate_per_kwh")) {
+      const raw = get("net_rate_per_kwh").value.trim();
+      if (raw === "") {
+        body.net_rate_per_kwh = null;
+      } else {
+        const n = Number(raw);
+        if (isNaN(n) || n < 0 || n > 5) {
+          st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be 0–5 $/kWh, or blank to auto-read from the bill."; return;
+        }
+        body.net_rate_per_kwh = n;
+      }
+    }
     // discount: blank → null (clear → use the default 10% off); whole % → fraction.
     if (get("discount_pct")) {
       const raw = get("discount_pct").value.trim();
@@ -1656,6 +1670,9 @@
                 <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
                   <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
                 ` : ""}
+                <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
+                  <input type="number" data-f="net_rate_per_kwh" min="0" max="5" step="0.0001" value="${s.net_rate_per_kwh != null ? s.net_rate_per_kwh : ""}" placeholder="blank = auto from bill">
+                  <span class="rb-fld-hint">Blank = read from the GMP bill automatically. Set this to your actual net-metering credit rate when the meter's own bill shows $0 credit (e.g. group net metering).</span></label>
                 <label class="rep-fld"><span class="rl">Discount (% off the solar credit rate)</span>
                   <input type="number" data-f="discount_pct" min="0" max="99" step="1" value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="e.g. 10">
                   <span class="rb-fld-hint">Blank = your default discount (10% off).</span></label>
