@@ -906,7 +906,7 @@
     if(outputState(inv, "ok").reporting)
       return { key:"producing", word:"Producing", tone:"ok", title:"Making power now." };
     // OFFLINE: daylight, but no usable live signal (telemetry gap / not reporting).
-    return { key:"offline", word:"Offline", tone:"info",
+    return { key:"offline", word:"Offline", tone:"bad",
              title:"No live signal from this inverter right now." };
   }
 
@@ -1543,8 +1543,8 @@
         // the inverter card (it stays on the array card).
         const st4 = fourState(inv, sortedInvs, col.is_daylight, sCls, sleeping);
         const stateChip = `<div class="sb-state ${st4.tone}"${st4.title?` title="${esc(st4.title)}"`:""}><span class="sb-now-dot"></span>${esc(st4.word)}</div>`;
-        // Whole-card tint: error → alarming; otherwise the calm live output tone.
-        const cardTone = st4.key === "error" ? "bad" : obTone;
+        // Whole-card tint: error/offline → red; otherwise the calm live output tone.
+        const cardTone = (st4.key === "error" || st4.key === "offline") ? "bad" : obTone;
         // Cards are FIRM in place — not draggable until the owner picks "Move" from
         // the right-click menu (which sets draggable + .sb-movable). Re-locks on drop.
         return `
