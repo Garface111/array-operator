@@ -733,3 +733,46 @@ html[data-theme="day"] .sb-viewport{
   background-position:0 0, 0 0, 0 0 !important;
   background-attachment:local, local, local !important;
 }
+
+/* ── FOURTH PASS (2026-06-21, Lane B) — boost day-mode card contrast + fix the
+   SOURCE-OFFLINE banner/badge. On the light skin the cards felt too delicate
+   (slate-200 hairline, barely lifted off the canvas) and the source-offline
+   freshness banner kept its NIGHT amber palette — pale cream body (#f4e3c4) +
+   light-gold headline (#ffd479) on a light amber box = effectively invisible. ── */
+
+/* cards: firmer slate-300 border + a touch more lift so they read as crisp,
+   confident cards on the light dotted canvas instead of washing into it. */
+html[data-theme="day"] .sb-inv,
+html[data-theme="day"] .sb-array,
+html[data-theme="day"] .sb-array--card{
+  border-color:#cbd5e1 !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.10), 0 4px 12px -6px rgba(15,23,42,.16) !important;
+}
+html[data-theme="day"] .sb-inv:hover,
+html[data-theme="day"] .sb-array--card:hover{box-shadow:0 12px 28px -14px rgba(15,23,42,.30) !important}
+/* lift the faintest in-card captions off slate-400/500 to readable slate-600 */
+html[data-theme="day"] .sb-perf-sub,
+html[data-theme="day"] .sb-perf-sub--lone,
+html[data-theme="day"] .sb-ag-nodata,
+html[data-theme="day"] .sb-inv-size,
+html[data-theme="day"] .sb-spark-axis span{color:#475569 !important}
+
+/* SOURCE-OFFLINE freshness banner → dark amber text on a light amber box. */
+html[data-theme="day"] .sb-srcout{
+  background:linear-gradient(180deg,#fef3c7,#fde9b3) !important;
+  border-color:#f59e0b !important;
+  box-shadow:0 0 0 1px rgba(217,119,6,.16) !important;
+}
+html[data-theme="day"] .sb-srcout-ic{color:#b45309 !important;filter:none !important}
+html[data-theme="day"] .sb-srcout-txt{color:#7c3a06 !important}     /* dark-amber body — readable */
+html[data-theme="day"] .sb-srcout-txt b{color:#92400e !important}   /* amber-800 headline */
+
+/* "⚠ SOURCE OFFLINE" ribbon → solid amber with white text (matches the day warn
+   badge convention; the gold-ribbon + dark-brown text read weakly on the light card). */
+html[data-theme="day"] .sb-array--srcout::after{
+  background:#d97706 !important;color:#ffffff !important;
+}
+html[data-theme="day"] .sb-array--srcout{
+  border-color:rgba(217,119,6,.7) !important;
+  box-shadow:0 0 0 1px rgba(217,119,6,.4), 0 8px 22px -10px rgba(217,119,6,.42) !important;
+}
