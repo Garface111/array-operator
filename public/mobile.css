@@ -38,12 +38,18 @@
   /* Full-bleed wrapper (was 96vw centered via translateX). */
   #sbWrap { width: 100%; left: auto; transform: none; margin-left: 0;
             padding: 14px 12px 16px; border-radius: 16px; }
-  .sb-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  /* command-center.css floats .sb-head (and its children) position:absolute over
+     the canvas — fine for the desktop pan/zoom, but on the mobile vertical scroll
+     it overlays the fleet status bar (the "$/mo recoverable" + legend). Put it
+     back in normal flow so it takes space and pushes the status bar + canvas down. */
+  .sb-head { position: static; flex-direction: column; align-items: stretch;
+             gap: 10px; margin-bottom: 12px; }
   .sb-sub { font-size: 12px; }
   .sb-legend { flex-wrap: wrap; }
   /* Toolbar (Full screen / New empty array / Reset layout / +Card / +Add array)
      was flex-nowrap → clipped. Wrap + compact. */
-  .sb-head-actions, .sb-head-btns { flex-wrap: wrap; justify-content: flex-start;
+  .sb-head-actions, .sb-head-left, .sb-head-btns { position: static;
+                                    flex-wrap: wrap; justify-content: flex-start;
                                     gap: 8px; width: 100%; }
   .sb-head-btns button, .sb-head-btns .sb-cardbtn-wrap { font-size: 12px; }
   .sb-resetbtn, .sb-addbtn { padding: 9px 12px; min-height: 40px; }
