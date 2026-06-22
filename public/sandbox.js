@@ -2391,6 +2391,7 @@
 
   // ---- "+ Card" head button → small Note/Data menu ----
   function wireCardButton(host){
+    return;  // Note/Data card feature KILLED 2026-06-21 (Ford) — no "+ Card" menu.
     const btn = host.querySelector("#sbAddCard");
     if(!btn) return;
     const wrap = btn.closest(".sb-cardbtn-wrap") || btn.parentElement;
@@ -2520,6 +2521,10 @@
 
   // ---- reconcile cards into the canvas (free) + fixed layer (idempotent) ----
   function renderCards(){
+    // Note/Data owner cards KILLED 2026-06-21 (Ford) — the free-form sticky-note +
+    // live-metric card feature is removed from the sandbox. No-op so nothing renders;
+    // the dead body below is kept for git history / possible revival.
+    return;
     const canvas = document.querySelector("#sandbox .sb-canvas");
     const fixed = fixedCardHost();
     const cards = loadCards();
@@ -2610,6 +2615,7 @@
 
   // Recompute every data card's value from the live fleet DOM (call each tick).
   function refreshDataCards(){
+    return;  // Note/Data card feature KILLED 2026-06-21 (Ford).
     document.querySelectorAll('.sb-card[data-kind="data"]').forEach(node => {
       const id = node.dataset.cardId;
       const sel = node.querySelector(".sb-data-pick");

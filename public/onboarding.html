@@ -288,7 +288,7 @@ const VENDORS = [
       {name:"client_secret", label:"Client Secret", secret:true},
       {name:"system_id", label:"Plant / System ID"},
     ] },
-  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false, loginOnly:true,
+  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:true, discover:false, loginOnly:true,
     note:"New — sign into the Chint Connect monitoring portal you already use and the EnergyAgent helper reads your inverters automatically (no key to paste). Chint/CPS support is in final verification against live accounts." },
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
