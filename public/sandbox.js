@@ -3042,7 +3042,7 @@
     }, { passive:false });
     // Suppress OS middle-click autoscroll so a middle-drag can pan instead.
     vp.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); });
-    let panning=false, captured=false, pid=null, sx=0, sy=0;
+    let panning=false, captured=false, pid=null, sx=0, sy=0, pinch=null;
     vp.addEventListener("pointerdown", e => {
       const onControl = e.target.closest("button,a,input");
       // MIDDLE button pans from ANYWHERE. LEFT button pans from the whole canvas
@@ -3058,6 +3058,7 @@
       panning=true; captured=false; pid=e.pointerId; sx=e.clientX-_view.x; sy=e.clientY-_view.y;
     });
     vp.addEventListener("pointermove", e => {
+      if(pinch) return;
       if(!panning) return;
       // Defer pointer capture until the first real move, so a plain click still
       // reaches the element underneath (e.g. click an array name to rename it).
@@ -3067,6 +3068,36 @@
     const end = () => { panning=false; captured=false; vp.classList.remove("panning"); };
     vp.addEventListener("pointerup", end);
     vp.addEventListener("pointercancel", end);
+    // ---- Pinch-to-zoom (touch). Two fingers zoom toward the pinch midpoint,
+    // mirroring the wheel zoom; single-finger pan still runs via the pointer
+    // handlers above (stood down while two fingers are active). The viewport is
+    // touch-action:none, so the browser won't steal the gesture.
+    const _tdist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    vp.addEventListener("touchstart", e => {
+      if(e.touches.length === 2){
+        panning=false; captured=false; vp.classList.remove("panning");
+        pinch = { d:_tdist(e.touches), z:_view.z };
+        e.preventDefault();
+      }
+    }, { passive:false });
+    vp.addEventListener("touchmove", e => {
+      if(!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const d = _tdist(e.touches);
+      if(!pinch.d) return;
+      const r = vp.getBoundingClientRect();
+      const mx = (e.touches[0].clientX + e.touches[1].clientX)/2 - r.left;
+      const my = (e.touches[0].clientY + e.touches[1].clientY)/2 - r.top;
+      const prev = _view.z;
+      const next = Math.min(2.5, Math.max(0.4, pinch.z * (d / pinch.d)));
+      if(next === prev) return;
+      _view.x = mx - (mx - _view.x) * (next/prev);
+      _view.y = my - (my - _view.y) * (next/prev);
+      _view.z = next; applyCanvasView(host, true);
+    }, { passive:false });
+    const _endPinch = e => { if(!e.touches || e.touches.length < 2) pinch = null; };
+    vp.addEventListener("touchend", _endPinch);
+    vp.addEventListener("touchcancel", _endPinch);
     vp.addEventListener("dblclick", e => {
       if(e.target.closest(".sb-inv,.sb-array,button,a")) return;
       fitView(host);                                    // double-click empty space → re-fit to screen
