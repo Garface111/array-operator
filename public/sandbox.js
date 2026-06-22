@@ -159,8 +159,12 @@
       } else if(isMeterProvider && hasAccounts){
         // Utility-meter capture (GMP server-pull + VEC/WEC client-pull) all land
         // as a per-account daily[] payload → the one proven utility-meter endpoint.
+        // auth is passed through (GMP only) so the backend can store a UtilitySession
+        // and later pull bills autonomously via the scheduler.
+        const meterBody = { provider: d.provider, accounts: d.accounts };
+        if(d.auth && d.auth.apiToken) meterBody.auth = d.auth;
         r = await fetch("/v1/array-owners/utility-meter-capture",
-          { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, accounts: d.accounts }) });
+          { method:"POST", headers:hdr, body: JSON.stringify(meterBody) });
       } else {
         // Honest, provider-appropriate message: GMP/VEC/WEC are utility METERS,
         // not inverters. Only reaches here when we truly got nothing usable.
