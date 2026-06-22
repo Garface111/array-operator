@@ -1495,6 +1495,14 @@
       : "drafted for your approval, then sent to " + esc(recips);
     const sentence = "<b>" + esc(s.customer_name) + "</b> receives <b>" + pctTxt + "</b> of <b>"
       + esc(srcName) + "</b>'s generation. <b>" + cadTxt + "</b> " + esc(fmts) + " &mdash; " + deliveryTxt + ".";
+    // Plain statement of WHERE the invoice numbers come from (replaces the rate-math
+    // line). Honest per source: the GMP bill, an uploaded workbook, or "link one first".
+    const discTxt = s.resolved_discount_pct ? `, at <b>${Math.round(s.resolved_discount_pct * 100)}% off</b>` : "";
+    const invoiceSource = s.utility_account_id
+      ? `Your offtaker's invoice is calculated from the GMP bill${discTxt}.`
+      : (s.source_filename
+          ? `Your offtaker's invoice is calculated from the uploaded billing workbook${discTxt}.`
+          : "Link a GMP utility bill to invoice this offtaker.");
     return `
       <div class="rb-sub ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}">
         <div class="rb-sub-main">
@@ -1503,11 +1511,7 @@
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
           <div class="rb-sub-sentence">${sentence}</div>
-          ${s.resolved_net_rate != null ? `<div class="rb-sub-rate" title="${esc(s.resolved_net_note || "")}">
-            Solar credit rate <b>$${Number(s.resolved_net_rate).toFixed(4)}/kWh</b>
-            ${s.resolved_discount_pct ? "− " + Math.round(s.resolved_discount_pct * 100) + "% = <b>$" + Number(s.resolved_effective_rate).toFixed(4) + "/kWh</b>" : ""}
-            <span class="rb-rate-prov">${esc(rateSourceLabel(s.resolved_net_source))}</span>
-          </div>` : ""}
+          <div class="rb-sub-rate">${invoiceSource}</div>
           <div class="rb-sub-meta">
             Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
           </div>
