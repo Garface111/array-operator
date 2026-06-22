@@ -602,3 +602,50 @@ html[data-theme="day"] .fc-liq-stars{opacity:.25 !important}
 /* identity chip dot glow + vendor/utility stream toggle (green-400) → blue */
 html[data-theme="day"] .whoami-dot{box-shadow:0 0 8px rgba(37,99,235,.6) !important}
 html[data-theme="day"] .sb-stream-seg.on{background:rgba(37,99,235,.14) !important}
+
+/* ===========================================================================
+ * SECOND PASS (2026-06-21) — readability + clean professional look for the
+ * reworked SANDBOX + TRENDS tabs. Two systemic issues on the light skin:
+ *   (1) the dark theme leaned on slate-400 (--faint) for real secondary text
+ *       (labels, sub-labels, table headers, axis text) — only ~2.6:1 on white.
+ *   (2) the trends revamp added emerald/gold accents + sky-as-small-text.
+ * Fix at the token level (darken the day grays to a crisp, readable two-step
+ * hierarchy) + recolor the trends accents/states to the utility-blue system.
+ * ==========================================================================*/
+
+/* readable gray hierarchy: secondary slate-600, tertiary slate-500 (were
+   slate-500/slate-400). Lifts every var(--muted)/var(--faint) label AND the
+   canvas chart text, which reads these vars at draw time. */
+html[data-theme="day"]{
+  --muted:#475569;   /* slate-600 — secondary text (was #64748b) */
+  --faint:#64748b;   /* slate-500 — tertiary text (was #94a3b8, ~2.6:1 on white) */
+}
+
+/* sandbox "4 honest states": the rework colors the Error state amber — make it
+   red (matches the alert pill + universal convention). warn=amber, off=gray. */
+html[data-theme="day"] .sb-state.bad{background:rgba(220,38,38,.12) !important;color:#dc2626 !important}
+html[data-theme="day"] .sb-state.warn{background:rgba(217,119,6,.14) !important;color:#b45309 !important}
+html[data-theme="day"] .sb-state.off,
+html[data-theme="day"] .sb-state.idle,
+html[data-theme="day"] .sb-state.offline{background:rgba(71,85,105,.12) !important;color:#475569 !important}
+/* warn alert + amber stat as small text on white → amber-700 for legibility */
+html[data-theme="day"] .sb-inv-alert.warn{color:#b45309 !important}
+
+/* positive deltas/values were sky-500 (#0ea5e9) — too light as small text on
+   white (~2.8:1). Use a readable sky-700; negatives stay red. */
+html[data-theme="day"] .tr-v.pos,
+html[data-theme="day"] .an-delta.pos,
+html[data-theme="day"] .rp-pos{color:#0369a1 !important}
+html[data-theme="day"] .an-delta.pos{background:rgba(2,132,199,.10) !important}
+
+/* ---- trends: emerald/gold accents → utility blue ---- */
+/* stat-tile ambient glow (was emerald radial) */
+html[data-theme="day"] .tr-glow{background:radial-gradient(circle at 50% 0%,rgba(37,99,235,.10),transparent 70%) !important}
+/* export button → white ghost with blue label */
+html[data-theme="day"] .tr-export{background:#ffffff !important;border-color:var(--line) !important;color:var(--good) !important}
+html[data-theme="day"] .tr-export:hover{background:var(--day-hover) !important}
+/* advanced art-view per-block accent (ACCENT map = green/gold) → uniform blue */
+html[data-theme="day"] .tr-chartblock{--tr-accent:#2563eb !important}
+html[data-theme="day"] .tr-stack-dot{background:#2563eb !important;box-shadow:0 0 8px rgba(37,99,235,.5) !important}
+/* analytics toggle "on" state (green-400) → blue */
+html[data-theme="day"] .an-g.on{background:#2563eb !important;color:#ffffff !important;box-shadow:0 0 0 1px rgba(37,99,235,.3) !important}
