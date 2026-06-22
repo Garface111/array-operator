@@ -781,11 +781,16 @@
     animation:sbliqtwinkle ease-in-out infinite}
   @keyframes sbliqtwinkle{0%,100%{opacity:.15}50%{opacity:.9}}
   .sb-liq-moon{position:absolute;z-index:4;top:3px;right:5px;font-size:11px;opacity:.85}
-  /* sleeping card: calm the text + status, dim the sparkline (not red/amber) */
+  /* sleeping card: calm the text + status. The sparkline keeps the healthy
+     production-history brand color (var(--good): blue in day, green at night) to
+     match the array production graph — a sleeping inverter's PAST output is good
+     data; "resting" is conveyed by the SLEEPING pill + text, not by graying the
+     history (which read as an error, esp. on the light day skin). A whisper of
+     opacity keeps it visually calmer than an actively-producing card. */
   .sb-inv.sleep .sb-ob-pct,.sb-inv.sleep .sb-ob-idle{color:#9aa8e0}
   .sb-inv.sleep .sb-inv-alert{color:#aab4e8 !important;background:rgba(120,135,210,.14) !important}
-  .sb-inv.sleep .sb-spark polyline,.sb-inv.sleep svg polyline{stroke:#5a6790 !important;opacity:.6}
-  .sb-inv.sleep .sb-inv-spark rect,.sb-inv.sleep svg.sb-inv-spark rect{fill:#5a6790 !important;opacity:.6}
+  .sb-inv.sleep .sb-spark polyline,.sb-inv.sleep svg polyline{stroke:var(--good) !important;opacity:.8}
+  .sb-inv.sleep .sb-inv-spark rect,.sb-inv.sleep svg.sb-inv-spark rect{fill:var(--good) !important;opacity:.8}
   @media (prefers-reduced-motion:reduce){
     .sb-liquid,.sb-liquid::before,.sb-liquid::after,.sb-liq-bubbles span,
     .sb-liq-stars span,.sb-liquid--sleep{animation:none !important}
