@@ -49,6 +49,7 @@
   let _switching = false;
   let _arrayId = null;      // current per-array filter scope (null = whole fleet)
   let _fleetArrays = [];    // full array list for the filter dropdown (kept across scopes)
+  let _lastData = null;     // last rendered payload — re-rendered on a theme switch
 
   function loading() {
     const r = root(); if (!r) return;
@@ -353,6 +354,7 @@
       return;
     }
     _prepped = c.prep(d);
+    _lastData = d;            // keep the payload so a theme switch can re-render in-place
     teardown();
 
     const views = c.listViews();   // ordered: bars, monthly, liquid, spiral, heatfield…
@@ -517,4 +519,26 @@
   }
 
   window.__aoLoadTrends = load;
+
+  // Theme switch (night⇄day): the charts are <canvas> rasters drawn with the
+  // theme's colors AT DRAW TIME, so a toggle leaves the report + analytics charts
+  // showing the old theme's colors until a redraw. Watch data-theme and re-render
+  // from the cached payload (no refetch) so every chart repaints in the new colors.
+  // Only when the tab is actually visible (a hidden 0-width canvas can't draw, and
+  // it re-renders correctly on next show anyway). Scroll position is preserved.
+  (function () {
+    if (!window.MutationObserver) return;
+    let last = document.documentElement.getAttribute("data-theme");
+    const obs = new MutationObserver(function () {
+      const t = document.documentElement.getAttribute("data-theme");
+      if (t === last) return;
+      last = t;
+      const r = root();
+      if (!_lastData || !r || r.offsetParent === null) return;   // not loaded / tab hidden
+      const y = window.scrollY;
+      try { render(_lastData); } catch (e) {}
+      requestAnimationFrame(function () { window.scrollTo(0, y); });
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  })();
 })();
