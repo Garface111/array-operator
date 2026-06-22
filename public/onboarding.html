@@ -235,7 +235,7 @@ const VENDORS = [
     fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
              hint:"The one key that unlocks every site on your account.",
              ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="https://monitoring.solaredge.com" target="_blank" rel="noopener">Open the SolarEdge portal →</a>`}] },
-  { code:"enphase", label:"Enphase", meta:"Enlighten", available:true, discover:false,
+  { code:"enphase", label:"Enphase", meta:"Enlighten", available:false, discover:false,
     note:"Enphase connects through the Enlighten developer API — paste your Enphase app key + client ID/secret and your System ID. We're in final verification against live Enphase accounts, and a one-click owner sign-in is on the way.",
     fields:[
       {name:"api_key", label:"Enphase API key", secret:true,
@@ -244,14 +244,14 @@ const VENDORS = [
       {name:"client_secret", label:"App Client Secret", secret:true},
       {name:"system_id", label:"System ID", hint:"Your Enlighten system ID."},
     ] },
-  { code:"solis", label:"Solis", meta:"SolisCloud", available:true, discover:false,
+  { code:"solis", label:"Solis", meta:"SolisCloud", available:false, discover:false,
     note:"Solis connects through the SolisCloud Platform API. In SolisCloud, open API Management and request an API key (KeyId + KeySecret), then paste them here. We're in final verification against live Solis accounts.",
     fields:[
       {name:"key_id", label:"SolisCloud KeyId"},
       {name:"key_secret", label:"SolisCloud KeySecret", secret:true},
       {name:"station_id", label:"Station ID (optional)"},
     ] },
-  { code:"tigo", label:"Tigo", meta:"Energy Intelligence", available:true, discover:false,
+  { code:"tigo", label:"Tigo", meta:"Energy Intelligence", available:false, discover:false,
     note:"Tigo connects with your Energy Intelligence (EI) login — the API needs a Premium data subscription on your Tigo account. We're in final verification against live Tigo accounts.",
     fields:[
       {name:"username", label:"Tigo EI username"},
@@ -288,7 +288,7 @@ const VENDORS = [
       {name:"client_secret", label:"Client Secret", secret:true},
       {name:"system_id", label:"Plant / System ID"},
     ] },
-  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:true, discover:false, loginOnly:true,
+  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false, loginOnly:true,
     note:"New — sign into the Chint Connect monitoring portal you already use and the EnergyAgent helper reads your inverters automatically (no key to paste). Chint/CPS support is in final verification against live accounts." },
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
