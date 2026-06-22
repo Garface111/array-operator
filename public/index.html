@@ -327,6 +327,7 @@
       txt=document.getElementById("fsText"), send=document.getElementById("fsSend"),
       cancel=document.getElementById("fsCancel"), msg=document.getElementById("fsMsg");
   if(!btn) return;
+  try{ if(!localStorage.getItem("so_session")){ var _w=document.getElementById("fsWrap"); if(_w) _w.style.display="none"; return; } }catch(e){}
   function open(o){ panel.classList.toggle("open", o); btn.setAttribute("aria-expanded", o?"true":"false"); if(o){ msg.textContent=""; setTimeout(function(){ txt.focus(); }, 30); } }
   btn.onclick=function(){ open(!panel.classList.contains("open")); };
   cancel.onclick=function(){ open(false); };
