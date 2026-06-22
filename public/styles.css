@@ -834,15 +834,6 @@
      out as a clean, readable VERTICAL SCROLL — full-width array cards, each with
      its inverter cards in a 2-up (1-up on the narrowest) grid. ═══ */
   @media(max-width:600px){
-    /* SHORTER, SOLID top status bar: it was sticky with a half-transparent bottom,
-       so once the sandbox scrolled (mobile overhaul) the array status bars bled
-       through and looked overlapped. Solid bg hides under-scroll cleanly; the
-       reduced height + the sandbox nudge stop it crowding the fleet view. */
-    nav{padding:6px 0 4px;background:var(--bg)}
-    .brand{font-size:14px}
-    .logo{width:24px;height:24px}
-    /* nudge the sandbox's default view down a little so it sits clear of the bar */
-    #sbWrap{margin-top:8px}
     /* viewport: stop being a fixed-height pan surface; flow in normal page scroll */
     .sb-viewport{overflow:visible;height:auto;min-height:0;cursor:default;
       touch-action:auto;border-radius:0;background:none}
