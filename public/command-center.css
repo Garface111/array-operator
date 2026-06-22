@@ -303,6 +303,14 @@ body.sb-fs-lock{ overflow:hidden; }
   gap:18px; flex-wrap:wrap; margin-bottom:16px; }
 .rb-globalrate .rb-gr-main h3{ font-size:15.5px; margin:.2em 0 .15em; }
 .rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:52ch; margin:0; }
+/* invoice-template upload card — operator's own format */
+.rb-tpl{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }
+.rb-tpl .rb-tpl-main h3{ font-size:15.5px; margin:.2em 0 .15em; }
+.rb-tpl .rb-tpl-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:52ch; margin:0; }
+.rb-tpl-ctl{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.rb-tpl-status{ font-size:12.5px; color:var(--faint); }
+.rb-tpl-status.rb-tpl-have{ color:var(--ink); }
+.rb-tpl-status.rb-err{ color:#e06666; }
 .rb-gr-ctl{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .rb-gr-ctl .rb-gr-dollar{ color:var(--muted); font-weight:700; }
 .rb-gr-ctl .rb-gr-unit{ color:var(--faint); font-size:12.5px; }

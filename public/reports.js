@@ -69,6 +69,7 @@
       } catch (e) {}
     };
     wireGlobalRate();
+    wireInvoiceTemplate();
     // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
     // spreadsheet); the upload zone + live doc-preview live inside that panel
     // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
@@ -553,6 +554,19 @@
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
+      <div class="rb-tpl rep-card" id="rbTpl">
+        <div class="rb-tpl-main">
+          <h3>Your invoice template</h3>
+          <p>Upload your own invoice and every offtaker invoice will reproduce your exact format — PDF, Word, HTML, or an image.</p>
+        </div>
+        <div class="rb-tpl-ctl">
+          <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg" hidden>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbTplPick" type="button">⬆ Upload template</button>
+          <span class="rb-tpl-status" id="rbTplStatus">Checking…</span>
+          <button class="ao-btn rb-btn" id="rbTplView" type="button" hidden>View</button>
+          <button class="ao-btn rb-btn rb-danger" id="rbTplDel" type="button" hidden>Remove</button>
+        </div>
+      </div>
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
           <div>
@@ -803,6 +817,58 @@
       const f = e.dataTransfer && e.dataTransfer.files[0];
       if (f) matchFile(f);
     });
+  }
+
+  // ---- invoice template upload (operator's own format) ----------------------
+  // Stage 1: bank the operator's invoice template per-tenant. Generating offtaker
+  // invoices FROM it is gated server-side (Stage 2), so uploading here never
+  // changes a live send today — it captures the format to reproduce.
+  async function wireInvoiceTemplate() {
+    const pick = $("#rbTplPick"), fileIn = $("#rbTplFile"), status = $("#rbTplStatus");
+    const view = $("#rbTplView"), del = $("#rbTplDel");
+    if (!pick || !fileIn || !status) return;
+    function paint(t) {
+      const has = t && t.has_template;
+      status.textContent = has
+        ? "On file: " + (t.filename || "your template") + ". New offtaker invoices will match this format."
+        : "No template yet — offtaker invoices use the standard format.";
+      status.className = "rb-tpl-status" + (has ? " rb-tpl-have" : "");
+      if (view) view.hidden = !has;
+      if (del) del.hidden = !has;
+    }
+    try {
+      const r = await fetch(API + "/invoice-template", { headers: authHeaders() });
+      const d = await r.json().catch(() => ({}));
+      paint(r.ok ? d.template : null);
+    } catch (e) { paint(null); }
+    pick.onclick = () => fileIn.click();
+    fileIn.onchange = async () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      status.textContent = "Uploading " + f.name + "…"; status.className = "rb-tpl-status rb-busy";
+      const fd = new FormData(); fd.append("file", f);
+      try {
+        const r = await fetch(API + "/invoice-template", { method: "POST", headers: authHeaders(), body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { status.textContent = (d && d.detail) || "Upload failed."; status.className = "rb-tpl-status rb-err"; }
+        else paint(d.template);
+      } catch (e) { status.textContent = "Upload failed — check your connection."; status.className = "rb-tpl-status rb-err"; }
+      fileIn.value = "";
+    };
+    if (view) view.onclick = async () => {
+      try {
+        const r = await fetch(API + "/invoice-template/file", { headers: authHeaders() });
+        if (!r.ok) return;
+        const url = URL.createObjectURL(await r.blob());
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (e) {}
+    };
+    if (del) del.onclick = async () => {
+      if (!confirm("Remove your invoice template? Offtaker invoices go back to the standard format.")) return;
+      try { await fetch(API + "/invoice-template", { method: "DELETE", headers: authHeaders() }); } catch (e) {}
+      paint(null);
+    };
   }
 
   // ---- global default billing (net rate + discount) --------------------------
