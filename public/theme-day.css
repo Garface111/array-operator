@@ -662,6 +662,14 @@ html[data-theme="day"] .rp-tip-v.pos,
 html[data-theme="day"] .rp-tip-sub.pos,
 html[data-theme="day"] .rp-tip-row b.pos{color:#0369a1 !important}
 
+/* Production Analytics chart tooltip (an-tip) — same dark hardcoded bg fix */
+html[data-theme="day"] .an-tip{
+  background:#ffffff !important;border-color:var(--line) !important;
+  box-shadow:0 8px 24px -8px rgba(15,23,42,.18) !important;
+}
+/* positive delta badge: emerald bg tint → blue tint */
+html[data-theme="day"] .an-delta.pos{background:rgba(37,99,235,.10) !important}
+
 /* ===========================================================================
  * THIRD PASS (2026-06-21, Lane B) — SANDBOX readability on the day skin.
  * The fleet cards rendered as heavy SATURATED green/blue blocks: the array /
