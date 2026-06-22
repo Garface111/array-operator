@@ -1887,6 +1887,7 @@
         </div>
         <div class="rb-draft-acts">
           <button class="ao-btn ao-btn-primary rb-btn" data-dact="approve">Approve &amp; send</button>
+          <button class="ao-btn rb-btn" data-dact="sendme" type="button" title="Email a test copy to yourself first">Send to me</button>
           <a class="ao-btn rb-btn" data-dact="preview" href="#">Preview invoice</a>
           <button class="ao-btn rb-btn rb-danger" data-dact="dismiss">Dismiss</button>
           <span class="rb-status rb-draft-status"></span>
@@ -1916,8 +1917,35 @@
     const st = $(".rb-draft-status", card);
 
     if (act === "preview") {
-      // Drafts share the subscription's preview; resolve the sub id via the draft.
-      return downloadDraftPreview(id, st);
+      // Open the tab SYNCHRONOUSLY (still inside the click = a user gesture) so the
+      // popup blocker doesn't kill it after the await; the sub id is on the card.
+      const win = window.open("", "_blank");
+      return previewDraftInvoice(card.getAttribute("data-subid"), st, win);
+    }
+    if (act === "sendme") {
+      // Email a TEST copy of this draft to the operator (you). Save the edited note
+      // first so the test reflects exactly what the offtaker would receive.
+      const subId = card.getAttribute("data-subid");
+      const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
+      st.className = "rb-status rb-busy"; st.textContent = "Sending a test to you…";
+      try {
+        if (ta) {
+          await fetch(API + "/drafts/" + id, {
+            method: "PATCH",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ note: ta.value }),
+          });
+        }
+        const r = await fetch(API + "/drafts/" + id + "/test", { method: "POST", headers: authHeaders() });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.ok) {
+          const to = (data.result && data.result.to || []).join(", ");
+          st.className = "rb-status rb-ok"; st.textContent = "Test sent to " + (to || "you") + " — check your inbox.";
+        } else {
+          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Test send failed.";
+        }
+      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+      return;
     }
     if (act === "autogmp") {
       // Per-customer auto-attach toggle. The draft carries subscription_id;
@@ -1975,22 +2003,20 @@
     }
   }
 
-  async function downloadDraftPreview(draftId, st) {
-    // The draft's subscription preview is the same invoice; fetch via the sub.
+  async function previewDraftInvoice(subId, st, win) {
+    // Stream the invoice PDF for this draft's subscription into the pre-opened tab
+    // (opened synchronously by the click so it isn't popup-blocked).
     st.className = "rb-status rb-busy"; st.textContent = "Building preview…";
+    function fail(msg) { if (win && !win.closed) win.close(); st.className = "rb-status rb-err"; st.textContent = msg; }
+    if (!subId) return fail("Preview unavailable.");
     try {
-      // get the draft to resolve its subscription_id
-      const dl = await fetch(API + "/drafts?status=all", { headers: authHeaders() });
-      const all = (await dl.json().catch(() => ({}))).drafts || [];
-      const d = all.find(x => String(x.id) === String(draftId));
-      if (!d) { st.className = "rb-status rb-err"; st.textContent = "Preview unavailable."; return; }
-      const r = await fetch(API + "/subscriptions/" + d.subscription_id + "/preview?kind=invoice&fmt=pdf", { headers: authHeaders() });
-      if (!r.ok) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; return; }
+      const r = await fetch(API + "/subscriptions/" + subId + "/preview?kind=invoice&fmt=pdf", { headers: authHeaders() });
+      if (!r.ok) return fail("Preview failed.");
       const url = URL.createObjectURL(await r.blob());
-      window.open(url, "_blank");
+      if (win && !win.closed) win.location = url; else window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       st.textContent = "";
-    } catch (e) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; }
+    } catch (e) { fail("Preview failed."); }
   }
 
   // If the Reports tab is the active hash on first load, render immediately.
