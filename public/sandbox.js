@@ -947,25 +947,24 @@
     const curKw = curW != null ? (curW/1000) : null;
     const nowKw = curKw != null ? `${curKw.toFixed(1)} kW now` : "";
     if(st.key === "producing"){
-      const pp = peerPerf(inv, peers);
-      if(pp && pp.kind === "peer"){
-        const tone = pp.pct < 80 ? "bad" : pp.pct < 92 ? "warn" : "ok";
-        const sub  = pp.pct < 92  ? `${Math.max(0, 100 - pp.pct)}% below its siblings`
-                   : pp.pct > 110 ? "ahead of its siblings"
-                   : "pulling its fair share";
-        return `<div class="sb-perf ${tone}">
-          <div class="sb-perf-main"><b class="sb-perf-pct">${pp.pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of fair share</span></div>
-          ${nowKw?`<div class="sb-perf-prod">${nowKw}</div>`:""}
-          <div class="sb-perf-sub">${esc(sub)}</div>
-          <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${Math.max(0, Math.min(100, pp.pct))}%"></div></div>
-        </div>`;
-      }
-      if(pp && pp.kind === "solo"){
+      // Headline = live output as a % of the inverter's MAX possible production
+      // (capacity factor = current ÷ rated nameplate, with an estimated max when
+      // the vendor reports none). A genuine laggard is already flagged at the
+      // STATE level ("error"), so a producing inverter keeps the calm OK tone —
+      // a low % here just means low sun, never a fault.
+      const npW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : estNameplateW(inv);
+      const cf  = (npW && npW > 0 && curW != null) ? curW / npW : null;
+      if(cf != null){
+        const pct = Math.round(Math.max(0, Math.min(100, cf * 100)));
+        const maxKw = npW / 1000;
+        const est = inv.nameplate_kw == null;
+        const maxStr = (maxKw % 1) ? maxKw.toFixed(1) : String(maxKw);
+        const sub = est ? `of its ~${maxKw.toFixed(1)} kW est. max` : `of its ${maxStr} kW max`;
         return `<div class="sb-perf ok">
-          <div class="sb-perf-main"><b class="sb-perf-pct">${pp.pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of rated max</span></div>
+          <div class="sb-perf-main"><b class="sb-perf-pct">${pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of max</span></div>
           ${nowKw?`<div class="sb-perf-prod">${nowKw}</div>`:""}
-          <div class="sb-perf-sub" title="No sibling inverter to compare against — raw capacity factor, not weather-adjusted.">no peer to compare</div>
-          <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${Math.max(0, Math.min(100, pp.pct))}%"></div></div>
+          <div class="sb-perf-sub"${est?' title="Rated max estimated from peak production — this vendor reports no nameplate."':''}>${esc(sub)}</div>
+          <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${pct}%"></div></div>
         </div>`;
       }
       return `<div class="sb-perf ok"><div class="sb-perf-main"><b class="sb-perf-pct">${curKw!=null?curKw.toFixed(1):"—"}</b><span class="sb-perf-unit">kW now</span></div></div>`;
