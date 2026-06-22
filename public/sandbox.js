@@ -2705,6 +2705,19 @@
     // round the pan offset to whole pixels so text/edges don't land on half-pixels
     c.style.transform = `translate(${Math.round(_view.x)}px,${Math.round(_view.y)}px) scale(${_view.z})`;
     if(promote) markInteracting(c);
+    // Glue the canvas DOT GRID to the SAME plane as the cards: the dots are a
+    // background layer on the fixed .sb-viewport, so panning offsets that layer's
+    // position by _view.x/y and zoom scales its 24px world period by _view.z — the
+    // dots translate + scale in lockstep with the cards (like the NEPOOL board),
+    // while the two ambient glow layers stay put (their position stays 0 0).
+    // setProperty(...,"important") so it beats the theme-day.css !important defaults.
+    const vp = c.closest(".sb-viewport");
+    if(vp){
+      const ds = (24 * (_view.z || 1)).toFixed(2);
+      vp.style.setProperty("background-position",
+        `0 0, 0 0, ${Math.round(_view.x)}px ${Math.round(_view.y)}px`, "important");
+      vp.style.setProperty("background-size", `auto, auto, ${ds}px ${ds}px`, "important");
+    }
   }
   // ---- Full-screen mode: maximize #sbWrap (the whole fleet-tree card) to fill
   // the viewport via a CSS overlay class (.sb-fs). We drive it with our own class
