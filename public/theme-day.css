@@ -1,79 +1,94 @@
 /* ============================================================================
- * Array Operator — DAY MODE  (theme-day.css)
+ * Array Operator — DAY MODE  (theme-day.css)  ·  the DEFAULT theme
  *
- * A light skin that recolors the dark-solarpunk dashboard to look exactly like
- * NEPOOL Operator *in color* (the shapes/layout are untouched). Activated by
- * setting  <html data-theme="day">  (see the toggle + init in index.html).
+ * A professional, control-room light skin in the spirit of the operational
+ * dashboards run by major energy / oil corporations (Schneider EcoStruxure,
+ * Siemens, GE Digital, Bloomberg NEF): cool slate-and-white surfaces, a calm
+ * utility-blue primary, and status reserved for amber/red. The emerald brand
+ * of the original solarpunk skin is replaced sitewide (in day mode) with blue.
  *
- * Palette is lifted straight from NEPOOL Operator's design tokens:
- *   cream page  #faf8f5     cream border #e8e2d9
- *   emerald     #34d399 / #10b981 / #059669 / #047857 / #065f46
- *   wood ochre  #e6b470 / #d4914a / #b56d2c / #8c4e1c
- *   ink text    zinc-900 #18181b
+ * Palette — "utility blue on cool slate":
+ *   page slate   #f6f8fb     fill slate    #eef2f7     hairline #e2e8f0
+ *   primary blue #2563eb / #1d4ed8 (deep) / #3b82f6 (top)
+ *   data sky     #0ea5e9     info cyan     #0891b2
+ *   ink slate-900 #0f172a    muted #64748b   faint #94a3b8
+ *   warn amber   #d97706     fault red     #dc2626
  *
  * Strategy: (1) re-point every CSS custom property so everything that already
- * reads var(--…) flips for free, then (2) override the hardcoded dark hexes and
- * rgba(255,255,255,…) "lift" surfaces that don't go through a variable. Loaded
+ * reads var(--…) flips for free, then (2) override the hardcoded dark/emerald
+ * hexes and rgba "lift"/glow surfaces that don't go through a variable. Loaded
  * LAST so its higher-specificity html[data-theme="day"] rules win; !important is
  * used to also beat the dark .ao-*!important modal skin in styles.css.
- * Dark mode is the default and is left completely untouched.
+ * Night mode (the original emerald solarpunk skin) is left completely untouched.
  * ==========================================================================*/
 
 html[data-theme="day"]{
   /* ---- core surfaces / ink ---- */
-  --bg:#faf8f5;            /* cream page surface */
-  --bg2:#f1ebe1;           /* warm fill for inputs, search, chips, .res */
-  --ink:#18181b;           /* zinc-900 primary text */
-  --muted:#586068;         /* readable secondary text on cream */
-  --faint:#8f8a80;         /* hints / tertiary, warm gray */
+  --bg:#f6f8fb;            /* cool page surface (slate-50.5) */
+  --bg2:#eef2f7;           /* slate fill for inputs, search, chips, .res */
+  --ink:#0f172a;           /* slate-900 primary text */
+  --muted:#64748b;         /* slate-500 secondary text */
+  --faint:#94a3b8;         /* slate-400 hints / tertiary */
 
   /* ---- accents ---- */
-  --good:#059669;          /* emerald-700 — legible accent on white/cream */
-  --good2:#10b981;         /* emerald-600 — bright value text + button top */
-  --green-deep:#047857;
-  --gold:#c07d2a;          /* wood ochre */
-  --gold2:#8c4e1c;         /* deeper wood (was the bright highlight) */
-  --sky:#2877c0;           /* calm info blue (comm-gap / array tier / info) */
-  --warn:#b56d2c;          /* wood-500 amber — reads on light */
+  --good:#2563eb;          /* blue-600 — brand primary + healthy/OK status */
+  --good2:#0ea5e9;         /* sky-500 — bright value text + data series */
+  --green-deep:#1d4ed8;    /* blue-700 — deep brand */
+  --gold:#d97706;          /* amber-600 — warn */
+  --gold2:#b45309;         /* amber-700 — deep warn / attention */
+  --sky:#0891b2;           /* cyan-600 — info / comm-gap (distinct from blue) */
+  --warn:#d97706;          /* amber-600 — reads on light */
   --bad:#dc2626;           /* red-600 — reads on light */
 
   /* ---- lines + cards ---- */
-  --line:#e7e1d6;          /* warm cream hairline (NEPOOL cream-border) */
+  --line:#e2e8f0;          /* slate-200 hairline */
   --card:#ffffff;          /* white card */
-  --card2:#fcfaf7;         /* faint warm card (gradient partner) */
+  --card2:#f8fafc;         /* slate-50 card (gradient partner) */
 
   /* day-only helpers used in the overrides below */
-  --day-chip:#efe9df;      /* neutral warm chip/tag fill */
-  --day-tile:#f1ece2;      /* icon tiles */
-  --day-track:rgba(0,0,0,.09);   /* progress/meter tracks */
-  --day-hover:rgba(0,0,0,.04);   /* row / button hover wash */
-  --day-surf:#faf6f0;      /* very subtle raised surface */
+  --day-chip:#eef2f7;      /* neutral slate chip/tag fill */
+  --day-tile:#eef2f7;      /* icon tiles */
+  --day-track:rgba(15,23,42,.08);   /* progress/meter tracks */
+  --day-hover:rgba(15,23,42,.045);  /* row / button hover wash */
+  --day-surf:#f8fafc;      /* very subtle raised surface (slate-50) */
 
   color-scheme:light;
-  background:#faf8f5;
+  background:#f6f8fb;
 }
 
 /* ── page background ────────────────────────────────────────────────────── */
 html[data-theme="day"],
-html[data-theme="day"] body{background:#faf8f5 !important}
+html[data-theme="day"] body{background:#f6f8fb !important}
 html[data-theme="day"] body{
-  background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%) !important;
+  background:radial-gradient(1200px 700px at 75% -10%, #eef3fb 0%, #f6f8fb 55%) !important;
   background-attachment:fixed !important;
 }
 
-/* ── gradient "clipped" headings (white→gray text is invisible on cream) ──── */
+/* ── gradient "clipped" headings (white→gray text is invisible on light) ──── */
 html[data-theme="day"] .hero h1,
 html[data-theme="day"] .pricing h2{
-  background:linear-gradient(180deg,#15281e,#3c574a) !important;
+  background:linear-gradient(180deg,#0f172a,#475569) !important;
   -webkit-background-clip:text;background-clip:text;color:transparent !important;
 }
 
 /* ── nav / brand ──────────────────────────────────────────────────────────── */
 html[data-theme="day"] nav{
-  background:linear-gradient(180deg,#faf8f5 64%,transparent) !important;
+  background:linear-gradient(180deg,#f6f8fb 64%,transparent) !important;
+}
+/* the emerald logo orb + its halo ring → utility blue */
+html[data-theme="day"] .logo{
+  box-shadow:0 0 22px rgba(37,99,235,.32),inset 0 0 8px rgba(255,255,255,.6) !important;
+}
+html[data-theme="day"] .logo::after{border-color:rgba(37,99,235,.25) !important}
+/* the live-pulse dot used a hardcoded green keyframe — run a blue one in day */
+html[data-theme="day"] .dot{animation-name:pulse-day !important}
+@keyframes pulse-day{
+  0%{box-shadow:0 0 0 0 rgba(37,99,235,.55)}
+  70%{box-shadow:0 0 0 9px rgba(37,99,235,0)}
+  100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}
 }
 
-/* ── primary CTA buttons → NEPOOL emerald with white text ─────────────────── */
+/* ── primary CTA buttons → utility blue with white text ───────────────────── */
 html[data-theme="day"] .btn-primary-lg,
 html[data-theme="day"] .acct-btn.primary,
 html[data-theme="day"] .sb-addbtn,
@@ -84,16 +99,16 @@ html[data-theme="day"] .cl-btn.primary,
 html[data-theme="day"] .cl-segbtn.on,
 html[data-theme="day"] .cc-collapsible .cc-collapse-hint,
 html[data-theme="day"] .rb-save{
-  background:linear-gradient(180deg,#10b981,#047857) !important;
+  background:linear-gradient(180deg,#3b82f6,#1d4ed8) !important;
   color:#ffffff !important;
-  box-shadow:0 4px 14px -4px rgba(4,120,87,.45) !important;
+  box-shadow:0 4px 14px -4px rgba(29,78,216,.45) !important;
 }
 html[data-theme="day"] .cc-btn.primary:hover,
-html[data-theme="day"] .cl-btn.primary:hover{background:linear-gradient(180deg,#10b981,#059669) !important}
+html[data-theme="day"] .cl-btn.primary:hover{background:linear-gradient(180deg,#2563eb,#1d4ed8) !important}
 
-/* ── small green tags keep dark text but on the lighter emerald ──────────── */
+/* ── small accent tags keep dark text on the lighter blue ─────────────────── */
 html[data-theme="day"] .act h3 .tag,
-html[data-theme="day"] .pc-free{color:#053024 !important}
+html[data-theme="day"] .pc-free{color:#0b2f6b !important}
 
 /* ── inputs / selects / textareas → white fields on the card ──────────────── */
 html[data-theme="day"] .acct-edit .r-v input,
@@ -110,8 +125,7 @@ html[data-theme="day"] .cl-fld textarea,
 html[data-theme="day"] .cl-grace input{
   background:#ffffff !important;color:var(--ink) !important;border-color:var(--line) !important;
 }
-/* Day mode: flip native popups back to light so option lists match the light
-   theme (overrides the global color-scheme:dark set in styles.css). */
+/* Day mode: flip native popups back to light so option lists match the theme. */
 html[data-theme="day"] select,
 html[data-theme="day"] option,
 html[data-theme="day"] optgroup,
@@ -120,7 +134,7 @@ html[data-theme="day"] textarea{ color-scheme:light; }
 html[data-theme="day"] select option,
 html[data-theme="day"] select optgroup{ background:#ffffff; color:var(--ink); }
 
-/* ── ghost / secondary buttons → white with warm border ───────────────────── */
+/* ── ghost / secondary buttons → white with slate border ──────────────────── */
 html[data-theme="day"] .acct-btn,
 html[data-theme="day"] .acct-pw-eye,
 html[data-theme="day"] .sb-togglebtn,
@@ -141,7 +155,7 @@ html[data-theme="day"] .cl-x:hover{background:var(--day-hover) !important}
 /* ── icon tiles ───────────────────────────────────────────────────────────── */
 html[data-theme="day"] .act .ic{background:var(--day-tile) !important}
 
-/* ── neutral chips / tags / badges (warm cream fill) ──────────────────────── */
+/* ── neutral chips / tags / badges (slate fill) ───────────────────────────── */
 html[data-theme="day"] .sb-srctag,
 html[data-theme="day"] .sb-brand,
 html[data-theme="day"] .sb-brand.chint,
@@ -157,6 +171,8 @@ html[data-theme="day"] .rb-chip{background:var(--day-chip) !important}
 html[data-theme="day"] .peerbar,
 html[data-theme="day"] .cc-meter,
 html[data-theme="day"] .sb-pi{background:var(--day-track) !important}
+/* peer-bar fill glow was emerald → utility blue */
+html[data-theme="day"] .peerbar i{box-shadow:0 0 10px rgba(37,99,235,.45) !important}
 
 /* ── code chips in footer / empty state ───────────────────────────────────── */
 html[data-theme="day"] footer code,
@@ -195,20 +211,20 @@ html[data-theme="day"] .cc-kpi,
 html[data-theme="day"] .cl-kpi,
 html[data-theme="day"] .cl-policy,
 html[data-theme="day"] .cl-card{
-  background:linear-gradient(168deg,#ffffff,#fbf8f3) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;
 }
 
 /* ── frosted floating clusters over the fleet tree ────────────────────────── */
 html[data-theme="day"] .sb-head-btns,
 html[data-theme="day"] .sb-legend{
-  background:rgba(255,255,255,.72) !important;border-color:var(--line) !important;
+  background:rgba(255,255,255,.78) !important;border-color:var(--line) !important;
 }
 
-/* ── overlays / scrims (were near-black) → soft warm dim ──────────────────── */
+/* ── overlays / scrims (were near-black) → cool slate dim ─────────────────── */
 html[data-theme="day"] .ao-overlay,
 html[data-theme="day"] .sb-ov,
 html[data-theme="day"] .cl-modal-back{
-  background:rgba(30,38,32,.34) !important;
+  background:rgba(15,23,42,.40) !important;
 }
 
 /* ── modals / toasts / alert cards / dropdown menus → light ───────────────── */
@@ -219,18 +235,18 @@ html[data-theme="day"] .sb-toast,
 html[data-theme="day"] .sb-detail-card,
 html[data-theme="day"] .sb-card,
 html[data-theme="day"] .sb-card-menu{
-  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;color:var(--ink) !important;
   border-color:var(--line) !important;
-  box-shadow:0 24px 60px -28px rgba(40,32,20,.35) !important;
+  box-shadow:0 24px 60px -28px rgba(15,23,42,.28) !important;
 }
 html[data-theme="day"] .cl-menu{background:#ffffff !important;border-color:var(--line) !important;
-  box-shadow:0 18px 44px -20px rgba(40,32,20,.3) !important}
+  box-shadow:0 18px 44px -20px rgba(15,23,42,.22) !important}
 html[data-theme="day"] .ao-modal-foot,
 html[data-theme="day"] .sb-modal-foot{background:var(--day-surf) !important}
 /* red-tinted alert variants stay red, just light */
 html[data-theme="day"] .sb-toast.alert,
 html[data-theme="day"] .sb-alert-card{
-  background:linear-gradient(165deg,#ffffff,#fdeceb) !important;border-color:rgba(220,38,38,.4) !important;
+  background:linear-gradient(165deg,#ffffff,#fef2f2) !important;border-color:rgba(220,38,38,.4) !important;
 }
 html[data-theme="day"] .cl-x{background:var(--day-tile) !important;color:var(--muted) !important}
 html[data-theme="day"] .ao-sites,
@@ -245,15 +261,15 @@ html[data-theme="day"] .cl-menu-i:hover{background:var(--day-hover) !important}
 
 /* ── login-portal buttons inside the add-array modal ──────────────────────── */
 html[data-theme="day"] .sb-login-btn{
-  background:linear-gradient(165deg,#ffffff,#f7f3ec) !important;border-color:var(--line) !important;
+  background:linear-gradient(165deg,#ffffff,#f8fafc) !important;border-color:var(--line) !important;
 }
 html[data-theme="day"] .sb-login-btn:hover{background:var(--day-surf) !important}
 
-/* ── fleet-tree feeder wires / flow motes (light mint vanished on cream) ──── */
+/* ── fleet-tree feeder wires / flow motes → utility blue on light ─────────── */
 html[data-theme="day"] svg.sb-wires path.feed,
-html[data-theme="day"] svg.sb-wires path.trunk{stroke:rgba(5,150,105,.20) !important}
+html[data-theme="day"] svg.sb-wires path.trunk{stroke:rgba(37,99,235,.20) !important}
 html[data-theme="day"] svg.sb-wires path.flow{
-  stroke:rgba(5,150,105,.9) !important;filter:drop-shadow(0 0 5px rgba(5,150,105,.5)) !important;
+  stroke:rgba(14,165,233,.9) !important;filter:drop-shadow(0 0 5px rgba(14,165,233,.5)) !important;
 }
 
 /* ── soften the heavy black drop-shadows the dark theme used everywhere ───── */
@@ -265,7 +281,7 @@ html[data-theme="day"] .rep-card,
 html[data-theme="day"] .pc-main,
 html[data-theme="day"] .pc-tiers,
 html[data-theme="day"] .rb-sub{
-  box-shadow:0 2px 10px -4px rgba(40,32,20,.12), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.07) !important;
 }
 
 /* ── the live "verdict" / value glow text-shadows are loud on white ───────── */
@@ -277,62 +293,221 @@ html[data-theme="day"] .cl-kpi.atstake .v,
 html[data-theme="day"] .cl-kpi.recovered .v{text-shadow:none !important}
 
 /* ===========================================================================
- * NEW SANDBOX SURFACES (overview grid, fleet commander, enriched detail modal,
- * split toolbar) — these use hardcoded dark gradients that bypass the variables,
- * so flip them to the cream/white palette here.
+ * EMERALD-GLOW LONG TAIL — the dark theme hardcoded rgba(63,214,138,…) glows,
+ * borders, focus-rings and "ok"/win tints all over styles.css. Re-point them
+ * to utility blue so no green specks survive on the light skin. (Night keeps
+ * the emerald — these only fire under [data-theme="day"].)
+ * ==========================================================================*/
+
+/* value / pricing hero cards that were emerald-tinted */
+html[data-theme="day"] .hcard.value{
+  background:linear-gradient(150deg,rgba(37,99,235,.08),rgba(37,99,235,.02)) !important;
+  border-color:rgba(37,99,235,.25) !important;
+}
+html[data-theme="day"] .hcard .sun{
+  background:radial-gradient(circle at 40% 40%,rgba(37,99,235,.18),rgba(37,99,235,.05) 60%,transparent 72%) !important;
+}
+html[data-theme="day"] .pc-main{
+  background:linear-gradient(150deg,rgba(37,99,235,.07),rgba(37,99,235,.02)) !important;
+  border-color:rgba(37,99,235,.28) !important;
+}
+html[data-theme="day"] .pc-sun{
+  background:radial-gradient(circle at 40% 40%,rgba(37,99,235,.18),rgba(37,99,235,.05) 60%,transparent 72%) !important;
+}
+html[data-theme="day"] .pc-badge{
+  background:rgba(37,99,235,.10) !important;border-color:rgba(37,99,235,.28) !important;color:var(--good) !important;
+}
+
+/* "win"/"ok" status tints */
+html[data-theme="day"] .act.win{
+  border-color:rgba(37,99,235,.32) !important;
+  background:linear-gradient(170deg,rgba(37,99,235,.07),rgba(37,99,235,.02)) !important;
+}
+html[data-theme="day"] .act.win .ic{background:rgba(37,99,235,.12) !important;border-color:rgba(37,99,235,.28) !important}
+html[data-theme="day"] .pill.ok{background:rgba(37,99,235,.12) !important;color:var(--good) !important}
+html[data-theme="day"] .vlight.green{
+  background:radial-gradient(circle at 38% 32%,#60a5fa,#2563eb) !important;
+  box-shadow:0 0 18px rgba(37,99,235,.45),inset 0 0 8px rgba(255,255,255,.5) !important;
+}
+
+/* sandbox tiles / dots / flags / tier tags / alerts in the "ok" state */
+html[data-theme="day"] .sb-tile.ok{border-color:rgba(37,99,235,.22) !important}
+html[data-theme="day"] .sb-tile.ok:hover{border-color:rgba(37,99,235,.5) !important}
+html[data-theme="day"] .sb-tile-dot.ok{background:var(--good) !important;box-shadow:0 0 8px rgba(37,99,235,.5) !important}
+html[data-theme="day"] .sb-tile-flag.ok{color:var(--good) !important;background:rgba(37,99,235,.10) !important}
+html[data-theme="day"] .sb-srctag.live{background:rgba(37,99,235,.14) !important;color:var(--good) !important}
+html[data-theme="day"] .sb-alert.ok{border-color:rgba(37,99,235,.28) !important}
+html[data-theme="day"] .sb-tier-tag.c{background:rgba(8,145,178,.12) !important;color:var(--sky) !important;border-color:rgba(8,145,178,.3) !important}
+html[data-theme="day"] .sb-editable.sb-editing{outline-color:var(--good) !important;background:rgba(37,99,235,.08) !important}
+html[data-theme="day"] .sb-inv-toggle:hover{border-color:rgba(37,99,235,.45) !important}
+
+/* hover / focus rings that hardcoded the emerald glow → utility blue */
+html[data-theme="day"] .acct-btn:hover,
+html[data-theme="day"] .sb-togglebtn:hover{border-color:rgba(37,99,235,.45) !important;background:rgba(37,99,235,.06) !important}
+html[data-theme="day"] .acct-edit .r-v input:focus,
+html[data-theme="day"] .acct-pw-edit input:focus,
+html[data-theme="day"] .acct-pw-eye:hover,
+html[data-theme="day"] .rep-fld select:focus,
+html[data-theme="day"] .rep-fld input:focus{border-color:rgba(37,99,235,.5) !important}
+html[data-theme="day"] .ao-input:focus,
+html[data-theme="day"] .ao-textarea:focus{border-color:var(--good) !important;box-shadow:0 0 0 3px rgba(37,99,235,.15) !important}
+html[data-theme="day"] .fc-alerts-btn:hover{background:rgba(37,99,235,.10) !important;border-color:rgba(37,99,235,.4) !important;color:var(--ink) !important}
+html[data-theme="day"] .ao-evidence{background:rgba(37,99,235,.05) !important;border-color:rgba(37,99,235,.16) !important}
+/* global focus-visible ring — cheap, professional polish */
+html[data-theme="day"] :focus-visible{outline:2px solid rgba(37,99,235,.55) !important;outline-offset:2px}
+
+/* ===========================================================================
+ * LANDING / ANONYMOUS-VISITOR SURFACES (index.html inline <style>):
+ * hero value-prop + pricing aside + demo strip + GMP gate + trial nudge.
+ * These hardcode warm gold/green and a dark pricing card; flip them to the
+ * cool slate + utility-blue front door. Warnings keep amber (correct status).
+ * ==========================================================================*/
+
+/* conversion banner wrapper + demo strip → clean light panel */
+html[data-theme="day"] .demo-banner{
+  background:#ffffff !important;border-color:var(--line) !important;
+  box-shadow:0 1px 3px rgba(15,23,42,.06) !important;
+}
+html[data-theme="day"] .db-demostrip{
+  background:var(--day-surf) !important;border-top-color:var(--line) !important;
+}
+html[data-theme="day"] .db-badge{
+  color:#1d4ed8 !important;background:#eff6ff !important;border-color:#bfdbfe !important;
+}
+html[data-theme="day"] .hero-h1 em{color:#2563eb !important}
+/* pricing aside used a dark translucent card + emerald border → white card */
+html[data-theme="day"] .hero-price{
+  background:#ffffff !important;border-color:#bfdbfe !important;
+  box-shadow:0 1px 3px rgba(15,23,42,.07) !important;
+}
+html[data-theme="day"] .hp-num{color:#2563eb !important}
+/* primary marketing CTA: warm gold gradient → utility blue */
+html[data-theme="day"] .db-cta{
+  background:linear-gradient(180deg,#3b82f6,#1d4ed8) !important;color:#ffffff !important;
+  box-shadow:0 6px 18px -8px rgba(29,78,216,.6) !important;
+}
+html[data-theme="day"] .db-cta:hover{filter:brightness(1.05)}
+
+/* GMP "you're not done" gate is a WARNING → amber (kept), just on light */
+html[data-theme="day"] .gmp-gate{
+  border-color:#fcd34d !important;
+  background:linear-gradient(115deg,#fffbeb,#fef3c7) !important;
+  box-shadow:0 1px 3px rgba(15,23,42,.06) !important;
+}
+html[data-theme="day"] .gmp-gate-badge,
+html[data-theme="day"] .gmp-gate-cta{background:#d97706 !important;color:#ffffff !important}
+html[data-theme="day"] .gmp-gate-cta{box-shadow:0 6px 18px -8px rgba(217,119,6,.55) !important}
+/* "almost there" variant was green → utility blue */
+html[data-theme="day"] .gmp-gate.almost{
+  border-color:#93c5fd !important;
+  background:linear-gradient(115deg,#eff6ff,#dbeafe) !important;
+  box-shadow:0 1px 3px rgba(15,23,42,.06) !important;
+}
+html[data-theme="day"] .gmp-gate.almost .gmp-gate-badge,
+html[data-theme="day"] .gmp-gate.almost .gmp-gate-cta{background:#2563eb !important;color:#ffffff !important}
+
+/* trial nudge: quiet light card; CTA + urgent rail to brand/warn */
+html[data-theme="day"] .trial-nudge{background:#ffffff !important;border-color:var(--line) !important}
+html[data-theme="day"] .trial-nudge-cta{color:var(--good) !important;border-color:var(--line) !important}
+html[data-theme="day"] .trial-nudge-cta:hover{border-color:var(--good) !important}
+
+/* ===========================================================================
+ * REPORTS + DASHBOARD POLISH — make the Reports tab and the command-center
+ * KPIs read like an energy-corp operational dashboard: white cards, slate
+ * hairlines, tabular blue data, restrained chrome.
+ * ==========================================================================*/
+
+html[data-theme="day"] .rb-card,
+html[data-theme="day"] .rb-wiz-card,
+html[data-theme="day"] .rb-doc,
+html[data-theme="day"] .rb-draft,
+html[data-theme="day"] .rb-gr,
+html[data-theme="day"] .rep-card{
+  background:#ffffff !important;border-color:var(--line) !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.07) !important;
+}
+/* report section headers / labels → uppercase slate eyebrow feel */
+html[data-theme="day"] .rb-k,
+html[data-theme="day"] .rb-q{color:var(--muted) !important}
+html[data-theme="day"] .rb-v{color:var(--ink) !important}
+/* numeric report values blue + tabular for the corporate ledger look */
+html[data-theme="day"] .rb-v.num,
+html[data-theme="day"] .rb-gr-v,
+html[data-theme="day"] .rb-status-v{color:var(--good) !important;font-variant-numeric:tabular-nums}
+/* report status chips: ready=blue, scheduled=cyan, error keeps red */
+html[data-theme="day"] .rb-status.ok,
+html[data-theme="day"] .rb-status.ready{background:rgba(37,99,235,.10) !important;color:var(--good) !important}
+html[data-theme="day"] .rb-status.scheduled{background:rgba(8,145,178,.10) !important;color:var(--sky) !important}
+html[data-theme="day"] .rb-gmp-ok,
+html[data-theme="day"] .rb-wiz-gmp-ok{color:var(--good) !important}
+/* GMP empty/none states → quiet slate cards */
+html[data-theme="day"] .rb-gmp-empty,
+html[data-theme="day"] .rb-gmp-none,
+html[data-theme="day"] .rb-wiz-gmp-none,
+html[data-theme="day"] .rb-wiz-gmp-some{
+  background:var(--day-surf) !important;border-color:var(--line) !important;color:var(--muted) !important;
+}
+/* command-center fleet KPIs: positive numbers blue, at-risk red, warn amber */
+html[data-theme="day"] .cc-kpi.recovered .v,
+html[data-theme="day"] .cl-kpi.recovered .v{color:var(--good) !important}
+html[data-theme="day"] .cc-kpi.risk .v,
+html[data-theme="day"] .cl-kpi.atstake .v{color:var(--bad) !important}
+
+/* ===========================================================================
+ * FLEET COMMANDER bar + OVERVIEW GRID tiles + ENRICHED detail modal.
+ * Hardcoded dark gradients & emerald "ok" tints → cool slate + utility blue.
  * ==========================================================================*/
 
 /* ── fleet COMMANDER bar ──────────────────────────────────────────────────── */
 html[data-theme="day"] .fc-card{
-  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;color:var(--ink) !important;
   border-color:var(--line) !important;
-  box-shadow:0 2px 12px -5px rgba(40,32,20,.14), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.07) !important;
 }
-html[data-theme="day"] .fc-card.ok{border-color:rgba(5,150,105,.35) !important}
-html[data-theme="day"] .fc-card.warn{border-color:rgba(181,109,44,.4) !important}
+html[data-theme="day"] .fc-card.ok{border-color:rgba(37,99,235,.4) !important;box-shadow:0 1px 3px rgba(15,23,42,.07),0 0 0 1px rgba(37,99,235,.10) !important}
+html[data-theme="day"] .fc-card.warn{border-color:rgba(217,119,6,.4) !important}
 html[data-theme="day"] .fc-card.bad{border-color:rgba(220,38,38,.4) !important}
-html[data-theme="day"] .fc-tank--ok{background:linear-gradient(90deg,rgba(5,150,105,.7),rgba(16,185,129,.5)) !important}
-html[data-theme="day"] .fc-tank--warn{background:linear-gradient(90deg,rgba(200,140,40,.7),rgba(245,180,90,.5)) !important}
-html[data-theme="day"] .fc-tank--bad{background:linear-gradient(90deg,rgba(210,70,50,.68),rgba(248,150,120,.5)) !important}
-html[data-theme="day"] .fc-plate{background:rgba(255,255,255,.66) !important;border-color:rgba(15,23,42,.08) !important}
+html[data-theme="day"] .fc-tank--ok{background:linear-gradient(90deg,rgba(37,99,235,.7),rgba(14,165,233,.5)) !important}
+html[data-theme="day"] .fc-tank--warn{background:linear-gradient(90deg,rgba(217,119,6,.7),rgba(251,191,36,.5)) !important}
+html[data-theme="day"] .fc-tank--bad{background:linear-gradient(90deg,rgba(220,38,38,.68),rgba(248,113,113,.5)) !important}
+html[data-theme="day"] .fc-plate{background:rgba(255,255,255,.7) !important;border-color:rgba(15,23,42,.08) !important}
 html[data-theme="day"] .fc-health-num span,
 html[data-theme="day"] .fc-stats{color:var(--muted) !important}
 html[data-theme="day"] .fc-stat b{color:var(--ink) !important}
 
 /* ── OVERVIEW GRID tiles ──────────────────────────────────────────────────── */
 html[data-theme="day"] .sb-tile{
-  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;color:var(--ink) !important;
   border-color:var(--line) !important;
-  box-shadow:0 2px 10px -4px rgba(40,32,20,.12), 0 1px 2px -1px rgba(40,32,20,.08) !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.07) !important;
 }
-html[data-theme="day"] .sb-tile.warn{background:linear-gradient(168deg,#fffaf3,#fdf3e6) !important;border-color:rgba(181,109,44,.32) !important}
-html[data-theme="day"] .sb-tile.bad{background:linear-gradient(168deg,#fff6f5,#fdeceb) !important;border-color:rgba(220,38,38,.32) !important}
-html[data-theme="day"] .sb-tile:hover{box-shadow:0 12px 26px -14px rgba(40,32,20,.28) !important}
+html[data-theme="day"] .sb-tile.warn{background:linear-gradient(168deg,#fffbeb,#fef3c7) !important;border-color:rgba(217,119,6,.32) !important}
+html[data-theme="day"] .sb-tile.bad{background:linear-gradient(168deg,#fef2f2,#fee2e2) !important;border-color:rgba(220,38,38,.32) !important}
+html[data-theme="day"] .sb-tile:hover{box-shadow:0 12px 26px -14px rgba(15,23,42,.22) !important}
 html[data-theme="day"] .sb-tile-name{color:var(--ink) !important}
 html[data-theme="day"] .sb-tile-sub{color:var(--muted) !important}
-html[data-theme="day"] .sb-tile-flag.ok{color:var(--good) !important;background:rgba(5,150,105,.1) !important}
-html[data-theme="day"] .sb-tile-flag.warn{color:var(--warn) !important;background:rgba(181,109,44,.13) !important}
+html[data-theme="day"] .sb-tile-flag.warn{color:var(--warn) !important;background:rgba(217,119,6,.13) !important}
 html[data-theme="day"] .sb-tile-flag.bad{color:var(--bad) !important;background:rgba(220,38,38,.1) !important}
 html[data-theme="day"] .sb-tile-risk{color:var(--bad) !important}
 html[data-theme="day"] .sb-tile-risk small{color:var(--faint) !important}
 
 /* ── ENRICHED detail modal: blown-up card + stat panel ────────────────────── */
 html[data-theme="day"] .sb-dc-bigcard .sb-inv{
-  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;color:var(--ink) !important;
-  box-shadow:0 30px 80px -28px rgba(40,32,20,.4),0 0 0 1px rgba(5,150,105,.18) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;color:var(--ink) !important;
+  box-shadow:0 30px 80px -28px rgba(15,23,42,.32),0 0 0 1px rgba(37,99,235,.16) !important;
 }
-html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="warn"]{background:linear-gradient(168deg,#fffaf3,#fdf3e6) !important}
-html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="bad"]{background:linear-gradient(168deg,#fff6f5,#fdeceb) !important}
+html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="warn"]{background:linear-gradient(168deg,#fffbeb,#fef3c7) !important}
+html[data-theme="day"] .sb-dc-bigcard .sb-inv[data-tone="bad"]{background:linear-gradient(168deg,#fef2f2,#fee2e2) !important}
 html[data-theme="day"] .sb-dc-diag{
   background:var(--day-surf) !important;color:var(--ink) !important;border-left-color:var(--good) !important;
 }
 html[data-theme="day"] .sb-dc-diag.warn{border-left-color:var(--warn) !important}
 html[data-theme="day"] .sb-dc-diag.bad{border-left-color:var(--bad) !important}
 html[data-theme="day"] .sb-dc-stat{
-  background:linear-gradient(168deg,#ffffff,#f7f3ec) !important;border-color:var(--line) !important;
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;border-color:var(--line) !important;
 }
 html[data-theme="day"] .sb-dc-stat.hero{
-  background:linear-gradient(168deg,#fff6f5,#fdeceb) !important;border-color:rgba(220,38,38,.32) !important;
+  background:linear-gradient(168deg,#fef2f2,#fee2e2) !important;border-color:rgba(220,38,38,.32) !important;
 }
 html[data-theme="day"] .sb-dc-sv{color:var(--ink) !important}
 html[data-theme="day"] .sb-dc-sk,
@@ -345,10 +520,85 @@ html[data-theme="day"] .sb-dc-actions .sb-dc-origin{
   background:var(--day-surf) !important;border-color:var(--line) !important;color:var(--ink) !important;
 }
 
-/* ── split toolbar: frosted clusters were dark glass ──────────────────────── */
-html[data-theme="day"] .sb-head-btns{
-  background:rgba(255,255,255,.72) !important;border-color:var(--line) !important;
+/* ===========================================================================
+ * SANDBOX "LIQUID TANK" FLEET CARDS (sb-inv / sb-array) — the live fleet view
+ * and the DEFAULT tab. The dark theme hardcodes dark gradients, light text and
+ * emerald tank fills with no variables, so flip the whole component to the
+ * light control-room look here: white cards, slate ink, utility-blue "ok".
+ * ==========================================================================*/
+
+/* card surfaces */
+html[data-theme="day"] .sb-inv,
+html[data-theme="day"] .sb-array,
+html[data-theme="day"] .sb-array--card{
+  background:linear-gradient(168deg,#ffffff,#f8fafc) !important;
+  color:var(--ink) !important;border-color:var(--line) !important;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.07) !important;
 }
-html[data-theme="day"] .sb-legend{
-  background:rgba(255,255,255,.7) !important;border-color:var(--line) !important;
+html[data-theme="day"] .sb-inv.warn{
+  background:linear-gradient(168deg,#fffbeb,#fef6e6) !important;border-color:rgba(217,119,6,.4) !important;
 }
+html[data-theme="day"] .sb-inv.bad{
+  background:linear-gradient(168deg,#fef2f2,#fde9e8) !important;border-color:rgba(220,38,38,.45) !important;
+}
+html[data-theme="day"] .sb-inv:hover,
+html[data-theme="day"] .sb-array--card:hover{box-shadow:0 10px 24px -14px rgba(15,23,42,.25) !important}
+
+/* text inside the cards (hardcoded light → slate ink / muted) */
+html[data-theme="day"] .sb-inv-name,
+html[data-theme="day"] .sb-array-name,
+html[data-theme="day"] .sb-perf-main,
+html[data-theme="day"] .sb-perf-prod,
+html[data-theme="day"] .sb-ag-total,
+html[data-theme="day"] .sb-ag-graph,
+html[data-theme="day"] .sb-inv-now,
+html[data-theme="day"] .sb-spark-axis{color:var(--ink) !important}
+html[data-theme="day"] .sb-perf-sub,
+html[data-theme="day"] .sb-perf-sub--lone,
+html[data-theme="day"] .sb-inv-size,
+html[data-theme="day"] .sb-perf-unit,
+html[data-theme="day"] .sb-perf-sym,
+html[data-theme="day"] .sb-array-k,
+html[data-theme="day"] .sb-ag-k,
+html[data-theme="day"] .sb-wx{color:var(--muted) !important}
+
+/* dark spec "plates" → light slate plate */
+html[data-theme="day"] .sb-inv-plate,
+html[data-theme="day"] .sb-array-plate{
+  background:rgba(15,23,42,.05) !important;color:var(--ink) !important;border-color:var(--line) !important;
+}
+
+/* liquid tank fills — ok → utility blue, low → amber, fault → red */
+html[data-theme="day"] .sb-liquid--ok{background-image:linear-gradient(rgba(37,99,235,.4),rgba(29,78,216,.82)) !important}
+html[data-theme="day"] .sb-liquid--low{background-image:linear-gradient(rgba(245,158,11,.4),rgba(217,119,6,.78)) !important}
+html[data-theme="day"] .sb-liquid--fault{background-image:linear-gradient(rgba(248,113,113,.42),rgba(220,38,38,.8)) !important}
+
+/* output bar: track → slate; fill → blue (ok), amber/red on toned cards */
+html[data-theme="day"] .sb-ob-track{background:var(--day-track) !important}
+html[data-theme="day"] .sb-ob-fill{background-image:linear-gradient(90deg,#2563eb,#0ea5e9) !important}
+html[data-theme="day"] .sb-inv.warn .sb-ob-fill{background-image:linear-gradient(90deg,#d97706,#f59e0b) !important}
+html[data-theme="day"] .sb-inv.bad .sb-ob-fill{background-image:linear-gradient(90deg,#dc2626,#f87171) !important}
+
+/* fair-share % — ok → blue, warn → amber, bad → red */
+html[data-theme="day"] .sb-perf-pct{color:var(--good) !important}
+html[data-theme="day"] .sb-inv.warn .sb-perf-pct{color:var(--warn) !important}
+html[data-theme="day"] .sb-inv.bad .sb-perf-pct{color:var(--bad) !important}
+
+/* status pill: producing → blue, watch → amber, error → red */
+html[data-theme="day"] .sb-state{background:rgba(37,99,235,.12) !important;color:var(--good) !important}
+html[data-theme="day"] .sb-state.st-warn,
+html[data-theme="day"] .sb-inv.warn .sb-state{background:rgba(217,119,6,.13) !important;color:var(--warn) !important}
+html[data-theme="day"] .sb-state.st-error,
+html[data-theme="day"] .sb-inv.bad .sb-state{background:rgba(220,38,38,.12) !important;color:var(--bad) !important}
+
+/* decorative tank bubbles/stars: green-white → light-blue, read on light glass */
+html[data-theme="day"] .sb-liq-bubbles span,
+html[data-theme="day"] .fc-liq-bubbles span{
+  background-image:radial-gradient(circle at 35% 35%, rgba(219,234,254,.95), rgba(96,165,250,.5)) !important;
+}
+html[data-theme="day"] .sb-liq-stars,
+html[data-theme="day"] .fc-liq-stars{opacity:.25 !important}
+
+/* identity chip dot glow + vendor/utility stream toggle (green-400) → blue */
+html[data-theme="day"] .whoami-dot{box-shadow:0 0 8px rgba(37,99,235,.6) !important}
+html[data-theme="day"] .sb-stream-seg.on{background:rgba(37,99,235,.14) !important}

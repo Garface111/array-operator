@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Set up your array · Array Operator</title>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
-<script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
+<script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   /* Design language matched to array-operator-ea.netlify.app (styles.css):
@@ -148,30 +148,35 @@
   .theme-toggle:hover{color:var(--good);border-color:var(--good)}
   .theme-toggle .tt-ico{line-height:1;pointer-events:none}
 
-  /* ===== DAY MODE — NEPOOL Operator light palette (in color, not shape) ===== */
+  /* ===== DAY MODE (default) — utility-blue on cool slate ===== */
   html[data-theme="day"]{
-    --bg:#faf8f5; --bg2:#f1ebe1; --ink:#18181b; --muted:#586068; --faint:#8f8a80;
-    --gold:#c07d2a; --gold2:#8c4e1c; --sky:#2877c0; --good:#059669; --good2:#10b981;
-    --warn:#b56d2c; --bad:#dc2626; --line:#e7e1d6; --card:#ffffff; --card2:#fcfaf7;
+    --bg:#f6f8fb; --bg2:#eef2f7; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --gold:#d97706; --gold2:#b45309; --sky:#0891b2; --good:#2563eb; --good2:#0ea5e9;
+    --warn:#d97706; --bad:#dc2626; --line:#e2e8f0; --card:#ffffff; --card2:#f8fafc;
     color-scheme:light;
   }
-  html[data-theme="day"] body{background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%);}
-  html[data-theme="day"] h1{background:linear-gradient(180deg,#15281e,#3c574a);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  html[data-theme="day"] body{background:radial-gradient(1200px 700px at 75% -10%, #eef3fb 0%, #f6f8fb 55%);}
+  html[data-theme="day"] h1{background:linear-gradient(180deg,#0f172a,#475569);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  html[data-theme="day"] .logo{background:radial-gradient(circle at 35% 30%,#60a5fa,#2563eb 55%,#1d4ed8 100%);box-shadow:0 0 0 4px rgba(37,99,235,.1),0 6px 18px rgba(37,99,235,.32);}
   html[data-theme="day"] .pill.todo{background:#ffffff;}
-  html[data-theme="day"] .pill.todo .n{background:#efe9df;}
+  html[data-theme="day"] .pill.todo .n{background:#eef2f7;}
   html[data-theme="day"] .pill.active{color:#fff;}
   html[data-theme="day"] .pill.active .n{background:rgba(255,255,255,.28);color:#fff;}
   html[data-theme="day"] input[type=text],
   html[data-theme="day"] input[type=email],
   html[data-theme="day"] input[type=password]{background:#ffffff;color:var(--ink);}
-  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#10b981,#047857);color:#fff;box-shadow:0 4px 14px -4px rgba(4,120,87,.45);}
+  html[data-theme="day"] input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;box-shadow:0 4px 14px -4px rgba(29,78,216,.45);}
   html[data-theme="day"] .btn-ghost{background:#ffffff;}
   html[data-theme="day"] .vend{background:#ffffff;}
-  html[data-theme="day"] .vend .vtag{background:#efe9df;}
-  html[data-theme="day"] .vendnote b{color:#8c4e1c;}
-  html[data-theme="day"] .card{box-shadow:0 10px 30px -14px rgba(40,32,20,.16),0 0 0 1px rgba(40,32,20,.03);}
-  html[data-theme="day"] .achip{box-shadow:0 6px 18px -10px rgba(40,32,20,.18);}
+  html[data-theme="day"] .vend .vtag{background:#eef2f7;}
+  html[data-theme="day"] .vendnote b{color:#b45309;}
+  html[data-theme="day"] .card{box-shadow:0 10px 30px -14px rgba(15,23,42,.14),0 0 0 1px rgba(15,23,42,.03);}
+  html[data-theme="day"] .achip{box-shadow:0 6px 18px -10px rgba(15,23,42,.16);}
   html[data-theme="day"] .vh-big{text-shadow:none;}
+  html[data-theme="day"] .pill.active{box-shadow:0 4px 16px rgba(37,99,235,.28);}
+  html[data-theme="day"] .callout{background:linear-gradient(150deg,rgba(37,99,235,.10),rgba(37,99,235,.03));border-color:rgba(37,99,235,.3);}
+  html[data-theme="day"] .ck{background:rgba(37,99,235,.12);border-color:rgba(37,99,235,.3);}
 </style>
 </head>
 <body>
@@ -186,7 +191,7 @@
     /* Day/night toggle — persists in localStorage (ao_theme), shared sitewide. */
     (function(){
       var btn = document.getElementById("themeToggle");
-      function read(){ try { return localStorage.getItem("ao_theme") === "day"; } catch(e){ return false; } }
+      function read(){ try { return localStorage.getItem("ao_theme") !== "night"; } catch(e){ return true; } }
       function apply(day){
         document.documentElement.setAttribute("data-theme", day ? "day" : "night");
         if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }

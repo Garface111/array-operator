@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in · Array Operator</title>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
-<script>(function(){try{if(localStorage.getItem("ao_theme")==="day")document.documentElement.setAttribute("data-theme","day");}catch(e){}})();</script>
+<script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   :root{
@@ -67,26 +67,29 @@
   .theme-toggle:hover{color:var(--good);border-color:var(--good)}
   .theme-toggle .tt-ico{line-height:1;pointer-events:none}
 
-  /* ===== DAY MODE — NEPOOL Operator light palette (in color, not shape) ===== */
+  /* ===== DAY MODE (default) — utility-blue on cool slate ===== */
   html[data-theme="day"]{
-    --bg:#faf8f5; --bg2:#f1ebe1; --ink:#18181b; --muted:#586068; --faint:#8f8a80;
-    --good:#059669; --good2:#10b981; --warn:#b56d2c; --bad:#dc2626;
-    --line:#e7e1d6; --card:#ffffff; --card2:#fcfaf7;
+    --bg:#f6f8fb; --bg2:#eef2f7; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --good:#2563eb; --good2:#0ea5e9; --warn:#d97706; --bad:#dc2626;
+    --line:#e2e8f0; --card:#ffffff; --card2:#f8fafc;
     color-scheme:light;
   }
   html[data-theme="day"] body{
-    background:radial-gradient(1200px 700px at 75% -10%, #eef7f0 0%, #faf8f5 55%);
+    background:radial-gradient(1200px 700px at 75% -10%, #eef3fb 0%, #f6f8fb 55%);
   }
   html[data-theme="day"] h1{
-    background:linear-gradient(180deg,#15281e,#3c574a);-webkit-background-clip:text;background-clip:text;color:transparent;
+    background:linear-gradient(180deg,#0f172a,#475569);-webkit-background-clip:text;background-clip:text;color:transparent;
   }
-  html[data-theme="day"] .tabs{background:#f1ebe1;}
-  html[data-theme="day"] .tab.on{background:#ffffff;color:#059669;box-shadow:inset 0 0 0 1px rgba(5,150,105,.35);}
+  html[data-theme="day"] .logo{background:radial-gradient(circle at 35% 30%,#60a5fa,#2563eb 55%,#1d4ed8 100%);box-shadow:0 0 0 4px rgba(37,99,235,.1),0 6px 18px rgba(37,99,235,.32);}
+  html[data-theme="day"] .tabs{background:#eef2f7;}
+  html[data-theme="day"] .tab.on{background:#ffffff;color:#1d4ed8;box-shadow:inset 0 0 0 1px rgba(37,99,235,.35);}
   html[data-theme="day"] input{background:#ffffff;color:var(--ink);}
-  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#10b981,#047857);color:#fff;box-shadow:0 4px 14px -4px rgba(4,120,87,.45);}
-  html[data-theme="day"] .card{box-shadow:0 10px 30px -12px rgba(40,32,20,.18);}
+  html[data-theme="day"] input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;box-shadow:0 4px 14px -4px rgba(29,78,216,.45);}
+  html[data-theme="day"] .card{box-shadow:0 10px 30px -12px rgba(15,23,42,.16);}
   html[data-theme="day"] .msg.err{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.3);color:#b42318;}
-  html[data-theme="day"] .ring{border-color:rgba(255,255,255,.45);border-top-color:#fff;}
+  html[data-theme="day"] .msg.ok{background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.3);color:#1d4ed8;}
+  html[data-theme="day"] .ring{border-color:rgba(255,255,255,.55);border-top-color:#fff;}
 </style>
 </head>
 <body>
@@ -134,7 +137,7 @@
 // Day/night toggle — persists in localStorage (ao_theme), shared with the dashboard.
 (function(){
   var btn = document.getElementById("themeToggle");
-  function read(){ try { return localStorage.getItem("ao_theme") === "day"; } catch(e){ return false; } }
+  function read(){ try { return localStorage.getItem("ao_theme") !== "night"; } catch(e){ return true; } }
   function apply(day){
     document.documentElement.setAttribute("data-theme", day ? "day" : "night");
     if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
