@@ -661,3 +661,54 @@ html[data-theme="day"] .rp-tip{
 html[data-theme="day"] .rp-tip-v.pos,
 html[data-theme="day"] .rp-tip-sub.pos,
 html[data-theme="day"] .rp-tip-row b.pos{color:#0369a1 !important}
+
+/* ===========================================================================
+ * THIRD PASS (2026-06-21, Lane B) — SANDBOX readability on the day skin.
+ * The fleet cards rendered as heavy SATURATED green/blue blocks: the array /
+ * inverter "liquid tank" fills are dynamic (class sb-liquid--clip + an inline
+ * green/blue gradient), which the --ok/--low/--fault day overrides never catch,
+ * AND the day content-plate was lightened to ~5% opacity — so the night-bright
+ * tank flooded the whole card and clashed with the clean inverter tiles.
+ * Fix: (1) re-skin the tank fill to a SUBTLE, theme-appropriate low-alpha tint
+ * (blue ok / amber warn / red fault) so each card reads as a clean white
+ * control-room card with a gentle production wash; (2) frost the content plate
+ * to near-white so the data sits crisply above the wash; (3) tidy a few hairline
+ * separators + the toolbar so the whole tab reads calm and legible. Night skin
+ * untouched (these only fire under [data-theme="day"]).
+ * ==========================================================================*/
+
+/* (1) liquid tank fills → subtle tint, by parent tone. !important beats the
+   inline night gradient. */
+html[data-theme="day"] .sb-array .sb-liquid,
+html[data-theme="day"] .sb-inv .sb-liquid{
+  background-image:linear-gradient(rgba(37,99,235,.07),rgba(37,99,235,.20)) !important;
+  opacity:1 !important;
+}
+html[data-theme="day"] .sb-array--card[data-tone="warn"] .sb-liquid,
+html[data-theme="day"] .sb-inv.warn .sb-liquid,
+html[data-theme="day"] .sb-inv[data-tone="warn"] .sb-liquid{
+  background-image:linear-gradient(rgba(217,119,6,.08),rgba(217,119,6,.22)) !important;
+}
+html[data-theme="day"] .sb-array--card[data-tone="bad"] .sb-liquid,
+html[data-theme="day"] .sb-inv.bad .sb-liquid,
+html[data-theme="day"] .sb-inv[data-tone="bad"] .sb-liquid{
+  background-image:linear-gradient(rgba(220,38,38,.08),rgba(220,38,38,.22)) !important;
+}
+/* decorative tank bubbles/stars: quiet right down on the light wash */
+html[data-theme="day"] .sb-liq-bubbles span{opacity:.5 !important}
+
+/* (2) content plate → frosted near-white so name/stats read crisply over the
+   wash (was ~5% slate, which let the tank show straight through). */
+html[data-theme="day"] .sb-array-plate,
+html[data-theme="day"] .sb-inv-plate{
+  background:rgba(255,255,255,.62) !important;border-color:rgba(15,23,42,.06) !important;
+}
+
+/* (3) calmer chrome: array section divider + the combined-graph divider use the
+   slate hairline (were white-alpha, invisible on light); array eyebrow label
+   reads sky-700 not the too-light cyan. */
+html[data-theme="day"] .sb-ag{border-top-color:var(--line) !important}
+html[data-theme="day"] .sb-array-k{color:#0369a1 !important}
+/* per-array data-source brand chip + spec nameplates on a clean slate fill */
+html[data-theme="day"] .sb-inv-plate,
+html[data-theme="day"] .sb-array-plate .sb-inv-now{backdrop-filter:none !important}
