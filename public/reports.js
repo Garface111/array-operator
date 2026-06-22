@@ -1839,14 +1839,20 @@
   }
 
   // ---- approval inbox (Paul's draft → review → approve & send) ---------------
+  // The pending drafts currently shown, + which one the live preview tracks.
+  let INBOX_DRAFTS = [];
+  let ACTIVE_DRAFT_ID = null;
+
   async function refreshInbox() {
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
     try {
       const r = await fetch(API + "/drafts?status=pending", { headers: authHeaders() });
-      if (!r.ok) { wrap.innerHTML = ""; return; }
+      if (!r.ok) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }
       const drafts = (await r.json().catch(() => ({}))).drafts || [];
-      if (!drafts.length) { wrap.innerHTML = ""; return; }   // hide the section when empty
+      if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }   // hide when empty
+      INBOX_DRAFTS = drafts;
+      if (!drafts.some(d => String(d.id) === String(ACTIVE_DRAFT_ID))) ACTIVE_DRAFT_ID = drafts[0].id;
       wrap.innerHTML = `
         <div class="rb-inbox rep-card">
           <div class="rb-inbox-h">
@@ -1856,10 +1862,103 @@
                approve — nothing goes to an offtaker until you do. The GMP bill
                attaches automatically.</p>
           </div>
-          ${drafts.map(draftCard).join("")}
+          <div class="rb-layout">
+            <div class="rb-col-form">
+              ${drafts.map(draftCard).join("")}
+            </div>
+            <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
+          </div>
         </div>`;
       wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-    } catch (e) { wrap.innerHTML = ""; }
+      // Live preview: paint now, then repaint as the operator edits the email,
+      // toggles the GMP attach, or focuses a different draft.
+      renderDraftDoc();
+      wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
+        const focusDraft = () => { ACTIVE_DRAFT_ID = ta.getAttribute("data-draftmsg"); renderDraftDoc(); };
+        ta.addEventListener("input", focusDraft);
+        ta.addEventListener("focus", focusDraft);
+      });
+      wrap.querySelectorAll('input[data-dact="autogmp"]').forEach(cb =>
+        cb.addEventListener("change", () => renderDraftDoc()));
+    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; }
+  }
+
+  function activeDraft() {
+    return INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || INBOX_DRAFTS[0] || null;
+  }
+
+  /* Live invoice preview beside the approval draft — a styled mock of exactly
+   * what the offtaker receives, rebuilt in real time from the draft numbers, the
+   * (live-edited) cover email, and the GMP-attach toggle. Mirrors the standard
+   * backend invoice; the card's "Preview invoice" button still fetches the exact
+   * PDF (incl. a custom template). */
+  function renderDraftDoc() {
+    const pane = $("#rbDraftDocPane");
+    if (!pane) return;
+    const d = activeDraft();
+    if (!d) { pane.innerHTML = ""; return; }
+    const layout = pane.closest(".rb-layout");
+    const card = layout && layout.querySelector(`.rb-draft[data-did="${d.id}"]`);
+    const ta = card && card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
+    const note = ta ? ta.value : (d.note || defaultDraftNote(d));
+    const autoCb = card && card.querySelector('input[data-dact="autogmp"]');
+    const autoOn = autoCb ? autoCb.checked : (d.auto_attach_gmp !== false);
+
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const period = d.period_label || "latest period";
+    const lineSub = [
+      d.customer_kwh != null ? `${fmt0(d.customer_kwh)} kWh` : null,
+      pct != null ? `${pct}% of array` : null,
+    ].filter(Boolean).join(" · ");
+
+    const badges = ['<span class="rb-doc-badge">PDF INVOICE</span>'];
+    if (d.has_gmp_pdf) badges.push('<span class="rb-doc-badge">GMP BILL</span>');
+    else if (autoOn) badges.push('<span class="rb-doc-badge pending">GMP BILL · ON CAPTURE</span>');
+
+    const msg = note && note.trim()
+      ? `<div class="rb-doc-msg"><span class="lab">Cover email</span>${esc(note.trim())}</div>` : "";
+
+    pane.innerHTML = `
+      <div class="rb-doc-cap">Live preview — exactly what ${esc(d.customer_name || "your offtaker")} receives</div>
+      <div class="rb-doc-paper">
+        <div class="rb-doc-band">
+          <div class="brand">⚡ Array Operator<small>Solar generation billing</small></div>
+          <div class="doctype">INVOICE<small>${esc(period)}</small></div>
+        </div>
+        <div class="rb-doc-body">
+          ${msg}
+          <div class="rb-doc-parties">
+            <div><span class="lab">From</span><b>Your operator account</b>
+              <span class="sub">via Array Operator</span></div>
+            <div style="text-align:right"><span class="lab">Bill to</span><b>${esc(d.customer_name || "—")}</b></div>
+          </div>
+          <table class="rb-doc-table">
+            <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Solar generation billing</b>${lineSub ? `<br><small>${esc(lineSub)}</small>` : ""}
+                  <br><small>Period ${esc(period)}</small></td>
+                <td class="num">${money(d.amount_usd)}</td>
+              </tr>
+            </tbody>
+            <tfoot><tr class="rb-doc-total"><td>Total due</td><td class="num amt">${money(d.amount_usd)}</td></tr></tfoot>
+          </table>
+          <div class="rb-doc-summary">
+            <h4>Performance summary</h4>
+            <div class="rb-doc-stats">
+              <div class="st"><b>${fmt0(d.array_total_kwh)}</b><span>array total kWh</span></div>
+              <div class="st"><b>${pct != null ? pct + "%" : "—"}</b><span>their share</span></div>
+              <div class="st"><b>${fmt0(d.customer_kwh)}</b><span>their kWh</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="rb-doc-foot">
+          <span>Attaches when you approve</span>
+          <span class="rb-doc-badges">${badges.join("")}</span>
+        </div>
+      </div>
+      <p class="rb-doc-hint">Styled preview of the standard invoice. Use
+        <b>Preview invoice</b> for the exact PDF, including your uploaded template.</p>`;
   }
 
   function draftCard(d) {
