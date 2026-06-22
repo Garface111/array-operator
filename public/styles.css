@@ -382,14 +382,16 @@
      a card-column on the left. */
   .sb-fleet-col{flex:0 0 auto;align-self:stretch;box-sizing:border-box}
   .sb-fleet-col #fleetCommander{margin:0;width:100%}
-  /* Full-width banner: stretch to the fleet's content width (the widest array row)
-     so it spans the default sandbox view instead of stopping short at a fixed cap.
-     align-self:stretch (above) sizes it to the canvas; no max-width clamp. */
+  /* The fleet-col spans the canvas, but the commander CARD inside sizes to its
+     own content and centers (see .fc-card) — a compact, centered health bar
+     instead of one stretched comically across the whole fleet's width. */
   .sb-canvas.sb-orient-horizontal .sb-fleet-col{width:100%;max-width:none}
   .sb-canvas.sb-orient-vertical .sb-fleet-col{align-self:flex-start;min-width:380px;max-width:460px}
   /* The CARD is the bottom layer = the tank container (holds the liquid). It no
-     longer lays out content directly; .fc-plate does. */
+     longer lays out content directly; .fc-plate does. It sizes to its content
+     and centers, so the bar stays compact + centered no matter how wide the fleet. */
   .fc-card{position:relative;overflow:hidden;padding:5px;border-radius:16px;
+    width:fit-content;max-width:min(100%,860px);margin:0 auto;
     border:1px solid var(--line);background:linear-gradient(165deg,#10161f,#0b0f17);
     box-shadow:0 18px 44px -26px rgba(0,0,0,.85)}
   /* The PLATE is the TOP card — a frosted, slightly see-through panel floating
@@ -414,8 +416,9 @@
   .fc-card.warn .fc-health-num b{color:var(--warn)}
   .fc-card.bad  .fc-health-num b{color:var(--bad)}
   .fc-health-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-top:5px}
-  /* middle: counts */
-  .fc-mid{flex:1 1 auto;min-width:0}
+  /* middle: counts — does NOT grow, so the bar stays content-sized + centered
+     (flex:1 1 auto ballooned the gap and flung the sections to the extremes). */
+  .fc-mid{flex:0 1 auto;min-width:0}
   /* ── WHOLE-BAR LIQUID TANK — the entire top bar IS the tank. Energy fills
      LEFT→RIGHT; width = % fleet healthy. The liquid sits BEHIND the content
      (z-index 0). To keep text crisp regardless of fill (the inverter-card
