@@ -9,7 +9,7 @@
 <script src="error-reporter.js"></script>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
 <script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="command-center.css">
 <link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
@@ -278,6 +278,7 @@
       document.documentElement.setAttribute("data-theme", day ? "day" : "night");
       if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
       if (meta) meta.setAttribute("content", day ? "#f6f8fb" : "#0a0e14");
+      var fav = document.getElementById("favicon"); if (fav) fav.href = day ? "favicon-day.svg" : "favicon.svg";
     }
     var day = read();
     apply(day);
