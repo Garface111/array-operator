@@ -68,7 +68,7 @@ html[data-theme="day"] body{
 html[data-theme="day"] .hero h1,
 html[data-theme="day"] .pricing h2{
   background:linear-gradient(180deg,#0f172a,#475569) !important;
-  -webkit-background-clip:text;background-clip:text;color:transparent !important;
+  -webkit-background-clip:text !important;background-clip:text !important;color:transparent !important;
 }
 
 /* ── nav / brand ──────────────────────────────────────────────────────────── */
