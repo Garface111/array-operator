@@ -486,6 +486,9 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-sub.rb-paused{ opacity:.6; }
 .rb-sub-name{ font-size:15px; font-weight:680; color:var(--ink); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .rb-sub-meta{ font-size:12px; color:var(--faint); margin-top:4px; }
+/* the plain-English summary sentence (who gets what % of which bill, how often) */
+.rb-sub-sentence{ font-size:13.5px; line-height:1.5; color:var(--muted); margin:6px 0 5px; }
+.rb-sub-sentence b{ color:var(--ink); font-weight:680; }
 .rb-sub-rate{ font-size:12px; color:var(--muted); margin-top:3px; }
 .rb-sub-rate b{ color:var(--ink); }
 .rb-rate-prov{ font-size:10.5px; color:var(--sky); background:rgba(94,194,255,.1);

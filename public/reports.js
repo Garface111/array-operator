@@ -1476,24 +1476,41 @@
     const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
     const arrayOpts = (arrs || []).map(a =>
       `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+    // ── one plain-English sentence, built from the offtaker's actual choices:
+    //    "<name> receives <pct> of <linked GMP account / array>'s generation.
+    //     <Monthly|Quarterly> <PDF> — drafted for approval / auto-sent to <emails>." ──
+    const srcName = s.utility_account_name
+      || ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name
+      || "the array";
+    const pctTxt = s.allocation_pct != null ? (Math.round(s.allocation_pct * 1000) / 10) + "%" : "a share";
+    const cadTxt = s.cadence === "quarterly" ? "Quarterly" : s.cadence === "monthly" ? "Monthly" : (s.cadence || "");
+    const cc = (s.cc_emails || "").trim();
+    const client = (s.client_email || "").trim();
+    let recips;
+    if (s.send_mode === "to_client") recips = (client || "the offtaker") + (cc ? ", cc " + cc : "");
+    else if (s.send_mode === "to_both") recips = "you and " + (client || "the offtaker") + (cc ? ", cc " + cc : "");
+    else recips = "you" + (s.operator_email ? " (" + s.operator_email + ")" : "");
+    const deliveryTxt = s.delivery_mode === "auto"
+      ? "auto-sent to " + esc(recips)
+      : "drafted for your approval, then sent to " + esc(recips);
+    const sentence = "<b>" + esc(s.customer_name) + "</b> receives <b>" + pctTxt + "</b> of <b>"
+      + esc(srcName) + "</b>'s generation. <b>" + cadTxt + "</b> " + esc(fmts) + " &mdash; " + deliveryTxt + ".";
     return `
       <div class="rb-sub ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}">
         <div class="rb-sub-main">
           <div class="rb-sub-name">${esc(s.customer_name)}
-            <span class="rb-chip">${esc(MODEL_LABEL[s.billing_model] || s.billing_model)}</span>
             <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
-            <span class="rb-chip ${live ? "rb-chip-live" : ""}">${esc(MODE_LABEL[s.send_mode] || s.send_mode)}</span>
             ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
           </div>
-          <div class="rb-sub-meta">
-            ${esc(s.cadence)} · ${esc(fmts)} · next ${esc(next)} · last sent ${esc(last)}
-            ${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
-          </div>
+          <div class="rb-sub-sentence">${sentence}</div>
           ${s.resolved_net_rate != null ? `<div class="rb-sub-rate" title="${esc(s.resolved_net_note || "")}">
             Solar credit rate <b>$${Number(s.resolved_net_rate).toFixed(4)}/kWh</b>
             ${s.resolved_discount_pct ? "− " + Math.round(s.resolved_discount_pct * 100) + "% = <b>$" + Number(s.resolved_effective_rate).toFixed(4) + "/kWh</b>" : ""}
             <span class="rb-rate-prov">${esc(rateSourceLabel(s.resolved_net_source))}</span>
           </div>` : ""}
+          <div class="rb-sub-meta">
+            Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
+          </div>
         </div>
         <div class="rb-sub-acts">
           <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
