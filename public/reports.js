@@ -566,6 +566,19 @@
           <button class="ao-btn rb-btn" id="rbTplView" type="button" hidden>View</button>
           <button class="ao-btn rb-btn rb-danger" id="rbTplDel" type="button" hidden>Remove</button>
         </div>
+        <div class="rb-tpl-edit">
+          <label class="rb-tpl-enable"><input type="checkbox" id="rbTplEnabled"> Use this template for my offtaker invoices</label>
+          <details class="rb-tpl-adv">
+            <summary>Edit &amp; preview template</summary>
+            <p class="rb-tpl-tokens" id="rbTplTokens"></p>
+            <textarea id="rbTplHtml" class="rb-tpl-html" spellcheck="false" rows="12"></textarea>
+            <div class="rb-tpl-editbtns">
+              <button class="ao-btn ao-btn-primary rb-btn" id="rbTplSave" type="button">Save template</button>
+              <button class="ao-btn rb-btn" id="rbTplPreview" type="button">Preview PDF</button>
+              <span class="rb-tpl-estatus" id="rbTplEStatus"></span>
+            </div>
+          </details>
+        </div>
       </div>
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
@@ -839,21 +852,33 @@
   async function wireInvoiceTemplate() {
     const pick = $("#rbTplPick"), fileIn = $("#rbTplFile"), status = $("#rbTplStatus");
     const view = $("#rbTplView"), del = $("#rbTplDel");
+    const enabled = $("#rbTplEnabled"), htmlBox = $("#rbTplHtml"), tokens = $("#rbTplTokens");
+    const saveBtn = $("#rbTplSave"), prevBtn = $("#rbTplPreview"), estatus = $("#rbTplEStatus");
     if (!pick || !fileIn || !status) return;
+    const jsonHdr = () => Object.assign({ "Content-Type": "application/json" }, authHeaders() || {});
     function paint(t) {
       const has = t && t.has_template;
       status.textContent = has
-        ? "On file: " + (t.filename || "your template") + ". New offtaker invoices will match this format."
+        ? "On file: " + (t.filename || "your template") + ". " +
+          (t.enabled ? "Used for your offtaker invoices." : "Saved — turn on below to use it.")
         : "No template yet — offtaker invoices use the standard format.";
       status.className = "rb-tpl-status" + (has ? " rb-tpl-have" : "");
-      if (view) view.hidden = !has;
+      if (view) view.hidden = !(t && t.filename);
       if (del) del.hidden = !has;
+      if (enabled && t) enabled.checked = !!t.enabled;
+      // don't clobber unsaved edits in the textarea
+      if (htmlBox && t && t.html != null && !htmlBox.dataset.dirty) htmlBox.value = t.html;
+      if (tokens && t && t.tokens) tokens.innerHTML = "Tokens you can use: " +
+        t.tokens.map(x => "<code>{{ " + x + " }}</code>").join(" ");
     }
-    try {
-      const r = await fetch(API + "/invoice-template", { headers: authHeaders() });
-      const d = await r.json().catch(() => ({}));
-      paint(r.ok ? d.template : null);
-    } catch (e) { paint(null); }
+    async function refresh() {
+      try {
+        const r = await fetch(API + "/invoice-template", { headers: authHeaders() });
+        const d = await r.json().catch(() => ({}));
+        paint(r.ok ? d.template : null);
+      } catch (e) { paint(null); }
+    }
+    await refresh();
     pick.onclick = () => fileIn.click();
     fileIn.onchange = async () => {
       const f = fileIn.files && fileIn.files[0];
@@ -864,7 +889,7 @@
         const r = await fetch(API + "/invoice-template", { method: "POST", headers: authHeaders(), body: fd });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { status.textContent = (d && d.detail) || "Upload failed."; status.className = "rb-tpl-status rb-err"; }
-        else paint(d.template);
+        else { if (htmlBox) htmlBox.dataset.dirty = ""; await refresh(); }
       } catch (e) { status.textContent = "Upload failed — check your connection."; status.className = "rb-tpl-status rb-err"; }
       fileIn.value = "";
     };
@@ -880,7 +905,36 @@
     if (del) del.onclick = async () => {
       if (!confirm("Remove your invoice template? Offtaker invoices go back to the standard format.")) return;
       try { await fetch(API + "/invoice-template", { method: "DELETE", headers: authHeaders() }); } catch (e) {}
-      paint(null);
+      if (htmlBox) { htmlBox.value = ""; htmlBox.dataset.dirty = ""; }
+      await refresh();
+    };
+    if (htmlBox) htmlBox.oninput = () => { htmlBox.dataset.dirty = "1"; };
+    async function savePut(body, okMsg) {
+      if (estatus) { estatus.textContent = "Saving…"; estatus.className = "rb-tpl-estatus rb-busy"; }
+      try {
+        const r = await fetch(API + "/invoice-template", { method: "PUT", headers: jsonHdr(), body: JSON.stringify(body) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { if (estatus) { estatus.textContent = (d && d.detail) || "Save failed."; estatus.className = "rb-tpl-estatus rb-err"; } return false; }
+        if (htmlBox) htmlBox.dataset.dirty = "";
+        paint(d.template);
+        if (estatus) { estatus.textContent = okMsg || "Saved."; estatus.className = "rb-tpl-estatus rb-ok"; }
+        return true;
+      } catch (e) { if (estatus) { estatus.textContent = "Save failed."; estatus.className = "rb-tpl-estatus rb-err"; } return false; }
+    }
+    if (enabled) enabled.onchange = () => savePut({ enabled: enabled.checked },
+      enabled.checked ? "On — invoices will use your template." : "Off — using the standard format.");
+    if (saveBtn) saveBtn.onclick = () => savePut({ html: htmlBox ? htmlBox.value : "" }, "Template saved.");
+    if (prevBtn) prevBtn.onclick = async () => {
+      if (estatus) { estatus.textContent = "Rendering preview…"; estatus.className = "rb-tpl-estatus rb-busy"; }
+      try {
+        const r = await fetch(API + "/invoice-template/preview", { method: "POST", headers: jsonHdr(),
+          body: JSON.stringify({ html: htmlBox ? htmlBox.value : null }) });
+        if (!r.ok) { const d = await r.json().catch(() => ({})); if (estatus) { estatus.textContent = (d && d.detail) || "Preview failed."; estatus.className = "rb-tpl-estatus rb-err"; } return; }
+        const url = URL.createObjectURL(await r.blob());
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        if (estatus) { estatus.textContent = "Preview opened."; estatus.className = "rb-tpl-estatus rb-ok"; }
+      } catch (e) { if (estatus) { estatus.textContent = "Preview failed."; estatus.className = "rb-tpl-estatus rb-err"; } }
     };
   }
 
