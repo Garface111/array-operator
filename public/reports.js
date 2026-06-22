@@ -792,6 +792,19 @@
         body.rate_per_kwh = n;
       }
     }
+    // starting invoice #: blank → null (clear, back to date-based); whole number → set/seed.
+    if (get("invoice_number_start")) {
+      const raw = get("invoice_number_start").value.trim();
+      if (raw === "") {
+        body.invoice_number_start = null;
+      } else {
+        const n = parseInt(raw, 10);
+        if (isNaN(n) || n < 0) {
+          st.className = "rb-status rb-err"; st.textContent = "Starting invoice number must be a whole number, or blank."; return;
+        }
+        body.invoice_number_start = n;
+      }
+    }
 
     const ok = await patch(id, body, st);
     if (ok) {
@@ -1597,6 +1610,9 @@
                 <label class="rep-fld"><span class="rl">Rate ($/kWh)</span>
                   <input type="number" data-f="rate_per_kwh" min="0" max="5" step="0.001" value="${s.rate_per_kwh != null ? Number(s.rate_per_kwh) : ""}" placeholder="blank = your default rate">
                   <span class="rb-fld-hint">Leave blank to bill at your default rate.</span></label>
+                <label class="rep-fld"><span class="rl">Starting invoice #</span>
+                  <input type="number" data-f="invoice_number_start" min="0" step="1" value="${s.invoice_number_start != null ? s.invoice_number_start : ""}" placeholder="e.g. 1001">
+                  <span class="rb-fld-hint">${s.invoice_number_next != null ? "Next invoice will be #" + s.invoice_number_next + ". " : ""}Array Operator adds 1 after each send. Blank = date-based.</span></label>
               </div>
               <button class="ao-btn ao-btn-primary rb-btn" data-cact="save" type="button">Save details</button>
               <span class="rb-status rb-cust-status"></span>
