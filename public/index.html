@@ -7,8 +7,8 @@
 <!-- Whole-system browser error capture — loaded first so it sees errors from
      every later script. POSTs to the shared backend /v1/client-error. -->
 <script src="error-reporter.js"></script>
-<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
-<script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
+<!-- Day mode only (the night toggle was removed) — set before first paint, no flash. -->
+<script>document.documentElement.setAttribute("data-theme","day");</script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="command-center.css">
@@ -156,11 +156,6 @@
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Arrays</a>
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
-    <!-- Day/night toggle: flips to the NEPOOL-Operator light palette and persists. -->
-    <button class="theme-toggle" id="themeToggle" type="button"
-            title="Toggle day / night" aria-label="Toggle day or night theme">
-      <span class="tt-ico" aria-hidden="true">☾</span>
-    </button>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
     <!-- Signed-in identity chip — which account am I in. Top-right, next to the
@@ -271,7 +266,7 @@
   (function(){
     var btn = document.getElementById("themeToggle");
     var meta = document.querySelector('meta[name="theme-color"]');
-    function read(){ try { return localStorage.getItem("ao_theme") !== "night"; } catch(e){ return true; } }
+    function read(){ return true; }   // day mode only — the night toggle was removed
     function apply(day){
       document.documentElement.setAttribute("data-theme", day ? "day" : "night");
       if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
