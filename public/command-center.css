@@ -715,6 +715,8 @@ body.sb-fs-lock{ overflow:hidden; }
  * browser PDF-viewer toolbar / thumbnail rail / dark canvas around it. */
 /* the two "view default format / view your template" buttons above the preview */
 .rb-tpl-prevbtns{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
+/* the two preview buttons act as a toggle for the inline pane — highlight the active one */
+.rb-tpl-prevbtns button.on{ background:rgba(37,99,235,.10); border-color:var(--good); color:var(--good); font-weight:680; }
 .rb-tpl-paper{ background:#fff; border-radius:14px; overflow:hidden; display:block;
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); min-height:120px; }
 .rb-tpl-paper canvas{ display:block; width:100%; height:auto; }

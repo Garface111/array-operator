@@ -944,37 +944,50 @@
       pane.innerHTML = '<div class="rb-doc-cap">Our reproduction of your template — ' +
         esc(t.filename || 'your invoice') + '</div>' +
         '<div class="rb-tpl-prevbtns">' +
-          '<button type="button" class="ao-btn rb-btn" id="rbPrevDefault">View our default format</button>' +
-          '<button type="button" class="ao-btn rb-btn" id="rbPrevRepro">View your reproduced template</button>' +
+          '<button type="button" class="ao-btn rb-btn" id="rbPrevDefault" data-fmt="default">View our default format</button>' +
+          '<button type="button" class="ao-btn rb-btn" id="rbPrevRepro" data-fmt="repro">View your reproduced template</button>' +
         '</div>' +
         '<div class="rb-tpl-paper" id="rbTplPaper"><div class="rb-tpl-load">Rendering preview…</div></div>' +
-        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown). ' +
-        'Each button opens the full PDF in a new tab.</p>';
-      const openPreview = async (url, btn) => {
-        const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Opening…";
+        '<p class="rb-doc-hint">Switch between your reproduced template and our standard format to compare them. ' +
+        '<a href="#" id="rbPrevOpen">Open the full PDF ↗</a></p>';
+      const paper = $("#rbTplPaper");
+      const PREV_URL = {
+        repro: API + "/invoice-template/preview.pdf",
+        default: API + "/invoice-template/preview.pdf?default=1",
+      };
+      let curFmt = "repro";
+      // The two buttons TOGGLE this inline pane (no new tab) so the operator can
+      // flip between their reproduced template and our standard format side by side.
+      const showFmt = async (fmt) => {
+        curFmt = fmt;
+        pane.querySelectorAll(".rb-tpl-prevbtns button").forEach(b =>
+          b.classList.toggle("on", b.getAttribute("data-fmt") === fmt));
+        paper.innerHTML = '<div class="rb-tpl-load">Rendering preview…</div>';
         try {
-          const rr = await fetch(url, { headers: authHeaders() });
-          if (!rr.ok) throw new Error(rr.status);
+          const r = await fetch(PREV_URL[fmt], { headers: authHeaders() });
+          if (!r.ok) throw new Error("preview " + r.status);
+          await renderPdfToPaper(await r.arrayBuffer(), paper);
+        } catch (e) {
+          paper.innerHTML = '<div class="rb-doc-empty" style="padding:34px 16px;">' +
+            '<span class="ico">📄</span><b>This view is unavailable right now</b>' +
+            '<div>Your template is still saved — try the other view.</div></div>';
+        }
+      };
+      const bDef = $("#rbPrevDefault"), bRep = $("#rbPrevRepro");
+      if (bDef) bDef.onclick = () => showFmt("default");
+      if (bRep) bRep.onclick = () => showFmt("repro");
+      const openBtn = $("#rbPrevOpen");
+      if (openBtn) openBtn.onclick = async (e) => {
+        e.preventDefault();
+        try {
+          const rr = await fetch(PREV_URL[curFmt], { headers: authHeaders() });
+          if (!rr.ok) return;
           const u = URL.createObjectURL(await rr.blob());
           window.open(u, "_blank");
           setTimeout(() => URL.revokeObjectURL(u), 60000);
-          btn.textContent = lbl;
-        } catch (e) {
-          btn.textContent = "Couldn't open"; setTimeout(() => { btn.textContent = lbl; }, 2500);
-        } finally { btn.disabled = false; }
+        } catch (_) {}
       };
-      const bDef = $("#rbPrevDefault"), bRep = $("#rbPrevRepro");
-      if (bDef) bDef.onclick = () => openPreview(API + "/invoice-template/preview.pdf?default=1", bDef);
-      if (bRep) bRep.onclick = () => openPreview(API + "/invoice-template/preview.pdf", bRep);
-      try {
-        const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
-        if (!r.ok) throw new Error("preview " + r.status);
-        await renderPdfToPaper(await r.arrayBuffer(), $("#rbTplPaper"));
-      } catch (e) {
-        pane.innerHTML = '<div class="rb-doc-cap">Template preview</div>' +
-          '<div class="rb-doc-empty"><span class="ico">📄</span><b>Preview unavailable</b>' +
-          '<div>We couldn\'t render a preview right now — your template is still saved.</div></div>';
-      }
+      showFmt("repro");   // default inline view = the reproduced template
     }
     async function refresh() {
       try {
