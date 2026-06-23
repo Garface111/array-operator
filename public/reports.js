@@ -623,7 +623,6 @@
           <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls,.xlsm" hidden>
           <button class="ao-btn ao-btn-primary rb-btn" id="rbTplPick" type="button">⬆ Upload template</button>
           <span class="rb-tpl-status" id="rbTplStatus">Checking…</span>
-          <button class="ao-btn rb-btn" id="rbTplView" type="button" hidden>View</button>
           <button class="ao-btn rb-btn rb-danger" id="rbTplDel" type="button" hidden>Remove</button>
         </div>
         <div class="rb-tpl-edit">
@@ -944,8 +943,29 @@
       }
       pane.innerHTML = '<div class="rb-doc-cap">Our reproduction of your template — ' +
         esc(t.filename || 'your invoice') + '</div>' +
+        '<div class="rb-tpl-prevbtns">' +
+          '<button type="button" class="ao-btn rb-btn" id="rbPrevDefault">View our default format</button>' +
+          '<button type="button" class="ao-btn rb-btn" id="rbPrevRepro">View your reproduced template</button>' +
+        '</div>' +
         '<div class="rb-tpl-paper" id="rbTplPaper"><div class="rb-tpl-load">Rendering preview…</div></div>' +
-        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown).</p>';
+        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown). ' +
+        'Each button opens the full PDF in a new tab.</p>';
+      const openPreview = async (url, btn) => {
+        const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Opening…";
+        try {
+          const rr = await fetch(url, { headers: authHeaders() });
+          if (!rr.ok) throw new Error(rr.status);
+          const u = URL.createObjectURL(await rr.blob());
+          window.open(u, "_blank");
+          setTimeout(() => URL.revokeObjectURL(u), 60000);
+          btn.textContent = lbl;
+        } catch (e) {
+          btn.textContent = "Couldn't open"; setTimeout(() => { btn.textContent = lbl; }, 2500);
+        } finally { btn.disabled = false; }
+      };
+      const bDef = $("#rbPrevDefault"), bRep = $("#rbPrevRepro");
+      if (bDef) bDef.onclick = () => openPreview(API + "/invoice-template/preview.pdf?default=1", bDef);
+      if (bRep) bRep.onclick = () => openPreview(API + "/invoice-template/preview.pdf", bRep);
       try {
         const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
         if (!r.ok) throw new Error("preview " + r.status);

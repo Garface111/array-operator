@@ -713,6 +713,8 @@ body.sb-fs-lock{ overflow:hidden; }
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); display:block; }
 /* template card preview: paint JUST the invoice page (pdf.js canvas) on white — no
  * browser PDF-viewer toolbar / thumbnail rail / dark canvas around it. */
+/* the two "view default format / view your template" buttons above the preview */
+.rb-tpl-prevbtns{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
 .rb-tpl-paper{ background:#fff; border-radius:14px; overflow:hidden; display:block;
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); min-height:120px; }
 .rb-tpl-paper canvas{ display:block; width:100%; height:auto; }
