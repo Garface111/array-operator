@@ -167,6 +167,21 @@ html[data-theme="day"] .cl-col-n,
 html[data-theme="day"] .cl-chip,
 html[data-theme="day"] .rb-chip{background:var(--day-chip) !important}
 
+/* ── "Open in <Vendor>" buttons: vibrant per-vendor color in day mode ──────────
+ * The neutral slate flatten above (.sb-brand → day-chip) would gray these out, so
+ * give the CLICKABLE link variant explicit, distinct vendor color (light tint + bold
+ * vendor text + vendor border; filled on hover) so it pops on the light card. */
+html[data-theme="day"] a.sb-brandlink.solaredge{background:rgba(234,88,12,.10) !important;color:#c2410c !important;border-color:#ea580c !important}
+html[data-theme="day"] a.sb-brandlink.fronius{background:rgba(79,70,229,.10) !important;color:#4338ca !important;border-color:#4f46e5 !important}
+html[data-theme="day"] a.sb-brandlink.sma{background:rgba(8,145,178,.10) !important;color:#0e7490 !important;border-color:#0891b2 !important}
+html[data-theme="day"] a.sb-brandlink.chint{background:rgba(219,39,119,.10) !important;color:#be185d !important;border-color:#db2777 !important}
+html[data-theme="day"] a.sb-brandlink.locus{background:rgba(2,132,199,.10) !important;color:#0369a1 !important;border-color:#0284c7 !important}
+html[data-theme="day"] a.sb-brandlink.solaredge:hover{background:#ea580c !important;color:#fff !important}
+html[data-theme="day"] a.sb-brandlink.fronius:hover{background:#4f46e5 !important;color:#fff !important}
+html[data-theme="day"] a.sb-brandlink.sma:hover{background:#0891b2 !important;color:#fff !important}
+html[data-theme="day"] a.sb-brandlink.chint:hover{background:#db2777 !important;color:#fff !important}
+html[data-theme="day"] a.sb-brandlink.locus:hover{background:#0284c7 !important;color:#fff !important}
+
 /* ── progress / meter / peer tracks ───────────────────────────────────────── */
 html[data-theme="day"] .peerbar,
 html[data-theme="day"] .cc-meter,
