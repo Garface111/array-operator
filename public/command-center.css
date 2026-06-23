@@ -368,6 +368,13 @@ body.sb-fs-lock{ overflow:hidden; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rb-file .when{ flex:0 0 auto; font-size:10.5px; color:var(--faint); white-space:nowrap; }
 .rb-files-status{ font-size:11.5px; color:#e06666; margin-top:8px; }
+
+/* file library hosted in a Master Account settings row (label | files | —) */
+.acct-files-row{ align-items:start; }
+.acct-files-row .r-k{ padding-top:3px; }
+.acct-files-row .r-k .rb-files-count{ display:block; margin-top:4px; font-size:10.5px;
+  font-weight:500; letter-spacing:0; text-transform:none; color:var(--faint); }
+.acct-files-row .r-v{ font-weight:initial; }
 .rb-gr-ctl{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .rb-gr-ctl .rb-gr-dollar{ color:var(--muted); font-weight:700; }
 .rb-gr-ctl .rb-gr-unit{ color:var(--faint); font-size:12.5px; }
@@ -699,6 +706,9 @@ body.sb-fs-lock{ overflow:hidden; }
 /* the operator's own uploaded template, rendered live (token-filled) on white */
 .rb-doc-frame{ width:100%; height:780px; border:0; background:#fff; border-radius:14px;
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); display:block; }
+/* a smaller "preview" height for the template card's rendered-PDF pane */
+.rb-tpl-frame{ height:560px; }
+.rb-tpl-layout{ margin-bottom:16px; }
 
 /* ── faithful EMAIL reproduction (envelope + cover body + attachment chips) ── */
 .rb-eml{ background:#fff; color:#16202b; border-radius:14px; overflow:hidden;

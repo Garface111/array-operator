@@ -3673,6 +3673,52 @@
     </div>`;
   }
 
+  // ---- Master Account file library (the operator's stored files) ------------
+  // The template, uploaded billing workbooks, and captured GMP utility-bill PDFs —
+  // newest first, the latest upload featured center stage. Files open in a new tab
+  // (fetched with the session bearer → blob). Reuses the .rb-files/.rb-file styles.
+  function _flIcon(kind, name){ const n=String(name||"").toLowerCase();
+    if(kind==="gmp_bill"||n.endsWith(".pdf"))return"🧾"; if(kind==="template")return"🧩";
+    if(/\.(xlsx|xls|xlsm|csv)$/.test(n))return"📊"; if(/\.(docx?|html?|txt)$/.test(n))return"📄";
+    if(/\.(png|jpe?g|gif|webp)$/.test(n))return"🖼️"; return"📁"; }
+  function _flSize(b){ if(!b&&b!==0)return""; if(b<1024)return b+" B";
+    if(b<1048576)return(b/1024).toFixed(0)+" KB"; return(b/1048576).toFixed(1)+" MB"; }
+  function _flAgo(iso){ if(!iso)return""; const t=Date.parse(iso); if(isNaN(t))return"";
+    const d=(Date.now()-t)/1000; if(d<90)return"just now"; if(d<3600)return Math.round(d/60)+" min ago";
+    if(d<86400)return Math.round(d/3600)+"h ago"; if(d<86400*30)return Math.round(d/86400)+"d ago";
+    try{ return new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return"";} }
+  async function _flOpen(url, status){
+    try{ const r=await fetch(url,{headers:authHeaders()});
+      if(!r.ok){ if(status)status.textContent="Couldn't open that file."; return; }
+      const u=URL.createObjectURL(await r.blob()); window.open(u,"_blank");
+      setTimeout(()=>URL.revokeObjectURL(u),60000);
+    }catch(e){ if(status)status.textContent="Couldn't open that file."; }
+  }
+  async function loadAcctFiles(){
+    const body=document.getElementById("acctFilesBody"), countEl=document.getElementById("acctFilesCount");
+    if(!body) return;
+    let files=[];
+    try{ const r=await fetch("/v1/array-operator/billing/files",{headers:authHeaders()});
+      const d=await r.json().catch(()=>({})); if(r.ok)files=Array.isArray(d.files)?d.files:[];
+    }catch(e){}
+    if(countEl)countEl.textContent=files.length?`${files.length} file${files.length===1?"":"s"}`:"";
+    if(!files.length){ body.innerHTML=`<div class="rb-files-empty">No files yet. Upload an invoice template on the Reports tab, add a billing workbook, or connect GMP — your invoice, workbook, and utility-bill files collect here.</div>`; return; }
+    const feat=files[0], rest=files.slice(1);
+    const tile=f=>`<button type="button" class="rb-file" data-url="${esc(f.download)}" title="${esc(f.name)}"><span class="ico">${_flIcon(f.kind,f.name)}</span><span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role||"")}</small></span><span class="when">${esc(_flAgo(f.uploaded_at))}${f.size?" · "+_flSize(f.size):""}</span></button>`;
+    body.innerHTML=`
+      <button type="button" class="rb-file-feat" data-url="${esc(feat.download)}" title="${esc(feat.name)}">
+        <span class="badge">Latest upload</span>
+        <span class="ico">${_flIcon(feat.kind,feat.name)}</span>
+        <span class="name">${esc(feat.name)}</span>
+        <span class="role">${esc(feat.role||"")}</span>
+        <span class="meta">${esc(_flAgo(feat.uploaded_at))}${feat.size?" · "+_flSize(feat.size):""} · open ↗</span>
+      </button>
+      ${rest.length?`<div class="rb-files-list">${rest.map(tile).join("")}</div>`:""}
+      <div class="rb-files-status" id="acctFilesStatus"></div>`;
+    body.querySelectorAll("[data-url]").forEach(b=>b.onclick=()=>_flOpen(b.getAttribute("data-url"),document.getElementById("acctFilesStatus")));
+  }
+  window.__aoReloadFiles = loadAcctFiles;
+
   function renderAccountList(a){
     const list = document.getElementById("acctList");
     if(!list) return;
@@ -3695,12 +3741,18 @@
         `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
         null,
         `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
+      `<div class="acct-row acct-files-row">
+        <div class="r-k">Your files <span class="rb-files-count" id="acctFilesCount"></span></div>
+        <div class="r-v"><div class="rb-files-body" id="acctFilesBody"><div class="rb-files-empty">Loading…</div></div></div>
+        <div class="r-a"></div>
+      </div>` +
       cancelRow(a);
 
     wireAcctEdits();
     wirePasswordRow();
     wireAutoRefreshRow();
     wireCancelRow();
+    loadAcctFiles();
   }
 
   /* ---- Danger zone: cancel the account.
