@@ -386,6 +386,11 @@
      own content and centers (see .fc-card) — a compact, centered health bar
      instead of one stretched comically across the whole fleet's width. */
   .sb-canvas.sb-orient-horizontal .sb-fleet-col{width:100%;max-width:none}
+  /* Sit the fleet card OVER the (left) array column. The card is fit-content and
+     was centered across the WHOLE fleet width — which, with a wide fleet, floats
+     it far right of the columns in the viewport. Left-align it so it sits above
+     the array column where the eye starts. */
+  .sb-canvas.sb-orient-horizontal .fc-card{margin-left:0;margin-right:auto}
   .sb-canvas.sb-orient-vertical .sb-fleet-col{align-self:flex-start;min-width:380px;max-width:460px}
   /* The CARD is the bottom layer = the tank container (holds the liquid). It no
      longer lays out content directly; .fc-plate does. It sizes to its content
