@@ -549,8 +549,7 @@
 
   function shell() {
     return `
-      <div class="rb-subtabs" role="tablist">
-        <button type="button" class="rb-subtab on" data-sub="invoice" role="tab">Offtaker Invoice Generator</button>
+      <div class="rb-subtabs rb-subtabs-bare" role="toolbar">
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
