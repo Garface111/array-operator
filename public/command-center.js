@@ -144,7 +144,9 @@
     const h = host(); if(!h || !MODEL) return;
     const q = document.getElementById("ccQueue");
     const k = MODEL.kpis;
-    const healthCls = k.healthyPct >= 95 ? "ok" : k.healthyPct >= 85 ? "warn" : "bad";
+    // Fleet-health color (Ford, 2026-06-23): blue = good, all the way down to 80%;
+    // at 80% and below it turns orange. Two states only — no red tier.
+    const healthCls = k.healthyPct > 80 ? "ok" : "warn";
     const riskMo = Math.round(MODEL.kpis.riskMo || 0);
     const simNote = MODEL.simulated
       ? `Demo fleet — sign in to load yours`
