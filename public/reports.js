@@ -27,6 +27,53 @@
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function authHeaders() { const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
 
+  // ── pdf.js: paint page 1 of a PDF onto a <canvas> inside `paper` — no browser
+  //    PDF-viewer chrome. Shared by the template-card preview AND the approval-inbox
+  //    draft preview, so both show the REAL reproduced invoice (not lossy token-HTML).
+  let _pdfjsPromise = null;
+  function _ensurePdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (_pdfjsPromise) return _pdfjsPromise;
+    const BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+    _pdfjsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = BASE + "pdf.min.js";
+      s.onload = () => {
+        try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = BASE + "pdf.worker.min.js"; resolve(window.pdfjsLib); }
+        catch (e) { reject(e); }
+      };
+      s.onerror = () => reject(new Error("pdfjs load failed"));
+      document.head.appendChild(s);
+    });
+    return _pdfjsPromise;
+  }
+  function _pdfFallbackIframe(buf, paper) {            // CDN-down fallback: native viewer, chrome suppressed
+    try {
+      const url = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
+      paper.innerHTML = '<iframe class="rb-tpl-frame" title="Invoice preview" src="' +
+        url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH"></iframe>';
+    } catch (e) { paper.innerHTML = '<div class="rb-tpl-load">Preview unavailable.</div>'; }
+  }
+  async function renderPdfToPaper(buf, paper) {
+    if (!paper) return;
+    let lib;
+    try { lib = await _ensurePdfJs(); } catch (e) { return _pdfFallbackIframe(buf, paper); }
+    try {
+      const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+      const page = await pdf.getPage(1);
+      const cssW = Math.max(240, paper.clientWidth || 520);
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: (cssW / base.width) * ratio });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      paper.innerHTML = "";
+      paper.appendChild(canvas);
+    } catch (e) { _pdfFallbackIframe(buf, paper); }
+  }
+
   const MODEL_LABEL = {
     fixed_budget: "Fixed monthly budget",
     flat_rate: "Flat rate + true-up",
@@ -894,63 +941,8 @@
       renderDraftDoc();
       loadTplPreview(t);                              // rendered PDF of the template
     }
-    // Render the operator's stored template and paint JUST the invoice page — pdf.js
-    // draws page 1 onto a canvas, so there's no browser PDF-viewer chrome (toolbar,
-    // thumbnail rail, dark canvas). The native iframe is only a CDN-down fallback.
-    let _tplPrevUrl = null;
-    let _pdfjsPromise = null;
-    function _ensurePdfJs() {
-      if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
-      if (_pdfjsPromise) return _pdfjsPromise;
-      const BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
-      _pdfjsPromise = new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = BASE + "pdf.min.js";
-        s.onload = () => {
-          try {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = BASE + "pdf.worker.min.js";
-            resolve(window.pdfjsLib);
-          } catch (e) { reject(e); }
-        };
-        s.onerror = () => reject(new Error("pdfjs load failed"));
-        document.head.appendChild(s);
-      });
-      return _pdfjsPromise;
-    }
-    function _tplFallbackIframe(buf, paper) {
-      // Native viewer with toolbar / thumbnails / scrollbar suppressed — only if
-      // pdf.js can't load (offline / CDN blocked).
-      try {
-        if (_tplPrevUrl) URL.revokeObjectURL(_tplPrevUrl);
-        _tplPrevUrl = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
-        paper.innerHTML = '<iframe class="rb-tpl-frame" title="Template preview" src="' +
-          _tplPrevUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH"></iframe>';
-      } catch (e) {
-        paper.innerHTML = '<div class="rb-tpl-load">Preview unavailable.</div>';
-      }
-    }
-    async function _renderPdfToPaper(buf, paper) {
-      if (!paper) return;
-      let lib;
-      try { lib = await _ensurePdfJs(); }
-      catch (e) { return _tplFallbackIframe(buf, paper); }
-      try {
-        const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
-        const page = await pdf.getPage(1);
-        const cssW = Math.max(240, paper.clientWidth || 520);
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        const base = page.getViewport({ scale: 1 });
-        const vp = page.getViewport({ scale: (cssW / base.width) * ratio });
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.ceil(vp.width);
-        canvas.height = Math.ceil(vp.height);
-        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
-        paper.innerHTML = "";
-        paper.appendChild(canvas);
-      } catch (e) {
-        _tplFallbackIframe(buf, paper);
-      }
-    }
+    // Template-card preview: render the stored template (sample data) via the shared
+    // renderPdfToPaper — JUST the invoice page, no PDF-viewer chrome.
     async function loadTplPreview(t) {
       const pane = $("#rbTplDocPane");
       if (!pane) return;
@@ -970,7 +962,7 @@
       try {
         const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
         if (!r.ok) throw new Error("preview " + r.status);
-        await _renderPdfToPaper(await r.arrayBuffer(), $("#rbTplPaper"));
+        await renderPdfToPaper(await r.arrayBuffer(), $("#rbTplPaper"));
       } catch (e) {
         pane.innerHTML = '<div class="rb-doc-cap">Template preview</div>' +
           '<div class="rb-doc-empty"><span class="ico">📄</span><b>Preview unavailable</b>' +
@@ -2102,15 +2094,24 @@
           ${attChips}
         </div>
       </div>
-      ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html)
+      ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled && sid)
         ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — your template, filled</div>
-           <iframe class="rb-doc-frame" title="Invoice preview" sandbox></iframe>` : ""}
+           <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>` : ""}
       <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
         Use <b>Preview invoice</b> for the exact invoice PDF${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
 
-    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html) {
-      const frame = pane.querySelector("iframe.rb-doc-frame");
-      if (frame) frame.srcdoc = fillTemplate(TEMPLATE_STATE.html, d);
+    // Render the ACTUAL reproduced invoice (the exact PDF that gets attached/sent) onto
+    // a canvas — same source as the attachment chip + "Preview invoice", so it shows
+    // THIS offtaker's real values, not the lossy token-HTML that left sample text in.
+    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && sid) {
+      const paper = pane.querySelector("#rbDraftInvPaper");
+      if (paper) {
+        fetch(`${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf`, { headers: authHeaders() })
+          .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error("preview " + r.status)))
+          .then(buf => renderPdfToPaper(buf, paper))
+          .catch(() => { paper.innerHTML =
+            '<div class="rb-tpl-load">Invoice preview unavailable — use “Preview invoice” for the exact PDF.</div>'; });
+      }
     }
     // Clicking an attachment chip downloads that exact file.
     pane.querySelectorAll(".rb-eml-att[data-dl]").forEach(b => b.onclick = () =>
