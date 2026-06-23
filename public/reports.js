@@ -1989,28 +1989,38 @@
     const slug = String(d.customer_name || "offtaker").toLowerCase()
       .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "offtaker";
     const invSuffix = d.invoice_number ? "_" + d.invoice_number : "";
+    const sid = d.subscription_id;
+    // Each chip carries a `url` — clicking downloads that exact file. The GMP bill
+    // is downloadable once captured (manual attach OR auto-capture ready); until
+    // then it's a non-clickable "pending" chip.
     const atts = [{
       ico: "📄", name: `invoice_${slug}${invSuffix}.pdf`,
       sub: `${money(d.amount_usd)} · solar credit invoice`, state: "ready",
+      url: sid ? `${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf` : null,
     }];
     if (d.include_summary !== false) atts.push({
       ico: "📈", name: `production_summary_${slug}.pdf`,
       sub: "generation + savings report", state: "ready",
+      url: sid ? `${API}/subscriptions/${sid}/preview?kind=summary&fmt=pdf` : null,
     });
-    if (d.has_gmp_pdf) atts.push({
+    if (d.has_gmp_pdf || (autoOn && d.gmp_auto_status === "ready")) atts.push({
       ico: "🧾", name: esc(d.gmp_filename || "gmp_utility_bill.pdf"),
       sub: "the GMP bill behind this invoice", state: "ready",
+      url: `${API}/drafts/${d.id}/gmp-bill`,
     });
     else if (autoOn) atts.push({
       ico: "🧾", name: "GMP utility bill",
-      sub: "attaches automatically once captured", state: "pending",
+      sub: "attaches automatically once captured", state: "pending", url: null,
     });
-    const attChips = atts.map(a => `
-      <div class="rb-eml-att ${a.state}">
+    const attChips = atts.map(a => {
+      const dl = a.url ? ` data-dl="${esc(a.url)}" data-fn="${esc(a.name)}"` : " disabled";
+      const tag = a.state === "pending" ? "pending" : "download ↓";
+      return `<button type="button" class="rb-eml-att ${a.state}${a.url ? "" : " disabled"}"${dl} title="${a.url ? "Download " + esc(a.name) : "Not captured yet"}">
         <span class="ico">${a.ico}</span>
         <span class="meta"><b>${a.name}</b><small>${a.sub}</small></span>
-        <span class="tag">${a.state === "pending" ? "pending" : "PDF"}</span>
-      </div>`).join("");
+        <span class="tag">${tag}</span>
+      </button>`;
+    }).join("");
 
     // ── Cover body — note → figure table → attached line (mirrors _email_html). ──
     const noteHtml = note && note.trim()
@@ -2050,6 +2060,23 @@
       const frame = pane.querySelector("iframe.rb-doc-frame");
       if (frame) frame.srcdoc = fillTemplate(TEMPLATE_STATE.html, d);
     }
+    // Clicking an attachment chip downloads that exact file.
+    pane.querySelectorAll(".rb-eml-att[data-dl]").forEach(b => b.onclick = () =>
+      downloadAttachment(b.getAttribute("data-dl"), b.getAttribute("data-fn")));
+  }
+
+  // Fetch a file with the session bearer and save it (true download, not a tab).
+  async function downloadAttachment(url, filename) {
+    if (!url) return;
+    try {
+      const r = await fetch(url, { headers: authHeaders() });
+      if (!r.ok) return;
+      const u = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = u; a.download = filename || "attachment";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    } catch (e) { /* swallow — never break the preview */ }
   }
 
   function draftCard(d) {

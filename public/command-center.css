@@ -735,8 +735,12 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-eml-atts{ border-top:1px solid #eef2f6; background:#fbfcfd; padding:13px 18px; }
 .rb-eml-atts .lab{ font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:#8a98a6;
   font-weight:650; margin-bottom:9px; }
-.rb-eml-att{ display:flex; align-items:center; gap:11px; background:#fff; border:1px solid #e6ecf1;
-  border-radius:10px; padding:10px 12px; margin-top:8px; }
+.rb-eml-att{ display:flex; align-items:center; gap:11px; width:100%; box-sizing:border-box; text-align:left;
+  font:inherit; color:inherit; background:#fff; border:1px solid #e6ecf1; border-radius:10px;
+  padding:10px 12px; margin-top:8px; cursor:pointer; transition:border-color .15s, transform .1s, box-shadow .15s; }
+.rb-eml-att:not(.disabled):hover{ border-color:rgba(94,194,255,.62);
+  box-shadow:0 4px 14px -8px rgba(94,194,255,.6); transform:translateY(-1px); }
+.rb-eml-att.disabled{ cursor:default; }
 .rb-eml-att .ico{ font-size:19px; line-height:1; flex:0 0 auto; }
 .rb-eml-att .meta{ flex:1 1 auto; min-width:0; }
 .rb-eml-att .meta b{ display:block; font-size:12.5px; color:#16202b; font-weight:680;
