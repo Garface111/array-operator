@@ -88,9 +88,87 @@
       if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
       else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
     };
-    await Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus()]);
+    await Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus(), loadFiles()]);
   }
   window.__aoLoadReports = load;
+
+  // ---- file library (the operator's stored files) ---------------------------
+  // Repository beside the invoice-template card: the template, uploaded billing
+  // workbooks, and captured GMP utility-bill PDFs — newest first, the latest
+  // upload featured center stage. Files open in a new tab (fetched with the
+  // session bearer, then a blob URL) — same pattern as the template "View".
+  function fileIcon(kind, name) {
+    const n = String(name || "").toLowerCase();
+    if (kind === "gmp_bill" || n.endsWith(".pdf")) return "🧾";
+    if (kind === "template") return "🧩";
+    if (/\.(xlsx|xls|xlsm|csv)$/.test(n)) return "📊";
+    if (/\.(docx?|html?|txt)$/.test(n)) return "📄";
+    if (/\.(png|jpe?g|gif|webp)$/.test(n)) return "🖼️";
+    return "📁";
+  }
+  function fileSize(b) {
+    if (!b && b !== 0) return "";
+    if (b < 1024) return b + " B";
+    if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+    return (b / 1048576).toFixed(1) + " MB";
+  }
+  function fileAgo(iso) {
+    if (!iso) return "";
+    const t = Date.parse(iso); if (isNaN(t)) return "";
+    const d = (Date.now() - t) / 1000;
+    if (d < 90) return "just now";
+    if (d < 3600) return Math.round(d / 60) + " min ago";
+    if (d < 86400) return Math.round(d / 3600) + "h ago";
+    if (d < 86400 * 30) return Math.round(d / 86400) + "d ago";
+    try { return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } catch (e) { return ""; }
+  }
+  async function openFile(url, status) {
+    // Backend `download` URLs are already absolute paths (/v1/array-operator/...).
+    try {
+      const r = await fetch(url, { headers: authHeaders() });
+      if (!r.ok) { if (status) status.textContent = "Couldn't open that file."; return; }
+      const u = URL.createObjectURL(await r.blob());
+      window.open(u, "_blank");
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    } catch (e) { if (status) status.textContent = "Couldn't open that file."; }
+  }
+  async function loadFiles() {
+    const body = $("#rbFilesBody"), countEl = $("#rbFilesCount");
+    if (!body) return;
+    let files = [];
+    try {
+      const r = await fetch(API + "/files", { headers: authHeaders() });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) files = Array.isArray(d.files) ? d.files : [];
+    } catch (e) { /* leave empty */ }
+    if (countEl) countEl.textContent = files.length ? `${files.length} file${files.length === 1 ? "" : "s"}` : "";
+    if (!files.length) {
+      body.innerHTML = `<div class="rb-files-empty">No files yet. Upload an invoice template, add a billing
+        workbook, or connect GMP — your invoice, workbook, and utility-bill files collect here.</div>`;
+      return;
+    }
+    const [feat, ...rest] = files;   // newest first → featured
+    const tile = f => `
+      <button type="button" class="rb-file" data-url="${esc(f.download)}" title="${esc(f.name)}">
+        <span class="ico">${fileIcon(f.kind, f.name)}</span>
+        <span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role || "")}</small></span>
+        <span class="when">${esc(fileAgo(f.uploaded_at))}${f.size ? " · " + fileSize(f.size) : ""}</span>
+      </button>`;
+    body.innerHTML = `
+      <button type="button" class="rb-file-feat" data-url="${esc(feat.download)}" title="${esc(feat.name)}">
+        <span class="badge">Latest upload</span>
+        <span class="ico">${fileIcon(feat.kind, feat.name)}</span>
+        <span class="name">${esc(feat.name)}</span>
+        <span class="role">${esc(feat.role || "")}</span>
+        <span class="meta">${esc(fileAgo(feat.uploaded_at))}${feat.size ? " · " + fileSize(feat.size) : ""} · open ↗</span>
+      </button>
+      ${rest.length ? `<div class="rb-files-list">${rest.map(tile).join("")}</div>` : ""}
+      <div class="rb-files-status" id="rbFilesStatus"></div>`;
+    body.querySelectorAll("[data-url]").forEach(b => b.onclick = () =>
+      openFile(b.getAttribute("data-url"), $("#rbFilesStatus")));
+  }
+  window.__aoReloadFiles = loadFiles;
+
   // Let a GMP capture landing (sandbox.js fires __aoRefreshGmpGate) also refresh
   // the bills status + the offtaker utility-bill picker, so the operator sees the
   // bills appear without a manual reload.
@@ -567,6 +645,7 @@
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
+      <div class="rb-tpl-row">
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
           <h3>Your invoice template</h3>
@@ -593,6 +672,11 @@
           </details>
         </div>
       </div>
+      <aside class="rb-files rep-card" id="rbFiles">
+        <div class="rb-files-head"><h3>Your files</h3><span class="rb-files-count" id="rbFilesCount"></span></div>
+        <div class="rb-files-body" id="rbFilesBody"><div class="rb-files-empty">Loading…</div></div>
+      </aside>
+      </div><!-- /rb-tpl-row -->
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       </div><!-- /rbSubInvoice -->
       <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
@@ -894,6 +978,8 @@
         const d = await r.json().catch(() => ({}));
         paint(r.ok ? d.template : null);
       } catch (e) { paint(null); }
+      // keep the file library in sync after upload/remove/enable changes
+      try { if (window.__aoReloadFiles) window.__aoReloadFiles(); } catch (e) {}
     }
     await refresh();
     pick.onclick = () => fileIn.click();
