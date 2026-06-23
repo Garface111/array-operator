@@ -628,16 +628,6 @@
         </div>
         <div class="rb-tpl-edit">
           <label class="rb-tpl-enable"><input type="checkbox" id="rbTplEnabled"> Use this template for my offtaker invoices</label>
-          <details class="rb-tpl-adv">
-            <summary>Edit &amp; preview template</summary>
-            <p class="rb-tpl-tokens" id="rbTplTokens"></p>
-            <textarea id="rbTplHtml" class="rb-tpl-html" spellcheck="false" rows="12"></textarea>
-            <div class="rb-tpl-editbtns">
-              <button class="ao-btn ao-btn-primary rb-btn" id="rbTplSave" type="button">Save template</button>
-              <button class="ao-btn rb-btn" id="rbTplPreview" type="button">Preview PDF</button>
-              <span class="rb-tpl-estatus" id="rbTplEStatus"></span>
-            </div>
-          </details>
         </div>
       </div>
         </div>
@@ -955,8 +945,7 @@
       pane.innerHTML = '<div class="rb-doc-cap">Our reproduction of your template — ' +
         esc(t.filename || 'your invoice') + '</div>' +
         '<div class="rb-tpl-paper" id="rbTplPaper"><div class="rb-tpl-load">Rendering preview…</div></div>' +
-        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown). ' +
-        'Refine it under <b>Edit &amp; preview template</b>.</p>';
+        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown).</p>';
       try {
         const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
         if (!r.ok) throw new Error("preview " + r.status);
