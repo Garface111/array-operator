@@ -567,7 +567,6 @@
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
-      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
           <h3>Your invoice template</h3>
@@ -594,6 +593,7 @@
           </details>
         </div>
       </div>
+      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       </div><!-- /rbSubInvoice -->
       <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
   }
