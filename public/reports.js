@@ -1926,20 +1926,7 @@
     const d = activeDraft();
     if (!d) { pane.innerHTML = ""; return; }
 
-    // When the operator has an ENABLED invoice template, the real invoice is
-    // rendered from it — so the preview shows THAT (their exact format), filled
-    // with this offtaker's numbers, in an isolated iframe.
-    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html) {
-      pane.innerHTML =
-        `<div class="rb-doc-cap">Live preview — your invoice template, filled for ${esc(d.customer_name || "this offtaker")}</div>` +
-        `<iframe class="rb-doc-frame" title="Invoice preview" sandbox></iframe>` +
-        `<p class="rb-doc-hint">Your uploaded template, filled with this offtaker's numbers. ` +
-        `Use <b>Preview invoice</b> for the exact PDF.</p>`;
-      const frame = pane.querySelector("iframe.rb-doc-frame");
-      if (frame) frame.srcdoc = fillTemplate(TEMPLATE_STATE.html, d);
-      return;
-    }
-
+    // Live state from the card (note edits + GMP-attach toggle repaint this).
     const layout = pane.closest(".rb-layout");
     const card = layout && layout.querySelector(`.rb-draft[data-did="${d.id}"]`);
     const ta = card && card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
@@ -1947,61 +1934,83 @@
     const autoCb = card && card.querySelector('input[data-dact="autogmp"]');
     const autoOn = autoCb ? autoCb.checked : (d.auto_attach_gmp !== false);
 
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
     const period = d.period_label || "latest period";
-    const lineSub = [
-      d.customer_kwh != null ? `${fmt0(d.customer_kwh)} kWh` : null,
-      pct != null ? `${pct}% of array` : null,
-    ].filter(Boolean).join(" · ");
+    const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "—";
 
-    const badges = ['<span class="rb-doc-badge">PDF INVOICE</span>'];
-    if (d.has_gmp_pdf) badges.push('<span class="rb-doc-badge">GMP BILL</span>');
-    else if (autoOn) badges.push('<span class="rb-doc-badge pending">GMP BILL · ON CAPTURE</span>');
+    // ── Envelope — faithful to the backend's _email_html (subject/from/to). ──
+    const subject = `Your solar credit invoice — ${d.customer_name || "your offtaker"}`
+      + (d.invoice_number ? ` (${d.invoice_number})` : "");
+    const fromName = d.operator_name || "Your operator account";
+    const toClient = !!(d.send_mode && d.send_mode !== "to_me");
+    const toLine = toClient
+      ? esc(d.customer_name || "your offtaker") + (d.client_email ? ` &lt;${esc(d.client_email)}&gt;` : "")
+      : "you (operator copy — “Send to: Me”)";
 
-    const msg = note && note.trim()
-      ? `<div class="rb-doc-msg"><span class="lab">Cover email</span>${esc(note.trim())}</div>` : "";
+    // ── Attachments — faithful: invoice + summary (if on) + the GMP bill. ──
+    const slug = String(d.customer_name || "offtaker").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "offtaker";
+    const invSuffix = d.invoice_number ? "_" + d.invoice_number : "";
+    const atts = [{
+      ico: "📄", name: `invoice_${slug}${invSuffix}.pdf`,
+      sub: `${money(d.amount_usd)} · solar credit invoice`, state: "ready",
+    }];
+    if (d.include_summary !== false) atts.push({
+      ico: "📈", name: `production_summary_${slug}.pdf`,
+      sub: "generation + savings report", state: "ready",
+    });
+    if (d.has_gmp_pdf) atts.push({
+      ico: "🧾", name: esc(d.gmp_filename || "gmp_utility_bill.pdf"),
+      sub: "the GMP bill behind this invoice", state: "ready",
+    });
+    else if (autoOn) atts.push({
+      ico: "🧾", name: "GMP utility bill",
+      sub: "attaches automatically once captured", state: "pending",
+    });
+    const attChips = atts.map(a => `
+      <div class="rb-eml-att ${a.state}">
+        <span class="ico">${a.ico}</span>
+        <span class="meta"><b>${a.name}</b><small>${a.sub}</small></span>
+        <span class="tag">${a.state === "pending" ? "pending" : "PDF"}</span>
+      </div>`).join("");
+
+    // ── Cover body — note → figure table → attached line (mirrors _email_html). ──
+    const noteHtml = note && note.trim()
+      ? `<div class="rb-eml-note">${esc(note.trim()).replace(/\n/g, "<br>")}</div>` : "";
+    const attWord = d.include_summary !== false
+      ? "invoice and performance summary are" : "invoice is";
 
     pane.innerHTML = `
-      <div class="rb-doc-cap">Live preview — exactly what ${esc(d.customer_name || "your offtaker")} receives</div>
-      <div class="rb-doc-paper">
-        <div class="rb-doc-band">
-          <div class="brand">⚡ Array Operator<small>Solar generation billing</small></div>
-          <div class="doctype">INVOICE<small>${esc(period)}</small></div>
+      <div class="rb-doc-cap">Live preview — the email ${esc(toClient ? (d.customer_name || "your offtaker") : "you")} receive${toClient ? "s" : ""}</div>
+      <div class="rb-eml">
+        <div class="rb-eml-head">
+          <div class="row"><span class="k">From</span><span class="v">${esc(fromName)} <small>via Array Operator</small></span></div>
+          <div class="row"><span class="k">To</span><span class="v">${toLine}</span></div>
+          <div class="row"><span class="k">Subject</span><span class="v subj">${esc(subject)}</span></div>
         </div>
-        <div class="rb-doc-body">
-          ${msg}
-          <div class="rb-doc-parties">
-            <div><span class="lab">From</span><b>Your operator account</b>
-              <span class="sub">via Array Operator</span></div>
-            <div style="text-align:right"><span class="lab">Bill to</span><b>${esc(d.customer_name || "—")}</b></div>
-          </div>
-          <table class="rb-doc-table">
-            <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
-            <tbody>
-              <tr>
-                <td><b>Solar generation billing</b>${lineSub ? `<br><small>${esc(lineSub)}</small>` : ""}
-                  <br><small>Period ${esc(period)}</small></td>
-                <td class="num">${money(d.amount_usd)}</td>
-              </tr>
-            </tbody>
-            <tfoot><tr class="rb-doc-total"><td>Total due</td><td class="num amt">${money(d.amount_usd)}</td></tr></tfoot>
+        <div class="rb-eml-body">
+          ${noteHtml}
+          <table class="rb-eml-figs">
+            <tr><td>Billing period</td><td>${esc(period)}</td></tr>
+            <tr><td>Your production</td><td>${kwh}</td></tr>
+            <tr class="due"><td>Solar credit value due</td><td>${money(d.amount_usd)}</td></tr>
           </table>
-          <div class="rb-doc-summary">
-            <h4>Performance summary</h4>
-            <div class="rb-doc-stats">
-              <div class="st"><b>${fmt0(d.array_total_kwh)}</b><span>array total kWh</span></div>
-              <div class="st"><b>${pct != null ? pct + "%" : "—"}</b><span>their share</span></div>
-              <div class="st"><b>${fmt0(d.customer_kwh)}</b><span>their kWh</span></div>
-            </div>
-          </div>
+          <p class="rb-eml-attline">The full ${attWord} attached.</p>
         </div>
-        <div class="rb-doc-foot">
-          <span>Attaches when you approve</span>
-          <span class="rb-doc-badges">${badges.join("")}</span>
+        <div class="rb-eml-atts">
+          <div class="lab">📎 ${atts.length} attachment${atts.length === 1 ? "" : "s"}</div>
+          ${attChips}
         </div>
       </div>
-      <p class="rb-doc-hint">Styled preview of the standard invoice. Use
-        <b>Preview invoice</b> for the exact PDF, including your uploaded template.</p>`;
+      ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html)
+        ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — your template, filled</div>
+           <iframe class="rb-doc-frame" title="Invoice preview" sandbox></iframe>` : ""}
+      <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
+        Use <b>Preview invoice</b> for the exact invoice PDF${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
+
+    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html) {
+      const frame = pane.querySelector("iframe.rb-doc-frame");
+      if (frame) frame.srcdoc = fillTemplate(TEMPLATE_STATE.html, d);
+    }
   }
 
   function draftCard(d) {

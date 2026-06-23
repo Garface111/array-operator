@@ -657,6 +657,42 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-doc-frame{ width:100%; height:780px; border:0; background:#fff; border-radius:14px;
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); display:block; }
 
+/* ── faithful EMAIL reproduction (envelope + cover body + attachment chips) ── */
+.rb-eml{ background:#fff; color:#16202b; border-radius:14px; overflow:hidden;
+  box-shadow:0 26px 70px -30px rgba(0,0,0,.75); font-size:13px; }
+.rb-eml-head{ background:#f7f9fb; border-bottom:1px solid #e6ecf1; padding:13px 18px; }
+.rb-eml-head .row{ display:flex; gap:10px; padding:3px 0; align-items:baseline; }
+.rb-eml-head .k{ flex:0 0 56px; font-size:10.5px; letter-spacing:.04em; text-transform:uppercase;
+  color:#8a98a6; font-weight:650; }
+.rb-eml-head .v{ flex:1 1 auto; min-width:0; font-size:13px; color:#2b3a47; word-break:break-word; }
+.rb-eml-head .v small{ color:#8a98a6; font-size:11.5px; }
+.rb-eml-head .v.subj{ font-weight:700; color:#16202b; }
+.rb-eml-body{ padding:18px; }
+.rb-eml-note{ background:#f3f7fa; border:1px solid #e3e9ef; border-radius:10px; padding:12px 14px;
+  font-size:13px; line-height:1.6; color:#2f3e4c; margin-bottom:15px; }
+.rb-eml-figs{ width:100%; border-collapse:collapse; font-size:13px; }
+.rb-eml-figs td{ padding:7px 0; border-bottom:1px solid #eef2f6; }
+.rb-eml-figs td:last-child{ text-align:right; font-variant-numeric:tabular-nums; color:#16202b; }
+.rb-eml-figs td:first-child{ color:#5a6b7b; }
+.rb-eml-figs tr.due td{ border-bottom:0; padding-top:11px; font-weight:800; }
+.rb-eml-figs tr.due td:last-child{ color:#0a7d4f; font-size:15px; }
+.rb-eml-attline{ font-size:12.5px; color:#5a6b7b; margin:14px 0 0; }
+.rb-eml-atts{ border-top:1px solid #eef2f6; background:#fbfcfd; padding:13px 18px; }
+.rb-eml-atts .lab{ font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:#8a98a6;
+  font-weight:650; margin-bottom:9px; }
+.rb-eml-att{ display:flex; align-items:center; gap:11px; background:#fff; border:1px solid #e6ecf1;
+  border-radius:10px; padding:10px 12px; margin-top:8px; }
+.rb-eml-att .ico{ font-size:19px; line-height:1; flex:0 0 auto; }
+.rb-eml-att .meta{ flex:1 1 auto; min-width:0; }
+.rb-eml-att .meta b{ display:block; font-size:12.5px; color:#16202b; font-weight:680;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rb-eml-att .meta small{ display:block; font-size:11px; color:#7a8a98; margin-top:1px; }
+.rb-eml-att .tag{ flex:0 0 auto; font-size:9.5px; font-weight:800; letter-spacing:.04em;
+  padding:3px 8px; border-radius:20px; background:#e8f5ee; color:#0a7d4f; }
+.rb-eml-att.pending{ border-style:dashed; background:#fffdf8; }
+.rb-eml-att.pending .ico{ opacity:.5; }
+.rb-eml-att.pending .tag{ background:#fdf0d8; color:#9a6a00; }
+
 /* ============================ TRENDS TAB (.tr-*) ============================
  * Portfolio-wide multi-year trends. Dark solarpunk tokens; mirrors the report
  * card styling. Inline SVG chart, seasonal grid, per-array table. */
