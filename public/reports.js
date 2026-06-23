@@ -553,6 +553,20 @@
         <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
       </div>
       <div id="rbSubInvoice" class="rb-subpanel">
+      <div class="rb-listwrap">
+        <div class="cc-treedivider rb-list-head">
+          <div>
+            <h3>Your offtakers</h3>
+          </div>
+          <div class="rb-head-actions">
+            <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
+            <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+          </div>
+        </div>
+        <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
+        <div id="rbCustManual"></div>
+        <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
+      </div>
       <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
@@ -579,20 +593,6 @@
             </div>
           </details>
         </div>
-      </div>
-      <div class="rb-listwrap">
-        <div class="cc-treedivider rb-list-head">
-          <div>
-            <h3>Your offtakers</h3>
-          </div>
-          <div class="rb-head-actions">
-            <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
-            <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
-          </div>
-        </div>
-        <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
-        <div id="rbCustManual"></div>
-        <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       </div><!-- /rbSubInvoice -->
       <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
