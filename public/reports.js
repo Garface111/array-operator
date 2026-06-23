@@ -908,9 +908,11 @@
           '<div>Upload your invoice and we\'ll render a live PDF preview of it here.</div></div>';
         return;
       }
-      pane.innerHTML = '<div class="rb-doc-cap">Template preview — ' +
+      pane.innerHTML = '<div class="rb-doc-cap">Our reproduction of your template — ' +
         esc(t.filename || 'your invoice') + '</div>' +
-        '<iframe class="rb-doc-frame rb-tpl-frame" title="Template preview" id="rbTplPrevFrame"></iframe>';
+        '<iframe class="rb-doc-frame rb-tpl-frame" title="Template reproduction preview" id="rbTplPrevFrame"></iframe>' +
+        '<p class="rb-doc-hint">How the system reproduces your format (sample data shown). ' +
+        'Refine it under <b>Edit &amp; preview template</b>.</p>';
       try {
         const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
         if (!r.ok) throw new Error("preview " + r.status);
