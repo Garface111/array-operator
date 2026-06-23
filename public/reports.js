@@ -884,6 +884,9 @@
       if (htmlBox && t && t.html != null && !htmlBox.dataset.dirty) htmlBox.value = t.html;
       if (tokens && t && t.tokens) tokens.innerHTML = "Tokens you can use: " +
         t.tokens.map(x => "<code>{{ " + x + " }}</code>").join(" ");
+      // Feed the live draft preview so an uploaded/enabled template shows there now.
+      TEMPLATE_STATE = t ? { enabled: !!t.enabled, html: t.html || "" } : null;
+      renderDraftDoc();
     }
     async function refresh() {
       try {
@@ -1842,6 +1845,31 @@
   // The pending drafts currently shown, + which one the live preview tracks.
   let INBOX_DRAFTS = [];
   let ACTIVE_DRAFT_ID = null;
+  // The operator's invoice template ({enabled, html}) — when enabled, the live
+  // preview renders THIS (their exact format) instead of the generic mock, so an
+  // uploaded template propagates into the preview immediately.
+  let TEMPLATE_STATE = null;
+
+  // Fill {{ tokens }} in a template with a draft's known numbers (graceful: an
+  // unknown token renders blank, exactly like the backend's ChainableUndefined).
+  function draftTokenValues(d) {
+    let ps = "", pe = "";
+    const m = String(d.period_label || "").match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
+    if (m) { ps = m[1]; pe = m[2]; }
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    return {
+      amount_due: d.amount_usd != null ? money(d.amount_usd) : "",
+      kwh: d.customer_kwh != null ? fmt0(d.customer_kwh) : "",
+      offtaker_name: d.customer_name || "", customer_name: d.customer_name || "",
+      period_start: ps, period_end: pe,
+      rate: pct != null ? pct + "%" : "",
+    };
+  }
+  function fillTemplate(html, d) {
+    const v = draftTokenValues(d);
+    return String(html || "").replace(/\{\{\s*(\w+)\s*\}\}/g,
+      (_, k) => (k in v && v[k] != null) ? esc(String(v[k])) : "");
+  }
 
   async function refreshInbox() {
     const wrap = $("#rbInboxWrap");
@@ -1897,6 +1925,21 @@
     if (!pane) return;
     const d = activeDraft();
     if (!d) { pane.innerHTML = ""; return; }
+
+    // When the operator has an ENABLED invoice template, the real invoice is
+    // rendered from it — so the preview shows THAT (their exact format), filled
+    // with this offtaker's numbers, in an isolated iframe.
+    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && TEMPLATE_STATE.html) {
+      pane.innerHTML =
+        `<div class="rb-doc-cap">Live preview — your invoice template, filled for ${esc(d.customer_name || "this offtaker")}</div>` +
+        `<iframe class="rb-doc-frame" title="Invoice preview" sandbox></iframe>` +
+        `<p class="rb-doc-hint">Your uploaded template, filled with this offtaker's numbers. ` +
+        `Use <b>Preview invoice</b> for the exact PDF.</p>`;
+      const frame = pane.querySelector("iframe.rb-doc-frame");
+      if (frame) frame.srcdoc = fillTemplate(TEMPLATE_STATE.html, d);
+      return;
+    }
+
     const layout = pane.closest(".rb-layout");
     const card = layout && layout.querySelector(`.rb-draft[data-did="${d.id}"]`);
     const ta = card && card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
@@ -2031,6 +2074,10 @@
     const id = card && card.getAttribute("data-did");
     if (!id) return;
     const st = $(".rb-draft-status", card);
+    // Null-safe status writer: a missing status span must NEVER throw and block
+    // the actual send (this was the "Approve & send does nothing" bug — st was
+    // null, `st.className=` threw before the fetch fired, so nothing happened).
+    const setSt = (cls, txt) => { if (st) { st.className = cls; if (txt !== undefined) st.textContent = txt; } };
 
     if (act === "preview") {
       // Open the tab SYNCHRONOUSLY (still inside the click = a user gesture) so the
@@ -2043,7 +2090,7 @@
       // first so the test reflects exactly what the offtaker would receive.
       const subId = card.getAttribute("data-subid");
       const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
-      st.className = "rb-status rb-busy"; st.textContent = "Sending a test to you…";
+      setSt("rb-status rb-busy", "Sending a test to you…");
       try {
         if (ta) {
           await fetch(API + "/drafts/" + id, {
@@ -2056,11 +2103,11 @@
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
           const to = (data.result && data.result.to || []).join(", ");
-          st.className = "rb-status rb-ok"; st.textContent = "Test sent to " + (to || "you") + " — check your inbox.";
+          setSt("rb-status rb-ok", "Test sent to " + (to || "you") + " — check your inbox.");
         } else {
-          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Test send failed.";
+          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Test send failed.");
         }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
       return;
     }
     if (act === "autogmp") {
@@ -2068,54 +2115,54 @@
       // PATCH the subscription, then refresh the inbox to update the status line.
       const on = e.target.checked;
       const subId = card.getAttribute("data-subid");
-      st.className = "rb-status rb-busy"; st.textContent = "Saving…";
+      setSt("rb-status rb-busy", "Saving…");
       try {
         const r = await fetch(API + "/subscriptions/" + subId, {
           method: "PATCH",
           headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
           body: JSON.stringify({ auto_attach_gmp: on }),
         });
-        if (r.ok) { st.textContent = ""; await refreshInbox(); }
-        else { st.className = "rb-status rb-err"; st.textContent = "Couldn't save."; }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+        if (r.ok) { setSt("rb-status", ""); await refreshInbox(); }
+        else { setSt("rb-status rb-err", "Couldn't save."); }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
       return;
     }
     if (act === "savemsg") {
       const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
       const note = ta ? ta.value : "";
-      st.className = "rb-status rb-busy"; st.textContent = "Saving email…";
+      setSt("rb-status rb-busy", "Saving email…");
       try {
         const r = await fetch(API + "/drafts/" + id, {
           method: "PATCH",
           headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
           body: JSON.stringify({ note }),
         });
-        if (r.ok) { st.className = "rb-status rb-ok"; st.textContent = "Email saved."; }
-        else { st.className = "rb-status rb-err"; st.textContent = "Couldn't save email."; }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+        if (r.ok) { setSt("rb-status rb-ok", "Email saved."); }
+        else { setSt("rb-status rb-err", "Couldn't save email."); }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
       return;
     }
     if (act === "dismiss") {
       if (!confirm("Dismiss this drafted report without sending?")) return;
-      st.className = "rb-status rb-busy"; st.textContent = "Dismissing…";
+      setSt("rb-status rb-busy", "Dismissing…");
       await fetch(API + "/drafts/" + id + "/dismiss", { method: "POST", headers: authHeaders() });
       await refreshInbox();
       return;
     }
     if (act === "approve") {
       if (!confirm("Approve and send this report to the offtaker now?")) return;
-      st.className = "rb-status rb-busy"; st.textContent = "Sending…";
+      setSt("rb-status rb-busy", "Sending…");
       try {
         const r = await fetch(API + "/drafts/" + id + "/approve", { method: "POST", headers: authHeaders() });
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
           const to = (data.result && data.result.to || []).join(", ");
-          st.className = "rb-status rb-ok"; st.textContent = "Sent" + (to ? " to " + to : "") + ".";
+          setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + ".");
           setTimeout(refreshInbox, 900);
         } else {
-          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Send failed.";
+          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Send failed.");
         }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
     }
   }
 

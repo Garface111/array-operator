@@ -653,6 +653,9 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-doc-msg .lab{ display:block; font-size:10px; letter-spacing:.07em; text-transform:uppercase;
   color:#8a98a6; margin-bottom:5px; }
 .rb-doc-hint{ font-size:11.5px; color:var(--faint); margin:9px 2px 0; line-height:1.5; }
+/* the operator's own uploaded template, rendered live (token-filled) on white */
+.rb-doc-frame{ width:100%; height:780px; border:0; background:#fff; border-radius:14px;
+  box-shadow:0 26px 70px -30px rgba(0,0,0,.75); display:block; }
 
 /* ============================ TRENDS TAB (.tr-*) ============================
  * Portfolio-wide multi-year trends. Dark solarpunk tokens; mirrors the report
