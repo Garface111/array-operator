@@ -591,6 +591,15 @@ body.sb-fs-lock{ overflow:hidden; }
   filter:drop-shadow(0 0 5px rgba(245,158,11,.6)); }
 .sb-srcout-txt{ font-size:12px; line-height:1.5; color:#f4e3c4; }
 .sb-srcout-txt b{ color:#ffd479; font-weight:800; display:block; margin-bottom:2px; font-size:12.5px; }
+/* Capture-freshness line on extension-captured arrays — calm/informational (NOT an
+   alarm): states "Last synced Xh ago" when our scrape is older than the live window. */
+.sb-fresh{ display:flex; align-items:center; gap:7px; margin:7px 0 5px; padding:6px 10px;
+  border-radius:9px; font-size:11.5px; line-height:1.4; font-weight:600;
+  background:rgba(148,163,184,.12); border:1px solid rgba(148,163,184,.28); color:var(--muted,#8b97a8); }
+.sb-fresh-dot{ width:7px; height:7px; border-radius:50%; flex:none;
+  background:#94a3b8; box-shadow:0 0 5px rgba(148,163,184,.7); }
+.sb-fresh--stale .sb-fresh-dot{ background:#cbd5e1; }
+.sb-fresh-cta{ opacity:.72; font-weight:600; }
 /* Auto-login hint — subtle tip on extension-captured arrays when vault creds not saved yet */
 .sb-autologin-hint{ display:flex; align-items:flex-start; gap:8px; margin:8px 0 4px;
   padding:8px 11px; border-radius:9px; font-size:11.5px; line-height:1.45;

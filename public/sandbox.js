@@ -1502,6 +1502,29 @@
     return `<div class="sb-autologin-hint" data-vendor="${esc(vendor)}" aria-live="polite"></div>`;
   }
 
+  // Capture-freshness line for EXTENSION-captured array cards (Fronius/SMA/Chint).
+  // These have NO server feed — their data is only as fresh as our last successful
+  // scrape (an owner portal login or a background-tab refresh). So we say it plainly:
+  // when our newest capture is older than the live window, show "Last synced Xh ago"
+  // with a reconnect nudge instead of letting a frozen reading imply real-time data
+  // (the West Chester bug). When fresh (≤ the window) we show nothing — the live kW
+  // speaks for itself. The action is the existing vendor portal link at the card
+  // foot (no separate mechanism). Polled vendors (SolarEdge) keep sourceStatusHTML's
+  // amber source-outage banner; this is only the ext-capture story. (Ford.)
+  const _LIVE_FRESH_H = 15 / 60;   // 15 min — matches the backend _POWER_LIVE_FRESH gate
+  function freshnessHTML(col){
+    const vs = col && col.vendor ? [col.vendor]
+      : (col && Array.isArray(col.vendors) ? col.vendors : []);
+    if(!vs.length || !vs.every(v => _EXT_VAULT_VENDORS.has(v))) return "";
+    const ss = col && col.source_status;
+    const age = ss ? ss.age_hours : null;
+    if(age == null || age <= _LIVE_FRESH_H) return "";   // never captured, or live — say nothing
+    const vlabel = BRAND[vs[0]] || vs[0];
+    return `<div class="sb-fresh sb-fresh--stale" role="status"
+        title="No live server feed for ${esc(String(vlabel))} — its data is only as fresh as the last time the extension captured it. Open ${esc(String(vlabel))} below (with the EnergyAgent extension installed) to refresh now.">
+        <span class="sb-fresh-dot" aria-hidden="true"></span>Last synced ${esc(fmtAge(age))}<span class="sb-fresh-cta"> · open ${esc(String(vlabel))} to refresh</span></div>`;
+  }
+
   const expanded = getExpandedSet();   // which arrays have their inverter comb open
     // First login (fresh from onboarding) OR a never-customized fleet → open every
     // inverter comb so the new owner sees their WHOLE fleet at once. freshWindowActive()
@@ -1630,6 +1653,7 @@
               </div>
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
               ${srcStatusBanner}
+              ${freshnessHTML(col)}
               ${autoLoginHintHTML(col.vendor||"")}
               ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
