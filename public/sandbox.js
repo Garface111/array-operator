@@ -3442,17 +3442,31 @@
       note.className = "sb-note"; note.textContent = "";
       if(!manual){
         // ── One-click login view (the lead path) ──
-        const loginBtns = LOGIN_VENDORS.map(code => `
+        // Vendor picker — grouped (inverter monitoring vs utility meters), each a
+        // clean row-card with a brand badge + chevron. The repetitive "utility
+        // meter" copy now lives once in the section subtitle, not on every row.
+        const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", gmp:"GMP", vec:"VEC", wec:"WEC" };
+        const SUBS  = { chint:"Open each site once — all its inverters come in together." };
+        const card = code => `
           <button type="button" class="sb-login-btn" data-login="${code}">
-            <span class="sb-login-brand sb-brand ${code}">${esc(BRAND[code]||code)}</span>
-            <span class="sb-login-cta">Log in with ${esc(BRAND[code]||code)} →</span>
-            ${code==="chint" ? `<span class="sb-login-tip">Open each of your sites once — all its inverters come in together.</span>` : ""}
-            ${code==="gmp" ? `<span class="sb-login-tip">Your utility meter — brings in each account's solar production (whole-array, not per-inverter). Good when you have no inverter portal.</span>` : ""}
-            ${(code==="vec"||code==="wec") ? `<span class="sb-login-tip">Your utility meter (SmartHub) — brings in each account's solar production (whole-array, not per-inverter). Good when you have no inverter portal.</span>` : ""}
-          </button>`).join("");
+            <span class="sb-login-ico ${code}">${esc(ICONS[code] || (BRAND[code]||code).slice(0,2))}</span>
+            <span class="sb-login-main">
+              <span class="sb-login-name">${esc(BRAND[code]||code)}</span>
+              ${SUBS[code] ? `<span class="sb-login-sub">${SUBS[code]}</span>` : ""}
+            </span>
+            <span class="sb-login-go">Log in <span class="sb-login-arrow">→</span></span>
+          </button>`;
+        const section = (title, note, codes) => `
+          <div class="sb-login-sec">
+            <div class="sb-login-sec-h">${title}${note ? `<span>${note}</span>` : ""}</div>
+            <div class="sb-login-grid">${codes.map(card).join("")}</div>
+          </div>`;
+        const loginSections =
+          section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) +
+          section("Utility meter", "whole-array production · for arrays with no inverter portal", ["gmp","vec","wec"]);
         const extBlock = EXT_PRESENT
           ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
-             <div class="sb-login-grid">${loginBtns}</div>`
+             ${loginSections}`
           : `<p class="sb-modal-lede">Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.</p>
              <a class="sb-mbtn primary sb-login-install" href="${EXT_STORE_URL}" target="_blank" rel="noopener">Add the 1-click helper — free →</a>
              <div class="sb-login-hint">Already added it? <button type="button" class="sb-linkbtn" id="sbRecheck">Re-check</button></div>`;
