@@ -596,9 +596,6 @@
 
   function shell() {
     return `
-      <div class="rb-subtabs rb-subtabs-bare" role="toolbar">
-        <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
-      </div>
       <div id="rbSubInvoice" class="rb-subpanel">
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
@@ -606,6 +603,7 @@
             <h3>Your offtakers</h3>
           </div>
           <div class="rb-head-actions">
+            <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
             <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
