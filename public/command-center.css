@@ -708,8 +708,14 @@ body.sb-fs-lock{ overflow:hidden; }
 /* the operator's own uploaded template, rendered live (token-filled) on white */
 .rb-doc-frame{ width:100%; height:780px; border:0; background:#fff; border-radius:14px;
   box-shadow:0 26px 70px -30px rgba(0,0,0,.75); display:block; }
-/* a smaller "preview" height for the template card's rendered-PDF pane */
-.rb-tpl-frame{ height:560px; }
+/* template card preview: paint JUST the invoice page (pdf.js canvas) on white — no
+ * browser PDF-viewer toolbar / thumbnail rail / dark canvas around it. */
+.rb-tpl-paper{ background:#fff; border-radius:14px; overflow:hidden; display:block;
+  box-shadow:0 26px 70px -30px rgba(0,0,0,.75); min-height:120px; }
+.rb-tpl-paper canvas{ display:block; width:100%; height:auto; }
+.rb-tpl-load{ padding:46px 16px; text-align:center; color:var(--faint); font-size:12px; }
+/* fallback native-viewer height (only used if pdf.js can't load) */
+.rb-tpl-frame{ width:100%; height:560px; border:0; display:block; }
 .rb-tpl-layout{ margin-bottom:16px; }
 
 /* ── faithful EMAIL reproduction (envelope + cover body + attachment chips) ── */

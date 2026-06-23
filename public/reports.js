@@ -894,8 +894,63 @@
       renderDraftDoc();
       loadTplPreview(t);                              // rendered PDF of the template
     }
-    // Render the operator's stored template to a PDF and embed it beside the card.
+    // Render the operator's stored template and paint JUST the invoice page — pdf.js
+    // draws page 1 onto a canvas, so there's no browser PDF-viewer chrome (toolbar,
+    // thumbnail rail, dark canvas). The native iframe is only a CDN-down fallback.
     let _tplPrevUrl = null;
+    let _pdfjsPromise = null;
+    function _ensurePdfJs() {
+      if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+      if (_pdfjsPromise) return _pdfjsPromise;
+      const BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+      _pdfjsPromise = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = BASE + "pdf.min.js";
+        s.onload = () => {
+          try {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = BASE + "pdf.worker.min.js";
+            resolve(window.pdfjsLib);
+          } catch (e) { reject(e); }
+        };
+        s.onerror = () => reject(new Error("pdfjs load failed"));
+        document.head.appendChild(s);
+      });
+      return _pdfjsPromise;
+    }
+    function _tplFallbackIframe(buf, paper) {
+      // Native viewer with toolbar / thumbnails / scrollbar suppressed — only if
+      // pdf.js can't load (offline / CDN blocked).
+      try {
+        if (_tplPrevUrl) URL.revokeObjectURL(_tplPrevUrl);
+        _tplPrevUrl = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
+        paper.innerHTML = '<iframe class="rb-tpl-frame" title="Template preview" src="' +
+          _tplPrevUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH"></iframe>';
+      } catch (e) {
+        paper.innerHTML = '<div class="rb-tpl-load">Preview unavailable.</div>';
+      }
+    }
+    async function _renderPdfToPaper(buf, paper) {
+      if (!paper) return;
+      let lib;
+      try { lib = await _ensurePdfJs(); }
+      catch (e) { return _tplFallbackIframe(buf, paper); }
+      try {
+        const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+        const page = await pdf.getPage(1);
+        const cssW = Math.max(240, paper.clientWidth || 520);
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const base = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: (cssW / base.width) * ratio });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(vp.width);
+        canvas.height = Math.ceil(vp.height);
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        paper.innerHTML = "";
+        paper.appendChild(canvas);
+      } catch (e) {
+        _tplFallbackIframe(buf, paper);
+      }
+    }
     async function loadTplPreview(t) {
       const pane = $("#rbTplDocPane");
       if (!pane) return;
@@ -909,16 +964,13 @@
       }
       pane.innerHTML = '<div class="rb-doc-cap">Our reproduction of your template — ' +
         esc(t.filename || 'your invoice') + '</div>' +
-        '<iframe class="rb-doc-frame rb-tpl-frame" title="Template reproduction preview" id="rbTplPrevFrame"></iframe>' +
+        '<div class="rb-tpl-paper" id="rbTplPaper"><div class="rb-tpl-load">Rendering preview…</div></div>' +
         '<p class="rb-doc-hint">How the system reproduces your format (sample data shown). ' +
         'Refine it under <b>Edit &amp; preview template</b>.</p>';
       try {
         const r = await fetch(API + "/invoice-template/preview.pdf", { headers: authHeaders() });
         if (!r.ok) throw new Error("preview " + r.status);
-        if (_tplPrevUrl) URL.revokeObjectURL(_tplPrevUrl);
-        _tplPrevUrl = URL.createObjectURL(await r.blob());
-        const fr = $("#rbTplPrevFrame");
-        if (fr) fr.src = _tplPrevUrl;
+        await _renderPdfToPaper(await r.arrayBuffer(), $("#rbTplPaper"));
       } catch (e) {
         pane.innerHTML = '<div class="rb-doc-cap">Template preview</div>' +
           '<div class="rb-doc-empty"><span class="ico">📄</span><b>Preview unavailable</b>' +
