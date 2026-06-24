@@ -4401,11 +4401,11 @@
     // Context line: trial + next-invoice date.
     const ctx = [];
     if(onTrial) ctx.push(trialEnds ? `Free trial through ${fmtDate(trialEnds)} — nothing charged yet` : "Free trial — nothing charged yet");
-    const invAmt = invoice ? pick(invoice, ["amount_cents","amount_due","total","amount"], null) : null;
-    if(invAmt != null){
-      const invDate = pick(invoice, ["period_end","due_date","date","next_payment_date"], null);
-      ctx.push(`next invoice ${usdFromCents(invAmt)}${invDate ? ` on ${fmtDate(invDate)}` : ""}`);
-    }
+    // Show the next billing DATE only — NOT a separate Stripe amount, which can lag
+    // the computed plan total during a usage-report / plan-change sync gap and read
+    // as two disagreeing bills. The "Monthly bill" above is the honest plan estimate.
+    const invDate = invoice ? pick(invoice, ["period_end","due_date","date","next_payment_date"], null) : null;
+    if(invDate) ctx.push(`next charge on ${fmtDate(invDate)}`);
 
     box.innerHTML =
       (lines || `<div class="ao-bill-empty">No charges yet.</div>`) +
