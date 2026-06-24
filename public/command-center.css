@@ -1018,6 +1018,13 @@ body.sb-fs-lock{ overflow:hidden; }
 .vs-vhead{ display:flex; align-items:center; gap:10px; padding:9px 16px 7px;
   background:var(--card2,#f8fafc); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .vs-vbadge{ font-size:11.5px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:var(--good,#2563eb); }
+/* Per-vendor color coding — same palette as the sandbox's "Open in <Vendor>" links so
+   the two views read identically at a glance. Night/base here; day overrides in theme-day.css. */
+.vs-vbadge.vs-vendor-solaredge{ color:#fdba74; }
+.vs-vbadge.vs-vendor-fronius{ color:#a5b4fc; }
+.vs-vbadge.vs-vendor-sma{ color:#67e8f9; }
+.vs-vbadge.vs-vendor-chint{ color:#f9a8d4; }
+.vs-vbadge.vs-vendor-locus{ color:#7dd3fc; }
 .vs-vcount{ font-size:11px; color:var(--faint); }
 .vs-vlag{ font-size:10.5px; font-weight:600; color:var(--good,#2563eb); background:var(--card2,#f8fafc);
   border:1px solid var(--line); border-radius:999px; padding:1px 8px; letter-spacing:.02em; cursor:help; white-space:nowrap; }
