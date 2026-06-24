@@ -3939,6 +3939,11 @@
   function renderAccountList(a){
     const list = document.getElementById("acctList");
     if(!list) return;
+    // Keep the global entitlement in sync with the freshly-fetched account, so the
+    // Plan row + tab gating show the REAL plan even when the initial loadEntitlement
+    // ran before the session was ready (else the Plan row read null → "Choose your
+    // plan" for an operator who's already on Both).
+    if(a && a.plan_features){ _entitlement = a.plan_features; applyTabGating(); }
     const company  = pick(a, ["company_name","company"], "");
     const operator = pick(a, ["operator_name","name","owner_name"], "");
     const email    = pick(a, ["email","operator_email"], "");
