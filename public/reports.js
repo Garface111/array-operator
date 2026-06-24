@@ -729,8 +729,13 @@
 
     const cust = $("#rbqCustomer").selectedOptions[0]
       ? $("#rbqCustomer").selectedOptions[0].textContent : "Offtaker";
-    const srcLabel = math && math.kwh_source === "gmp_api" ? "GMP metered data"
-      : math && math.kwh_source === "daily_csv" ? "your uploaded generation data"
+    // Honest provenance (audit #8): bill_prorate is an ESTIMATE (a utility bill smeared
+    // flat across its days), never "uploaded/measured" data.
+    const _ks = math && math.kwh_source;
+    const srcLabel = _ks === "gmp_api" ? "GMP metered data"
+      : _ks === "bill_prorate" ? "estimated from your utility bill (prorated)"
+      : _ks === "utility_bill" ? "your utility bill"
+      : _ks === "daily_csv" ? "your metered generation data"
       : "best available data";
     const hasData = math && math.has_data;
 
