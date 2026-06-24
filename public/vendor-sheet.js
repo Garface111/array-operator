@@ -92,47 +92,16 @@
     locus: "https://app.locusenergy.com/",
   };
 
-  // Ask the EnergyAgent extension (via so_bridge → background recaptureNow) to RE-SCRAPE
-  // the vendor portal NOW — a silent background tab grabs fresh power and POSTs it to the
-  // backend. Resolves on SO_RECAPTURE_DONE for our reqId, or after a safety timeout (the
-  // recapture's own budget is ~90s). The caller refetches the fleet after it resolves.
+  // True when the EnergyAgent extension is detected on this page, so "Open to sync"
+  // routes through it (opening the portal also arms a fresh capture) instead of a plain tab.
   function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
-
-  function triggerRecapture(vendor) {
-    return new Promise((resolve) => {
-      const reqId = "vs-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
-      let done = false;
-      let t = null;
-      const finish = (r) => {
-        if (done) return; done = true;
-        window.removeEventListener("message", onMsg); if (t) clearTimeout(t); resolve(r);
-      };
-      function onMsg(e) {
-        if (e.source !== window) return;
-        const d = e.data; if (!d) return;
-        if (d.type === "SO_EXTENSION_PRESENT" || d.type === "SO_STATUS_ACK") _extPresent = true;
-        if (d.type === "SO_RECAPTURE_DONE" && d.reqId === reqId) finish(d);
-      }
-      window.addEventListener("message", onMsg);
-      // A real re-scrape (open tab → capture → POST) runs on the extension's ~90s budget,
-      // so wait a touch longer than that when the extension is here (else we'd report a
-      // false "timed out" while it's still working); fail FAST when no extension, so a
-      // click never just hangs.
-      const budgetMs = extPresent() ? 100000 : 7000;
-      t = setTimeout(() => finish({ ok: false, timeout: true, noext: !extPresent() }), budgetMs);
-      try { window.postMessage({ type: "SO_RECAPTURE", vendor, reqId }, "*"); }
-      catch (_) { finish({ ok: false }); }
-    });
-  }
 
   const _expanded = {};                       // array_id -> bool (survives re-renders)
   let _query = "";                            // search filter (lowercased)
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
   let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "sandbox"; } catch (e) { return "sandbox"; } })();
 
-  let _extPresent = false;        // EnergyAgent extension detected on this page (Refresh can then re-scrape)
-  const _refreshState = {};       // vendor -> "refreshing" | "done" | "error" (drives the Refresh button across re-renders)
-  const _refreshErr = {};         // vendor -> short failure reason (button tooltip)
+  let _extPresent = false;        // EnergyAgent extension detected on this page (routes "Open to sync" through it)
 
   // The sortable columns (Vendor is the grouping, not sortable).
   const COLS = [
@@ -186,7 +155,8 @@
     }).join("");
     host.innerHTML = `
       <div class="vs-topbar">
-        <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div></div>
+        <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
+          <div class="vs-hint">To refresh a vendor, open its portal — click the vendor name or its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
         <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
           placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
       </div>
@@ -238,22 +208,15 @@
       const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
-      const lag = CADENCE_MIN[v];
-      let lagChip = "";
-      if (lag) {
-        const rs = _refreshState[v];
-        if (rs === "refreshing") {
-          lagChip = `<span class="vs-vlag vs-refreshing" role="status"><span class="vs-vlag-ic">↻</span> Refreshing…</span>`;
-        } else if (rs === "done") {
-          lagChip = `<span class="vs-vlag vs-vlag-done">✓ Updated just now</span>`;
-        } else if (rs === "error") {
-          const er = _refreshErr[v] || {};
-          lagChip = `<button type="button" class="vs-vlag vs-vlag-err" data-vrefresh="${esc(v)}" title="${esc(er.title || "Couldn't refresh — try again")}">⚠ ${esc(er.label || "Couldn't refresh")} — try again</button>`;
-        } else {
-          lagChip = `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Click to refresh now — re-scrape ${esc(vlabel(v))} for the latest readings. (Live values sync from the EnergyAgent extension about every ${lag} min, so they can run up to ~${lag} min behind real time.)"><span class="vs-vlag-ic">↻</span> Refresh<span class="vs-vlag-sub"> · ~${lag} min lag</span></button>`;
-        }
-      }
+      // Data syncs when the owner OPENS the vendor portal (signing in there lets the
+      // EnergyAgent extension capture the latest readings) — that's the reliable path,
+      // not a background re-scrape. So the per-vendor chip OPENS the portal.
       const _portal = VENDOR_PORTAL[v];
+      // Only the extension-scraped vendors (Chint/Fronius/SMA) sync by opening the portal;
+      // SolarEdge is pulled server-side via API, so it needs no "open to sync" prompt.
+      const lagChip = (_portal && CADENCE_MIN[v])
+        ? `<button type="button" class="vs-vlag" data-vportal="${esc(v)}" title="Opens your ${esc(vlabel(v))} portal in a new tab. Sign in there and your latest readings sync here automatically — the EnergyAgent extension captures them.">↗ Open ${esc(vlabel(v))} to sync</button>`
+        : "";
       const badge = _portal
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
@@ -307,13 +270,8 @@
       _expanded[id] = !_expanded[id];
       renderBody();
     });
-    // The per-vendor lag chip is a Refresh button → doRefresh(): re-scrape the vendor NOW
-    // via the extension, wait for it to land, then refetch so the row + "Synced" flip to
-    // live. State (Refreshing… → Updated / Couldn't refresh) lives in _refreshState so the
-    // feedback survives the fleet re-render that delivers the fresh data.
-    body.querySelectorAll("[data-vrefresh]").forEach(btn =>
-      btn.onclick = () => doRefresh(btn.getAttribute("data-vrefresh")));
-    // Clicking a vendor NAME opens that vendor's monitoring portal. With the extension
+    // Clicking a vendor NAME (badge) or its "Open to sync" chip opens that vendor's
+    // monitoring portal. With the extension
     // present, route through it (so opening the portal also arms a fresh capture);
     // otherwise open the site in a new tab.
     body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = () => {
@@ -329,53 +287,6 @@
       }
       try { window.open(url, "_blank", "noopener"); } catch (_) {}
     });
-  }
-
-  // Refresh one vendor NOW: re-scrape via the extension, wait for it, then refetch so the
-  // row + "Synced" come back to live. Drives _refreshState so the button shows what it's
-  // doing ("Refreshing…" → "Updated" / "Couldn't refresh") even as the fleet re-renders.
-  async function doRefresh(vendor) {
-    if (!vendor || _refreshState[vendor] === "refreshing") return;
-    _refreshState[vendor] = "refreshing"; _refreshErr[vendor] = null;
-    renderBody();
-    let res = null;
-    try { res = await triggerRecapture(vendor); } catch (_) { res = { ok: false }; }
-    // Pull the freshest fleet regardless — the re-scrape just wrote it (or the server may
-    // already hold newer data). refetch() fires a notify → subscribe → renderBody.
-    try { if (window.FleetStore && FleetStore.refetch) await Promise.resolve(FleetStore.refetch()); } catch (_) {}
-    const ok = !!(res && res.ok);
-    const captured = !!(res && res.captured);
-    if (ok && captured) {
-      _refreshState[vendor] = "done";          // got a genuinely fresh reading
-    } else {
-      _refreshState[vendor] = "error";
-      const lab = vlabel(vendor);
-      let label, title;
-      if (res && res.noext) {
-        label = "Extension not found";
-        title = "The EnergyAgent extension isn't responding on this page. Make sure it's installed + enabled, then reload the page.";
-      } else if (res && res.error === "busy") {
-        label = "Busy";
-        title = "Another sync is already running. Wait a few seconds and try again.";
-      } else if (res && res.error === "not-paired") {
-        label = "Not connected";
-        title = "The extension isn't linked to your account yet — reconnect it from the dashboard.";
-      } else if (res && res.timeout) {
-        label = "Timed out";
-        title = `The ${lab} re-scrape didn't finish in time — the portal session may need a sign-in. Open ${lab}, sign in, then try again.`;
-      } else if (ok && !captured) {
-        label = "No new reading";
-        title = `Re-scraped ${lab} but it returned no fresh data — the portal session likely lapsed. Sign back into ${lab} (it auto-logs-in if your creds are saved), then try again.`;
-      } else {
-        label = "Couldn't refresh";
-        title = (res && res.error) || "Something went wrong — try again.";
-      }
-      _refreshErr[vendor] = { label, title };
-    }
-    renderBody();
-    setTimeout(() => {
-      if (_refreshState[vendor] !== "refreshing") { _refreshState[vendor] = null; renderBody(); }
-    }, (ok && captured) ? 2200 : 6000);
   }
 
   // Size the scroll region to fill the viewport below it, so the column header can

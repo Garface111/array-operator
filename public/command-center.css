@@ -1008,6 +1008,8 @@ body.sb-fs-lock{ overflow:hidden; }
 .vs-headrow{ margin:0 2px 14px; }
 .vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
 .vs-sub{ font-size:13px; color:var(--muted); }
+.vs-hint{ margin-top:6px; font-size:12px; line-height:1.45; color:var(--muted); max-width:680px; }
+.vs-hint strong{ color:var(--good,#2563eb); font-weight:650; }
 .vs-scroll{ overflow-y:auto; border:1px solid var(--line); border-radius:14px;
   background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06); }
 .vs-row{ display:grid; grid-template-columns:minmax(180px,2.2fr) 1fr .8fr .9fr 1fr 1.2fr .8fr;
