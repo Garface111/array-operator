@@ -1298,7 +1298,10 @@
     const billOpts = (utilAccts || []).map(a => {
       const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
         : (a.has_bill ? " (bill on file)" : "");
-      const lbl = (a.utility_name || "GMP") + " · acct " + (a.account_number || "?") + bills;
+      // Label by the array name the bill feeds (recognizable site), not the raw
+      // GMP account number. Fall back to nickname, then the account number.
+      const nm = a.array_name || a.nickname;
+      const lbl = nm ? (nm + bills) : ("GMP · acct " + (a.account_number || "?") + bills);
       const sel = String(a.utility_account_id) === String(s.utility_account_id) ? "selected" : "";
       return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
     }).join("");
@@ -1844,7 +1847,10 @@
     const billOpts = (utilAccts || []).map(a => {
       const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
         : (a.has_bill ? " (bill on file)" : "");
-      const lbl = (a.utility_name || "GMP") + " · acct " + (a.account_number || "?") + bills;
+      // Label by the array name the bill feeds (recognizable site), not the raw
+      // GMP account number. Fall back to nickname, then the account number.
+      const nm = a.array_name || a.nickname;
+      const lbl = nm ? (nm + bills) : ("GMP · acct " + (a.account_number || "?") + bills);
       const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
       return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
     }).join("");
