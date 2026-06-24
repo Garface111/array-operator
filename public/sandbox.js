@@ -93,6 +93,27 @@
   function extSend(type, extra){
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
   }
+  // AUTO-PAIR: the extension needs this tenant's long-lived key to capture/refresh
+  // at all. A freshly-(re)loaded extension starts with EMPTY storage → "Not connected"
+  // and the whole capture pipeline goes dark. So the dashboard re-pairs the extension
+  // every time it announces itself: fetch the tenant key once (GET /v1/account, the
+  // session we already hold), then SO_PAIR it across. This makes pairing self-heal —
+  // no more manual reconnect after an extension update.
+  let _pairKey = null, _pairFetching = false;
+  async function fetchPairKey(){
+    if(_pairKey) return _pairKey;
+    if(_pairFetching) return null;
+    const s = getSession(); if(!s) return null;
+    _pairFetching = true;
+    try {
+      const r = await fetch("/v1/account", { headers:{ Authorization:"Bearer "+s } });
+      if(r.ok){ const a = await r.json(); if(a && a.tenant_key) _pairKey = a.tenant_key; }
+    } catch(_){} finally { _pairFetching = false; }
+    return _pairKey;
+  }
+  async function autoPairExtension(){
+    try { const key = await fetchPairKey(); if(key) extSend("SO_PAIR", { tenantKey: key }); } catch(_){}
+  }
   function openPortalLogin(vendor){
     const url = PORTAL_URL[vendor];
     if(!url) return;
@@ -247,6 +268,7 @@
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
       try { window.__AO_EXT_PRESENT = true; } catch(e){}   // shared flag: the spreadsheet view's Refresh button uses it
+      autoPairExtension();   // re-link the extension to this tenant's key — self-heals "Not connected"
     }
     if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)){
       // A sync for this vendor landed — clear its chip state; handleCaptureLanded
