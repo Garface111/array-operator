@@ -1786,8 +1786,8 @@
           ${attChips}
         </div>
       </div>
-      ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled && sid)
-        ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — your template, filled</div>
+      ${sid
+        ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled) ? "your template, filled" : "our default format"}</div>
            <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>` : ""}
       <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
         The invoice shown below is the exact PDF that gets attached${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
@@ -1795,7 +1795,7 @@
     // Render the ACTUAL reproduced invoice (the exact PDF that gets attached/sent) onto
     // a canvas — same source as the attachment chip + "Preview invoice", so it shows
     // THIS offtaker's real values, not the lossy token-HTML that left sample text in.
-    if (TEMPLATE_STATE && TEMPLATE_STATE.enabled && sid) {
+    if (sid) {
       const paper = pane.querySelector("#rbDraftInvPaper");
       if (paper) {
         fetch(`${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf`, { headers: authHeaders() })
