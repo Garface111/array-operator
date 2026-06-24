@@ -202,6 +202,7 @@
           <span class="rb-tpl-status" id="rbTplStatus">Checking…</span>
           <button class="ao-btn rb-btn rb-danger" id="rbTplDel" type="button" hidden>Remove</button>
         </div>
+        <p class="rb-tpl-drophint">…or just drag &amp; drop a file anywhere on this box.</p>
         <div class="rb-tpl-edit" id="rbTplEditRow" hidden>
           <span class="rb-tpl-fmt-label">Offtaker invoice format</span>
           <div class="rb-seg rb-slider rb-tpl-fmt" id="rbTplFmt">
@@ -603,8 +604,7 @@
     }
     await refresh();
     pick.onclick = () => fileIn.click();
-    fileIn.onchange = async () => {
-      const f = fileIn.files && fileIn.files[0];
+    async function doUpload(f) {
       if (!f) return;
       status.textContent = "Uploading " + f.name + "…"; status.className = "rb-tpl-status rb-busy";
       const fd = new FormData(); fd.append("file", f);
@@ -614,8 +614,26 @@
         if (!r.ok) { status.textContent = (d && d.detail) || "Upload failed."; status.className = "rb-tpl-status rb-err"; }
         else { if (htmlBox) htmlBox.dataset.dirty = ""; await refresh(); }
       } catch (e) { status.textContent = "Upload failed — check your connection."; status.className = "rb-tpl-status rb-err"; }
-      fileIn.value = "";
-    };
+    }
+    fileIn.onchange = async () => { await doUpload(fileIn.files && fileIn.files[0]); fileIn.value = ""; };
+    // Drag & drop a file anywhere on the template box. Listeners live on #rbTpl,
+    // which survives the parkTpl/foldTplIntoInbox DOM moves.
+    const drop = $("#rbTpl");
+    if (drop && !drop.dataset.dropWired) {
+      drop.dataset.dropWired = "1";
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+      ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, (e) => { stop(e); drop.classList.add("rb-tpl-drag"); }));
+      ["dragleave", "dragend"].forEach(ev => drop.addEventListener(ev, (e) => {
+        stop(e);
+        if (ev === "dragleave" && drop.contains(e.relatedTarget)) return;  // moving over a child
+        drop.classList.remove("rb-tpl-drag");
+      }));
+      drop.addEventListener("drop", (e) => {
+        stop(e); drop.classList.remove("rb-tpl-drag");
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) doUpload(f);
+      });
+    }
     if (view) view.onclick = async () => {
       try {
         const r = await fetch(API + "/invoice-template/file", { headers: authHeaders() });
