@@ -1031,11 +1031,12 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-vbadge.vs-vendor-chint{ color:#f9a8d4; }
 .vs-vbadge.vs-vendor-locus{ color:#7dd3fc; }
 .vs-vcount{ font-size:11px; color:var(--faint); }
-.vs-vlag{ font-size:10.5px; font-weight:600; color:var(--good,#2563eb); background:var(--card2,#f8fafc);
-  border:1px solid var(--line); border-radius:999px; padding:2px 9px; letter-spacing:.02em; cursor:pointer;
-  white-space:nowrap; font-family:inherit; line-height:1.4; display:inline-flex; align-items:center; gap:3px;
+.vs-vlag{ font-size:10.5px; font-weight:700; color:var(--good,#2563eb); background:rgba(37,99,235,.08);
+  border:1px solid rgba(37,99,235,.28); border-radius:999px; padding:2px 10px; letter-spacing:.02em; cursor:pointer;
+  white-space:nowrap; font-family:inherit; line-height:1.4; display:inline-flex; align-items:center; gap:4px;
   transition:background .12s, border-color .12s, color .12s; }
-.vs-vlag:hover{ background:rgba(37,99,235,.09); border-color:var(--good,#2563eb); color:var(--good,#2563eb); }
+.vs-vlag:hover{ background:rgba(37,99,235,.18); border-color:var(--good,#2563eb); color:var(--good,#2563eb); }
+.vs-vlag-sub{ font-weight:500; color:var(--muted); }
 .vs-vlag:active{ transform:translateY(.5px); }
 .vs-vlag-ic{ display:inline-block; font-weight:700; }
 .vs-vlag.vs-refreshing{ cursor:progress; }

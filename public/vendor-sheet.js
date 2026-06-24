@@ -227,7 +227,7 @@
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       const lag = CADENCE_MIN[v];
-      const lagChip = lag ? `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Refresh now — re-pull the latest readings from the server. (${esc(vlabel(v))} live values sync from the EnergyAgent extension about every ${lag} min, so they can be up to ~${lag} min behind.)"><span class="vs-vlag-ic">↻</span> ~${lag} min lag</button>` : "";
+      const lagChip = lag ? `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Click to refresh now — re-scrape ${esc(vlabel(v))} for the latest readings. (Live values sync from the EnergyAgent extension about every ${lag} min, so they can run up to ~${lag} min behind real time.)"><span class="vs-vlag-ic">↻</span> Refresh<span class="vs-vlag-sub"> · ~${lag} min lag</span></button>` : "";
       const _portal = VENDOR_PORTAL[v];
       const badge = _portal
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
