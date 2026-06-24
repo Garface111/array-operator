@@ -114,9 +114,11 @@
         if (d.type === "SO_RECAPTURE_DONE" && d.reqId === reqId) finish(d);
       }
       window.addEventListener("message", onMsg);
-      // A real re-scrape (open tab → capture → POST) takes ~20-40s, so wait generously
-      // when the extension is here; fail FAST when it isn't, so a click never just hangs.
-      const budgetMs = extPresent() ? 60000 : 7000;
+      // A real re-scrape (open tab → capture → POST) runs on the extension's ~90s budget,
+      // so wait a touch longer than that when the extension is here (else we'd report a
+      // false "timed out" while it's still working); fail FAST when no extension, so a
+      // click never just hangs.
+      const budgetMs = extPresent() ? 100000 : 7000;
       t = setTimeout(() => finish({ ok: false, timeout: true, noext: !extPresent() }), budgetMs);
       try { window.postMessage({ type: "SO_RECAPTURE", vendor, reqId }, "*"); }
       catch (_) { finish({ ok: false }); }
@@ -245,7 +247,8 @@
         } else if (rs === "done") {
           lagChip = `<span class="vs-vlag vs-vlag-done">✓ Updated just now</span>`;
         } else if (rs === "error") {
-          lagChip = `<button type="button" class="vs-vlag vs-vlag-err" data-vrefresh="${esc(v)}" title="${esc(_refreshErr[v] || "Couldn't refresh")}">⚠ Couldn't refresh — try again</button>`;
+          const er = _refreshErr[v] || {};
+          lagChip = `<button type="button" class="vs-vlag vs-vlag-err" data-vrefresh="${esc(v)}" title="${esc(er.title || "Couldn't refresh — try again")}">⚠ ${esc(er.label || "Couldn't refresh")} — try again</button>`;
         } else {
           lagChip = `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Click to refresh now — re-scrape ${esc(vlabel(v))} for the latest readings. (Live values sync from the EnergyAgent extension about every ${lag} min, so they can run up to ~${lag} min behind real time.)"><span class="vs-vlag-ic">↻</span> Refresh<span class="vs-vlag-sub"> · ~${lag} min lag</span></button>`;
         }
@@ -341,17 +344,38 @@
     // already hold newer data). refetch() fires a notify → subscribe → renderBody.
     try { if (window.FleetStore && FleetStore.refetch) await Promise.resolve(FleetStore.refetch()); } catch (_) {}
     const ok = !!(res && res.ok);
-    _refreshState[vendor] = ok ? "done" : "error";
-    if (!ok) {
-      _refreshErr[vendor] = (res && res.noext)
-        ? "EnergyAgent extension not detected on this page — open the vendor portal to refresh."
-        : (res && res.timeout) ? "Refresh timed out — the portal may need you to sign in again."
-        : ((res && res.error) || "Couldn't refresh — try again.");
+    const captured = !!(res && res.captured);
+    if (ok && captured) {
+      _refreshState[vendor] = "done";          // got a genuinely fresh reading
+    } else {
+      _refreshState[vendor] = "error";
+      const lab = vlabel(vendor);
+      let label, title;
+      if (res && res.noext) {
+        label = "Extension not found";
+        title = "The EnergyAgent extension isn't responding on this page. Make sure it's installed + enabled, then reload the page.";
+      } else if (res && res.error === "busy") {
+        label = "Busy";
+        title = "Another sync is already running. Wait a few seconds and try again.";
+      } else if (res && res.error === "not-paired") {
+        label = "Not connected";
+        title = "The extension isn't linked to your account yet — reconnect it from the dashboard.";
+      } else if (res && res.timeout) {
+        label = "Timed out";
+        title = `The ${lab} re-scrape didn't finish in time — the portal session may need a sign-in. Open ${lab}, sign in, then try again.`;
+      } else if (ok && !captured) {
+        label = "No new reading";
+        title = `Re-scraped ${lab} but it returned no fresh data — the portal session likely lapsed. Sign back into ${lab} (it auto-logs-in if your creds are saved), then try again.`;
+      } else {
+        label = "Couldn't refresh";
+        title = (res && res.error) || "Something went wrong — try again.";
+      }
+      _refreshErr[vendor] = { label, title };
     }
     renderBody();
     setTimeout(() => {
       if (_refreshState[vendor] !== "refreshing") { _refreshState[vendor] = null; renderBody(); }
-    }, ok ? 2200 : 4500);
+    }, (ok && captured) ? 2200 : 6000);
   }
 
   // Size the scroll region to fill the viewport below it, so the column header can
