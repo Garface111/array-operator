@@ -316,7 +316,8 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-tpl-status{ font-size:12.5px; color:var(--faint); }
 .rb-tpl-status.rb-tpl-have{ color:var(--ink); }
 .rb-tpl-status.rb-err{ color:#e06666; }
-.rb-tpl-edit{ flex-basis:100%; width:100%; margin-top:8px; }
+.rb-tpl-edit{ flex-basis:100%; width:100%; margin-top:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.rb-tpl-fmt-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--faint); font-weight:600; }
 .rb-tpl-enable{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer; }
 .rb-tpl-adv{ margin-top:8px; }
 .rb-tpl-adv summary{ cursor:pointer; font-size:12.5px; color:var(--sky); }
@@ -911,9 +912,25 @@ body.sb-fs-lock{ overflow:hidden; }
  * approval; the GMP utility invoice can be attached before sending. */
 .rb-inbox-wrap{ margin-bottom:20px; }
 .rb-inbox{ border:1px solid var(--good,#3fd68a); box-shadow:0 0 0 1px rgba(63,214,138,.12), 0 8px 30px rgba(0,0,0,.18); }
-.rb-inbox-h{ margin-bottom:14px; }
+.rb-inbox-h{ margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start; gap:24px; flex-wrap:wrap; }
+.rb-inbox-h-main{ flex:1 1 360px; min-width:0; }
 .rb-inbox-h h3{ margin:4px 0 2px; }
 .rb-inbox-h p{ font-size:13px; color:var(--faint); margin:0; max-width:62ch; line-height:1.55; }
+/* offtaker picker — selecting an offtaker re-renders the whole approval section to it */
+.rb-inbox-pick{ flex:0 0 auto; display:flex; flex-direction:column; gap:5px; align-items:stretch;
+  min-width:240px; max-width:340px; padding:12px 14px; border:1px solid var(--line,#e2e8f0);
+  border-radius:12px; background:rgba(63,214,138,.05); }
+.rb-pick-lab{ font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; font-weight:700; color:var(--muted,#8b97a8); }
+.rb-pick-sel-wrap{ position:relative; width:100%; }
+.rb-pick-sel-wrap::after{ content:"▾"; position:absolute; right:13px; top:50%; transform:translateY(-50%);
+  pointer-events:none; color:var(--good,#047857); font-size:12px; }
+.rb-pick-sel{ width:100%; appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
+  font:inherit; font-size:15px; font-weight:700; color:var(--ink,#0f172a); line-height:1.3;
+  padding:9px 34px 9px 13px; border:1.5px solid var(--good,#047857); border-radius:9px;
+  background:var(--bg-card,#fff); transition:border-color .12s, box-shadow .12s; }
+.rb-pick-sel:hover{ box-shadow:0 0 0 3px rgba(63,214,138,.16); }
+.rb-pick-sel:focus{ outline:none; box-shadow:0 0 0 3px rgba(63,214,138,.28); }
+.rb-pick-sub{ font-size:11px; color:var(--faint); }
 
 .rb-draft{ border:1px solid var(--line); border-radius:14px; padding:15px 17px; margin-top:12px; background:rgba(255,255,255,.018); }
 .rb-draft-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }

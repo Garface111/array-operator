@@ -199,8 +199,13 @@
           <span class="rb-tpl-status" id="rbTplStatus">Checking…</span>
           <button class="ao-btn rb-btn rb-danger" id="rbTplDel" type="button" hidden>Remove</button>
         </div>
-        <div class="rb-tpl-edit">
-          <label class="rb-tpl-enable"><input type="checkbox" id="rbTplEnabled"> Use this template for my offtaker invoices</label>
+        <div class="rb-tpl-edit" id="rbTplEditRow" hidden>
+          <span class="rb-tpl-fmt-label">Offtaker invoice format</span>
+          <div class="rb-seg rb-slider rb-tpl-fmt" id="rbTplFmt">
+            <button type="button" data-v="template">Use this template</button>
+            <button type="button" data-v="default">Default format</button>
+          </div>
+          <span class="rb-tpl-estatus" id="rbTplEStatus"></span>
         </div>
       </div>
         </div>
@@ -494,10 +499,16 @@
   async function wireInvoiceTemplate() {
     const pick = $("#rbTplPick"), fileIn = $("#rbTplFile"), status = $("#rbTplStatus");
     const view = $("#rbTplView"), del = $("#rbTplDel");
-    const enabled = $("#rbTplEnabled"), htmlBox = $("#rbTplHtml"), tokens = $("#rbTplTokens");
+    const fmtSeg = $("#rbTplFmt"), editRow = $("#rbTplEditRow"), htmlBox = $("#rbTplHtml"), tokens = $("#rbTplTokens");
     const saveBtn = $("#rbTplSave"), prevBtn = $("#rbTplPreview"), estatus = $("#rbTplEStatus");
     if (!pick || !fileIn || !status) return;
     const jsonHdr = () => Object.assign({ "Content-Type": "application/json" }, authHeaders() || {});
+    // Reflect the enabled state on the two-option slider (Use this template / Default).
+    function setFmt(useTpl) {
+      if (!fmtSeg) return;
+      fmtSeg.querySelectorAll("button").forEach(b =>
+        b.classList.toggle("on", (b.getAttribute("data-v") === "template") === !!useTpl));
+    }
     function paint(t) {
       const has = t && t.has_template;
       status.textContent = has
@@ -507,7 +518,10 @@
       status.className = "rb-tpl-status" + (has ? " rb-tpl-have" : "");
       if (view) view.hidden = !(t && t.filename);
       if (del) del.hidden = !has;
-      if (enabled && t) enabled.checked = !!t.enabled;
+      // The Use-this-template / Default-format slider only makes sense with a
+      // template on file; it defaults to "Use this template" once one is uploaded.
+      if (editRow) editRow.hidden = !has;
+      if (fmtSeg && t) setFmt(!!t.enabled);
       // don't clobber unsaved edits in the textarea
       if (htmlBox && t && t.html != null && !htmlBox.dataset.dirty) htmlBox.value = t.html;
       if (tokens && t && t.tokens) tokens.innerHTML = "Tokens you can use: " +
@@ -630,8 +644,12 @@
         return true;
       } catch (e) { if (estatus) { estatus.textContent = "Save failed."; estatus.className = "rb-tpl-estatus rb-err"; } return false; }
     }
-    if (enabled) enabled.onchange = () => savePut({ enabled: enabled.checked },
-      enabled.checked ? "On — invoices will use your template." : "Off — using the standard format.");
+    if (fmtSeg) fmtSeg.querySelectorAll("button").forEach(b => b.onclick = () => {
+      const useTpl = b.getAttribute("data-v") === "template";
+      setFmt(useTpl);                                  // optimistic; paint() reconciles
+      savePut({ enabled: useTpl },
+        useTpl ? "On — invoices use your template." : "Using the standard format.");
+    });
     if (saveBtn) saveBtn.onclick = () => savePut({ html: htmlBox ? htmlBox.value : "" }, "Template saved.");
     if (prevBtn) prevBtn.onclick = async () => {
       if (estatus) { estatus.textContent = "Rendering preview…"; estatus.className = "rb-tpl-estatus rb-busy"; }
@@ -1560,6 +1578,7 @@
   // The pending drafts currently shown, + which one the live preview tracks.
   let INBOX_DRAFTS = [];
   let ACTIVE_DRAFT_ID = null;
+  let INBOX_UTIL_ACCTS = [];   // cached so the offtaker dropdown can re-render without a refetch
   // The operator's invoice template ({enabled, html}) — when enabled, the live
   // preview renders THIS (their exact format) instead of the generic mock, so an
   // uploaded template propagates into the preview immediately.
@@ -1598,38 +1617,68 @@
       const drafts = (await r.json().catch(() => ({}))).drafts || [];
       if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }   // hide when empty
       INBOX_DRAFTS = drafts;
-      if (!drafts.some(d => String(d.id) === String(ACTIVE_DRAFT_ID))) ACTIVE_DRAFT_ID = drafts[0].id;
-      wrap.innerHTML = `
-        <div class="rb-inbox rep-card">
-          <div class="rb-inbox-h">
+      INBOX_UTIL_ACCTS = utilAccts || [];
+      renderInboxBody();
+    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; }
+  }
+
+  // Render the approval inbox from the CACHED drafts (no refetch), so the header
+  // offtaker dropdown can switch the whole section instantly. ONE offtaker shows at a
+  // time — the dropdown picks which, and its draft card + live preview update together.
+  function renderInboxBody() {
+    const wrap = $("#rbInboxWrap");
+    if (!wrap) return;
+    const drafts = INBOX_DRAFTS;
+    if (!drafts.length) { wrap.innerHTML = ""; return; }
+    if (!drafts.some(d => String(d.id) === String(ACTIVE_DRAFT_ID))) ACTIVE_DRAFT_ID = drafts[0].id;
+    const active = activeDraft();
+    const opts = drafts.map(d =>
+      `<option value="${esc(String(d.id))}"${String(d.id) === String(ACTIVE_DRAFT_ID) ? " selected" : ""}>`
+      + `${esc(d.customer_name || "Offtaker")}${d.period_label ? " — " + esc(d.period_label) : ""}</option>`
+    ).join("");
+    wrap.innerHTML = `
+      <div class="rb-inbox rep-card">
+        <div class="rb-inbox-h">
+          <div class="rb-inbox-h-main">
             <span class="rep-eyebrow">Awaiting your approval</span>
             <h3>${drafts.length} report${drafts.length === 1 ? "" : "s"} ready to review &amp; send</h3>
             <p>Drafted from the latest billing period. Review the numbers, then
                approve — nothing goes to an offtaker until you do. The GMP bill
                attaches automatically.</p>
           </div>
-          <div class="rb-layout">
-            <div class="rb-col-form">
-              ${drafts.map(d => draftCard(d, utilAccts)).join("")}
+          <div class="rb-inbox-pick">
+            <label class="rb-pick-lab" for="rbOfftakerPick">Reviewing offtaker</label>
+            <div class="rb-pick-sel-wrap">
+              <select class="rb-pick-sel" id="rbOfftakerPick" aria-label="Choose which offtaker's report to review">${opts}</select>
             </div>
-            <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
+            <span class="rb-pick-sub">${drafts.length > 1 ? `Pick any of the ${drafts.length} awaiting approval` : "Sends only when you approve"}</span>
           </div>
-        </div>`;
-      wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-      // Live preview: paint now, then repaint as the operator edits the email,
-      // toggles the GMP attach, or focuses a different draft.
-      renderDraftDoc();
-      wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
-        const focusDraft = () => { ACTIVE_DRAFT_ID = ta.getAttribute("data-draftmsg"); renderDraftDoc(); };
-        ta.addEventListener("input", focusDraft);
-        ta.addEventListener("focus", focusDraft);
-      });
-      wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
-        cb.addEventListener("change", () => renderDraftDoc()));
-      // Inline offtaker-detail editors — edits persist to the offtaker and
-      // live-update the preview (money fields recompute the draft figures).
-      wireOfftakerEditors(wrap);
-    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; }
+        </div>
+        <div class="rb-layout">
+          <div class="rb-col-form">
+            ${draftCard(active, INBOX_UTIL_ACCTS)}
+          </div>
+          <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
+        </div>
+      </div>`;
+    wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
+    // Live preview: paint now, then repaint as the operator edits the email or toggles
+    // an attachment.
+    renderDraftDoc();
+    wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
+      const focusDraft = () => { ACTIVE_DRAFT_ID = ta.getAttribute("data-draftmsg"); renderDraftDoc(); };
+      ta.addEventListener("input", focusDraft);
+      ta.addEventListener("focus", focusDraft);
+    });
+    wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
+      cb.addEventListener("change", () => renderDraftDoc()));
+    // Offtaker picker — switch the WHOLE approval section to the chosen offtaker
+    // (re-render from cache, instant, no refetch).
+    const pick = wrap.querySelector("#rbOfftakerPick");
+    if (pick) pick.addEventListener("change", () => { ACTIVE_DRAFT_ID = pick.value; renderInboxBody(); });
+    // Inline offtaker-detail editors — edits persist to the offtaker and live-update
+    // the preview (money fields recompute the draft figures).
+    wireOfftakerEditors(wrap);
   }
 
   function activeDraft() {
