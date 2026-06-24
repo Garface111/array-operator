@@ -2178,6 +2178,7 @@
           <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
             placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
           <div class="rb-draft-email-row">
+            <button class="ao-btn ao-btn-primary rb-btn" data-dact="aiemail" type="button" title="Write a cover email tailored to this invoice's figures + context">✨ Write with AI</button>
             <button class="ao-btn rb-btn" data-dact="savemsg" type="button">Save email</button>
             <span class="rb-draft-msg-hint">Saved with the report. The invoice${d.has_gmp_pdf ? " + GMP invoice are" : " is"} attached automatically.</span>
           </div>
@@ -2503,6 +2504,32 @@
         });
         if (r.ok) { setSt("rb-status", ""); await refreshInbox(); }
         else { setSt("rb-status rb-err", "Couldn't save."); }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
+      return;
+    }
+    if (act === "aiemail") {
+      const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
+      setSt("rb-status rb-busy", "✨ Writing a tailored email…");
+      try {
+        const r = await fetch(API + "/drafts/" + id + "/ai-email", { method: "POST", headers: authHeaders() });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.email) {
+          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Couldn't write the email.");
+          return;
+        }
+        if (ta) { ta.value = data.email; autoGrowMsg(ta); }
+        const d = INBOX_DRAFTS.find(x => String(x.id) === String(id));
+        if (d) d.note = data.email;            // preview + send use this note
+        ACTIVE_DRAFT_ID = id; renderDraftDoc();
+        // Persist it so Approve/Send uses it even without a separate Save click.
+        try {
+          await fetch(API + "/drafts/" + id, {
+            method: "PATCH",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ note: data.email }),
+          });
+        } catch (e) { /* the textarea still holds it; Save email persists it */ }
+        setSt("rb-status rb-ok", "✨ Written + saved — review, edit anything, then send.");
       } catch (err) { setSt("rb-status rb-err", "Network error."); }
       return;
     }
