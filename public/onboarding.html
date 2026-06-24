@@ -894,7 +894,13 @@ async function finish(){
               method:"POST", headers:hdr, body: JSON.stringify(state.readingsCapture)
             });
             cd = await conn.json().catch(()=>({}));
-            state.arraysConnected = !!(conn.ok && cd.ok && cd.sites_captured);
+            // Require ACTUAL inverters, not just a site — a CHINT capture can land
+            // a site with 0 devices (busTypeDevices not loaded yet) and still 200;
+            // counting that as "connected" claims arrays that never appear.
+            const _nInv = (typeof cd.inverters_persisted === "number")
+              ? cd.inverters_persisted
+              : ((cd.sites||[]).reduce((t,s)=>t+(s.inverters_persisted||0),0));
+            state.arraysConnected = !!(conn.ok && cd.ok && cd.sites_captured && _nInv > 0);
           } else if(state.vendor==="solaredge" && state.apiKey){
             conn = await fetch(`${API_BASE}/v1/array-owners/solaredge/connect-account`, {
               method:"POST", headers:hdr, body: JSON.stringify({api_key: state.apiKey})

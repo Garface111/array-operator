@@ -177,6 +177,20 @@
       const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured || data.accounts_captured);
       const isMeter = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
       if(ok){
+        // HONEST GATE: an inverter capture can return ok/200 with site(s) but ZERO
+        // inverters persisted — e.g. CHINT's portal SPA hadn't loaded its device
+        // list (busTypeDevices) when capture fired, so we saw the site but no
+        // inverters. Don't claim "inverters on the canvas" when nothing landed;
+        // tell the owner to fully open each site and let them retry.
+        if(!isMeter){
+          const nInv = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
+          if(!nInv){
+            const B = esc(BRAND[d.provider]||d.provider);
+            if(note){ note.className = "sb-note err"; note.innerHTML =
+              `We reached ${B} but didn't see any inverters yet — open each site fully in the ${B} portal so its inverter list loads, then sync again.`; }
+            return;   // keep the modal open for a retry; no false "on the canvas" toast
+          }
+        }
         // Pull the freshly-attached array(s) from the server and re-render the
         // tree. load() short-circuits when the store is already loaded (it is, on
         // the dashboard), so we must force a real re-fetch.
