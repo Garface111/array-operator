@@ -1037,6 +1037,19 @@ body.sb-fs-lock{ overflow:hidden; }
 .vs-inv-meta{ font-size:11px; color:var(--faint); font-weight:400; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
 .vs-empty{ padding:60px 20px; text-align:center; color:var(--faint); font-size:14px; }
+/* search + sortable headers */
+.vs-topbar{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 2px 14px; }
+.vs-headrow{ margin:0; }
+.vs-searchwrap{ flex:0 0 auto; }
+.vs-search{ width:280px; max-width:48vw; font:inherit; font-size:13px; color:var(--ink,#0f172a);
+  padding:8px 12px; border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff);
+  transition:border-color .12s, box-shadow .12s; }
+.vs-search:focus{ outline:none; border-color:var(--good,#2563eb); box-shadow:0 0 0 3px rgba(37,99,235,.16); }
+.vs-search::placeholder{ color:var(--faint); }
+.vs-sortable{ cursor:pointer; user-select:none; }
+.vs-sortable:hover{ color:var(--ink,#0f172a); }
+.vs-colhead .vs-sortable.on{ color:var(--good,#2563eb); }
+.vs-sc{ font-style:normal; font-size:9px; }
 
 .rb-draft{ border:1px solid var(--line); border-radius:14px; padding:15px 17px; margin-top:12px; background:rgba(255,255,255,.018); }
 .rb-draft-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }

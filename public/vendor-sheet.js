@@ -3,9 +3,10 @@
  *
  * A structured, spreadsheet-style sibling to the Sandbox under the "Vendor data"
  * tab: every array as a row, grouped by vendor; click a row to expand its
- * inverters. Reads the SAME canonical fleet as the sandbox (FleetStore) so the
- * two views never drift, and re-renders on every fleet change. The Sandbox |
- * Spreadsheet sub-toggle (in index.html, #panelArrays) flips between them.
+ * inverters; SEARCH to filter; click a column header to SORT (within each vendor
+ * group). Reads the SAME canonical fleet as the sandbox (FleetStore) so the two
+ * views never drift. The persistent header (search + sortable headers) is built
+ * once and only the table BODY re-renders — so typing never loses focus.
  * ==========================================================================*/
 (function () {
   "use strict";
@@ -34,6 +35,12 @@
     if ((c.source_status || {}).state === "stale") return { label: "Source offline", cls: "warn" };
     return { label: "All clear", cls: "ok" };
   }
+  function statusRank(c) {
+    const a = c.alert || {};
+    if (a.level === "critical") return 3;
+    if (a.level === "warn" || (c.source_status || {}).state === "stale") return 2;
+    return 0;
+  }
   function invStatus(iv) {
     const s = iv.status || "ok";
     if (s === "dead") return { label: "Stopped", cls: "bad" };
@@ -52,35 +59,110 @@
   }
 
   const _expanded = {};                       // array_id -> bool (survives re-renders)
+  let _query = "";                            // search filter (lowercased)
+  let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
   let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "sandbox"; } catch (e) { return "sandbox"; } })();
 
-  function render() {
-    const host = $("#vendorSheet");
-    if (!host || !window.FleetStore) return;
-    const data = FleetStore.toColumns();      // ALL arrays, same shape the sandbox uses
-    const cols = (data && data.columns) || [];
+  // The sortable columns (Vendor is the grouping, not sortable).
+  const COLS = [
+    { key: "name", cls: "vs-c-name", label: "Array" },
+    { key: null, cls: "vs-c-vendor", label: "Vendor" },
+    { key: "inv", cls: "vs-c-inv", label: "Inverters" },
+    { key: "pow", cls: "vs-c-pow", label: "Live now" },
+    { key: "today", cls: "vs-c-today", label: "Today" },
+    { key: "status", cls: "vs-c-status", label: "Status" },
+    { key: "fresh", cls: "vs-c-fresh", label: "Synced" },
+  ];
+  function sortVal(c, key) {
+    switch (key) {
+      case "inv": return c.inverter_count || 0;
+      case "pow": return c.current_power_w == null ? -1 : c.current_power_w;
+      case "today": return c.produced_today_kwh == null ? -1 : c.produced_today_kwh;
+      case "status": return statusRank(c);
+      case "fresh": { const h = (c.source_status || {}).age_hours; return h == null ? Infinity : h; }
+      default: return (c.array_name || "").toLowerCase();
+    }
+  }
+  function sortCols(list) {
+    const m = _sort.dir === "desc" ? -1 : 1;
+    return list.slice().sort((a, b) => {
+      const va = sortVal(a, _sort.key), vb = sortVal(b, _sort.key);
+      if (va < vb) return -1 * m;
+      if (va > vb) return 1 * m;
+      return String(a.array_name || "").localeCompare(String(b.array_name || ""));   // stable tiebreak
+    });
+  }
+  function setSort(key) {
+    if (!key) return;
+    if (_sort.key === key) _sort.dir = _sort.dir === "asc" ? "desc" : "asc";
+    else _sort = { key, dir: key === "name" ? "asc" : "desc" };   // numbers default biggest-first
+  }
+  function invMatch(c, q) {
+    return (c.inverters || []).some(iv =>
+      ((iv.name || "") + " " + (iv.model || "") + " " + (iv.sn || "")).toLowerCase().includes(q));
+  }
+  function matches(c, q) {
+    if (!q) return true;
+    if ((c.array_name || "").toLowerCase().includes(q)) return true;
+    if (vlabel((c.vendor || "").toLowerCase()).toLowerCase().includes(q)) return true;
+    return invMatch(c, q);
+  }
+
+  function buildShell(host) {
+    const heads = COLS.map(col => {
+      if (!col.key) return `<span class="${col.cls}">${col.label}</span>`;
+      return `<span class="${col.cls} vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`;
+    }).join("");
+    host.innerHTML = `
+      <div class="vs-topbar">
+        <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div></div>
+        <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
+          placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div class="vs-table">
+        <div class="vs-row vs-colhead">${heads}</div>
+        <div id="vsBody"></div>
+      </div>`;
+    const s = host.querySelector("#vsSearch");
+    s.value = _query;
+    s.addEventListener("input", () => { _query = s.value.trim().toLowerCase(); renderBody(); });
+    host.querySelectorAll("[data-sort]").forEach(b => {
+      const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
+      b.addEventListener("click", go);
+      b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    });
+  }
+
+  function renderBody() {
+    const body = $("#vsBody");
+    if (!body || !window.FleetStore) return;
+    // refresh the sort-caret indicators on the persistent header
+    document.querySelectorAll("#vendorSheet [data-sort]").forEach(h => {
+      const on = h.getAttribute("data-sort") === _sort.key;
+      h.classList.toggle("on", on);
+      const i = h.querySelector(".vs-sc");
+      if (i) i.textContent = on ? (_sort.dir === "asc" ? " ▲" : " ▼") : "";
+    });
+    const data = FleetStore.toColumns();
+    const all = (data && data.columns) || [];
+    const cols = all.filter(c => matches(c, _query));
+    const cnt = $("#vsCount");
+    if (cnt) {
+      const invShown = cols.reduce((t, c) => t + (c.inverter_count || 0), 0);
+      cnt.textContent = _query
+        ? `${cols.length} of ${all.length} arrays match "${_query}"`
+        : `${all.length} array${all.length === 1 ? "" : "s"} · ${(data.summary || {}).inverters_total || invShown} inverters`;
+    }
     if (!cols.length) {
-      host.innerHTML = '<div class="vs-empty">No arrays connected yet — add one from the Sandbox view, then they\'ll appear here.</div>';
+      body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — add one from the Sandbox view."}</div>`;
       return;
     }
     const byVendor = {};
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
-
-    let h = `<div class="vs-headrow">
-      <div><h2>All vendor data</h2>
-      <div class="vs-sub">${cols.length} array${cols.length === 1 ? "" : "s"} · ${data.summary.inverters_total} inverters · ${vendors.length} vendor${vendors.length === 1 ? "" : "s"}</div></div>
-    </div>
-    <div class="vs-table">
-      <div class="vs-row vs-colhead">
-        <span class="vs-c-name">Array</span><span class="vs-c-vendor">Vendor</span>
-        <span class="vs-c-inv">Inverters</span><span class="vs-c-pow">Live now</span>
-        <span class="vs-c-today">Today</span><span class="vs-c-status">Status</span>
-        <span class="vs-c-fresh">Synced</span>
-      </div>`;
-
+    let h = "";
     vendors.forEach(v => {
-      const list = byVendor[v].slice().sort((a, b) => String(a.array_name || "").localeCompare(String(b.array_name || "")));
+      const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       h += `<div class="vs-vgroup">
@@ -89,7 +171,7 @@
           <span class="vs-vtot">${kw(vtot)} now</span></div>`;
       list.forEach(c => {
         const st = arrStatus(c);
-        const open = !!_expanded[c.array_id];
+        const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span>${esc(c.array_name || "Array")}</span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
@@ -123,13 +205,21 @@
       });
       h += `</div>`;
     });
-    h += `</div>`;
-    host.innerHTML = h;
-    host.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
+    body.innerHTML = h;
+    body.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
       const id = b.getAttribute("data-arr");
       _expanded[id] = !_expanded[id];
-      render();
+      renderBody();
     });
+  }
+
+  function render() {
+    const host = $("#vendorSheet");
+    if (!host || !window.FleetStore) return;
+    const data = FleetStore.toColumns();
+    if (!((data && data.columns) || []).length) { host.innerHTML = '<div class="vs-empty">No arrays connected yet — add one from the Sandbox view, then they\'ll appear here.</div>'; return; }
+    if (!host.querySelector("#vsSearch")) buildShell(host);   // build the persistent shell once
+    renderBody();
   }
 
   function showView(v) {
@@ -142,27 +232,29 @@
     [["sandbox", segSb], ["spreadsheet", segSheet]].forEach(([name, el]) => {
       if (el) { el.classList.toggle("on", v === name); el.setAttribute("aria-pressed", String(v === name)); }
     });
-    if (v === "spreadsheet") {
-      if (window.FleetStore) { if (!FleetStore.isLoaded()) FleetStore.load(); render(); }
+    if (v === "spreadsheet" && window.FleetStore) {
+      if (!FleetStore.isLoaded()) FleetStore.load();
+      render();
     }
   }
 
   function init() {
     const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet");
-    if (!segSb || !segSheet) return;          // markup not present (older index.html)
+    if (!segSb || !segSheet) return;
     segSb.onclick = () => showView("sandbox");
     segSheet.onclick = () => showView("spreadsheet");
     if (window.FleetStore && FleetStore.subscribe) {
-      // Re-render on real fleet changes; skip the high-frequency "live" beat + triage
-      // so the table doesn't rebuild (and lose scroll) every few seconds.
+      // Re-render on real fleet changes; skip the high-frequency "live" beat + triage so
+      // the body doesn't rebuild every few seconds. renderBody() leaves the search input
+      // (in the persistent shell) untouched, so a live refresh never steals focus.
       FleetStore.subscribe((s, kind) => {
-        if (_view === "spreadsheet" && kind !== "live" && kind !== "triage") render();
+        if (_view !== "spreadsheet" || kind === "live" || kind === "triage") return;
+        if ($("#vsSearch")) renderBody(); else render();
       });
     }
-    showView(_view);                          // apply the persisted choice
+    showView(_view);
   }
 
-  // Called by the tab system when the Vendor-data tab is (re)entered.
   window.__aoLoadVendorSheet = function () {
     if (_view === "spreadsheet" && window.FleetStore) {
       if (!FleetStore.isLoaded()) FleetStore.load();
