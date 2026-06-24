@@ -96,6 +96,8 @@
   // the vendor portal NOW — a silent background tab grabs fresh power and POSTs it to the
   // backend. Resolves on SO_RECAPTURE_DONE for our reqId, or after a safety timeout (the
   // recapture's own budget is ~90s). The caller refetches the fleet after it resolves.
+  function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
+
   function triggerRecapture(vendor) {
     return new Promise((resolve) => {
       const reqId = "vs-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
@@ -107,11 +109,15 @@
       };
       function onMsg(e) {
         if (e.source !== window) return;
-        const d = e.data;
-        if (d && d.type === "SO_RECAPTURE_DONE" && d.reqId === reqId) finish(d);
+        const d = e.data; if (!d) return;
+        if (d.type === "SO_EXTENSION_PRESENT" || d.type === "SO_STATUS_ACK") _extPresent = true;
+        if (d.type === "SO_RECAPTURE_DONE" && d.reqId === reqId) finish(d);
       }
       window.addEventListener("message", onMsg);
-      t = setTimeout(() => finish({ ok: false, timeout: true }), 95000);
+      // A real re-scrape (open tab → capture → POST) takes ~20-40s, so wait generously
+      // when the extension is here; fail FAST when it isn't, so a click never just hangs.
+      const budgetMs = extPresent() ? 60000 : 7000;
+      t = setTimeout(() => finish({ ok: false, timeout: true, noext: !extPresent() }), budgetMs);
       try { window.postMessage({ type: "SO_RECAPTURE", vendor, reqId }, "*"); }
       catch (_) { finish({ ok: false }); }
     });
@@ -121,6 +127,10 @@
   let _query = "";                            // search filter (lowercased)
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
   let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "sandbox"; } catch (e) { return "sandbox"; } })();
+
+  let _extPresent = false;        // EnergyAgent extension detected on this page (Refresh can then re-scrape)
+  const _refreshState = {};       // vendor -> "refreshing" | "done" | "error" (drives the Refresh button across re-renders)
+  const _refreshErr = {};         // vendor -> short failure reason (button tooltip)
 
   // The sortable columns (Vendor is the grouping, not sortable).
   const COLS = [
@@ -227,7 +237,19 @@
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       const lag = CADENCE_MIN[v];
-      const lagChip = lag ? `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Click to refresh now — re-scrape ${esc(vlabel(v))} for the latest readings. (Live values sync from the EnergyAgent extension about every ${lag} min, so they can run up to ~${lag} min behind real time.)"><span class="vs-vlag-ic">↻</span> Refresh<span class="vs-vlag-sub"> · ~${lag} min lag</span></button>` : "";
+      let lagChip = "";
+      if (lag) {
+        const rs = _refreshState[v];
+        if (rs === "refreshing") {
+          lagChip = `<span class="vs-vlag vs-refreshing" role="status"><span class="vs-vlag-ic">↻</span> Refreshing…</span>`;
+        } else if (rs === "done") {
+          lagChip = `<span class="vs-vlag vs-vlag-done">✓ Updated just now</span>`;
+        } else if (rs === "error") {
+          lagChip = `<button type="button" class="vs-vlag vs-vlag-err" data-vrefresh="${esc(v)}" title="${esc(_refreshErr[v] || "Couldn't refresh")}">⚠ Couldn't refresh — try again</button>`;
+        } else {
+          lagChip = `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Click to refresh now — re-scrape ${esc(vlabel(v))} for the latest readings. (Live values sync from the EnergyAgent extension about every ${lag} min, so they can run up to ~${lag} min behind real time.)"><span class="vs-vlag-ic">↻</span> Refresh<span class="vs-vlag-sub"> · ~${lag} min lag</span></button>`;
+        }
+      }
       const _portal = VENDOR_PORTAL[v];
       const badge = _portal
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
@@ -282,22 +304,12 @@
       _expanded[id] = !_expanded[id];
       renderBody();
     });
-    // The per-vendor lag chip is a refresh button: re-pull the latest fleet from the
-    // server (FleetStore.refetch → notify → re-render with fresh values). Spin while
-    // the fetch is in flight; the re-render replaces these nodes when data lands.
-    body.querySelectorAll("[data-vrefresh]").forEach(btn => btn.onclick = () => {
-      if (btn.classList.contains("vs-refreshing")) return;
-      const vendor = btn.getAttribute("data-vrefresh");
-      btn.classList.add("vs-refreshing");
-      const settle = () => {
-        try { if (window.FleetStore && FleetStore.refetch) FleetStore.refetch(); } catch (_) {}
-        try { btn.classList.remove("vs-refreshing"); } catch (_) {}
-      };
-      // Extension present → trigger a live RE-SCRAPE of the portal, then refetch when it
-      // lands. No extension → just re-pull whatever the server already has.
-      if (window.__AO_EXT_PRESENT) triggerRecapture(vendor).finally(settle);
-      else settle();
-    });
+    // The per-vendor lag chip is a Refresh button → doRefresh(): re-scrape the vendor NOW
+    // via the extension, wait for it to land, then refetch so the row + "Synced" flip to
+    // live. State (Refreshing… → Updated / Couldn't refresh) lives in _refreshState so the
+    // feedback survives the fleet re-render that delivers the fresh data.
+    body.querySelectorAll("[data-vrefresh]").forEach(btn =>
+      btn.onclick = () => doRefresh(btn.getAttribute("data-vrefresh")));
     // Clicking a vendor NAME opens that vendor's monitoring portal. With the extension
     // present, route through it (so opening the portal also arms a fresh capture);
     // otherwise open the site in a new tab.
@@ -305,7 +317,7 @@
       const v = btn.getAttribute("data-vportal");
       const url = VENDOR_PORTAL[v];
       if (!url) return;
-      if (window.__AO_EXT_PRESENT) {
+      if (extPresent()) {
         try {
           window.postMessage({ type: "SO_OPEN_PORTAL", url, active: true, provider: v, vendor: v,
                                reqId: "vs-" + Date.now() }, "*");
@@ -314,6 +326,32 @@
       }
       try { window.open(url, "_blank", "noopener"); } catch (_) {}
     });
+  }
+
+  // Refresh one vendor NOW: re-scrape via the extension, wait for it, then refetch so the
+  // row + "Synced" come back to live. Drives _refreshState so the button shows what it's
+  // doing ("Refreshing…" → "Updated" / "Couldn't refresh") even as the fleet re-renders.
+  async function doRefresh(vendor) {
+    if (!vendor || _refreshState[vendor] === "refreshing") return;
+    _refreshState[vendor] = "refreshing"; _refreshErr[vendor] = null;
+    renderBody();
+    let res = null;
+    try { res = await triggerRecapture(vendor); } catch (_) { res = { ok: false }; }
+    // Pull the freshest fleet regardless — the re-scrape just wrote it (or the server may
+    // already hold newer data). refetch() fires a notify → subscribe → renderBody.
+    try { if (window.FleetStore && FleetStore.refetch) await Promise.resolve(FleetStore.refetch()); } catch (_) {}
+    const ok = !!(res && res.ok);
+    _refreshState[vendor] = ok ? "done" : "error";
+    if (!ok) {
+      _refreshErr[vendor] = (res && res.noext)
+        ? "EnergyAgent extension not detected on this page — open the vendor portal to refresh."
+        : (res && res.timeout) ? "Refresh timed out — the portal may need you to sign in again."
+        : ((res && res.error) || "Couldn't refresh — try again.");
+    }
+    renderBody();
+    setTimeout(() => {
+      if (_refreshState[vendor] !== "refreshing") { _refreshState[vendor] = null; renderBody(); }
+    }, ok ? 2200 : 4500);
   }
 
   // Size the scroll region to fill the viewport below it, so the column header can
@@ -365,6 +403,15 @@
         if ($("#vsSearch")) renderBody(); else render();
       });
     }
+    // Detect the EnergyAgent extension so the Refresh button can re-scrape. so_bridge
+    // announces SO_EXTENSION_PRESENT at page load (we may have loaded after it), so we
+    // both listen for it AND ask for status to prompt a fresh announce. Belt + the global.
+    if (window.__AO_EXT_PRESENT) _extPresent = true;
+    window.addEventListener("message", (e) => {
+      if (e.source !== window || !e.data) return;
+      if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") _extPresent = true;
+    });
+    try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, "*"); } catch (_) {}
     window.addEventListener("resize", sizeScroll);
     showView(_view);
   }
