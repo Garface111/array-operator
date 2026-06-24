@@ -616,6 +616,41 @@ body.sb-fs-lock{ overflow:hidden; }
 .sb-fresh--stale .sb-fresh-dot{ background:#cbd5e1; }
 .sb-fresh-cta{ opacity:.72; font-weight:600; }
 .sb-fresh-txt{ flex:1 1 auto; min-width:0; }
+
+/* ── Plan entitlements: locked tabs + the login plan-picker + the upgrade popup ── */
+.tabbar .tab.locked{ opacity:.5; }
+.tabbar .tab.locked .tab-lock{ margin-left:5px; font-size:11px; filter:grayscale(1); }
+.tabbar .tab.locked:hover{ opacity:.62; cursor:pointer; }
+.ao-modal-ov{ position:fixed; inset:0; z-index:9000; background:rgba(15,23,42,.55);
+  backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:20px; }
+.ao-modal.ao-plan{ background:#fff; border-radius:20px; max-width:760px; width:100%;
+  box-shadow:0 24px 70px rgba(2,6,23,.4); padding:26px 26px 20px; }
+.ao-plan-h h2{ margin:0 0 4px; font-size:21px; font-weight:800; color:#0f172a; }
+.ao-plan-h p{ margin:0 0 18px; font-size:13.5px; color:#64748b; }
+.ao-plan-cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media(max-width:640px){ .ao-plan-cards{ grid-template-columns:1fr; } }
+.ao-plan-card{ display:flex; flex-direction:column; gap:5px; text-align:left; cursor:pointer;
+  border:1.5px solid #e2e8f0; background:#f8fafc; border-radius:15px; padding:16px 15px;
+  transition:border-color .12s, background .12s, transform .08s; }
+.ao-plan-card:hover{ border-color:#2563eb; background:#eff6ff; transform:translateY(-2px); }
+.ao-plan-card.on{ border-color:#2563eb; background:#eff6ff; }
+.ao-plan-card .ico{ font-size:24px; }
+.ao-plan-card .t{ font-size:15px; font-weight:750; color:#0f172a; }
+.ao-plan-card .d{ font-size:12px; color:#64748b; line-height:1.45; min-height:34px; }
+.ao-plan-card .p{ margin-top:4px; font-size:12.5px; font-weight:700; color:#2563eb; }
+.ao-plan-close{ margin-top:14px; background:none; border:none; color:#64748b; font-size:12.5px; cursor:pointer; text-decoration:underline; }
+.ao-plan-msg{ margin-top:10px; font-size:12.5px; color:#64748b; min-height:16px; }
+.ao-upgrade-pop{ position:absolute; z-index:9500; width:260px; background:#fff; border:1px solid #e2e8f0;
+  border-radius:13px; box-shadow:0 14px 40px rgba(2,6,23,.28); padding:13px 14px; }
+.ao-up-arrow{ position:absolute; top:-7px; left:22px; width:13px; height:13px; background:#fff;
+  border-left:1px solid #e2e8f0; border-top:1px solid #e2e8f0; transform:rotate(45deg); }
+.ao-upgrade-pop b{ display:block; font-size:13px; color:#0f172a; }
+.ao-upgrade-pop p{ margin:3px 0 10px; font-size:12px; color:#64748b; line-height:1.45; }
+.ao-up-actions{ display:flex; flex-direction:column; gap:7px; }
+.ao-up-btn{ border:1px solid #e2e8f0; background:#fff; border-radius:9px; padding:7px 10px; font-size:12.5px; font-weight:650; color:#0f172a; cursor:pointer; }
+.ao-up-btn.primary{ background:#2563eb; border-color:#2563eb; color:#fff; }
+.ao-up-btn.ghost{ color:#64748b; }
+.ao-up-btn:hover{ filter:brightness(.97); }
 /* little click-to-sync button right next to "Last synced …" */
 .sb-fresh-sync{ display:inline-flex; align-items:center; justify-content:center; flex:none;
   padding:3px 7px; border:1px solid rgba(148,163,184,.42); border-radius:7px;

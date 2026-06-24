@@ -3949,6 +3949,7 @@
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
+      planRow() +
       passwordRow(a) +
       autoRefreshRow() +
       rowStatic("Your bill",
@@ -3966,6 +3967,7 @@
       cancelRow(a);
 
     wireAcctEdits();
+    wirePlanRow();
     wirePasswordRow();
     wireAutoRefreshRow();
     wireCancelRow();
@@ -4523,10 +4525,180 @@
     } else if(active === "reports"){
       loadReports();
     }
+    applyTabGating();   // keep tab locks fresh + bounce off a tab the plan doesn't include
     _firstApply = false;
   }
+  /* ==========================================================================
+   * PLAN ENTITLEMENTS — on login the operator picks Offtaker invoices / Live
+   * vendor data / Both. That choice (billing_plan) gates the tabs: "Vendor data"
+   * + "Trends" need vendor_data; "Offtaker Invoice Generator" needs invoicing. A
+   * locked tab is greyed; clicking it offers an upgrade. Managed in Master Account.
+   * ========================================================================== */
+  let _entitlement = null;   // { plan, plan_chosen, vendor_data, invoicing } | null
+  const TAB_FEATURE = { arrays: "vendor_data", trends: "vendor_data", reports: "invoicing" };
+  const PLAN_LABEL  = { monitoring: "Live vendor data", invoicing: "Offtaker invoices", both: "Both" };
+  const FEAT_LABEL  = { vendor_data: "Live vendor data", invoicing: "Offtaker invoices" };
+
+  function tabAllowed(name){
+    const feat = TAB_FEATURE[name];
+    if(!feat) return true;                 // Master Account + others always open
+    if(!_entitlement) return true;         // entitlement not loaded yet → don't gate (no flash)
+    if(!_entitlement.plan_chosen) return false;   // no plan chosen → locked (picker shows)
+    return !!_entitlement[feat];
+  }
+
+  async function loadEntitlement(){
+    const h = authHeaders();
+    if(!h) return;                         // signed out — nothing to gate
+    try{
+      const r = await fetch("/v1/account", { headers: h });
+      if(!r.ok) return;
+      const a = await r.json().catch(()=>null);
+      if(!a) return;
+      _account = a;                        // share with Master Account renderer
+      _entitlement = a.plan_features || null;
+      applyTabGating();
+      if(_entitlement && !_entitlement.plan_chosen) showPlanPicker();
+    }catch(e){}
+  }
+
+  function applyTabGating(){
+    Object.keys(TAB_FEATURE).forEach(name => {
+      const t = TABS[name]; if(!t) return;
+      const btn = document.getElementById(t.tab); if(!btn) return;
+      const ok = tabAllowed(name);
+      btn.classList.toggle("locked", !ok);
+      const has = btn.querySelector(".tab-lock");
+      if(!ok && !has){ const lk=document.createElement("span"); lk.className="tab-lock"; lk.textContent="🔒"; btn.appendChild(lk); }
+      else if(ok && has){ has.remove(); }
+    });
+    // Don't strand the operator on a tab they can't use — bounce to an allowed one.
+    if(_entitlement){
+      const cur = tabFromHash();
+      if(!tabAllowed(cur)){
+        const fb = tabAllowed("arrays") ? "arrays" : tabAllowed("reports") ? "reports" : "account";
+        if(location.hash !== "#"+fb) location.hash = "#"+fb;
+      }
+    }
+  }
+
+  // Intercept clicks on a locked tab → upgrade popup instead of navigating.
+  function wireTabGateClicks(){
+    Object.keys(TAB_FEATURE).forEach(name => {
+      const t = TABS[name]; if(!t) return;
+      const btn = document.getElementById(t.tab); if(!btn || btn._gateWired) return;
+      btn._gateWired = true;
+      btn.addEventListener("click", (e) => {
+        if(!tabAllowed(name)){ e.preventDefault(); e.stopPropagation(); showUpgradePopup(TAB_FEATURE[name], btn); }
+      }, true);   // capture phase — beat the href hash navigation
+    });
+  }
+
+  // ---- the login plan-picker modal ----------------------------------------
+  function planCard(plan, icon, title, desc, price){
+    return `<button type="button" class="ao-plan-card" data-plan="${plan}">
+      <span class="ico">${icon}</span><span class="t">${esc(title)}</span>
+      <span class="d">${esc(desc)}</span><span class="p">${esc(price)}</span></button>`;
+  }
+  function showPlanPicker(opts){
+    opts = opts || {};
+    const ex = document.getElementById("aoPlanModal"); if(ex) ex.remove();
+    const ov = document.createElement("div"); ov.id = "aoPlanModal"; ov.className = "ao-modal-ov";
+    ov.innerHTML = `
+      <div class="ao-modal ao-plan" role="dialog" aria-modal="true" aria-label="Choose your plan">
+        <div class="ao-plan-h">
+          <h2>${opts.change ? "Change your plan" : "Welcome — what would you like to use?"}</h2>
+          <p>Pick what you need. You can change or upgrade anytime in Master Account.</p>
+        </div>
+        <div class="ao-plan-cards">
+          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","$100/mo · 4 offtakers incl.")}
+          ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","0.5¢ per kWh")}
+          ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together.","Both plans")}
+        </div>
+        ${opts.change ? `<button type="button" class="ao-plan-close" id="aoPlanClose">Keep my current plan</button>` : ""}
+        <div class="ao-plan-msg" id="aoPlanMsg"></div>
+      </div>`;
+    document.body.appendChild(ov);
+    const cur = _entitlement && _entitlement.plan;
+    ov.querySelectorAll("[data-plan]").forEach(c => {
+      if(c.getAttribute("data-plan") === cur) c.classList.add("on");
+      c.onclick = async () => {
+        const msg = document.getElementById("aoPlanMsg"); if(msg) msg.textContent = "Setting up your account…";
+        const ok = await applyPlan(c.getAttribute("data-plan"));
+        if(ok){ ov.remove(); const land = _entitlement.vendor_data ? "arrays" : _entitlement.invoicing ? "reports" : "account"; location.hash = "#"+land; toast(`You're set up for ${PLAN_LABEL[c.getAttribute("data-plan")]}.`, "ok"); }
+        else if(msg){ msg.textContent = "Couldn't save that — please try again."; }
+      };
+    });
+    const close = document.getElementById("aoPlanClose"); if(close) close.onclick = () => ov.remove();
+  }
+
+  // ---- small upgrade popup, anchored near the locked tab ------------------
+  function showUpgradePopup(feature, anchorEl){
+    const ex = document.getElementById("aoUpgradePop"); if(ex) ex.remove();
+    const want = FEAT_LABEL[feature] || "this feature";
+    const single = feature === "invoicing" ? "invoicing" : "monitoring";
+    // If they already have the OTHER feature, the upgrade is to "both".
+    const haveOther = _entitlement && ((feature === "invoicing" && _entitlement.vendor_data) || (feature === "vendor_data" && _entitlement.invoicing));
+    const target = haveOther ? "both" : single;
+    const pop = document.createElement("div"); pop.id = "aoUpgradePop"; pop.className = "ao-upgrade-pop";
+    pop.innerHTML = `<div class="ao-up-arrow"></div>
+      <b>${esc(want)} isn't in your plan</b>
+      <p>Upgrade your membership to unlock it.</p>
+      <div class="ao-up-actions">
+        <button type="button" class="ao-up-btn primary" data-up="${target}">${haveOther?"Upgrade to Both":("Add "+want)}</button>
+        <button type="button" class="ao-up-btn ghost" data-up="manage">Manage plan</button>
+      </div>`;
+    document.body.appendChild(pop);
+    const r = anchorEl.getBoundingClientRect();
+    pop.style.top  = (r.bottom + window.scrollY + 8) + "px";
+    pop.style.left = Math.min(window.innerWidth - pop.offsetWidth - 10, Math.max(8, r.left + window.scrollX)) + "px";
+    pop.querySelectorAll("[data-up]").forEach(b => b.onclick = async () => {
+      const v = b.getAttribute("data-up"); pop.remove();
+      if(v === "manage"){ location.hash = "#account"; return; }
+      const ok = await applyPlan(v);
+      if(ok){ toast(`Unlocked — you now have ${PLAN_LABEL[v]}.`, "ok"); location.hash = (feature==="invoicing"?"#reports":"#arrays"); }
+      else toast("Couldn't upgrade right now — try again.", "err");
+    });
+    setTimeout(() => { const off = (e)=>{ if(!pop.contains(e.target)){ pop.remove(); document.removeEventListener("click", off, true); } }; document.addEventListener("click", off, true); }, 0);
+  }
+
+  // POST the chosen plan, update entitlement + re-gate. Returns true on success.
+  async function applyPlan(plan){
+    const h = authHeaders(); if(!h) return false;
+    try{
+      const r = await fetch("/v1/account/select-plan", { method:"POST",
+        headers: Object.assign({ "Content-Type":"application/json" }, h),
+        body: JSON.stringify({ plan }) });
+      const d = await r.json().catch(()=>({}));
+      if(!r.ok) return false;
+      _entitlement = d.plan_features || _entitlement;
+      if(_account){ _account.plan_features = _entitlement; _account.billing_plan = plan; }
+      applyTabGating();
+      const pv = document.getElementById("acctPlanVal"); if(pv) pv.textContent = PLAN_LABEL[plan] || plan;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // Master Account "Plan" row + its button.
+  function planRow(){
+    const plan = _entitlement && _entitlement.plan;
+    const label = PLAN_LABEL[plan] || "Choose your plan";
+    const sub = _entitlement && _entitlement.plan_chosen
+      ? `Vendor data ${_entitlement.vendor_data?"✓":"—"} · Offtaker invoices ${_entitlement.invoicing?"✓":"—"}`
+      : "Pick what your account can do";
+    return rowStatic("Plan",
+      `<span class="r-big" id="acctPlanVal">${esc(label)}</span>`, sub,
+      `<button class="acct-btn primary" id="acctChangePlan" type="button">${plan?"Change / upgrade":"Choose plan"}</button>`);
+  }
+  function wirePlanRow(){ const b = document.getElementById("acctChangePlan"); if(b) b.onclick = () => showPlanPicker({ change: true }); }
+
+  // QA/preview hooks (offline harness) — set entitlement + drive the gating/picker.
+  window.__aoSetEntitlement = (e) => { _entitlement = e; applyTabGating(); };
+  window.__aoShowPlanPicker = showPlanPicker;
+  window.__aoLoadEntitlement = loadEntitlement;
+
   window.addEventListener("hashchange", applyView);
-  document.addEventListener("DOMContentLoaded", applyView);
+  document.addEventListener("DOMContentLoaded", () => { applyView(); wireTabGateClicks(); loadEntitlement(); });
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
   // QA/debug hook: render a fleet-tree payload directly (used by the offline
