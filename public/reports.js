@@ -852,21 +852,13 @@
                 <button type="button" data-v="quarterly">Quarterly</button>
               </div>
             </div>
-            <div class="rb-ctl">
-              <span class="rl">Send to</span>
-              <div class="rb-seg rb-slider" id="rbmMode">
-                <button type="button" data-v="to_me" class="on">To me</button>
-                <button type="button" data-v="to_client">To my client</button>
-                <button type="button" data-v="to_both">To both</button>
-              </div>
-            </div>
           </div>
+          <p class="rb-bcc-note">📩 Every invoice email sent to an offtaker is automatically
+             <b>BCC'd to your email</b> — so you always see exactly what they received.</p>
           <div class="rb-actions">
             <button class="ao-btn ao-btn-primary rb-save" id="rbmSave" type="button">Add offtaker</button>
             <span class="rb-status" id="rbmStatus"></span>
           </div>
-          <p class="rep-note">New offtakers send <b>to you</b> by default — move the slider
-             to “To my client” only when you're ready for them to receive it.</p>
         </div>
 
         <div id="rbAddUpload" ${ADD_MODE === "upload" ? "" : "hidden"}>
@@ -945,7 +937,9 @@
     const utilityId = $("#rbmUtility").value;
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
-    const mode = segValue("rbmMode") || "to_me";
+    // The "Send to" slider was removed — offtaker invoices go to the offtaker and
+    // the operator is BCC'd on every send (so they always see what was received).
+    const mode = "to_client";
     const clientEmail = $("#rbmEmail").value.trim();
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
     if (!utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which GMP utility bill connects to this offtaker."; return; }
@@ -1042,7 +1036,7 @@
           <div class="rb-ctl">
             <span class="rl">Include</span>
             <div class="rb-checks">
-              <label><input type="checkbox" id="rbSummary" checked> Performance summary</label>
+              <label><input type="checkbox" id="rbSummary"> Performance summary</label>
               <label><input type="checkbox" id="rbTrueup"> Annual true-up (Sept)</label>
             </div>
           </div>
@@ -1093,7 +1087,7 @@
       cadence: segValue("rbCadence") || "monthly",
       mode: segValue("rbMode") || "to_me",
       formats: checkedFormats().length ? checkedFormats() : ["pdf"],
-      summary: $("#rbSummary") ? $("#rbSummary").checked : true,
+      summary: $("#rbSummary") ? $("#rbSummary").checked : false,
       trueup: $("#rbTrueup") ? $("#rbTrueup").checked : false,
       clientEmail: ($("#rbClientEmail") || {}).value || "",
       opEmail: ($("#rbOpEmail") || {}).value || "",
@@ -1626,7 +1620,7 @@
         ta.addEventListener("input", focusDraft);
         ta.addEventListener("focus", focusDraft);
       });
-      wrap.querySelectorAll('input[data-dact="autogmp"]').forEach(cb =>
+      wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
         cb.addEventListener("change", () => renderDraftDoc()));
       // Inline offtaker-detail editors — edits persist to the offtaker and
       // live-update the preview (money fields recompute the draft figures).
@@ -1656,6 +1650,8 @@
     const note = ta ? ta.value : (d.note || defaultDraftNote(d));
     const autoCb = card && card.querySelector('input[data-dact="autogmp"]');
     const autoOn = autoCb ? autoCb.checked : (d.auto_attach_gmp !== false);
+    const sumCb = card && card.querySelector('input[data-dact="summary"]');
+    const sumOn = sumCb ? sumCb.checked : (d.include_summary === true);   // OFF by default
 
     const period = d.period_label || "latest period";
     const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "—";
@@ -1682,7 +1678,7 @@
       sub: `${money(d.amount_usd)} · solar credit invoice`, state: "ready",
       url: sid ? `${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf` : null,
     }];
-    if (d.include_summary !== false) atts.push({
+    if (sumOn) atts.push({
       ico: "📈", name: `production_summary_${slug}.pdf`,
       sub: "generation + savings report", state: "ready",
       url: sid ? `${API}/subscriptions/${sid}/preview?kind=summary&fmt=pdf` : null,
@@ -1709,7 +1705,7 @@
     // ── Cover body — note → figure table → attached line (mirrors _email_html). ──
     const noteHtml = note && note.trim()
       ? `<div class="rb-eml-note">${esc(note.trim()).replace(/\n/g, "<br>")}</div>` : "";
-    const attWord = d.include_summary !== false
+    const attWord = sumOn
       ? "invoice and performance summary are" : "invoice is";
 
     pane.innerHTML = `
@@ -1738,7 +1734,7 @@
         ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — your template, filled</div>
            <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>` : ""}
       <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
-        Use <b>Preview invoice</b> for the exact invoice PDF${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
+        The invoice shown below is the exact PDF that gets attached${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
 
     // Render the ACTUAL reproduced invoice (the exact PDF that gets attached/sent) onto
     // a canvas — same source as the attachment chip + "Preview invoice", so it shows
@@ -1778,21 +1774,28 @@
     // while the operator hasn't customized it (we compare against this snapshot).
     d._defaultNote = defaultDraftNote(d);
     const auto = d.auto_attach_gmp !== false;   // ON by default
+    const sumOn = d.include_summary === true;    // OFF by default — AO summary is opt-in (Ford)
     // Honest auto-attach status line (never implies a PDF exists when it doesn't).
     const autoStatusText = {
       ready: "✓ GMP bill found — it will attach automatically.",
       pending: "GMP bill will attach automatically once it's captured (none yet).",
       no_gmp: "No GMP account on this array yet — connect one to auto-attach.",
     }[d.gmp_auto_status] || "";
-    const gmp = `
-      <div class="rb-gmp-toggle-row">
+    // Attachment controls box — sits beside the send buttons (Ford). Auto-attach the
+    // GMP bill (on by default) + opt-in Array Operator summary data (off by default).
+    const attachBox = `
+      <div class="rb-draft-attach">
         <label class="rb-gmp-switch">
           <input type="checkbox" data-dact="autogmp" ${auto ? "checked" : ""}>
           <span>Auto-attach the GMP bill</span>
         </label>
         ${auto && autoStatusText ? `<span class="rb-gmp-auto-status rb-gmp-${esc(d.gmp_auto_status)}">${autoStatusText}</span>` : ""}
-      </div>
-      ${d.has_gmp_pdf ? `<div class="rb-gmp-manual"><span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span></div>` : ""}`;
+        <label class="rb-gmp-switch">
+          <input type="checkbox" data-dact="summary" ${sumOn ? "checked" : ""}>
+          <span>Attach Array Operator's summary data</span>
+        </label>
+        ${d.has_gmp_pdf ? `<div class="rb-gmp-manual"><span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span></div>` : ""}
+      </div>`;
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
@@ -1805,7 +1808,6 @@
           <div><span class="rb-k">Their production</span><span class="rb-v">${fmt0(d.customer_kwh)} kWh</span></div>
           <div><span class="rb-k">Amount</span><span class="rb-v rb-amt">${money(d.amount_usd)}</span></div>
         </div>
-        <div class="rb-draft-gmp">${gmp}</div>
         <div class="rb-draft-email">
           <span class="rl">Email to your offtaker (editable)</span>
           <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
@@ -1818,9 +1820,8 @@
         <div class="rb-draft-acts">
           <button class="ao-btn ao-btn-primary rb-btn" data-dact="approve">Approve &amp; send</button>
           <button class="ao-btn rb-btn" data-dact="sendme" type="button" title="Email a test copy to yourself first">Send to me</button>
-          <a class="ao-btn rb-btn" data-dact="preview" href="#">Preview invoice</a>
-          <button class="ao-btn rb-btn rb-danger" data-dact="dismiss">Dismiss</button>
           <span class="rb-status rb-draft-status"></span>
+          ${attachBox}
         </div>
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this offtaker's
            delivery setting below, with the offtaker invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
@@ -2030,7 +2031,15 @@
     const amt = d.amount_usd != null ? money(d.amount_usd) : "the amount due";
     const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "your production";
     const period = d.period_label || "the latest period";
-    return `Hi,\n\nAttached is your solar invoice for ${period}. Your array produced ${kwh} this period, for a total of ${amt}. The GMP source data and a production summary are attached so you can see exactly how it was calculated.\n\nThanks for going solar!`;
+    // Only claim attachments that will actually be there (auto-attach GMP on by
+    // default; AO summary opt-in) so the note never promises a file that isn't sent.
+    const extras = [];
+    if (d.auto_attach_gmp !== false) extras.push("the GMP source data");
+    if (d.include_summary === true) extras.push("a production summary");
+    const extraLine = extras.length
+      ? ` ${extras.join(" and ")} ${extras.length > 1 ? "are" : "is"} attached so you can see exactly how it was calculated.`
+      : "";
+    return `Hi,\n\nAttached is your solar invoice for ${period}. Your array produced ${kwh} this period, for a total of ${amt}.${extraLine}\n\nThanks for going solar!`;
   }
 
   async function onDraftAction(e) {
@@ -2088,6 +2097,24 @@
           method: "PATCH",
           headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
           body: JSON.stringify({ auto_attach_gmp: on }),
+        });
+        if (r.ok) { setSt("rb-status", ""); await refreshInbox(); }
+        else { setSt("rb-status rb-err", "Couldn't save."); }
+      } catch (err) { setSt("rb-status rb-err", "Network error."); }
+      return;
+    }
+    if (act === "summary") {
+      // Per-offtaker opt-in (OFF by default): attach Array Operator's performance
+      // summary PDF. PATCH the subscription's include_summary, then refresh so the
+      // live preview's attachment list + note update.
+      const on = e.target.checked;
+      const subId = card.getAttribute("data-subid");
+      setSt("rb-status rb-busy", "Saving…");
+      try {
+        const r = await fetch(API + "/subscriptions/" + subId, {
+          method: "PATCH",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ include_summary: on }),
         });
         if (r.ok) { setSt("rb-status", ""); await refreshInbox(); }
         else { setSt("rb-status rb-err", "Couldn't save."); }
