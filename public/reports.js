@@ -93,28 +93,10 @@
       el.innerHTML = signInPrompt();
       return;
     }
-    // First-run: if the owner has no customers yet, run the guided setup wizard
-    // (collect arrays' age, accept the rate, add customers) instead of the bare
-    // tab. Once set up — or if they reopen via the Setup link — show the tab.
-    if (!FORCE_TAB) {
-      try {
-        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
-        const st = await r.json().catch(() => ({}));
-        if (r.ok && st.ok && !st.has_customers) {
-          return renderWizard(st);
-        }
-      } catch (e) { /* fall through to the normal tab */ }
-    }
+    // The guided setup wizard was removed — the operator works the tab directly:
+    // set the global rate, "＋ Add an offtaker", and link GMP bills, all inline.
     el.innerHTML = shell();
     wireSubtabs();
-    const setupLink = $("#rbSetupLink");
-    if (setupLink) setupLink.onclick = async () => {
-      try {
-        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
-        const st = await r.json();
-        if (r.ok && st.ok) { FORCE_TAB = false; return renderWizard(st); }
-      } catch (e) {}
-    };
     wireGlobalRate();
     wireInvoiceTemplate();
     // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
@@ -178,9 +160,6 @@
     }
   }
 
-  // When true, load() skips the wizard and shows the normal tab (Setup link / done).
-  let FORCE_TAB = false;
-
   function signInPrompt() {
     return `<div class="rep-card"><span class="rep-eyebrow">Reports</span>
       <h3>Sign in to set up automatic reports</h3>
@@ -188,410 +167,6 @@
       summaries on the schedule you choose. <a href="/accounts" style="color:var(--good)">Sign in</a> to get started.</p></div>`;
   }
 
-  // ===========================================================================
-  // FIRST-RUN SETUP WIZARD
-  // A guided, sequential flow so an owner enters everything needed to start
-  // sending reports: ① confirm arrays + age → ② accept the rate → ③ add
-  // customers → ④ review & finish. Backed by /setup-state, PATCH /arrays/{id},
-  // PUT /global-rate, POST /subscriptions. Lands in the normal tab when done.
-  // ===========================================================================
-  const WIZ_STEPS = ["Your arrays", "GMP utility bills", "Your rate", "Your offtakers", "Review"];
-  let WIZ = null;   // { step, state(from setup-state), customers:[], rateDirty }
-
-  function renderWizard(setupState) {
-    WIZ = { step: 0, state: setupState, customers: [] };
-    drawWizard();
-  }
-  // Test/QA hook: jump to a wizard step (no-op if the wizard isn't active).
-  try { window.__rbWizGoto = (n) => { if (WIZ) { WIZ.step = n; drawWizard(); } }; } catch (e) {}
-  try { window.__rbRenderWizard = (s) => renderWizard(s); } catch (e) {}
-
-  function thisYear() { return new Date().getFullYear(); }
-
-  function drawWizard() {
-    const el = root();
-    if (!el) return;
-    el.innerHTML = `
-      <div class="rb-wiz">
-        <div class="rb-wiz-head">
-          <span class="rep-eyebrow">Set up Reports</span>
-          <h2>Let's get you ready to send invoices</h2>
-          <p>A few quick steps and you'll be billing your offtakers automatically.</p>
-          <button type="button" class="rb-wiz-skip" id="rbWizSkip">Skip for now →</button>
-        </div>
-        <ol class="rb-wiz-steps">
-          ${WIZ_STEPS.map((s, i) => `<li class="${i === WIZ.step ? "on" : (i < WIZ.step ? "done" : "")}">
-            <span class="rb-wiz-num">${i < WIZ.step ? "✓" : (i + 1)}</span>${esc(s)}</li>`).join("")}
-        </ol>
-        <div class="rb-wiz-body" id="rbWizBody"></div>
-      </div>`;
-    $("#rbWizSkip").onclick = () => { FORCE_TAB = true; load(); };
-    [drawStepArrays, drawStepGmp, drawStepRate, drawStepCustomers, drawStepReview][WIZ.step]();
-  }
-
-  // ── Step ① arrays + age ────────────────────────────────────────────────────
-  function drawStepArrays() {
-    const body = $("#rbWizBody");
-    const arrays = WIZ.state.arrays || [];
-    if (!arrays.length) {
-      body.innerHTML = `<div class="rb-wiz-card">
-        <h3>No arrays detected yet</h3>
-        <p>Connect an array (or capture data via the extension) and it'll show up
-           here. You can still set your rate and add offtakers — come back to set
-           ages later.</p>
-        ${wizNav({ back: false, nextLabel: "Continue" })}</div>`;
-      wireWizNav();
-      return;
-    }
-    body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Confirm your arrays</h3>
-      <p>How old is each array? This sets the correct blended rate — arrays past
-         ${WIZ.state.age_threshold_years || 11} years bill at a different rate.</p>
-      <div class="rb-wiz-arrays">
-        ${arrays.map(a => `
-          <div class="rb-wiz-arr" data-aid="${a.array_id}">
-            <div class="rb-wiz-arr-main">
-              <b>${esc(a.name)}</b>
-              <span class="rb-wiz-arr-sub">${a.provider ? esc(a.provider.toUpperCase()) : "utility —"}${a.region ? " · " + esc(a.region) : ""}</span>
-            </div>
-            <label class="rb-wiz-yr">Installed in
-              <input type="number" class="rb-wiz-yr-input" data-aid="${a.array_id}"
-                min="1990" max="${thisYear()}" placeholder="year"
-                value="${a.install_year != null ? a.install_year : ""}">
-            </label>
-            <span class="rb-wiz-arr-rate" data-aid="${a.array_id}">${
-              a.age_known ? "$" + Number(a.auto_net_rate).toFixed(4) + "/kWh" : ""}</span>
-          </div>`).join("")}
-      </div>
-      <p class="rb-wiz-hint">Don't know the exact date? The year is enough.</p>
-      ${wizNav({ back: false, nextLabel: "Save & continue" })}</div>`;
-    wireWizNav(async () => {
-      // Persist any entered years.
-      const inputs = body.querySelectorAll(".rb-wiz-yr-input");
-      for (const inp of inputs) {
-        const yr = inp.value.trim();
-        if (yr === "") continue;
-        const n = Number(yr);
-        if (isNaN(n) || n < 1990 || n > thisYear()) continue;
-        await fetch(API + "/arrays/" + inp.getAttribute("data-aid"), {
-          method: "PATCH",
-          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-          body: JSON.stringify({ install_year: n }),
-        });
-      }
-      // refresh state so later steps + rate reflect the saved ages
-      try {
-        const r = await fetch(API + "/setup-state", { headers: authHeaders() });
-        const st = await r.json(); if (r.ok && st.ok) WIZ.state = st;
-      } catch (e) {}
-      return true;
-    });
-  }
-
-  // ── Step ② GMP utility bills ─────────────────────────────────────────────────
-  // Offtakers are billed EXCLUSIVELY from GMP utility bills, so connecting GMP is
-  // a first-class setup step (not buried in a banner). Shows live status from
-  // /utility-accounts and launches the real connect flow (window.__aoConnectGmp).
-  async function drawStepGmp() {
-    const body = $("#rbWizBody");
-    body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Connect your GMP utility bills</h3>
-      <p>Offtaker invoices are generated <b>only</b> from your Green Mountain Power
-         utility bills — never from inverter data. Connect GMP once and your bills
-         flow in automatically, ready to link to each offtaker.</p>
-      <div id="rbWizGmpStatus" class="rb-wiz-gmp-status">
-        <div class="empty" style="color:var(--faint)">Checking your GMP connection…</div>
-      </div>
-      <div class="rb-wiz-gmp-actions">
-        <button type="button" class="ao-btn ao-btn-primary rb-btn" id="rbWizGmpConnect">🔗 Link GMP utility bills</button>
-      </div>
-      ${wizNav({ back: true, nextLabel: "Continue" })}
-      <p class="rb-wiz-hint">You can connect GMP now or skip and do it later — but
-         offtaker invoices won't send until a GMP bill is linked.</p></div>`;
-    wireWizNav();
-    const connectBtn = $("#rbWizGmpConnect");
-    if (connectBtn) connectBtn.onclick = () => {
-      if (window.__aoConnectGmp) window.__aoConnectGmp();
-      else location.hash = "#arrays";
-    };
-    // Live status — re-checks after a capture lands (we hook __aoRefreshGmpGate).
-    async function paintGmp() {
-      const host = $("#rbWizGmpStatus");
-      if (!host) return;
-      let accts = [];
-      try {
-        const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
-        if (r.ok) { const d = await r.json().catch(() => ({})); accts = d.utility_accounts || []; }
-      } catch (e) {}
-      const withBills = accts.filter(a => a.has_bill);
-      if (!accts.length) {
-        host.innerHTML = `<div class="rb-wiz-gmp-none">No GMP utility bills connected yet — click the button below to link them.</div>`;
-      } else if (!withBills.length) {
-        host.innerHTML = `<div class="rb-wiz-gmp-some">${accts.length} GMP account${accts.length === 1 ? "" : "s"} connected — open GMP once more so the extension captures the bills.</div>`;
-      } else {
-        host.innerHTML = `<div class="rb-wiz-gmp-ok">✓ ${withBills.length} GMP utility bill source${withBills.length === 1 ? "" : "s"} connected and ready to link.</div>
-          <ul class="rb-wiz-gmp-list">${accts.slice(0, 8).map(a =>
-            `<li>${esc(a.nickname || a.array_name || ("GMP " + a.account_number))}
-              <span class="sub">${a.has_bill ? (a.bill_count + " bill" + (a.bill_count === 1 ? "" : "s") + " · latest " + (a.latest_period_label || "—")) : "no bill yet"}</span></li>`).join("")}</ul>`;
-      }
-    }
-    paintGmp();
-    // Refresh when a GMP capture lands while the owner is on this step.
-    try {
-      const _prev = window.__aoRefreshGmpGate;
-      window.__aoRefreshGmpGate = function(){
-        try { if (_prev) _prev(); } catch(e){}
-        if ($("#rbWizGmpStatus")) paintGmp();
-      };
-    } catch(e){}
-  }
-
-  // ── Step ③ rate + discount ──────────────────────────────────────────────────
-  function drawStepRate() {
-    const body = $("#rbWizBody");
-    const g = WIZ.state.global || {};
-    const discPct = Math.round((g.effective_discount_pct != null ? g.effective_discount_pct : 0.10) * 100);
-    // Show the auto rate from the first array as the illustrative blended rate.
-    const a0 = (WIZ.state.arrays || [])[0];
-    const autoRate = a0 ? Number(a0.auto_net_rate) : null;
-    body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Your billing rate</h3>
-      <p>The rate that will be used is <b>the rate that's on your current bill</b> —
-         we read that solar credit rate automatically from your utility, so you don't
-         need to enter it. Just enter the <b>discount rate from your contract with the
-         offtaker</b> — that's the solar savings you pass on (we default it to 10%).</p>
-      <div class="rb-wiz-rate">
-        <label class="rb-gr-field"><span class="rb-gr-lbl">Solar credit rate (from your bill)</span>
-          <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
-            <input type="number" id="rbWizNet" min="0" max="5" step="0.001"
-              placeholder="${autoRate != null ? autoRate.toFixed(3) : "auto"}"
-              value="${g.default_net_rate_per_kwh != null ? g.default_net_rate_per_kwh : ""}">
-            <span class="rb-gr-unit">/kWh</span></span></label>
-        <label class="rb-gr-field"><span class="rb-gr-lbl">Discount (from your offtaker contract)</span>
-          <span class="rb-gr-inwrap">
-            <input type="number" id="rbWizDisc" min="0" max="99" step="1" value="${discPct}">
-            <span class="rb-gr-unit">% off</span></span></label>
-      </div>
-      <div class="rb-gr-eff" id="rbWizEff"></div>
-      <p class="rb-wiz-hint">Leave the solar credit rate blank to use the rate from your
-         bill${autoRate != null ? " (~$" + autoRate.toFixed(3) + "/kWh)" : ""}. You can override the discount per offtaker later.</p>
-      ${wizNav({ back: true, nextLabel: "Accept & continue" })}</div>`;
-    const net = $("#rbWizNet"), disc = $("#rbWizDisc"), eff = $("#rbWizEff");
-    function renderEff() {
-      const n = net.value.trim() === "" ? (autoRate || 0) : Number(net.value);
-      const d = disc.value.trim() === "" ? 10 : Number(disc.value);
-      if (!isNaN(n) && !isNaN(d) && n > 0) {
-        eff.innerHTML = `Offtakers pay <b>$${(n * (1 - d / 100)).toFixed(4)}/kWh</b> (credit $${n.toFixed(4)} − ${d}% off).`;
-      } else { eff.textContent = ""; }
-    }
-    renderEff(); net.addEventListener("input", renderEff); disc.addEventListener("input", renderEff);
-    wireWizNav(async () => {
-      const bodyJson = {};
-      const rawNet = net.value.trim();
-      bodyJson.default_net_rate_per_kwh = rawNet === "" ? null : Number(rawNet);
-      const rawDisc = disc.value.trim();
-      bodyJson.default_discount_pct = rawDisc === "" ? null : Number(rawDisc) / 100;
-      await fetch(API + "/global-rate", {
-        method: "PUT",
-        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-        body: JSON.stringify(bodyJson),
-      });
-      return true;
-    });
-  }
-
-  // ── Step ③ customers ─────────────────────────────────────────────────────────
-  function drawStepCustomers() {
-    const body = $("#rbWizBody");
-    const rows = WIZ.customers.map((c, i) => `
-      <div class="rb-wiz-cust-row">
-        <span><b>${esc(c.customer_name)}</b> · ${c.from_upload
-          ? "from spreadsheet ✓"
-          : (esc(c.utility_name || "GMP bill") + " · " + Math.round(c.allocation_pct * 100) + "%")
-            + (c.discount_pct != null ? " · " + Math.round(c.discount_pct * 100) + "% off" : "")}</span>
-        ${c.from_upload
-          ? `<span class="rb-wiz-cust-saved">added</span>`
-          : `<button type="button" class="rb-wiz-cust-del" data-i="${i}">Remove</button>`}
-      </div>`).join("");
-    body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Add your offtakers</h3>
-      <p>Each offtaker is billed for their share of a <b>GMP utility bill</b> —
-         their invoices come only from that bill. Add as many as you like.</p>
-      <div class="rb-wiz-custs" id="rbWizCusts">${rows || `<div class="rb-wiz-empty">No offtakers added yet.</div>`}</div>
-      <div class="rb-wiz-cust-form">
-        <input type="text" id="rbWizCName" placeholder="Offtaker name">
-        <div class="rb-wiz-arraysel" id="rbWizCUtil">
-          <div class="rb-wiz-arraysel-lbl">Which GMP utility bill is this offtaker's?</div>
-          <select id="rbWizCUtilSel"><option value="">Loading GMP utility bills…</option></select>
-        </div>
-        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCPct" min="0.01" max="100" step="0.01" placeholder="100"><span>% of the array</span></span>
-        <span class="rb-wiz-inwrap"><input type="number" id="rbWizCDisc" min="0" max="99" step="1" placeholder="default"><span>% off (optional)</span></span>
-        <input type="email" id="rbWizCEmail" placeholder="offtaker@email (optional)">
-        <button type="button" class="ao-btn rb-btn" id="rbWizCAdd">+ Add offtaker</button>
-        <span class="rb-status" id="rbWizCStatus"></span>
-      </div>
-      <div class="rb-wiz-upload">
-        <span class="rb-wiz-or">— or —</span>
-        <label class="rb-wiz-uplabel">
-          <input type="file" id="rbWizFile" accept=".xlsx,.xls" hidden>
-          <b>Already bill in your own spreadsheet?</b> Upload it and we'll keep
-          invoicing in that exact format. <span class="rb-sample-link">Choose a file…</span>
-        </label>
-        <span class="rb-status" id="rbWizUpStatus"></span>
-      </div>
-      ${wizNav({ back: true, nextLabel: WIZ.customers.length ? "Continue" : "Skip for now", nextId: "rbWizCustNext" })}</div>`;
-    // Populate the GMP utility-bill picker (offtakers bind to a GMP bill).
-    fetchUtilityAccounts().then(accts => {
-      const sel = $("#rbWizCUtilSel");
-      if (!sel) return;
-      if (!accts.length) {
-        sel.innerHTML = `<option value="">No GMP utility bills yet — connect on the previous step</option>`;
-        return;
-      }
-      sel.innerHTML = `<option value="">Choose a GMP utility bill…</option>` +
-        accts.map(a => {
-          const label = a.nickname || a.array_name || ("GMP " + a.account_number);
-          const note = a.has_bill ? (a.bill_count + " bill" + (a.bill_count === 1 ? "" : "s")) : "no bill yet";
-          return `<option value="${a.utility_account_id}" data-name="${esc(label)}">${esc(label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
-        }).join("");
-    });
-    body.querySelectorAll(".rb-wiz-cust-del").forEach(b => b.onclick = () => {
-      WIZ.customers.splice(Number(b.getAttribute("data-i")), 1); drawStepCustomers();
-    });
-    $("#rbWizCAdd").onclick = () => {
-      const st = $("#rbWizCStatus");
-      const name = $("#rbWizCName").value.trim();
-      const sel = $("#rbWizCUtilSel");
-      const utilId = sel ? sel.value : "";
-      const utilName = sel && sel.selectedOptions[0] ? (sel.selectedOptions[0].getAttribute("data-name") || "") : "";
-      const pctRaw = $("#rbWizCPct").value.trim();
-      const discRaw = $("#rbWizCDisc").value.trim();
-      const email = $("#rbWizCEmail").value.trim();
-      if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
-      if (!utilId) { st.className = "rb-status rb-err"; st.textContent = "Pick which GMP utility bill is theirs."; return; }
-      const pct = Number(pctRaw);
-      if (isNaN(pct) || pct <= 0 || pct > 100) { st.className = "rb-status rb-err"; st.textContent = "Enter their share 0–100%."; return; }
-      let disc = null;
-      if (discRaw !== "") { const d = Number(discRaw); if (isNaN(d) || d < 0 || d >= 100) { st.className = "rb-status rb-err"; st.textContent = "Discount 0–99% or blank."; return; } disc = d / 100; }
-      WIZ.customers.push({ customer_name: name,
-        utility_account_id: utilId, utility_name: utilName,
-        allocation_pct: pct / 100,
-        discount_pct: disc, client_email: email || null });
-      drawStepCustomers();
-    };
-    // Spreadsheet path in the wizard: match + create the workbook sub immediately
-    // (wizard defaults: monthly · draft for approval · to me), then list it.
-    const upFile = $("#rbWizFile");
-    if (upFile) upFile.onchange = async () => {
-      const f = upFile.files[0];
-      if (!f) return;
-      const st = $("#rbWizUpStatus");
-      st.className = "rb-status rb-busy"; st.textContent = "Reading " + f.name + "…";
-      try {
-        const fd0 = new FormData(); fd0.append("file", f);
-        const mr = await fetch(API + "/match", { method: "POST", headers: authHeaders(), body: fd0 });
-        const mdata = await mr.json().catch(() => ({}));
-        const m = mdata.match;   // /match nests the result under `match`
-        if (!mr.ok || !mdata.ok || !m || !m.matched) {
-          st.className = "rb-status rb-err";
-          st.textContent = "Couldn't recognize that workbook — try the typed form above.";
-          return;
-        }
-        const fd = new FormData();
-        fd.append("file", f);
-        fd.append("customer_name", (m.customer && m.customer.name) || f.name.replace(/\.xl\w+$/i, ""));
-        fd.append("cadence", "monthly");
-        fd.append("delivery_mode", "approval");
-        fd.append("send_mode", "to_me");
-        if (m.customer && m.customer.email) fd.append("client_email", m.customer.email);
-        fd.append("formats", JSON.stringify(["pdf"]));
-        const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok || !data.ok) {
-          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) || "Couldn't save that workbook.";
-          return;
-        }
-        WIZ.customers.push({ customer_name: (m.customer && m.customer.name) || f.name, from_upload: true });
-        drawStepCustomers();
-      } catch (e) {
-        st.className = "rb-status rb-err"; st.textContent = "Network error reading that file.";
-      }
-    };
-    wireWizNav();   // Continue just advances; customers are created at Review/Finish
-  }
-
-  // ── Step ④ review & finish ───────────────────────────────────────────────────
-  function drawStepReview() {
-    const body = $("#rbWizBody");
-    const g = WIZ.state.global || {};
-    const discPct = Math.round((g.effective_discount_pct != null ? g.effective_discount_pct : 0.10) * 100);
-    const arrays = WIZ.state.arrays || [];
-    const knownAges = arrays.filter(a => a.age_known).length;
-    body.innerHTML = `<div class="rb-wiz-card">
-      <h3>Review &amp; finish</h3>
-      <div class="rb-wiz-review">
-        <div class="rb-wiz-rev-item"><span class="rl">Arrays</span>
-          <b>${arrays.length} array${arrays.length === 1 ? "" : "s"}</b>
-          <span class="sub">${knownAges}/${arrays.length} with install year set</span></div>
-        <div class="rb-wiz-rev-item"><span class="rl">Default billing</span>
-          <b>${g.default_net_rate_per_kwh != null ? "$" + Number(g.default_net_rate_per_kwh).toFixed(4) + "/kWh credit" : "auto solar credit rate"} − ${discPct}% off</b>
-          <span class="sub">offtakers without their own rate</span></div>
-        <div class="rb-wiz-rev-item"><span class="rl">Offtakers</span>
-          <b>${WIZ.customers.length} to create</b>
-          <span class="sub">${WIZ.customers.map(c => esc(c.customer_name)).join(", ") || "none yet — you can add later"}</span></div>
-      </div>
-      <p class="rb-wiz-hint">Finishing creates your offtakers and opens the Reports tab. Nothing is emailed automatically — you review every draft before it sends.</p>
-      ${wizNav({ back: true, nextLabel: "Finish setup", nextId: "rbWizFinish" })}
-      <span class="rb-status" id="rbWizFinStatus"></span></div>`;
-    wireWizNav(async () => {
-      const st = $("#rbWizFinStatus");
-      st.className = "rb-status rb-busy"; st.textContent = "Creating your offtakers…";
-      let created = 0;
-      for (const c of WIZ.customers) {
-        if (c.from_upload) { created++; continue; }  // workbook subs already created on upload
-        const fd = new FormData();
-        fd.append("customer_name", c.customer_name);
-        // Offtaker ↔ GMP utility bill (utility data only).
-        fd.append("utility_account_id", String(c.utility_account_id));
-        fd.append("allocation_pct", String(c.allocation_pct));
-        if (c.discount_pct != null) fd.append("discount_pct", String(c.discount_pct));
-        fd.append("cadence", "monthly");
-        fd.append("delivery_mode", "approval");
-        fd.append("send_mode", c.client_email ? "to_both" : "to_me");
-        if (c.client_email) fd.append("client_email", c.client_email);
-        try {
-          const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
-          if (r.ok) created++;
-        } catch (e) {}
-      }
-      st.className = "rb-status rb-ok"; st.textContent = `Done — ${created} offtaker${created === 1 ? "" : "s"} ready.`;
-      FORCE_TAB = true;
-      setTimeout(() => load(), 600);
-      return false;   // don't auto-advance; load() takes over
-    });
-  }
-
-  // ── wizard nav helpers ───────────────────────────────────────────────────────
-  function wizNav({ back, nextLabel, nextId }) {
-    return `<div class="rb-wiz-nav">
-      ${back ? `<button type="button" class="ao-btn rb-btn" id="rbWizBack">← Back</button>` : "<span></span>"}
-      <button type="button" class="ao-btn ao-btn-primary rb-btn" id="${nextId || "rbWizNext"}">${esc(nextLabel || "Continue")}</button>
-    </div>`;
-  }
-
-  // beforeNext: optional async fn; return false to NOT auto-advance.
-  function wireWizNav(beforeNext) {
-    const back = $("#rbWizBack");
-    if (back) back.onclick = () => { if (WIZ.step > 0) { WIZ.step--; drawWizard(); } };
-    const nextBtn = $("#rbWizNext") || $("#rbWizCustNext") || $("#rbWizFinish");
-    if (nextBtn) nextBtn.onclick = async () => {
-      nextBtn.disabled = true;
-      let advance = true;
-      if (beforeNext) { try { advance = await beforeNext(); } catch (e) { advance = true; } }
-      nextBtn.disabled = false;
-      if (advance !== false && WIZ.step < WIZ_STEPS.length - 1) { WIZ.step++; drawWizard(); }
-    };
-  }
 
 
   function shell() {
@@ -603,7 +178,6 @@
             <h3>Your offtakers</h3>
           </div>
           <div class="rb-head-actions">
-            <button type="button" class="rb-setup-link" id="rbSetupLink" title="Re-run the guided setup">⚙ Setup</button>
             <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
@@ -825,6 +399,16 @@
     if (get("array_id")) {
       const av = get("array_id").value;
       if (av) body.array_id = Number(av);
+    }
+    // GMP utility bill (the billing source). Only send when one is chosen — the
+    // blank "keep current" option leaves the existing binding untouched.
+    if (get("utility_account_id")) {
+      const uv = get("utility_account_id").value;
+      if (uv) body.utility_account_id = Number(uv);
+    }
+    if (get("cadence")) {
+      const cv = get("cadence").value;
+      if (cv) body.cadence = cv;
     }
     if (get("allocation_pct")) {
       const raw = get("allocation_pct").value.trim();
@@ -1658,9 +1242,10 @@
     const list = $("#rbList");
     if (!list) return;
     try {
-      const [r, arrs] = await Promise.all([
+      const [r, arrs, utilAccts] = await Promise.all([
         fetch(API + "/subscriptions", { headers: authHeaders() }),
         fetchArrays(),
+        fetchUtilityAccounts(),
       ]);
       if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
       const data = await r.json().catch(() => ({}));
@@ -1669,7 +1254,7 @@
         list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
         return;
       }
-      list.innerHTML = subs.map(s => subCard(s, arrs)).join("");
+      list.innerHTML = subs.map(s => subCard(s, arrs, utilAccts)).join("");
       list.querySelectorAll("[data-act]").forEach(b => b.onclick = onAction);
       // Rate inputs commit on change (not click) — wire them separately.
       list.querySelectorAll("input.rb-rate-input[data-act='discount']").forEach(inp =>
@@ -1697,7 +1282,7 @@
     }[src] || (src || "");
   }
 
-  function subCard(s, arrs) {
+  function subCard(s, arrs, utilAccts) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
     const last = s.last_sent_at ? new Date(s.last_sent_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never";
@@ -1707,6 +1292,16 @@
     const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
     const arrayOpts = (arrs || []).map(a =>
       `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
+    // GMP utility-bill (billing-source) options for the edit form. The offtaker's
+    // invoice is generated from this account's bills, so being able to (re)pick it
+    // here is essential — it was only collectible when adding before.
+    const billOpts = (utilAccts || []).map(a => {
+      const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
+        : (a.has_bill ? " (bill on file)" : "");
+      const lbl = (a.utility_name || "GMP") + " · acct " + (a.account_number || "?") + bills;
+      const sel = String(a.utility_account_id) === String(s.utility_account_id) ? "selected" : "";
+      return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
+    }).join("");
     // ── one plain-English sentence, built from the offtaker's actual choices:
     //    "<name> receives <pct> of <linked GMP account / array>'s generation.
     //     <Monthly|Quarterly> <PDF> — drafted for approval / auto-sent to <emails>." ──
@@ -1776,11 +1371,22 @@
                 <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
                   <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
                 ${manual ? `
+                <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
+                  <select data-f="utility_account_id">
+                    <option value="">${s.utility_account_id ? "— keep current —" : "Select a GMP bill…"}</option>
+                    ${billOpts}
+                  </select>
+                  <span class="rb-fld-hint">The offtaker's invoice is generated from this GMP account's utility bills only. ${s.utility_account_id ? "" : "<b>Pick one to start invoicing this offtaker.</b>"}</span></label>
                 <label class="rep-fld"><span class="rl">Array</span>
                   <select data-f="array_id">${arrayOpts || `<option value="">No arrays</option>`}</select></label>
                 <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
                   <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
                 ` : ""}
+                <label class="rep-fld"><span class="rl">Cadence</span>
+                  <select data-f="cadence">
+                    <option value="monthly" ${s.cadence === "monthly" ? "selected" : ""}>Monthly</option>
+                    <option value="quarterly" ${s.cadence === "quarterly" ? "selected" : ""}>Quarterly</option>
+                  </select></label>
                 <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
                   <input type="number" data-f="net_rate_per_kwh" min="0" max="5" step="0.0001" value="${s.net_rate_per_kwh != null ? s.net_rate_per_kwh : ""}" placeholder="blank = auto from bill">
                   <span class="rb-fld-hint">Blank = read from the GMP bill automatically. Set this to your actual net-metering credit rate when the meter's own bill shows $0 credit (e.g. group net metering).</span></label>
