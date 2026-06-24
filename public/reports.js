@@ -1589,7 +1589,10 @@
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
     try {
-      const r = await fetch(API + "/drafts?status=pending", { headers: authHeaders() });
+      const [r, utilAccts] = await Promise.all([
+        fetch(API + "/drafts?status=pending", { headers: authHeaders() }),
+        fetchUtilityAccounts(),
+      ]);
       if (!r.ok) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }
       const drafts = (await r.json().catch(() => ({}))).drafts || [];
       if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }   // hide when empty
@@ -1606,7 +1609,7 @@
           </div>
           <div class="rb-layout">
             <div class="rb-col-form">
-              ${drafts.map(draftCard).join("")}
+              ${drafts.map(d => draftCard(d, utilAccts)).join("")}
             </div>
             <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
           </div>
@@ -1622,6 +1625,9 @@
       });
       wrap.querySelectorAll('input[data-dact="autogmp"]').forEach(cb =>
         cb.addEventListener("change", () => renderDraftDoc()));
+      // Inline offtaker-detail editors — edits persist to the offtaker and
+      // live-update the preview (money fields recompute the draft figures).
+      wireOfftakerEditors(wrap);
     } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; }
   }
 
@@ -1763,8 +1769,11 @@
     } catch (e) { /* swallow — never break the preview */ }
   }
 
-  function draftCard(d) {
+  function draftCard(d, utilAccts) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    // Remember the auto-written note so a live recompute can re-sync it — but only
+    // while the operator hasn't customized it (we compare against this snapshot).
+    d._defaultNote = defaultDraftNote(d);
     const auto = d.auto_attach_gmp !== false;   // ON by default
     // Honest auto-attach status line (never implies a PDF exists when it doesn't).
     const autoStatusText = {
@@ -1813,7 +1822,200 @@
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this offtaker's
            delivery setting below, with the offtaker invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
            <b>Nothing sends until you click Approve &amp; send.</b></p>
+        ${offtakerEditor(d, utilAccts)}
       </div>`;
+  }
+
+  // The inline, live offtaker-detail editor that sits under each draft in the
+  // approval inbox. Every field maps to a SubscriptionPatch field (data-of) and
+  // persists on edit; copy fields repaint the preview instantly, money fields
+  // (share / discount / rate / GMP bill) recompute the draft figures via the
+  // production path (generate_draft → build_manual_match), so the numbers the
+  // operator sees stay true. Mirrors the per-offtaker Edit form one-to-one.
+  function offtakerEditor(d, utilAccts) {
+    const sid = d.subscription_id;
+    if (!sid) return "";
+    const wb = d.has_workbook === true;        // workbook offtakers bill from the sheet
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : "";
+    const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
+    const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
+    const cad = d.cadence || "monthly";
+    const sm = d.send_mode || "to_me";
+    const billOpts = (utilAccts || []).map(a => {
+      const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
+        : (a.has_bill ? " (bill on file)" : "");
+      const lbl = (a.utility_name || "GMP") + " · acct " + (a.account_number || "?") + bills;
+      const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
+      return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
+    }).join("");
+    const showBillPicker = !wb && (utilAccts || []).length > 0;
+    return `
+      <div class="rb-offedit" data-offedit="${sid}">
+        <div class="rb-offedit-h">
+          <span class="rl">Offtaker details</span>
+          <span class="rb-offedit-hint">Edits save to this offtaker and update the preview live.</span>
+        </div>
+        <div class="rb-cust-grid rb-offedit-grid">
+          <label class="rep-fld"><span class="rl">Offtaker name</span>
+            <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
+          ${showBillPicker ? `
+          <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
+            <select data-of="utility_account_id">
+              <option value="">${d.utility_account_id ? "— keep current —" : "Select a GMP bill…"}</option>
+              ${billOpts}
+            </select></label>` : ""}
+          ${wb ? "" : `
+          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
+            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>`}
+          <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
+            <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10"></label>
+          <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
+            <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
+          <label class="rep-fld"><span class="rl">Cadence</span>
+            <select data-of="cadence">
+              <option value="monthly" ${cad === "monthly" ? "selected" : ""}>Monthly</option>
+              <option value="quarterly" ${cad === "quarterly" ? "selected" : ""}>Quarterly</option>
+            </select></label>
+          <label class="rep-fld"><span class="rl">Send to</span>
+            <select data-of="send_mode">
+              <option value="to_me" ${sm === "to_me" ? "selected" : ""}>Me (operator copy)</option>
+              <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
+              <option value="both" ${sm === "both" ? "selected" : ""}>Both</option>
+            </select></label>
+          <label class="rep-fld"><span class="rl">Offtaker email</span>
+            <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com"></label>
+          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
+            <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
+        </div>
+        <span class="rb-status rb-offedit-status"></span>
+      </div>`;
+  }
+
+  // ── Live offtaker-edit wiring ──────────────────────────────────────────────
+  // Money fields change the invoiced amount, so a change recomputes the draft;
+  // copy fields only repaint the preview envelope.
+  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh"]);
+  const OF_PENDING = {};   // sid -> { body, money, timer, card, box, did }
+
+  function wireOfftakerEditors(wrap) {
+    wrap.querySelectorAll(".rb-offedit").forEach(box => {
+      const sid = box.getAttribute("data-offedit");
+      const card = box.closest(".rb-draft");
+      const did = card && card.getAttribute("data-did");
+      box.querySelectorAll("[data-of]").forEach(inp => {
+        const field = inp.getAttribute("data-of");
+        const h = () => onOfftakerEdit(card, box, did, sid, field, inp);
+        inp.addEventListener("input", h);
+        inp.addEventListener("change", h);
+      });
+    });
+  }
+
+  function onOfftakerEdit(card, box, did, sid, field, inp) {
+    const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+    if (!d) return;
+    const raw = inp.value;
+    ACTIVE_DRAFT_ID = did;                       // preview tracks the edited draft
+    // Optimistic repaint for what the preview/grid can honestly show right now.
+    if (field === "customer_name") d.customer_name = raw;
+    else if (field === "client_email") d.client_email = raw;
+    else if (field === "send_mode") d.send_mode = raw;
+    else if (field === "cc_emails") d.cc_emails = raw;
+    else if (field === "allocation_pct" && raw !== "") {
+      d.allocation_pct = Number(raw) / 100;
+      const v = card && card.querySelectorAll(".rb-draft-grid .rb-v")[1];
+      if (v) v.textContent = (Math.round(d.allocation_pct * 1000) / 10) + "%";
+    }
+    renderDraftDoc();
+    const body = ofPatchBody(field, raw);
+    if (body === null) return;                   // nothing to persist (blank required)
+    scheduleOfftakerPatch(card, box, did, sid, body, OF_MONEY_FIELDS.has(field));
+  }
+
+  function ofPatchBody(field, raw) {
+    const v = String(raw == null ? "" : raw).trim();
+    switch (field) {
+      case "allocation_pct":     return v === "" ? null : { allocation_pct: Number(v) / 100 };
+      case "discount_pct":       return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
+      case "net_rate_per_kwh":   return { net_rate_per_kwh: v === "" ? null : Number(v) };
+      case "utility_account_id": return v === "" ? null : { utility_account_id: Number(v) };
+      case "customer_name":      return v === "" ? null : { customer_name: v };
+      case "client_email":       return { client_email: v };
+      case "cc_emails":          return { cc_emails: v };
+      case "cadence":            return { cadence: v };
+      case "send_mode":          return { send_mode: v };
+      default: return null;
+    }
+  }
+
+  function scheduleOfftakerPatch(card, box, did, sid, body, isMoney) {
+    let p = OF_PENDING[sid];
+    if (!p) p = OF_PENDING[sid] = { body: {}, money: false };
+    Object.assign(p.body, body);
+    p.money = p.money || isMoney;
+    p.card = card; p.box = box; p.did = did;
+    clearTimeout(p.timer);
+    p.timer = setTimeout(() => flushOfftakerPatch(sid), 600);
+  }
+
+  async function flushOfftakerPatch(sid) {
+    const p = OF_PENDING[sid];
+    if (!p) return;
+    delete OF_PENDING[sid];
+    const { body, money, card, box, did } = p;
+    const st = box && box.querySelector(".rb-offedit-status");
+    const setSt = (cls, txt) => { if (st) { st.className = cls; if (txt !== undefined) st.textContent = txt; } };
+    setSt("rb-status rb-busy", money ? "Recalculating…" : "Saving…");
+    try {
+      const r = await fetch(API + "/subscriptions/" + sid, {
+        method: "PATCH",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        setSt("rb-status rb-err", (e && e.detail) ? e.detail : "Couldn't save.");
+        return;
+      }
+      if (!money) { setSt("rb-status rb-ok", "Saved."); renderDraftDoc(); return; }
+      // Money changed → recompute the draft figures via the production path
+      // (generate_draft → build_match → build_manual_match for GMP-bound offtakers).
+      try {
+        const rg = await fetch(API + "/subscriptions/" + sid + "/draft",
+          { method: "POST", headers: authHeaders() });
+        const dg = await rg.json().catch(() => ({}));
+        const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+        if (rg.ok && dg.draft && d) {
+          ["array_total_kwh", "allocation_pct", "customer_kwh", "amount_usd",
+           "invoice_number", "period_label"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
+          applyDraftFigures(card, d);
+          setSt("rb-status rb-ok", "Saved · figures updated.");
+        } else {
+          setSt("rb-status rb-ok", "Saved · figures update once a GMP bill lands.");
+        }
+      } catch (e) { setSt("rb-status rb-ok", "Saved."); }
+    } catch (e) { setSt("rb-status rb-err", "Network error."); }
+  }
+
+  // Repaint a draft card's number grid + the live preview from the updated draft
+  // object, WITHOUT re-rendering the editor inputs (so the operator keeps focus).
+  function applyDraftFigures(card, d) {
+    if (card) {
+      const vs = card.querySelectorAll(".rb-draft-grid .rb-v");
+      const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+      if (vs[0]) vs[0].textContent = fmt0(d.array_total_kwh) + " kWh";
+      if (vs[1]) vs[1].textContent = pct != null ? pct + "%" : "—";
+      if (vs[2]) vs[2].textContent = fmt0(d.customer_kwh) + " kWh";
+      if (vs[3]) vs[3].textContent = money(d.amount_usd);
+      // Re-sync the auto-written note to the new figures — but only if it's still
+      // the default (never clobber an email the operator has edited).
+      const ta = card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
+      if (ta && d._defaultNote != null && ta.value === d._defaultNote) {
+        const nn = defaultDraftNote(d);
+        ta.value = nn; d._defaultNote = nn;
+      }
+    }
+    renderDraftDoc();
   }
 
   // A sensible pre-written note the operator edits before sending (Paul's
