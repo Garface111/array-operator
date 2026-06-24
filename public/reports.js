@@ -440,6 +440,19 @@
         body.net_rate_per_kwh = n;
       }
     }
+    // budget bill: blank → null (use the calculated total); number → fixed final amount.
+    if (get("budget_amount_usd")) {
+      const raw = get("budget_amount_usd").value.trim();
+      if (raw === "") {
+        body.budget_amount_usd = null;
+      } else {
+        const n = Number(raw);
+        if (isNaN(n) || n < 0) {
+          st.className = "rb-status rb-err"; st.textContent = "Budget amount must be 0 or more, or blank."; return;
+        }
+        body.budget_amount_usd = n;
+      }
+    }
     // discount: blank → null (clear → use the default 10% off); whole % → fraction.
     if (get("discount_pct")) {
       const raw = get("discount_pct").value.trim();
@@ -1436,6 +1449,9 @@
                 <label class="rep-fld"><span class="rl">Discount (% off the solar credit rate)</span>
                   <input type="number" data-f="discount_pct" min="0" max="99" step="1" value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="e.g. 10">
                   <span class="rb-fld-hint">Blank = your default discount (10% off).</span></label>
+                <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
+                  <input type="number" data-f="budget_amount_usd" min="0" step="0.01" value="${s.budget_amount_usd != null ? s.budget_amount_usd : ""}" placeholder="blank = use the calculated amount">
+                  <span class="rb-fld-hint">Set a flat amount this offtaker pays each period — overrides the calculated total. The line items still show on the invoice.</span></label>
                 <label class="rep-fld"><span class="rl">Starting invoice #</span>
                   <input type="number" data-f="invoice_number_start" min="0" step="1" value="${s.invoice_number_start != null ? s.invoice_number_start : ""}" placeholder="e.g. 1001">
                   <span class="rb-fld-hint">${s.invoice_number_next != null ? "Next invoice will be #" + s.invoice_number_next + ". " : ""}Array Operator adds 1 after each send. Blank = date-based.</span></label>
@@ -2227,6 +2243,9 @@
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10"></label>
           <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
             <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
+          <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
+            <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = use the calculated amount">
+            <span class="rb-fld-hint">Set a flat amount this offtaker pays — overrides the calculated total (line items still show).</span></label>
           <label class="rep-fld"><span class="rl">Cadence</span>
             <select data-of="cadence">
               <option value="monthly" ${cad === "monthly" ? "selected" : ""}>Monthly</option>
@@ -2250,7 +2269,7 @@
   // ── Live offtaker-edit wiring ──────────────────────────────────────────────
   // Money fields change the invoiced amount, so a change recomputes the draft;
   // copy fields only repaint the preview envelope.
-  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh"]);
+  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
   const OF_PENDING = {};   // sid -> { body, money, timer, card, box, did }
 
   function wireOfftakerEditors(wrap) {
@@ -2301,6 +2320,7 @@
       case "allocation_pct":     return v === "" ? null : { allocation_pct: Number(v) / 100 };
       case "discount_pct":       return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
       case "net_rate_per_kwh":   return { net_rate_per_kwh: v === "" ? null : Number(v) };
+      case "budget_amount_usd":  return { budget_amount_usd: v === "" ? null : Number(v) };
       case "utility_account_id": return v === "" ? null : { utility_account_id: Number(v) };
       case "customer_name":      return v === "" ? null : { customer_name: v };
       case "client_email":       return { client_email: v };
