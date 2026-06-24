@@ -891,6 +891,9 @@
               </div>
             </div>
           </div>
+          <p class="rb-autosend-note" id="rbmAutoNote" hidden>⚡ With <b>Auto-send</b>, each invoice
+             emails to your offtaker automatically — sent under <b>your name</b>, with replies coming to
+             your email. Your offtaker never sees any Array Operator branding.</p>
           <p class="rb-bcc-note">📩 Every invoice email sent to an offtaker is automatically
              <b>BCC'd to your email</b> — so you always see exactly what they received.</p>
           <div class="rb-actions">
@@ -931,6 +934,11 @@
 
     if (ADD_MODE === "manual") {
       wireSegments(host);
+      // Reveal the auto-send explanation the moment the operator picks Auto-send.
+      const autoNote = $("#rbmAutoNote"), dseg = $("#rbmDelivery");
+      if (dseg) dseg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+        if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
+      }));
       $("#rbmSave").onclick = saveManual;
       // Populate the GMP utility-bill picker. Offtakers bind to a GMP account;
       // their invoice is generated from THAT account's utility bills only.
@@ -1506,6 +1514,11 @@
       const target = e.target.closest("button");
       if (!target) return;
       const dm = target.getAttribute("data-v");
+      // Switching to Auto-send enables automatic outward emails — tell the operator
+      // it goes out under THEIR name before turning it on (and let them back out).
+      if (dm === "auto" && !confirm("Turn on Auto-send for this offtaker?\n\nEach period's invoice will email to them automatically — sent under your name, with replies coming to you. Your offtaker won't see any Array Operator branding. (Nothing sends until the next billing period.)")) {
+        return;
+      }
       seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
       target.classList.add("on");
       await patch(id, { delivery_mode: dm }, st);
