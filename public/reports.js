@@ -1801,6 +1801,11 @@
     requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
     wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
       cb.addEventListener("change", () => renderDraftDoc()));
+    // Manual GMP-bill upload — the fallback when auto-capture hasn't run (the bill DATA
+    // is in but its PDF was never pulled). Uploads onto the draft; on send it takes
+    // precedence over auto-attach.
+    wrap.querySelectorAll("[data-gmpupload]").forEach(inp =>
+      inp.addEventListener("change", () => uploadGmpBill(inp)));
     const regen = wrap.querySelector("[data-regen]");
     if (regen) regen.onclick = () => selectOfftaker(regen.getAttribute("data-regen"), true);
     // Custom offtaker dropdown (open/close/select/keyboard) + inline offtaker editors.
@@ -1877,6 +1882,39 @@
     GENERATING_SUB_ID = null;
     _pinActiveSub = true;              // stay on this offtaker through the refetch
     await refreshInbox();              // refetch → DRAFT_BY_SUB updated → renders the draft or empty state
+  }
+
+  // Attach a GMP bill PDF to a draft by hand — the operator's fallback for when
+  // auto-capture hasn't pulled the bill's PDF yet. POSTs to /drafts/{id}/gmp-invoice;
+  // a manually-attached PDF takes precedence over auto-attach on send.
+  async function uploadGmpBill(inp) {
+    const did = inp.getAttribute("data-gmpupload");
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    const box = inp.closest(".rb-gmp-manual");
+    const stat = box && box.querySelector(".rb-gmp-upload-stat");
+    const setStat = (cls, txt) => { if (stat) { stat.className = "rb-gmp-upload-stat " + cls; stat.textContent = txt; } };
+    if (file.type && file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+      setStat("rb-err", "Please choose a PDF."); inp.value = ""; return;
+    }
+    setStat("rb-busy", "Uploading…");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      // NOTE: don't set Content-Type — the browser adds the multipart boundary.
+      const r = await fetch(API + "/drafts/" + did + "/gmp-invoice",
+        { method: "POST", headers: authHeaders(), body: fd });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        setStat("rb-err", (e && e.detail) ? e.detail : ("Upload failed (HTTP " + r.status + ")."));
+        inp.value = "";
+        return;
+      }
+      const jr = await r.json().catch(() => ({}));
+      const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+      if (d) { d.has_gmp_pdf = true; d.gmp_filename = (jr.draft && jr.draft.gmp_filename) || file.name; }
+      renderInboxBody();   // chip flips to "✓ attached"; the live preview now shows the GMP bill
+    } catch (e) { setStat("rb-err", "Network error — try again."); inp.value = ""; }
   }
 
   function activeDraft() {
@@ -2063,7 +2101,16 @@
           <input type="checkbox" data-dact="summary" ${sumOn ? "checked" : ""}>
           <span>Attach Array Operator's summary data</span>
         </label>
-        ${d.has_gmp_pdf ? `<div class="rb-gmp-manual"><span class="rb-gmp-ok">✓ GMP invoice attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span></div>` : ""}
+        ${d.has_gmp_pdf
+          ? `<div class="rb-gmp-manual">
+               <span class="rb-gmp-ok">✓ GMP bill attached${d.gmp_filename ? " · " + esc(d.gmp_filename) : ""}</span>
+               <label class="rb-gmp-upload-link" title="Replace the attached GMP bill PDF">Replace<input type="file" accept="application/pdf,.pdf" data-gmpupload="${d.id}" hidden></label>
+               <span class="rb-gmp-upload-stat"></span>
+             </div>`
+          : `<div class="rb-gmp-manual rb-gmp-manual-empty">
+               <label class="rb-gmp-upload-link" title="Attach the GMP bill PDF yourself if it hasn't been captured automatically yet">⬆ Upload the GMP bill PDF<input type="file" accept="application/pdf,.pdf" data-gmpupload="${d.id}" hidden></label>
+               <span class="rb-gmp-upload-stat"></span>
+             </div>`}
       </div>`;
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
