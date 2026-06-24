@@ -50,12 +50,30 @@
     if (s === "monitoring") return { label: "Monitoring", cls: "muted" };
     return { label: "OK", cls: "ok" };
   }
-  function freshness(c) {
+  function _ageMin(c) {
     const h = (c.source_status || {}).age_hours;
-    if (h == null) return "";
-    if (h < 1) return "live";
-    if (h < 24) return Math.round(h) + "h ago";
-    return Math.round(h / 24) + "d ago";
+    return h == null ? null : h * 60;
+  }
+  // How recent a reading must be to still count as "live", per vendor. Extension-
+  // captured vendors promise a tight cadence (Chint ~4 min, Fronius/SMA ~6); allow
+  // ~2x before we call a reading stale. Other vendors (SolarEdge API) are coarser.
+  function _liveWindowMin(c) {
+    const cad = CADENCE_MIN[(c.vendor || "").toLowerCase()];
+    return cad ? cad * 2 : 24;
+  }
+  // A reading is STALE when it's older than its vendor's live window — i.e. the feed
+  // has paused (e.g. the portal session lapsed) and the number on screen is frozen.
+  function isStale(c) {
+    const a = _ageMin(c);
+    return a != null && a >= _liveWindowMin(c);
+  }
+  function freshness(c) {
+    const a = _ageMin(c);
+    if (a == null) return "";
+    if (a < _liveWindowMin(c)) return "live";
+    if (a < 90) return Math.round(a) + " min ago";
+    if (a < 1440) return Math.round(a / 60) + "h ago";
+    return Math.round(a / 1440) + "d ago";
   }
 
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
@@ -205,15 +223,19 @@
           <span class="vs-vtot">${kw(vtot)} now</span></div>`;
       list.forEach(c => {
         const st = arrStatus(c);
+        // Frozen feed: a reading older than the vendor's live window. Dim the (stale)
+        // live number and flag its age so a paused feed never masquerades as current.
+        const stale = isStale(c) && c.current_power_w != null;
+        const staleTitle = stale ? ` title="Last reading ${esc(freshness(c))} — live feed may be paused (sign back into the vendor portal, or hit ${esc(vlabel(v))}'s refresh)"` : "";
         const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span>${esc(c.array_name || "Array")}</span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
-          <span class="vs-c-pow">${kw(c.current_power_w)}</span>
+          <span class="vs-c-pow${stale ? " vs-stale" : ""}"${staleTitle}>${kw(c.current_power_w)}</span>
           <span class="vs-c-today">${kwh0(c.produced_today_kwh)}</span>
           <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
-          <span class="vs-c-fresh">${esc(freshness(c))}</span>
+          <span class="vs-c-fresh${isStale(c) ? " vs-stale-syn" : ""}">${esc(freshness(c))}</span>
         </button>`;
         if (open) {
           h += `<div class="vs-inv-wrap">`;
@@ -227,7 +249,7 @@
               h += `<div class="vs-row vs-inv">
                 <span class="vs-c-name vs-inv-name">${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
-                <span class="vs-c-pow">${kw(iv.current_power_w)}</span>
+                <span class="vs-c-pow${stale ? " vs-stale" : ""}">${kw(iv.current_power_w)}</span>
                 <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}">${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
