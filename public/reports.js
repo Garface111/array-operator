@@ -186,8 +186,11 @@
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
-      <div class="rb-layout rb-tpl-layout">
-        <div class="rb-col-form">
+      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
+      <!-- The invoice-template box lives here by default; when an approval draft is
+           showing it is relocated to the BOTTOM of that card (one consolidated
+           element) and parked back here when there's nothing to approve. -->
+      <div id="rbTplHome">
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
           <h3>Your invoice template</h3>
@@ -208,10 +211,7 @@
           <span class="rb-tpl-estatus" id="rbTplEStatus"></span>
         </div>
       </div>
-        </div>
-        <aside class="rb-col-doc" id="rbTplDocPane"></aside>
       </div>
-      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
       </div><!-- /rbSubInvoice -->
       <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
   }
@@ -527,7 +527,7 @@
       if (tokens && t && t.tokens) tokens.innerHTML = "Tokens you can use: " +
         t.tokens.map(x => "<code>{{ " + x + " }}</code>").join(" ");
       // Feed the live draft preview so an uploaded/enabled template shows there now.
-      TEMPLATE_STATE = t ? { enabled: !!t.enabled, html: t.html || "" } : null;
+      TEMPLATE_STATE = t ? { enabled: !!t.enabled, html: t.html || "", has: !!t.has_template } : null;
       renderDraftDoc();
       loadTplPreview(t);                              // rendered PDF of the template
     }
@@ -1642,6 +1642,23 @@
     OFFTAKERS = rows;
   }
 
+  // ── invoice-template box relocation ──────────────────────────────────────
+  // #rbTpl is one wired element moved between its standalone home (#rbTplHome)
+  // and the bottom of the approval card. ALWAYS park it home before an innerHTML
+  // wipe so its event wiring survives the re-render.
+  function parkTpl() {
+    const home = $("#rbTplHome"), tpl = $("#rbTpl");
+    if (home && tpl && tpl.parentElement !== home) home.appendChild(tpl);
+  }
+  function foldTplIntoInbox(inboxCard) {
+    const tpl = $("#rbTpl");
+    if (!inboxCard || !tpl) return;
+    const div = document.createElement("div");
+    div.className = "rb-tpl-divider";
+    inboxCard.appendChild(div);
+    inboxCard.appendChild(tpl);
+  }
+
   async function refreshInbox() {
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
@@ -1651,12 +1668,12 @@
         fetch(API + "/subscriptions", { headers: authHeaders() }),
         fetchUtilityAccounts(),
       ]);
-      if (!rd.ok) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
+      if (!rd.ok) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
       const drafts = (await rd.json().catch(() => ({}))).drafts || [];
       const subs = rs.ok ? ((await rs.json().catch(() => ({}))).subscriptions || []) : [];
       // The section appears when there's something awaiting approval (≥1 pending draft);
       // from there the dropdown lets the operator swap to ANY offtaker.
-      if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
+      if (!drafts.length) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
       INBOX_UTIL_ACCTS = utilAccts || [];
       _indexInbox(drafts, subs);
       // Default / re-home the selected offtaker.
@@ -1674,7 +1691,7 @@
       const ad = DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
       if (ad) ACTIVE_DRAFT_ID = ad.id;
       renderInboxBody();
-    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; }
+    } catch (e) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; }
   }
 
   // The secondary line under an offtaker's name — amount + period when a draft
@@ -1708,6 +1725,7 @@
   function renderInboxBody() {
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
+    parkTpl();                          // protect the wired template box before any wipe
     if (!OFFTAKERS.length) { wrap.innerHTML = ""; return; }
     if (!OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID))) ACTIVE_SUB_ID = String(OFFTAKERS[0].id);
     const activeOf = OFFTAKERS.find(s => String(s.id) === String(ACTIVE_SUB_ID)) || OFFTAKERS[0];
@@ -1785,6 +1803,9 @@
     // Custom offtaker dropdown (open/close/select/keyboard) + inline offtaker editors.
     wireOfftakerPicker(wrap);
     wireOfftakerEditors(wrap);
+    // Consolidate: drop the (already-wired) invoice-template box at the bottom of
+    // this approval card so the page reads as one element, not three.
+    foldTplIntoInbox(wrap.querySelector(".rb-inbox.rep-card"));
   }
 
   // Wire the custom dropdown: toggle, click-outside, Esc, arrow-key nav, item select.
@@ -1961,8 +1982,12 @@
         </div>
       </div>
       ${sid
-        ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment — ${(TEMPLATE_STATE && TEMPLATE_STATE.enabled) ? "your template, filled" : "our default format"}</div>
-           <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>` : ""}
+        ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment</div>
+           <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>
+           ${(TEMPLATE_STATE && TEMPLATE_STATE.has) ? `<div class="rb-tpl-prevbtns rb-invfmt-btns">
+             <button type="button" class="ao-btn rb-btn" data-invfmt="default">View our default format</button>
+             <button type="button" class="ao-btn rb-btn" data-invfmt="template">View your reproduced template</button>
+           </div>` : ""}` : ""}
       <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
         The invoice shown below is the exact PDF that gets attached${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
 
@@ -1971,13 +1996,24 @@
     // THIS offtaker's real values, not the lossy token-HTML that left sample text in.
     if (sid) {
       const paper = pane.querySelector("#rbDraftInvPaper");
-      if (paper) {
-        fetch(`${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf`, { headers: authHeaders() })
+      const invBtns = pane.querySelectorAll("[data-invfmt]");
+      // Render the invoice in a given variant ("default" = our standard format,
+      // "template" = the operator's reproduced template, forced even if toggled
+      // off) and light its button. Lets the operator compare without changing the
+      // saved format (the slider commits; these buttons just preview).
+      const showInv = (variant) => {
+        invBtns.forEach(b => b.classList.toggle("on", b.getAttribute("data-invfmt") === variant));
+        if (!paper) return;
+        paper.innerHTML = '<div class="rb-tpl-load">Rendering invoice…</div>';
+        fetch(`${API}/subscriptions/${sid}/preview?kind=invoice&fmt=pdf&variant=${variant}`, { headers: authHeaders() })
           .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error("preview " + r.status)))
           .then(buf => renderPdfToPaper(buf, paper))
           .catch(() => { paper.innerHTML =
             '<div class="rb-tpl-load">Invoice preview unavailable — use “Preview invoice” for the exact PDF.</div>'; });
-      }
+      };
+      invBtns.forEach(b => b.onclick = () => showInv(b.getAttribute("data-invfmt")));
+      // Default view = the format that actually gets sent (honors the slider).
+      showInv((TEMPLATE_STATE && TEMPLATE_STATE.enabled) ? "template" : "default");
     }
     // Clicking an attachment chip downloads that exact file.
     pane.querySelectorAll(".rb-eml-att[data-dl]").forEach(b => b.onclick = () =>

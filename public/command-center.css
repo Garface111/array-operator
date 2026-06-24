@@ -329,6 +329,13 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-tpl-html:focus{ outline:none; border-color:rgba(94,194,255,.55); }
 .rb-tpl-editbtns{ display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap; }
 .rb-tpl-estatus{ font-size:12px; color:var(--faint); }
+/* template box folded into the bottom of the approval card so the page reads as
+   one element: strip its own card chrome + sit it under a divider. */
+.rb-tpl-divider{ height:1px; background:var(--line); margin:22px 0 0; }
+.rb-inbox .rb-tpl.rep-card{ border:0 !important; box-shadow:none !important;
+  background:transparent !important; padding:18px 0 0 !important; margin:0 !important; border-radius:0 !important; }
+/* compare buttons sit UNDER the approval invoice preview (top margin, not bottom) */
+.rb-invfmt-btns{ margin:10px 0 4px !important; }
 .rb-tpl-estatus.rb-ok{ color:#3fb950; }
 .rb-tpl-estatus.rb-err{ color:#e06666; }
 
