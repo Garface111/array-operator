@@ -56,10 +56,14 @@
   }
   // How recent a reading must be to still count as "live", per vendor. Extension-
   // captured vendors promise a tight cadence (Chint ~4 min, Fronius/SMA ~6); allow
-  // ~2x before we call a reading stale. Other vendors (SolarEdge API) are coarser.
+  // ~2x before we call a reading stale. SolarEdge is API-pulled and its lastUpdateTime
+  // routinely lags 15-30 min behind a live currentPower, and the BACKEND still serves
+  // it as live until 6h (_SOURCE_STALE_HOURS) — so match that (360 min) for non-cadence
+  // vendors, else a healthy SolarEdge array shows a false "stale"/dimmed reading that
+  // contradicts the backend.
   function _liveWindowMin(c) {
     const cad = CADENCE_MIN[(c.vendor || "").toLowerCase()];
-    return cad ? cad * 2 : 24;
+    return cad ? cad * 2 : 360;
   }
   // A reading is STALE when it's older than its vendor's live window — i.e. the feed
   // has paused (e.g. the portal session lapsed) and the number on screen is frozen.
