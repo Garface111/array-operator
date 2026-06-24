@@ -92,6 +92,13 @@
     locus: "https://app.locusenergy.com/",
   };
 
+  // Per-vendor sync caveats shown under the group header. Chint reports inverters
+  // PER SITE — the portal only loads a site's inverters once you open that site, so
+  // landing on the dashboard alone won't sync them.
+  const SYNC_NOTE = {
+    chint: "Chint syncs per site: after you open the portal, click into each of your sites so its inverters load.",
+  };
+
   // True when the EnergyAgent extension is detected on this page, so "Open to sync"
   // routes through it (opening the portal also arms a fresh capture) instead of a plain tab.
   function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
@@ -220,10 +227,11 @@
       const badge = _portal
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
+      const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       h += `<div class="vs-vgroup">
         <div class="vs-vhead">${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
-          <span class="vs-vtot">${kw(vtot)} now</span></div>`;
+          <span class="vs-vtot">${kw(vtot)} now</span></div>${vnote}`;
       list.forEach(c => {
         const st = arrStatus(c);
         // Frozen feed: a reading older than the vendor's live window. Dim the (stale)
