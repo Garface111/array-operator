@@ -58,6 +58,11 @@
     return Math.round(h / 24) + "d ago";
   }
 
+  // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
+  // recapture alarms — surfaced so owners know how far behind real time a reading
+  // can be. Chint recaptures every ~4 min; Fronius/SMA every ~6 min.
+  const CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
+
   const _expanded = {};                       // array_id -> bool (survives re-renders)
   let _query = "";                            // search filter (lowercased)
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
@@ -167,9 +172,11 @@
       const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
+      const lag = CADENCE_MIN[v];
+      const lagChip = lag ? `<span class="vs-vlag" title="${esc(vlabel(v))} live readings refresh about every ${lag} minutes (via the EnergyAgent extension), so a value can be up to ~${lag} min behind real time.">↻ ~${lag} min lag</span>` : "";
       h += `<div class="vs-vgroup">
         <div class="vs-vhead"><span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>
-          <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>
+          <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
           <span class="vs-vtot">${kw(vtot)} now</span></div>`;
       list.forEach(c => {
         const st = arrStatus(c);
