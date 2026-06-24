@@ -81,6 +81,17 @@
   // can be. Chint recaptures every ~4 min; Fronius/SMA every ~6 min.
   const CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
 
+  // Each vendor's monitoring portal — clicking the vendor name opens it (via the
+  // extension when present, so opening it also arms a fresh capture; else a new tab).
+  const VENDOR_PORTAL = {
+    solaredge: "https://monitoring.solaredge.com/",
+    fronius: "https://www.solarweb.com/",
+    sma: "https://ennexos.sunnyportal.com/",
+    chint: "https://monitor.chintpowersystems.com/",
+    enphase: "https://enlighten.enphaseenergy.com/",
+    locus: "https://app.locusenergy.com/",
+  };
+
   // Ask the EnergyAgent extension (via so_bridge → background recaptureNow) to RE-SCRAPE
   // the vendor portal NOW — a silent background tab grabs fresh power and POSTs it to the
   // backend. Resolves on SO_RECAPTURE_DONE for our reqId, or after a safety timeout (the
@@ -217,8 +228,12 @@
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       const lag = CADENCE_MIN[v];
       const lagChip = lag ? `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Refresh now — re-pull the latest readings from the server. (${esc(vlabel(v))} live values sync from the EnergyAgent extension about every ${lag} min, so they can be up to ~${lag} min behind.)"><span class="vs-vlag-ic">↻</span> ~${lag} min lag</button>` : "";
+      const _portal = VENDOR_PORTAL[v];
+      const badge = _portal
+        ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
+        : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       h += `<div class="vs-vgroup">
-        <div class="vs-vhead"><span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>
+        <div class="vs-vhead">${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
           <span class="vs-vtot">${kw(vtot)} now</span></div>`;
       list.forEach(c => {
@@ -282,6 +297,22 @@
       // lands. No extension → just re-pull whatever the server already has.
       if (window.__AO_EXT_PRESENT) triggerRecapture(vendor).finally(settle);
       else settle();
+    });
+    // Clicking a vendor NAME opens that vendor's monitoring portal. With the extension
+    // present, route through it (so opening the portal also arms a fresh capture);
+    // otherwise open the site in a new tab.
+    body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = () => {
+      const v = btn.getAttribute("data-vportal");
+      const url = VENDOR_PORTAL[v];
+      if (!url) return;
+      if (window.__AO_EXT_PRESENT) {
+        try {
+          window.postMessage({ type: "SO_OPEN_PORTAL", url, active: true, provider: v, vendor: v,
+                               reqId: "vs-" + Date.now() }, "*");
+          return;
+        } catch (_) { /* fall through to a plain open */ }
+      }
+      try { window.open(url, "_blank", "noopener"); } catch (_) {}
     });
   }
 
