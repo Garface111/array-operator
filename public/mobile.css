@@ -88,10 +88,49 @@
   .fc-stat b { font-size: 17px; }
   .fc-health-num { font-size: 40px; }
   .fc-right { align-items: flex-start; }
+
+  /* ── Offtaker Invoice Generator — approval inbox ─────────────────────────── */
+  /* The "Reviewing offtaker" picker is hard-set to min-width:520px (desktop wants
+     it big + unmissable). On a phone that's wider than the screen → it overflows
+     and, with body{overflow-x:hidden}, the right side (caret + part of the name)
+     gets clipped and is unreachable. Let it become a full-width block that wraps
+     under the heading. */
+  .rb-inbox-h { gap: 12px; }
+  .rb-inbox-pick { min-width: 0; max-width: none; width: 100%; flex: 1 1 100%;
+                   padding: 10px 13px; }
+  .rb-pick-btn { padding: 10px 13px; }
+  .rb-pick-btn-name { font-size: 16px; }       /* 19px crowds a narrow button */
+  .rb-pick-btn-sub { font-size: 12px; }
+  .rb-pick-item-name { font-size: 15px; }
+
+  /* Draft card: the attach-controls box is pushed right (margin-left:auto) on
+     desktop; on a phone drop it onto its own full-width line under the buttons. */
+  .rb-draft-attach { margin-left: 0; width: 100%; box-sizing: border-box;
+                     align-items: stretch; }
+  .rb-draft-acts { width: 100%; }
+
+  /* Live invoice / template previews — give the iframes a phone-sane height so a
+     single preview doesn't become an endless internal scroll. (Width is already
+     100%; the pdf.js canvas variant scales to width on its own.) */
+  .rb-doc-frame { height: 560px; }
+  .rb-tpl-frame { height: 420px; }
+
+  /* ── Master Account ──────────────────────────────────────────────────────── */
+  /* The itemized "Your bill" block carries min-width:250px to keep its two
+     columns apart on desktop; let it shrink so it never forces the account row
+     wider than the screen on the smallest phones. */
+  .ao-bill { min-width: 0; }
+  /* Plan-picker modal: tighten the inner padding so the cards aren't cramped. */
+  .ao-modal.ao-plan { padding: 20px 16px 16px; }
 }
 
 /* Extra squeeze for the smallest phones. */
 @media (max-width: 380px) {
   .tab { font-size: 10.5px; padding: 11px 1px; }
   .cc-kpi .v { font-size: 20px; }
+  /* The 3-way "Send to" segmented slider (To me / To my client / To both) is an
+     inline-flex no-wrap row; on a ~320px screen it can edge past the card. Let it
+     wrap instead of overflowing. */
+  .rb-seg { flex-wrap: wrap; }
+  .rb-pick-btn-name { font-size: 15px; }
 }
