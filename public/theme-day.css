@@ -143,13 +143,13 @@ html[data-theme="day"] .sb-cardbtn,
 html[data-theme="day"] .sb-mbtn.ghost,
 html[data-theme="day"] .ao-btn-ghost,
 html[data-theme="day"] .ao-btn:not(.ao-btn-primary),
-html[data-theme="day"] .rb-btn,
+html[data-theme="day"] .rb-btn:not(.ao-btn-primary),
 html[data-theme="day"] .rb-cancel,
 html[data-theme="day"] .cl-btn.ghost,
 html[data-theme="day"] .cc-btn.ghost{
   background:#ffffff !important;color:var(--ink) !important;border:1px solid var(--line) !important;
 }
-html[data-theme="day"] .rb-btn:hover,
+html[data-theme="day"] .rb-btn:not(.ao-btn-primary):hover,
 html[data-theme="day"] .cl-x:hover{background:var(--day-hover) !important}
 
 /* ── icon tiles ───────────────────────────────────────────────────────────── */
