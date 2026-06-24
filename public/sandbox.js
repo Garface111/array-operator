@@ -920,6 +920,13 @@
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
     const curKw = curW != null ? (curW / 1000) : null;
     const maxKw = os.maxW != null ? (os.maxW / 1000) : null;
+    // Fronius/SMA/Chint expose only ONE site-level instantaneous power; the backend
+    // splits it across inverters by today's energy share — so a per-inverter "kW now"
+    // is an ESTIMATE, not a measured per-device reading (audit #5). Mark it "~" + a tip.
+    const _alloc = curKw != null && (inv.vendor === "fronius" || inv.vendor === "sma" || inv.vendor === "chint");
+    const curB = (txt) => _alloc
+      ? `<b class="sb-ob-cur" title="${esc(BRAND[inv.vendor]||inv.vendor)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.">~${txt}</b>`
+      : `<b class="sb-ob-cur">${txt}</b>`;
     let label;
     if(!os.reporting){
       // Distinguish "we have no live wattage feed for this vendor" (Fronius:
@@ -938,8 +945,8 @@
       // Mark an estimated denominator honestly ("of ~est. max"); a real
       // nameplate stays the plain "of max · cur/max kW".
       const ofTxt = os.estimated
-        ? `<span title="No rated nameplate from this vendor — max estimated from peak production.">of ~est · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/~${maxKw.toFixed(1)} kW</span>`
-        : `of max · <b class="sb-ob-cur">${curKw.toFixed(1)}</b>/${maxKw} kW`;
+        ? `<span title="No rated nameplate from this vendor — max estimated from peak production.">of ~est · ${curB(curKw.toFixed(1))}/~${maxKw.toFixed(1)} kW</span>`
+        : `of max · ${curB(curKw.toFixed(1))}/${maxKw} kW`;
       label = `<b class="sb-ob-pct">${os.pct}%</b><span class="sb-ob-of">${ofTxt}</span>`;
     } else {
       // Producing, but no rated max AND no history to estimate from — last-resort
@@ -1103,7 +1110,10 @@
   function perfBlock(inv, peers, st){
     const curW  = inv.current_power_w;
     const curKw = curW != null ? (curW/1000) : null;
-    const nowKw = curKw != null ? `${curKw.toFixed(1)} kW now` : "";
+    // audit #5: Fronius/SMA/Chint per-inverter power is a site-level split (an estimate).
+    const _allocP = curKw != null && (inv.vendor === "fronius" || inv.vendor === "sma" || inv.vendor === "chint");
+    const _allocTip = _allocP ? ` title="${esc(BRAND[inv.vendor]||inv.vendor)} reports one site-level power — split across inverters by today's energy share, so this per-inverter kW is an estimate."` : "";
+    const nowKw = curKw != null ? `${_allocP?"~":""}${curKw.toFixed(1)} kW now` : "";
     if(st.key === "producing"){
       // Headline = live output as a % of the inverter's MAX possible production
       // (capacity factor = current ÷ rated nameplate, with an estimated max when
@@ -1120,12 +1130,12 @@
         const sub = est ? `of its ~${maxKw.toFixed(1)} kW est. max` : `of its ${maxStr} kW max`;
         return `<div class="sb-perf ok">
           <div class="sb-perf-main"><b class="sb-perf-pct">${pct}<span class="sb-perf-sym">%</span></b><span class="sb-perf-unit">of max</span></div>
-          ${nowKw?`<div class="sb-perf-prod">${nowKw}</div>`:""}
+          ${nowKw?`<div class="sb-perf-prod"${_allocTip}>${nowKw}</div>`:""}
           <div class="sb-perf-sub"${est?' title="Rated max estimated from peak production — this vendor reports no nameplate."':''}>${esc(sub)}</div>
           <div class="sb-ob-track"><div class="sb-ob-fill" style="width:${pct}%"></div></div>
         </div>`;
       }
-      return `<div class="sb-perf ok"><div class="sb-perf-main"><b class="sb-perf-pct">${curKw!=null?curKw.toFixed(1):"—"}</b><span class="sb-perf-unit">kW now</span></div></div>`;
+      return `<div class="sb-perf ok"><div class="sb-perf-main"><b class="sb-perf-pct"${_allocTip}>${curKw!=null?(_allocP?"~":"")+curKw.toFixed(1):"—"}</b><span class="sb-perf-unit">kW now</span></div></div>`;
     }
     // Non-producing states: an honest line, no %.
     const tk = liveReadingMissing(inv) ? todayKwh(inv) : null;
