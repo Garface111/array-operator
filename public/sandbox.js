@@ -3954,9 +3954,9 @@
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
-      planRow() +
       passwordRow(a) +
       autoRefreshRow() +
+      planRow() +
       rowStatic("Your bill",
         `<div class="ao-bill" id="aoBill"><span class="ao-bill-load">Loading…</span></div>`) +
       rowStatic("Payment method",
