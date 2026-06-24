@@ -98,6 +98,14 @@
   .rb-inbox-h { gap: 12px; }
   .rb-inbox-pick { min-width: 0; max-width: none; width: 100%; flex: 1 1 100%;
                    padding: 10px 13px; }
+  /* Belt-and-suspenders: a single over-wide descendant (like the picker's old
+     520px min-width) widens the whole layout viewport on Android Chrome, which
+     reads as "half the page is cut off / zoomed out". Cap the reports panel to
+     the screen and let long offtaker tokens (e.g. 1a_Starlake_South) wrap. */
+  #reportsRoot, .rb-subpanel, .rb-inbox, .rb-inbox-wrap, .rb-sub, .rb-draft {
+    max-width: 100%; min-width: 0; }
+  .rb-sub-name, .rb-sub-sentence, .rb-sub-meta, .rb-pick-btn-name,
+  .rb-pick-item-name, .rb-draft-name { overflow-wrap: anywhere; }
   .rb-pick-btn { padding: 10px 13px; }
   .rb-pick-btn-name { font-size: 16px; }       /* 19px crowds a narrow button */
   .rb-pick-btn-sub { font-size: 12px; }
