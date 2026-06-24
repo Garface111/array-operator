@@ -184,7 +184,7 @@ body.sb-fs-lock{ overflow:hidden; }
  * Align it to the content column (page gutters), then FLOAT the controls over
  * the top-right of the canvas instead of giving them a header row — so the fleet
  * tree fills the entire card and extends up beneath the buttons. */
-#sbWrap{ left:auto; transform:none; width:100%; max-width:100%; margin-left:0; margin-right:0; padding:14px; }
+#sbWrap{ position:relative; left:auto; transform:none; width:100%; max-width:100%; margin-left:0; margin-right:0; padding:14px; }
 
 /* controls float over the canvas, top-right */
 .sb-head{ position:absolute; top:14px; right:14px; left:14px; width:auto; margin:0; z-index:6; gap:10px; pointer-events:none; }
@@ -993,8 +993,10 @@ body.sb-fs-lock{ overflow:hidden; }
 /* ============================ VENDOR-DATA SPREADSHEET VIEW ============================ */
 /* Sub-view toggle (Sandbox | Spreadsheet) — floats at the top of the Vendor-data tab. */
 #panelArrays{ position:relative; }
-.vs-seg{ position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:55;
-  display:inline-flex; gap:2px; padding:3px; border-radius:11px; border:1px solid var(--line,#e2e8f0);
+/* Sub-view toggle — its OWN centered row ABOVE the sandbox. Was absolute-positioned
+   over the canvas, overlapping the fleet-health / "recoverable $" banner. */
+.vs-seg{ display:flex; width:fit-content; margin:12px auto 6px; position:relative; z-index:55;
+  gap:2px; padding:3px; border-radius:11px; border:1px solid var(--line,#e2e8f0);
   background:var(--card,#fff); box-shadow:0 2px 12px -5px rgba(15,23,42,.35); }
 .vs-seg-btn{ border:0; cursor:pointer; font:inherit; font-size:12.5px; font-weight:700; color:var(--muted,#64748b);
   padding:6px 18px; border-radius:8px; background:none; transition:background .12s, color .12s; }
@@ -1002,7 +1004,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .vs-seg-btn:not(.on):hover{ background:var(--day-hover,rgba(15,23,42,.05)); color:var(--ink,#0f172a); }
 
 /* The spreadsheet panel itself. */
-#sheetWrap{ padding:58px 20px 48px; max-width:1120px; margin:0 auto; }
+#sheetWrap{ padding:16px 20px 48px; max-width:1120px; margin:0 auto; }
 .vs-headrow{ margin:0 2px 14px; }
 .vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
 .vs-sub{ font-size:13px; color:var(--muted); }
