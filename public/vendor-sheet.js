@@ -106,7 +106,7 @@
   const _expanded = {};                       // array_id -> bool (survives re-renders)
   let _query = "";                            // search filter (lowercased)
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
-  let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "sandbox"; } catch (e) { return "sandbox"; } })();
+  let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "spreadsheet"; } catch (e) { return "spreadsheet"; } })();
 
   let _extPresent = false;        // EnergyAgent extension detected on this page (routes "Open to sync" through it)
 
@@ -310,7 +310,14 @@
     const host = $("#vendorSheet");
     if (!host || !window.FleetStore) return;
     const data = FleetStore.toColumns();
-    if (!((data && data.columns) || []).length) { host.innerHTML = '<div class="vs-empty">No arrays connected yet — add one from the Sandbox view, then they\'ll appear here.</div>'; return; }
+    if (!((data && data.columns) || []).length) {
+      // Spreadsheet is the DEFAULT view, so it renders during the initial fleet load —
+      // show a neutral "loading" state, not the misleading "no arrays", until data lands
+      // (the FleetStore subscribe re-renders this once the tree arrives).
+      const loading = !!(FleetStore.isLoaded && !FleetStore.isLoaded());
+      host.innerHTML = `<div class="vs-empty">${loading ? "Loading your fleet…" : "No arrays connected yet — add one from the Sandbox view, then they'll appear here."}</div>`;
+      return;
+    }
     if (!host.querySelector("#vsSearch")) buildShell(host);   // build the persistent shell once
     renderBody();
     sizeScroll();
