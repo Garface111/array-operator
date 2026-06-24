@@ -173,7 +173,7 @@
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       const lag = CADENCE_MIN[v];
-      const lagChip = lag ? `<span class="vs-vlag" title="${esc(vlabel(v))} live readings refresh about every ${lag} minutes (via the EnergyAgent extension), so a value can be up to ~${lag} min behind real time.">↻ ~${lag} min lag</span>` : "";
+      const lagChip = lag ? `<button type="button" class="vs-vlag" data-vrefresh="${esc(v)}" title="Refresh now — re-pull the latest readings from the server. (${esc(vlabel(v))} live values sync from the EnergyAgent extension about every ${lag} min, so they can be up to ~${lag} min behind.)"><span class="vs-vlag-ic">↻</span> ~${lag} min lag</button>` : "";
       h += `<div class="vs-vgroup">
         <div class="vs-vhead"><span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
@@ -219,6 +219,16 @@
       const id = b.getAttribute("data-arr");
       _expanded[id] = !_expanded[id];
       renderBody();
+    });
+    // The per-vendor lag chip is a refresh button: re-pull the latest fleet from the
+    // server (FleetStore.refetch → notify → re-render with fresh values). Spin while
+    // the fetch is in flight; the re-render replaces these nodes when data lands.
+    body.querySelectorAll("[data-vrefresh]").forEach(btn => btn.onclick = () => {
+      if (btn.classList.contains("vs-refreshing") || !window.FleetStore || !FleetStore.refetch) return;
+      btn.classList.add("vs-refreshing");
+      Promise.resolve(FleetStore.refetch()).finally(() => {
+        try { btn.classList.remove("vs-refreshing"); } catch (_) {}
+      });
     });
   }
 
