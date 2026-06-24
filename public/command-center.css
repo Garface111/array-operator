@@ -575,7 +575,15 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-gmp-ready{ color:var(--good); }
 .rb-gmp-pending{ color:var(--warn); }
 .rb-gmp-no_gmp{ color:var(--faint); }
-.rb-gmp-manual{ margin:2px 0 4px; }
+.rb-gmp-manual{ margin:2px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+/* manual GMP-bill upload — the fallback when auto-capture hasn't run yet */
+.rb-gmp-upload-link{ display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-size:11.5px;
+  font-weight:700; color:var(--good,#047857); padding:4px 9px; border:1px dashed var(--good,#047857);
+  border-radius:8px; background:rgba(63,214,138,.06); }
+.rb-gmp-upload-link:hover{ background:rgba(63,214,138,.14); }
+.rb-gmp-upload-stat{ font-size:11px; }
+.rb-gmp-upload-stat.rb-busy{ color:var(--muted); }
+.rb-gmp-upload-stat.rb-err{ color:var(--bad,#dc2626); }
 
 .rb-listwrap{ margin-top:8px; }
 .rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
@@ -926,21 +934,21 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-inbox-h p{ font-size:13px; color:var(--faint); margin:0; max-width:62ch; line-height:1.55; }
 /* offtaker picker — a CUSTOM dropdown (not a native <select>, so we own the menu
    design + nothing gets clipped); picking an offtaker switches the whole section. */
-.rb-inbox-pick{ flex:0 0 auto; display:flex; flex-direction:column; gap:9px; align-items:stretch;
-  min-width:440px; max-width:600px; padding:18px 22px; border:2px solid var(--good,#2563eb);
-  border-radius:16px; background:rgba(37,99,235,.06); box-shadow:0 12px 34px -12px rgba(37,99,235,.32); }
-.rb-pick-lab{ font-size:13px; letter-spacing:.1em; text-transform:uppercase; font-weight:800; color:var(--good,#2563eb); }
+.rb-inbox-pick{ flex:0 0 auto; display:flex; flex-direction:column; gap:6px; align-items:stretch;
+  min-width:520px; max-width:700px; padding:11px 18px; border:2px solid var(--good,#2563eb);
+  border-radius:14px; background:rgba(37,99,235,.06); box-shadow:0 8px 22px -12px rgba(37,99,235,.24); }
+.rb-pick-lab{ font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; font-weight:800; color:var(--good,#2563eb); }
 .rb-pick{ position:relative; width:100%; }
-.rb-pick-btn{ width:100%; display:flex; align-items:center; gap:14px; text-align:left; cursor:pointer;
-  font:inherit; color:var(--ink,#0f172a); padding:15px 18px; border:2px solid var(--good,#2563eb);
-  border-radius:13px; background:var(--card,#fff); transition:border-color .12s, box-shadow .12s; }
-.rb-pick-btn:hover{ box-shadow:0 0 0 4px rgba(37,99,235,.18); }
-.rb-pick[data-open="true"] .rb-pick-btn{ box-shadow:0 0 0 4px rgba(37,99,235,.30); }
-.rb-pick-btn:focus-visible{ outline:none; box-shadow:0 0 0 4px rgba(37,99,235,.30); }
-.rb-pick-btn-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
-.rb-pick-btn-name{ font-size:24px; font-weight:800; line-height:1.18; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rb-pick-btn-sub{ font-size:14px; font-weight:600; color:var(--faint); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rb-pick-caret{ flex:0 0 auto; color:var(--good,#2563eb); font-size:20px; transition:transform .15s ease; }
+.rb-pick-btn{ width:100%; display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer;
+  font:inherit; color:var(--ink,#0f172a); padding:10px 16px; border:2px solid var(--good,#2563eb);
+  border-radius:11px; background:var(--card,#fff); transition:border-color .12s, box-shadow .12s; }
+.rb-pick-btn:hover{ box-shadow:0 0 0 4px rgba(37,99,235,.16); }
+.rb-pick[data-open="true"] .rb-pick-btn{ box-shadow:0 0 0 4px rgba(37,99,235,.28); }
+.rb-pick-btn:focus-visible{ outline:none; box-shadow:0 0 0 4px rgba(37,99,235,.28); }
+.rb-pick-btn-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.rb-pick-btn-name{ font-size:19px; font-weight:800; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rb-pick-btn-sub{ font-size:13px; font-weight:600; color:var(--faint); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rb-pick-caret{ flex:0 0 auto; color:var(--good,#2563eb); font-size:18px; transition:transform .15s ease; }
 .rb-pick[data-open="true"] .rb-pick-caret{ transform:rotate(180deg); }
 .rb-pick-menu{ position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:60; max-height:330px;
   overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding:6px; border:1px solid var(--line);
