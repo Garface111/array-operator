@@ -470,8 +470,10 @@
     const ok = await patch(id, body, st);
     if (ok) {
       st.className = "rb-status rb-ok"; st.textContent = "Saved.";
-      // keep the other tabs' lists fresh (name/rate show there too).
+      // keep everything in sync — the offtaker list AND the approval inbox (the
+      // draft card + picker + email preview all read the offtaker's name/details).
       refreshList();
+      refreshInbox();
     }
   }
 
@@ -2258,7 +2260,14 @@
     const raw = inp.value;
     ACTIVE_DRAFT_ID = did;                       // preview tracks the edited draft
     // Optimistic repaint for what the preview/grid can honestly show right now.
-    if (field === "customer_name") d.customer_name = raw;
+    if (field === "customer_name") {
+      d.customer_name = raw;
+      // Rename updates EVERYWHERE instantly: the draft-card header + the picker.
+      const nameEl = card && card.querySelector(".rb-draft-name");
+      if (nameEl) nameEl.textContent = raw;
+      const pickName = document.querySelector(".rb-pick-btn-name");
+      if (pickName) pickName.textContent = raw;
+    }
     else if (field === "client_email") d.client_email = raw;
     else if (field === "send_mode") d.send_mode = raw;
     else if (field === "cc_emails") d.cc_emails = raw;
