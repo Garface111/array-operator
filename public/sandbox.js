@@ -3950,7 +3950,7 @@
 
     // One flat list of rows: identity → login & password → auto-refresh → bill → payment.
     list.innerHTML =
-      rowStatic("Name", esc(operator || "—")) +
+      rowEdit("Name", "name", operator, "Your name") +
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
@@ -4298,11 +4298,13 @@
         if(!val){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Enter a value first."; } return; }
         const h = authHeaders();
         if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
-        const url  = field === "company" ? "/v1/account/company-name" : "/v1/account/email";
-        // Backend models: UpdateCompanyName{name}, UpdateEmail{email}. The
-        // company endpoint wants `name` (not `company_name`) — sending the wrong
-        // key 422s, which was the "Couldn't save (HTTP 422)" bug.
-        const body = field === "company" ? { name: val } : { email: val };
+        const url  = field === "company" ? "/v1/account/company-name"
+                   : field === "name"    ? "/v1/account/name"
+                   : "/v1/account/email";
+        // Backend models: UpdateName{name}, UpdateCompanyName{name}, UpdateEmail{email}.
+        // The name + company endpoints want `name` (not `company_name`) — sending the
+        // wrong key 422s, which was the "Couldn't save (HTTP 422)" bug.
+        const body = (field === "company" || field === "name") ? { name: val } : { email: val };
         btn.disabled = true;
         if(msg){ msg.className = "acct-msg"; msg.textContent = "Saving…"; }
         try{
@@ -4311,7 +4313,7 @@
             body: JSON.stringify(body) });
           if(r.ok){
             if(msg){ msg.className = "acct-msg ok"; msg.textContent = "Saved."; }
-            if(_account) _account[field === "company" ? "company_name" : "email"] = val;
+            if(_account){ _account[field === "company" ? "company_name" : field === "name" ? "operator_name" : "email"] = val; }
             // Email is also the login — keep the Login row in sync.
             if(field === "email"){ const lg = document.getElementById("loginEmail"); if(lg) lg.textContent = val; }
           } else {
