@@ -600,6 +600,24 @@ body.sb-fs-lock{ overflow:hidden; }
   background:#94a3b8; box-shadow:0 0 5px rgba(148,163,184,.7); }
 .sb-fresh--stale .sb-fresh-dot{ background:#cbd5e1; }
 .sb-fresh-cta{ opacity:.72; font-weight:600; }
+.sb-fresh-txt{ flex:1 1 auto; min-width:0; }
+/* little click-to-sync button right next to "Last synced …" */
+.sb-fresh-sync{ display:inline-flex; align-items:center; justify-content:center; flex:none;
+  padding:3px 7px; border:1px solid rgba(148,163,184,.42); border-radius:7px;
+  background:rgba(255,255,255,.6); color:inherit; cursor:pointer; font:inherit; line-height:1;
+  transition:background .12s,border-color .12s,color .12s,transform .12s; }
+.sb-fresh-sync:hover{ background:#047857; border-color:#047857; color:#fff; transform:translateY(-1px); }
+.sb-fresh-sync:active{ transform:translateY(0); }
+.sb-fresh-sync svg{ display:block; }
+.sb-fresh-install{ flex:none; font-weight:700; color:#047857; text-decoration:none; white-space:nowrap; }
+.sb-fresh-install:hover{ text-decoration:underline; }
+.sb-fresh-ic{ display:inline-flex; flex:none; }
+/* states */
+.sb-fresh--warn{ background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.4); color:#92600a; }
+.sb-fresh--warn .sb-fresh-dot{ background:#f59e0b; box-shadow:0 0 5px rgba(245,158,11,.6); }
+.sb-fresh--syncing{ background:rgba(4,120,87,.1); border-color:rgba(4,120,87,.32); color:#065f46; }
+.sb-fresh--syncing .sb-fresh-ic{ animation:sb-fresh-spin .9s linear infinite; }
+@keyframes sb-fresh-spin{ to{ transform:rotate(360deg); } }
 /* Auto-login hint — subtle tip on extension-captured arrays when vault creds not saved yet */
 .sb-autologin-hint{ display:flex; align-items:flex-start; gap:8px; margin:8px 0 4px;
   padding:8px 11px; border-radius:9px; font-size:11.5px; line-height:1.45;

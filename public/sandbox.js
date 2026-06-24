@@ -233,8 +233,27 @@
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
     }
-    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)) handleCaptureLanded(d);
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)){
+      // A sync for this vendor landed — clear its chip state; handleCaptureLanded
+      // reloads the fleet so the chip re-renders fresh (or vanishes).
+      if(_syncState[d.provider]){ delete _syncState[d.provider]; if(_syncTimers[d.provider]) clearTimeout(_syncTimers[d.provider]); }
+      handleCaptureLanded(d);
+    }
+    // Portal says the owner isn't signed in → say exactly that on the sync chip and
+    // offer a foreground "Open ↗" so they can log in (then the capture flows).
+    if(d.type === "SO_LOGIN_STATE" && d.provider && (d.state === "login_required" || d.state === "signed_out")
+       && _syncState[d.provider] && _syncState[d.provider].phase === "syncing"){
+      if(_syncTimers[d.provider]) clearTimeout(_syncTimers[d.provider]);
+      _syncState[d.provider] = { phase:"signin" };
+      try { repaintFresh(d.provider); } catch(_){}
+    }
     if(d.type === "SO_CAPTURE_FAILED"){
+      // Sync chip: surface what a pull needs (usually a portal sign-in).
+      if(d.provider && _syncState[d.provider]){
+        if(_syncTimers[d.provider]) clearTimeout(_syncTimers[d.provider]);
+        _syncState[d.provider] = { phase:"failed", msg:_friendlySyncFail(d.reason, BRAND[d.provider]||d.provider) };
+        try { repaintFresh(d.provider); } catch(_){}
+      }
       const note = _ov && _ov.querySelector("#sbNote");
       if(note){
         note.className = "sb-note err";
@@ -267,6 +286,99 @@
     extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor, vendor });
     try { if(typeof toast === "function") toast(`Opening ${BRAND[vendor]||vendor} — your latest readings will sync back here.`, "ok"); } catch(_){}
   });
+
+  // ── little click-to-sync button on a stale array's freshness chip ───────────
+  // Pulls fresh via the extension (background tab → the dashboard keeps focus);
+  // the "Open ↗" escalation (data-fresh-fg) foregrounds the portal for sign-in.
+  // startSync handles the no-extension / sign-in / failure messaging.
+  document.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest && e.target.closest("button.sb-fresh-sync");
+    if(!b) return;
+    e.preventDefault();
+    const chip = b.closest(".sb-fresh");
+    const vendor = chip && chip.getAttribute("data-fresh-vendor");
+    if(!vendor) return;
+    startSync(vendor, b.getAttribute("data-fresh-fg") === "1");
+  });
+
+  // ── freshness-chip sync engine (MODULE scope: reached by the handlers above AND
+  // by render()'s freshnessHTML below) ────────────────────────────────────────
+  const _syncState = {};   // vendor -> {phase:"syncing"|"signin"|"failed"|"needext", msg?}
+  const _syncTimers = {};  // vendor -> setTimeout id
+  const REFRESH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
+
+  function _friendlySyncFail(reason, vlabel){
+    const r = String(reason || "").toLowerCase();
+    if(r.includes("sign in") || r.includes("log in") || r.includes("login") || r.includes("signed"))
+      return `sign in to ${vlabel}, then sync again`;
+    return `open ${vlabel} and sign in, then sync again`;
+  }
+
+  // Inner content (class + html) of the freshness chip for a vendor's current state —
+  // shared by the first render (freshnessHTML) and in-place repaints (repaintFresh).
+  function freshInner(vendor, ageStr){
+    const vlabel = BRAND[vendor] || vendor;
+    const st = _syncState[vendor];
+    const phase = st && st.phase;
+    const dot = '<span class="sb-fresh-dot" aria-hidden="true"></span>';
+    if(phase === "syncing"){
+      return { cls:"sb-fresh--syncing", html:
+        `<span class="sb-fresh-ic">${REFRESH_SVG}</span>`+
+        `<span class="sb-fresh-txt">Syncing ${esc(String(vlabel))}…</span>` };
+    }
+    if(phase === "signin"){
+      return { cls:"sb-fresh--warn", html: dot +
+        `<span class="sb-fresh-txt">Sign in to ${esc(String(vlabel))} to sync</span>`+
+        `<button class="sb-fresh-sync" type="button" data-fresh-fg="1" aria-label="Open ${esc(String(vlabel))} to sign in">Open&nbsp;↗</button>` };
+    }
+    if(phase === "needext"){
+      return { cls:"sb-fresh--warn", html: dot +
+        `<span class="sb-fresh-txt">Syncing needs the EnergyAgent extension</span>`+
+        `<a class="sb-fresh-install" href="${esc(EXT_STORE_URL)}" target="_blank" rel="noopener">Add it&nbsp;→</a>` };
+    }
+    if(phase === "failed"){
+      const msg = (st && st.msg) || _friendlySyncFail("", vlabel);
+      return { cls:"sb-fresh--warn", html: dot +
+        `<span class="sb-fresh-txt">Couldn't sync — ${esc(String(msg))}</span>`+
+        `<button class="sb-fresh-sync" type="button" title="Try again" aria-label="Retry sync">${REFRESH_SVG}</button>` };
+    }
+    return { cls:"sb-fresh--stale", html: dot +
+      `<span class="sb-fresh-txt">Last synced ${esc(String(ageStr))}</span>`+
+      `<button class="sb-fresh-sync" type="button" title="Sync ${esc(String(vlabel))} now" aria-label="Sync ${esc(String(vlabel))} now">${REFRESH_SVG}</button>` };
+  }
+
+  // Repaint every freshness chip for a vendor IN PLACE (no fleet reload), so a sync
+  // click / login-required / failure updates instantly. Success instead rides the
+  // normal reload in handleCaptureLanded (the chip re-renders fresh, or vanishes).
+  function repaintFresh(vendor){
+    const sel = '.sb-fresh[data-fresh-vendor="' + (window.CSS && CSS.escape ? CSS.escape(vendor) : vendor) + '"]';
+    document.querySelectorAll(sel).forEach(el => {
+      const { cls, html } = freshInner(vendor, el.getAttribute("data-fresh-age") || "");
+      el.className = "sb-fresh " + cls;
+      el.innerHTML = html;
+    });
+  }
+
+  // Pull fresh data for a vendor: arm the capture intent + open its portal so the
+  // extension captures live readings that sync back here. Default sync click opens a
+  // BACKGROUND tab (dashboard keeps focus); the "Open ↗" sign-in escalation passes
+  // foreground=true so the owner can log in. Tells them what's missing when it can't.
+  function startSync(vendor, foreground){
+    const url = PORTAL_URL[vendor];
+    const vlabel = BRAND[vendor] || vendor;
+    if(!url) return;
+    if(!EXT_PRESENT){ _syncState[vendor] = { phase:"needext" }; repaintFresh(vendor); return; }
+    _syncState[vendor] = { phase:"syncing", startedAt: Date.now() };
+    repaintFresh(vendor);
+    extSend("SO_OPEN_PORTAL", { url, active: foreground === true, provider: vendor, vendor });
+    if(_syncTimers[vendor]) clearTimeout(_syncTimers[vendor]);
+    _syncTimers[vendor] = setTimeout(() => {
+      if(_syncState[vendor] && _syncState[vendor].phase === "syncing"){
+        _syncState[vendor] = { phase:"failed", msg:`open ${vlabel} and sign in, then sync again` };
+        repaintFresh(vendor);
+      }
+    }, 75000);
+  }
 
 
   // ---- saved column order (localStorage) ----
@@ -1543,10 +1655,12 @@
     const ss = col && col.source_status;
     const age = ss ? ss.age_hours : null;
     if(age == null || age <= _LIVE_FRESH_H) return "";   // never captured, or live — say nothing
-    const vlabel = BRAND[vs[0]] || vs[0];
-    return `<div class="sb-fresh sb-fresh--stale" role="status"
-        title="No live server feed for ${esc(String(vlabel))} — its data is only as fresh as the last time the extension captured it. Open ${esc(String(vlabel))} below (with the EnergyAgent extension installed) to refresh now.">
-        <span class="sb-fresh-dot" aria-hidden="true"></span>Last synced ${esc(fmtAge(age))}<span class="sb-fresh-cta"> · open ${esc(String(vlabel))} to refresh</span></div>`;
+    const vendor = vs[0];
+    const vlabel = BRAND[vendor] || vendor;
+    const ageStr = fmtAge(age);
+    const { cls, html } = freshInner(vendor, ageStr);
+    return `<div class="sb-fresh ${cls}" role="status" data-fresh-vendor="${esc(String(vendor))}" data-fresh-age="${esc(String(ageStr))}"
+        title="No live server feed for ${esc(String(vlabel))} — its data is only as fresh as the last sync. Click sync to pull the latest now.">${html}</div>`;
   }
 
   const expanded = getExpandedSet();   // which arrays have their inverter comb open
