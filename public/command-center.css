@@ -651,6 +651,21 @@ body.sb-fs-lock{ overflow:hidden; }
 .ao-up-btn.primary{ background:#2563eb; border-color:#2563eb; color:#fff; }
 .ao-up-btn.ghost{ color:#64748b; }
 .ao-up-btn:hover{ filter:brightness(.97); }
+
+/* ── Itemized monthly bill (Master Account "Your bill") ── */
+.ao-bill{ display:flex; flex-direction:column; gap:0; min-width:250px; }
+.ao-bill-line{ display:flex; justify-content:space-between; align-items:baseline; gap:14px; padding:5px 0; }
+.ao-bill-line .bl-k{ display:flex; flex-direction:column; gap:1px; }
+.ao-bill-line .bl-k b{ font-size:12.5px; color:#0f172a; font-weight:680; }
+.ao-bill-line .bl-calc{ font-size:11.5px; color:#64748b; }
+.ao-bill-line .bl-v{ font-size:13.5px; font-weight:680; color:#0f172a; white-space:nowrap; }
+.ao-bill-total{ display:flex; justify-content:space-between; align-items:baseline; gap:14px;
+  margin-top:5px; padding:9px 12px; border-radius:11px; background:#ecfdf5; border:1px solid #a7f3d0; }
+.ao-bill-total > span:first-child{ font-size:12.5px; font-weight:750; color:#065f46; }
+.ao-bill-tot-v{ font-size:19px; font-weight:820; color:#047857; white-space:nowrap; }
+.ao-bill-tot-v small{ font-size:12px; font-weight:600; color:#059669; margin-left:1px; }
+.ao-bill-ctx{ margin-top:7px; font-size:11.5px; color:#64748b; }
+.ao-bill-empty, .ao-bill-load{ font-size:12.5px; color:#94a3b8; }
 /* little click-to-sync button right next to "Last synced …" */
 .sb-fresh-sync{ display:inline-flex; align-items:center; justify-content:center; flex:none;
   padding:3px 7px; border:1px solid rgba(148,163,184,.42); border-radius:7px;

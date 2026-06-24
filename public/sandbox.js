@@ -3953,8 +3953,7 @@
       passwordRow(a) +
       autoRefreshRow() +
       rowStatic("Your bill",
-        `<span class="r-big" id="billAmount">Loading…</span>`,
-        `<span id="billWhy"></span>`) +
+        `<div class="ao-bill" id="aoBill"><span class="ao-bill-load">Loading…</span></div>`) +
       rowStatic("Payment method",
         `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
         null,
@@ -4345,9 +4344,8 @@
 
   // Fill the "Your bill" + "Payment method" rows once billing data lands.
   async function renderBilling(h){
-    const amtEl = document.getElementById("billAmount");
-    const whyEl = document.getElementById("billWhy");
-    if(!amtEl) return;
+    const box = document.getElementById("aoBill");
+    if(!box) return;
 
     let summary = null, invoice = null;
     try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); } catch(e){}
@@ -4360,46 +4358,59 @@
     const onTrial = (_account && (_account.on_trial === true || _account.trial === true)) || /trial/i.test(String(status));
     const trialEnds = _account ? pick(_account, ["trial_ends_at","trial_end","trial_expires_at"], null) : null;
 
-    let amount = "—", why = "";
-    if(basis === "kwh"){
-      // Array Operator — billed by generation.
-      const mtdKwh = pick(summary, ["mtd_kwh"], null);
-      const rate   = pick(summary, ["rate_cents_per_kwh"], null);
-      const totalC = pick(summary, ["total_cents"], null);
-      const arrays = pick(summary, ["billable_arrays"], null);
-      amount = `${usdFromCents(totalC)} <small>this month</small>`;
-      const bits = [];
-      if(rate != null && mtdKwh != null) bits.push(`${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh × ${Number(mtdKwh).toLocaleString(undefined,{maximumFractionDigits:0})} kWh generated`);
-      else if(rate != null)              bits.push(`${Number(rate).toLocaleString(undefined,{maximumFractionDigits:3})}&cent; per kWh your arrays generate`);
-      if(arrays != null)                 bits.push(`across ${arrays} array${Number(arrays)===1?"":"s"}`);
-      why = bits.join(" ");
+    // ── Itemized monthly bill. Array Operator = the DUAL model: a Generation line
+    // (kWh × rate) and/or an Offtaker line (N × $20), each shown, then SUMMED into a
+    // highlighted total. Which lines appear is driven by the plan's entitlements
+    // (so a "both" tenant sees both). NEPOOL keeps a single per-array line.
+    const feats = (_account && _account.plan_features) || {};
+    const isAO = (basis === "kwh" || basis === "invoicing");
+    const billLine = (kind, calc, amt) =>
+      `<div class="ao-bill-line"><span class="bl-k"><b>${esc(kind)}</b><span class="bl-calc">${calc}</span></span><span class="bl-v">${amt}</span></div>`;
+    let lines = "", total = 0;
+    if(summary && isAO){
+      // Use the entitlement when a plan's chosen; else infer from the active basis.
+      const showMon = feats.plan_chosen ? !!feats.vendor_data : (basis === "kwh");
+      const showInv = feats.plan_chosen ? !!feats.invoicing  : (basis === "invoicing");
+      if(showMon){
+        const kwh  = Number(pick(summary, ["mtd_kwh"], 0));
+        const rate = Number(pick(summary, ["blended_cents_per_kwh"], pick(summary, ["rate_cents_per_kwh"], 0.5)));
+        const c    = Number(pick(summary, ["monitoring_total_cents"], 0));
+        total += c;
+        lines += billLine("Generation",
+          `${kwh.toLocaleString(undefined,{maximumFractionDigits:0})} kWh × ${rate.toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh`,
+          usdFromCents(c));
+      }
+      if(showInv){
+        const n   = Number(pick(summary, ["offtaker_count"], 0));
+        const per = Number(pick(summary, ["invoicing_per_offtaker_cents"], 2000));
+        const c   = Number(pick(summary, ["invoicing_total_cents"], 0));
+        total += c;
+        lines += billLine("Offtaker invoices",
+          `${n} offtaker${n===1?"":"s"} × ${usdFromCents(per)}`, usdFromCents(c));
+      }
     } else if(summary){
-      // NEPOOL Operator — billed per array (legacy shape kept for the verifier app).
-      const arrayCount = pick(summary, ["billable_arrays","array_count","arrays_count","arrays"], null);
-      const fullUnit   = pick(summary, ["full_unit_cents"], null);
-      const totalC     = pick(summary, ["total_cents"], null);
-      amount = `${usdFromCents(totalC)} <small>this month</small>`;
-      const bits = [];
-      if(fullUnit != null)   bits.push(`${usdFromCents(fullUnit)} per array / mo`);
-      if(arrayCount != null) bits.push(`× ${arrayCount} array${Number(arrayCount)===1?"":"s"}`);
-      why = bits.join(" ");
-    } else {
-      amount = `$0.00 <small>this month</small>`;
-      why = "You're only billed for the kWh your arrays generate.";
+      // NEPOOL — per array.
+      const n    = pick(summary, ["billable_arrays","array_count","arrays_count","arrays"], 0);
+      const full = pick(summary, ["full_unit_cents"], null);
+      const c    = Number(pick(summary, ["total_cents"], 0));
+      total = c;
+      lines += billLine("Arrays",
+        `${n} array${Number(n)===1?"":"s"}${full!=null?` × ${usdFromCents(full)}`:""}`, usdFromCents(c));
     }
 
-    // Trial + next-invoice context appended to the "why".
+    // Context line: trial + next-invoice date.
     const ctx = [];
-    if(onTrial) ctx.push(trialEnds ? `free trial through ${fmtDate(trialEnds)} — nothing charged yet` : "free trial — nothing charged yet");
+    if(onTrial) ctx.push(trialEnds ? `Free trial through ${fmtDate(trialEnds)} — nothing charged yet` : "Free trial — nothing charged yet");
     const invAmt = invoice ? pick(invoice, ["amount_cents","amount_due","total","amount"], null) : null;
     if(invAmt != null){
       const invDate = pick(invoice, ["period_end","due_date","date","next_payment_date"], null);
       ctx.push(`next invoice ${usdFromCents(invAmt)}${invDate ? ` on ${fmtDate(invDate)}` : ""}`);
     }
-    if(ctx.length) why = why ? `${why} · ${ctx.join(" · ")}` : ctx.join(" · ");
 
-    amtEl.innerHTML = amount;
-    if(whyEl) whyEl.innerHTML = why || "—";
+    box.innerHTML =
+      (lines || `<div class="ao-bill-empty">No charges yet.</div>`) +
+      `<div class="ao-bill-total"><span>Monthly bill</span><span class="ao-bill-tot-v">${usdFromCents(total)}<small>/mo</small></span></div>` +
+      (ctx.length ? `<div class="ao-bill-ctx">${ctx.join(" · ")}</div>` : "");
 
     // Payment state + button. A card exists only on a real paid/active status or an
     // explicit flag — a bare trial does NOT mean a card is on file (that's why the
@@ -4611,7 +4622,7 @@
           <p>Pick what you need. You can change or upgrade anytime in Master Account.</p>
         </div>
         <div class="ao-plan-cards">
-          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","$100/mo · 4 offtakers incl.")}
+          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","$20 per offtaker / mo")}
           ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","0.5¢ per kWh")}
           ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together.","Both plans")}
         </div>
