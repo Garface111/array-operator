@@ -643,6 +643,9 @@ html[data-theme="day"] .sb-state.warn{background:rgba(217,119,6,.14) !important;
 html[data-theme="day"] .sb-state.off,
 html[data-theme="day"] .sb-state.idle,
 html[data-theme="day"] .sb-state.offline{background:rgba(71,85,105,.12) !important;color:#475569 !important}
+/* "No live feed" calm/informational (audit #4) — CYAN: distinct from the day theme's
+   utility-blue "Producing", slate "Offline", amber warn, red error. */
+html[data-theme="day"] .sb-state.info{background:rgba(8,145,178,.13) !important;color:#0e7490 !important}
 /* offline card: pure red on both night (styles.css) and day */
 html[data-theme="day"] .sb-inv.st-offline{
   background:linear-gradient(168deg,#fef2f2,#fde9e8) !important;

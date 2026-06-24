@@ -305,6 +305,8 @@
   // by render()'s freshnessHTML below) ────────────────────────────────────────
   const _syncState = {};   // vendor -> {phase:"syncing"|"signin"|"failed"|"needext", msg?}
   const _syncTimers = {};  // vendor -> setTimeout id
+  const _SYNCABLE_VENDORS = new Set(["fronius","sma","chint"]); // extension-captured → user can sync
+  const _POLLED_VENDORS = new Set(["solaredge"]);               // server-polled → passive "as of" only
   const REFRESH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
 
   function _friendlySyncFail(reason, vlabel){
@@ -318,9 +320,16 @@
   // shared by the first render (freshnessHTML) and in-place repaints (repaintFresh).
   function freshInner(vendor, ageStr){
     const vlabel = BRAND[vendor] || vendor;
+    const dot = '<span class="sb-fresh-dot" aria-hidden="true"></span>';
+    // POLLED vendors (SolarEdge): refreshed server-side, nothing for the user to sync —
+    // show an honest "Updated Xh ago" (audit #6) so an aging reading in the 15min–6h
+    // window isn't read as live. No sync button (the poller handles it on its own).
+    if(!_SYNCABLE_VENDORS.has(vendor)){
+      return { cls:"sb-fresh--stale", html: dot +
+        `<span class="sb-fresh-txt">Updated ${esc(String(ageStr))}</span>` };
+    }
     const st = _syncState[vendor];
     const phase = st && st.phase;
-    const dot = '<span class="sb-fresh-dot" aria-hidden="true"></span>';
     if(phase === "syncing"){
       return { cls:"sb-fresh--syncing", html:
         `<span class="sb-fresh-ic">${REFRESH_SVG}</span>`+
@@ -1046,7 +1055,16 @@
     // PRODUCING: a real live reading above the floor.
     if(outputState(inv, "ok").reporting)
       return { key:"producing", word:"Producing", tone:"ok", title:"Making power now." };
-    // OFFLINE: daylight, but no usable live signal (telemetry gap / not reporting).
+    // NO LIVE FEED (calm, NOT an alarm — audit #4): a healthy inverter whose vendor
+    // exposes no per-inverter instantaneous power (Fronius/SMA report site-level only),
+    // so current_power_w is null — yet its 14-day status is ok and/or it produced today.
+    // That's a missing live FEED, not an outage; never paint it red "Offline" (tone
+    // "info" also keeps it out of the bad cardTone tint, which keys off key error/offline).
+    if(liveReadingMissing(inv) && (statusCls === "ok" || (todayKwh(inv) || 0) > 0))
+      return { key:"nofeed", word:"No live feed", tone:"info",
+               title:"No per-inverter live signal from this vendor — it's producing; output shows at the array level." };
+    // OFFLINE: a usable live reading exists but it's dark/not producing in daylight
+    // (genuinely making nothing right now), or no signal where there should be one.
     return { key:"offline", word:"Offline", tone:"bad",
              title:"No live signal from this inverter right now." };
   }
@@ -1651,7 +1669,10 @@
   function freshnessHTML(col){
     const vs = col && col.vendor ? [col.vendor]
       : (col && Array.isArray(col.vendors) ? col.vendors : []);
-    if(!vs.length || !vs.every(v => _EXT_VAULT_VENDORS.has(v))) return "";
+    // Show for extension-captured (syncable) AND polled (SolarEdge) vendors — the
+    // latter so an aging polled reading (15min–6h) gets an honest "Updated Xh ago"
+    // instead of reading as live (audit #6).
+    if(!vs.length || !vs.every(v => _SYNCABLE_VENDORS.has(v) || _POLLED_VENDORS.has(v))) return "";
     const ss = col && col.source_status;
     const age = ss ? ss.age_hours : null;
     if(age == null || age <= _LIVE_FRESH_H) return "";   // never captured, or live — say nothing
@@ -1659,8 +1680,11 @@
     const vlabel = BRAND[vendor] || vendor;
     const ageStr = fmtAge(age);
     const { cls, html } = freshInner(vendor, ageStr);
+    const titleTxt = _SYNCABLE_VENDORS.has(vendor)
+      ? `No live server feed for ${vlabel} — its data is only as fresh as the last sync. Click sync to pull the latest now.`
+      : `${vlabel} is polled on our side — this is how fresh the reading is; it refreshes automatically.`;
     return `<div class="sb-fresh ${cls}" role="status" data-fresh-vendor="${esc(String(vendor))}" data-fresh-age="${esc(String(ageStr))}"
-        title="No live server feed for ${esc(String(vlabel))} — its data is only as fresh as the last sync. Click sync to pull the latest now.">${html}</div>`;
+        title="${esc(titleTxt)}">${html}</div>`;
   }
 
   const expanded = getExpandedSet();   // which arrays have their inverter comb open
@@ -1953,7 +1977,7 @@
         ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
         : `<span class="sb-tile-flag ok">all good</span>`;
       const risk = h.lossMo >= 1
-        ? `<span class="sb-tile-risk">${usd0(h.lossMo)}<small>/mo</small></span>`
+        ? `<span class="sb-tile-risk" title="Estimate at $0.21/kWh + $38/MWh RECs — connect your live tariff to pin it.">${usd0(h.lossMo)}<small>/mo est.</small></span>`
         : ``;
       return `
         <button type="button" class="sb-tile ${h.tone}" data-array-id="${esc(col.array_id)}"
@@ -2079,17 +2103,16 @@
     _liveBeat = 0;
     _liveTimer = setInterval(() => {
       _liveBeat++;
-      const t = Date.now();
       document.querySelectorAll("#sandbox .sb-outbar").forEach(bar => {
         const maxW = parseFloat(bar.dataset.maxw);
         const base = parseFloat(bar.dataset.curw);
         if(!maxW || !base) return;                 // idle / not reporting → leave as-is
-        // Smoothly breathe the live current around its last REAL reading every second.
-        // A slow continuous sine (no per-tick random jitter, so the 1s cadence glides
-        // instead of twitching) — paired with the CSS width/color transition this reads
-        // as a living, real-time bar while the actual number refreshes hourly underneath.
-        const phase = t/9000 + (base % 997);       // unique, slow per-inverter phase
-        const cur = base * (1 + Math.sin(phase) * 0.012);
+        // HONESTY (audit #3): show the LAST REAL reading, NOT a fabricated per-second
+        // wobble. current_power_w only refreshes every ~5min–hourly (polled SolarEdge)
+        // or per capture (extension vendors) — a second-by-second "breathing" bar read
+        // as real-time telemetry it isn't. The bar now changes only when real data
+        // refreshes (the FleetStore re-render + the CSS width transition animate it).
+        const cur = base;
         const pct = Math.max(0, Math.min(100, Math.round((cur/maxW)*100)));
         // Health-aware tone (mirrors outputState): a healthy inverter never goes
         // orange just because live output dips — only a flagged inverter does. This
@@ -2276,17 +2299,25 @@
       lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
     }
 
+    // HONESTY (audit #7): "live now" ONLY when the card itself shows a live reading.
+    // Derive from the card's own state key (st-producing / st-nofeed / st-offline / …) —
+    // the truth the user sees beside this stat — so the modal can never claim "live now"
+    // for an inverter the card calls "No live feed"/"Offline".
+    const _cardKey = (((node && node.className) || "").match(/\bst-([a-z]+)\b/) || [])[1] || "";
     const lastSeen = (d.status==="comm_gap" && isFinite(stale) && stale>0)
       ? (stale>=48 ? `${Math.round(stale/24)} days ago` : `${Math.round(stale)} h ago`)
-      : (d.status==="dead" ? "not reporting" : "live now");
+      : d.status==="dead" ? "not reporting"
+      : _cardKey==="producing" ? "live now"
+      : _cardKey==="sleeping" ? "asleep"
+      : "no live reading";
 
     const stat = (k,v,cls) => v ? `<div class="sb-dc-stat"><span class="sb-dc-sk">${k}</span><span class="sb-dc-sv ${cls||""}">${v}</span></div>` : "";
     const statsHTML = [
-      lossMo>=1 ? `<div class="sb-dc-stat hero"><span class="sb-dc-sk">$ at stake</span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
+      lossMo>=1 ? `<div class="sb-dc-stat hero" title="Estimate at $0.21/kWh + $38/MWh RECs — connect your live tariff to pin it."><span class="sb-dc-sk">$ at stake <small style="opacity:.65;font-weight:600">est.</small></span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
       stat("Peer index", isFinite(piNum) ? `${piNum.toFixed(2)} <small>vs neighbors</small>` : "", sCls),
       stat("Nameplate", npKw ? `${npKw} kW` : ""),
       stat("Last 14 days", isFinite(winKwh) ? `${winKwh.toLocaleString()} kWh` : ""),
-      stat("Last seen", lastSeen, d.status==="comm_gap"||d.status==="dead" ? "warn" : "ok"),
+      stat("Last seen", lastSeen, _cardKey==="producing" ? "ok" : (d.status==="comm_gap"||d.status==="dead") ? "warn" : ""),
       stat("Best day", isFinite(peak) ? `${peak} kWh` : ""),
       stat("Lowest day", isFinite(minD) ? `${minD} kWh` : ""),
       stat("Model", d.model || ""),
