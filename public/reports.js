@@ -1666,10 +1666,13 @@
     // an attachment.
     renderDraftDoc();
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
+      autoGrowMsg(ta);                                // size to fit the whole note now
       const focusDraft = () => { ACTIVE_DRAFT_ID = ta.getAttribute("data-draftmsg"); renderDraftDoc(); };
-      ta.addEventListener("input", focusDraft);
+      ta.addEventListener("input", () => { autoGrowMsg(ta); focusDraft(); });
       ta.addEventListener("focus", focusDraft);
     });
+    // Re-fit after layout settles (scrollHeight is only reliable once painted).
+    requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
     wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
       cb.addEventListener("change", () => renderDraftDoc()));
     // Offtaker picker — switch the WHOLE approval section to the chosen offtaker
@@ -2073,9 +2076,18 @@
       if (ta && d._defaultNote != null && ta.value === d._defaultNote) {
         const nn = defaultDraftNote(d);
         ta.value = nn; d._defaultNote = nn;
+        autoGrowMsg(ta);                              // re-fit after the note grows/shrinks
       }
     }
     renderDraftDoc();
+  }
+
+  // Grow the cover-email textarea to fit its whole content (no inner scrollbar),
+  // so the operator sees the entire message without dragging the resize handle.
+  function autoGrowMsg(ta) {
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.max(ta.scrollHeight, 140) + "px";
   }
 
   // A sensible pre-written note the operator edits before sending (Paul's
