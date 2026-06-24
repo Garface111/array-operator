@@ -246,6 +246,7 @@
     const d = e.data; if(!d || typeof d !== "object") return;
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
+      try { window.__AO_EXT_PRESENT = true; } catch(e){}   // shared flag: the spreadsheet view's Refresh button uses it
     }
     if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)){
       // A sync for this vendor landed — clear its chip state; handleCaptureLanded

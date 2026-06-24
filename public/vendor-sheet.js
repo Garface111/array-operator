@@ -63,6 +63,31 @@
   // can be. Chint recaptures every ~4 min; Fronius/SMA every ~6 min.
   const CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
 
+  // Ask the EnergyAgent extension (via so_bridge → background recaptureNow) to RE-SCRAPE
+  // the vendor portal NOW — a silent background tab grabs fresh power and POSTs it to the
+  // backend. Resolves on SO_RECAPTURE_DONE for our reqId, or after a safety timeout (the
+  // recapture's own budget is ~90s). The caller refetches the fleet after it resolves.
+  function triggerRecapture(vendor) {
+    return new Promise((resolve) => {
+      const reqId = "vs-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+      let done = false;
+      let t = null;
+      const finish = (r) => {
+        if (done) return; done = true;
+        window.removeEventListener("message", onMsg); if (t) clearTimeout(t); resolve(r);
+      };
+      function onMsg(e) {
+        if (e.source !== window) return;
+        const d = e.data;
+        if (d && d.type === "SO_RECAPTURE_DONE" && d.reqId === reqId) finish(d);
+      }
+      window.addEventListener("message", onMsg);
+      t = setTimeout(() => finish({ ok: false, timeout: true }), 95000);
+      try { window.postMessage({ type: "SO_RECAPTURE", vendor, reqId }, "*"); }
+      catch (_) { finish({ ok: false }); }
+    });
+  }
+
   const _expanded = {};                       // array_id -> bool (survives re-renders)
   let _query = "";                            // search filter (lowercased)
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
@@ -224,11 +249,17 @@
     // server (FleetStore.refetch → notify → re-render with fresh values). Spin while
     // the fetch is in flight; the re-render replaces these nodes when data lands.
     body.querySelectorAll("[data-vrefresh]").forEach(btn => btn.onclick = () => {
-      if (btn.classList.contains("vs-refreshing") || !window.FleetStore || !FleetStore.refetch) return;
+      if (btn.classList.contains("vs-refreshing")) return;
+      const vendor = btn.getAttribute("data-vrefresh");
       btn.classList.add("vs-refreshing");
-      Promise.resolve(FleetStore.refetch()).finally(() => {
+      const settle = () => {
+        try { if (window.FleetStore && FleetStore.refetch) FleetStore.refetch(); } catch (_) {}
         try { btn.classList.remove("vs-refreshing"); } catch (_) {}
-      });
+      };
+      // Extension present → trigger a live RE-SCRAPE of the portal, then refetch when it
+      // lands. No extension → just re-pull whatever the server already has.
+      if (window.__AO_EXT_PRESENT) triggerRecapture(vendor).finally(settle);
+      else settle();
     });
   }
 
