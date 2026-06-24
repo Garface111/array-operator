@@ -2024,11 +2024,11 @@
       </div>
       ${sid
         ? `<div class="rb-doc-cap" style="margin-top:15px">Inside the invoice attachment</div>
-           <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>
            ${(TEMPLATE_STATE && TEMPLATE_STATE.has) ? `<div class="rb-tpl-prevbtns rb-invfmt-btns">
              <button type="button" class="ao-btn rb-btn" data-invfmt="default">View our default format</button>
              <button type="button" class="ao-btn rb-btn" data-invfmt="template">View your reproduced template</button>
-           </div>` : ""}` : ""}
+           </div>` : ""}
+           <div class="rb-tpl-paper" id="rbDraftInvPaper"><div class="rb-tpl-load">Rendering invoice…</div></div>` : ""}
       <p class="rb-doc-hint">A faithful copy of the email${toClient ? " your offtaker" : ""} receives, with its attachments.
         The invoice shown below is the exact PDF that gets attached${d.has_gmp_pdf ? "; the GMP bill rides along automatically" : ""}.</p>`;
 

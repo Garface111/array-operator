@@ -335,7 +335,10 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-inbox .rb-tpl.rep-card{ border:0 !important; box-shadow:none !important;
   background:transparent !important; padding:18px 0 0 !important; margin:0 !important; border-radius:0 !important; }
 /* compare buttons sit UNDER the approval invoice preview (top margin, not bottom) */
-.rb-invfmt-btns{ margin:10px 0 4px !important; }
+/* compare buttons sit ABOVE the invoice preview and STRETCH to its full width
+   (each takes half) so the preview block reads more square */
+.rb-invfmt-btns{ margin:12px 0 12px !important; }
+.rb-invfmt-btns button{ flex:1 1 0; justify-content:center; }
 .rb-tpl-estatus.rb-ok{ color:#3fb950; }
 .rb-tpl-estatus.rb-err{ color:#e06666; }
 
