@@ -211,6 +211,14 @@
        table, no sub-headers — just the at-a-glance health + the canvas. -->
   <section class="panel" id="panelArrays" role="tabpanel" aria-label="Vendor data">
 
+    <!-- Sub-view toggle: SANDBOX (the spatial canvas) vs SPREADSHEET (every array
+         as a row, grouped by vendor; expand a row to see its inverters). Both read
+         the same FleetStore data; vendor-sheet.js flips between them. -->
+    <div class="vs-seg" role="group" aria-label="Vendor data view">
+      <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
+      <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Spreadsheet</button>
+    </div>
+
     <!-- SANDBOX — the live fleet tree, almost full-screen. The fleet commander
          (whole-fleet health at a glance) is rendered as the FIRST CARD INSIDE the
          canvas by sandbox.js (a card in the scene, above the stacked arrays) and
@@ -218,6 +226,10 @@
     <section id="sbWrap" class="sb-fullscreen">
       <div id="sandbox"></div>
     </section>
+
+    <!-- SPREADSHEET — structured rows of every array by vendor (vendor-sheet.js →
+         #vendorSheet). Hidden until the Spreadsheet sub-tab is selected. -->
+    <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
 
     <!-- Triage queue still renders (hidden) so other views can read its model,
          but it's no longer surfaced on this tab — the sandbox IS the view. -->
@@ -249,6 +261,7 @@
 <script src="fleet-store.js"></script>
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
+<script src="vendor-sheet.js"></script>
 <script src="command-center.js"></script>
 <script src="reports.js"></script>
 <script src="trends-core.js"></script>

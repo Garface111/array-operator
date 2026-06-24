@@ -990,6 +990,54 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-draft-empty{ display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
 .rb-empty-why{ color:var(--muted); font-size:13px; line-height:1.5; margin:2px 0 4px; }
 
+/* ============================ VENDOR-DATA SPREADSHEET VIEW ============================ */
+/* Sub-view toggle (Sandbox | Spreadsheet) — floats at the top of the Vendor-data tab. */
+#panelArrays{ position:relative; }
+.vs-seg{ position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:55;
+  display:inline-flex; gap:2px; padding:3px; border-radius:11px; border:1px solid var(--line,#e2e8f0);
+  background:var(--card,#fff); box-shadow:0 2px 12px -5px rgba(15,23,42,.35); }
+.vs-seg-btn{ border:0; cursor:pointer; font:inherit; font-size:12.5px; font-weight:700; color:var(--muted,#64748b);
+  padding:6px 18px; border-radius:8px; background:none; transition:background .12s, color .12s; }
+.vs-seg-btn.on{ background:var(--good,#2563eb); color:#fff; }
+.vs-seg-btn:not(.on):hover{ background:var(--day-hover,rgba(15,23,42,.05)); color:var(--ink,#0f172a); }
+
+/* The spreadsheet panel itself. */
+#sheetWrap{ padding:58px 20px 48px; max-width:1120px; margin:0 auto; }
+.vs-headrow{ margin:0 2px 14px; }
+.vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
+.vs-sub{ font-size:13px; color:var(--muted); }
+.vs-table{ border:1px solid var(--line); border-radius:14px; overflow:hidden;
+  background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06); }
+.vs-row{ display:grid; grid-template-columns:minmax(180px,2.2fr) 1fr .8fr .9fr 1fr 1.2fr .8fr;
+  align-items:center; gap:10px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
+.vs-colhead{ font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
+  color:var(--faint); background:var(--bg2,#eef2f7); border-bottom:1px solid var(--line); }
+.vs-vhead{ display:flex; align-items:center; gap:10px; padding:9px 16px 7px;
+  background:var(--card2,#f8fafc); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.vs-vbadge{ font-size:11.5px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:var(--good,#2563eb); }
+.vs-vcount{ font-size:11px; color:var(--faint); }
+.vs-vtot{ margin-left:auto; font-size:11.5px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+.vs-arr{ border:0; background:none; font:inherit; cursor:pointer; color:var(--ink); border-bottom:1px solid var(--line); }
+.vs-arr:hover{ background:var(--day-hover,rgba(15,23,42,.045)); }
+.vs-arr.open{ background:rgba(37,99,235,.06); }
+.vs-caret{ display:inline-block; width:13px; color:var(--faint); transition:transform .15s ease; }
+.vs-arr.open .vs-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vs-c-inv, .vs-c-pow, .vs-c-today{ font-variant-numeric:tabular-nums; color:var(--ink); }
+.vs-c-fresh{ font-size:11.5px; color:var(--faint); }
+.vs-vchip{ font-size:11.5px; font-weight:600; color:var(--muted); }
+.vs-pill{ display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; }
+.vs-pill.ok{ color:#065f46; background:rgba(16,185,129,.16); }
+.vs-pill.warn{ color:var(--gold2,#b45309); background:rgba(217,119,6,.16); }
+.vs-pill.bad{ color:#b91c1c; background:rgba(220,38,38,.15); }
+.vs-pill.muted{ color:var(--muted); background:var(--day-chip,#eef2f7); }
+.vs-inv-wrap{ background:var(--bg,#f6f8fb); border-bottom:1px solid var(--line); }
+.vs-inv{ padding-top:8px; padding-bottom:8px; font-size:12.5px; }
+.vs-inv .vs-c-name{ padding-left:26px; font-weight:500; color:var(--muted); }
+.vs-inv-meta{ font-size:11px; color:var(--faint); font-weight:400; }
+.vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
+.vs-empty{ padding:60px 20px; text-align:center; color:var(--faint); font-size:14px; }
+
 .rb-draft{ border:1px solid var(--line); border-radius:14px; padding:15px 17px; margin-top:12px; background:rgba(255,255,255,.018); }
 .rb-draft-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .rb-draft-name{ font-size:16px; font-weight:740; color:var(--ink); }
