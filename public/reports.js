@@ -1653,10 +1653,13 @@
   function foldTplIntoInbox(inboxCard) {
     const tpl = $("#rbTpl");
     if (!inboxCard || !tpl) return;
+    // Drop it into the LEFT column (under the offtaker editor), filling the empty
+    // space beside the taller invoice preview — not the full-width card bottom.
+    const col = inboxCard.querySelector(".rb-col-form") || inboxCard;
     const div = document.createElement("div");
     div.className = "rb-tpl-divider";
-    inboxCard.appendChild(div);
-    inboxCard.appendChild(tpl);
+    col.appendChild(div);
+    col.appendChild(tpl);
   }
 
   async function refreshInbox() {
