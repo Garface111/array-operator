@@ -1544,11 +1544,15 @@
         headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
         body: JSON.stringify(body),
       });
+      if (r.ok) { if (st) st.textContent = ""; return true; }
+      // Surface the backend reason instead of a blind "Save failed." so a real
+      // error (a rejected field, a 500) is diagnosable from the form.
+      const d = await r.json().catch(() => ({}));
       if (st) {
-        if (r.ok) { st.textContent = ""; }
-        else { st.className = "rb-status rb-err"; st.textContent = "Save failed."; }
+        st.className = "rb-status rb-err";
+        st.textContent = (d && d.detail) ? d.detail : ("Save failed (HTTP " + r.status + ").");
       }
-      return r.ok;
+      return false;
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } return false; }
   }
 
