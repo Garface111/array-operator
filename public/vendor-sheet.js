@@ -119,9 +119,11 @@
         <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
           placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
       </div>
-      <div class="vs-table">
-        <div class="vs-row vs-colhead">${heads}</div>
-        <div id="vsBody"></div>
+      <div class="vs-scroll" id="vsScroll">
+        <div class="vs-table">
+          <div class="vs-row vs-colhead">${heads}</div>
+          <div id="vsBody"></div>
+        </div>
       </div>`;
     const s = host.querySelector("#vsSearch");
     s.value = _query;
@@ -194,7 +196,7 @@
                 <span class="vs-c-name vs-inv-name">${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
                 <span class="vs-c-pow">${kw(iv.current_power_w)}</span>
-                <span class="vs-c-today">${iv.peer_index != null ? Math.round(iv.peer_index * 100) + "% of peers" : ""}</span>
+                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}">${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
@@ -213,6 +215,15 @@
     });
   }
 
+  // Size the scroll region to fill the viewport below it, so the column header can
+  // stay sticky at its top while the rows scroll. Recomputed on render + window resize.
+  function sizeScroll() {
+    const sc = $("#vsScroll");
+    if (!sc || (sc.closest("[hidden]"))) return;       // skip while the sheet is hidden (no layout)
+    const top = sc.getBoundingClientRect().top;
+    sc.style.height = Math.max(260, window.innerHeight - top - 18) + "px";
+  }
+
   function render() {
     const host = $("#vendorSheet");
     if (!host || !window.FleetStore) return;
@@ -220,6 +231,7 @@
     if (!((data && data.columns) || []).length) { host.innerHTML = '<div class="vs-empty">No arrays connected yet — add one from the Sandbox view, then they\'ll appear here.</div>'; return; }
     if (!host.querySelector("#vsSearch")) buildShell(host);   // build the persistent shell once
     renderBody();
+    sizeScroll();
   }
 
   function showView(v) {
@@ -252,6 +264,7 @@
         if ($("#vsSearch")) renderBody(); else render();
       });
     }
+    window.addEventListener("resize", sizeScroll);
     showView(_view);
   }
 
