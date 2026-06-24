@@ -1579,6 +1579,15 @@
   let INBOX_DRAFTS = [];
   let ACTIVE_DRAFT_ID = null;
   let INBOX_UTIL_ACCTS = [];   // cached so the offtaker dropdown can re-render without a refetch
+  // The offtaker dropdown lists ALL the operator's offtakers (not just the ones the
+  // scheduler already drafted), so they can swap to ANY of them. Selecting one shows
+  // its pending draft if it has one, else mints one on demand (idempotent generate).
+  let OFFTAKERS = [];           // enabled subscriptions (+ any with a pending draft) = dropdown rows
+  let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
+  let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
+  let GENERATING_SUB_ID = null; // the offtaker whose draft is being minted right now (loading state)
+  let GEN_FAIL = {};            // subscription_id -> why its on-demand draft couldn't be built
+  let _pinActiveSub = false;    // keep refreshInbox from auto-advancing off a just-selected offtaker
   // The operator's invoice template ({enabled, html}) — when enabled, the live
   // preview renders THIS (their exact format) instead of the generic mock, so an
   // uploaded template propagates into the preview immediately.
@@ -1605,65 +1614,161 @@
       (_, k) => (k in v && v[k] != null) ? esc(String(v[k])) : "");
   }
 
+  // Build the dropdown's offtaker list + the subscription->draft index from a fetch.
+  function _indexInbox(drafts, subs) {
+    INBOX_DRAFTS = drafts;
+    DRAFT_BY_SUB = {};
+    drafts.forEach(d => { if (d.subscription_id != null) DRAFT_BY_SUB[String(d.subscription_id)] = d; });
+    // Dropdown rows = every enabled offtaker, PLUS any (even disabled) that has a
+    // pending draft so a queued report is never stranded.
+    const rows = (subs || []).filter(s => s.enabled !== false || DRAFT_BY_SUB[String(s.id)]);
+    const seen = new Set(rows.map(s => String(s.id)));
+    // A pending draft whose subscription isn't in the list (disabled+excluded or
+    // deleted) still needs a selectable row — synthesize one from the draft.
+    drafts.forEach(d => {
+      const sid = d.subscription_id;
+      if (sid != null && !seen.has(String(sid))) {
+        rows.push({ id: sid, customer_name: d.customer_name, _fromDraft: true });
+        seen.add(String(sid));
+      }
+    });
+    // Offtakers WITH a pending draft float to the top (the genuine approval queue),
+    // then the rest alphabetically.
+    rows.sort((a, b) => {
+      const ap = DRAFT_BY_SUB[String(a.id)] ? 0 : 1, bp = DRAFT_BY_SUB[String(b.id)] ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return String(a.customer_name || "").localeCompare(String(b.customer_name || ""));
+    });
+    OFFTAKERS = rows;
+  }
+
   async function refreshInbox() {
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
     try {
-      const [r, utilAccts] = await Promise.all([
+      const [rd, rs, utilAccts] = await Promise.all([
         fetch(API + "/drafts?status=pending", { headers: authHeaders() }),
+        fetch(API + "/subscriptions", { headers: authHeaders() }),
         fetchUtilityAccounts(),
       ]);
-      if (!r.ok) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }
-      const drafts = (await r.json().catch(() => ({}))).drafts || [];
-      if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; return; }   // hide when empty
-      INBOX_DRAFTS = drafts;
+      if (!rd.ok) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
+      const drafts = (await rd.json().catch(() => ({}))).drafts || [];
+      const subs = rs.ok ? ((await rs.json().catch(() => ({}))).subscriptions || []) : [];
+      // The section appears when there's something awaiting approval (≥1 pending draft);
+      // from there the dropdown lets the operator swap to ANY offtaker.
+      if (!drafts.length) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
       INBOX_UTIL_ACCTS = utilAccts || [];
+      _indexInbox(drafts, subs);
+      // Default / re-home the selected offtaker.
+      const inList = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
+      if (!inList) {
+        const def = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
+        ACTIVE_SUB_ID = def ? String(def.id) : null;
+      } else if (!_pinActiveSub && !DRAFT_BY_SUB[String(ACTIVE_SUB_ID)]) {
+        // The active offtaker's draft was just sent/dismissed → advance to the next
+        // one still awaiting approval (unless pinned to a deliberate selection).
+        const fp = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]);
+        if (fp) ACTIVE_SUB_ID = String(fp.id);
+      }
+      _pinActiveSub = false;
+      const ad = DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
+      if (ad) ACTIVE_DRAFT_ID = ad.id;
       renderInboxBody();
-    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; }
+    } catch (e) { wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; }
   }
 
-  // Render the approval inbox from the CACHED drafts (no refetch), so the header
-  // offtaker dropdown can switch the whole section instantly. ONE offtaker shows at a
-  // time — the dropdown picks which, and its draft card + live preview update together.
+  // The secondary line under an offtaker's name — amount + period when a draft
+  // exists, else a hint about what's available.
+  function pickSubLine(s) {
+    const d = DRAFT_BY_SUB[String(s.id)];
+    if (d) return `${money(d.amount_usd)}${d.period_label ? " · " + esc(d.period_label) : ""}`;
+    if (s.preview && s.preview.amount_owed != null) return `~${money(s.preview.amount_owed)} · not yet drafted`;
+    return "No report drafted yet";
+  }
+
+  // One row in the custom dropdown menu (name + sub-line + a status pill).
+  function offtakerMenuItem(s) {
+    const on = String(s.id) === String(ACTIVE_SUB_ID);
+    const pill = DRAFT_BY_SUB[String(s.id)]
+      ? `<span class="rb-pick-pill ready">Ready</span>`
+      : `<span class="rb-pick-pill todraft">Draft</span>`;
+    return `<button type="button" class="rb-pick-item${on ? " active" : ""}" role="option"
+              aria-selected="${on ? "true" : "false"}" data-subpick="${esc(String(s.id))}">
+        <span class="rb-pick-item-main">
+          <span class="rb-pick-item-name">${esc(s.customer_name || "Offtaker")}</span>
+          <span class="rb-pick-item-sub">${pickSubLine(s)}</span>
+        </span>${pill}
+      </button>`;
+  }
+
+  // Render the approval inbox from the cached data, so the offtaker dropdown switches
+  // the whole section instantly. ONE offtaker shows at a time; the custom dropdown picks
+  // which (its draft card + live preview move together). An offtaker with no pending
+  // draft shows a loading state while one is minted, or a graceful empty state.
   function renderInboxBody() {
     const wrap = $("#rbInboxWrap");
     if (!wrap) return;
-    const drafts = INBOX_DRAFTS;
-    if (!drafts.length) { wrap.innerHTML = ""; return; }
-    if (!drafts.some(d => String(d.id) === String(ACTIVE_DRAFT_ID))) ACTIVE_DRAFT_ID = drafts[0].id;
+    if (!OFFTAKERS.length) { wrap.innerHTML = ""; return; }
+    if (!OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID))) ACTIVE_SUB_ID = String(OFFTAKERS[0].id);
+    const activeOf = OFFTAKERS.find(s => String(s.id) === String(ACTIVE_SUB_ID)) || OFFTAKERS[0];
     const active = activeDraft();
-    const opts = drafts.map(d =>
-      `<option value="${esc(String(d.id))}"${String(d.id) === String(ACTIVE_DRAFT_ID) ? " selected" : ""}>`
-      + `${esc(d.customer_name || "Offtaker")}${d.period_label ? " — " + esc(d.period_label) : ""}</option>`
-    ).join("");
+    const pendingCount = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
+    const btnSub = pickSubLine(activeOf);
+    const menuRows = OFFTAKERS.map(offtakerMenuItem).join("");
+
+    // The body column: the real draft card | a loading card | a graceful empty state.
+    let bodyCol;
+    if (String(GENERATING_SUB_ID) === String(ACTIVE_SUB_ID)) {
+      bodyCol = `<div class="rb-draft rb-draft-loading"><div class="rb-spin"></div>
+        <p>Drafting ${esc(activeOf.customer_name || "this offtaker")}'s latest period…</p></div>`;
+    } else if (active) {
+      bodyCol = draftCard(active, INBOX_UTIL_ACCTS);
+    } else {
+      const why = GEN_FAIL[String(ACTIVE_SUB_ID)]
+        || "No billable period yet for this offtaker — its report appears here once a GMP bill lands.";
+      bodyCol = `<div class="rb-draft rb-draft-empty">
+        <div class="rb-draft-top"><div class="rb-draft-name">${esc(activeOf.customer_name || "Offtaker")}</div></div>
+        <p class="rb-empty-why">${esc(why)}</p>
+        <button class="ao-btn rb-btn" type="button" data-regen="${esc(String(ACTIVE_SUB_ID))}">Try drafting this period</button>
+      </div>`;
+    }
+
     wrap.innerHTML = `
       <div class="rb-inbox rep-card">
         <div class="rb-inbox-h">
           <div class="rb-inbox-h-main">
             <span class="rep-eyebrow">Awaiting your approval</span>
-            <h3>${drafts.length} report${drafts.length === 1 ? "" : "s"} ready to review &amp; send</h3>
+            <h3>${pendingCount} report${pendingCount === 1 ? "" : "s"} ready to review &amp; send</h3>
             <p>Drafted from the latest billing period. Review the numbers, then
                approve — nothing goes to an offtaker until you do. The GMP bill
                attaches automatically.</p>
           </div>
           <div class="rb-inbox-pick">
-            <label class="rb-pick-lab" for="rbOfftakerPick">Reviewing offtaker</label>
-            <div class="rb-pick-sel-wrap">
-              <select class="rb-pick-sel" id="rbOfftakerPick" aria-label="Choose which offtaker's report to review">${opts}</select>
+            <label class="rb-pick-lab" id="rbPickLab">Reviewing offtaker</label>
+            <div class="rb-pick" data-open="false">
+              <button class="rb-pick-btn" type="button" id="rbPickBtn" aria-haspopup="listbox"
+                      aria-expanded="false" aria-labelledby="rbPickLab">
+                <span class="rb-pick-btn-main">
+                  <span class="rb-pick-btn-name">${esc(activeOf.customer_name || "Offtaker")}</span>
+                  ${btnSub ? `<span class="rb-pick-btn-sub">${btnSub}</span>` : ""}
+                </span>
+                <span class="rb-pick-caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="rb-pick-menu" id="rbPickMenu" role="listbox" aria-labelledby="rbPickLab" hidden>${menuRows}</div>
             </div>
-            <span class="rb-pick-sub">${drafts.length > 1 ? `Pick any of the ${drafts.length} awaiting approval` : "Sends only when you approve"}</span>
+            <span class="rb-pick-sub">${OFFTAKERS.length > 1
+              ? `Switch between your ${OFFTAKERS.length} offtakers`
+              : "Sends only when you approve"}</span>
           </div>
         </div>
         <div class="rb-layout">
-          <div class="rb-col-form">
-            ${draftCard(active, INBOX_UTIL_ACCTS)}
-          </div>
+          <div class="rb-col-form">${bodyCol}</div>
           <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
         </div>
       </div>`;
     wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-    // Live preview: paint now, then repaint as the operator edits the email or toggles
-    // an attachment.
+    // Live preview: paint now (only when a real draft is showing), then repaint as the
+    // operator edits the email or toggles an attachment.
     renderDraftDoc();
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
       autoGrowMsg(ta);                                // size to fit the whole note now
@@ -1675,17 +1780,86 @@
     requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
     wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
       cb.addEventListener("change", () => renderDraftDoc()));
-    // Offtaker picker — switch the WHOLE approval section to the chosen offtaker
-    // (re-render from cache, instant, no refetch).
-    const pick = wrap.querySelector("#rbOfftakerPick");
-    if (pick) pick.addEventListener("change", () => { ACTIVE_DRAFT_ID = pick.value; renderInboxBody(); });
-    // Inline offtaker-detail editors — edits persist to the offtaker and live-update
-    // the preview (money fields recompute the draft figures).
+    const regen = wrap.querySelector("[data-regen]");
+    if (regen) regen.onclick = () => selectOfftaker(regen.getAttribute("data-regen"), true);
+    // Custom offtaker dropdown (open/close/select/keyboard) + inline offtaker editors.
+    wireOfftakerPicker(wrap);
     wireOfftakerEditors(wrap);
   }
 
+  // Wire the custom dropdown: toggle, click-outside, Esc, arrow-key nav, item select.
+  function wireOfftakerPicker(wrap) {
+    const pick = wrap.querySelector(".rb-pick");
+    const btn = wrap.querySelector("#rbPickBtn");
+    const menu = wrap.querySelector("#rbPickMenu");
+    if (!pick || !btn || !menu) return;
+    const items = Array.prototype.slice.call(menu.querySelectorAll("[data-subpick]"));
+    let kbd = -1;
+    const setKbd = (i) => {
+      kbd = i;
+      items.forEach((el, j) => el.classList.toggle("kbd", j === i));
+      if (items[i]) items[i].scrollIntoView({ block: "nearest" });
+    };
+    function onDoc(e) { if (!pick.contains(e.target)) close(); }
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); btn.focus(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setKbd(Math.min(items.length - 1, kbd + 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setKbd(Math.max(0, kbd - 1)); }
+      else if ((e.key === "Enter" || e.key === " ") && items[kbd]) { e.preventDefault(); items[kbd].click(); }
+    }
+    function open() {
+      pick.setAttribute("data-open", "true");
+      btn.setAttribute("aria-expanded", "true");
+      menu.hidden = false;
+      const cur = items.findIndex(el => el.classList.contains("active"));
+      setKbd(cur >= 0 ? cur : 0);
+      document.addEventListener("mousedown", onDoc, true);
+      document.addEventListener("keydown", onKey, true);
+    }
+    function close() {
+      pick.setAttribute("data-open", "false");
+      btn.setAttribute("aria-expanded", "false");
+      menu.hidden = true;
+      document.removeEventListener("mousedown", onDoc, true);
+      document.removeEventListener("keydown", onKey, true);
+    }
+    btn.onclick = () => (pick.getAttribute("data-open") === "true" ? close() : open());
+    items.forEach(el => el.onclick = () => { close(); selectOfftaker(el.getAttribute("data-subpick")); });
+  }
+
+  // Switch the whole approval section to a chosen offtaker. If they already have a
+  // pending draft, show it instantly; otherwise mint one on demand (idempotent — the
+  // backend reuses/refreshes the period's draft) and refetch so it carries its live
+  // envelope fields. `force` re-mints even when a draft already exists.
+  async function selectOfftaker(subId, force) {
+    subId = String(subId);
+    if (DRAFT_BY_SUB[subId] && !force) {
+      ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody(); return;
+    }
+    ACTIVE_SUB_ID = subId;
+    delete GEN_FAIL[subId];
+    GENERATING_SUB_ID = subId;
+    _pinActiveSub = true;
+    renderInboxBody();                 // show the loading card for this offtaker
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft",
+        { method: "POST", headers: authHeaders() });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        GEN_FAIL[subId] = (e && e.detail) ? e.detail
+          : "No billable period yet for this offtaker — its report appears here once a GMP bill lands.";
+      }
+    } catch (e) { GEN_FAIL[subId] = "Couldn't reach the server — try again."; }
+    GENERATING_SUB_ID = null;
+    _pinActiveSub = true;              // stay on this offtaker through the refetch
+    await refreshInbox();              // refetch → DRAFT_BY_SUB updated → renders the draft or empty state
+  }
+
   function activeDraft() {
-    return INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || INBOX_DRAFTS[0] || null;
+    // The selected OFFTAKER is the source of truth; its pending draft (if any) is what
+    // the card + live preview render. Falls back to the id-based lookup for safety.
+    if (ACTIVE_SUB_ID != null && DRAFT_BY_SUB[String(ACTIVE_SUB_ID)]) return DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
+    return INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || null;
   }
 
   /* Live invoice preview beside the approval draft — a styled mock of exactly
