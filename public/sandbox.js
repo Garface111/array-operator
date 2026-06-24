@@ -244,6 +244,30 @@
   });
   extSend("SO_STATUS_REQUEST");   // ask explicitly in case the bridge announced before we listened
 
+  // ── "Open in <Vendor>" buttons → arm a fresh extension capture ──────────────
+  // The portal deep-links (.sb-brandlink / .sb-origin, data-portal=vendor) used to
+  // be plain new-tab links — opening the portal did NOTHING, because every vendor
+  // content script refuses to capture without an explicit AO "intent" (so_capture_
+  // intent, 10-min TTL). So the card's own "open <vendor> to refresh" was a promise
+  // it couldn't keep. Now, when the extension is present, a click ARMS that intent
+  // and lets the extension open the portal (SO_OPEN_PORTAL → background sets the
+  // intent + opens the tab), so the .58 content script captures live readings on
+  // load and they sync straight back here (SO_CAPTURE_LANDED → handleCaptureLanded
+  // → /inverter-capture). No extension → fall through to the plain link.
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest && e.target.closest("a[data-portal]");
+    if(!a) return;
+    // Leave new-tab / modified clicks (middle, ⌘/ctrl/shift/alt) to the browser.
+    if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if(!EXT_PRESENT) return;            // no extension installed → plain link opens the portal
+    const vendor = a.getAttribute("data-portal");
+    const url = a.getAttribute("href");
+    if(!vendor || !url) return;
+    e.preventDefault();                 // the extension opens the tab — don't open a second one
+    extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor, vendor });
+    try { if(typeof toast === "function") toast(`Opening ${BRAND[vendor]||vendor} — your latest readings will sync back here.`, "ok"); } catch(_){}
+  });
+
 
   // ---- saved column order (localStorage) ----
   function loadOrder(){
@@ -1280,7 +1304,7 @@
     if(!links.length) return "";
     const rows = links.map(l => {
       const label = l.label || BRAND[l.vendor] || l.vendor || "portal";
-      return `<a class="sb-origin" href="${esc(l.url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
+      return `<a class="sb-origin" data-portal="${esc(l.vendor||"")}" href="${esc(l.url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
     }).join("");
     return `<div class="sb-origins">${rows}</div>`;
   }
@@ -1294,7 +1318,7 @@
     const links = originLinks(col);
     const url = links.length ? links[0].url : "";
     if(url){
-      return `<a class="sb-brand sb-brandlink ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
+      return `<a class="sb-brand sb-brandlink ${esc(v)}" data-portal="${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener">Open in ${esc(label)} ↗</a>`;
     }
     return `<span class="sb-brand ${esc(v)}">${esc(label)}</span>`;
   }
@@ -2111,7 +2135,7 @@
       originLabel = originLabel || BRAND[d.vendor] || d.vendor;
     }
     const originRow = originUrl
-      ? `<a class="sb-origin sb-dc-origin" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
+      ? `<a class="sb-origin sb-dc-origin" data-portal="${esc(d.vendor||"")}" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
       : "";
 
     // ---- ENRICHED stats for the blown-up card: $ at stake, peer index, last-seen,
