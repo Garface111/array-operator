@@ -4443,14 +4443,24 @@
       const showMon = feats.plan_chosen ? !!feats.vendor_data : (basis === "kwh");
       const showInv = feats.plan_chosen ? !!feats.invoicing  : (basis === "invoicing");
       if(showMon){
-        const kwh  = Number(pick(summary, ["mtd_kwh"], 0));
-        const rate = Number(pick(summary, ["blended_cents_per_kwh"], pick(summary, ["rate_cents_per_kwh"], 0.5)));
         const c    = Number(pick(summary, ["monitoring_total_cents"], 0));
         total += c;
-        lines += billLine("Generation",
-          `${kwh.toLocaleString(undefined,{maximumFractionDigits:0})} kWh × ${rate.toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh`,
-          usdFromCents(c),
-          `Live fleet monitoring — metered on every kWh your arrays produced this billing month${sinceTxt}. Charged monthly to your card.`);
+        if(pick(summary, ["monitoring_basis"], "kwh") === "nameplate"){
+          // Per-kW NAMEPLATE: deterministic — kW of registered capacity × rate.
+          const kw   = Number(pick(summary, ["nameplate_kw"], 0));
+          const rate = Number(pick(summary, ["rate_cents_per_kw"], 30));
+          lines += billLine("Fleet monitoring",
+            `${kw.toLocaleString(undefined,{maximumFractionDigits:0})} kW × ${usdFromCents(rate)}/kW`,
+            usdFromCents(c),
+            `Live fleet monitoring — billed on your registered nameplate capacity. Charged monthly to your card.`);
+        } else {
+          const kwh  = Number(pick(summary, ["mtd_kwh"], 0));
+          const rate = Number(pick(summary, ["blended_cents_per_kwh"], pick(summary, ["rate_cents_per_kwh"], 0.5)));
+          lines += billLine("Generation",
+            `${kwh.toLocaleString(undefined,{maximumFractionDigits:0})} kWh × ${rate.toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh`,
+            usdFromCents(c),
+            `Live fleet monitoring — metered on every kWh your arrays produced this billing month${sinceTxt}. Charged monthly to your card.`);
+        }
       }
       if(showInv){
         const n   = Number(pick(summary, ["offtaker_count"], 0));
