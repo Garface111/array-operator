@@ -1094,6 +1094,14 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-topbar{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 2px 14px; }
 .vs-headrow{ margin:0; }
 .vs-searchwrap{ flex:0 0 auto; }
+/* right-side cluster: [+ Add vendor] [search] sit together (the header's open gap) */
+.vs-actions{ display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.vs-addbtn{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; border:0;
+  border-radius:9px; padding:9px 16px; font:inherit; font-size:13px; font-weight:650; color:#fff;
+  white-space:nowrap; background:linear-gradient(180deg,#3b82f6,#1d4ed8);
+  box-shadow:0 4px 14px -4px rgba(29,78,216,.45); transition:filter .12s, transform .04s; }
+.vs-addbtn:hover{ filter:brightness(1.06); }
+.vs-addbtn:active{ transform:translateY(1px); }
 .vs-search{ width:280px; max-width:48vw; font:inherit; font-size:13px; color:var(--ink,#0f172a);
   padding:8px 12px; border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff);
   transition:border-color .12s, box-shadow .12s; }

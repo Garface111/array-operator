@@ -206,8 +206,11 @@
       <div class="vs-topbar">
         <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
           <div class="vs-hint">To refresh a vendor, open its portal — click the vendor name or its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
-        <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
-          placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
+        <div class="vs-actions">
+          <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
+          <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
+            placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
+        </div>
       </div>
       <div class="vs-scroll" id="vsScroll">
         <div class="vs-table">
@@ -218,6 +221,12 @@
     const s = host.querySelector("#vsSearch");
     s.value = _query;
     s.addEventListener("input", () => { _query = s.value.trim().toLowerCase(); renderBody(); });
+    // "+ Add vendor" → the SAME add-array modal the Sandbox view uses (one flow).
+    const add = host.querySelector("#vsAddVendor");
+    if (add) add.onclick = () => {
+      if (window.__aoAddArray) window.__aoAddArray();
+      else location.hash = "#arrays";   // defensive: sandbox owns the modal
+    };
     host.querySelectorAll("[data-sort]").forEach(b => {
       const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
       b.addEventListener("click", go);
@@ -246,7 +255,7 @@
         : `${all.length} array${all.length === 1 ? "" : "s"} · ${(data.summary || {}).inverters_total || invShown} inverters`;
     }
     if (!cols.length) {
-      body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — add one from the Sandbox view."}</div>`;
+      body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
       return;
     }
     const byVendor = {};
