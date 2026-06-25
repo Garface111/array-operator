@@ -4726,7 +4726,7 @@
         </div>
         <div class="ao-plan-cards">
           ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","$20 per offtaker / mo")}
-          ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","$0.30 / kW · mo")}
+          ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","$0.15 / kW · mo")}
           ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together.","Both plans")}
         </div>
         ${opts.change ? `<button type="button" class="ao-plan-close" id="aoPlanClose">Keep my current plan</button>` : ""}
