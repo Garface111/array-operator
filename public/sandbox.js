@@ -4165,15 +4165,18 @@
   }
 
   async function wireAutoRefreshRow(){
-    // Collapsible header: tuck the (bulky) per-vendor cred cards away; remember the choice.
+    // Collapsible header: tuck the (bulky) per-vendor cred cards away; remember the
+    // choice. Clicking ANYWHERE on the header row toggles it — except inside the
+    // expanded body, so typing/saving credentials never collapses the panel.
+    const row = document.getElementById("rowAutoRefresh");
     const toggle = document.getElementById("arToggle");
     const body = document.getElementById("arBody");
-    if(toggle && body && !toggle._wired){
-      toggle._wired = true;
-      toggle.addEventListener("click", () => {
+    if(row && body && !row._wired){
+      row._wired = true;
+      row.addEventListener("click", (e) => {
+        if(e.target.closest(".ar-body")) return;   // cred fields aren't a collapse target
         const open = !body.classList.toggle("ar-collapsed");
-        toggle.classList.toggle("open", open);
-        toggle.setAttribute("aria-expanded", String(open));
+        if(toggle){ toggle.classList.toggle("open", open); toggle.setAttribute("aria-expanded", String(open)); }
         try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
       });
     }

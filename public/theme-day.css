@@ -824,6 +824,12 @@ html[data-theme="day"] .sb-autologin-hint{
 }
 html[data-theme="day"] .sb-autologin-hint a.sb-al-link{color:#1d4ed8 !important;}
 
+/* Auto-refresh expand chip + whole-row click affordance → utility blue in day mode */
+html[data-theme="day"] .ar-caret{ background:rgba(37,99,235,.12) !important; color:#2563eb !important; }
+html[data-theme="day"] #rowAutoRefresh:hover{ background:rgba(37,99,235,.05) !important; }
+html[data-theme="day"] #rowAutoRefresh:hover .ar-caret{ background:rgba(37,99,235,.22) !important; }
+html[data-theme="day"] #rowAutoRefresh:hover .ar-toggle{ color:#1d4ed8 !important; }
+
 /* ===========================================================================
  * DIVINE DASHBOARD (2026-06-24) — premium control-room redesign of the owner
  * health tab. Elevates the reused command-center card + attention queue into a
