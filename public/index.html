@@ -154,7 +154,9 @@
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Health</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverter Dashboard</a>
-    <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
+    <!-- Trends tab removed for now (Ford). The portal is gone, but #panelTrends, trends.js,
+         the TABS["trends"] route + #trends deep-link, and the backend fleet-trends endpoint
+         are all kept intact — re-add this <a> to restore the tab. -->
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
