@@ -108,7 +108,45 @@
   function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
 
   const _expanded = {};                       // array_id -> bool (survives re-renders)
+  const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
   let _query = "";                            // search filter (lowercased)
+
+  // A tiny bar sparkline of an inverter's recent daily output (last ~14 days).
+  function sparkline(daily) {
+    const pts = (daily || []).filter(d => d && d.kwh != null).slice(-14);
+    if (pts.length < 2) return `<div class="vs-id-nospark">Not enough history yet — a sparkline needs a couple of days of capture.</div>`;
+    const W = 240, H = 40, max = Math.max(...pts.map(p => p.kwh), 0.001), bw = W / pts.length;
+    const bars = pts.map((p, i) => {
+      const bh = Math.max(1.5, (p.kwh / max) * (H - 6));
+      return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - bh).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1"/>`;
+    }).join("");
+    return `<svg class="vs-id-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days">${bars}</svg>`;
+  }
+  // The detail panel shown when an inverter row is clicked open.
+  function invDetailHTML(iv) {
+    const cell = (k, val) => (val == null || val === "") ? "" :
+      `<div class="vs-id-cell"><span class="vs-id-k">${k}</span><span class="vs-id-v">${val}</span></div>`;
+    const pct = (iv.nameplate_kw && iv.current_power_w != null)
+      ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "%" : null;
+    const live = iv.current_power_w != null ? esc(kw(iv.current_power_w) + (pct ? ` · ${pct} of rated` : "")) : null;
+    const peer = iv.peer_index != null ? esc(iv.peer_index.toFixed(2) + "× its neighbors") : null;
+    const win = iv.window_kwh != null ? esc(Math.round(iv.window_kwh).toLocaleString() + " kWh") : null;
+    const range = (iv.min_kwh != null && iv.peak_kwh != null)
+      ? esc(Math.round(iv.min_kwh).toLocaleString() + "–" + Math.round(iv.peak_kwh).toLocaleString() + " kWh/day") : null;
+    const cells = [
+      cell("Live now", live),
+      cell("vs. neighbors", peer),
+      cell("14-day output", win),
+      cell("Daily range", range),
+      cell("Model", iv.model ? esc(iv.model) : null),
+      cell("Rated", iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null),
+    ].join("");
+    const diag = iv.diagnosis ? `<div class="vs-id-diag">${esc(iv.diagnosis)}</div>` : "";
+    return `<div class="vs-inv-detail">${diag}
+      <div class="vs-id-grid">${cells}</div>
+      <div class="vs-id-sparkwrap"><div class="vs-id-sparklabel">Daily output · last 14 days</div>${sparkline(iv.daily)}</div>
+    </div>`;
+  }
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
   let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "spreadsheet"; } catch (e) { return "spreadsheet"; } })();
 
@@ -261,14 +299,17 @@
             invs.forEach(iv => {
               const ist = invStatus(iv);
               const meta = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null].filter(Boolean).join(" · ");
-              h += `<div class="vs-row vs-inv">
-                <span class="vs-c-name vs-inv-name">${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
+              const ikey = c.array_id + ":" + iv.inverter_id;
+              const iopen = !!_invExpanded[ikey];
+              h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
+                <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span>${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}">${kw(iv.current_power_w)}</span>
                 <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}">${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
+              if (iopen) h += invDetailHTML(iv);
             });
           }
           h += `</div>`;
@@ -281,6 +322,13 @@
       const id = b.getAttribute("data-arr");
       _expanded[id] = !_expanded[id];
       renderBody();
+    });
+    // Click an inverter row → toggle its detail panel (diagnosis, peer comparison,
+    // 14-day output + sparkline). Keyboard-accessible (Enter/Space).
+    body.querySelectorAll("[data-inv]").forEach(b => {
+      const go = () => { const k = b.getAttribute("data-inv"); _invExpanded[k] = !_invExpanded[k]; renderBody(); };
+      b.onclick = go;
+      b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     });
     // Clicking a vendor NAME (badge) or its "Open to sync" chip opens that vendor's
     // monitoring portal. With the extension

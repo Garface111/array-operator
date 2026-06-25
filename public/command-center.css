@@ -1071,6 +1071,24 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv .vs-c-name{ padding-left:26px; font-weight:500; color:var(--muted); }
 .vs-inv-meta{ font-size:11px; color:var(--faint); font-weight:400; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
+/* Click an inverter row → detail panel (diagnosis, peer comparison, 14-day output + sparkline). */
+.vs-inv-click{ cursor:pointer; }
+.vs-inv-click:hover{ background:rgba(37,99,235,.05); }
+.vs-inv-caret{ width:12px; font-size:10px; }
+.vs-inv-click.open{ background:rgba(37,99,235,.05); }
+.vs-inv-click.open .vs-inv-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.vs-inv-detail{ background:var(--card,#fff); border-bottom:1px solid var(--line);
+  padding:12px 18px 14px 52px; display:flex; flex-wrap:wrap; gap:14px 28px; align-items:flex-start; }
+.vs-id-diag{ flex-basis:100%; font-size:13px; font-weight:600; color:var(--ink); }
+.vs-id-grid{ display:flex; flex-wrap:wrap; gap:14px 26px; }
+.vs-id-cell{ display:flex; flex-direction:column; gap:2px; }
+.vs-id-k{ font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); }
+.vs-id-v{ font-size:13px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+.vs-id-sparkwrap{ margin-left:auto; }
+.vs-id-sparklabel{ font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); margin-bottom:5px; }
+.vs-id-spark{ display:block; width:240px; height:40px; }
+.vs-id-spark rect{ fill:var(--good,#2563eb); opacity:.85; }
+.vs-id-nospark{ font-size:11.5px; color:var(--faint); max-width:240px; align-self:center; }
 .vs-empty{ padding:60px 20px; text-align:center; color:var(--faint); font-size:14px; }
 /* search + sortable headers */
 .vs-topbar{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 2px 14px; }
