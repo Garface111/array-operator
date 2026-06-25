@@ -4142,17 +4142,36 @@
   }
 
   function autoRefreshRow(){
+    let collapsed = true;   // collapsed by default — the vendor cards are bulky
+    try { collapsed = localStorage.getItem("ao_ar_open") !== "1"; } catch(e){}
     return `<div class="acct-row" id="rowAutoRefresh">
       <div class="r-k">Auto-refresh</div>
       <div class="r-v">
-        <span id="arState">Keeps your live production fresh automatically.</span>
-        <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any vendor anytime.</span>
-        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+        <button type="button" id="arToggle" class="ar-toggle${collapsed?"":" open"}" aria-expanded="${!collapsed}" aria-controls="arBody">
+          <span class="ar-caret" aria-hidden="true">▸</span>
+          <span id="arState">Keeps your live production fresh automatically.</span>
+        </button>
+        <div class="ar-body${collapsed?" ar-collapsed":""}" id="arBody">
+          <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any vendor anytime.</span>
+          <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+        </div>
       </div>
     </div>`;
   }
 
   async function wireAutoRefreshRow(){
+    // Collapsible header: tuck the (bulky) per-vendor cred cards away; remember the choice.
+    const toggle = document.getElementById("arToggle");
+    const body = document.getElementById("arBody");
+    if(toggle && body && !toggle._wired){
+      toggle._wired = true;
+      toggle.addEventListener("click", () => {
+        const open = !body.classList.toggle("ar-collapsed");
+        toggle.classList.toggle("open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+        try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
+      });
+    }
     const listEl = document.getElementById("arList");
     if(!listEl) return;
     if(!EXT_PRESENT){
