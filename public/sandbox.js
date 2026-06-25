@@ -3399,6 +3399,11 @@
     }, 60);
   };
 
+  // Generic global so other surfaces (the Vendor-data Spreadsheet view's
+  // "+ Add vendor" button) open the SAME add-array modal — one flow, never a
+  // parallel mechanism.
+  window.__aoAddArray = openAddArrayModal;
+
   /* ---- 'Reset layout' — snap inverters back to their discovered grouping.
    * Goes through the store (which persists to the server when live). ---- */
   function wireResetButton(host){
@@ -4481,7 +4486,20 @@
       || /active|past_due|paid/i.test(sStatus);
     const payState = document.getElementById("payState");
     const btn = document.getElementById("billManage");
-    if(payState) payState.textContent = hasCard ? "Card on file" : "No card on file";
+    if(payState){
+      if(hasCard){
+        const bMap = {visa:"Visa",mastercard:"Mastercard",amex:"Amex","american express":"Amex",discover:"Discover",diners:"Diners",jcb:"JCB",unionpay:"UnionPay"};
+        const bRaw = String(pick(summary, ["card_brand"], "") || "");
+        const brand = bMap[bRaw.toLowerCase()] || (bRaw ? bRaw.charAt(0).toUpperCase()+bRaw.slice(1) : "");
+        const last4 = pick(summary, ["card_last4"], null);
+        const exp = pick(summary, ["card_exp"], null);
+        payState.textContent = last4
+          ? `${brand ? brand + " " : ""}•••• ${last4}${exp ? " · exp " + exp : ""}`
+          : "Card on file";
+      } else {
+        payState.textContent = "No card on file";
+      }
+    }
     if(btn){
       btn.textContent = hasCard ? "Update credit card" : "Add credit card";
       btn.onclick = () => manageBilling(hasCard);
