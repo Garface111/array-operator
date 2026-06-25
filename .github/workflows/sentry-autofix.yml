@@ -1,0 +1,83 @@
+name: Sentry Auto-Fix
+
+# Runs a Claude Code agent that identifies, fixes, and tests a production error
+# reported by Sentry, then opens a PR. See tools/sentry-autofix/README.md.
+
+on:
+  # Fired by the relay (tools/sentry-autofix/relay.py) when Sentry alerts.
+  repository_dispatch:
+    types: [sentry-issue]
+  # Manual trigger: paste a Sentry issue URL or raw payload JSON to test the flow.
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: "Raw Sentry payload OR brief as JSON (leave blank to use sentry_url)"
+        required: false
+      sentry_url:
+        description: "Sentry issue URL (used only for the PR body if payload is blank)"
+        required: false
+      target_repo:
+        description: "owner/name of the repo to fix (blank = this repo)"
+        required: false
+
+concurrency:
+  # One auto-fix per distinct issue at a time; never cancel an in-flight fix.
+  group: sentry-autofix-${{ github.event.client_payload.issue_id || github.event.inputs.payload || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          # Fix this repo by default; AUTOFIX_TARGET_REPO/target_repo overrides it.
+          repository: ${{ github.event.client_payload.target_repo || github.event.inputs.target_repo || github.repository }}
+          token: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch the auto-fix tooling
+        # The tooling lives in garface111/array-operator; pull just that folder
+        # so the workflow works even when fixing a different target repo.
+        uses: actions/checkout@v4
+        with:
+          repository: garface111/array-operator
+          path: .sentry-autofix-tools
+          sparse-checkout: tools/sentry-autofix
+
+      - name: Build agent prompt from Sentry payload
+        id: prompt
+        run: |
+          python .sentry-autofix-tools/tools/sentry-autofix/build_prompt.py \
+            --payload "${PAYLOAD}" --out-dir "${RUNNER_TEMP}"
+          # claude-code-action's `prompt` takes literal text, so hand it the
+          # rendered prompt through a multiline env var.
+          {
+            echo "AGENT_PROMPT<<SENTRY_AUTOFIX_EOF"
+            cat "${RUNNER_TEMP}/sentry-autofix-prompt.md"
+            echo "SENTRY_AUTOFIX_EOF"
+          } >> "$GITHUB_ENV"
+        env:
+          PAYLOAD: ${{ toJSON(github.event.client_payload.brief) != 'null' && toJSON(github.event.client_payload.brief) || github.event.inputs.payload }}
+          PYTHONPATH: .sentry-autofix-tools/tools/sentry-autofix
+
+      - name: Run Claude Code agent (identify → fix → test → PR)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ env.AGENT_PROMPT }}
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
+          github_token: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
