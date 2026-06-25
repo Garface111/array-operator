@@ -823,3 +823,112 @@ html[data-theme="day"] .sb-autologin-hint{
   color:#334155 !important;
 }
 html[data-theme="day"] .sb-autologin-hint a.sb-al-link{color:#1d4ed8 !important;}
+
+/* ===========================================================================
+ * DIVINE DASHBOARD (2026-06-24) — premium control-room redesign of the owner
+ * health tab. Elevates the reused command-center card + attention queue into a
+ * refined, layered, expensive-feeling dashboard. Scoped to #panelDashboard so it
+ * never touches the marketing command-center; loaded last + !important to beat
+ * the base .fc-*/.cc-* rules.
+ * ==========================================================================*/
+:root{ --dash-shadow:0 1px 2px rgba(15,23,42,.04), 0 22px 48px -28px rgba(15,23,42,.22); }
+
+/* — canvas — */
+html[data-theme="day"] #panelDashboard .dash-wrap{ max-width:1160px !important; margin:0 auto !important; padding:30px 26px 76px !important; }
+
+/* — header: gradient-clipped title + production STAT-PILLS — */
+html[data-theme="day"] #panelDashboard .dash-head{ align-items:center !important; margin:0 4px 22px !important; }
+html[data-theme="day"] #panelDashboard .dash-head h2{
+  font-size:27px !important; font-weight:800 !important; letter-spacing:-.025em !important;
+  background:linear-gradient(165deg,#0f172a,#41566d) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .dash-prod{ gap:9px !important; }
+html[data-theme="day"] #panelDashboard .dash-prod .dp-dot{ display:none !important; }
+html[data-theme="day"] #panelDashboard .dash-prod .dp{
+  display:inline-flex !important; align-items:baseline !important; gap:6px !important;
+  padding:8px 15px !important; background:#fff !important; border:1px solid #e7edf5 !important;
+  border-radius:12px !important; font-size:12px !important; color:var(--muted) !important;
+  box-shadow:0 1px 2px rgba(15,23,42,.05) !important; }
+html[data-theme="day"] #panelDashboard .dash-prod .dp b{ font-size:15.5px !important; font-weight:760 !important; color:var(--ink) !important; letter-spacing:-.01em !important; font-variant-numeric:tabular-nums !important; }
+
+/* — HERO HEALTH CARD — layered depth, big gradient %, refined cluster — */
+html[data-theme="day"] #panelDashboard .fc-card{
+  border-radius:22px !important; overflow:hidden !important; padding:0 !important;
+  border:1px solid #e7edf5 !important; background:#fff !important;
+  box-shadow:var(--dash-shadow), inset 0 1px 0 rgba(255,255,255,.9) !important; }
+html[data-theme="day"] #panelDashboard .fc-card.ok{ box-shadow:var(--dash-shadow), inset 0 0 0 1px rgba(37,99,235,.06) !important; }
+/* the health "tank" → a soft, restrained left-to-right wash behind the plate */
+html[data-theme="day"] #panelDashboard .fc-tank{ opacity:1 !important; filter:none !important; }
+html[data-theme="day"] #panelDashboard .fc-tank--ok{ background:linear-gradient(90deg,rgba(37,99,235,.12),rgba(14,165,233,.045) 70%,transparent) !important; }
+html[data-theme="day"] #panelDashboard .fc-tank--warn{ background:linear-gradient(90deg,rgba(217,119,6,.14),rgba(251,191,36,.05) 70%,transparent) !important; }
+html[data-theme="day"] #panelDashboard .fc-tank--bad{ background:linear-gradient(90deg,rgba(220,38,38,.13),rgba(248,113,113,.05) 70%,transparent) !important; }
+html[data-theme="day"] #panelDashboard .fc-plate{
+  background:transparent !important; border:0 !important; backdrop-filter:none !important;
+  display:grid !important; grid-template-columns:auto 1fr auto !important; align-items:center !important;
+  gap:34px !important; padding:26px 30px !important; }
+/* big health % numeral — gradient-clipped, tight */
+html[data-theme="day"] #panelDashboard .fc-health-num{ display:flex !important; align-items:baseline !important; gap:2px !important; }
+html[data-theme="day"] #panelDashboard .fc-health-num b{
+  font-size:64px !important; font-weight:830 !important; letter-spacing:-.045em !important; line-height:.86 !important;
+  background:linear-gradient(160deg,#3b82f6,#0ea5e9) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .fc-card.warn .fc-health-num b{ background:linear-gradient(160deg,#f59e0b,#d97706) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .fc-card.bad .fc-health-num b{ background:linear-gradient(160deg,#f87171,#dc2626) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .fc-health-num span{ font-size:23px !important; font-weight:760 !important; color:var(--faint) !important; }
+html[data-theme="day"] #panelDashboard .fc-health-lbl{ font-size:10.5px !important; letter-spacing:.14em !important; text-transform:uppercase !important; color:var(--faint) !important; font-weight:750 !important; margin-top:6px !important; }
+/* stats cluster */
+html[data-theme="day"] #panelDashboard .fc-mid{ border-left:1px solid #eef2f7 !important; padding-left:32px !important; }
+html[data-theme="day"] #panelDashboard .fc-stats{ display:flex !important; flex-wrap:wrap !important; align-items:baseline !important; gap:8px !important; color:var(--muted) !important; font-size:13.5px !important; }
+html[data-theme="day"] #panelDashboard .fc-stat b{ color:var(--ink) !important; font-weight:770 !important; font-variant-numeric:tabular-nums !important; }
+html[data-theme="day"] #panelDashboard .fc-stat.flag b{ color:var(--gold2) !important; }
+html[data-theme="day"] #panelDashboard .fc-dot{ color:#cbd5e1 !important; }
+html[data-theme="day"] #panelDashboard .fc-sub{ display:block !important; width:100% !important; color:var(--faint) !important; font-size:12px !important; margin-top:4px !important; letter-spacing:.01em !important; }
+/* $ recoverable highlight */
+html[data-theme="day"] #panelDashboard .fc-right{ text-align:right !important; display:flex !important; flex-direction:column !important; align-items:flex-end !important; gap:8px !important; }
+html[data-theme="day"] #panelDashboard .fc-risk{ display:flex !important; flex-direction:column !important; align-items:flex-end !important; line-height:1.05 !important; }
+html[data-theme="day"] #panelDashboard .fc-risk-k{ font-size:10px !important; letter-spacing:.13em !important; text-transform:uppercase !important; color:var(--faint) !important; font-weight:700 !important; }
+html[data-theme="day"] #panelDashboard .fc-risk b{ font-size:30px !important; font-weight:820 !important; letter-spacing:-.025em !important; color:var(--good) !important; font-variant-numeric:tabular-nums !important; }
+html[data-theme="day"] #panelDashboard .fc-risk-u{ font-size:13px !important; color:var(--muted) !important; font-weight:600 !important; }
+html[data-theme="day"] #panelDashboard .fc-risk-sub{ font-size:11px !important; color:var(--faint) !important; margin-top:2px !important; }
+html[data-theme="day"] #panelDashboard .fc-watch b{ font-size:30px !important; font-weight:820 !important; color:var(--gold2) !important; }
+html[data-theme="day"] #panelDashboard .fc-allclear{ font-size:18px !important; font-weight:760 !important; color:var(--good) !important; }
+html[data-theme="day"] #panelDashboard .fc-asof{ font-size:11px !important; color:var(--faint) !important; }
+html[data-theme="day"] #panelDashboard .fc-alerts-btn{
+  background:#fff !important; border:1px solid #e7edf5 !important; border-radius:10px !important;
+  padding:7px 13px !important; font-size:12.5px !important; font-weight:650 !important; color:var(--muted) !important;
+  box-shadow:0 1px 2px rgba(15,23,42,.05) !important; transition:all .14s !important; cursor:pointer !important; }
+html[data-theme="day"] #panelDashboard .fc-alerts-btn:hover{ border-color:rgba(37,99,235,.4) !important; color:var(--good) !important; background:rgba(37,99,235,.05) !important; }
+
+/* — "NEEDS ATTENTION" heading — */
+html[data-theme="day"] #panelDashboard .dash-attn{ margin:30px 4px 12px !important; }
+html[data-theme="day"] #panelDashboard .dash-attn h3{ font-size:11px !important; letter-spacing:.13em !important; text-transform:uppercase !important; color:var(--faint) !important; font-weight:760 !important; }
+
+/* — ATTENTION QUEUE — refined ledger — */
+html[data-theme="day"] #panelDashboard .cc-tools{ margin-bottom:14px !important; gap:12px !important; }
+html[data-theme="day"] #panelDashboard .cc-search input{ border-radius:11px !important; padding:10px 14px 10px 30px !important; background:#fff !important; border:1px solid #e7edf5 !important; box-shadow:0 1px 2px rgba(15,23,42,.04) !important; }
+html[data-theme="day"] #panelDashboard .cc-chips{ background:#fff !important; border:1px solid #e7edf5 !important; border-radius:12px !important; padding:4px !important; box-shadow:0 1px 2px rgba(15,23,42,.04) !important; }
+html[data-theme="day"] #panelDashboard .cc-chip{ border-radius:9px !important; padding:6px 12px !important; font-size:12.5px !important; font-weight:600 !important; }
+html[data-theme="day"] #panelDashboard .cc-chip.on{ background:var(--good) !important; color:#fff !important; box-shadow:0 2px 8px -2px rgba(37,99,235,.5) !important; }
+html[data-theme="day"] #panelDashboard .cc-chip.on .n{ color:rgba(255,255,255,.85) !important; }
+html[data-theme="day"] #panelDashboard .cc-tablewrap{ border-radius:18px !important; border:1px solid #e7edf5 !important; background:#fff !important; box-shadow:var(--dash-shadow) !important; overflow:hidden !important; }
+html[data-theme="day"] #panelDashboard .cc-table thead th{ padding:12px 16px !important; font-size:10px !important; letter-spacing:.09em !important; text-transform:uppercase !important; color:var(--faint) !important; background:#fbfcfe !important; border-bottom:1px solid #eef2f7 !important; font-weight:700 !important; }
+html[data-theme="day"] #panelDashboard .cc-table td{ padding:15px 16px !important; border-bottom:1px solid #f1f5f9 !important; }
+html[data-theme="day"] #panelDashboard .cc-table tbody tr.row{ transition:background .13s ease !important; }
+html[data-theme="day"] #panelDashboard .cc-table tbody tr.row:hover{ background:#f4f8ff !important; }
+html[data-theme="day"] #panelDashboard .cc-table tbody tr:last-child td{ border-bottom:0 !important; }
+/* severity left-rail (inset box-shadow → works under border-collapse) */
+html[data-theme="day"] #panelDashboard .cc-table tbody tr.sev-crit td:first-child{ box-shadow:inset 3px 0 0 var(--bad) !important; }
+html[data-theme="day"] #panelDashboard .cc-table tbody tr.sev-under td:first-child{ box-shadow:inset 3px 0 0 var(--warn) !important; }
+html[data-theme="day"] #panelDashboard .cc-table tbody tr.sev-quiet td:first-child{ box-shadow:inset 3px 0 0 var(--sky) !important; }
+/* verdict → refined pill */
+html[data-theme="day"] #panelDashboard .cc-verdict{ display:inline-flex !important; align-items:center !important; gap:7px !important; font-size:12.5px !important; font-weight:600 !important; padding:4px 10px !important; border-radius:999px !important; }
+html[data-theme="day"] #panelDashboard .cc-verdict.crit{ background:rgba(220,38,38,.10) !important; color:#b91c1c !important; }
+html[data-theme="day"] #panelDashboard .cc-verdict.under{ background:rgba(217,119,6,.12) !important; color:var(--gold2) !important; }
+html[data-theme="day"] #panelDashboard .cc-verdict.quiet{ background:rgba(8,145,178,.12) !important; color:#0e7490 !important; }
+html[data-theme="day"] #panelDashboard td .cc-verdict[style]{ background:transparent !important; padding:0 !important; }   /* the "action" cell reuses cc-verdict as a plain link */
+html[data-theme="day"] #panelDashboard .cc-sevdot{ box-shadow:none !important; width:7px !important; height:7px !important; }
+/* $ at stake — emphasized blue ledger figure */
+html[data-theme="day"] #panelDashboard .cc-loss{ color:var(--good) !important; font-weight:780 !important; font-size:14px !important; letter-spacing:-.01em !important; }
+html[data-theme="day"] #panelDashboard .cc-pi{ font-weight:750 !important; }
+html[data-theme="day"] #panelDashboard .cc-site{ font-weight:700 !important; }
+html[data-theme="day"] #panelDashboard .cc-state{ background:var(--day-chip) !important; color:var(--muted) !important; font-weight:650 !important; }
+html[data-theme="day"] #panelDashboard .cc-foot{ color:var(--faint) !important; padding:0 2px !important; margin-top:14px !important; }

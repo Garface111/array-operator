@@ -307,7 +307,7 @@
       const st = wfState(r.key);
       const sel = UI.selected.has(r.key);
       const main = `
-        <tr class="row ${sel?"sel":""}" data-key="${esc(r.key)}">
+        <tr class="row sev-${r.sev} ${sel?"sel":""}" data-key="${esc(r.key)}">
           <td class="shrink"><input type="checkbox" class="cc-check ccRow" data-key="${esc(r.key)}" ${sel?"checked":""}></td>
           <td><span class="cc-site">${esc(r.site)}</span><small>${esc(r.region)}${r.host?` · ${esc(r.host)}`:""}</small></td>
           <td class="cc-inv"><b>${esc(r.inv)}</b> · ${esc(r.model)}</td>
