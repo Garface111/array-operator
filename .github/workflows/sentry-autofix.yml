@@ -75,6 +75,10 @@ jobs:
       - name: Run Claude Code agent (identify → fix → test → PR)
         uses: anthropics/claude-code-action@v1
         with:
+          # Prefer the Claude Pro/Max subscription token (generate locally with
+          # `claude setup-token`, store as the CLAUDE_CODE_OAUTH_TOKEN secret).
+          # Falls back to a metered Anthropic API key if the OAuth token is unset.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: ${{ env.AGENT_PROMPT }}
           claude_args: >-

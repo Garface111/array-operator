@@ -39,8 +39,13 @@ relay.py  ──►  GitHub repository_dispatch  (event_type = "sentry-issue")
 
 | Secret | Purpose |
 | --- | --- |
-| `ANTHROPIC_API_KEY` | Auth for the Claude Code agent. **Required.** |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Recommended.** Uses your Claude Pro/Max **subscription** instead of metered API billing. Generate locally with `claude setup-token` and paste the result. The token expires periodically — regenerate and update the secret when it does. |
+| `ANTHROPIC_API_KEY` | Alternative to the OAuth token: a metered Anthropic API key. Used only if `CLAUDE_CODE_OAUTH_TOKEN` is unset. Provide **one** of these two. |
 | `AUTOFIX_GH_TOKEN` | PAT with `repo` + `workflow` scope. Needed so the agent can open PRs (and to fix a **different** target repo, e.g. the backend). Falls back to the default `GITHUB_TOKEN` for same-repo fixes. |
+
+> **Subscription vs API key.** With `CLAUDE_CODE_OAUTH_TOKEN`, automated runs draw
+> on your Claude Code usage limits — keep `AUTOFIX_MIN_LEVEL` and the workflow's
+> per-issue `concurrency` group in place so an error storm can't burn your quota.
 
 ### 2. Deploy the relay
 
