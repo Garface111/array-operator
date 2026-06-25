@@ -4405,7 +4405,7 @@
     // highlighted total. Which lines appear is driven by the plan's entitlements
     // (so a "both" tenant sees both). NEPOOL keeps a single per-array line.
     const feats = (_account && _account.plan_features) || {};
-    const isAO = (basis === "kwh" || basis === "invoicing");
+    const isAO = (basis === "kwh" || basis === "invoicing" || basis === "both");
     const billLine = (kind, calc, amt) =>
       `<div class="ao-bill-line"><span class="bl-k"><b>${esc(kind)}</b><span class="bl-calc">${calc}</span></span><span class="bl-v">${amt}</span></div>`;
     let lines = "", total = 0;
