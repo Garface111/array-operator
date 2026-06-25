@@ -10,18 +10,25 @@ unique constraint "uq_daily_array_day"` on `POST /v1/array-owners/inverter-captu
 
 ## How it flows
 
+There are two triggers; **the poller needs no server and is the recommended one.**
+
+**A) Scheduled poller (zero infrastructure — recommended)**
 ```
-Sentry Issue Alert (webhook action)
-   │  POST, HMAC-signed
-   ▼
-relay.py  ──►  GitHub repository_dispatch  (event_type = "sentry-issue")
-                       │  client_payload = normalized brief
-                       ▼
-        .github/workflows/sentry-autofix.yml
-                       │  build_prompt.py renders the agent prompt
-                       ▼
-        anthropics/claude-code-action  (the agent: identify → fix → test → PR)
+GitHub Actions cron (every 15 min)  →  poll_sentry.py
+   reads the Sentry REST API for new unresolved errors
+   →  repository_dispatch (event_type = "sentry-issue")
+   →  .github/workflows/sentry-autofix.yml
+   →  anthropics/claude-code-action  (identify → fix → test → PR)
 ```
+
+**B) Webhook relay (lower latency — optional, needs a host)**
+```
+Sentry Issue Alert (webhook action)  →  relay.py (HMAC-verified)
+   →  repository_dispatch  →  same autofix workflow as above
+```
+
+Both feed the same `sentry-autofix.yml`. Pick A for hands-off setup; add B later
+if you want near-instant fixes instead of up-to-15-minute latency.
 
 ## Files
 
@@ -33,21 +40,43 @@ relay.py  ──►  GitHub repository_dispatch  (event_type = "sentry-issue")
 | `test_sentry_brief.py` | Tests, including the real `uq_daily_array_day` payload. |
 | `../../.github/workflows/sentry-autofix.yml` | The GitHub Actions job that runs the agent. |
 
-## Setup
+## Setup — fully automated path (poller)
 
-### 1. GitHub secrets (repo → Settings → Secrets → Actions)
+This is everything needed for "all Sentry errors flow through the system." No
+server to run; GitHub does the polling.
+
+### 1. Secrets — repo → Settings → Secrets and variables → Actions → **Secrets**
 
 | Secret | Purpose |
 | --- | --- |
-| `CLAUDE_CODE_OAUTH_TOKEN` | **Recommended.** Uses your Claude Pro/Max **subscription** instead of metered API billing. Generate locally with `claude setup-token` and paste the result. The token expires periodically — regenerate and update the secret when it does. |
-| `ANTHROPIC_API_KEY` | Alternative to the OAuth token: a metered Anthropic API key. Used only if `CLAUDE_CODE_OAUTH_TOKEN` is unset. Provide **one** of these two. |
-| `AUTOFIX_GH_TOKEN` | PAT with `repo` + `workflow` scope. Needed so the agent can open PRs (and to fix a **different** target repo, e.g. the backend). Falls back to the default `GITHUB_TOKEN` for same-repo fixes. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Recommended.** Runs the agent on your Claude Pro/Max **subscription** instead of metered API billing. Generate locally with `claude setup-token` and paste the printed token. Expires periodically — regenerate and update when it does. |
+| `ANTHROPIC_API_KEY` | Alternative to the OAuth token (metered API key). Used only if the OAuth token is unset. Provide **one** of these two. |
+| `SENTRY_AUTH_TOKEN` | Sentry token with **project:read + event:read**. Create at Sentry → Settings → Account → Auth Tokens (or an Org Internal Integration token). Lets the poller read your errors. |
+| `AUTOFIX_GH_TOKEN` | **Required for the poller.** A fine-grained or classic PAT with `repo` + `workflow` scope. GitHub deliberately blocks events fired with the default `GITHUB_TOKEN` from triggering other workflows, so the poller's `repository_dispatch` needs a PAT to start the autofix run. The same token lets the agent open PRs (and fix a different target repo). |
 
-> **Subscription vs API key.** With `CLAUDE_CODE_OAUTH_TOKEN`, automated runs draw
-> on your Claude Code usage limits — keep `AUTOFIX_MIN_LEVEL` and the workflow's
-> per-issue `concurrency` group in place so an error storm can't burn your quota.
+### 2. Variables — same page → **Variables** tab
 
-### 2. Deploy the relay
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `SENTRY_ORG` | `your-org-slug` | Sentry organization slug. |
+| `SENTRY_PROJECT` | `python-fastapi` | Sentry project slug to watch. |
+| `SENTRY_QUERY` | `is:unresolved level:error` | (optional) which issues qualify. |
+| `SENTRY_LOOKBACK` | `1h` | (optional) only consider issues seen in this window. |
+| `AUTOFIX_TARGET_REPO` | `owner/backend-repo` | (optional) the repo the agent should **fix**, if it isn't this one. The errors in the screenshot live in the FastAPI backend, so set this to that repo. |
+
+That's it. The poller (`.github/workflows/sentry-poll.yml`) runs every 15 minutes,
+finds new errors, and opens a fix PR for each — deduped so the same issue never
+gets two PRs. Tune the cadence by editing the `cron` line.
+
+> **Subscription usage.** With `CLAUDE_CODE_OAUTH_TOKEN`, automated runs draw on
+> your Claude Code limits. `SENTRY_MAX_ISSUES` (default 5/run), `SENTRY_QUERY`,
+> and the per-issue `concurrency` group keep an error storm from burning quota.
+
+## Setup — optional low-latency path (webhook relay)
+
+Skip this unless you want sub-minute fixes instead of the poller's ≤15 min.
+
+### Deploy the relay
 
 Pick one:
 
@@ -72,7 +101,7 @@ Relay environment variables:
 | `AUTOFIX_TARGET_REPO` | — | Repo the agent should actually fix, if different (e.g. `garface111/python-fastapi-backend`). |
 | `AUTOFIX_MIN_LEVEL` | `error` | Skip issues below this level (`debug`/`info`/`warning`/`error`/`fatal`). |
 
-### 3. Wire up Sentry
+### Point Sentry at the relay
 
 1. **Settings → Developer Settings → New Internal Integration.**
 2. Webhook URL: `https://<your-host>/sentry/webhook`. Enable the **issue & error** webhooks. Copy the **Client Secret** into `SENTRY_CLIENT_SECRET`.

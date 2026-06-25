@@ -37,7 +37,10 @@ try:  # FastAPI is optional — the verify/dispatch helpers work without it.
 except Exception:  # pragma: no cover - import guard for non-FastAPI use
     router = None
 
-from .sentry_brief import build_brief
+try:
+    from .sentry_brief import build_brief
+except ImportError:  # imported flat (e.g. by poll_sentry or the workflow)
+    from sentry_brief import build_brief
 
 GITHUB_API = "https://api.github.com"
 _LEVEL_RANK = {"debug": 0, "info": 1, "warning": 2, "error": 3, "fatal": 4}

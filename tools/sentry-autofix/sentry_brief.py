@@ -39,19 +39,44 @@ def _get(d: Any, *path: str, default: Any = None) -> Any:
     return cur if cur is not None else default
 
 
+def _lift_entries(event: dict) -> dict:
+    """Sentry's REST API nests exception/request under `entries`, not at top level.
+
+    The webhook payload uses event["exception"]["values"] and event["request"];
+    the API's `events/latest/` endpoint uses event["entries"] = [{type, data}].
+    Normalize the API shape into the webhook shape so the rest of this module
+    has a single code path. Returns the event unchanged if it has no entries.
+    """
+    entries = event.get("entries")
+    if not isinstance(entries, list):
+        return event
+    lifted = dict(event)
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        etype, data = entry.get("type"), entry.get("data")
+        if etype == "exception" and isinstance(data, dict) and "exception" not in lifted:
+            lifted["exception"] = data            # data == {"values": [...]}
+        elif etype == "request" and isinstance(data, dict) and "request" not in lifted:
+            lifted["request"] = data
+    return lifted
+
+
 def _extract_event(payload: dict) -> dict:
     """Find the event/issue dict inside whatever shape Sentry sent."""
     data = payload.get("data") if isinstance(payload, dict) else None
     if isinstance(data, dict):
         if isinstance(data.get("event"), dict):
-            return data["event"]
+            return _lift_entries(data["event"])
         if isinstance(data.get("issue"), dict):
-            return data["issue"]
+            return _lift_entries(data["issue"])
         if isinstance(data.get("error"), dict):
-            return data["error"]
-    # Legacy / flat payloads: the event *is* the top level.
-    if isinstance(payload, dict) and (payload.get("event_id") or payload.get("exception")):
-        return payload
+            return _lift_entries(data["error"])
+    # Legacy / flat payloads, and REST API events: the event *is* the top level.
+    if isinstance(payload, dict) and (
+        payload.get("event_id") or payload.get("exception") or payload.get("entries")
+    ):
+        return _lift_entries(payload)
     return {}
 
 
