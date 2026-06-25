@@ -22,7 +22,8 @@ on:
 
 concurrency:
   # One auto-fix per distinct issue at a time; never cancel an in-flight fix.
-  group: sentry-autofix-${{ github.event.client_payload.issue_id || github.event.inputs.payload || github.run_id }}
+  # Manual runs key off run_id so each is independent.
+  group: sentry-autofix-${{ github.event.client_payload.issue_id || github.run_id }}
   cancel-in-progress: false
 
 permissions:
