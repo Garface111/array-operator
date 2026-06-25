@@ -689,6 +689,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .ao-bill-line .bl-k{ display:flex; flex-direction:column; gap:1px; }
 .ao-bill-line .bl-k b{ font-size:12.5px; color:#0f172a; font-weight:680; }
 .ao-bill-line .bl-calc{ font-size:11.5px; color:#64748b; }
+.ao-bill-line .bl-desc{ font-size:10.5px; color:#94a3b8; line-height:1.4; margin-top:2px; max-width:42ch; }
 .ao-bill-line .bl-v{ font-size:13.5px; font-weight:680; color:#0f172a; white-space:nowrap; }
 .ao-bill-total{ display:flex; justify-content:space-between; align-items:baseline; gap:14px;
   margin-top:5px; padding:9px 12px; border-radius:11px; background:#ecfdf5; border:1px solid #a7f3d0; }

@@ -4430,8 +4430,10 @@
     // (so a "both" tenant sees both). NEPOOL keeps a single per-array line.
     const feats = (_account && _account.plan_features) || {};
     const isAO = (basis === "kwh" || basis === "invoicing" || basis === "both");
-    const billLine = (kind, calc, amt) =>
-      `<div class="ao-bill-line"><span class="bl-k"><b>${esc(kind)}</b><span class="bl-calc">${calc}</span></span><span class="bl-v">${amt}</span></div>`;
+    const billLine = (kind, calc, amt, desc) =>
+      `<div class="ao-bill-line"><span class="bl-k"><b>${esc(kind)}</b><span class="bl-calc">${calc}</span>${desc?`<span class="bl-desc">${esc(desc)}</span>`:""}</span><span class="bl-v">${amt}</span></div>`;
+    const periodStart = pick(summary, ["period_start"], null);
+    const sinceTxt = periodStart ? ` (since ${fmtDate(periodStart)})` : "";
     let lines = "", total = 0;
     if(summary && isAO){
       // Use the entitlement when a plan's chosen; else infer from the active basis.
@@ -4444,7 +4446,8 @@
         total += c;
         lines += billLine("Generation",
           `${kwh.toLocaleString(undefined,{maximumFractionDigits:0})} kWh × ${rate.toLocaleString(undefined,{maximumFractionDigits:3})}&cent;/kWh`,
-          usdFromCents(c));
+          usdFromCents(c),
+          `Live fleet monitoring — metered on every kWh your arrays produced this billing month${sinceTxt}. Charged monthly to your card.`);
       }
       if(showInv){
         const n   = Number(pick(summary, ["offtaker_count"], 0));
@@ -4452,7 +4455,8 @@
         const c   = Number(pick(summary, ["invoicing_total_cents"], 0));
         total += c;
         lines += billLine("Offtaker invoices",
-          `${n} offtaker${n===1?"":"s"} × ${usdFromCents(per)}`, usdFromCents(c));
+          `${n} offtaker${n===1?"":"s"} × ${usdFromCents(per)}`, usdFromCents(c),
+          `A flat ${usdFromCents(per)} per offtaker you invoice. Charged monthly to your card.`);
       }
     } else if(summary){
       // NEPOOL — per array.
