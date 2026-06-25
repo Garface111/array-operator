@@ -152,8 +152,8 @@
 
   <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
-    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Dashboard</a>
-    <a class="tab" id="tabArrays" href="#arrays" role="tab">Vendor data</a>
+    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Health</a>
+    <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverter Dashboard</a>
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
@@ -207,7 +207,7 @@
        fleet-healthy %, $ recoverable, and the COMBINED "needs attention" list (every
        flagged inverter across the fleet, worst-first). Reuses command-center.js: it
        fills #fleetCommander (the health card) + #ccQueue (the attention queue). -->
-  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Dashboard">
+  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Health">
     <div class="dash-wrap">
       <div class="dash-head">
         <h2>Fleet health</h2>
@@ -227,12 +227,12 @@
   <!-- One job: the sandbox, almost full-screen, with a single pinned COMMANDER
        card that gives whole-fleet health at a glance. No KPI strip, no triage
        table, no sub-headers — just the at-a-glance health + the canvas. -->
-  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Vendor data">
+  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverter Dashboard">
 
     <!-- Sub-view toggle: SANDBOX (the spatial canvas) vs SPREADSHEET (every array
          as a row, grouped by vendor; expand a row to see its inverters). Both read
          the same FleetStore data; vendor-sheet.js flips between them. -->
-    <div class="vs-seg" role="group" aria-label="Vendor data view">
+    <div class="vs-seg" role="group" aria-label="Inverter Dashboard view">
       <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
       <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Spreadsheet</button>
     </div>
