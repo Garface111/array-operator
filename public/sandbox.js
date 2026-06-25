@@ -1884,11 +1884,9 @@
         </div>`;
     }).join("");
 
-    // Fleet-health CARD lives INSIDE the canvas as the FIRST card — it pans and
-    // zooms with the scene (a card in the sandbox), above the stacked arrays.
-    // command-center.js owns its content and renders into #fleetCommander by id;
-    // we (re)trigger that fill right after the canvas rebuild below.
-    const fleetCard = `<div class="sb-fleet-col" aria-label="Fleet health at a glance"><section id="fleetCommander"></section></div>`;
+    // Fleet-health card moved to the dedicated DASHBOARD tab (#fleetCommander lives in
+    // panelDashboard now). The sandbox is purely the spatial fleet tree.
+    const fleetCard = "";
     host.innerHTML = head + `<div class="sb-viewport"><div class="sb-canvas sb-orient-${getOrient()} sb-stream-${getStream()}">${fleetCard}${columns}</div></div>
       <div class="sb-foot" id="sbFoot">${DEFAULT_FOOT_HTML}</div>`;
     host.classList.remove("sb-mode-grid");
@@ -4545,6 +4543,7 @@
    * #fleet / #pricing links) resolves to Arrays for backward compatibility.
    * ==========================================================================*/
   const TABS = {
+    dashboard: { panel: "panelDashboard", tab: "tabDashboard" },
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
     trends:  { panel: "panelTrends",  tab: "tabTrends"  },
@@ -4553,9 +4552,10 @@
   function tabFromHash(){
     const h = location.hash;
     if(h === "#account") return "account";
+    if(h === "#arrays" || h === "#sandbox") return "arrays";
     if(h === "#trends")  return "trends";
     if(h === "#reports") return "reports";
-    return "arrays";   // #arrays + empty + legacy #sandbox/#dashboard/#fleet/#pricing/#audit
+    return "dashboard";   // #dashboard + empty + legacy aliases → owner health home
   }
 
   let _firstApply = true;
@@ -4569,7 +4569,12 @@
       if(tab)   tab.classList.toggle("active",   name === active);
     });
 
-    if(active === "arrays"){
+    if(active === "dashboard"){
+      // Owner health home — command-center.js fills #fleetCommander + #ccQueue + the
+      // production strip (#dashProd) from the shared FleetStore.
+      if(window.FleetStore) FleetStore.load();
+      if(window.__ccRender) window.__ccRender();
+    } else if(active === "arrays"){
       load();                                       // sandbox fleet tree
       // app.js auto-runs loadDashboard() once on parse; only re-run on later switches.
       if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
@@ -4590,7 +4595,7 @@
    * locked tab is greyed; clicking it offers an upgrade. Managed in Master Account.
    * ========================================================================== */
   let _entitlement = null;   // { plan, plan_chosen, vendor_data, invoicing } | null
-  const TAB_FEATURE = { arrays: "vendor_data", trends: "vendor_data", reports: "invoicing" };
+  const TAB_FEATURE = { dashboard: "vendor_data", arrays: "vendor_data", trends: "vendor_data", reports: "invoicing" };
   const PLAN_LABEL  = { monitoring: "Live vendor data", invoicing: "Offtaker invoices", both: "Both" };
   const FEAT_LABEL  = { vendor_data: "Live vendor data", invoicing: "Offtaker invoices" };
 

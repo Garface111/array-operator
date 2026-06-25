@@ -202,10 +202,44 @@
       if(typeof window.__sbOpenAlerts === "function") window.__sbOpenAlerts();
     };
 
-    // The triage queue still renders into its hidden container so other views that
-    // read MODEL stay in sync — but it's no longer surfaced on this tab.
+    // On the DASHBOARD tab, surface the combined attention queue (every flagged
+    // inverter across the fleet, worst-first); elsewhere keep it empty.
+    renderProdKpis();
     if(!q) return;
-    q.innerHTML = "";
+    if(_dashActive()) renderQueueLEGACY(); else q.innerHTML = "";
+  }
+
+  // Active only when the owner is on the Dashboard tab.
+  function _dashActive(){
+    const p = document.getElementById("panelDashboard");
+    return !!(p && p.classList.contains("active"));
+  }
+
+  // Live production strip on the Dashboard: fleet kW now · kWh today · arrays producing.
+  // Reads the SAME FleetStore.toColumns() the spreadsheet uses, so the numbers agree.
+  function kwFmt(w){
+    const k = (Number(w)||0)/1000;
+    return (k >= 10 ? Math.round(k) : Math.round(k*10)/10) + " kW";
+  }
+  function renderProdKpis(){
+    const el = document.getElementById("dashProd");
+    if(!el || !window.FleetStore || !FleetStore.toColumns) return;
+    let cols = [];
+    try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
+    let kw = 0, kwh = 0, producing = 0;
+    cols.forEach(c => {
+      // Array live power: prefer the array-level value (real backend), else sum the
+      // array's inverters (the demo fleet only carries per-inverter watts).
+      let p = c.current_power_w;
+      if(p == null) p = (c.inverters || []).reduce((t,i)=>t+(i.current_power_w||0),0);
+      kw += (p || 0);
+      if((p || 0) > 0) producing++;
+      if(c.produced_today_kwh != null) kwh += c.produced_today_kwh;
+    });
+    el.innerHTML =
+      `<span class="dp"><b>${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
+      `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
+      `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>`;
   }
 
   // legacy render kept for reference / other callers
@@ -457,6 +491,7 @@ Thank you,
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
+    renderProdKpis();   // keep the live production strip fresh on every beat
   }
 
   // React to the shared store: a "live" beat just repaints the numbers; any

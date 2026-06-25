@@ -152,6 +152,7 @@
 
   <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
+    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Dashboard</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Vendor data</a>
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
@@ -201,6 +202,23 @@
   <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
   <!-- All business: one flat list of horizontal rows — identity, login & billing.
        Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
+  <!-- ============================ TAB: DASHBOARD (owner health at a glance) ============================ -->
+  <!-- The owner's front door: whole-fleet health in one screen — production now/today,
+       fleet-healthy %, $ recoverable, and the COMBINED "needs attention" list (every
+       flagged inverter across the fleet, worst-first). Reuses command-center.js: it
+       fills #fleetCommander (the health card) + #ccQueue (the attention queue). -->
+  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Dashboard">
+    <div class="dash-wrap">
+      <div class="dash-head">
+        <h2>Fleet health</h2>
+        <div class="dash-prod" id="dashProd"></div>
+      </div>
+      <section id="fleetCommander"></section>
+      <div class="dash-attn"><h3 id="dashAttnH">Needs attention</h3></div>
+      <section id="ccQueue"></section>
+    </div>
+  </section>
+
   <section class="panel" id="panelAccount" role="tabpanel" aria-label="Master Account">
     <div class="acct-list" id="acctList"><div class="empty">Loading your account…</div></div>
   </section>
@@ -230,10 +248,6 @@
     <!-- SPREADSHEET — structured rows of every array by vendor (vendor-sheet.js →
          #vendorSheet). Hidden until the Spreadsheet sub-tab is selected. -->
     <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
-
-    <!-- Triage queue still renders (hidden) so other views can read its model,
-         but it's no longer surfaced on this tab — the sandbox IS the view. -->
-    <section id="ccQueue" hidden></section>
 
   </section>
 
