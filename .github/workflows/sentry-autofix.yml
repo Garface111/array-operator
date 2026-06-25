@@ -71,6 +71,9 @@ jobs:
           } >> "$GITHUB_ENV"
         env:
           PAYLOAD: ${{ toJSON(github.event.client_payload.brief) != 'null' && toJSON(github.event.client_payload.brief) || github.event.inputs.payload }}
+          # When set to true (repo Variable), the agent merges its own PR after
+          # verifying the fix — fully autonomous, no human review. Unset = PR only.
+          AUTOFIX_AUTOMERGE: ${{ vars.AUTOFIX_AUTOMERGE }}
           PYTHONPATH: .sentry-autofix-tools/tools/sentry-autofix
 
       - name: Run Claude Code agent (identify → fix → test → PR)

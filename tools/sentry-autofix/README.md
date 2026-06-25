@@ -63,6 +63,7 @@ server to run; GitHub does the polling.
 | `SENTRY_QUERY` | `is:unresolved level:error` | (optional) which issues qualify. |
 | `SENTRY_LOOKBACK` | `1h` | (optional) only consider issues seen in this window. |
 | `AUTOFIX_TARGET_REPO` | `owner/backend-repo` | (optional) the repo the agent should **fix**, if it isn't this one. The errors in the screenshot live in the FastAPI backend, so set this to that repo. |
+| `AUTOFIX_AUTOMERGE` | `true` | (optional) **autonomous mode.** When `true`, the agent squash-merges its own PR right after its regression test passes — no human review. Leave unset to keep the PR open for review. ⚠️ With no CI on the target repo, this ships AI-written fixes straight to the default branch; the only check is the agent's own test run. |
 
 That's it. The poller (`.github/workflows/sentry-poll.yml`) runs every 15 minutes,
 finds new errors, and opens a fix PR for each — deduped so the same issue never

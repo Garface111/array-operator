@@ -60,7 +60,7 @@ Work autonomously end-to-end: identify the root cause, fix it, prove it with a t
    - **Test:** what you added and the command + result proving it passes.
    - **Sentry:** {web_url}
    - A note if any step (e.g. running tests) could not be completed here.
-
+{automerge}
 ## Guardrails
 - If the stack trace points outside this repository, or the fix would require a
   large refactor or a schema migration, do NOT force a change: open a PR (or
@@ -106,10 +106,27 @@ def main() -> None:
 
     brief = _load_brief(args)
     branch = _branch_name(brief)
+
+    # Autonomous mode: when AUTOFIX_AUTOMERGE is truthy, the agent merges its own
+    # PR right after verifying the fix. This ships to the target repo's default
+    # branch with no human review, so it is opt-in via a repo Variable.
+    automerge = ""
+    if str(os.environ.get("AUTOFIX_AUTOMERGE", "")).strip().lower() in ("1", "true", "yes", "on"):
+        automerge = (
+            "\n7. **Merge automatically (autonomous mode is ON).** Only if you made a"
+            " confident code fix AND your regression test passed in step 5, merge the"
+            " PR you just opened immediately:\n"
+            "   `gh pr merge --squash --delete-branch --admin <pr-number>`\n"
+            "   Do NOT merge if you only produced a diagnosis, the trace points outside"
+            " this repo, the fix needs a migration/large refactor, or any test failed —"
+            " in those cases leave the PR open for a human and say why.\n"
+        )
+
     prompt = PROMPT_TEMPLATE.format(
         brief_md=brief_to_markdown(brief),
         branch=branch,
         web_url=brief.get("web_url") or "(no link)",
+        automerge=automerge,
     )
 
     prompt_file = os.path.join(args.out_dir, "sentry-autofix-prompt.md")
