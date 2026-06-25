@@ -1334,14 +1334,35 @@
     const list = $("#rbList");
     if (!list) return;
     try {
-      const [r, arrs, utilAccts] = await Promise.all([
-        fetch(API + "/subscriptions", { headers: authHeaders() }),
-        fetchArrays(),
-        fetchUtilityAccounts(),
-      ]);
-      if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
-      const data = await r.json().catch(() => ({}));
-      const subs = (data && data.subscriptions) || [];
+      // ONE round-trip: the offtaker list + the array & utility-account options
+      // its edit forms need. Falls back to the three individual endpoints if the
+      // bundle isn't available (older backend), so frontend + backend can deploy
+      // independently and an old cached app still works.
+      let subs, arrs, utilAccts, bundled = false;
+      try {
+        const rb = await fetch(API + "/list-bundle", { headers: authHeaders() });
+        if (rb.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
+        if (rb.ok) {
+          const d = await rb.json().catch(() => ({}));
+          if (d && d.ok) {
+            subs = d.subscriptions || [];
+            arrs = ARRAYS = (d.arrays || []).filter(a => a.id != null);   // prime the shared arrays cache
+            utilAccts = (d.utility_accounts || []).filter(a => a.utility_account_id != null);
+            bundled = true;
+          }
+        }
+      } catch (e) { /* fall through to the legacy three-call path */ }
+      if (!bundled) {
+        const [r, a2, u2] = await Promise.all([
+          fetch(API + "/subscriptions", { headers: authHeaders() }),
+          fetchArrays(),
+          fetchUtilityAccounts(),
+        ]);
+        if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
+        const data = await r.json().catch(() => ({}));
+        subs = (data && data.subscriptions) || [];
+        arrs = a2; utilAccts = u2;
+      }
       if (!subs.length) {
         list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
         return;
