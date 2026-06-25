@@ -2216,10 +2216,7 @@
                <label class="rb-gmp-upload-link" title="Replace the attached GMP bill PDF">Replace<input type="file" accept="application/pdf,.pdf" data-gmpupload="${d.id}" hidden></label>
                <span class="rb-gmp-upload-stat"></span>
              </div>`
-          : `<div class="rb-gmp-manual rb-gmp-manual-empty">
-               <label class="rb-gmp-upload-link" title="Attach the GMP bill PDF yourself if it hasn't been captured automatically yet">⬆ Upload the GMP bill PDF<input type="file" accept="application/pdf,.pdf" data-gmpupload="${d.id}" hidden></label>
-               <span class="rb-gmp-upload-stat"></span>
-             </div>`}
+          : ""}
       </div>`;
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
