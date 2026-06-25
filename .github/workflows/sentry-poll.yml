@@ -1,0 +1,44 @@
+name: Sentry Poll
+
+# Zero-infrastructure trigger: instead of hosting the webhook relay, this job
+# polls the Sentry API on a schedule and dispatches an auto-fix for each NEW
+# error (deduped by deterministic fix-branch name). See tools/sentry-autofix/README.md.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch: {}        # allow a manual poll from the Actions tab
+
+concurrency:
+  group: sentry-poll
+  cancel-in-progress: true
+
+permissions:
+  contents: read     # repository_dispatch is sent with the token below, not GITHUB_TOKEN
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/sentry-autofix
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Poll Sentry and dispatch fixes
+        run: python tools/sentry-autofix/poll_sentry.py
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_QUERY: ${{ vars.SENTRY_QUERY }}
+          SENTRY_LOOKBACK: ${{ vars.SENTRY_LOOKBACK }}
+          AUTOFIX_TARGET_REPO: ${{ vars.AUTOFIX_TARGET_REPO }}
+          # PAT preferred so dispatched runs (and the agent's PRs) aren't blocked
+          # by the default-token restriction; falls back to GITHUB_TOKEN.
+          GITHUB_TOKEN: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
