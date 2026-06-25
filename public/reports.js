@@ -86,40 +86,79 @@
   function root() { return document.getElementById("reportsRoot"); }
 
   // ---- top-level entry -------------------------------------------------------
-  async function load() {
+  // load() runs on every Reports tab activation. It used to rebuild the whole
+  // shell + re-fetch everything (including the heavy invoice-template PDF
+  // preview) on EVERY visit — so the tab visibly "reloaded" each time. It's now
+  // idempotent: build the shell + wire handlers ONCE, render the heavy template
+  // preview once (and only when the tab is actually viewed, not during an idle
+  // prefetch), and never re-blank an already-rendered tab — just a quiet
+  // background data refresh when the cached data has gone stale. Result: instant
+  // on revisit, and instant on first open when warmed during idle (see below).
+  let _dataAt = 0;
+  let _tplWired = false;
+  const DATA_TTL_MS = 45000;
+  async function load(opts) {
     const el = root();
     if (!el) return;
     if (!authHeaders()) {
       el.innerHTML = signInPrompt();
+      el.dataset.rbBuilt = "";
+      _dataAt = 0; _tplWired = false;
       return;
     }
-    // The guided setup wizard was removed — the operator works the tab directly:
-    // set the global rate, "＋ Add an offtaker", and link GMP bills, all inline.
-    el.innerHTML = shell();
-    wireSubtabs();
-    wireGlobalRate();
-    wireInvoiceTemplate();
-    // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
-    // spreadsheet); the upload zone + live doc-preview live inside that panel
-    // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
-    MANUAL_HOST_ID = "rbCustManual";
-    MANUAL_AFTER_ADD = refreshList;
-    MANUAL_OPEN = false;
-    const addBtn = $("#rbCustAdd");
-    if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
-    // "Link GMP utility bills" — launches the REAL GMP connect flow (opens
-    // greenmountainpower.com; the extension captures + lands the bills here).
-    // Offtaker invoices bill from these utility bills only, so this is how the
-    // operator gets bills to link an offtaker to. Reuses the same flow as the
-    // onboarding gate's "Connect GMP" CTA (window.__aoConnectGmp).
-    const linkGmpBtn = $("#rbLinkGmp");
-    if (linkGmpBtn) linkGmpBtn.onclick = () => {
-      if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
-      else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
-    };
-    await Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus()]);
+    const prefetch = !!(opts && opts.prefetch);
+    const built = el.dataset.rbBuilt === "1" && document.getElementById("rbList");
+    if (!built) {
+      // The guided setup wizard was removed — the operator works the tab
+      // directly: set the global rate, "＋ Add an offtaker", and link GMP bills.
+      el.innerHTML = shell();
+      wireSubtabs();
+      wireGlobalRate();
+      // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
+      // spreadsheet); the upload zone + live doc-preview live inside that panel
+      // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
+      MANUAL_HOST_ID = "rbCustManual";
+      MANUAL_AFTER_ADD = refreshList;
+      MANUAL_OPEN = false;
+      const addBtn = $("#rbCustAdd");
+      if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
+      // "Link GMP utility bills" — launches the REAL GMP connect flow (opens
+      // greenmountainpower.com; the extension captures + lands the bills here).
+      // Offtaker invoices bill from these utility bills only, so this is how the
+      // operator gets bills to link an offtaker to. Reuses the same flow as the
+      // onboarding gate's "Connect GMP" CTA (window.__aoConnectGmp).
+      const linkGmpBtn = $("#rbLinkGmp");
+      if (linkGmpBtn) linkGmpBtn.onclick = () => {
+        if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
+        else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
+      };
+      el.dataset.rbBuilt = "1";
+    }
+    // Heavy invoice-template preview: wire ONCE, and only when the tab is really
+    // being viewed (skip during an idle prefetch so we never render a PDF for
+    // users who never open Reports).
+    if (!_tplWired && !prefetch) { _tplWired = true; wireInvoiceTemplate(); }
+    // Data sections: fill on first build; quiet background refresh when the cache
+    // is stale. Fire-and-forget so the tab paints instantly (refreshList et al.
+    // fetch-then-fill in place, so this never re-blanks a rendered tab).
+    if (!built || (Date.now() - _dataAt) > DATA_TTL_MS) {
+      _dataAt = Date.now();
+      Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus()]).catch(() => {});
+    }
   }
   window.__aoLoadReports = load;
+
+  // Warm the tab during browser idle so the FIRST open is instant too: prebuild
+  // the shell + prefetch the data into the (hidden) panel ahead of any click.
+  // The heavy template preview still defers to the first real view. Gated on a
+  // signed-in session; harmless (and cheap) if the user never opens Reports.
+  try {
+    if (authHeaders()) {
+      const warm = () => { try { if (root() && root().dataset.rbBuilt !== "1") load({ prefetch: true }); } catch (e) {} };
+      if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 3000 });
+      else setTimeout(warm, 1500);
+    }
+  } catch (e) {}
 
   // Let a GMP capture landing (sandbox.js fires __aoRefreshGmpGate) also refresh
   // the bills status + the offtaker utility-bill picker, so the operator sees the
