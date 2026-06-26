@@ -298,11 +298,19 @@
   function renderProdKpis(){
     const el = document.getElementById("dashProd");
     if(!el || !window.FleetStore || !FleetStore.toColumns) return;
-    // Before the fleet tree lands, show a calm "loading" line instead of a blank
-    // strip that reads as a broken/empty dashboard. (The FleetStore subscribe
-    // re-runs render() once data arrives, replacing this.)
+    // Before the fleet tree lands, show a shimmer skeleton that mirrors the final
+    // 3-segment layout (kW now · kWh today · arrays producing) instead of a blank
+    // strip or a bare text line — so the loading state previews the shape that's
+    // coming and the numbers don't jump the layout when they arrive. (The
+    // FleetStore subscribe re-runs render() once data lands, replacing this.)
     if(FleetStore.isLoaded && !FleetStore.isLoaded()){
-      el.innerHTML = `<span class="dp dp-loading">Loading your fleet…</span>`;
+      el.innerHTML =
+        `<span class="dp dp-skel" aria-hidden="true"><span class="dp-skel-bar w-kw"></span></span>` +
+        `<span class="dp-dot">·</span>` +
+        `<span class="dp dp-skel" aria-hidden="true"><span class="dp-skel-bar w-kwh"></span></span>` +
+        `<span class="dp-dot">·</span>` +
+        `<span class="dp dp-skel" aria-hidden="true"><span class="dp-skel-bar w-arr"></span></span>` +
+        `<span class="dp-sr">Loading your fleet…</span>`;
       return;
     }
     let cols = [];

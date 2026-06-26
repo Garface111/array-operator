@@ -856,6 +856,12 @@ html[data-theme="day"] #panelDashboard .dash-prod .dp{
   border-radius:12px !important; font-size:12px !important; color:var(--muted) !important;
   box-shadow:0 1px 2px rgba(15,23,42,.05) !important; }
 html[data-theme="day"] #panelDashboard .dash-prod .dp b{ font-size:15.5px !important; font-weight:760 !important; color:var(--ink) !important; letter-spacing:-.01em !important; font-variant-numeric:tabular-nums !important; }
+/* Loading skeleton in day mode: the .dp pill is white, so the night white-on-white
+   shimmer is invisible — repaint the bars dark-on-light. */
+html[data-theme="day"] #panelDashboard .dash-prod .dp-skel{ padding:8px 15px !important; }
+html[data-theme="day"] #panelDashboard .dash-prod .dp-skel-bar{
+  background:linear-gradient(90deg, rgba(15,23,42,.06) 25%, rgba(15,23,42,.13) 37%, rgba(15,23,42,.06) 63%) !important;
+  background-size:280% 100% !important; }
 
 /* — HERO HEALTH CARD — layered depth, big gradient %, refined cluster — */
 html[data-theme="day"] #panelDashboard .fc-card{
