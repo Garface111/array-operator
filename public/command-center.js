@@ -205,6 +205,15 @@
     // On the DASHBOARD tab, surface the combined attention queue (every flagged
     // inverter across the fleet, worst-first); elsewhere keep it empty.
     renderProdKpis();
+    // Relabel the attention header so a clean fleet doesn't sit under a "Needs
+    // attention" heading over an empty list — read it as the all-clear it is.
+    const attnH = document.getElementById("dashAttnH");
+    if(attnH){
+      const loaded = !(window.FleetStore && FleetStore.isLoaded && !FleetStore.isLoaded());
+      attnH.textContent = !loaded ? "Needs attention"
+        : (k.flagged ? "Needs attention" : "All clear — nothing needs attention 🌞");
+      attnH.classList.toggle("all-clear", loaded && !k.flagged);
+    }
     if(!q) return;
     if(_dashActive()) renderQueueLEGACY(); else q.innerHTML = "";
   }
@@ -224,6 +233,13 @@
   function renderProdKpis(){
     const el = document.getElementById("dashProd");
     if(!el || !window.FleetStore || !FleetStore.toColumns) return;
+    // Before the fleet tree lands, show a calm "loading" line instead of a blank
+    // strip that reads as a broken/empty dashboard. (The FleetStore subscribe
+    // re-runs render() once data arrives, replacing this.)
+    if(FleetStore.isLoaded && !FleetStore.isLoaded()){
+      el.innerHTML = `<span class="dp dp-loading">Loading your fleet…</span>`;
+      return;
+    }
     let cols = [];
     try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
     let kw = 0, kwh = 0, producing = 0;
