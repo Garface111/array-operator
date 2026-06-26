@@ -1926,11 +1926,28 @@
       (_, k) => (k in v && v[k] != null) ? esc(String(v[k])) : "");
   }
 
+  // True if draft a is NEWER than b — by billing period, then created_at, then id.
+  // period_label is "YYYY-MM-DD → YYYY-MM-DD", so a lexical compare ranks later periods
+  // higher; a null/placeholder period sorts below any real one.
+  function _draftNewer(a, b) {
+    const ka = [String(a.period_label || ""), String(a.created_at || ""), Number(a.id) || 0];
+    const kb = [String(b.period_label || ""), String(b.created_at || ""), Number(b.id) || 0];
+    for (let i = 0; i < ka.length; i++) { if (ka[i] > kb[i]) return true; if (ka[i] < kb[i]) return false; }
+    return false;
+  }
+
   // Build the dropdown's offtaker list + the subscription->draft index from a fetch.
   function _indexInbox(drafts, subs) {
     INBOX_DRAFTS = drafts;
     DRAFT_BY_SUB = {};
-    drafts.forEach(d => { if (d.subscription_id != null) DRAFT_BY_SUB[String(d.subscription_id)] = d; });
+    // An offtaker can have >1 pending draft (a new period's draft + a stale older one).
+    // Index the NEWEST per offtaker so the inbox auto-switches to the latest draft and
+    // never surfaces a superseded bill (Paul Bozuwa: a May $3,167 draft in front of June).
+    drafts.forEach(d => {
+      if (d.subscription_id == null) return;
+      const k = String(d.subscription_id);
+      if (!DRAFT_BY_SUB[k] || _draftNewer(d, DRAFT_BY_SUB[k])) DRAFT_BY_SUB[k] = d;
+    });
     // Dropdown rows = every enabled offtaker, PLUS any (even disabled) that has a
     // pending draft so a queued report is never stranded.
     const rows = (subs || []).filter(s => s.enabled !== false || DRAFT_BY_SUB[String(s.id)]);
