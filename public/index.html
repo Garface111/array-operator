@@ -335,12 +335,17 @@
   #fsSend{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:600}
   #fsSend:hover{background:rgba(52,216,150,.08)}
   #fsMsg{font-size:12px;margin-top:8px;min-height:1em}
+  /* Keyboard focus: a clear octarine-leaning ring so tabbing through the widget is
+     visible (mouse clicks stay clean via :focus-visible). */
+  #fsBtn:focus-visible,#fsText:focus-visible,#fsSend:focus-visible,#fsCancel:focus-visible{
+    outline:2px solid var(--good,#34d896);outline-offset:2px;border-radius:9px}
+  #fsText:focus-visible{outline-offset:1px}
 </style>
 <div id="fsWrap">
-  <div id="fsPanel" role="dialog" aria-label="Suggest a feature">
-    <h4>We're always building.</h4>
+  <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle" aria-label="Suggest a feature">
+    <h4 id="fsTitle">We're always building.</h4>
     <p>Our team is always listening to feedback.</p>
-    <textarea id="fsText" placeholder="What would make Array Operator better for you?"></textarea>
+    <textarea id="fsText" aria-label="Your feature suggestion" placeholder="What would make Array Operator better for you?"></textarea>
     <div id="fsMsg"></div>
     <div id="fsRow">
       <button id="fsCancel" type="button">Cancel</button>
@@ -356,9 +361,27 @@
       cancel=document.getElementById("fsCancel"), msg=document.getElementById("fsMsg");
   if(!btn) return;
   try{ if(!localStorage.getItem("so_session")){ var _w=document.getElementById("fsWrap"); if(_w) _w.style.display="none"; return; } }catch(e){}
-  function open(o){ panel.classList.toggle("open", o); btn.setAttribute("aria-expanded", o?"true":"false"); if(o){ msg.textContent=""; setTimeout(function(){ txt.focus(); }, 30); } }
+  function open(o){
+    panel.classList.toggle("open", o);
+    btn.setAttribute("aria-expanded", o?"true":"false");
+    if(o){ msg.textContent=""; setTimeout(function(){ txt.focus(); }, 30); }
+    else { btn.focus(); }   // return focus to the trigger on close (a11y)
+  }
   btn.onclick=function(){ open(!panel.classList.contains("open")); };
   cancel.onclick=function(){ open(false); };
+  // Keyboard: Escape dismisses the dialog; Tab/Shift+Tab is trapped within the panel
+  // while it's open so focus can't escape to the page behind it (aria-modal contract).
+  panel.addEventListener("keydown", function(e){
+    if(!panel.classList.contains("open")) return;
+    if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); open(false); return; }
+    if(e.key==="Tab"){
+      var f=[txt,cancel,send].filter(function(el){ return el && !el.disabled; });
+      if(!f.length) return;
+      var first=f[0], last=f[f.length-1], a=document.activeElement;
+      if(e.shiftKey && (a===first || !panel.contains(a))){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && a===last){ e.preventDefault(); first.focus(); }
+    }
+  });
   send.onclick=function(){
     var t=(txt.value||"").trim();
     if(!t){ msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Type a suggestion first."; return; }
