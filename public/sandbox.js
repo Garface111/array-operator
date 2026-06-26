@@ -3967,10 +3967,17 @@
   async function loadAcctFiles(){
     const body=document.getElementById("acctFilesBody"), countEl=document.getElementById("acctFilesCount");
     if(!body) return;
-    let files=[];
+    let files=[], failed=false;
     try{ const r=await fetch("/v1/array-operator/billing/files",{headers:authHeaders()});
-      const d=await r.json().catch(()=>({})); if(r.ok)files=Array.isArray(d.files)?d.files:[];
-    }catch(e){}
+      const d=await r.json().catch(()=>({})); if(r.ok)files=Array.isArray(d.files)?d.files:[]; else failed=true;
+    }catch(e){ failed=true; }
+    // Hard fetch failure (network / 5xx) must NOT read as "No files yet" — show an
+    // honest error with an inline retry (re-runs loadAcctFiles, no page refresh).
+    if(failed){
+      if(countEl)countEl.textContent="";
+      body.innerHTML=`<div class="rb-files-empty">Couldn't load your files — <a href="#" onclick="window.__aoReloadFiles && window.__aoReloadFiles(); return false;">try again</a>.</div>`;
+      return;
+    }
     if(countEl)countEl.textContent=files.length?`${files.length} file${files.length===1?"":"s"}`:"";
     if(!files.length){ body.innerHTML=`<div class="rb-files-empty">No files yet. Upload an invoice template on the Reports tab, add a billing workbook, or connect GMP — your invoice, workbook, and utility-bill files collect here.</div>`; return; }
     const feat=files[0], rest=files.slice(1);
@@ -4430,8 +4437,22 @@
     if(!box) return;
 
     let summary = null, invoice = null;
-    try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); } catch(e){}
-    try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); } catch(e){}
+    // Track HARD failures (network / 5xx) separately from a legit empty bill. A
+    // 200 with no charges is "No charges yet"; a thrown fetch / !ok on BOTH calls
+    // is a real load failure and must not masquerade as "No charges yet."
+    let sumFailed = false, invFailed = false;
+    try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); else sumFailed = true; } catch(e){ sumFailed = true; }
+    try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); else invFailed = true; } catch(e){ invFailed = true; }
+
+    // Both endpoints failed → show an honest error + retry instead of a misleading
+    // "No charges yet." Retry re-runs renderBilling with fresh headers, so the
+    // owner recovers without a full page refresh.
+    if(sumFailed && invFailed){
+      window.__aoRetryBilling = () => { try { renderBilling(authHeaders()); } catch(e){} };
+      box.innerHTML =
+        `<div class="ao-bill-empty">Couldn't load billing — <a href="#" onclick="window.__aoRetryBilling && window.__aoRetryBilling(); return false;">refresh to retry</a>.</div>`;
+      return;
+    }
 
     // Amounts from billing-summary are in (possibly fractional) CENTS.
     const usdFromCents = c => (c==null ? "—" : "$" + (Number(c)/100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
