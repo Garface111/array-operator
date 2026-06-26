@@ -319,6 +319,16 @@
         </button>`;
         if (open) {
           h += `<div class="vs-inv-wrap">`;
+          // Stale feed recovery: when this array's source is paused, give a direct
+          // path back to fresh data right where the owner notices it — open the
+          // vendor portal (extension re-captures on open). Reuses the existing
+          // [data-vportal] click delegation, so no extra handler is wired.
+          if (isStale(c) && _portal) {
+            h += `<div class="vs-src-recover">
+              <span class="vs-src-recover-txt">Your ${esc(vlabel(v))} feed paused — readings here are from ${esc(freshness(c))}. Open the portal to sync the latest.</span>
+              <button type="button" class="vs-src-recover-btn" data-vportal="${esc(v)}">↗ Open ${esc(vlabel(v))} to sync</button>
+            </div>`;
+          }
           const invs = c.inverters || [];
           if (!invs.length) {
             h += `<div class="vs-inv-empty">No inverters captured for this array yet.</div>`;
