@@ -6,6 +6,13 @@
     --green-deep:#3fd68a;
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  /* Global keyboard-focus ring (default/night theme). theme-day.css already ships
+     the day-mode equivalent; this is its night counterpart so EVERY focusable
+     control — primary CTAs (Open dashboard, Connect GMP, Add a card), modal close
+     buttons, segment toggles, links — gets a consistent, visible focus indicator
+     for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
+  :focus-visible{outline:2px solid rgba(94,194,255,.6);outline-offset:2px}
+  .ao-modal-close:focus-visible,.sb-modal-x:focus-visible,.sb-alerts-x:focus-visible{outline-offset:1px;border-radius:6px}
   /* Native form-control popups (dropdown <option> lists, date pickers, etc.)
      must render dark to match the theme — without this, browsers paint the
      option list white. color-scheme flips the native widget to dark; the
