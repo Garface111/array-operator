@@ -354,7 +354,7 @@ Thank you,
          style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:8px;background:#fff;cursor:pointer;font-weight:600;">Copy to clipboard</button>
        <button class="ao-btn ao-btn-primary" id="ao-mail" type="button"
          style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Open in email</button>`,
-    onMount(root){
+    onMount(root, close){
       const note = root.querySelector("#ao-claim-note");
       const getVals = () => ({
         to: root.querySelector("#ao-to").value,
@@ -369,8 +369,10 @@ Thank you,
           note.textContent = "Copied — paste it into your email client.";
           note.className = "ao-note ok";
         }catch(e){
-          // fallback: select the textarea contents
-          const ta = root.querySelector("#ao-body"); ta.focus(); ta.select();
+          // fallback: select the textarea contents (guard — the node may be gone
+          // if the modal was torn down or the DOM changed under us)
+          const ta = root.querySelector("#ao-body");
+          if(ta){ ta.focus(); ta.select(); }
           note.textContent = "Couldn't auto-copy — the draft is selected, press ⌘/Ctrl-C.";
           note.className = "ao-note err";
         }
@@ -383,6 +385,9 @@ Thank you,
         window.location.href = href;
         note.textContent = "Opening your email client…";
         note.className = "ao-note ok";
+        // Hand off to the email client, then close the overlay so it doesn't sit
+        // stuck on top blocking the page while the user finishes the email.
+        setTimeout(() => { try{ close(); }catch(e){} }, 400);
       };
     }
   });
