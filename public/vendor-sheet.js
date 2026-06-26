@@ -462,6 +462,12 @@
     }
   };
 
+  // Expose the canonical freshness check so other surfaces (e.g. the Dashboard's
+  // "kW now" production strip in command-center.js) agree with the spreadsheet on
+  // which feeds are frozen — a single source of truth for "is this reading stale".
+  window.VendorSheet = window.VendorSheet || {};
+  window.VendorSheet.isStale = isStale;
+
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })();

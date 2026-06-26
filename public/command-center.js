@@ -276,6 +276,22 @@
     const k = (Number(w)||0)/1000;
     return (k >= 10 ? Math.round(k) : Math.round(k*10)/10) + " kW";
   }
+  // Is this array's reading frozen (feed paused, e.g. a lapsed portal session)?
+  // Prefer the spreadsheet's canonical isStale so the two surfaces never disagree;
+  // fall back to a self-contained check (vendor live-window vs source age) if the
+  // vendor-sheet module hasn't loaded. A stale array's current_power_w is a frozen
+  // number, not live output — it must not inflate the headline "kW now".
+  const _CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
+  function _isStale(c){
+    if(window.VendorSheet && typeof window.VendorSheet.isStale === "function"){
+      try { return window.VendorSheet.isStale(c); } catch(_){}
+    }
+    const h = (c.source_status || {}).age_hours;
+    if(h == null) return false;
+    const cad = _CADENCE_MIN[(c.vendor || "").toLowerCase()];
+    const liveWindowMin = cad ? cad * 2 : 360;
+    return h * 60 >= liveWindowMin;
+  }
   function renderProdKpis(){
     const el = document.getElementById("dashProd");
     if(!el || !window.FleetStore || !FleetStore.toColumns) return;
@@ -288,20 +304,29 @@
     }
     let cols = [];
     try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
-    let kw = 0, kwh = 0, producing = 0;
+    let kw = 0, kwh = 0, producing = 0, stale = 0;
     cols.forEach(c => {
+      // A frozen feed's reading isn't live power — exclude it from "kW now" and the
+      // producing count so the headline matches the dimmed/stale rows in the sheet.
+      // (kWh-today still accrues from the last real cumulative reading, so we keep
+      // it — only the instantaneous "now" power is the one that goes false-live.)
+      const frozen = _isStale(c);
+      if(frozen) stale++;
       // Array live power: prefer the array-level value (real backend), else sum the
       // array's inverters (the demo fleet only carries per-inverter watts).
       let p = c.current_power_w;
       if(p == null) p = (c.inverters || []).reduce((t,i)=>t+(i.current_power_w||0),0);
-      kw += (p || 0);
-      if((p || 0) > 0) producing++;
+      if(!frozen){
+        kw += (p || 0);
+        if((p || 0) > 0) producing++;
+      }
       if(c.produced_today_kwh != null) kwh += c.produced_today_kwh;
     });
     el.innerHTML =
       `<span class="dp"><b>${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
-      `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>`;
+      `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>` +
+      (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``);
   }
 
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
