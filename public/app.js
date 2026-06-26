@@ -52,10 +52,13 @@ const fmt = n => n==null ? "—" : Number(n).toLocaleString(undefined,{maximumFr
 function spark(daily, color){
   if(!daily || !daily.length) return "";
   const w=300,h=40,max=Math.max(...daily.map(d=>d.kwh),0.001);
-  const pts=daily.map((d,i)=>`${(i/(daily.length-1))*w},${h-3-(d.kwh/max)*(h-8)}`).join(" ");
+  // With a single day of history, daily.length-1 is 0 → x would be 0/0 = NaN (broken SVG).
+  // Spread points across the full width, but pin a lone point to the left edge.
+  const xAt=(i)=> daily.length>1 ? (i/(daily.length-1))*w : 0;
+  const pts=daily.map((d,i)=>`${xAt(i)},${h-3-(d.kwh/max)*(h-8)}`).join(" ");
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
     <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
-    ${daily.map((d,i)=>d.kwh===0?`<circle cx="${(i/(daily.length-1))*w}" cy="${h-3}" r="2.2" fill="var(--bad)"/>`:"").join("")}
+    ${daily.map((d,i)=>d.kwh===0?`<circle cx="${xAt(i)}" cy="${h-3}" r="2.2" fill="var(--bad)"/>`:"").join("")}
   </svg>`;
 }
 
