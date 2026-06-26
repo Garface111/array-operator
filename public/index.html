@@ -216,6 +216,10 @@
         <div class="dash-prod" id="dashProd"></div>
       </div>
       <section id="fleetCommander"></section>
+      <!-- Modeled production target (expected vs actual) — catches a whole fleet
+           sagging together (soiling/snow/degradation) that peer analysis misses.
+           Filled by command-center.js → renderProductionTarget(). -->
+      <section id="fleetTarget"></section>
       <div class="dash-attn"><h3 id="dashAttnH">Needs attention</h3></div>
       <section id="ccQueue"></section>
     </div>

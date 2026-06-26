@@ -27,6 +27,24 @@
   const energyRate = () => { const s = FS(); return s && s.energyRate ? s.energyRate() : ENERGY_RATE_FALLBACK; };
   const REC_PER_MWH = (FS() && FS().REC_PER_MWH) || 38;   // $/MWh REC value
   const WINDOW_DAYS = 14;
+
+  // ---- modeled production target (expected vs actual) ----
+  // Peer analysis catches ONE inverter lagging its neighbors, but it's blind to a
+  // whole fleet sagging together — soiling after a dry spell, snow, smoke, or
+  // slow degradation hits every panel under the same sky, so peers all match and
+  // nothing flags. A modeled target catches that: compare measured production to
+  // what this nameplate SHOULD make in this month.
+  //
+  // Target = nameplate_kW × 24h × days × monthly capacity factor. The CF table is
+  // a typical Northeast-US fixed-tilt PV AC capacity factor by month (NREL PVWatts-
+  // class numbers: ~13-14% annual, summer peak ~18%, winter trough ~7%). It is a
+  // MODEL, never a measurement — the UI labels it "modeled / typical" and the
+  // shortfall flag stays conservative (only a sustained, sizable gap trips it).
+  const CF_BY_MONTH = [0.072,0.095,0.135,0.160,0.175,0.182,0.180,0.168,0.145,0.110,0.072,0.060];
+  const seasonalCF = () => CF_BY_MONTH[new Date().getMonth()] || 0.14;
+  // A gap only reads as a problem past this band — below it is normal model/weather
+  // noise (a clear-vs-cloudy fortnight easily moves ±15%). 18% under target = real.
+  const TARGET_SHORTFALL_PCT = 0.18;
   const val  = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
   const usd0 = n => "$"+Math.round(Number(n)||0).toLocaleString();
   const num  = n => Number(n||0).toLocaleString();
@@ -69,11 +87,21 @@
   // flatten → {rows:[…flagged…], kpis:{…}}
   function buildModel(fleet){
     const rows=[]; let invTotal=0, invHealthy=0;
+    // modeled-target accumulators — only over inverters with REAL window history,
+    // so a freshly-connected (no-history) unit never drags the fleet's actual %.
+    const cf = seasonalCF();
+    let measuredKwh = 0, targetKwh = 0, measuredCount = 0;
     fleet.arrays.forEach(a => {
       const totalNp = a.inverters.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
       const fleetWin = a.inverters.reduce((t,i)=>t+(i.window_kwh||0),0);
       a.inverters.forEach(inv => {
         invTotal++;
+        // Production target: only when we have a real measured window for this unit.
+        if(inv.nameplate_kw > 0 && inv.window_kwh != null && inv.window_kwh > 0){
+          measuredKwh += inv.window_kwh;
+          targetKwh   += inv.nameplate_kw * 24 * WINDOW_DAYS * cf;
+          measuredCount++;
+        }
         // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 14-day
         // peer verdict; a fresh live anomaly (dark now while >=2 daylight peers
         // produce) isn't caught by it yet, so we promote a status:"ok" inverter to
@@ -103,8 +131,19 @@
     });
     const flagged = rows.length;
     const riskMo = rows.reduce((t,r)=>t+r.lossMo,0);
+    // pct of modeled target the fleet actually made over the window (real measured
+    // kWh ÷ modeled target kWh). null when no unit has window history yet.
+    const ratio = targetKwh > 0 ? measuredKwh / targetKwh : null;
+    const production = {
+      ready: measuredCount > 0 && targetKwh > 0,
+      measuredKwh, targetKwh, ratio, cf,
+      pct: ratio == null ? null : Math.round(ratio * 100),
+      coveredInverters: measuredCount,
+      // shortfall is a SUSTAINED, sizable gap (past the noise band) — not a blip
+      short: ratio != null && ratio < (1 - TARGET_SHORTFALL_PCT),
+    };
     return {
-      rows, recovered:fleet.recovered_ytd||0, simulated:fleet.simulated,
+      rows, recovered:fleet.recovered_ytd||0, simulated:fleet.simulated, production,
       kpis:{
         sites:fleet.arrays.length, inverters:invTotal,
         healthyPct: invTotal? Math.round(invHealthy/invTotal*100):100,
@@ -211,6 +250,7 @@
     // On the DASHBOARD tab, surface the combined attention queue (every flagged
     // inverter across the fleet, worst-first); elsewhere keep it empty.
     renderProdKpis();
+    renderProductionTarget();   // modeled expected-vs-actual card (Dashboard only)
     // Relabel the attention header so a clean fleet doesn't sit under a "Needs
     // attention" heading over an empty list — read it as the all-clear it is.
     const attnH = document.getElementById("dashAttnH");
@@ -262,6 +302,54 @@
       `<span class="dp"><b>${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>`;
+  }
+
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  // Modeled production target card — actual measured kWh vs what this nameplate
+  // typically makes this month. Honest by construction: "actual" is real measured
+  // window production; "target" is explicitly labeled a typical/seasonal model,
+  // and we only show it once at least one unit has real history. The shortfall
+  // flag is conservative (sustained gap past the noise band).
+  function renderProductionTarget(){
+    const el = document.getElementById("fleetTarget");
+    if(!el) return;
+    // Only on the Dashboard tab + after the fleet loads; otherwise leave it empty.
+    if(!_dashActive() || !MODEL){ el.innerHTML = ""; return; }
+    if(window.FleetStore && FleetStore.isLoaded && !FleetStore.isLoaded()){ el.innerHTML = ""; return; }
+    const p = MODEL.production;
+    if(!p || !p.ready){ el.innerHTML = ""; return; }   // no window history yet → say nothing
+
+    const pct = p.pct;                                  // % of modeled target made
+    // bar fills to actual %, capped at 120% so an over-target fleet still reads;
+    // the 100% target line is drawn as a marker on the track.
+    const fill = Math.max(0, Math.min(pct, 120));
+    const tone = p.short ? "warn" : (pct >= 92 ? "ok" : "soft");
+    const month = MONTHS[new Date().getMonth()];
+    const verdict = p.short
+      ? `${100 - pct}% under its typical ${month} output`
+      : pct >= 100
+        ? `on track — at or above typical ${month} output`
+        : `tracking near typical ${month} output`;
+    el.innerHTML = `
+      <div class="ft-card ${tone}">
+        <div class="ft-head">
+          <div class="ft-title">Production vs target</div>
+          <div class="ft-pct"><b>${pct}<span>%</span></b><small>of typical</small></div>
+        </div>
+        <div class="ft-track" role="img" aria-label="Fleet made ${pct}% of its modeled ${esc(month)} target">
+          <div class="ft-fill ${tone}" style="width:${fill}%"></div>
+          <span class="ft-mark" style="left:${100/1.2}%" title="100% = typical ${esc(month)} output"></span>
+        </div>
+        <div class="ft-row">
+          <span class="ft-verdict ${tone}">${p.short?"⚠ ":""}${esc(verdict)}</span>
+          <span class="ft-nums">${Math.round(p.measuredKwh).toLocaleString()} kWh measured · ${Math.round(p.targetKwh).toLocaleString()} kWh typical</span>
+        </div>
+        <div class="ft-note">${p.short
+          ? `A whole-fleet shortfall like this is what peer checks miss — every panel's down together (soiling, snow, smoke, or aging), so neighbors still match. Worth a fleet-wide clean/inspection.`
+          : `Target is a <b>typical-weather model</b> for ${esc(month)} (nameplate × seasonal capacity factor, ${Math.round(p.cf*100)}%), not a guarantee — a cloudy fortnight runs under, a sunny one over. Catches sustained fleet-wide drops peer checks can't.`}
+          <span class="ft-cov">Across ${num(p.coveredInverters)} inverter${p.coveredInverters===1?"":"s"} with ${WINDOW_DAYS}-day history.</span>
+        </div>
+      </div>`;
   }
 
   // legacy render kept for reference / other callers
@@ -538,7 +626,8 @@ Thank you,
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
-    renderProdKpis();   // keep the live production strip fresh on every beat
+    renderProdKpis();           // keep the live production strip fresh on every beat
+    renderProductionTarget();   // and the modeled expected-vs-actual card
   }
 
   // React to the shared store: a "live" beat just repaints the numbers; any
