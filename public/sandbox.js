@@ -91,7 +91,10 @@
     wec:       "https://washingtonelectric.smarthub.coop/",
   };
   function extSend(type, extra){
-    try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), "*"); } catch(e){}
+    // Target the page's own origin, never "*": SO_PAIR carries the tenant key and
+    // SO_VAULT carries plaintext creds. so_bridge.js is injected into this same page
+    // (same window, same origin), so location.origin reaches it and nothing else.
+    try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), window.location.origin); } catch(e){}
   }
   // AUTO-PAIR: the extension needs this tenant's long-lived key to capture/refresh
   // at all. A freshly-(re)loaded extension starts with EMPTY storage → "Not connected"
@@ -263,7 +266,7 @@
     }
   }
   window.addEventListener("message", (e) => {
-    if(e.source !== window) return;
+    if(e.source !== window || e.origin !== window.location.origin) return;
     const d = e.data; if(!d || typeof d !== "object") return;
     if(d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)){
       if(!EXT_PRESENT){ EXT_PRESENT = true; if(_ov && _ov.classList.contains("open")) renderAddModalBody(); }
@@ -4108,7 +4111,7 @@
   }
   // Listen for vault acks (separate from the capture listener so it can't interfere).
   window.addEventListener("message", (e) => {
-    if(e.source !== window) return;
+    if(e.source !== window || e.origin !== window.location.origin) return;
     const d = e.data; if(!d || d.type !== "SO_VAULT_ACK" || !d.reqId) return;
     const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
   });

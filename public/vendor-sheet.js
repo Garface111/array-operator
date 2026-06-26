@@ -350,7 +350,7 @@
       if (extPresent()) {
         try {
           window.postMessage({ type: "SO_OPEN_PORTAL", url, active: true, provider: v, vendor: v,
-                               reqId: "vs-" + Date.now() }, "*");
+                               reqId: "vs-" + Date.now() }, window.location.origin);
           return;
         } catch (_) { /* fall through to a plain open */ }
       }
@@ -419,10 +419,10 @@
     // both listen for it AND ask for status to prompt a fresh announce. Belt + the global.
     if (window.__AO_EXT_PRESENT) _extPresent = true;
     window.addEventListener("message", (e) => {
-      if (e.source !== window || !e.data) return;
+      if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
       if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") _extPresent = true;
     });
-    try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, "*"); } catch (_) {}
+    try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, window.location.origin); } catch (_) {}
     window.addEventListener("resize", sizeScroll);
     showView(_view);
   }
