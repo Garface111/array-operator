@@ -377,11 +377,29 @@ Thank you,
           note.className = "ao-note err";
         }
       };
-      root.querySelector("#ao-mail").onclick = () => {
+      root.querySelector("#ao-mail").onclick = async () => {
         const v = getVals();
         const href = `mailto:${encodeURIComponent(v.to)}`+
           `?subject=${encodeURIComponent(v.subj)}`+
           `&body=${encodeURIComponent(v.body)}`;
+        // Browsers silently drop overly-long mailto: URLs — exactly the dead/fault
+        // inverters that matter most produce the longest drafts. When the href is
+        // too long to open reliably, copy the full draft instead so it's never
+        // lost, and keep the modal open so the user sees what happened.
+        if(href.length > 1800){
+          const text = `To: ${v.to}\nSubject: ${v.subj}\n\n${v.body}`;
+          try{
+            await navigator.clipboard.writeText(text);
+            note.textContent = "This draft was too long to open in your email automatically — we copied it instead. Paste it into a new email.";
+            note.className = "ao-note ok";
+          }catch(e){
+            const ta = root.querySelector("#ao-body");
+            if(ta){ ta.focus(); ta.select(); }
+            note.textContent = "This draft is too long to open automatically — it's selected, press ⌘/Ctrl-C to copy it.";
+            note.className = "ao-note err";
+          }
+          return;
+        }
         window.location.href = href;
         note.textContent = "Opening your email client…";
         note.className = "ao-note ok";

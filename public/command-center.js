@@ -454,6 +454,21 @@ Neighboring inverters produced normally over the same period, ruling out weather
 Thank you,
 [Your name]`;
     const href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+    // Browsers silently drop overly-long mailto: URLs — exactly the dead/fault
+    // inverters that matter most produce the longest drafts. When the href is too
+    // long to open reliably, fall back to copying the full draft so it's never lost.
+    if(href.length > 1800){
+      const draft = `To: ${to}\nSubject: ${subj}\n\n${body}`;
+      const done = () => toast("Draft copied — paste it into your email (it was too long to open automatically).");
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(draft).then(done).catch(()=>{
+          try { window.location.href = href; } catch(e){}  // last resort: try anyway
+        });
+      } else {
+        try { window.location.href = href; } catch(e){}
+      }
+      return;
+    }
     try { window.location.href = href; } catch(e){}
   }
 
