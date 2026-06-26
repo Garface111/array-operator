@@ -71,6 +71,24 @@
     live_dark:"Check why it stopped"
   };
 
+  // Each vendor's monitoring portal - every flagged inverter deep-links out so the
+  // operator can jump straight to the vendor's own site to investigate it.
+  const VENDOR_PORTAL = {
+    solaredge:"https://monitoring.solaredge.com/", fronius:"https://www.solarweb.com/",
+    sma:"https://ennexos.sunnyportal.com/", chint:"https://monitor.chintpowersystems.com/",
+    enphase:"https://enlighten.enphaseenergy.com/", locus:"https://app.locusenergy.com/",
+  };
+  const VENDOR_NAME = { solaredge:"SolarEdge", fronius:"Fronius", sma:"SMA", chint:"Chint",
+    enphase:"Enphase", locus:"Locus", solis:"Solis", tigo:"Tigo", alsoenergy:"AlsoEnergy" };
+  const vendorLabel = v => VENDOR_NAME[v] || (v ? v.charAt(0).toUpperCase()+v.slice(1) : "portal");
+  function vendorLinkHTML(r){
+    const v = (r.vendor||"").toLowerCase();
+    const url = VENDOR_PORTAL[v];
+    if(!url) return "";
+    const lbl = vendorLabel(v);
+    return `<a class="cc-vendor-link ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener" title="Open the ${esc(lbl)} monitoring portal in a new tab">Open in ${esc(lbl)} ↗</a>`;
+  }
+
   /* ===========================================================================
    * 1. DATA — normalize to a flat list of flagged inverters w/ $ at stake.
    * ==========================================================================*/
@@ -464,7 +482,7 @@
         <tr class="row sev-${r.sev} ${sel?"sel":""}" data-key="${esc(r.key)}">
           <td class="shrink"><input type="checkbox" class="cc-check ccRow" data-key="${esc(r.key)}" ${sel?"checked":""}></td>
           <td><span class="cc-site">${esc(r.site)}</span><small>${esc(r.region)}${r.host?` · ${esc(r.host)}`:""}</small></td>
-          <td class="cc-inv"><b>${esc(r.inv)}</b> · ${esc(r.model)}</td>
+          <td class="cc-inv"><b>${esc(r.inv)}</b> · ${esc(r.model)}${vendorLinkHTML(r)}</td>
           <td><span class="cc-verdict ${r.sev}"><span class="cc-sevdot ${r.sev}"></span> ${STATUS_LABEL[r.status]}</span></td>
           <td class="num">${piTxt}</td>
           <td class="num">${r.lossMo>=1?`<span class="cc-loss">${usd0(r.lossMo)}</span>`:`<span style="color:var(--faint)">—</span>`}</td>
