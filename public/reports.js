@@ -99,7 +99,10 @@
     document.addEventListener("keydown", onKey);
     document.body.appendChild(overlay);
     try {
-      const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+      // pdf.js transfers (and detaches) the buffer it's given, so render from a fresh
+      // COPY each time — otherwise the first enlarge consumes `buf` and every later
+      // click gets a detached/empty buffer and silently fails (Ford: "only works once").
+      const pdf = await lib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
       const page = await pdf.getPage(1);
       const base = page.getViewport({ scale: 1 });
       const dispW = Math.min((window.innerWidth || 1200) * 0.92, 1500);
