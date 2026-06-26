@@ -183,8 +183,13 @@ function openClaimModal(inv){
   const vendorTitle = (inv.vendor||"manufacturer").replace(/\b\w/g,c=>c.toUpperCase());
   const today = new Date().toISOString().slice(0,10);
 
-  const to = `support@${(inv.vendor||"installer").toLowerCase().replace(/[^a-z0-9]/g,"")}.com`;
-  const subject = `${isFault?"Service request":"Warranty claim"} — ${inv.model} ${inv.serial}${inv.error_code?` (fault ${inv.error_code})`:""}`;
+  // Real manufacturer support inboxes for the vendors we capture; fall back to a
+  // sanitized slug guess for anything else (no injectable chars survive the strip).
+  const VENDOR_SUPPORT = { solaredge:"support@solaredge.com", fronius:"pv-support-usa@fronius.com", sma:"service@sma-america.com", enphase:"support@enphase.com", chint:"service@chintpower.com" };
+  const vKey = (inv.vendor||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  const to = VENDOR_SUPPORT[vKey] || `support@${vKey||"installer"}.com`;
+  // Subject is a single header line — strip CR/LF/tabs from backend fields.
+  const subject = `${isFault?"Service request":"Warranty claim"} — ${inv.model} ${inv.serial}${inv.error_code?` (fault ${inv.error_code})`:""}`.replace(/[\r\n\t]+/g," ").trim();
 
   const downLine = daysDown!=null
     ? `It has produced ZERO output for ${streak>0?`${streak} consecutive days`:`approximately ${daysDown} day(s)`}${hours!=null?` (last telemetry ${fmt(hours)} hours ago)`:""}.`
@@ -652,16 +657,27 @@ function updateTrialNudge(session){
       if(days < 0 || days > 7){ bar.hidden = true; return; }
       const tier = days <= 2 ? "urgent" : "soft";
       let dis = null;
+      const rawDismiss = localStorage.getItem("ao_trialnudge_dismiss");
       try {
-        const parsed = JSON.parse(localStorage.getItem("ao_trialnudge_dismiss") || "null");
+        const parsed = JSON.parse(rawDismiss || "null");
         // Only accept the exact shape we wrote ({ends, tier}); localStorage is same-origin
         // writable, so a poisoned/wrong-typed value (array, primitive, hostile object) must
         // not slip past the property reads below — coerce or discard.
         if(parsed && typeof parsed === "object" && !Array.isArray(parsed)
            && typeof parsed.ends === "string" && typeof parsed.tier === "string"){
           dis = { ends: parsed.ends, tier: parsed.tier };
+        } else if(rawDismiss != null && rawDismiss !== "null"){
+          // Wrong shape but valid JSON — the user's dismissal is being silently lost.
+          // Log it and clear the bad value so the nudge re-arms cleanly next time.
+          console.warn("[trial-nudge] discarding malformed dismissal state:", rawDismiss);
+          try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
         }
-      } catch(e){}
+      } catch(e){
+        // Corrupt (non-JSON) value — surface it and self-heal so a dismissal isn't lost
+        // forever to a stale bad write.
+        console.warn("[trial-nudge] corrupt dismissal state in localStorage, resetting:", e && e.message);
+        try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
+      }
       if(dis && dis.ends === a.trial_ends_at){
         if(dis.tier === "urgent"){ bar.hidden = true; return; }
         if(tier === "soft"){ bar.hidden = true; return; }
