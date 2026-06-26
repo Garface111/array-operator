@@ -2377,15 +2377,26 @@
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
     const explicitRate = d.net_rate_per_kwh != null;
     const disc = d.discount_pct ? Math.round(d.discount_pct * 100) : 0;
-    const hasBudget = d.budget_amount_usd != null && d.solar_credit_value != null;
+    // A budget bill is keyed on budget_amount_usd ALONE — never inferred from the dollar
+    // total. This panel is "how we calculated this invoice": it must ALWAYS land on the
+    // genuine production calculation and surface the budget only as a separate override
+    // line — it must NEVER present the budget as if it were the calculated credit.
+    const budgetSet = d.budget_amount_usd != null;
     const gmpReady = d.has_gmp_pdf || (d.auto_attach_gmp !== false && d.gmp_auto_status === "ready");
     const billUrl = gmpReady ? `${API}/drafts/${d.id}/gmp-bill` : null;
-    // The solar-credit value BEFORE any budget override (what the production is worth).
-    const creditVal = hasBudget ? d.solar_credit_value : d.amount_usd;
+    // The CALCULATED solar-credit value (production × real net-metering rate), independent
+    // of any budget. With a budget set this is solar_credit_value (the pre-override amount);
+    // with NO budget it's amount_usd (which IS the calculated total). When a budget is set
+    // but solar_credit_value hasn't reached us, we have NO genuine calculated value — so we
+    // must NOT fall back to amount_usd (that's the budget, and budget ÷ kWh is exactly the
+    // fake $2.42718/kWh bug). Leave it null and show the value as pending instead.
+    const creditVal = budgetSet ? (d.solar_credit_value != null ? d.solar_credit_value : null)
+                                : d.amount_usd;
     // ALWAYS surface the per-kWh rate that turns production into that credit, so the
     // multiplication kWh × rate = $ is visible. Use the operator's set rate when there is
     // one; otherwise show the EFFECTIVE rate implied by the bill's net-metering credit
-    // (credit ÷ kWh) — so an offtaker priced straight off the bill isn't a mystery jump.
+    // (CALCULATED credit ÷ kWh — never budget ÷ kWh) — so an offtaker priced straight off
+    // the bill isn't a mystery jump.
     const effRate = (d.customer_kwh && creditVal != null) ? (creditVal / d.customer_kwh) : null;
     const shownRate = explicitRate ? d.net_rate_per_kwh : effRate;
     const ratePfx = explicitRate ? "" : "≈ ";
@@ -2397,8 +2408,11 @@
       `<div class="rb-calc-row"><span class="rb-calc-k">Solar credit rate`
       + `${explicitRate ? "" : "<small>effective — from the bill's net-metering credit</small>"}</span>`
       + `<span class="rb-calc-v">${rateTxt}${(explicitRate && disc) ? ` <span class="rb-calc-eq">− ${disc}%</span>` : ""}</span></div>`;
-    const totalRows = hasBudget
-      ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.solar_credit_value)}</span></div>
+    // The calculated credit value: the genuine number when we have it; "computing…" when a
+    // budget is set but the calculated value hasn't landed yet (NEVER the budget amount).
+    const creditDue = creditVal != null ? money(creditVal) : "computing…";
+    const totalRows = budgetSet
+      ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${creditDue}</span></div>
          <div class="rb-calc-row total"><span class="rb-calc-k">Budget bill — fixed total<small>overrides the calculated value</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
       : `<div class="rb-calc-row total"><span class="rb-calc-k">Solar credit value due<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`;
     return `
@@ -2522,8 +2536,8 @@
           <table class="rb-eml-figs">
             <tr><td>Billing period</td><td>${esc(period)}</td></tr>
             <tr><td>Your production</td><td>${kwh}</td></tr>
-            ${(d.budget_amount_usd != null && d.solar_credit_value != null)
-              ? `<tr><td>Solar credit value due</td><td>${money(d.solar_credit_value)}</td></tr>
+            ${(d.budget_amount_usd != null)
+              ? `<tr><td>Solar credit value due</td><td>${d.solar_credit_value != null ? money(d.solar_credit_value) : "computing…"}</td></tr>
                  <tr class="due"><td>Budgeted amount</td><td>${money(d.amount_usd)}</td></tr>`
               : `<tr class="due"><td>Solar credit value due</td><td>${money(d.amount_usd)}</td></tr>`}
           </table>
