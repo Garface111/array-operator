@@ -1710,10 +1710,22 @@
   // Auto-login hint: a subtle inline banner on extension-captured array cards
   // when the owner hasn't saved vault credentials yet. Async-filled by
   // wireAutoLoginHints() after the canvas renders.
+  //
+  // GAP-AWARE escalation: Fronius/SMA/Chint only sync when the owner opens the
+  // portal (or an auto-login background tab fires). If creds aren't saved AND this
+  // array's last capture is already stale (a real coverage gap → undercounting),
+  // we upgrade the generic "save your login" nudge to name the gap directly. The
+  // gap is read from the SAME source_status the freshness chip uses, so the two
+  // surfaces agree. data-gap-age carries the stale age (empty = fresh, no gap).
   const _EXT_VAULT_VENDORS = new Set(["fronius","sma","chint"]);
-  function autoLoginHintHTML(vendor){
+  function autoLoginHintHTML(vendor, col){
     if(!vendor || !_EXT_VAULT_VENDORS.has(vendor)) return "";
-    return `<div class="sb-autologin-hint" data-vendor="${esc(vendor)}" aria-live="polite"></div>`;
+    const ss = col && col.source_status;
+    const age = ss ? ss.age_hours : null;
+    // Only count it as a "gap" once we're past the live-fresh window (same gate as
+    // freshnessHTML) — a fresh array isn't undercounting and needs no urgency.
+    const gapAge = (age != null && age > _LIVE_FRESH_H) ? fmtAge(age) : "";
+    return `<div class="sb-autologin-hint" data-vendor="${esc(vendor)}" data-gap-age="${esc(gapAge)}" aria-live="polite"></div>`;
   }
 
   // Capture-freshness line for EXTENSION-captured array cards (Fronius/SMA/Chint).
@@ -1876,7 +1888,7 @@
               <div class="sb-array-name">${esc(col.array_name)}${weatherBadge(col)}</div>
               ${srcStatusBanner}
               ${freshnessHTML(col)}
-              ${autoLoginHintHTML(col.vendor||"")}
+              ${autoLoginHintHTML(col.vendor||"", col)}
               ${arrayGraph(sortedInvs, col.daily, col, getStream())}
               ${aNowChip}
               ${arrayOutputBar(aOs, col)}
@@ -4150,11 +4162,19 @@
       if(st.hasCreds){ el.innerHTML = ""; el.style.display = "none"; return; }
       if(el.innerHTML) return;  // already filled this render
       const label = (typeof BRAND !== "undefined" && BRAND[vendor]) || vendor;
+      // A coverage gap (stale capture) turns the gentle nudge into a specific one:
+      // name the gap, explain it's how this vendor undercounts, and offer the fix.
+      const gapAge = el.dataset.gapAge || "";
       el.style.display = "";
-      el.innerHTML =
-        `<span class="sb-al-ic" aria-hidden="true">⚡</span>` +
-        `<span>Save your <b>${esc(label)}</b> login for hands-free live updates — ` +
-        `<a href="#account" class="sb-al-link">set up auto-login →</a></span>`;
+      el.classList.toggle("gap", !!gapAge);
+      el.innerHTML = gapAge
+        ? `<span class="sb-al-ic" aria-hidden="true">⚡</span>` +
+          `<span><b>${esc(label)}</b> last synced ${esc(gapAge)} — it only updates when you open the portal. ` +
+          `Save your login so it refreshes itself and stops missing production — ` +
+          `<a href="#account" class="sb-al-link">set up auto-login →</a></span>`
+        : `<span class="sb-al-ic" aria-hidden="true">⚡</span>` +
+          `<span>Save your <b>${esc(label)}</b> login for hands-free live updates — ` +
+          `<a href="#account" class="sb-al-link">set up auto-login →</a></span>`;
       el.querySelector(".sb-al-link").addEventListener("click", e => {
         e.preventDefault();
         location.hash = "#account";

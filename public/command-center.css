@@ -720,8 +720,12 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:8px 11px; border-radius:9px; font-size:11.5px; line-height:1.45;
   background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.22); color:var(--fg2); }
 .sb-autologin-hint:empty{ display:none; }
+/* Gap state — this array is actually stale (a real coverage gap), so the nudge
+   carries amber urgency instead of the calm blue of the generic tip. */
+.sb-autologin-hint.gap{ background:rgba(245,158,11,.09); border-color:rgba(245,158,11,.34); }
 .sb-al-ic{ flex:none; font-size:13px; line-height:1.4; }
 .sb-autologin-hint a.sb-al-link{ color:var(--good2); text-decoration:none; white-space:nowrap; }
+.sb-autologin-hint.gap a.sb-al-link{ color:#f59e0b; }
 .sb-autologin-hint a.sb-al-link:hover{ text-decoration:underline; }
 /* whole-card emphasis when the source feed is dark — an unmistakable amber frame
    + a top "SOURCE OFFLINE" ribbon so it can't be missed at a glance. */
