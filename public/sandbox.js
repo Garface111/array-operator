@@ -1459,10 +1459,15 @@
     return "utility";
   }
   function filterColsByStream(cols){
-    // Slider removed — show the INTEGRATED fleet (every array, regardless of data
-    // source) in one view; no longer filter by stream. Thin pass-through so callers
-    // and the now-unreachable source-split branches keep working unchanged.
-    return cols;
+    // The sandbox is LOCKED to the vendor stream (getStream) — the integrated INVERTER
+    // fleet. Show only vendor-sourced arrays (inverters / a vendor / a vendor daily
+    // stream); utility-meter-only arrays (GMP/VEC/SmartHub with NO inverters) belong in
+    // the offtaker/NEPOOL views, not the Inverter Dashboard. arrayStream() does the
+    // strict classification and the empty-state hint below already assumes this filter.
+    // (Regression fix: this had become a `return cols` pass-through, which leaked GMP
+    // utility-only arrays in the moment the GMP bill-pull started creating Array rows.)
+    const stream = getStream();
+    return cols.filter(c => arrayStream(c) === stream);
   }
 
   // ---- view mode: "grid" (fleet OVERVIEW — health-tinted tile per array) vs
