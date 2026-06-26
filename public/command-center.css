@@ -1287,7 +1287,7 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .rb-gmp-attach:hover{ border-color:var(--good,#3fd68a); color:var(--ink); }
 
 .rb-draft-acts{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; }
-.rb-draft-acts > .rb-btn{ flex:1 1 0; justify-content:center; min-width:160px; padding:16px 22px; font-size:15.5px; font-weight:700; border-radius:12px; }
+.rb-draft-acts > .rb-btn{ flex:1 1 0; min-width:0; justify-content:center; }
 /* attachment-controls box, dropped to its own full-width line below the send buttons
    (auto-attach GMP + opt-in AO summary). */
 .rb-draft-attach{ flex-basis:100%; margin-left:0; display:flex; flex-direction:column; gap:7px; align-items:flex-start;
