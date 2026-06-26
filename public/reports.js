@@ -58,20 +58,62 @@
     if (!paper) return;
     let lib;
     try { lib = await _ensurePdfJs(); } catch (e) { return _pdfFallbackIframe(buf, paper); }
+    // Keep a copy of the bytes BEFORE pdf.js consumes them (it transfers the buffer to
+    // its worker, detaching the original) so the click-to-enlarge lightbox can re-render.
+    const lbBuf = buf.slice(0);
     try {
       const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
       const page = await pdf.getPage(1);
       const cssW = Math.max(240, paper.clientWidth || 520);
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
       const base = page.getViewport({ scale: 1 });
-      const vp = page.getViewport({ scale: (cssW / base.width) * ratio });
+      // Render at a HIGH internal resolution, independent of the display size. The canvas
+      // is shown at the container width (CSS width:100%), so extra internal pixels just
+      // sharpen the small invoice numbers. Target ~3x the display width (capped) so the
+      // figures stay legible enough to verify — Ford: "hard to read the numbers."
+      const targetW = Math.min(Math.max(cssW * 3, 1600), 2600);
+      const vp = page.getViewport({ scale: targetW / base.width });
       const canvas = document.createElement("canvas");
       canvas.width = Math.ceil(vp.width);
       canvas.height = Math.ceil(vp.height);
       await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
       paper.innerHTML = "";
       paper.appendChild(canvas);
+      // Click to enlarge — a full-screen, even sharper view to read every number.
+      canvas.classList.add("rb-tpl-zoomable");
+      canvas.title = "Click to enlarge";
+      canvas.onclick = () => _pdfLightbox(lbBuf);
     } catch (e) { _pdfFallbackIframe(buf, paper); }
+  }
+
+  // Full-screen lightbox of the invoice — large + crisp so every number is readable.
+  // Click anywhere (or Esc) to dismiss.
+  async function _pdfLightbox(buf) {
+    let lib;
+    try { lib = await _ensurePdfJs(); } catch (e) { return; }
+    const overlay = document.createElement("div");
+    overlay.className = "rb-tpl-lightbox";
+    overlay.innerHTML = '<div class="rb-tpl-lb-inner"><div class="rb-tpl-load" style="color:#9fb0c0">Rendering…</div></div>';
+    const close = () => { overlay.remove(); document.removeEventListener("keydown", onKey); };
+    function onKey(e) { if (e.key === "Escape") close(); }
+    overlay.onclick = close;
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(overlay);
+    try {
+      const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+      const page = await pdf.getPage(1);
+      const base = page.getViewport({ scale: 1 });
+      const dispW = Math.min((window.innerWidth || 1200) * 0.92, 1500);
+      const ratio = Math.min((window.devicePixelRatio || 1) * 1.5, 3);
+      const vp = page.getViewport({ scale: (dispW / base.width) * ratio });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      canvas.style.width = Math.round(dispW) + "px";
+      canvas.style.height = "auto";
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      const inner = overlay.querySelector(".rb-tpl-lb-inner");
+      if (inner) { inner.innerHTML = ""; inner.appendChild(canvas); }
+    } catch (e) { close(); }
   }
 
   const MODEL_LABEL = {
