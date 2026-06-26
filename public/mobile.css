@@ -36,9 +36,7 @@
   .cc-kpi .k { font-size: 10.5px; }
   .cc-kpi .v { font-size: 22px; }
 
-  /* ── Section headers / dividers wrap instead of overflowing ────────────── */
-  .section-h { margin: 22px 0 4px; }
-  .section-h h2 { font-size: 18px; }
+  /* ── Section dividers wrap instead of overflowing ──────────────────────── */
   .cc-treedivider { flex-wrap: wrap; gap: 4px; }
 
   /* ── Per-site fleet tree ───────────────────────────────────────────────── */
