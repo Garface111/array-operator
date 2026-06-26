@@ -70,7 +70,6 @@
   .section-h{display:flex;align-items:baseline;gap:12px;margin:34px 0 4px}
   .section-h h2{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
   .section-h .hint{color:var(--faint);font-size:13px}
-  .ribbon{color:var(--good);font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;margin-top:26px}
 
   .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0}
   .act{display:flex;gap:14px;background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);
