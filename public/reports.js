@@ -2366,14 +2366,28 @@
   // the solar-credit value (and any fixed budget override). All from the draft's figures.
   function calcDashboard(d) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
-    const rate = d.net_rate_per_kwh;
+    const explicitRate = d.net_rate_per_kwh != null;
     const disc = d.discount_pct ? Math.round(d.discount_pct * 100) : 0;
     const hasBudget = d.budget_amount_usd != null && d.solar_credit_value != null;
     const gmpReady = d.has_gmp_pdf || (d.auto_attach_gmp !== false && d.gmp_auto_status === "ready");
     const billUrl = gmpReady ? `${API}/drafts/${d.id}/gmp-bill` : null;
-    const rateMath = rate != null
-      ? `${fmt0(d.customer_kwh)} kWh × $${Number(rate).toFixed(5)}${disc ? ` × (1−${disc}%)` : ""}`
-      : "from the bill's net-metering credit";
+    // The solar-credit value BEFORE any budget override (what the production is worth).
+    const creditVal = hasBudget ? d.solar_credit_value : d.amount_usd;
+    // ALWAYS surface the per-kWh rate that turns production into that credit, so the
+    // multiplication kWh × rate = $ is visible. Use the operator's set rate when there is
+    // one; otherwise show the EFFECTIVE rate implied by the bill's net-metering credit
+    // (credit ÷ kWh) — so an offtaker priced straight off the bill isn't a mystery jump.
+    const effRate = (d.customer_kwh && creditVal != null) ? (creditVal / d.customer_kwh) : null;
+    const shownRate = explicitRate ? d.net_rate_per_kwh : effRate;
+    const ratePfx = explicitRate ? "" : "≈ ";
+    const rateTxt = shownRate != null ? `${ratePfx}$${Number(shownRate).toFixed(5)}/kWh` : "—";
+    const rateMath = (shownRate != null && d.customer_kwh != null)
+      ? `${fmt0(d.customer_kwh)} kWh × ${ratePfx}$${Number(shownRate).toFixed(5)}/kWh${(explicitRate && disc) ? ` × (1−${disc}%)` : ""}`
+      : (explicitRate ? "" : "from the bill's net-metering credit");
+    const rateRow =
+      `<div class="rb-calc-row"><span class="rb-calc-k">Solar credit rate`
+      + `${explicitRate ? "" : "<small>effective — from the bill's net-metering credit</small>"}</span>`
+      + `<span class="rb-calc-v">${rateTxt}${(explicitRate && disc) ? ` <span class="rb-calc-eq">− ${disc}%</span>` : ""}</span></div>`;
     const totalRows = hasBudget
       ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.solar_credit_value)}</span></div>
          <div class="rb-calc-row total"><span class="rb-calc-k">Budget bill — fixed total<small>overrides the calculated value</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
@@ -2386,7 +2400,7 @@
         <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(d.array_total_kwh)} kWh</span></div>
         <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share</span>
           <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
-        ${rate != null ? `<div class="rb-calc-row"><span class="rb-calc-k">Solar credit rate</span><span class="rb-calc-v">$${Number(rate).toFixed(5)}/kWh${disc ? ` <span class="rb-calc-eq">− ${disc}%</span>` : ""}</span></div>` : ""}
+        ${rateRow}
         ${totalRows}
       </div>`;
   }
