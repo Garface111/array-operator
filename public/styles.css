@@ -47,88 +47,25 @@
   .hero .meta{color:var(--muted);font-size:13.5px;margin-top:10px;font-variant-numeric:tabular-nums}
   .hero .meta b{color:var(--ink);font-weight:600}
 
-  .heroband{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:16px;margin:24px 0 6px}
-  .hcard{background:linear-gradient(165deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:22px;
-        padding:22px 24px;box-shadow:0 24px 60px -28px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.02);position:relative;overflow:hidden}
-  .hcard.value{background:linear-gradient(150deg,rgba(63,214,138,.12),rgba(63,214,138,.03));border-color:rgba(63,214,138,.3)}
-  .hcard .lab{color:var(--muted);font-size:12.5px;font-weight:600;letter-spacing:.02em}
-  .hcard .big{font-size:40px;font-weight:780;letter-spacing:-.02em;color:var(--ink);line-height:1.05;margin-top:6px;font-variant-numeric:tabular-nums}
-  .hcard.value .big{color:var(--good2);text-shadow:0 0 24px rgba(63,214,138,.3)}
-  .hcard .big small{font-size:18px;font-weight:600;color:var(--muted)}
-  .hcard .sub{color:var(--muted);font-size:12.5px;margin-top:6px}
-  .hcard .sun{position:absolute;right:-22px;top:-22px;width:120px;height:120px;border-radius:50%;
-    background:radial-gradient(circle at 40% 40%,rgba(63,214,138,.45),rgba(63,214,138,.1) 60%,transparent 72%);pointer-events:none}
-  .verdict{display:flex;align-items:center;gap:13px}
-  .vlight{width:42px;height:42px;border-radius:50%;flex:none;position:relative}
-  .vlight.green{background:radial-gradient(circle at 38% 32%,var(--good2),var(--good));box-shadow:0 0 22px rgba(63,214,138,.6),inset 0 0 8px rgba(255,255,255,.3)}
-  .vlight.amber{background:radial-gradient(circle at 38% 32%,var(--gold2),var(--gold));box-shadow:0 0 22px rgba(245,185,66,.6),inset 0 0 8px rgba(255,255,255,.3)}
-  .vlight.red{background:radial-gradient(circle at 38% 32%,#ff9a9a,var(--bad));box-shadow:0 0 22px rgba(255,107,107,.6),inset 0 0 8px rgba(255,255,255,.3)}
-  .verdict .vt{font-size:17px;font-weight:700;color:var(--ink);line-height:1.25}
-  .verdict .vs{color:var(--muted);font-size:13px;margin-top:2px}
-
-  /* we're on it — done-for-you features */
-  .section-h{display:flex;align-items:baseline;gap:12px;margin:34px 0 4px}
-  .section-h h2{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
-  .section-h .hint{color:var(--faint);font-size:13px}
-
-  .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0}
-  .act{display:flex;gap:14px;background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);
-       border-radius:18px;padding:17px 19px;box-shadow:0 18px 44px -28px rgba(0,0,0,.7);align-items:flex-start}
-  .act.hot{border-color:rgba(255,107,107,.4);background:linear-gradient(170deg,rgba(255,107,107,.1),rgba(255,107,107,.02))}
-  .act.win{border-color:rgba(63,214,138,.4);background:linear-gradient(170deg,rgba(63,214,138,.1),rgba(63,214,138,.02))}
-  .act .ic{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;font-size:20px;
-           background:rgba(255,255,255,.05);border:1px solid var(--line)}
-  .act.hot .ic{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.3)}
-  .act.win .ic{background:rgba(63,214,138,.14);border-color:rgba(63,214,138,.3)}
-  .act h3{font-size:14.5px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
-  .act h3 .tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#06140d;
-              background:var(--good);border-radius:6px;padding:2px 7px}
-  .act.hot h3 .tag{background:var(--bad);color:#1a0606}
-  .act p{color:var(--muted);font-size:13px;margin-top:5px;line-height:1.45}
-  .act p b{color:var(--ink);font-weight:600}
-  .act .cta{margin-top:9px;display:inline-block;font-size:12.5px;font-weight:650;color:var(--good)}
-  .act.hot .cta{color:#ff8f8f}
-  .act .cta::after{content:" →"}
-
-  /* fleet */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;padding-bottom:18px;margin-top:14px}
-  .inv{background:linear-gradient(170deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:20px;padding:19px 20px;
-       display:flex;flex-direction:column;gap:11px;position:relative;box-shadow:0 18px 44px -30px rgba(0,0,0,.7)}
-  .inv.bad-edge{border-color:rgba(255,107,107,.5);box-shadow:0 18px 44px -30px rgba(0,0,0,.7),0 0 0 1px rgba(255,107,107,.12)}
-  .inv.warn-edge{border-color:rgba(255,180,84,.55);box-shadow:0 18px 44px -30px rgba(0,0,0,.7),0 0 0 1px rgba(255,180,84,.12)}
-  .res{position:absolute;top:-9px;right:14px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;
-       background:var(--bg2);border:1px solid var(--line);border-radius:99px;padding:2px 9px;color:var(--muted)}
-  .res.panel{color:var(--good)}
-  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .inv-head h3{font-size:15px;font-weight:700;color:var(--ink)}
-  .inv-head .model{color:var(--muted);font-size:12px;margin-top:2px}
+  /* NOTE: the old dashboard hero band (.heroband/.hcard/.verdict), the "done-for-you"
+     action grid (.section-h/.actions/.act), and the legacy fleet card grid
+     (.grid/.inv/.res/.inv-head/.moneyrow/.peerwrap/.diag) were removed when the
+     dashboard moved to the command-center card + sandbox/spreadsheet views. Their CSS
+     was dead and has been deleted. The genuinely-shared classes that those blocks also
+     happened to define — .pill (status chips, used in onboarding), .spark (sparkline,
+     used in app.js), and .empty (generic empty state) — are KEPT below. */
   .pill{font-size:11.5px;font-weight:650;letter-spacing:.03em;padding:4px 10px;border-radius:99px;white-space:nowrap}
   .pill.ok{background:rgba(63,214,138,.14);color:var(--good)}
   .pill.underperforming{background:rgba(255,180,84,.16);color:var(--warn)}
   .pill.comm_gap{background:rgba(94,194,255,.14);color:var(--sky)}
   .pill.dead,.pill.fault{background:rgba(255,107,107,.14);color:var(--bad)}
-  .moneyrow{display:flex;justify-content:space-between;align-items:flex-end}
-  .moneyrow .now{font-size:13px;color:var(--muted)} .moneyrow .now b{color:var(--ink);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
-  .moneyrow .lost{font-size:12.5px;color:var(--bad);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-  .moneyrow .lost.zero{color:var(--good);font-weight:600}
-  .peerwrap{display:flex;align-items:center;gap:9px}
-  .peerbar{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;flex:1}
-  .peerbar i{display:block;height:100%;border-radius:4px;background:var(--good);box-shadow:0 0 10px rgba(63,214,138,.5);transition:width .9s cubic-bezier(.2,.8,.2,1)}
-  .peerbar i.warn{background:var(--warn);box-shadow:0 0 10px rgba(255,180,84,.5)} .peerbar i.bad{background:var(--bad);box-shadow:0 0 10px rgba(255,107,107,.5)}
-  .peerwrap .pv{font-size:12.5px;font-weight:700;color:var(--ink);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
   .spark{width:100%;height:40px;display:block}
-  .stat{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
-  .diag{color:var(--muted);font-size:12.8px;line-height:1.45;border-top:1px solid var(--line);padding-top:10px}
-  .diag b{color:var(--ink);font-weight:600}
-  .diag .fix{display:inline-block;margin-top:7px;font-size:12px;font-weight:650;color:var(--good)}
-  .diag .fix.hot{color:#ff8f8f}
 
   footer{border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;padding:24px 0 46px;margin-top:30px;line-height:1.6}
   footer b{color:var(--ink)}
   footer code{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--good2);font-size:12px}
   .empty{padding:80px 0;color:var(--muted);text-align:center;grid-column:1/-1}
   .empty code{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;padding:2px 8px;color:var(--good2)}
-  @media(max-width:820px){.heroband{grid-template-columns:1fr}.actions{grid-template-columns:1fr}}
 
   /* ── Dark modal skin — overrides the JS inline light styles (.ao-* from app.js) ── */
   .ao-overlay{background:rgba(4,7,11,.72)!important;backdrop-filter:blur(5px)}
