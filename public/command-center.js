@@ -282,6 +282,9 @@
   // vendor-sheet module hasn't loaded. A stale array's current_power_w is a frozen
   // number, not live output — it must not inflate the headline "kW now".
   const _CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
+  // Vendors that report ONE site-level power split across inverters — their kW is an
+  // estimate, mirrored from vendor-sheet's isAllocatedPower (data-honesty audit #5).
+  const _ALLOC_VENDOR = { fronius: 1, sma: 1, chint: 1 };
   function _isStale(c){
     if(window.VendorSheet && typeof window.VendorSheet.isStale === "function"){
       try { return window.VendorSheet.isStale(c); } catch(_){}
@@ -304,7 +307,7 @@
     }
     let cols = [];
     try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
-    let kw = 0, kwh = 0, producing = 0, stale = 0;
+    let kw = 0, kwh = 0, producing = 0, stale = 0, allocKw = 0;
     cols.forEach(c => {
       // A frozen feed's reading isn't live power — exclude it from "kW now" and the
       // producing count so the headline matches the dimmed/stale rows in the sheet.
@@ -319,11 +322,19 @@
       if(!frozen){
         kw += (p || 0);
         if((p || 0) > 0) producing++;
+        // Fronius/SMA/Chint expose ONE site-level power the backend splits across
+        // inverters, so any kW they contribute to this headline is an estimate, not a
+        // measured reading. Track how much of "kW now" came from those vendors so we
+        // can honestly mark the total with "~" when it's estimate-tainted.
+        if((p || 0) > 0 && _ALLOC_VENDOR[(c.vendor || "").toLowerCase()]) allocKw += p;
       }
       if(c.produced_today_kwh != null) kwh += c.produced_today_kwh;
     });
+    // The sum is estimate-tainted when an allocated vendor contributes a meaningful
+    // slice of it (>1%); a trivial rounding sliver shouldn't slap "~" on a real total.
+    const kwEstimated = kw > 0 && allocKw > 0.01 * kw;
     el.innerHTML =
-      `<span class="dp"><b>${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
+      `<span class="dp"${kwEstimated ? ` title="Some arrays (Fronius, SMA, Chint) report one site-level power we split across inverters — so this fleet 'kW now' total includes estimates, not purely measured readings."` : ``}><b>${kwEstimated ? "~" : ""}${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>` +
       (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``);
