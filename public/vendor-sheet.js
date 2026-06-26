@@ -280,7 +280,16 @@
       if (i) i.textContent = on ? (_sort.dir === "asc" ? " ▲" : " ▼") : "";
     });
     const data = FleetStore.toColumns();
-    const all = (data && data.columns) || [];
+    // Vendor-data spreadsheet = INVERTER arrays only. Drop utility-meter-only arrays
+    // (GMP/VEC/SmartHub with no inverters / no vendor) — they belong to the offtaker +
+    // NEPOOL views, not here. (Regression fix: the GMP bill-pull began creating
+    // utility-only Array rows that leaked into this grid once the source filter was lost.)
+    const all = ((data && data.columns) || []).filter(c => {
+      const ds = (c && c.daily_split) || {};
+      return !!ds.has_vendor || !!(c && c.vendor)
+        || (Array.isArray(c && c.vendors) && c.vendors.length > 0)
+        || (Array.isArray(c && c.inverters) && c.inverters.length > 0);
+    });
     const cols = all.filter(c => matches(c, _query));
     const cnt = $("#vsCount");
     if (cnt) {
