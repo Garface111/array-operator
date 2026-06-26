@@ -23,7 +23,6 @@
   "use strict";
 
   const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const REDUCE = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Stable color per data-source family for the attribution layer.
   const SRC_COLOR = {
@@ -396,15 +395,22 @@
     function renderChart() {
       const b = buildSeries();
       curSeries = b.series; curCmp = b.cmp; curAccent = b.accent;
-      el.querySelector("#anPeriod").textContent = b.periodLabel;
+      // Guard every lookup — renderChart can fire from an interval/event after the
+      // host scaffold has been torn down or before it's fully mounted; a null here
+      // would crash the whole draw loop.
+      const period = el.querySelector("#anPeriod");
+      if (period) period.textContent = b.periodLabel;
       el.style.setProperty("--an-accent", b.accent);
       // nav buttons
       const nav = el.querySelector(".an-nav");
-      nav.style.visibility = navVisible() ? "visible" : "hidden";
-      el.querySelector('[data-nav="prev"]').disabled = !canPrev();
-      el.querySelector('[data-nav="next"]').disabled = !canNext();
+      if (nav) nav.style.visibility = navVisible() ? "visible" : "hidden";
+      const prevBtn = el.querySelector('[data-nav="prev"]');
+      if (prevBtn) prevBtn.disabled = !canPrev();
+      const nextBtn = el.querySelector('[data-nav="next"]');
+      if (nextBtn) nextBtn.disabled = !canNext();
       // compare toggle only meaningful for month/day
-      el.querySelector(".an-cmp").style.visibility = (gran==="month"||gran==="day") ? "visible" : "hidden";
+      const cmp = el.querySelector(".an-cmp");
+      if (cmp) cmp.style.visibility = (gran==="month"||gran==="day") ? "visible" : "hidden";
       renderDelta(b);
       cvs.draw = (ctx,w,h) => drawBars(ctx,w,h, curSeries, curCmp, accentFor(gran), hoverIdx);
     }
