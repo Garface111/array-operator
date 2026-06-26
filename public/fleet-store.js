@@ -287,7 +287,7 @@ window.FleetStore = (function(){
     const list = (ids && ids.length) ? state.arrays.filter(a => ids.includes(a.id)) : state.arrays;
     const columns = list.map(a => ({
       array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
-      inverter_source: "solaredge", inverter_count: a.inverters.length,
+      inverter_source: a.vendor || "solaredge", inverter_count: a.inverters.length,
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
@@ -769,11 +769,21 @@ window.FleetStore = (function(){
   function simulateFleet(){
     const rng = mulberry32(0x5ECA11);
     const pick = arr => arr[Math.floor(rng()*arr.length)];
+    // Demo fleet spans every vendor Array Operator supports, weighted to look like a
+    // real mixed portfolio — so the signed-out Fleet Health + Vendor-data views show
+    // SolarEdge / Fronius / SMA / CHINT / Locus side by side, not one ecosystem.
+    const VMIX = [["solaredge",.38],["fronius",.22],["sma",.18],["chint",.12],["locus",.10]];
+    const pickVendor = () => { let x = rng(); for(const [v,w] of VMIX){ if((x-=w)<=0) return v; } return "solaredge"; };
+    const modelFor = (vendor, np) => { const r = Math.round(np); return ({
+      solaredge:`SE${np}K`, fronius:`Symo ${r}.0-3-M`, sma:`STP ${r}.0-3AV-40`,
+      chint:`CPS SCA${r}KTL-DO`, locus:`LGate ${r}`,
+    }[vendor] || `SE${np}K`); };
     const arrays = [];
     for(let n=0;n<100;n++){
       const invCount = 8 + Math.floor(rng()*9);
       const place = PLACES[n % PLACES.length];
       const name = n < PLACES.length ? place : `${place} ${Math.floor(n/PLACES.length)+1}`;
+      const vendor = pickVendor();
       const inverters = [];
       for(let j=0;j<invCount;j++){
         const r = rng(); let status="ok";
@@ -801,7 +811,7 @@ window.FleetStore = (function(){
         }
         const kwhVals = daily.map(d=>d.kwh);
         inverters.push({
-          id: _invSeq++, name:`Inverter ${j+1}`, model:`SE${np}K`, nameplate_kw:np,
+          id: _invSeq++, name:`Inverter ${j+1}`, model:modelFor(vendor, np), nameplate_kw:np, vendor,
           peer_index:pi, status, window_kwh:Math.round(win*10)/10,
           current_power_w: power==null?null:Math.round(power),
           daily, min_kwh: Math.round(Math.min(...kwhVals)*10)/10, peak_kwh: Math.round(Math.max(...kwhVals)*10)/10,
@@ -809,7 +819,7 @@ window.FleetStore = (function(){
           diagnosis: "",
         });
       }
-      arrays.push({ id:n+1, name, region:pick(REGIONS), host:pick(HOSTS), vendor:"solaredge", inverters });
+      arrays.push({ id:n+1, name, region:pick(REGIONS), host:pick(HOSTS), vendor, inverters });
     }
     return arrays;
   }
