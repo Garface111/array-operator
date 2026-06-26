@@ -232,6 +232,62 @@
     return invMatch(c, q);
   }
 
+  // ── "Sync all vendors": refresh every vendor with one click ────────────────
+  // Each silent-capable vendor (Fronius/SMA/SolarEdge) is recaptured through the
+  // extension — it opens the portal in a BACKGROUND tab on the existing signed-in
+  // session, grabs fresh readings, and CLOSES the tab automatically. The extension is
+  // single-flight, so we run them back-to-back. Chint can't be captured silently (it
+  // needs a per-site click), so we open its portal at the end to finish.
+  let _syncing = false;
+  function recaptureVendorViaBridge(vendor, timeoutMs = 120000) {
+    return new Promise((resolve) => {
+      const reqId = "vs-sync-" + vendor + "-" + Date.now();
+      let settled = false;
+      const onMsg = (e) => {
+        if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
+        if (e.data.type === "SO_RECAPTURE_DONE" && e.data.reqId === reqId) {
+          settled = true; window.removeEventListener("message", onMsg);
+          resolve({ ok: !!e.data.ok, captured: !!e.data.captured, error: e.data.error || null });
+        }
+      };
+      window.addEventListener("message", onMsg);
+      try { window.postMessage({ type: "SO_RECAPTURE", vendor, reqId }, window.location.origin); }
+      catch (_) { window.removeEventListener("message", onMsg); resolve({ ok: false, error: "post-failed" }); return; }
+      setTimeout(() => { if (!settled) { window.removeEventListener("message", onMsg); resolve({ ok: false, error: "timeout" }); } }, timeoutMs);
+    });
+  }
+  async function syncAllVendors(btn) {
+    if (_syncing) return;
+    if (!extPresent()) {
+      const o = btn.innerHTML; btn.innerHTML = "Install the EnergyAgent extension to sync";
+      setTimeout(() => { btn.innerHTML = o; }, 2600); return;
+    }
+    // The distinct vendors actually on screen (their per-vendor portal buttons).
+    const present = [...new Set([...document.querySelectorAll("#vsBody [data-vportal]")]
+      .map(b => b.getAttribute("data-vportal")))].filter(v => VENDOR_PORTAL[v]);
+    if (!present.length) return;
+    const silent = present.filter(v => v !== "chint");
+    const hasChint = present.includes("chint");
+    _syncing = true;
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.classList.add("on");
+    let okCount = 0;
+    for (let i = 0; i < silent.length; i++) {
+      const v = silent[i];
+      btn.innerHTML = `<span class="vs-spin"></span> Syncing ${esc(vlabel(v))}… (${i + 1}/${silent.length})`;
+      const r = await recaptureVendorViaBridge(v);
+      if (r.ok) okCount++;
+      try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {}  // surface fresh readings as they land
+    }
+    if (hasChint) {
+      btn.innerHTML = "Opening Chint to finish…";
+      try { window.postMessage({ type: "SO_OPEN_PORTAL", url: VENDOR_PORTAL.chint, active: true,
+        provider: "chint", vendor: "chint", reqId: "vs-sync-chint-" + Date.now() }, window.location.origin); } catch (_) {}
+    }
+    btn.innerHTML = `✓ Synced ${okCount}/${silent.length}${hasChint ? " · Chint opened" : ""}`;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; btn.classList.remove("on"); _syncing = false; }, 3000);
+  }
+
   function buildShell(host) {
     const heads = COLS.map(col => {
       if (!col.key) return `<span class="${col.cls}">${col.label}</span>`;
@@ -245,6 +301,8 @@
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
           <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
             placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
+          <button type="button" class="vs-syncall" id="vsSyncAll"
+            title="Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.">↻ Sync all vendors</button>
         </div>
       </div>
       <div class="vs-scroll" id="vsScroll">
@@ -262,6 +320,8 @@
       if (window.__aoAddArray) window.__aoAddArray();
       else location.hash = "#arrays";   // defensive: sandbox owns the modal
     };
+    const syncBtn = host.querySelector("#vsSyncAll");
+    if (syncBtn) syncBtn.onclick = () => syncAllVendors(syncBtn);
     host.querySelectorAll("[data-sort]").forEach(b => {
       const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
       b.addEventListener("click", go);

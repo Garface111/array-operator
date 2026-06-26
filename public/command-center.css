@@ -1198,6 +1198,17 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   box-shadow:0 4px 14px -4px rgba(29,78,216,.45); transition:filter .12s, transform .04s; }
 .vs-addbtn:hover{ filter:brightness(1.06); }
 .vs-addbtn:active{ transform:translateY(1px); }
+/* Sync all vendors — one click refreshes every vendor in the background. */
+.vs-syncall{ display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:0;
+  border-radius:9px; padding:9px 16px; font:inherit; font-size:13px; font-weight:650; color:#fff;
+  white-space:nowrap; background:linear-gradient(180deg,#10b981,#059669);
+  box-shadow:0 4px 14px -4px rgba(5,150,105,.45); transition:filter .12s, transform .04s; }
+.vs-syncall:hover{ filter:brightness(1.06); }
+.vs-syncall:active{ transform:translateY(1px); }
+.vs-syncall:disabled, .vs-syncall.on{ cursor:default; filter:saturate(.85) brightness(.98); }
+.vs-spin{ display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.45);
+  border-top-color:#fff; border-radius:50%; animation:vs-spin .7s linear infinite; vertical-align:-1px; }
+@keyframes vs-spin{ to{ transform:rotate(360deg); } }
 .vs-search{ width:280px; max-width:48vw; font:inherit; font-size:13px; color:var(--ink,#0f172a);
   padding:8px 12px; border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff);
   transition:border-color .12s, box-shadow .12s; }
