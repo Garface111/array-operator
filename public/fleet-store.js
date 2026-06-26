@@ -106,7 +106,28 @@ window.FleetStore = (function(){
     recovered: 0,
     focus: [],                 // arrayIds the sandbox shows (subset, keeps it from being 100 columns)
     triage: loadTriage(),      // shared workflow state, keyed by `${arrayId}|${invName}`
+    energyRate: null,          // $/kWh the owner is actually billed at (backend default_net_rate_per_kwh); null until fetched
   };
+  // The dashboard "$ at risk / recoverable" figures must reflect what the owner
+  // actually bills, not a marketing-blended guess. reports.js bills from the
+  // backend's configured default_net_rate_per_kwh; the loss math used a hardcoded
+  // $0.21/kWh, overstating recoverable dollars ~14% for a typical ~$0.184 rate.
+  // We fetch the real rate once per signed-in load and expose it via energyRate();
+  // consumers fall back to ENERGY_RATE_FALLBACK so demo/anon math is unchanged.
+  const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh — blended VT-ish offset (demo + pre-fetch)
+  function energyRate(){ return state.energyRate != null ? state.energyRate : ENERGY_RATE_FALLBACK; }
+  function fetchEnergyRate(){
+    const s = getSession(); if(!s) return;                 // demo/anon keeps the fallback
+    fetch("/v1/array-operator/billing/global-rate", { headers:{ Authorization:"Bearer "+s } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const n = d && Number(d.default_net_rate_per_kwh);
+        if(n != null && isFinite(n) && n > 0 && n < 5){   // sane $/kWh guard
+          if(state.energyRate !== n){ state.energyRate = n; notify("rate"); }
+        }
+      })
+      .catch(()=>{ /* transient — keep fallback, retried on next load/refetch */ });
+  }
   let _invSeq = 1;             // unique inverter id allocator (demo + new)
 
   const subs = new Set();
@@ -666,6 +687,7 @@ window.FleetStore = (function(){
     if(state.loaded || _loading) return;     // single shared bootstrap — both views may call it
     _loading = true;
     if(getSession()){
+      fetchEnergyRate();   // pull the owner's real billed $/kWh so loss math is honest
       // INSTANT PAINT: if we have a cached snapshot of this owner's real tree,
       // ingest it immediately so the sandbox renders with zero network wait, then
       // refresh from the backend in the background and re-ingest the authoritative
@@ -799,6 +821,8 @@ window.FleetStore = (function(){
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,
     lastUpdate: () => _lastUpdate,
+    energyRate,             // effective $/kWh for loss/value math (real billed rate when signed in, else fallback)
+    REC_PER_MWH: 38,        // $/MWh REC value — shared so consumers don't drift
     WINDOW_DAYS,
   };
 })();

@@ -38,9 +38,13 @@
  * ==========================================================================*/
 
 // ---- value model (transparent estimate; backend _value_model is source of truth) ----
-const ENERGY_RATE = 0.21;       // $/kWh blended residential offset (VT-ish)
-const REC_PER_MWH = 38;         // $/MWh REC value
-const val = kwh => kwh*ENERGY_RATE + (kwh/1000)*REC_PER_MWH;
+// $/kWh comes from FleetStore.energyRate() — the owner's REAL billed rate when
+// signed in — so the warranty-email lost-value figure matches what they invoice,
+// not a hardcoded $0.21. Falls back to 0.21 for the demo/anon fleet.
+const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended residential offset (VT-ish)
+const REC_PER_MWH = (window.FleetStore && window.FleetStore.REC_PER_MWH) || 38;  // $/MWh REC value
+const energyRate = () => (window.FleetStore && window.FleetStore.energyRate) ? window.FleetStore.energyRate() : ENERGY_RATE_FALLBACK;
+const val = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
 const usd = n => n==null ? "—" : "$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const usd0 = n => "$"+Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
 const fmt = n => n==null ? "—" : Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
@@ -202,7 +206,7 @@ Evidence (independently measured against ${s.inverters_total-1} peer inverters o
   • Peer index:            ${inv.peer_index!=null?inv.peer_index.toFixed(2):"—"} (1.00 = fair share; this unit is below par)
   • Production this window: ${fmt(inv.window_kwh)} kWh over ${s.window_days} days
   • Estimated lost output:  ${fmt(lostK)} kWh so far
-  • Estimated lost value:   ${usd(lostUsd)} (at ${usd(ENERGY_RATE)}/kWh offset + ${usd0(REC_PER_MWH)}/MWh RECs)
+  • Estimated lost value:   ${usd(lostUsd)} (at ${usd(energyRate())}/kWh offset + ${usd0(REC_PER_MWH)}/MWh RECs)
 
 The neighboring inverters continued to produce normally over the same period, which rules out weather or shading as the cause. Please advise on next steps for repair or replacement under warranty.
 

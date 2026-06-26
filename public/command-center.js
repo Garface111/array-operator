@@ -18,10 +18,16 @@
   "use strict";
 
   // ---- value model: mirrors app.js (transparent estimate) ----
-  const ENERGY_RATE = 0.21;       // $/kWh blended offset
-  const REC_PER_MWH = 38;         // $/MWh REC value
+  // Rate comes from FleetStore.energyRate() — the owner's REAL billed $/kWh when
+  // signed in (backend default_net_rate_per_kwh), so "$ at risk" matches invoices
+  // instead of overstating ~14% with the old hardcoded $0.21. Falls back to 0.21
+  // for the demo/anon fleet (and before the rate fetch returns).
+  const FS = () => (window.FleetStore || null);
+  const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended offset (demo/anon)
+  const energyRate = () => { const s = FS(); return s && s.energyRate ? s.energyRate() : ENERGY_RATE_FALLBACK; };
+  const REC_PER_MWH = (FS() && FS().REC_PER_MWH) || 38;   // $/MWh REC value
   const WINDOW_DAYS = 14;
-  const val  = kwh => kwh*ENERGY_RATE + (kwh/1000)*REC_PER_MWH;
+  const val  = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
   const usd0 = n => "$"+Math.round(Number(n)||0).toLocaleString();
   const num  = n => Number(n||0).toLocaleString();
 
@@ -301,7 +307,7 @@
           <tbody id="ccBody"></tbody>
         </table>
       </div>
-      <div class="cc-foot">Showing flagged inverters only — the ${num(k.inverters-k.flagged)} healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at ${usd0(ENERGY_RATE).replace("$","$0").slice(0,5)}/kWh + ${REC_PER_MWH}/MWh RECs.</div>`;
+      <div class="cc-foot">Showing flagged inverters only — the ${num(k.inverters-k.flagged)} healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at $${energyRate().toFixed(2)}/kWh + ${REC_PER_MWH}/MWh RECs.</div>`;
 
     renderBody();
     wire();

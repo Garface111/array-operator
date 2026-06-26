@@ -606,11 +606,21 @@
   const ALERT_CLASS = { ok: "ok", warn: "warn", critical: "bad" };
 
   // ---- value model (mirrors command-center.js / app.js) — $ at stake estimate ----
-  const ENERGY_RATE = 0.21;       // $/kWh blended offset
-  const REC_PER_MWH = 38;         // $/MWh REC value
+  // Rate from FleetStore.energyRate(): the owner's REAL billed $/kWh when signed
+  // in (backend default_net_rate_per_kwh), so "$ at stake" matches their invoices
+  // instead of overstating ~14% with a hardcoded $0.21. Falls back to 0.21 for the
+  // demo/anon fleet and before the rate fetch returns.
+  const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended offset (demo/anon)
+  const energyRate = () => (window.FleetStore && window.FleetStore.energyRate) ? window.FleetStore.energyRate() : ENERGY_RATE_FALLBACK;
+  const REC_PER_MWH = (window.FleetStore && window.FleetStore.REC_PER_MWH) || 38;  // $/MWh REC value
   const SB_WINDOW_DAYS = 14;
-  const dollarVal = kwh => kwh*ENERGY_RATE + (kwh/1000)*REC_PER_MWH;
+  const dollarVal = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
   const usd0 = n => "$" + Math.round(Number(n)||0).toLocaleString();
+  // Tooltip for the "$ at stake" estimates — names the rate actually used. When a
+  // signed-in owner's real billed rate is loaded it's pinned to their tariff; the
+  // demo/anon fallback still invites them to connect their tariff to pin it.
+  const _hasLiveRate = () => !!(window.FleetStore && window.FleetStore.energyRate && window.FleetStore.isLive && window.FleetStore.isLive());
+  const riskTip = () => `Estimate at $${energyRate().toFixed(2)}/kWh + $${REC_PER_MWH}/MWh RECs` + (_hasLiveRate() ? " — pinned to your billing rate." : " — connect your live tariff to pin it.");
 
   // Per-array health rollup for the OVERVIEW GRID. Returns the worst-case tone
   // (ok/warn/bad), flagged count, and estimated $/mo at stake across the array —
@@ -2025,7 +2035,7 @@
         ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
         : `<span class="sb-tile-flag ok">all good</span>`;
       const risk = h.lossMo >= 1
-        ? `<span class="sb-tile-risk" title="Estimate at $0.21/kWh + $38/MWh RECs — connect your live tariff to pin it.">${usd0(h.lossMo)}<small>/mo est.</small></span>`
+        ? `<span class="sb-tile-risk" title="${riskTip()}">${usd0(h.lossMo)}<small>/mo est.</small></span>`
         : ``;
       return `
         <button type="button" class="sb-tile ${h.tone}" data-array-id="${esc(col.array_id)}"
@@ -2361,7 +2371,7 @@
 
     const stat = (k,v,cls) => v ? `<div class="sb-dc-stat"><span class="sb-dc-sk">${k}</span><span class="sb-dc-sv ${cls||""}">${v}</span></div>` : "";
     const statsHTML = [
-      lossMo>=1 ? `<div class="sb-dc-stat hero" title="Estimate at $0.21/kWh + $38/MWh RECs — connect your live tariff to pin it."><span class="sb-dc-sk">$ at stake <small style="opacity:.65;font-weight:600">est.</small></span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
+      lossMo>=1 ? `<div class="sb-dc-stat hero" title="${riskTip()}"><span class="sb-dc-sk">$ at stake <small style="opacity:.65;font-weight:600">est.</small></span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
       stat("Peer index", isFinite(piNum) ? `${piNum.toFixed(2)} <small>vs neighbors</small>` : "", sCls),
       stat("Nameplate", npKw ? `${npKw} kW` : ""),
       stat("Last 14 days", isFinite(winKwh) ? `${winKwh.toLocaleString()} kWh` : ""),
