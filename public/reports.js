@@ -192,6 +192,10 @@
     // being viewed (skip during an idle prefetch so we never render a PDF for
     // users who never open Reports).
     if (!_tplWired && !prefetch) { _tplWired = true; wireInvoiceTemplate(); }
+    // Global generation-spreadsheet tracker — fetch on a real view (not idle
+    // prefetch). Self-hides on 404/disabled/network-error so deploying before
+    // the tenant endpoint is live is safe.
+    if (!prefetch) { loadGlobalTracker().catch(() => {}); }
     // Data sections: fill on first build; quiet background refresh when the cache
     // is stale. Fire-and-forget so the tab paints instantly (refreshList et al.
     // fetch-then-fill in place, so this never re-blanks a rendered tab).
@@ -424,6 +428,11 @@
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
+        <!-- GLOBAL generation-spreadsheet tracker — one operator-wide sheet for
+             the whole fleet, pinned at the top of the Offtaker Invoice Generator.
+             Hidden until the tenant tracker endpoint is live (404/network → stays
+             hidden). Reuses the shared renderTracker/wireTracker helpers. -->
+        <div class="rb-track rb-track-global rep-card" id="rbGlobalTracker" hidden></div>
         <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
@@ -2704,7 +2713,6 @@
             <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
         <span class="rb-status rb-offedit-status"></span>
-        <div class="rb-track" data-track="${sid}" hidden></div>
       </div>`;
   }
 
@@ -2712,7 +2720,12 @@
   // The operator uploads their existing generation-tracking sheet (any columns);
   // we detect its structure and append a new row each month as fresh GMP bills
   // land. A "Download latest spreadsheet" button streams the kept-current file.
-  // Lazy-loaded per offtaker — only rendered when the backend flag is on.
+  //
+  // ONE GLOBAL operator-wide sheet for the whole fleet — pinned at the top of
+  // the Offtaker Invoice Generator (#rbGlobalTracker), wired to the TENANT
+  // tracker endpoints (no subscription id). The box self-hides on
+  // 404/disabled/network so deploying ahead of the backend is safe.
+  const TRACKER_BASE = "/v1/array-operator/tracker";   // tenant-level (no /billing, no sid)
   const FIELD_LABEL = { period: "Period", generation: "Generation kWh",
     consumption: "Consumption", rate: "Credit rate", amount: "Amount $" };
 
@@ -2727,17 +2740,22 @@
     } catch (e) { return ""; }
   }
 
-  async function loadTracker(box) {
-    const sid = box.getAttribute("data-track");
+  // Load the single operator-wide tracker into #rbGlobalTracker. Tenant
+  // endpoint; on 404 / disabled / network-error the box stays hidden (safe to
+  // deploy before the backend route is live).
+  async function loadGlobalTracker() {
+    const box = $("#rbGlobalTracker");
+    if (!box) return;
+    if (!authHeaders()) { box.hidden = true; return; }   // demo / signed-out
     try {
-      const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { headers: authHeaders() });
-      if (!r.ok) return;                                  // flag off / not found → stay hidden
+      const r = await fetch(TRACKER_BASE, { headers: authHeaders() });
+      if (!r.ok) { box.hidden = true; return; }           // flag off / not found → hide
       const j = await r.json();
-      const t = j && j.tracker;
-      if (!t || !t.enabled) return;                       // feature disabled → hide entirely
+      const t = j && (j.tracker || j);                    // accept {tracker:{…}} or flat shape
+      if (!t || !t.enabled) { box.hidden = true; return; } // feature disabled → hide
       box.hidden = false;
-      renderTracker(box, sid, t);
-    } catch (e) { /* network — leave hidden */ }
+      renderTracker(box, t);
+    } catch (e) { box.hidden = true; }                    // network — leave hidden
   }
 
   function trackerMapTable(t) {
@@ -2757,30 +2775,30 @@
       </div>`;
   }
 
-  function renderTracker(box, sid, t) {
+  function renderTracker(box, t) {
     const has = !!t.has_sheet;
     box.innerHTML = `
       <div class="rb-track-h">
         <span class="rl">Your generation spreadsheet</span>
         <span class="rb-track-hint">${has
-          ? "We add a new row automatically each month as the GMP bill lands."
-          : "Upload your own tracking sheet — we'll detect its columns and keep it current."}</span>
+          ? "We add a new row automatically each month as your GMP bills land — one operator-wide sheet for all your offtakers."
+          : "Upload your operator-wide generation tracking sheet — we'll detect its columns and keep it current as GMP bills land."}</span>
       </div>
       ${trackerMapTable(t)}
       <div class="rb-track-actions">
-        ${has ? `<button type="button" class="rb-track-dl" data-tdl="${sid}">Download latest spreadsheet ↓</button>` : ""}
+        ${has ? `<button type="button" class="rb-track-dl" data-tdl="1">Download latest spreadsheet ↓</button>` : ""}
         <label class="rb-track-up" title="${has ? "Replace the tracked sheet" : "Upload a spreadsheet"}">
           ${has ? "Replace" : "Upload spreadsheet"}
-          <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-tup="${sid}" hidden>
+          <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-tup="1" hidden>
         </label>
-        ${has ? `<button type="button" class="rb-track-rm" data-trm="${sid}">Remove</button>` : ""}
+        ${has ? `<button type="button" class="rb-track-rm" data-trm="1">Remove</button>` : ""}
         <span class="rb-status rb-track-stat"></span>
       </div>
       ${(t.warnings && t.warnings.length) ? `<div class="rb-track-warn">${esc(t.warnings.join(" "))}</div>` : ""}`;
-    wireTracker(box, sid);
+    wireTracker(box);
   }
 
-  function wireTracker(box, sid) {
+  function wireTracker(box) {
     const stat = box.querySelector(".rb-track-stat");
     const setS = (cls, txt) => { if (stat) { stat.className = "rb-status rb-track-stat " + (cls || ""); stat.textContent = txt || ""; } };
     const up = box.querySelector("[data-tup]");
@@ -2790,17 +2808,17 @@
       setS("rb-busy", "Reading your sheet…");
       const fd = new FormData(); fd.append("file", f);
       try {
-        const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { method: "POST", headers: authHeaders(), body: fd });
+        const r = await fetch(TRACKER_BASE, { method: "POST", headers: authHeaders(), body: fd });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setS("rb-err", (j && j.detail) ? j.detail : "Couldn't read that sheet."); return; }
-        renderTracker(box, sid, j.tracker);
+        renderTracker(box, (j && (j.tracker || j)) || {});
       } catch (e) { setS("rb-err", "Upload failed."); }
     };
     const dl = box.querySelector("[data-tdl]");
     if (dl) dl.onclick = async () => {
       setS("rb-busy", "Building latest…");
       try {
-        const r = await fetch(API + "/subscriptions/" + sid + "/tracker/download", { headers: authHeaders() });
+        const r = await fetch(TRACKER_BASE + "/download", { headers: authHeaders() });
         if (!r.ok) { setS("rb-err", "Download failed."); return; }
         const blob = await r.blob();
         const cd = r.headers.get("Content-Disposition") || "";
@@ -2812,19 +2830,20 @@
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         setS("rb-ok", "Downloaded.");
         // Refresh the card so a just-appended period shows as the new last row.
-        const rr = await fetch(API + "/subscriptions/" + sid + "/tracker", { headers: authHeaders() });
+        const rr = await fetch(TRACKER_BASE, { headers: authHeaders() });
         const jj = await rr.json().catch(() => ({}));
-        if (rr.ok && jj.tracker && jj.tracker.enabled) renderTracker(box, sid, jj.tracker);
+        const tt = jj && (jj.tracker || jj);
+        if (rr.ok && tt && tt.enabled) renderTracker(box, tt);
       } catch (e) { setS("rb-err", "Download failed."); }
     };
     const rm = box.querySelector("[data-trm]");
     if (rm) rm.onclick = async () => {
       setS("rb-busy", "Removing…");
       try {
-        const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { method: "DELETE", headers: authHeaders() });
+        const r = await fetch(TRACKER_BASE, { method: "DELETE", headers: authHeaders() });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setS("rb-err", "Couldn't remove."); return; }
-        renderTracker(box, sid, j.tracker);
+        renderTracker(box, (j && (j.tracker || j)) || { enabled: true, has_sheet: false });
       } catch (e) { setS("rb-err", "Network error."); }
     };
   }
@@ -2847,8 +2866,6 @@
         inp.addEventListener("change", h);
       });
     });
-    // Lazy-load the BYO generation-spreadsheet tracker (no-op when flag off).
-    wrap.querySelectorAll(".rb-track[data-track]").forEach(loadTracker);
   }
 
   function onOfftakerEdit(card, box, did, sid, field, inp) {
