@@ -201,7 +201,9 @@
     // fetch-then-fill in place, so this never re-blanks a rendered tab).
     if (!built || (Date.now() - _dataAt) > DATA_TTL_MS) {
       _dataAt = Date.now();
-      Promise.all([refreshInbox(), refreshList(), refreshGmpBillsStatus()]).catch(() => {});
+      // refreshList() now renders the unified accordion (offtaker list + their
+      // drafts inline) — the old separate approval inbox is gone.
+      Promise.all([refreshList(), refreshGmpBillsStatus()]).catch(() => {});
     }
   }
   window.__aoLoadReports = load;
@@ -303,19 +305,12 @@
     if (gmpStatus) gmpStatus.innerHTML =
       `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from this operator's GMP utility bills.</div>`;
 
-    // ── Offtaker list — the exact live card, with demo arrays + util accounts. ──
+    // ── Offtaker accordion — same cards as the live app, with demo arrays/accts. ──
     const demoArrays = [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
     const demoUtil = [{ utility_account_id: 9001, array_name: "Catamount Community Solar",
       has_bill: true, bill_count: 6, account_number: "GMP-558210" }];
-    const list = $("#rbList");
-    if (list) {
-      list.innerHTML = D.offtakers.map(s => subCard(s, demoArrays, demoUtil)).join("");
-      // Intercept every action to a sign-in nudge (no live fetch in the demo).
-      list.querySelectorAll("[data-act],[data-cact]").forEach(b =>
-        b.onclick = (e) => { e.preventDefault(); demoNudge(b); });
-    }
 
-    // ── Approval inbox — populate the module globals + render the real inbox. ──
+    // Populate the inbox globals so the accordion renders + expands from the demo data.
     OFFTAKERS = D.offtakers.slice();
     INBOX_DRAFTS = D.drafts.slice();
     DRAFT_BY_SUB = {};
@@ -325,21 +320,38 @@
       if (sub) { d.subscription_id = null; DRAFT_BY_SUB[String(sub.id)] = d; }
     });
     INBOX_UTIL_ACCTS = demoUtil;
+    ACC_ARRS = demoArrays;
     TEMPLATE_STATE = { has: false, enabled: false };   // no template-PDF fetch in the demo
-    const firstWithDraft = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
-    ACTIVE_SUB_ID = String(firstWithDraft.id);
-    const ad = DRAFT_BY_SUB[ACTIVE_SUB_ID];
-    if (ad) ACTIVE_DRAFT_ID = ad.id;
-    renderInboxBody();
-    // Re-intercept the freshly-rendered inbox action buttons (Approve / Send / Edit /
-    // dropdown picks stay live so visitors can switch offtakers).
-    const wrap = $("#rbInboxWrap");
-    if (wrap) {
-      wrap.querySelectorAll("[data-dact]").forEach(b => {
-        const act = b.getAttribute("data-dact");
-        // Keep purely-local toggles (autogmp/summary repaint) usable; nudge on send/save.
-        if (act === "approve" || act === "sendme" || act === "aiemail" || act === "savemsg")
-          b.onclick = (e) => { e.preventDefault(); demoNudge(b); };
+
+    const list = $("#rbList");
+    if (list) {
+      const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
+      const headLine = pending
+        ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send — nothing sends until you approve.`
+        : `Click an offtaker to review &amp; send their invoice — nothing sends until you approve.`;
+      list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
+        OFFTAKERS.map(s => subCard(s, demoArrays, demoUtil)).join("");
+      wireAccordionHeaders(list);
+      // Open the first offtaker awaiting approval, just like the live app.
+      const firstWithDraft = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
+      ACTIVE_SUB_ID = String(firstWithDraft.id);
+      const ad = DRAFT_BY_SUB[ACTIVE_SUB_ID];
+      if (ad) ACTIVE_DRAFT_ID = ad.id;
+      expandAccordion(ACTIVE_SUB_ID, { silent: true });
+      // Intercept send/save actions to a sign-in nudge (no live fetch in the demo);
+      // local toggles (autogmp/summary) + the accordion expand/collapse stay live.
+      const reintercept = () => {
+        list.querySelectorAll("[data-dact]").forEach(b => {
+          const act = b.getAttribute("data-dact");
+          if (act === "approve" || act === "sendme" || act === "aiemail" || act === "savemsg" || act === "preview")
+            b.onclick = (e) => { e.preventDefault(); demoNudge(b); };
+        });
+      };
+      reintercept();
+      // The body re-renders on expand/edit, so re-intercept after any header click too.
+      list.querySelectorAll("[data-acchead]").forEach(h => {
+        const sid = h.getAttribute("data-acchead");
+        h.addEventListener("click", () => requestAnimationFrame(reintercept));
       });
     }
 
@@ -437,10 +449,9 @@
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
-      <div id="rbInboxWrap" class="rb-inbox-wrap"></div>
-      <!-- The invoice-template box lives here by default; when an approval draft is
-           showing it is relocated to the BOTTOM of that card (one consolidated
-           element) and parked back here when there's nothing to approve. -->
+      <!-- The invoice-template box lives here by default; when an offtaker card is
+           expanded it is relocated to the BOTTOM of that card (one consolidated
+           element) and parked back here when the card collapses. -->
       <div id="rbTplHome">
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
@@ -637,108 +648,6 @@
         if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft."; }
       }
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
-  }
-
-  async function saveCustCard(card) {
-    const id = card.getAttribute("data-id");
-    const st = card.querySelector(".rb-cust-status");
-    const get = f => card.querySelector(`[data-f="${f}"]`);
-    const body = {};
-
-    const name = get("customer_name") && get("customer_name").value.trim();
-    if (!name) { st.className = "rb-status rb-err"; st.textContent = "Offtaker name can't be empty."; return; }
-    body.customer_name = name;
-
-    const email = get("client_email") ? get("client_email").value.trim() : "";
-    body.client_email = email;
-    if (get("cc_emails")) body.cc_emails = get("cc_emails").value.trim();
-
-    if (get("array_id")) {
-      const av = get("array_id").value;
-      if (av) body.array_id = Number(av);
-    }
-    // GMP utility bill (the billing source). Only send when one is chosen — the
-    // blank "keep current" option leaves the existing binding untouched.
-    if (get("utility_account_id")) {
-      const uv = get("utility_account_id").value;
-      if (uv) body.utility_account_id = Number(uv);
-    }
-    if (get("cadence")) {
-      const cv = get("cadence").value;
-      if (cv) body.cadence = cv;
-    }
-    if (get("allocation_pct")) {
-      const raw = get("allocation_pct").value.trim();
-      if (raw !== "") {
-        const n = Number(raw);
-        if (isNaN(n) || n <= 0 || n > 100) {
-          st.className = "rb-status rb-err"; st.textContent = "Share must be a percent between 0 and 100."; return;
-        }
-        body.allocation_pct = n / 100;   // backend wants a fraction in (0,1]
-      }
-    }
-    // solar credit rate ($/kWh): blank → null (auto-derive from the GMP bill);
-    // positive number → per-offtaker override that wins over bill/reference rate.
-    if (get("net_rate_per_kwh")) {
-      const raw = get("net_rate_per_kwh").value.trim();
-      if (raw === "") {
-        body.net_rate_per_kwh = null;
-      } else {
-        const n = Number(raw);
-        if (isNaN(n) || n < 0 || n > 5) {
-          st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be 0–5 $/kWh, or blank to auto-read from the bill."; return;
-        }
-        body.net_rate_per_kwh = n;
-      }
-    }
-    // budget bill: blank → null (use the calculated total); number → fixed final amount.
-    if (get("budget_amount_usd")) {
-      const raw = get("budget_amount_usd").value.trim();
-      if (raw === "") {
-        body.budget_amount_usd = null;
-      } else {
-        const n = Number(raw);
-        if (isNaN(n) || n < 0) {
-          st.className = "rb-status rb-err"; st.textContent = "Budget amount must be 0 or more, or blank."; return;
-        }
-        body.budget_amount_usd = n;
-      }
-    }
-    // discount: blank → null (clear → use the default 10% off); whole % → fraction.
-    if (get("discount_pct")) {
-      const raw = get("discount_pct").value.trim();
-      if (raw === "") {
-        body.discount_pct = null;
-      } else {
-        const n = Number(raw);
-        if (isNaN(n) || n < 0 || n >= 100) {
-          st.className = "rb-status rb-err"; st.textContent = "Discount must be 0–99 (% off), or blank."; return;
-        }
-        body.discount_pct = n / 100;   // backend stores a fraction in [0,1)
-      }
-    }
-    // starting invoice #: blank → null (clear, back to date-based); whole number → set/seed.
-    if (get("invoice_number_start")) {
-      const raw = get("invoice_number_start").value.trim();
-      if (raw === "") {
-        body.invoice_number_start = null;
-      } else {
-        const n = parseInt(raw, 10);
-        if (isNaN(n) || n < 0) {
-          st.className = "rb-status rb-err"; st.textContent = "Starting invoice number must be a whole number, or blank."; return;
-        }
-        body.invoice_number_start = n;
-      }
-    }
-
-    const ok = await patch(id, body, st);
-    if (ok) {
-      st.className = "rb-status rb-ok"; st.textContent = "Saved.";
-      // keep everything in sync — the offtaker list AND the approval inbox (the
-      // draft card + picker + email preview all read the offtaker's name/details).
-      refreshList();
-      refreshInbox();
-    }
   }
 
   // ---- upload + match --------------------------------------------------------
@@ -1542,15 +1451,22 @@
   }
 
   // ---- subscriptions list ----------------------------------------------------
+  // The single list renderer for the Offtaker Invoice Generator. It fetches the
+  // offtaker list + their pending drafts + the array & utility-account options in
+  // one pass, primes the inbox globals (DRAFT_BY_SUB / OFFTAKERS / ARRAYS /
+  // INBOX_UTIL_ACCTS), then renders every offtaker as one accordion card and
+  // auto-expands the default (first with a pending draft). The old separate
+  // "approval inbox" section is GONE — each expanded card IS that offtaker's draft.
   async function refreshList() {
     const list = $("#rbList");
     if (!list) return;
     try {
-      // ONE round-trip: the offtaker list + the array & utility-account options
-      // its edit forms need. Falls back to the three individual endpoints if the
-      // bundle isn't available (older backend), so frontend + backend can deploy
-      // independently and an old cached app still works.
+      // ONE round-trip for subs+arrays+util-accounts (the list-bundle), in parallel
+      // with the pending drafts. Falls back to the legacy individual endpoints if the
+      // bundle isn't available (older backend), so frontend + backend deploy independently.
       let subs, arrs, utilAccts, bundled = false;
+      const draftsP = fetch(API + "/drafts?status=pending", { headers: authHeaders() })
+        .then(r => r.ok ? r.json().catch(() => ({})) : ({})).then(j => j.drafts || []).catch(() => []);
       try {
         const rb = await fetch(API + "/list-bundle", { headers: authHeaders() });
         if (rb.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
@@ -1575,21 +1491,47 @@
         subs = (data && data.subscriptions) || [];
         arrs = a2; utilAccts = u2;
       }
-      if (!subs.length) {
-        list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
-        return;
-      }
-      list.innerHTML = subs.map(s => subCard(s, arrs, utilAccts)).join("");
-      list.querySelectorAll("[data-act]").forEach(b => b.onclick = onAction);
-      // Rate inputs commit on change (not click) — wire them separately.
-      list.querySelectorAll("input.rb-rate-input[data-act='discount']").forEach(inp =>
-        inp.onchange = onRateChange);
-      // Per-offtaker "Save details" buttons (name/email/array/share/rate).
-      list.querySelectorAll('[data-cact="save"]').forEach(b =>
-        b.onclick = () => saveCustCard(b.closest(".rb-sub")));
+      const drafts = await draftsP;
+      INBOX_UTIL_ACCTS = utilAccts || [];
+      renderAccordion(subs, arrs, utilAccts, drafts);
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
     }
+  }
+
+  // Render every offtaker as a collapsed accordion card, preserve which one is
+  // open across refreshes, and auto-open the default (first awaiting approval) on
+  // a fresh load. The expanded body is filled lazily by expandAccordion().
+  let ACC_ARRS = [];               // arrays cache for the open card's offtaker editor
+  function renderAccordion(subs, arrs, utilAccts, drafts) {
+    const list = $("#rbList");
+    if (!list) return;
+    ACC_ARRS = arrs || [];
+    // Index the drafts (newest per offtaker) + build the dropdown-free OFFTAKERS list.
+    _indexInbox(drafts || [], subs || []);
+    // OFFTAKERS is reused as the canonical ordered offtaker list (drafts float to top).
+    if (!OFFTAKERS.length) {
+      list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
+      return;
+    }
+    // Header copy: "N reports ready to review & send — nothing sends until you approve."
+    const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
+    const headLine = pending
+      ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send — nothing sends until you approve.`
+      : `Click an offtaker to review &amp; send their invoice — nothing sends until you approve.`;
+    // Default selection: keep the currently-open card if it still exists, else the
+    // first offtaker awaiting approval (preserve today's default-selection logic).
+    const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
+    if (!stillOpen) {
+      const def = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
+      ACTIVE_SUB_ID = def ? String(def.id) : null;
+    }
+    list.innerHTML =
+      `<div class="rb-acc-lead">${headLine}</div>` +
+      OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
+    wireAccordionHeaders(list);
+    // Open the default card inline.
+    if (ACTIVE_SUB_ID != null) expandAccordion(ACTIVE_SUB_ID, { silent: true });
   }
 
   const MODE_LABEL = { to_me: "To me", to_client: "To client", to_both: "To both" };
@@ -1607,32 +1549,19 @@
     }[src] || (src || "");
   }
 
+  // ── ACCORDION CARD ─────────────────────────────────────────────────────────
+  // Each offtaker is ONE clickable accordion card. Collapsed = a summary header
+  // (name + status chip + the plain-English "receives X% of … · Next/last" line).
+  // Expanded = that offtaker's full draft inline (calc panel, cover email,
+  // offtaker editor, attachments, Approve & send) — built lazily into .rb-acc-body
+  // by expandAccordion() so it reuses the exact live draft pieces. Clicking the
+  // header toggles; expanding one collapses the rest (one open at a time).
   function subCard(s, arrs, utilAccts) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
     const last = s.last_sent_at ? new Date(s.last_sent_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never";
     const fmts = (s.formats || []).map(f => f.toUpperCase()).join(" + ");
-    const live = s.send_mode !== "to_me";
-    const manual = s.billing_model === "percent_of_array";
-    const pct = s.allocation_pct != null ? (Math.round(s.allocation_pct * 10000) / 100) : "";
-    const arrayOpts = (arrs || []).map(a =>
-      `<option value="${a.id}" ${String(a.id) === String(s.array_id) ? "selected" : ""}>${esc(a.name)}${a.client_name ? " · " + esc(a.client_name) : ""}</option>`).join("");
-    // GMP utility-bill (billing-source) options for the edit form. The offtaker's
-    // invoice is generated from this account's bills, so being able to (re)pick it
-    // here is essential — it was only collectible when adding before.
-    const billOpts = (utilAccts || []).map(a => {
-      const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
-        : (a.has_bill ? " (bill on file)" : "");
-      // Label by the array name the bill feeds (recognizable site), not the raw
-      // GMP account number. Fall back to nickname, then the account number.
-      const nm = a.array_name || a.nickname;
-      const lbl = nm ? (nm + bills) : ("GMP · acct " + (a.account_number || "?") + bills);
-      const sel = String(a.utility_account_id) === String(s.utility_account_id) ? "selected" : "";
-      return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
-    }).join("");
-    // ── one plain-English sentence, built from the offtaker's actual choices:
-    //    "<name> receives <pct> of <linked GMP account / array>'s generation.
-    //     <Monthly|Quarterly> <PDF> — drafted for approval / auto-sent to <emails>." ──
+    // ── one plain-English sentence, built from the offtaker's actual choices. ──
     const srcName = s.utility_account_name
       || ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name
       || "the array";
@@ -1649,230 +1578,28 @@
       : "drafted for your approval, then sent to " + esc(recips);
     const sentence = "<b>" + esc(s.customer_name) + "</b> receives <b>" + pctTxt + "</b> of <b>"
       + esc(srcName) + "</b>'s generation. <b>" + cadTxt + "</b> " + esc(fmts) + " &mdash; " + deliveryTxt + ".";
-    // Plain statement of WHERE the invoice numbers come from (replaces the rate-math
-    // line). Honest per source: the GMP bill, an uploaded workbook, or "link one first".
-    const discTxt = s.resolved_discount_pct ? `, at <b>${Math.round(s.resolved_discount_pct * 100)}% off</b>` : "";
-    const invoiceSource = s.utility_account_id
-      ? `Your offtaker's invoice is calculated from the GMP bill${discTxt}.`
-      : (s.source_filename
-          ? `Your offtaker's invoice is calculated from the uploaded billing workbook${discTxt}.`
-          : "Link a GMP utility bill to invoice this offtaker.");
+    // Whether a draft is queued for this offtaker (Ready) drives the header pill.
+    const draft = DRAFT_BY_SUB[String(s.id)];
+    const readyPill = draft
+      ? `<span class="rb-chip rb-chip-ready">${draft.amount_usd != null ? money(draft.amount_usd) + " ready" : "Ready"}</span>`
+      : "";
     return `
-      <div class="rb-sub ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}">
-        <div class="rb-sub-main">
-          <div class="rb-sub-name">${esc(s.customer_name)}
-            <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
-            ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
-          </div>
-          <div class="rb-sub-sentence">${sentence}</div>
-          <div class="rb-sub-rate">${invoiceSource}</div>
-          <div class="rb-sub-meta">
-            Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null ? " · " + money(prev.amount_owed) : ""}
-          </div>
-        </div>
-        <div class="rb-sub-acts">
-          <button class="ao-btn rb-btn" data-act="draft">Draft invoice</button>
-          <a class="ao-btn rb-btn" data-act="preview" href="#">Preview</a>
-          <button class="ao-btn rb-btn rb-edit-toggle" data-act="edit" aria-expanded="false">Edit ⌄</button>
-          <span class="rb-status rb-sub-status"></span>
-          <div class="rb-sub-more" hidden>
-            <div class="rb-more-row">
-              <span class="rb-more-lbl">Delivery</span>
-              <div class="rb-seg rb-slider rb-mini" data-act="delivery">
-                <button type="button" data-v="approval" class="${s.delivery_mode !== "auto" ? "on" : ""}">Draft</button>
-                <button type="button" data-v="auto" class="${s.delivery_mode === "auto" ? "on" : ""}">Auto</button>
-              </div>
-              <span class="rb-more-lbl">Send to</span>
-              <div class="rb-seg rb-slider rb-mini" data-act="mode">
-                <button type="button" data-v="to_me" class="${s.send_mode === "to_me" ? "on" : ""}">Me</button>
-                <button type="button" data-v="to_client" class="${s.send_mode === "to_client" ? "on" : ""}">Client</button>
-                <button type="button" data-v="to_both" class="${s.send_mode === "to_both" ? "on" : ""}">Both</button>
-              </div>
+      <div class="rb-acc ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}" data-open="false">
+        <div class="rb-acc-head" role="button" tabindex="0" aria-expanded="false"
+             aria-controls="rbAccBody-${s.id}" data-acchead="${s.id}">
+          <span class="rb-acc-caret" aria-hidden="true">▸</span>
+          <div class="rb-acc-head-main">
+            <div class="rb-acc-name">${esc(s.customer_name)}
+              ${readyPill}
+              <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
+              ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
             </div>
-            <div class="rb-more-details">
-              <span class="rb-more-lbl">Offtaker details</span>
-              <div class="rb-cust-grid">
-                <label class="rep-fld"><span class="rl">Company / offtaker name</span>
-                  <input type="text" data-f="customer_name" value="${esc(s.customer_name || "")}" placeholder="e.g. Sunnybrook Apartments"></label>
-                <label class="rep-fld"><span class="rl">Contact email</span>
-                  <input type="email" data-f="client_email" value="${esc(s.client_email || "")}" placeholder="offtaker@example.com"></label>
-                <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
-                  <input type="text" data-f="cc_emails" value="${esc(s.cc_emails || "")}" placeholder="optional"></label>
-                ${manual ? `
-                <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
-                  <select data-f="utility_account_id">
-                    <option value="">${s.utility_account_id ? "— keep current —" : "Select a GMP bill…"}</option>
-                    ${billOpts}
-                  </select>
-                  <span class="rb-fld-hint">The offtaker's invoice is generated from this GMP account's utility bills only. ${s.utility_account_id ? "" : "<b>Pick one to start invoicing this offtaker.</b>"}</span></label>
-                <label class="rep-fld"><span class="rl">Array</span>
-                  <select data-f="array_id">${arrayOpts || `<option value="">No arrays</option>`}</select></label>
-                <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-                  <input type="number" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
-                ` : ""}
-                <label class="rep-fld"><span class="rl">Cadence</span>
-                  <select data-f="cadence">
-                    <option value="monthly" ${s.cadence === "monthly" ? "selected" : ""}>Monthly</option>
-                    <option value="quarterly" ${s.cadence === "quarterly" ? "selected" : ""}>Quarterly</option>
-                  </select></label>
-                <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
-                  <input type="number" data-f="net_rate_per_kwh" min="0" max="5" step="0.0001" value="${s.net_rate_per_kwh != null ? s.net_rate_per_kwh : ""}" placeholder="blank = auto from bill">
-                  <span class="rb-fld-hint">Blank = read from the GMP bill automatically. Set this to your actual net-metering credit rate when the meter's own bill shows $0 credit (e.g. group net metering).</span></label>
-                <label class="rep-fld"><span class="rl">Discount (% off the solar credit rate)</span>
-                  <input type="number" data-f="discount_pct" min="0" max="99" step="1" value="${s.discount_pct != null ? Math.round(s.discount_pct * 100) : ""}" placeholder="e.g. 10">
-                  <span class="rb-fld-hint">Blank = your default discount (10% off).</span></label>
-                <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
-                  <input type="number" data-f="budget_amount_usd" min="0" step="0.01" value="${s.budget_amount_usd != null ? s.budget_amount_usd : ""}" placeholder="blank = use the calculated amount">
-                  <span class="rb-fld-hint">Set a flat amount this offtaker pays each period — overrides the calculated total. The line items still show on the invoice.</span></label>
-                <label class="rep-fld"><span class="rl">Starting invoice #</span>
-                  <input type="number" data-f="invoice_number_start" min="0" step="1" value="${s.invoice_number_start != null ? s.invoice_number_start : ""}" placeholder="e.g. 1001">
-                  <span class="rb-fld-hint">${s.invoice_number_next != null ? "Next invoice will be #" + s.invoice_number_next + ". " : ""}Array Operator adds 1 after each send. Blank = date-based.</span></label>
-              </div>
-              <button class="ao-btn ao-btn-primary rb-btn" data-cact="save" type="button">Save details</button>
-              <span class="rb-status rb-cust-status"></span>
-            </div>
-            <div class="rb-more-row">
-              <button class="ao-btn rb-btn" data-act="test">Send test</button>
-              <button class="ao-btn rb-btn" data-act="toggle">${s.enabled ? "Pause" : "Resume"}</button>
-              <button class="ao-btn rb-btn rb-danger" data-act="delete">Delete</button>
-            </div>
+            <div class="rb-acc-sentence">${sentence}</div>
+            <div class="rb-acc-meta">Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null && !draft ? " · ~" + money(prev.amount_owed) : ""}</div>
           </div>
         </div>
+        <div class="rb-acc-body" id="rbAccBody-${s.id}" data-accbody="${s.id}" hidden></div>
       </div>`;
-  }
-
-  // Per-customer discount committed inline (blank clears → use global default).
-  // UI shows whole % off; backend stores a fraction in [0,1).
-  async function onRateChange(e) {
-    const inp = e.currentTarget;
-    const row = inp.closest(".rb-sub");
-    const id = row && row.getAttribute("data-id");
-    if (!id) return;
-    const st = $(".rb-sub-status", row);
-    const raw = inp.value.trim();
-    let body;
-    if (raw === "") {
-      body = { discount_pct: null };
-    } else {
-      const d = Number(raw);
-      if (isNaN(d) || d < 0 || d >= 100) {
-        if (st) { st.className = "rb-status rb-err"; st.textContent = "Discount must be 0–99%, or blank."; }
-        return;
-      }
-      body = { discount_pct: d / 100 };
-    }
-    const ok = await patch(id, body, st);
-    if (ok) await refreshList();
-  }
-
-  async function onAction(e) {
-    e.preventDefault();
-    const btn = e.currentTarget;
-    const act = btn.getAttribute("data-act");
-    if (act === "discount") return;   // handled by onRateChange (change, not click)
-    const row = btn.closest(".rb-sub");
-    const id = row && row.getAttribute("data-id");
-    if (!id) return;
-    const st = $(".rb-sub-status", row);
-
-    if (act === "edit") {
-      // Expand/collapse the per-offtaker controls (delivery, send-to, discount,
-      // test/pause/delete). Purely local — no fetch, no list refresh.
-      const more = $(".rb-sub-more", row);
-      if (!more) return;
-      const open = more.hasAttribute("hidden");
-      if (open) { more.removeAttribute("hidden"); btn.textContent = "Close ⌃"; btn.setAttribute("aria-expanded", "true"); }
-      else { more.setAttribute("hidden", ""); btn.textContent = "Edit ⌄"; btn.setAttribute("aria-expanded", "false"); }
-      return;
-    }
-
-    if (act === "mode") {
-      const seg = btn; // wrapper has data-act=mode; actual click target is a button inside
-      const target = e.target.closest("button");
-      if (!target) return;
-      const mode = target.getAttribute("data-v");
-      seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
-      target.classList.add("on");
-      await patch(id, { send_mode: mode }, st);
-      await refreshList();
-      return;
-    }
-    if (act === "delivery") {
-      const seg = btn;
-      const target = e.target.closest("button");
-      if (!target) return;
-      const dm = target.getAttribute("data-v");
-      // Switching to Auto-send enables automatic outward emails — tell the operator
-      // it goes out under THEIR name before turning it on (and let them back out).
-      if (dm === "auto" && !confirm("Turn on Auto-send for this offtaker?\n\nEach period's invoice will email to them automatically — sent under your name, with replies coming to you. Your offtaker won't see any Array Operator branding. (Nothing sends until the next billing period.)")) {
-        return;
-      }
-      seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
-      target.classList.add("on");
-      await patch(id, { delivery_mode: dm }, st);
-      await refreshList();
-      return;
-    }
-    if (act === "toggle") {
-      const resuming = btn.textContent.trim() === "Resume";
-      await patch(id, { enabled: resuming }, st);
-      await refreshList();
-      return;
-    }
-    if (act === "delete") {
-      if (!confirm("Delete this scheduled report? This can't be undone.")) return;
-      st.className = "rb-status rb-busy"; st.textContent = "Deleting…";
-      await fetch(API + "/subscriptions/" + id, { method: "DELETE", headers: authHeaders() });
-      await refreshList();
-      return;
-    }
-    if (act === "draft") {
-      st.className = "rb-status rb-busy"; st.textContent = "Drafting invoice for review…";
-      try {
-        const r = await fetch(API + "/subscriptions/" + id + "/draft", { method: "POST", headers: authHeaders() });
-        const data = await r.json().catch(() => ({}));
-        if (r.ok && data.ok) {
-          st.className = "rb-status rb-ok"; st.textContent = "Draft added to your approval inbox ↑";
-          await refreshInbox();
-          const wrap = $("#rbInboxWrap");
-          if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else {
-          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft.";
-        }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
-      return;
-    }
-    if (act === "preview") {
-      // A new-tab GET wouldn't carry the Authorization header, so fetch the PDF
-      // as a blob (auth header attached) and open the object URL instead.
-      return downloadPreview(id, st);
-    }
-    if (act === "test") {
-      st.className = "rb-status rb-busy"; st.textContent = "Sending test to you…";
-      try {
-        const r = await fetch(API + "/subscriptions/" + id + "/send-now?test=true", { method: "POST", headers: authHeaders() });
-        const data = await r.json().catch(() => ({}));
-        if (r.ok && data.ok) {
-          const to = (data.result && data.result.to || []).join(", ");
-          st.className = "rb-status rb-ok"; st.textContent = "Test sent" + (to ? " to " + to : "") + ".";
-        } else {
-          st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Test failed.";
-        }
-      } catch (err) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
-    }
-  }
-
-  async function downloadPreview(id, st) {
-    st.className = "rb-status rb-busy"; st.textContent = "Building preview…";
-    try {
-      const r = await fetch(API + "/subscriptions/" + id + "/preview?kind=invoice&fmt=pdf", { headers: authHeaders() });
-      if (!r.ok) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; return; }
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      st.textContent = "";
-    } catch (e) { st.className = "rb-status rb-err"; st.textContent = "Preview failed."; }
   }
 
   async function patch(id, body, st) {
@@ -2000,127 +1727,125 @@
     col.appendChild(tpl);
   }
 
+  // refreshInbox() is retained as the canonical "re-pull drafts + re-render the
+  // list" entry point (every approve/send/dismiss/toggle path calls it). It now
+  // simply re-renders the unified accordion list (which fetches drafts itself).
   async function refreshInbox() {
-    const wrap = $("#rbInboxWrap");
-    if (!wrap) return;
-    try {
-      const [rd, rs, utilAccts] = await Promise.all([
-        fetch(API + "/drafts?status=pending", { headers: authHeaders() }),
-        fetch(API + "/subscriptions", { headers: authHeaders() }),
-        fetchUtilityAccounts(),
-      ]);
-      if (!rd.ok) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
-      const drafts = (await rd.json().catch(() => ({}))).drafts || [];
-      const subs = rs.ok ? ((await rs.json().catch(() => ({}))).subscriptions || []) : [];
-      // The section appears when there's something awaiting approval (≥1 pending draft);
-      // from there the dropdown lets the operator swap to ANY offtaker.
-      if (!drafts.length) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; return; }
-      INBOX_UTIL_ACCTS = utilAccts || [];
-      _indexInbox(drafts, subs);
-      // Default / re-home the selected offtaker.
-      const inList = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
-      if (!inList) {
-        const def = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
-        ACTIVE_SUB_ID = def ? String(def.id) : null;
-      } else if (!_pinActiveSub && !DRAFT_BY_SUB[String(ACTIVE_SUB_ID)]) {
-        // The active offtaker's draft was just sent/dismissed → advance to the next
-        // one still awaiting approval (unless pinned to a deliberate selection).
-        const fp = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]);
-        if (fp) ACTIVE_SUB_ID = String(fp.id);
-      }
-      _pinActiveSub = false;
-      const ad = DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
-      if (ad) ACTIVE_DRAFT_ID = ad.id;
-      renderInboxBody();
-    } catch (e) { parkTpl(); wrap.innerHTML = ""; INBOX_DRAFTS = []; OFFTAKERS = []; }
+    await refreshList();
   }
 
-  // The secondary line under an offtaker's name — amount + period when a draft
-  // exists, else a hint about what's available.
-  function pickSubLine(s) {
-    const d = DRAFT_BY_SUB[String(s.id)];
-    if (d) return `${money(d.amount_usd)}${d.period_label ? " · " + esc(d.period_label) : ""}`;
-    if (s.preview && s.preview.amount_owed != null) return `~${money(s.preview.amount_owed)} · not yet drafted`;
-    return "No report drafted yet";
-  }
-
-  // One row in the custom dropdown menu (name + sub-line + a status pill).
-  function offtakerMenuItem(s) {
-    const on = String(s.id) === String(ACTIVE_SUB_ID);
-    const pill = DRAFT_BY_SUB[String(s.id)]
-      ? `<span class="rb-pick-pill ready">Ready</span>`
-      : `<span class="rb-pick-pill todraft">Draft</span>`;
-    return `<button type="button" class="rb-pick-item${on ? " active" : ""}" role="option"
-              aria-selected="${on ? "true" : "false"}" data-subpick="${esc(String(s.id))}">
-        <span class="rb-pick-item-main">
-          <span class="rb-pick-item-name">${esc(s.customer_name || "Offtaker")}</span>
-          <span class="rb-pick-item-sub">${pickSubLine(s)}</span>
-        </span>${pill}
-      </button>`;
-  }
 
   // Render the approval inbox from the cached data, so the offtaker dropdown switches
   // the whole section instantly. ONE offtaker shows at a time; the custom dropdown picks
   // which (its draft card + live preview move together). An offtaker with no pending
   // draft shows a loading state while one is minted, or a graceful empty state.
+  // ── ACCORDION: header wiring + expand/collapse ───────────────────────────────
+  // The collapsed header is a real button (role+tabindex+aria-expanded). A click
+  // ANYWHERE on it toggles; Enter/Space do the same. Expanding one collapses any
+  // other open card (one at a time). Inner controls in the expanded body stop their
+  // own propagation, so editing/sending never bubbles up to collapse the card.
+  function wireAccordionHeaders(list) {
+    list.querySelectorAll("[data-acchead]").forEach(h => {
+      const sid = h.getAttribute("data-acchead");
+      h.onclick = () => toggleAccordion(sid);
+      h.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); toggleAccordion(sid); }
+      };
+    });
+  }
+
+  function toggleAccordion(sid) {
+    sid = String(sid);
+    const card = document.querySelector(`.rb-acc[data-id="${sid}"]`);
+    if (!card) return;
+    if (card.getAttribute("data-open") === "true") collapseAccordion(sid);
+    else expandAccordion(sid);
+  }
+
+  // Open one offtaker's card: collapse every other, mark this one open, set
+  // ACTIVE_SUB_ID, and render its full draft inline into .rb-acc-body. `silent`
+  // skips the scroll-into-view (used for the default-open on first render).
+  function expandAccordion(sid, opts) {
+    sid = String(sid);
+    const list = $("#rbList");
+    if (!list) return;
+    // Collapse any other open card first (one open at a time).
+    list.querySelectorAll('.rb-acc[data-open="true"]').forEach(c => {
+      if (c.getAttribute("data-id") !== sid) collapseAccordion(c.getAttribute("data-id"));
+    });
+    const card = list.querySelector(`.rb-acc[data-id="${sid}"]`);
+    if (!card) return;
+    ACTIVE_SUB_ID = sid;
+    VIEWING_VERSION_ID = null;          // always open on the latest version
+    card.setAttribute("data-open", "true");
+    const head = card.querySelector("[data-acchead]");
+    if (head) head.setAttribute("aria-expanded", "true");
+    const body = card.querySelector("[data-accbody]");
+    if (body) body.hidden = false;
+    renderAccordionBody(sid);
+    // A cached draft is shown instantly; pull the latest GMP bill + recompute in the
+    // background so a freshly-released statement is reflected without a manual regen.
+    if (DRAFT_BY_SUB[sid] && authHeaders()) backgroundRefreshDraft(sid);
+    if (!(opts && opts.silent)) {
+      requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    }
+  }
+
+  function collapseAccordion(sid) {
+    sid = String(sid);
+    const card = document.querySelector(`.rb-acc[data-id="${sid}"]`);
+    if (!card) return;
+    parkTpl();                          // protect the wired template box before wiping the body
+    card.setAttribute("data-open", "false");
+    const head = card.querySelector("[data-acchead]");
+    if (head) head.setAttribute("aria-expanded", "false");
+    const body = card.querySelector("[data-accbody]");
+    if (body) { body.hidden = true; body.innerHTML = ""; }
+    if (String(ACTIVE_SUB_ID) === sid) ACTIVE_SUB_ID = null;
+  }
+
+  // renderInboxBody() is the compatibility shim the rest of the module calls to
+  // "re-render the active draft view" (version picker, recompute, etc.). It now
+  // re-renders the OPEN accordion card's body.
   function renderInboxBody() {
-    const wrap = $("#rbInboxWrap");
+    if (ACTIVE_SUB_ID != null) renderAccordionBody(ACTIVE_SUB_ID);
+  }
+
+  // Fill one offtaker's expanded body with its full draft: the two-column review
+  // (left = cover email + attach controls + offtaker editor; right = Approve/Send
+  // header + the How-we-calculated panel + the live email/invoice preview). This is
+  // the SAME draft pipeline the old approval inbox used — draftCard/calcDashboard/
+  // reviewActions/renderDraftDoc — just hosted inside the accordion card.
+  function renderAccordionBody(sid) {
+    sid = String(sid);
+    const card = document.querySelector(`.rb-acc[data-id="${sid}"]`);
+    if (!card) return;
+    const wrap = card.querySelector("[data-accbody]");
     if (!wrap) return;
     parkTpl();                          // protect the wired template box before any wipe
-    if (!OFFTAKERS.length) { wrap.innerHTML = ""; return; }
-    if (!OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID))) ACTIVE_SUB_ID = String(OFFTAKERS[0].id);
-    const activeOf = OFFTAKERS.find(s => String(s.id) === String(ACTIVE_SUB_ID)) || OFFTAKERS[0];
-    const active = activeDraft();
-    const pendingCount = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
-    const btnSub = pickSubLine(activeOf);
-    const menuRows = OFFTAKERS.map(offtakerMenuItem).join("");
+    const activeOf = OFFTAKERS.find(s => String(s.id) === sid) || { id: sid };
+    const active = activeDraft();       // reads ACTIVE_SUB_ID / VIEWING_VERSION_ID
 
-    // The body column: the real draft card | a loading card | a graceful empty state.
+    // The form column: the real draft card | a loading card | a graceful empty state.
     let bodyCol;
-    if (String(GENERATING_SUB_ID) === String(ACTIVE_SUB_ID)) {
+    if (String(GENERATING_SUB_ID) === sid) {
       bodyCol = `<div class="rb-draft rb-draft-loading"><div class="rb-spin"></div>
         <p>Drafting ${esc(activeOf.customer_name || "this offtaker")}'s latest period…</p></div>`;
     } else if (active) {
       bodyCol = draftCard(active, INBOX_UTIL_ACCTS);
     } else {
-      const why = GEN_FAIL[String(ACTIVE_SUB_ID)]
+      const why = GEN_FAIL[sid]
         || "No billable period yet for this offtaker — its report appears here once a GMP bill lands.";
       bodyCol = `<div class="rb-draft rb-draft-empty">
         <div class="rb-draft-top"><div class="rb-draft-name">${esc(activeOf.customer_name || "Offtaker")}</div></div>
         <p class="rb-empty-why">${esc(why)}</p>
-        <button class="ao-btn rb-btn" type="button" data-regen="${esc(String(ACTIVE_SUB_ID))}">Try drafting this period</button>
+        <button class="ao-btn rb-btn" type="button" data-regen="${esc(sid)}">Try drafting this period</button>
       </div>`;
     }
 
     wrap.innerHTML = `
-      <div class="rb-inbox rep-card">
-        <div class="rb-inbox-h">
-          <div class="rb-inbox-h-main">
-            <span class="rep-eyebrow">Awaiting your approval</span>
-            <h3>${pendingCount} report${pendingCount === 1 ? "" : "s"} ready to review &amp; send</h3>
-            <p>Drafted from the latest billing period. Review the numbers, then
-               approve — nothing goes to an offtaker until you do. The GMP bill
-               attaches automatically.</p>
-          </div>
-          <div class="rb-inbox-pick">
-            <label class="rb-pick-lab" id="rbPickLab">Reviewing offtaker</label>
-            <div class="rb-pick" data-open="false">
-              <button class="rb-pick-btn" type="button" id="rbPickBtn" aria-haspopup="listbox"
-                      aria-expanded="false" aria-labelledby="rbPickLab">
-                <span class="rb-pick-btn-main">
-                  <span class="rb-pick-btn-name">${esc(activeOf.customer_name || "Offtaker")}</span>
-                  ${btnSub ? `<span class="rb-pick-btn-sub">${btnSub}</span>` : ""}
-                </span>
-                <span class="rb-pick-caret" aria-hidden="true">▾</span>
-              </button>
-              <div class="rb-pick-menu" id="rbPickMenu" role="listbox" aria-labelledby="rbPickLab" hidden>${menuRows}</div>
-            </div>
-            <span class="rb-pick-sub">${OFFTAKERS.length > 1
-              ? `Switch between your ${OFFTAKERS.length} offtakers`
-              : "Sends only when you approve"}</span>
-            ${verPickerHTML(ACTIVE_SUB_ID)}
-          </div>
-        </div>
+      <div class="rb-acc-inner">
+        ${verPickerHTML(sid)}
         <div class="rb-layout">
           <div class="rb-col-form">${bodyCol}</div>
           <aside class="rb-col-doc">
@@ -2129,27 +1854,29 @@
           </aside>
         </div>
       </div>`;
+    // Inner controls must NOT bubble a click up to the header (which would collapse
+    // the card). Only the header strip toggles; everything inside the body is inert
+    // to the accordion. (Capture isn't needed — the header listener is on the header
+    // element, not an ancestor of the body, but this guards future nesting + the
+    // version picker that sits at the top of the body.)
     wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-    // Version history: fetch this offtaker's older drafts (once), wire the dropdown, and
-    // make an older version read-only (you can look but not send — switch to latest first).
-    _ensureVersions(ACTIVE_SUB_ID);
-    const _vp = $("#rbVerPick");
-    if (_vp) _vp.onchange = () => { VIEWING_VERSION_ID = _vp.value || null; renderInboxBody(); };
+    // Version history: fetch older drafts (once), wire the dropdown; older = read-only.
+    _ensureVersions(sid);
+    const _vp = wrap.querySelector("#rbVerPick");
+    if (_vp) _vp.onchange = () => { VIEWING_VERSION_ID = _vp.value || null; renderAccordionBody(sid); };
     if (VIEWING_VERSION_ID != null) {
-      // The approve/send buttons (now in the review header) are disabled in reviewActions().
       const form = wrap.querySelector(".rb-col-form");
       if (form) { const b = document.createElement("div"); b.className = "rb-ver-banner";
         b.textContent = "Viewing an older version (read-only) — select “· latest” to edit or send."; form.insertBefore(b, form.firstChild); }
     }
-    // Live preview: paint now (only when a real draft is showing), then repaint as the
-    // operator edits the email or toggles an attachment.
+    // Live preview + review header (actions + calc dashboard).
     renderDraftDoc();
-    renderReviewTop();                                // actions + calc dashboard above the preview
+    renderReviewTop();
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
-      autoGrowMsg(ta);                                // size to fit the whole note now
+      autoGrowMsg(ta);
       const did = ta.getAttribute("data-draftmsg");
       const focusDraft = () => { ACTIVE_DRAFT_ID = did; renderDraftDoc(); };
-      // The cover email AUTO-SAVES as you type (debounced) — no Save button, no AI button.
+      // The cover email AUTO-SAVES as you type (debounced 700ms) — no Save button.
       let saveT = null;
       const tag = () => wrap.querySelector(".rb-email-saved");
       const doSave = async () => {
@@ -2161,71 +1888,25 @@
           });
           const t = tag(); if (t) t.textContent = r.ok ? "✓ saved" : "couldn’t save";
           const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
-          if (d) d.note = ta.value;                   // keep the model in sync for preview/send
+          if (d) d.note = ta.value;
         } catch (_) { const t = tag(); if (t) t.textContent = "couldn’t save"; }
       };
       const queueSave = () => { const t = tag(); if (t) t.textContent = "saving…"; clearTimeout(saveT); saveT = setTimeout(doSave, 700); };
       ta.addEventListener("input", () => { autoGrowMsg(ta); focusDraft(); queueSave(); });
       ta.addEventListener("focus", focusDraft);
-      ta.addEventListener("blur", () => { clearTimeout(saveT); doSave(); });   // flush on blur
+      ta.addEventListener("blur", () => { clearTimeout(saveT); doSave(); });
     });
-    // Re-fit after layout settles (scrollHeight is only reliable once painted).
     requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
     wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
       cb.addEventListener("change", () => renderDraftDoc()));
-    // Manual GMP-bill upload — the fallback when auto-capture hasn't run (the bill DATA
-    // is in but its PDF was never pulled). Uploads onto the draft; on send it takes
-    // precedence over auto-attach.
     wrap.querySelectorAll("[data-gmpupload]").forEach(inp =>
       inp.addEventListener("change", () => uploadGmpBill(inp)));
     const regen = wrap.querySelector("[data-regen]");
     if (regen) regen.onclick = () => selectOfftaker(regen.getAttribute("data-regen"), true);
-    // Custom offtaker dropdown (open/close/select/keyboard) + inline offtaker editors.
-    wireOfftakerPicker(wrap);
     wireOfftakerEditors(wrap);
     // Consolidate: drop the (already-wired) invoice-template box at the bottom of
-    // this approval card so the page reads as one element, not three.
-    foldTplIntoInbox(wrap.querySelector(".rb-inbox.rep-card"));
-  }
-
-  // Wire the custom dropdown: toggle, click-outside, Esc, arrow-key nav, item select.
-  function wireOfftakerPicker(wrap) {
-    const pick = wrap.querySelector(".rb-pick");
-    const btn = wrap.querySelector("#rbPickBtn");
-    const menu = wrap.querySelector("#rbPickMenu");
-    if (!pick || !btn || !menu) return;
-    const items = Array.prototype.slice.call(menu.querySelectorAll("[data-subpick]"));
-    let kbd = -1;
-    const setKbd = (i) => {
-      kbd = i;
-      items.forEach((el, j) => el.classList.toggle("kbd", j === i));
-      if (items[i]) items[i].scrollIntoView({ block: "nearest" });
-    };
-    function onDoc(e) { if (!pick.contains(e.target)) close(); }
-    function onKey(e) {
-      if (e.key === "Escape") { e.preventDefault(); close(); btn.focus(); }
-      else if (e.key === "ArrowDown") { e.preventDefault(); setKbd(Math.min(items.length - 1, kbd + 1)); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setKbd(Math.max(0, kbd - 1)); }
-      else if ((e.key === "Enter" || e.key === " ") && items[kbd]) { e.preventDefault(); items[kbd].click(); }
-    }
-    function open() {
-      pick.setAttribute("data-open", "true");
-      btn.setAttribute("aria-expanded", "true");
-      menu.hidden = false;
-      const cur = items.findIndex(el => el.classList.contains("active"));
-      setKbd(cur >= 0 ? cur : 0);
-      document.addEventListener("mousedown", onDoc, true);
-      document.addEventListener("keydown", onKey, true);
-    }
-    function close() {
-      pick.setAttribute("data-open", "false");
-      btn.setAttribute("aria-expanded", "false");
-      menu.hidden = true;
-      document.removeEventListener("mousedown", onDoc, true);
-      document.removeEventListener("keydown", onKey, true);
-    }
-    btn.onclick = () => (pick.getAttribute("data-open") === "true" ? close() : open());
-    items.forEach(el => el.onclick = () => { close(); selectOfftaker(el.getAttribute("data-subpick")); });
+    // the open card so the page reads as one element.
+    foldTplIntoInbox(wrap.querySelector(".rb-acc-inner"));
   }
 
   // Switch the whole approval section to a chosen offtaker. If they already have a
@@ -2431,10 +2112,14 @@
   // The send actions, lifted ABOVE the live preview (Paul's review flow). Disabled when
   // reviewing an OLDER version (look-only) — switch to latest to send.
   function reviewActions(d, readonly) {
+    // "Preview" downloads the exact PDF that gets sent (the old summary-row Preview
+    // button, absorbed here). Approve & send is the blue primary; Send-to-me + Preview
+    // are quiet secondaries beside it.
     return `
       <div class="rb-review-acts">
         <button class="ao-btn ao-btn-primary rb-btn rb-btn-lg" data-dact="approve"${readonly ? ' disabled title="Viewing an older version — switch to “latest” to send."' : ""}>Approve &amp; send</button>
         <button class="ao-btn rb-btn" data-dact="sendme" type="button" title="Email a test copy to yourself first"${readonly ? " disabled" : ""}>Send to me</button>
+        <button class="ao-btn rb-btn" data-dact="preview" type="button" title="Open the exact invoice PDF in a new tab">Preview ↗</button>
         <span class="rb-status rb-draft-status"></span>
       </div>`;
   }

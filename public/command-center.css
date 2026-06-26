@@ -666,6 +666,57 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-more-row{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .rb-more-lbl{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
   color:var(--faint); }
+
+/* ===================== OFFTAKER ACCORDION (.rb-acc) =========================
+ * Each offtaker is ONE clickable accordion card. Collapsed = the summary header
+ * (name + status chips + the plain-English line + Next/last meta). Click anywhere
+ * on the header to expand the full draft inline; click the header again to collapse.
+ * One open at a time. Cold, flat-matte, high-contrast, dense — the AO day palette:
+ * white cards, slate-200 hairlines, ink text, utility-blue accent, octarine signature
+ * on the open card's spine. (--line/--ink/--good resolve to the day tokens here.) */
+/* The global spreadsheet-tracker box is display:flex via .rep-card, which beat the
+   [hidden] UA display:none and left an empty white card above the list when the
+   feature is off. Force hidden to actually hide. */
+.rb-track-global[hidden]{ display:none !important; }
+.rb-acc-lead{ font-size:13px; line-height:1.5; color:var(--muted,#475569); margin:0 2px 12px;
+  letter-spacing:-.005em; }
+.rb-acc-lead b{ color:var(--ink,#0f172a); font-weight:750; }
+.rb-acc{ border:1px solid var(--line,#e2e8f0); border-radius:13px; background:var(--card,#fff);
+  margin-bottom:9px; overflow:hidden; transition:border-color .13s ease, box-shadow .13s ease; }
+.rb-acc.rb-paused{ opacity:.6; }
+.rb-acc:hover{ border-color:#cbd5e1; }
+/* The open card lifts forward (dolly, not scale) with an octarine left spine. */
+.rb-acc[data-open="true"]{ border-color:#cbd5e1;
+  box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 10px 30px -14px rgba(15,23,42,.22);
+  border-left:2px solid var(--octarine,#a368ff); }
+/* The clickable header strip — the WHOLE row is the toggle button. */
+.rb-acc-head{ display:flex; align-items:flex-start; gap:11px; padding:13px 15px; cursor:pointer;
+  user-select:none; transition:background .12s ease; }
+.rb-acc-head:hover{ background:rgba(37,99,235,.04); }
+.rb-acc-head:focus-visible{ outline:none; background:rgba(37,99,235,.06);
+  box-shadow:inset 0 0 0 2px rgba(37,99,235,.35); border-radius:12px; }
+.rb-acc[data-open="true"] .rb-acc-head{ background:rgba(37,99,235,.045); border-bottom:1px solid var(--line,#e2e8f0); }
+.rb-acc-caret{ flex:0 0 auto; margin-top:2px; color:var(--faint,#94a3b8); font-size:12px; line-height:1.4;
+  transition:transform .15s ease, color .12s ease; }
+.rb-acc[data-open="true"] .rb-acc-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.rb-acc-head-main{ flex:1 1 auto; min-width:0; }
+.rb-acc-name{ font-size:15px; font-weight:700; color:var(--ink,#0f172a); display:flex; align-items:center;
+  gap:7px; flex-wrap:wrap; line-height:1.3; }
+.rb-acc-sentence{ font-size:13px; line-height:1.5; color:var(--muted,#475569); margin:5px 0 4px; }
+.rb-acc-sentence b{ color:var(--ink,#0f172a); font-weight:680; }
+.rb-acc-meta{ font-size:11.5px; color:var(--faint,#94a3b8); font-variant-numeric:tabular-nums; }
+/* "$X ready" pill on a card that has a draft awaiting approval — utility blue. */
+.rb-chip-ready{ background:rgba(37,99,235,.12); color:var(--good,#2563eb); font-weight:750; }
+/* The expanded body — holds the full draft review (.rb-acc-inner > .rb-layout). */
+.rb-acc-body{ padding:0; }
+.rb-acc-body[hidden]{ display:none; }
+.rb-acc-inner{ padding:16px 16px 18px; animation:rbaccin .16s ease; }
+@keyframes rbaccin{ from{ opacity:0; transform:translateY(-4px) } to{ opacity:1; transform:none } }
+/* The draft card inside the open accordion is a flat panel, not a floating card —
+   the accordion IS the card; the draft is its contents. */
+.rb-acc-inner .rb-draft{ border:0 !important; box-shadow:none !important; background:transparent !important;
+  padding:0; }
+.rb-acc-inner .rb-layout{ margin-top:2px; }
 /* Source-data outage banner on an array card — makes it explicit the data gap
    is at the vendor/source, not Array Operator. Amber = attention, not failure. */
 .sb-srcout{ display:flex; align-items:flex-start; gap:9px; margin:9px 0 6px;
