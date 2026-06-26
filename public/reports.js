@@ -2920,8 +2920,13 @@
         const dg = await rg.json().catch(() => ({}));
         const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
         if (rg.ok && dg.draft && d) {
+          // Include budget_amount_usd + solar_credit_value so CLEARING a budget bill
+          // (or changing it) updates the preview live — otherwise the local draft kept
+          // the old budget and the two-row "Budgeted amount" display stayed stale until
+          // a hard refresh re-fetched the draft.
           ["array_total_kwh", "allocation_pct", "customer_kwh", "amount_usd",
-           "invoice_number", "period_label"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
+           "invoice_number", "period_label", "budget_amount_usd",
+           "solar_credit_value"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
           applyDraftFigures(card, d);
           setSt("rb-status rb-ok", "Saved · figures updated.");
         } else {
