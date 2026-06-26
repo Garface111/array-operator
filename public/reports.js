@@ -2109,6 +2109,7 @@
             <span class="rb-pick-sub">${OFFTAKERS.length > 1
               ? `Switch between your ${OFFTAKERS.length} offtakers`
               : "Sends only when you approve"}</span>
+            ${verPickerHTML(ACTIVE_SUB_ID)}
           </div>
         </div>
         <div class="rb-layout">
@@ -2117,6 +2118,19 @@
         </div>
       </div>`;
     wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
+    // Version history: fetch this offtaker's older drafts (once), wire the dropdown, and
+    // make an older version read-only (you can look but not send — switch to latest first).
+    _ensureVersions(ACTIVE_SUB_ID);
+    const _vp = $("#rbVerPick");
+    if (_vp) _vp.onchange = () => { VIEWING_VERSION_ID = _vp.value || null; renderInboxBody(); };
+    if (VIEWING_VERSION_ID != null) {
+      const ap = wrap.querySelector('[data-dact="approve"]');
+      if (ap) { ap.disabled = true; ap.title = "Viewing an older version — switch to “latest” to approve & send.";
+                ap.style.opacity = "0.45"; ap.style.cursor = "not-allowed"; }
+      const form = wrap.querySelector(".rb-col-form");
+      if (form) { const b = document.createElement("div"); b.className = "rb-ver-banner";
+        b.textContent = "Viewing an older version (read-only) — select “· latest” to edit or send."; form.insertBefore(b, form.firstChild); }
+    }
     // Live preview: paint now (only when a real draft is showing), then repaint as the
     // operator edits the email or toggles an attachment.
     renderDraftDoc();
@@ -2210,6 +2224,8 @@
   // envelope fields. `force` re-mints even when a draft already exists.
   async function selectOfftaker(subId, force) {
     subId = String(subId);
+    VIEWING_VERSION_ID = null;          // a new offtaker always opens on its LATEST version
+    _verFetched.delete(subId);          // re-fetch versions in case a new period landed
     if (DRAFT_BY_SUB[subId] && !force) {
       ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody();
       // Show the cached draft instantly, but ALSO pull the latest GMP bill + recompute in
@@ -2278,9 +2294,44 @@
     } catch (e) { setStat("rb-err", "Network error — try again."); inp.value = ""; }
   }
 
+  // ── Invoice version history (older drafts per offtaker) ──────────────────────
+  let VIEWING_VERSION_ID = null;     // a draft id when reviewing an OLDER version; null = latest
+  const VERSIONS_BY_SUB = {};        // subId -> [draft versions, latest first]
+  const _verFetched = new Set();     // subIds whose versions we've fetched this view
+  async function _ensureVersions(subId) {
+    subId = String(subId);
+    if (!subId || !authHeaders() || _verFetched.has(subId)) return;
+    _verFetched.add(subId);
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft-versions", { headers: authHeaders() });
+      if (!r.ok) return;
+      const j = await r.json();
+      VERSIONS_BY_SUB[subId] = j.versions || [];
+      // Re-render so the dropdown appears, but only if there's actually history to show.
+      if (String(ACTIVE_SUB_ID) === subId && VERSIONS_BY_SUB[subId].length > 1) renderInboxBody();
+    } catch (_) {}
+  }
+  // The version dropdown beside the offtaker picker — only when >1 version exists.
+  function verPickerHTML(subId) {
+    const vs = VERSIONS_BY_SUB[String(subId)] || [];
+    if (vs.length < 2) return "";
+    const opts = vs.map((d, i) => {
+      const amt = d.amount_usd != null
+        ? " · $" + Number(d.amount_usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+      const label = (d.period_label || d.invoice_number || ("Draft #" + d.id)) + (i === 0 ? " · latest" : "") + amt;
+      const val = i === 0 ? "" : String(d.id);
+      const sel = String(VIEWING_VERSION_ID || "") === val ? " selected" : "";
+      return `<option value="${esc(val)}"${sel}>${esc(label)}</option>`;
+    }).join("");
+    return `<label class="rb-ver-lab">Version <select class="rb-ver-pick" id="rbVerPick" title="View an older invoice version for this offtaker">${opts}</select></label>`;
+  }
   function activeDraft() {
-    // The selected OFFTAKER is the source of truth; its pending draft (if any) is what
-    // the card + live preview render. Falls back to the id-based lookup for safety.
+    // A selected OLDER version wins — a read-only look-back at a past invoice.
+    if (VIEWING_VERSION_ID != null) {
+      const v = (VERSIONS_BY_SUB[String(ACTIVE_SUB_ID)] || []).find(d => String(d.id) === String(VIEWING_VERSION_ID));
+      if (v) return v;
+    }
+    // The selected OFFTAKER is the source of truth; its latest pending draft renders.
     if (ACTIVE_SUB_ID != null && DRAFT_BY_SUB[String(ACTIVE_SUB_ID)]) return DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
     return INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || null;
   }

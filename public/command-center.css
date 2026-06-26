@@ -998,6 +998,13 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-pick-pill.ready{ color:#065f46; background:rgba(16,185,129,.18); }
 .rb-pick-pill.todraft{ color:var(--muted); background:var(--day-chip,#eef2f7); }
 .rb-pick-sub{ font-size:11px; color:var(--faint); }
+/* invoice version-history dropdown (older drafts per offtaker) */
+.rb-ver-lab{ font-size:11px; color:var(--faint); display:flex; align-items:center; gap:6px; margin-top:2px; }
+.rb-ver-pick{ font:inherit; font-size:12px; font-weight:600; color:var(--ink); background:var(--card2,#f8fafc);
+  border:1px solid var(--line); border-radius:7px; padding:3px 7px; cursor:pointer; max-width:240px; }
+.rb-ver-pick:hover{ border-color:var(--good,#2563eb); }
+.rb-ver-banner{ background:rgba(217,119,6,.10); border:1px solid rgba(217,119,6,.3); color:var(--gold2,#b45309);
+  font-size:12px; font-weight:600; border-radius:9px; padding:8px 12px; margin-bottom:10px; }
 /* on-demand draft: loading + graceful empty states in the body column */
 .rb-draft-loading{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:11px; padding:30px 16px; color:var(--muted); }
 .rb-spin{ width:26px; height:26px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--good,#047857); animation:rbspin .8s linear infinite; }
