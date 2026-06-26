@@ -363,8 +363,8 @@
               h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
                 <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span>${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
-                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}</span>
-                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? `<span title="Current power as a percent of this inverter's rated nameplate capacity">${Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100)}% of rated</span>` : ""}</span>
+                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate capacity">· ${Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100)}% of rated</span>` : ""}</span>
+                <span class="vs-c-today"></span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
