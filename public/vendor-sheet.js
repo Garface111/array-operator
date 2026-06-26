@@ -54,7 +54,10 @@
     const a = c.alert || {};
     if (a.level === "critical") return { label: a.headline || "Fault", cls: "bad" };
     if (a.level === "warn") return { label: a.count ? a.count + " need attention" : (a.headline || "Attention"), cls: "warn" };
-    if ((c.source_status || {}).state === "stale") return { label: "Source offline", cls: "warn" };
+    // A stale source is a PAUSED feed (the portal session lapsed, not a vendor API
+    // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
+    // matches that recoverable state; "offline" wrongly implied a hard outage.
+    if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn" };
     return { label: "All clear", cls: "ok" };
   }
   function statusRank(c) {
@@ -69,7 +72,11 @@
     if (s === "fault") return { label: "Fault", cls: "bad" };
     if (s === "underperforming") return { label: "Underperforming", cls: "warn" };
     if (s === "comm_gap") return { label: "Quiet", cls: "warn" };
-    if (s === "monitoring") return { label: "Monitoring", cls: "muted" };
+    // "Monitoring" = we're tracking it but don't yet have enough peer history to grade
+    // it (new device, or a metering channel the vendor isn't populating) — so we make
+    // no verdict rather than a false "OK"/flag. Spell that out; the bare word is opaque.
+    if (s === "monitoring") return { label: "Monitoring", cls: "muted",
+      tip: "Tracking this inverter, but not enough peer history yet to grade it — no verdict either way." };
     return { label: "OK", cls: "ok" };
   }
   function _ageMin(c) {
@@ -357,8 +364,8 @@
                 <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span>${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}</span>
-                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
-                <span class="vs-c-status"><span class="vs-pill ${ist.cls}">${esc(ist.label)}</span></span>
+                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? `<span title="Current power as a percent of this inverter's rated nameplate capacity">${Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100)}% of rated</span>` : ""}</span>
+                <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
               if (iopen) h += invDetailHTML(iv);
