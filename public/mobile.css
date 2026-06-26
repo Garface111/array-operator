@@ -99,4 +99,13 @@
      fits with an even 8px gutter — no horizontal scroll, button still reachable. */
   #fsWrap { left: 8px; right: 8px; bottom: 8px; }
   #fsPanel { width: auto; max-width: none; }
+
+  /* Command Center triage search: on the narrowest phones the wrapping flex row can
+     squeeze the field below a usable width. Keep it fat-finger friendly — wide enough
+     to type a full query and ≥44px tall — and let it take a full row if needed.
+     The dashboard scopes its input as #panelDashboard .cc-search input (ID-weighted),
+     so match that specificity or the min-height won't win. */
+  .cc-search { flex: 1 1 100%; min-width: 140px; }
+  .cc-search input,
+  #panelDashboard .cc-search input { min-height: 44px; }
 }
