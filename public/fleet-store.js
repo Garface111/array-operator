@@ -296,6 +296,10 @@ window.FleetStore = (function(){
       // reads ONE authoritative number and can show "produced today" when live≈0).
       current_power_w: (a.current_power_w != null ? a.current_power_w : null),
       produced_today_kwh: (a.produced_today_kwh != null ? a.produced_today_kwh : null),
+      // Provenance for "today" so consumers can mark an estimate (bill_prorate)
+      // distinctly from a measured reading (audit-style data honesty).
+      produced_today_source: (a.produced_today_source != null ? a.produced_today_source : null),
+      produced_today_is_estimated: a.produced_today_is_estimated === true,
       inverters: a.inverters.map(i => ({
         inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
@@ -749,6 +753,12 @@ window.FleetStore = (function(){
       // instantaneous feed must not make a healthy array read IDLE).
       current_power_w: (c.current_power_w != null ? c.current_power_w : null),
       produced_today_kwh: (c.produced_today_kwh != null ? c.produced_today_kwh : null),
+      // Provenance for produced_today_kwh so the dashboard + spreadsheet can be
+      // honest about whether today's kWh is MEASURED (vendor/csv/gmp/live) or an
+      // ESTIMATE smeared from a utility bill (bill_prorate). Backend sends both;
+      // we forward them. Absent → treated as unknown, never asserted as measured.
+      produced_today_source: (c.produced_today_source != null ? c.produced_today_source : null),
+      produced_today_is_estimated: c.produced_today_is_estimated === true,
       inverters: (c.inverters||[]).map(inv => ({
         id: inv.inverter_id!=null ? inv.inverter_id : ("inv-"+(_invSeq++)),
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
