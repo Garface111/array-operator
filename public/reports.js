@@ -2425,7 +2425,10 @@
           <table class="rb-eml-figs">
             <tr><td>Billing period</td><td>${esc(period)}</td></tr>
             <tr><td>Your production</td><td>${kwh}</td></tr>
-            <tr class="due"><td>Solar credit value due</td><td>${money(d.amount_usd)}</td></tr>
+            ${(d.budget_amount_usd != null && d.solar_credit_value != null)
+              ? `<tr><td>Solar credit value due</td><td>${money(d.solar_credit_value)}</td></tr>
+                 <tr class="due"><td>Budgeted amount</td><td>${money(d.amount_usd)}</td></tr>`
+              : `<tr class="due"><td>Solar credit value due</td><td>${money(d.amount_usd)}</td></tr>`}
           </table>
           <p class="rb-eml-attline">The full ${attWord} attached.</p>
         </div>
