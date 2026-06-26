@@ -645,7 +645,16 @@ function updateTrialNudge(session){
       if(days < 0 || days > 7){ bar.hidden = true; return; }
       const tier = days <= 2 ? "urgent" : "soft";
       let dis = null;
-      try { dis = JSON.parse(localStorage.getItem("ao_trialnudge_dismiss") || "null"); } catch(e){}
+      try {
+        const parsed = JSON.parse(localStorage.getItem("ao_trialnudge_dismiss") || "null");
+        // Only accept the exact shape we wrote ({ends, tier}); localStorage is same-origin
+        // writable, so a poisoned/wrong-typed value (array, primitive, hostile object) must
+        // not slip past the property reads below — coerce or discard.
+        if(parsed && typeof parsed === "object" && !Array.isArray(parsed)
+           && typeof parsed.ends === "string" && typeof parsed.tier === "string"){
+          dis = { ends: parsed.ends, tier: parsed.tier };
+        }
+      } catch(e){}
       if(dis && dis.ends === a.trial_ends_at){
         if(dis.tier === "urgent"){ bar.hidden = true; return; }
         if(tier === "soft"){ bar.hidden = true; return; }

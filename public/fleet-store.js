@@ -44,14 +44,57 @@ window.FleetStore = (function(){
       }));
     } catch(e){ /* quota/serialise — non-fatal, just lose the fast path */ }
   }
+  // Sanitize a single inverter object from the cache. localStorage is same-origin
+  // writable, so a hijacked/XSS-poisoned entry could carry hostile shapes; coerce to
+  // the fields recompute()/alertFor()/renderers actually read and drop anything that
+  // isn't a plain object. Strings are bounded so a giant injected serial can't bloat
+  // the DOM. Unknown extra keys are dropped (not spread) so nothing rides along.
+  const _str = (x, max) => (typeof x === "string" ? x.slice(0, max || 120) : (x == null ? "" : String(x).slice(0, max || 120)));
+  const _num = (x) => (typeof x === "number" && isFinite(x) ? x : null);
+  function sanitizeInverter(iv){
+    if(!iv || typeof iv !== "object" || Array.isArray(iv)) return null;
+    const out = {
+      id: iv.id != null ? _str(iv.id, 64) : ("iv" + (_invSeq++)),
+      name: _str(iv.name, 80),
+      serial: _str(iv.serial, 80),
+      vendor: _str(iv.vendor, 40),
+      status: _str(iv.status, 24),
+      nameplate_kw: _num(iv.nameplate_kw),
+      current_power_w: _num(iv.current_power_w),
+      window_kwh: _num(iv.window_kwh),
+      peer_index: _num(iv.peer_index),
+      last_seen: iv.last_seen != null ? _str(iv.last_seen, 40) : null,
+    };
+    return out;
+  }
+  function sanitizeArray(a){
+    if(!a || typeof a !== "object" || Array.isArray(a)) return null;
+    if(a.id == null) return null;                          // the id is load-bearing (focus, findArray, dedupe)
+    const invs = Array.isArray(a.inverters)
+      ? a.inverters.map(sanitizeInverter).filter(Boolean)
+      : [];
+    return {
+      id: _str(a.id, 64),
+      name: _str(a.name, 120),
+      region: a.region != null ? _str(a.region, 80) : "—",
+      host: _str(a.host, 200),
+      vendor: _str(a.vendor, 40),
+      inverters: invs,
+    };
+  }
   function readFleetCache(){
     const s = getSession(); if(!s) return null;
     try {
       const raw = localStorage.getItem(cacheKeyFor(s));
       if(!raw) return null;
       const c = JSON.parse(raw);
-      if(!c || c.v !== 1 || !Array.isArray(c.arrays)) return null;
-      return c;
+      if(!c || typeof c !== "object" || c.v !== 1 || !Array.isArray(c.arrays)) return null;
+      // Validate + coerce each cached array to the known shape; drop malformed ones
+      // rather than trusting the blob wholesale. A poisoned cache degrades to a network
+      // load, never to executing/rendering attacker-shaped data.
+      const arrays = c.arrays.map(sanitizeArray).filter(Boolean);
+      const recovered = _num(c.recovered) || 0;
+      return { v: 1, at: _num(c.at) || 0, recovered, arrays };
     } catch(e){ return null; }
   }
 
