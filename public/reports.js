@@ -146,6 +146,15 @@
     const el = root();
     if (!el) return;
     if (!authHeaders()) {
+      // Signed-out DEMO: render a fully-populated Offtaker Invoice Generator for
+      // the fake operator (Catamount Community Solar) — its offtaker list + an
+      // approval inbox with a styled demo invoice — instead of the sign-in wall.
+      // Gated on the demo module; the real signed-in path (authHeaders truthy)
+      // is never affected.
+      if (window.AO_DEMO && Array.isArray(window.AO_DEMO.offtakers)) {
+        renderDemo(el);
+        return;
+      }
       el.innerHTML = signInPrompt();
       el.dataset.rbBuilt = "";
       _dataAt = 0; _tplWired = false;
@@ -257,6 +266,147 @@
       <h3>Sign in to set up automatic reports</h3>
       <p>Upload a billing spreadsheet and we'll send invoices + performance
       summaries on the schedule you choose. <a href="/accounts" style="color:var(--good)">Sign in</a> to get started.</p></div>`;
+  }
+
+  /* ===========================================================================
+   * ANONYMOUS DEMO — a fully-populated Offtaker Invoice Generator for the fake
+   * operator (Catamount Community Solar) so a signed-out visitor sees the whole
+   * surface working: the offtaker list, the approval inbox with a real invoice
+   * email preview, and the dual bill model. Reuses subCard()/draftCard()/
+   * renderInboxBody() so the demo can't drift from the live UI. Every action
+   * button (Approve / Draft / Edit) is intercepted to a gentle "sign in" note
+   * rather than firing a fetch that would 401.
+   * ==========================================================================*/
+  let _demoBuilt = false;
+  function renderDemo(el) {
+    const D = window.AO_DEMO;
+    if (!_demoBuilt) {
+      el.innerHTML = shell();
+      _demoBuilt = true;
+    }
+    // A subtle demo affordance above the offtaker list (matches the page's demo banner).
+    const head = $(".rb-list-head");
+    if (head && !$("#rbDemoNote")) {
+      const note = document.createElement("div");
+      note.id = "rbDemoNote";
+      note.className = "rb-gmp-ok";
+      note.style.cssText = "margin:2px 0 0;background:rgba(245,185,66,.08);border:1px solid rgba(245,185,66,.28);color:var(--muted)";
+      note.innerHTML = `Demo — a sample operator's offtakers. <a href="/onboarding" style="color:var(--good);font-weight:650">Set up your own →</a>`;
+      head.parentNode.insertBefore(note, head.nextSibling);
+    }
+    // The GMP-bills status line: show the "connected" affordance (offtakers bill from bills).
+    const gmpStatus = $("#rbGmpBillsStatus");
+    if (gmpStatus) gmpStatus.innerHTML =
+      `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from this operator's GMP utility bills.</div>`;
+
+    // ── Offtaker list — the exact live card, with demo arrays + util accounts. ──
+    const demoArrays = [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
+    const demoUtil = [{ utility_account_id: 9001, array_name: "Catamount Community Solar",
+      has_bill: true, bill_count: 6, account_number: "GMP-558210" }];
+    const list = $("#rbList");
+    if (list) {
+      list.innerHTML = D.offtakers.map(s => subCard(s, demoArrays, demoUtil)).join("");
+      // Intercept every action to a sign-in nudge (no live fetch in the demo).
+      list.querySelectorAll("[data-act],[data-cact]").forEach(b =>
+        b.onclick = (e) => { e.preventDefault(); demoNudge(b); });
+    }
+
+    // ── Approval inbox — populate the module globals + render the real inbox. ──
+    OFFTAKERS = D.offtakers.slice();
+    INBOX_DRAFTS = D.drafts.slice();
+    DRAFT_BY_SUB = {};
+    INBOX_DRAFTS.forEach(d => {
+      // match each draft to its offtaker by name (subscription_id is null in the demo).
+      const sub = OFFTAKERS.find(s => s.customer_name === d.customer_name);
+      if (sub) { d.subscription_id = null; DRAFT_BY_SUB[String(sub.id)] = d; }
+    });
+    INBOX_UTIL_ACCTS = demoUtil;
+    TEMPLATE_STATE = { has: false, enabled: false };   // no template-PDF fetch in the demo
+    const firstWithDraft = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
+    ACTIVE_SUB_ID = String(firstWithDraft.id);
+    const ad = DRAFT_BY_SUB[ACTIVE_SUB_ID];
+    if (ad) ACTIVE_DRAFT_ID = ad.id;
+    renderInboxBody();
+    // Re-intercept the freshly-rendered inbox action buttons (Approve / Send / Edit /
+    // dropdown picks stay live so visitors can switch offtakers).
+    const wrap = $("#rbInboxWrap");
+    if (wrap) {
+      wrap.querySelectorAll("[data-dact]").forEach(b => {
+        const act = b.getAttribute("data-dact");
+        // Keep purely-local toggles (autogmp/summary repaint) usable; nudge on send/save.
+        if (act === "approve" || act === "sendme" || act === "aiemail" || act === "savemsg")
+          b.onclick = (e) => { e.preventDefault(); demoNudge(b); };
+      });
+    }
+
+    // Wire the "Add an offtaker" + "Link GMP" header buttons to the sign-in nudge.
+    const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
+    const linkBtn = $("#rbLinkGmp"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
+  }
+
+  // A gentle, in-place "this is a demo" affordance — no fetch, no error.
+  function demoNudge(near) {
+    let tip = document.getElementById("rbDemoTip");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.id = "rbDemoTip";
+      tip.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);" +
+        "z-index:9500;background:var(--card,#15201c);color:var(--ink,#e8f1ec);" +
+        "border:1px solid var(--good,#34d896);border-radius:12px;padding:11px 18px;" +
+        "font:600 13px/1.4 inherit;box-shadow:0 10px 34px -10px rgba(0,0,0,.6);max-width:min(92vw,420px)";
+      document.body.appendChild(tip);
+    }
+    tip.innerHTML = `This is a live demo. <a href="/onboarding" style="color:var(--good)">Start free →</a> to send real invoices.`;
+    tip.style.opacity = "1";
+    clearTimeout(demoNudge._t);
+    demoNudge._t = setTimeout(() => { if (tip) tip.style.opacity = "0"; tip.style.transition = "opacity .4s"; }, 3200);
+  }
+
+  // The draft envelope preview (renderDraftDoc) shows the email; with a null
+  // subscription_id it skips the live PDF pane, so append a clean styled demo
+  // invoice underneath so the visitor sees the actual document, not a blank.
+  function injectDemoInvoice() {
+    const pane = $("#rbDraftDocPane");
+    const d = activeDraft();
+    if (!pane || !d) return;
+    if (pane.querySelector(".rb-demo-inv")) return;
+    const credit = (window.AO_DEMO && window.AO_DEMO.creditRate) || 0.2576;
+    const rate = "$" + credit.toFixed(4) + "/kWh";
+    const inv = document.createElement("div");
+    inv.className = "rb-demo-inv";
+    inv.style.cssText = "margin-top:15px";
+    inv.innerHTML = `
+      <div class="rb-doc-cap">Inside the invoice attachment</div>
+      <div style="border:1px solid var(--line);border-radius:12px;background:var(--card);padding:20px 22px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px">
+          <div>
+            <div style="font-weight:800;font-size:15px;color:var(--ink)">Catamount Community Solar</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Solar credit invoice · ${esc(d.invoice_number || "")}</div>
+          </div>
+          <div style="text-align:right;font-size:11.5px;color:var(--muted)">
+            <div><b style="color:var(--ink)">Bill to</b></div>
+            <div>${esc(d.customer_name)}</div>
+            <div style="margin-top:5px">${esc(d.period_label || "")}</div>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <tr><td style="padding:5px 0;color:var(--muted)">Array total production</td>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.array_total_kwh)} kWh</td></tr>
+          <tr><td style="padding:5px 0;color:var(--muted)">Your share</td>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 + "%" : "—"}</td></tr>
+          <tr><td style="padding:5px 0;color:var(--muted)">Your production</td>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.customer_kwh)} kWh</td></tr>
+          <tr><td style="padding:5px 0;color:var(--muted)">Solar-credit rate</td>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${rate}</td></tr>
+          <tr style="border-top:1px solid var(--line)"><td style="padding:9px 0 0;font-weight:800;color:var(--ink)">Amount due</td>
+              <td style="padding:9px 0 0;text-align:right;font-weight:800;font-size:15px;color:var(--good)">${money(d.amount_usd)}</td></tr>
+        </table>
+        <div style="font-size:11px;color:var(--muted);margin-top:13px;line-height:1.5">
+          ${fmt0(d.customer_kwh)} kWh × ${rate} = ${money(d.amount_usd)}. Billed from the operator's GMP utility bill at the net-metering credit rate.
+        </div>
+      </div>
+      <p class="rb-doc-hint">In the live app this is your real reproduced invoice PDF. <a href="/onboarding" style="color:var(--good)">Start free →</a> to generate it from your own bills.</p>`;
+    pane.appendChild(inv);
   }
 
 
@@ -2027,6 +2177,14 @@
     if (DRAFT_BY_SUB[subId] && !force) {
       ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody(); return;
     }
+    // Signed-out DEMO: never mint via the backend (it would 401). Just switch to the
+    // offtaker; ones without a pre-built draft show the graceful empty state.
+    if (!authHeaders() && window.AO_DEMO) {
+      ACTIVE_SUB_ID = subId;
+      GEN_FAIL[subId] = "This sample offtaker is set to auto-send — its invoice is delivered automatically each period. Sign in to set up your own.";
+      renderInboxBody();
+      return;
+    }
     ACTIVE_SUB_ID = subId;
     delete GEN_FAIL[subId];
     GENERATING_SUB_ID = subId;
@@ -2221,6 +2379,10 @@
     // Clicking an attachment chip downloads that exact file.
     pane.querySelectorAll(".rb-eml-att[data-dl]").forEach(b => b.onclick = () =>
       downloadAttachment(b.getAttribute("data-dl"), b.getAttribute("data-fn")));
+
+    // Signed-out DEMO: drafts carry a null subscription_id (no live PDF fetch), so
+    // append a styled sample invoice in place of the backend-rendered one.
+    if (!authHeaders() && window.AO_DEMO && d && d._demo) injectDemoInvoice();
   }
 
   // Fetch a file with the session bearer and save it (true download, not a tab).
