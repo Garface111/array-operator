@@ -27,6 +27,10 @@
   const EXPAND_KEY = "ao_array_expanded";    // persisted set of array_ids whose inverter comb is expanded (JSON array)
   const ORIENT_KEY = "ao_sandbox_orient";    // "vertical" (arrays side-by-side, inverters below) | "horizontal" (arrays stacked left, inverters spread right)
   const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP", vec:"VEC", wec:"WEC" };
+  // Surface (don't swallow) a corrupt localStorage preference. Each caller still
+  // degrades to its safe default — this only makes a recurring poisoned/legacy value
+  // diagnosable instead of vanishing silently.
+  function _warnLS(key, e){ try { console.warn("[sandbox] ignoring unreadable localStorage '" + key + "':", e && e.message); } catch(_){} }
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
@@ -433,7 +437,7 @@
   // ---- saved column order (localStorage) ----
   function loadOrder(){
     try { const v = JSON.parse(localStorage.getItem(ORDER_KEY)); return Array.isArray(v) ? v.map(String) : []; }
-    catch(e){ return []; }
+    catch(e){ _warnLS(ORDER_KEY, e); return []; }
   }
   function saveOrder(canvas){
     const ids = [...canvas.querySelectorAll(".sb-col")].map(c => c.dataset.arrayId);
@@ -457,7 +461,7 @@
       const v = JSON.parse(localStorage.getItem(RENAME_KEY)) || {};
       return { arrays: (v.arrays && typeof v.arrays==="object") ? v.arrays : {},
                inverters: (v.inverters && typeof v.inverters==="object") ? v.inverters : {} };
-    } catch(e){ return { arrays:{}, inverters:{} }; }
+    } catch(e){ _warnLS(RENAME_KEY, e); return { arrays:{}, inverters:{} }; }
   }
   function saveRename(kind, id, name){
     if(id==null || id==="") return;
@@ -1390,7 +1394,7 @@
     try {
       const a = JSON.parse(localStorage.getItem(EXPAND_KEY) || "[]");
       return new Set(Array.isArray(a) ? a.map(String) : []);
-    } catch(e){ return new Set(); }
+    } catch(e){ _warnLS(EXPAND_KEY, e); return new Set(); }
   }
   function hasExpandPref(){
     try { return localStorage.getItem(EXPAND_KEY) != null; } catch(e){ return false; }
@@ -2624,7 +2628,7 @@
     try {
       const v = JSON.parse(localStorage.getItem(CARDS_KEY));
       return Array.isArray(v) ? v.filter(c => c && c.id && (c.kind==="note"||c.kind==="data")) : [];
-    } catch(e){ return []; }
+    } catch(e){ _warnLS(CARDS_KEY, e); return []; }
   }
   function saveCards(cards){
     try { localStorage.setItem(CARDS_KEY, JSON.stringify(cards)); } catch(e){}

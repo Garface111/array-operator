@@ -95,7 +95,12 @@ window.FleetStore = (function(){
       const arrays = c.arrays.map(sanitizeArray).filter(Boolean);
       const recovered = _num(c.recovered) || 0;
       return { v: 1, at: _num(c.at) || 0, recovered, arrays };
-    } catch(e){ return null; }
+    } catch(e){
+      // Corrupt/poisoned cache: degrade to a network load (return null), but say so —
+      // a silent swallow hides a recurring poisoned-cache bug. Behavior is unchanged.
+      try { console.warn("[fleet-cache] discarding unreadable fleet cache:", e && e.message); } catch(_){}
+      return null;
+    }
   }
 
   // ---- state ----
