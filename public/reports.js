@@ -182,18 +182,26 @@
       if (r.ok) { const d = await r.json().catch(() => ({})); accts = d.utility_accounts || []; }
     } catch (e) { /* leave empty */ }
     const withBills = accts.filter(a => a.has_bill);
+    // role="button" anchors carry no href, so they aren't keyboard-focusable or
+    // Enter/Space-activatable by default. Wire click AND keyboard so a keyboard
+    // user gets the same affordance as a mouse user (WCAG button pattern).
+    const wireConnectGmp = () => {
+      const a = $("#rbGmpInlineLink");
+      if (!a) return;
+      const go = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+      a.onclick = go;
+      a.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    };
     if (!accts.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
         <span>No GMP utility bills connected yet — offtaker invoices bill from GMP utility bills, so connect GMP to link them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button">Link GMP utility bills →</a></div>`;
-      const a = $("#rbGmpInlineLink");
-      if (a) a.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link GMP utility bills →</a></div>`;
+      wireConnectGmp();
     } else if (!withBills.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
         <span>${accts.length} GMP account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open GMP once more so the extension captures them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button">Open GMP →</a></div>`;
-      const a = $("#rbGmpInlineLink");
-      if (a) a.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Open GMP →</a></div>`;
+      wireConnectGmp();
     } else {
       host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} GMP utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
     }
