@@ -1000,9 +1000,15 @@ body.sb-fs-lock{ overflow:hidden; }
   gap:2px; padding:3px; border-radius:11px; border:1px solid var(--line,#e2e8f0);
   background:var(--card,#fff); box-shadow:0 2px 12px -5px rgba(15,23,42,.35); }
 .vs-seg-btn{ border:0; cursor:pointer; font:inherit; font-size:12.5px; font-weight:700; color:var(--muted,#64748b);
-  padding:6px 18px; border-radius:8px; background:none; transition:background .12s, color .12s; }
-.vs-seg-btn.on{ background:var(--good,#2563eb); color:#fff; }
-.vs-seg-btn:not(.on):hover{ background:var(--day-hover,rgba(15,23,42,.05)); color:var(--ink,#0f172a); }
+  padding:6px 18px; border-radius:8px; background:none; transition:background .12s, color .12s, box-shadow .12s; }
+.vs-seg-btn.on{ background:var(--good,#2563eb); color:#fff; box-shadow:0 1px 4px -1px rgba(37,99,235,.5); }
+/* Resting affordance for the INACTIVE option so the control reads as a two-state
+   toggle at a glance (not one styled button next to plain text). Subtle inset
+   fill + slightly darker ink invites the click without competing with the active
+   blue; hover/focus then lift it further. */
+.vs-seg-btn:not(.on){ background:var(--day-hover,rgba(15,23,42,.045)); color:var(--ink,#0f172a); opacity:.78; }
+.vs-seg-btn:not(.on):hover,
+.vs-seg-btn:not(.on):focus-visible{ background:var(--day-hover,rgba(15,23,42,.08)); color:var(--ink,#0f172a); opacity:1; outline:none; }
 
 /* The spreadsheet panel itself. */
 #sheetWrap{ padding:16px 20px 48px; max-width:1120px; margin:0 auto; }
