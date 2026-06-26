@@ -2114,7 +2114,10 @@
         </div>
         <div class="rb-layout">
           <div class="rb-col-form">${bodyCol}</div>
-          <aside class="rb-col-doc" id="rbDraftDocPane"></aside>
+          <aside class="rb-col-doc">
+            <div id="rbReviewTop"></div>
+            <div id="rbDraftDocPane"></div>
+          </aside>
         </div>
       </div>`;
     wrap.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
@@ -2124,9 +2127,7 @@
     const _vp = $("#rbVerPick");
     if (_vp) _vp.onchange = () => { VIEWING_VERSION_ID = _vp.value || null; renderInboxBody(); };
     if (VIEWING_VERSION_ID != null) {
-      const ap = wrap.querySelector('[data-dact="approve"]');
-      if (ap) { ap.disabled = true; ap.title = "Viewing an older version — switch to “latest” to approve & send.";
-                ap.style.opacity = "0.45"; ap.style.cursor = "not-allowed"; }
+      // The approve/send buttons (now in the review header) are disabled in reviewActions().
       const form = wrap.querySelector(".rb-col-form");
       if (form) { const b = document.createElement("div"); b.className = "rb-ver-banner";
         b.textContent = "Viewing an older version (read-only) — select “· latest” to edit or send."; form.insertBefore(b, form.firstChild); }
@@ -2134,11 +2135,30 @@
     // Live preview: paint now (only when a real draft is showing), then repaint as the
     // operator edits the email or toggles an attachment.
     renderDraftDoc();
+    renderReviewTop();                                // actions + calc dashboard above the preview
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
       autoGrowMsg(ta);                                // size to fit the whole note now
-      const focusDraft = () => { ACTIVE_DRAFT_ID = ta.getAttribute("data-draftmsg"); renderDraftDoc(); };
-      ta.addEventListener("input", () => { autoGrowMsg(ta); focusDraft(); });
+      const did = ta.getAttribute("data-draftmsg");
+      const focusDraft = () => { ACTIVE_DRAFT_ID = did; renderDraftDoc(); };
+      // The cover email AUTO-SAVES as you type (debounced) — no Save button, no AI button.
+      let saveT = null;
+      const tag = () => wrap.querySelector(".rb-email-saved");
+      const doSave = async () => {
+        try {
+          const r = await fetch(API + "/drafts/" + did, {
+            method: "PATCH",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ note: ta.value }),
+          });
+          const t = tag(); if (t) t.textContent = r.ok ? "✓ saved" : "couldn’t save";
+          const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+          if (d) d.note = ta.value;                   // keep the model in sync for preview/send
+        } catch (_) { const t = tag(); if (t) t.textContent = "couldn’t save"; }
+      };
+      const queueSave = () => { const t = tag(); if (t) t.textContent = "saving…"; clearTimeout(saveT); saveT = setTimeout(doSave, 700); };
+      ta.addEventListener("input", () => { autoGrowMsg(ta); focusDraft(); queueSave(); });
       ta.addEventListener("focus", focusDraft);
+      ta.addEventListener("blur", () => { clearTimeout(saveT); doSave(); });   // flush on blur
     });
     // Re-fit after layout settles (scrollHeight is only reliable once painted).
     requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
@@ -2341,6 +2361,60 @@
    * (live-edited) cover email, and the GMP-attach toggle. Mirrors the standard
    * backend invoice; the card's "Preview invoice" button still fetches the exact
    * PDF (incl. a custom template). */
+  // "How we calculated this" — a transparent breakdown above the live preview so the
+  // reviewer can trace latest bill → metered generation → their share → the rate math →
+  // the solar-credit value (and any fixed budget override). All from the draft's figures.
+  function calcDashboard(d) {
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const rate = d.net_rate_per_kwh;
+    const disc = d.discount_pct ? Math.round(d.discount_pct * 100) : 0;
+    const hasBudget = d.budget_amount_usd != null && d.solar_credit_value != null;
+    const gmpReady = d.has_gmp_pdf || (d.auto_attach_gmp !== false && d.gmp_auto_status === "ready");
+    const billUrl = gmpReady ? `${API}/drafts/${d.id}/gmp-bill` : null;
+    const rateMath = rate != null
+      ? `${fmt0(d.customer_kwh)} kWh × $${Number(rate).toFixed(5)}${disc ? ` × (1−${disc}%)` : ""}`
+      : "from the bill's net-metering credit";
+    const totalRows = hasBudget
+      ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.solar_credit_value)}</span></div>
+         <div class="rb-calc-row total"><span class="rb-calc-k">Budget bill — fixed total<small>overrides the calculated value</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
+      : `<div class="rb-calc-row total"><span class="rb-calc-k">Solar credit value due<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`;
+    return `
+      <div class="rb-calc">
+        <div class="rb-calc-h">How we calculated this invoice</div>
+        <div class="rb-calc-row"><span class="rb-calc-k">Latest GMP bill</span>
+          <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(d.gmp_filename || "gmp_bill.pdf")}">view ↓</button>` : ""}</span></div>
+        <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(d.array_total_kwh)} kWh</span></div>
+        <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share</span>
+          <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
+        ${rate != null ? `<div class="rb-calc-row"><span class="rb-calc-k">Solar credit rate</span><span class="rb-calc-v">$${Number(rate).toFixed(5)}/kWh${disc ? ` <span class="rb-calc-eq">− ${disc}%</span>` : ""}</span></div>` : ""}
+        ${totalRows}
+      </div>`;
+  }
+
+  // The send actions, lifted ABOVE the live preview (Paul's review flow). Disabled when
+  // reviewing an OLDER version (look-only) — switch to latest to send.
+  function reviewActions(d, readonly) {
+    return `
+      <div class="rb-review-acts">
+        <button class="ao-btn ao-btn-primary rb-btn rb-btn-lg" data-dact="approve"${readonly ? ' disabled title="Viewing an older version — switch to “latest” to send."' : ""}>Approve &amp; send</button>
+        <button class="ao-btn rb-btn" data-dact="sendme" type="button" title="Email a test copy to yourself first"${readonly ? " disabled" : ""}>Send to me</button>
+        <span class="rb-status rb-draft-status"></span>
+      </div>`;
+  }
+
+  // Render the review header (actions + calc dashboard) above the live preview. Kept in
+  // its OWN container so it repaints only when figures change — not on every keystroke.
+  function renderReviewTop() {
+    const top = $("#rbReviewTop");
+    if (!top) return;
+    const d = activeDraft();
+    if (!d) { top.innerHTML = ""; return; }
+    top.innerHTML = reviewActions(d, VIEWING_VERSION_ID != null) + calcDashboard(d);
+    top.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
+    top.querySelectorAll("[data-dl]").forEach(b => b.onclick = () =>
+      downloadAttachment(b.getAttribute("data-dl"), b.getAttribute("data-fn")));
+  }
+
   function renderDraftDoc() {
     const pane = $("#rbDraftDocPane");
     if (!pane) return;
@@ -2534,31 +2608,16 @@
           <div class="rb-draft-name">${esc(d.customer_name)}</div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
-        <div class="rb-draft-grid">
-          <div><span class="rb-k">Array total</span><span class="rb-v">${fmt0(d.array_total_kwh)} kWh</span></div>
-          <div><span class="rb-k">This customer</span><span class="rb-v">${pct != null ? pct + "%" : "—"}</span></div>
-          <div><span class="rb-k">Their production</span><span class="rb-v">${fmt0(d.customer_kwh)} kWh</span></div>
-          <div><span class="rb-k">Amount</span><span class="rb-v rb-amt">${money(d.amount_usd)}</span></div>
-        </div>
         <div class="rb-draft-email">
-          <span class="rl">Email to your offtaker (editable)</span>
+          <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
           <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
             placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
-          <div class="rb-draft-email-row">
-            <button class="ao-btn ao-btn-primary rb-btn" data-dact="aiemail" type="button" title="Write a cover email tailored to this invoice's figures + context">✨ Write with AI</button>
-            <button class="ao-btn rb-btn" data-dact="savemsg" type="button">Save email</button>
-            <span class="rb-draft-msg-hint">Saved with the report. The invoice${d.has_gmp_pdf ? " + GMP invoice are" : " is"} attached automatically.</span>
-          </div>
+          <span class="rb-draft-msg-hint">Saves automatically as you type. The invoice${d.has_gmp_pdf ? " + GMP bill are" : " is"} attached for you.</span>
         </div>
-        <div class="rb-draft-acts">
-          <button class="ao-btn ao-btn-primary rb-btn" data-dact="approve">Approve &amp; send</button>
-          <button class="ao-btn rb-btn" data-dact="sendme" type="button" title="Email a test copy to yourself first">Send to me</button>
-          <span class="rb-status rb-draft-status"></span>
-          ${attachBox}
-        </div>
-        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per this offtaker's
-           delivery setting below, with the offtaker invoice${d.has_gmp_pdf ? " and the GMP invoice" : ""} attached.
-           <b>Nothing sends until you click Approve &amp; send.</b></p>
+        ${attachBox}
+        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting below,
+           with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
+           <b>Nothing sends until you click Approve &amp; send</b> (top-right).</p>
         ${offtakerEditor(d, utilAccts)}
       </div>`;
   }
@@ -2767,6 +2826,7 @@
         autoGrowMsg(ta);                              // re-fit after the note grows/shrinks
       }
     }
+    renderReviewTop();                                // calc dashboard reflects the new figures
     renderDraftDoc();
   }
 
@@ -2799,10 +2859,13 @@
     e.preventDefault();
     const btn = e.currentTarget;
     const act = btn.getAttribute("data-dact");
-    const card = btn.closest(".rb-draft");
+    // Buttons live either in the LEFT card (attach toggles) or the RIGHT review header
+    // (approve/send). Resolve the active draft's card + the shared status span either way.
+    const layout = btn.closest(".rb-layout") || document;
+    const card = btn.closest(".rb-draft") || layout.querySelector(".rb-draft");
     const id = card && card.getAttribute("data-did");
     if (!id) return;
-    const st = $(".rb-draft-status", card);
+    const st = layout.querySelector(".rb-draft-status");
     // Null-safe status writer: a missing status span must NEVER throw and block
     // the actual send (this was the "Approve & send does nothing" bug — st was
     // null, `st.className=` threw before the fetch fired, so nothing happened).

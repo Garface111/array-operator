@@ -784,9 +784,26 @@ body.sb-fs-lock{ overflow:hidden; }
 @media(max-width:1080px){ .rb-layout{ grid-template-columns:1fr; } }
 .rb-col-form{ min-width:0; }
 .rb-col-form .rep-card{ max-width:none; }     /* fill the column, not the global 700px cap */
-.rb-col-doc{ position:sticky; top:18px; min-width:0; }
+.rb-col-doc{ position:sticky; top:18px; min-width:0; display:flex; flex-direction:column; gap:14px; }
 @media(max-width:1080px){ .rb-col-doc{ position:static; } }
 .rb-doc-cap{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); font-weight:650; margin:0 2px 9px; }
+/* ── Review header above the live preview: send actions + calc dashboard (Paul redesign) ── */
+.rb-review-acts{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.rb-btn-lg{ font-size:14px; font-weight:760; padding:11px 22px; }
+.rb-email-saved{ font-size:11px; font-weight:600; color:var(--good,#0a7d4f); text-transform:none; letter-spacing:0; }
+.rb-calc{ background:#fff; border:1px solid #e6edf3; border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,32,43,.04); }
+.rb-calc-h{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#5a6b7b; font-weight:700; margin-bottom:8px; }
+.rb-calc-row{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid #eef2f6; }
+.rb-calc-row:last-child{ border-bottom:0; }
+.rb-calc-k{ color:#5a6b7b; font-size:13px; display:flex; flex-direction:column; gap:2px; }
+.rb-calc-k small{ color:#90a0b0; font-size:11px; }
+.rb-calc-v{ color:#16202b; font-size:14px; font-weight:680; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rb-calc-eq{ color:#0a7d4f; font-weight:700; }
+.rb-calc-link{ border:0; background:none; color:#0a7d4f; font:inherit; font-size:12px; font-weight:700; cursor:pointer; padding:0 0 0 4px; text-decoration:underline; }
+.rb-calc-row.sub .rb-calc-v{ color:#5a6b7b; font-weight:640; }
+.rb-calc-row.total{ border-bottom:0; padding-top:10px; margin-top:2px; border-top:2px solid #16202b; }
+.rb-calc-row.total .rb-calc-k{ color:#16202b; font-weight:800; font-size:14px; }
+.rb-calc-row.total .rb-calc-v{ color:#0a7d4f; font-size:18px; font-weight:850; }
 
 /* placeholder shown before a spreadsheet is matched */
 .rb-doc-empty{ border:1.5px dashed var(--line); border-radius:16px; padding:46px 28px; text-align:center; }
