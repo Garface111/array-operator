@@ -2860,8 +2860,8 @@
 
   // Note card: editable title + body (contenteditable), debounced-persist on input.
   function buildNoteBody(body, c){
-    const title = el(`<div class="sb-note-title" contenteditable="true" data-ph="Title"></div>`);
-    const text  = el(`<div class="sb-note-text" contenteditable="true" data-ph="Write a note…"></div>`);
+    const title = el(`<div class="sb-note-title" contenteditable="true" role="textbox" aria-label="Note title" data-ph="Title"></div>`);
+    const text  = el(`<div class="sb-note-text" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note body" data-ph="Write a note…"></div>`);
     title.textContent = c.title || "";
     text.textContent  = c.text  || "";
     [title, text].forEach(ed => {
