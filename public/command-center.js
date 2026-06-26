@@ -392,26 +392,35 @@
   /* ===========================================================================
    * 4. WIRING
    * ==========================================================================*/
+  // Re-render only the triage queue (#ccQueue) — NOT the pinned commander card.
+  // Filter/sort/selection changes affect only the table; rebuilding the whole
+  // commander card (the big health tank + KPIs) on every chip/sort click is
+  // wasteful and resets the card's CSS-animated meter. The commander card's
+  // numbers don't depend on filter/sort state, so leave it untouched.
+  function renderQueueOnly(){
+    if(_dashActive()) renderQueueLEGACY();
+  }
+
   function wire(){
     const q = document.getElementById("ccQ");
     if(q) q.oninput = () => { UI.q = q.value; renderBody(); };
     const sev = document.getElementById("ccSev");
-    if(sev) sev.querySelectorAll(".cc-chip").forEach(c => c.onclick = () => { UI.sev=c.dataset.sev; UI.expanded=null; render(); });
+    if(sev) sev.querySelectorAll(".cc-chip").forEach(c => c.onclick = () => { UI.sev=c.dataset.sev; UI.expanded=null; renderQueueOnly(); });
     const region = document.getElementById("ccRegion");
-    if(region) region.onchange = () => { UI.region=region.value; UI.expanded=null; render(); };
+    if(region) region.onchange = () => { UI.region=region.value; UI.expanded=null; renderQueueOnly(); };
     document.querySelectorAll("#ccQueue th.sortable").forEach(th => th.onclick = () => {
       const col = th.dataset.sort;
       if(UI.sort===col) UI.dir*=-1; else { UI.sort=col; UI.dir = col==="site"?1:-1; }
-      render();
+      renderQueueOnly();
     });
     const all = document.getElementById("ccAll");
     if(all) all.onchange = () => {
       const rows = filteredRows();
       if(all.checked) rows.forEach(r=>UI.selected.add(r.key)); else rows.forEach(r=>UI.selected.delete(r.key));
-      render();
+      renderQueueOnly();
     };
     const bc = document.getElementById("ccBulkClaim"); if(bc) bc.onclick = bulkClaim;
-    const bx = document.getElementById("ccBulkClear"); if(bx) bx.onclick = () => { UI.selected.clear(); render(); };
+    const bx = document.getElementById("ccBulkClear"); if(bx) bx.onclick = () => { UI.selected.clear(); renderQueueOnly(); };
   }
 
   function wireBody(){
@@ -426,8 +435,9 @@
     document.querySelectorAll("#ccBody .ccRow").forEach(cb => cb.onclick = e => {
       e.stopPropagation();
       if(cb.checked) UI.selected.add(cb.dataset.key); else UI.selected.delete(cb.dataset.key);
-      // refresh bulk bar + row highlight without collapsing the drawer
-      render();
+      // refresh bulk bar + row highlight without collapsing the drawer — queue
+      // only, so the commander card above doesn't flicker on a selection toggle
+      renderQueueOnly();
     });
     document.querySelectorAll("#ccBody [data-do]").forEach(b => b.onclick = e => {
       e.stopPropagation();
