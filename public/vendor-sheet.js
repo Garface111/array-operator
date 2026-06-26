@@ -21,6 +21,18 @@
     alsoenergy: "AlsoEnergy",
   };
   const vlabel = v => BRAND[v] || (v ? v.charAt(0).toUpperCase() + v.slice(1) : "Other");
+  // Fronius/SMA/Chint expose only ONE site-level instantaneous power; the backend
+  // splits it across inverters by today's energy share — so a per-inverter "kW now"
+  // is an ESTIMATE, not a measured per-device reading (data-honesty audit #5). The
+  // sandbox marks it "~" + a tip; the spreadsheet must apply the same treatment so it
+  // can't read as an exact measured value. (A "% of rated" built on an estimated
+  // numerator also reads as exact, so we drop it for these vendors.)
+  function isAllocatedPower(iv) {
+    return iv && iv.current_power_w != null &&
+      (iv.vendor === "fronius" || iv.vendor === "sma" || iv.vendor === "chint");
+  }
+  const ALLOC_TIP = v =>
+    `${vlabel(v)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.`;
   function kw(w) {
     if (w == null) return "—";
     const k = w / 1000;
@@ -126,9 +138,15 @@
   function invDetailHTML(iv) {
     const cell = (k, val) => (val == null || val === "") ? "" :
       `<div class="vs-id-cell"><span class="vs-id-k">${k}</span><span class="vs-id-v">${val}</span></div>`;
-    const pct = (iv.nameplate_kw && iv.current_power_w != null)
+    const _alloc = isAllocatedPower(iv);
+    // % of rated is only honest off a measured numerator — drop it for allocated vendors.
+    const pct = (iv.nameplate_kw && iv.current_power_w != null && !_alloc)
       ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "%" : null;
-    const live = iv.current_power_w != null ? esc(kw(iv.current_power_w) + (pct ? ` · ${pct} of rated` : "")) : null;
+    const live = iv.current_power_w != null
+      ? (_alloc
+          ? `<span title="${esc(ALLOC_TIP(iv.vendor))}">~${esc(kw(iv.current_power_w))}</span>`
+          : esc(kw(iv.current_power_w) + (pct ? ` · ${pct} of rated` : "")))
+      : null;
     const peer = iv.peer_index != null ? esc(iv.peer_index.toFixed(2) + "× its neighbors") : null;
     const win = iv.window_kwh != null ? esc(Math.round(iv.window_kwh).toLocaleString() + " kWh") : null;
     const range = (iv.min_kwh != null && iv.peak_kwh != null)
@@ -313,8 +331,8 @@
               h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
                 <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span>${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
-                <span class="vs-c-pow${stale ? " vs-stale" : ""}">${kw(iv.current_power_w)}</span>
-                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
+                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}</span>
+                <span class="vs-c-today">${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of rated" : ""}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}">${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
