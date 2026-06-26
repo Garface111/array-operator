@@ -2690,7 +2690,129 @@
             <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
         <span class="rb-status rb-offedit-status"></span>
+        <div class="rb-track" data-track="${sid}" hidden></div>
       </div>`;
+  }
+
+  // ── Bring-your-own generation spreadsheet ("our magic" auto-updater) ────────
+  // The operator uploads their existing generation-tracking sheet (any columns);
+  // we detect its structure and append a new row each month as fresh GMP bills
+  // land. A "Download latest spreadsheet" button streams the kept-current file.
+  // Lazy-loaded per offtaker — only rendered when the backend flag is on.
+  const FIELD_LABEL = { period: "Period", generation: "Generation kWh",
+    consumption: "Consumption", rate: "Credit rate", amount: "Amount $" };
+
+  function relTime(iso) {
+    try {
+      const then = new Date(iso).getTime();
+      const s = Math.max(0, (Date.now() - then) / 1000);
+      if (s < 90) return "just now";
+      if (s < 3600) return Math.round(s / 60) + " min ago";
+      if (s < 86400) return Math.round(s / 3600) + "h ago";
+      return Math.round(s / 86400) + "d ago";
+    } catch (e) { return ""; }
+  }
+
+  async function loadTracker(box) {
+    const sid = box.getAttribute("data-track");
+    try {
+      const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { headers: authHeaders() });
+      if (!r.ok) return;                                  // flag off / not found → stay hidden
+      const j = await r.json();
+      const t = j && j.tracker;
+      if (!t || !t.enabled) return;                       // feature disabled → hide entirely
+      box.hidden = false;
+      renderTracker(box, sid, t);
+    } catch (e) { /* network — leave hidden */ }
+  }
+
+  function trackerMapTable(t) {
+    if (!t.has_sheet) return "";
+    const heads = t.headers || [];
+    const cols = t.columns || {};
+    const chips = ["period", "generation", "consumption", "rate", "amount"]
+      .filter(f => cols[f] != null)
+      .map(f => `<span class="rb-track-chip"><b>${FIELD_LABEL[f]}</b> ← ${esc(heads[cols[f]] || ("col " + (cols[f] + 1)))}</span>`)
+      .join("");
+    const last = t.last_period ? `Last row: <b>${esc(t.last_period)}</b>` : "No data rows yet";
+    const upd = t.updated_at ? " · updated " + relTime(t.updated_at) : "";
+    return `
+      <div class="rb-track-detected">
+        <div class="rb-track-map">${chips}</div>
+        <div class="rb-track-meta">${esc(t.filename || "spreadsheet")} · ${last}${upd}</div>
+      </div>`;
+  }
+
+  function renderTracker(box, sid, t) {
+    const has = !!t.has_sheet;
+    box.innerHTML = `
+      <div class="rb-track-h">
+        <span class="rl">Your generation spreadsheet</span>
+        <span class="rb-track-hint">${has
+          ? "We add a new row automatically each month as the GMP bill lands."
+          : "Upload your own tracking sheet — we'll detect its columns and keep it current."}</span>
+      </div>
+      ${trackerMapTable(t)}
+      <div class="rb-track-actions">
+        ${has ? `<button type="button" class="rb-track-dl" data-tdl="${sid}">Download latest spreadsheet ↓</button>` : ""}
+        <label class="rb-track-up" title="${has ? "Replace the tracked sheet" : "Upload a spreadsheet"}">
+          ${has ? "Replace" : "Upload spreadsheet"}
+          <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-tup="${sid}" hidden>
+        </label>
+        ${has ? `<button type="button" class="rb-track-rm" data-trm="${sid}">Remove</button>` : ""}
+        <span class="rb-status rb-track-stat"></span>
+      </div>
+      ${(t.warnings && t.warnings.length) ? `<div class="rb-track-warn">${esc(t.warnings.join(" "))}</div>` : ""}`;
+    wireTracker(box, sid);
+  }
+
+  function wireTracker(box, sid) {
+    const stat = box.querySelector(".rb-track-stat");
+    const setS = (cls, txt) => { if (stat) { stat.className = "rb-status rb-track-stat " + (cls || ""); stat.textContent = txt || ""; } };
+    const up = box.querySelector("[data-tup]");
+    if (up) up.onchange = async () => {
+      const f = up.files && up.files[0];
+      if (!f) return;
+      setS("rb-busy", "Reading your sheet…");
+      const fd = new FormData(); fd.append("file", f);
+      try {
+        const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { method: "POST", headers: authHeaders(), body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setS("rb-err", (j && j.detail) ? j.detail : "Couldn't read that sheet."); return; }
+        renderTracker(box, sid, j.tracker);
+      } catch (e) { setS("rb-err", "Upload failed."); }
+    };
+    const dl = box.querySelector("[data-tdl]");
+    if (dl) dl.onclick = async () => {
+      setS("rb-busy", "Building latest…");
+      try {
+        const r = await fetch(API + "/subscriptions/" + sid + "/tracker/download", { headers: authHeaders() });
+        if (!r.ok) { setS("rb-err", "Download failed."); return; }
+        const blob = await r.blob();
+        const cd = r.headers.get("Content-Disposition") || "";
+        const mm = /filename="?([^"]+)"?/.exec(cd);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = (mm && mm[1]) || "generation.xlsx";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setS("rb-ok", "Downloaded.");
+        // Refresh the card so a just-appended period shows as the new last row.
+        const rr = await fetch(API + "/subscriptions/" + sid + "/tracker", { headers: authHeaders() });
+        const jj = await rr.json().catch(() => ({}));
+        if (rr.ok && jj.tracker && jj.tracker.enabled) renderTracker(box, sid, jj.tracker);
+      } catch (e) { setS("rb-err", "Download failed."); }
+    };
+    const rm = box.querySelector("[data-trm]");
+    if (rm) rm.onclick = async () => {
+      setS("rb-busy", "Removing…");
+      try {
+        const r = await fetch(API + "/subscriptions/" + sid + "/tracker", { method: "DELETE", headers: authHeaders() });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setS("rb-err", "Couldn't remove."); return; }
+        renderTracker(box, sid, j.tracker);
+      } catch (e) { setS("rb-err", "Network error."); }
+    };
   }
 
   // ── Live offtaker-edit wiring ──────────────────────────────────────────────
@@ -2711,6 +2833,8 @@
         inp.addEventListener("change", h);
       });
     });
+    // Lazy-load the BYO generation-spreadsheet tracker (no-op when flag off).
+    wrap.querySelectorAll(".rb-track[data-track]").forEach(loadTracker);
   }
 
   function onOfftakerEdit(card, box, did, sid, field, inp) {
