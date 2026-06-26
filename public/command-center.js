@@ -578,11 +578,30 @@
     FleetStore.setTriageBatch(keys, "progress");   // one notify → re-render
   }
 
+  // Known manufacturer support inboxes — guessing support@<slug>.com gets the wrong
+  // address for several vendors (Fronius/SMA), and an unvalidated vendor string from the
+  // backend could otherwise steer the draft to an attacker-chosen domain. Whitelist the
+  // vendors we actually capture; anything else falls back to a sanitized slug guess.
+  const VENDOR_SUPPORT = {
+    solaredge: "support@solaredge.com",
+    fronius:   "pv-support-usa@fronius.com",
+    sma:       "service@sma-america.com",
+    enphase:   "support@enphase.com",
+    chint:     "service@chintpower.com",
+  };
+  function vendorSupportEmail(vendor){
+    const key = (vendor||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(VENDOR_SUPPORT[key]) return VENDOR_SUPPORT[key];
+    return `support@${key||"installer"}.com`;   // sanitized slug — no injectable chars survive
+  }
+
   // lightweight mailto claim (self-contained; the per-site sandbox has the full editor)
   function openClaim(r){
     if(!r) return;
-    const to = `support@${(r.vendor||"installer").toLowerCase().replace(/[^a-z0-9]/g,"")||"installer"}.com`;
-    const subj = `${r.status==="fault"?"Service request":"Warranty claim"} — ${r.model} (${r.site} · ${r.inv})`;
+    const to = vendorSupportEmail(r.vendor);
+    // An email Subject is a single header line: collapse any CR/LF/tabs from backend
+    // fields so they can't break the mailto subject header or the copied draft.
+    const subj = `${r.status==="fault"?"Service request":"Warranty claim"} — ${r.model} (${r.site} · ${r.inv})`.replace(/[\r\n\t]+/g," ").trim();
     const body =
 `To whom it may concern,
 
