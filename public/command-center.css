@@ -1082,6 +1082,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-c-pow.vs-stale{ color:var(--muted); font-weight:400; }
 /* "· N% of rated" rides next to the inverter's live kW (was misplaced under the Today=kWh column) — secondary weight so the kW reads as primary. */
 .vs-pct-rated{ color:var(--muted); font-weight:400; font-size:11.5px; }
+/* Today's kWh is an ESTIMATE (smeared from a utility bill), not a measured reading —
+   mute it and tag "est." so it can never be mistaken for metered production. */
+.vs-c-today.vs-est{ color:var(--muted); }
+.vs-est-tag{ font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--gold2,#b45309); text-transform:uppercase; }
 .vs-c-fresh.vs-stale-syn{ color:var(--gold2,#b45309); font-weight:600; }
 .vs-vchip{ font-size:11.5px; font-weight:600; color:var(--muted); }
 .vs-pill{ display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; }
