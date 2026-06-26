@@ -1209,6 +1209,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-spin{ display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.45);
   border-top-color:#fff; border-radius:50%; animation:vs-spin .7s linear infinite; vertical-align:-1px; }
 @keyframes vs-spin{ to{ transform:rotate(360deg); } }
+/* Close all vendor tabs — secondary, neutral; turns red on hover. */
+.vs-closetabs{ display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  border:1px solid #d7dee7; border-radius:9px; padding:9px 14px; font:inherit; font-size:13px;
+  font-weight:600; color:#475569; white-space:nowrap; background:#fff; transition:all .12s; }
+.vs-closetabs:hover{ border-color:#fca5a5; color:#b91c1c; background:#fef2f2; }
+.vs-closetabs:active{ transform:translateY(1px); }
+.vs-closetabs:disabled{ cursor:default; opacity:.7; }
 .vs-search{ width:280px; max-width:48vw; font:inherit; font-size:13px; color:var(--ink,#0f172a);
   padding:8px 12px; border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff);
   transition:border-color .12s, box-shadow .12s; }

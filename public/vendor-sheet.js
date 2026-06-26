@@ -256,6 +256,8 @@
       setTimeout(() => { if (!settled) { window.removeEventListener("message", onMsg); resolve({ ok: false, error: "timeout" }); } }, timeoutMs);
     });
   }
+  const openChint = () => { try { window.postMessage({ type: "SO_OPEN_PORTAL", url: VENDOR_PORTAL.chint,
+    active: true, provider: "chint", vendor: "chint", reqId: "vs-sync-chint-" + Date.now() }, window.location.origin); } catch (_) {} };
   async function syncAllVendors(btn) {
     if (_syncing) return;
     if (!extPresent()) {
@@ -271,21 +273,68 @@
     _syncing = true;
     const orig = btn.innerHTML;
     btn.disabled = true; btn.classList.add("on");
-    let okCount = 0;
-    for (let i = 0; i < silent.length; i++) {
-      const v = silent[i];
-      btn.innerHTML = `<span class="vs-spin"></span> Syncing ${esc(vlabel(v))}… (${i + 1}/${silent.length})`;
-      const r = await recaptureVendorViaBridge(v);
-      if (r.ok) okCount++;
-      try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {}  // surface fresh readings as they land
+    btn.innerHTML = `<span class="vs-spin"></span> Syncing all vendors…`;
+    // Prefer the CONCURRENT path: extension v1.9.70+ opens every portal at ONCE and
+    // auto-closes each as its data lands. Falls back to one-at-a-time on older versions.
+    const concurrent = await tryConcurrentSync(silent);
+    if (concurrent) {
+      if (hasChint) openChint();
+      btn.innerHTML = `✓ Syncing in background${hasChint ? " · Chint opened" : ""}`;
+      [6000, 14000, 25000].forEach(t => setTimeout(() => { try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {} }, t));
+    } else {
+      let okCount = 0;
+      for (let i = 0; i < silent.length; i++) {
+        const v = silent[i];
+        btn.innerHTML = `<span class="vs-spin"></span> Syncing ${esc(vlabel(v))}… (${i + 1}/${silent.length})`;
+        const r = await recaptureVendorViaBridge(v);
+        if (r.ok) okCount++;
+        try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {}  // surface fresh readings as they land
+      }
+      if (hasChint) { btn.innerHTML = "Opening Chint to finish…"; openChint(); }
+      btn.innerHTML = `✓ Synced ${okCount}/${silent.length}${hasChint ? " · Chint opened" : ""}`;
     }
-    if (hasChint) {
-      btn.innerHTML = "Opening Chint to finish…";
-      try { window.postMessage({ type: "SO_OPEN_PORTAL", url: VENDOR_PORTAL.chint, active: true,
-        provider: "chint", vendor: "chint", reqId: "vs-sync-chint-" + Date.now() }, window.location.origin); } catch (_) {}
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; btn.classList.remove("on"); _syncing = false; }, 3500);
+  }
+  // Ask the extension to open ALL vendor portals at once + auto-close (v1.9.70+).
+  // Resolves true if the extension acked (concurrent path taken), false → fall back.
+  function tryConcurrentSync(vendors) {
+    return new Promise((resolve) => {
+      const reqId = "vs-syncall-" + Date.now();
+      let settled = false;
+      const onMsg = (e) => {
+        if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
+        if (e.data.type === "SO_SYNC_ALL_DONE" && e.data.reqId === reqId) {
+          settled = true; window.removeEventListener("message", onMsg); resolve(!!e.data.ok);
+        }
+      };
+      window.addEventListener("message", onMsg);
+      try { window.postMessage({ type: "SO_SYNC_ALL", vendors, reqId }, window.location.origin); }
+      catch (_) { window.removeEventListener("message", onMsg); resolve(false); return; }
+      setTimeout(() => { if (!settled) { window.removeEventListener("message", onMsg); resolve(false); } }, 3000);
+    });
+  }
+  // Close every open vendor portal tab (the extension queries + removes them).
+  async function closeVendorTabs(btn) {
+    if (!extPresent()) {
+      const o = btn.innerHTML; btn.innerHTML = "Needs the EnergyAgent extension";
+      setTimeout(() => { btn.innerHTML = o; }, 2400); return;
     }
-    btn.innerHTML = `✓ Synced ${okCount}/${silent.length}${hasChint ? " · Chint opened" : ""}`;
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; btn.classList.remove("on"); _syncing = false; }, 3000);
+    const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = "Closing…";
+    const closed = await new Promise((resolve) => {
+      const reqId = "vs-close-" + Date.now();
+      const onMsg = (e) => {
+        if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
+        if (e.data.type === "SO_CLOSE_VENDOR_TABS_DONE" && e.data.reqId === reqId) {
+          window.removeEventListener("message", onMsg); resolve(e.data.closed || 0);
+        }
+      };
+      window.addEventListener("message", onMsg);
+      try { window.postMessage({ type: "SO_CLOSE_VENDOR_TABS", reqId }, window.location.origin); }
+      catch (_) { window.removeEventListener("message", onMsg); resolve(0); return; }
+      setTimeout(() => { window.removeEventListener("message", onMsg); resolve(0); }, 4000);
+    });
+    btn.innerHTML = `✓ Closed ${closed}`;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2400);
   }
 
   function buildShell(host) {
@@ -303,6 +352,8 @@
             placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
           <button type="button" class="vs-syncall" id="vsSyncAll"
             title="Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.">↻ Sync all vendors</button>
+          <button type="button" class="vs-closetabs" id="vsCloseTabs"
+            title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>
         </div>
       </div>
       <div class="vs-scroll" id="vsScroll">
@@ -322,6 +373,8 @@
     };
     const syncBtn = host.querySelector("#vsSyncAll");
     if (syncBtn) syncBtn.onclick = () => syncAllVendors(syncBtn);
+    const closeBtn = host.querySelector("#vsCloseTabs");
+    if (closeBtn) closeBtn.onclick = () => closeVendorTabs(closeBtn);
     host.querySelectorAll("[data-sort]").forEach(b => {
       const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
       b.addEventListener("click", go);
