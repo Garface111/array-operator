@@ -1252,9 +1252,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .rb-gmp-attach:hover{ border-color:var(--good,#3fd68a); color:var(--ink); }
 
 .rb-draft-acts{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-/* attachment-controls box, pushed to the right of the send buttons (auto-attach GMP
-   + opt-in AO summary). Wraps below the buttons on narrow screens. */
-.rb-draft-attach{ margin-left:auto; display:flex; flex-direction:column; gap:7px; align-items:flex-start;
+.rb-draft-acts > .rb-btn{ flex:1 1 0; justify-content:center; min-width:140px; }
+/* attachment-controls box, dropped to its own full-width line below the send buttons
+   (auto-attach GMP + opt-in AO summary). */
+.rb-draft-attach{ flex-basis:100%; margin-left:0; display:flex; flex-direction:column; gap:7px; align-items:flex-start;
   padding:9px 13px; border:1px solid var(--line,#e2e8f0); border-radius:10px; background:rgba(148,163,184,.06); }
 .rb-draft-attach .rb-gmp-auto-status{ font-size:11.5px; }
 .rb-draft-note{ font-size:12px; color:var(--faint); margin:11px 0 0; line-height:1.5; }
