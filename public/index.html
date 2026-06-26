@@ -48,8 +48,8 @@
   .gmp-gate-copy{flex:1 1 320px;min-width:0;color:var(--muted);font-size:13px;line-height:1.45}
   .gmp-gate-copy b{color:var(--ink);font-weight:750;display:inline}
   .gmp-gate-copy b:first-child{display:block;font-size:14.5px;margin-bottom:2px}
-  .gmp-gate-cta{flex:0 0 auto;font-size:13.5px;font-weight:780;color:#1a1008;
-    background:var(--gold2,#f5b942);border-radius:10px;padding:10px 16px;text-decoration:none;
+  .gmp-gate-cta{flex:0 0 auto;font:780 13.5px/1 inherit;font-family:inherit;color:#1a1008;
+    background:var(--gold2,#f5b942);border:0;border-radius:10px;padding:10px 16px;text-decoration:none;cursor:pointer;
     box-shadow:0 6px 18px -8px rgba(245,185,66,.7);white-space:nowrap;transition:transform .12s}
   .gmp-gate-cta:hover{transform:translateY(-1px)}
   /* When only the linking step remains, the bar goes green-ish (almost there). */
@@ -65,7 +65,7 @@
   .trial-nudge-row{display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap}
   .trial-nudge-copy{flex:1 1 280px;min-width:0;color:var(--muted);font-size:12.5px;line-height:1.45}
   .trial-nudge-copy b{color:var(--ink);font-weight:650}
-  .trial-nudge-cta{flex:0 0 auto;font-size:12.5px;font-weight:650;color:var(--good,#3fd68a);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;text-decoration:none;cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s}
+  .trial-nudge-cta{flex:0 0 auto;font-size:12.5px;font-weight:650;font-family:inherit;color:var(--good,#3fd68a);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;text-decoration:none;cursor:pointer;white-space:nowrap;transition:border-color .12s,color .12s}
   .trial-nudge-cta:hover{border-color:var(--good,#3fd68a)}
   .trial-nudge-x{flex:0 0 auto;cursor:pointer;color:var(--muted);opacity:.55;font-size:16px;line-height:1;background:none;border:none;padding:4px 6px;transition:opacity .12s}
   .trial-nudge-x:hover{opacity:1}
@@ -172,7 +172,7 @@
     <!-- Sign out — visible only when signed in (toggled by renderFromSession in
          app.js). href="/login" is a no-JS fallback; the handler clears the
          session + cached fleet tree first, then redirects. -->
-    <a class="tab tab-signout" id="tabSignOut" href="/login" role="button"
+    <a class="tab tab-signout" id="tabSignOut" href="/login"
        title="Sign out of this account" style="display:none">Sign out</a>
   </div>
 
@@ -187,7 +187,7 @@
         <b id="gmpGateTitle">Connect GMP to finish setting up</b>
         <span id="gmpGateSub">Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b></span>
       </div>
-      <a class="gmp-gate-cta" id="gmpGateCta" role="button" style="cursor:pointer">Connect GMP →</a>
+      <button type="button" class="gmp-gate-cta" id="gmpGateCta">Connect GMP →</button>
     </div>
   </div>
 
@@ -196,7 +196,7 @@
   <div class="trial-nudge" id="trialNudge" role="region" aria-label="Trial ending" hidden>
     <div class="trial-nudge-row">
       <div class="trial-nudge-copy" id="trialNudgeCopy"></div>
-      <a class="trial-nudge-cta" id="trialNudgeCta" role="button">Add a card</a>
+      <button type="button" class="trial-nudge-cta" id="trialNudgeCta">Add a card</button>
       <button class="trial-nudge-x" id="trialNudgeX" aria-label="Dismiss" title="Dismiss">×</button>
     </div>
   </div>
