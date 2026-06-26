@@ -124,9 +124,9 @@
   <div class="demo-banner" id="demoBanner" role="region" aria-label="What Array Operator is" hidden>
     <div class="hero">
       <div class="hero-main">
-        <span class="db-badge">FOR SOLAR ARRAY OWNERS</span>
-        <h1 class="hero-h1">Your solar array, finally working <em>for you</em>.</h1>
-        <p class="hero-sub">Array Operator watches every inverter for you — catching the quiet underperformer the day it starts slipping, drafting the warranty claim when one dies, and showing you in plain dollars what your array is really worth. One connection. Every panel. No spreadsheets.</p>
+        <span class="db-badge">FOR SOLAR ARRAY OWNERS &amp; OPERATORS</span>
+        <h1 class="hero-h1">Watch every inverter. <em>Invoice every offtaker.</em></h1>
+        <p class="hero-sub">Array Operator watches every inverter for you — catching the quiet underperformer the day it slips, drafting the warranty claim when one dies — <b>and</b> turns your utility bills into per-offtaker solar-credit invoices, drafted and ready to send. One connection. Every panel. No spreadsheets.</p>
         <div class="hero-ctas">
           <a class="db-cta" href="/onboarding">Start free — connect in 60 seconds →</a>
           <a class="db-signin" href="/login">Sign in</a>
@@ -134,13 +134,13 @@
         <div class="hero-trust">✓ 14-day free trial, no card &nbsp;·&nbsp; ✓ Read-only — we only see production data &nbsp;·&nbsp; ✓ Disconnect anytime, purged in 24h</div>
       </div>
       <aside class="hero-price" aria-label="Pricing">
-        <div class="hp-k">Simple, capacity-based pricing</div>
-        <div class="hp-rate"><span class="hp-num">$0.15</span><span class="hp-unit">/ kW of capacity, per month</span></div>
-        <div class="hp-eg" id="hpExample">≈ $1.50 / month for a 10&nbsp;kW array<span class="hp-eg-sub">scales with your fleet — a 100&nbsp;kW array runs about $15/mo</span></div>
+        <div class="hp-k">Pick what you need — pay for what you use</div>
+        <div class="hp-rate"><span class="hp-num">$0.15</span><span class="hp-unit">/ kW · month<br>fleet monitoring</span></div>
+        <div class="hp-eg" id="hpExample">＋ <b>$20 / offtaker</b> you invoice<span class="hp-eg-sub">run either, or both — a 100&nbsp;kW array ≈ $15/mo monitoring; 3 offtakers ≈ $60/mo invoicing</span></div>
         <ul class="hp-list">
-          <li>No setup fee · no contract</li>
-          <li>Flat monthly rate — predictable, no seasonal swings</li>
-          <li>Billed on your registered capacity, not metered guesswork</li>
+          <li>Live monitoring — billed on registered capacity, not guesswork</li>
+          <li>Offtaker invoices — drafted from your real utility bills</li>
+          <li>No setup fee · no contract · 14-day free trial</li>
         </ul>
       </aside>
     </div>
@@ -279,6 +279,11 @@
 </div>
 
 <script src="fleet-store.js"></script>
+<!-- Anonymous-demo data — a coherent fake operator (Catamount Community Solar, the
+     "both" plan) so signed-out visitors see a populated Master Account + Offtaker
+     Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
+     there's no session (gated inside those files). -->
+<script src="demo-data.js"></script>
 <script src="app.js"></script>
 <script src="sandbox.js"></script>
 <script src="vendor-sheet.js"></script>

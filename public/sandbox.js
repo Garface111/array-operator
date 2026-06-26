@@ -3984,6 +3984,26 @@
     const body=document.getElementById("acctFilesBody"), countEl=document.getElementById("acctFilesCount");
     if(!body) return;
     let files=[], failed=false;
+    // Signed-out DEMO: show the canned file set (no fetch, which would 401).
+    if(!authHeaders() && window.AO_DEMO && Array.isArray(window.AO_DEMO.files)){
+      files = window.AO_DEMO.files;
+      if(countEl)countEl.textContent=files.length?`${files.length} file${files.length===1?"":"s"}`:"";
+      const feat=files[0], rest=files.slice(1);
+      const tile=f=>`<button type="button" class="rb-file" data-url="" title="${esc(f.name)}"><span class="ico">${_flIcon(f.kind,f.name)}</span><span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role||"")}</small></span><span class="when">${esc(_flAgo(f.uploaded_at))}${f.size?" · "+_flSize(f.size):""}</span></button>`;
+      body.innerHTML=`
+        <button type="button" class="rb-file-feat" data-url="" title="${esc(feat.name)}">
+          <span class="badge">Latest upload</span>
+          <span class="ico">${_flIcon(feat.kind,feat.name)}</span>
+          <span class="name">${esc(feat.name)}</span>
+          <span class="role">${esc(feat.role||"")}</span>
+          <span class="meta">${esc(_flAgo(feat.uploaded_at))}${feat.size?" · "+_flSize(feat.size):""} · demo</span>
+        </button>
+        ${rest.length?`<div class="rb-files-list">${rest.map(tile).join("")}</div>`:""}
+        <div class="rb-files-status" id="acctFilesStatus"></div>`;
+      // Demo files aren't downloadable — clicking just notes it's a sample.
+      body.querySelectorAll("[data-url]").forEach(b=>b.onclick=()=>{ const s=document.getElementById("acctFilesStatus"); if(s)s.textContent="Sign in to open your own files."; });
+      return;
+    }
     try{ const r=await fetch("/v1/array-operator/billing/files",{headers:authHeaders()});
       const d=await r.json().catch(()=>({})); if(r.ok)files=Array.isArray(d.files)?d.files:[]; else failed=true;
     }catch(e){ failed=true; }
@@ -4465,8 +4485,15 @@
     // 200 with no charges is "No charges yet"; a thrown fetch / !ok on BOTH calls
     // is a real load failure and must not masquerade as "No charges yet."
     let sumFailed = false, invFailed = false;
-    try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); else sumFailed = true; } catch(e){ sumFailed = true; }
-    try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); else invFailed = true; } catch(e){ invFailed = true; }
+    // Signed-out DEMO: serve the canned bill from AO_DEMO (no fetch, which would
+    // 401). Real owners pass real headers and hit the live endpoints below.
+    if(!h && window.AO_DEMO && window.AO_DEMO.billingSummary){
+      summary = window.AO_DEMO.billingSummary;
+      invoice = window.AO_DEMO.nextInvoice || null;
+    } else {
+      try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); else sumFailed = true; } catch(e){ sumFailed = true; }
+      try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); else invFailed = true; } catch(e){ invFailed = true; }
+    }
 
     // Both endpoints failed → show an honest error + retry instead of a misleading
     // "No charges yet." Retry re-runs renderBilling with fresh headers, so the
@@ -4612,7 +4639,20 @@
     const list = document.getElementById("acctList");
     if(!list) return;
     const h = authHeaders();
-    if(!h){ list.innerHTML = signInPrompt(); return; }
+    if(!h){
+      // Signed-out DEMO: render a fully-populated Master Account for the fake
+      // operator (Catamount Community Solar) instead of the sign-in wall, so a
+      // cold visitor sees every account row + the dual bill + a card on file.
+      // Gated on the demo module existing; real signed-in flow is untouched (h set).
+      if(window.AO_DEMO && window.AO_DEMO.account){
+        _account = window.AO_DEMO.account;
+        renderAccountList(_account);
+        renderBilling(null);                 // null headers → renderBilling reads AO_DEMO
+        return;
+      }
+      list.innerHTML = signInPrompt();
+      return;
+    }
     list.innerHTML = `<div class="empty">Loading your account…</div>`;
     try{
       const r = await fetch("/v1/account", { headers: h });
