@@ -506,18 +506,6 @@
             <div class="e"><div class="en">${r.lossYr>=1?usd0(r.lossYr):"—"}</div><div class="ec">slipping / yr</div></div>
           </div>
         </div>
-        <div>
-          <h4>Recommended next action</h4>
-          <div class="cc-rec"><b>Do this:</b> ${rec}</div>
-          <div class="cc-actions">
-            ${(r.status==="dead"||r.status==="fault")
-              ? `<button class="cc-btn primary" data-do="claim" data-key="${esc(r.key)}">${r.status==="fault"?"Draft service request":"Draft warranty claim"}</button>`
-              : `<button class="cc-btn primary" data-do="progress" data-key="${esc(r.key)}">Start working it</button>`}
-            <button class="cc-btn ghost" data-do="progress" data-key="${esc(r.key)}">Mark in progress</button>
-            <button class="cc-btn ghost" data-do="snooze" data-key="${esc(r.key)}">Snooze</button>
-            <button class="cc-btn ghost" data-do="focus" data-key="${esc(r.key)}">Open in fleet tree →</button>
-          </div>
-        </div>
       </div></td></tr>`;
   }
 

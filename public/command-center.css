@@ -119,9 +119,8 @@
 .cc-drawer td{ padding:0; }
 .cc-drawer .inner{
   padding:16px 18px 18px; background:rgba(2,6,12,.45); border-bottom:1px solid var(--line);
-  display:grid; grid-template-columns:1.4fr 1fr; gap:18px;
+  display:grid; grid-template-columns:1fr; gap:18px;
 }
-@media(max-width:760px){ .cc-drawer .inner{ grid-template-columns:1fr; } }
 .cc-drawer h4{ font-size:13px; color:var(--ink); font-weight:700; margin:0 0 6px; }
 .cc-drawer p{ margin:0 0 10px; color:var(--muted); font-size:13px; line-height:1.55; }
 .cc-drawer p b{ color:var(--ink); }
