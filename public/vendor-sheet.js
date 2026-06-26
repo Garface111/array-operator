@@ -33,6 +33,16 @@
   }
   const ALLOC_TIP = v =>
     `${vlabel(v)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.`;
+  // The ARRAY-level kW is just the sum of those split per-inverter readings, so for
+  // these vendors it's an estimate too. Mark it the same way so the array row (and the
+  // per-vendor group total) can't read as an exact measured value.
+  const ALLOC_VENDORS = { fronius: 1, sma: 1, chint: 1 };
+  function isAllocatedVendor(v) { return !!ALLOC_VENDORS[(v || "").toLowerCase()]; }
+  function isArrayAllocatedPower(c) {
+    return c && c.current_power_w != null && isAllocatedVendor(c.vendor);
+  }
+  const ARR_ALLOC_TIP = v =>
+    `${vlabel(v)} reports one site-level power that we split across inverters — this array total is the sum of those estimates, not a measured reading.`;
   function kw(w) {
     if (w == null) return "—";
     const k = w / 1000;
@@ -297,22 +307,27 @@
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
+      const vAlloc = isAllocatedVendor(v) && vtot > 0;
       h += `<div class="vs-vgroup">
         <div class="vs-vhead">${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
-          <span class="vs-vtot">${kw(vtot)} now</span></div>${vnote}`;
+          <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span></div>${vnote}`;
       list.forEach(c => {
         const st = arrStatus(c);
         // Frozen feed: a reading older than the vendor's live window. Dim the (stale)
         // live number and flag its age so a paused feed never masquerades as current.
         const stale = isStale(c) && c.current_power_w != null;
-        const staleTitle = stale ? ` title="Last reading ${esc(freshness(c))} — live feed may be paused (sign back into the vendor portal, or hit ${esc(vlabel(v))}'s refresh)"` : "";
+        const allocArr = isArrayAllocatedPower(c);
+        const staleMsg = stale ? `Last reading ${freshness(c)} — live feed may be paused (sign back into the vendor portal, or hit ${vlabel(v)}'s refresh)` : "";
+        const powTitle = (allocArr || stale)
+          ? ` title="${esc([allocArr ? ARR_ALLOC_TIP(c.vendor) : "", staleMsg].filter(Boolean).join(" "))}"`
+          : "";
         const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span>${esc(c.array_name || "Array")}</span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
-          <span class="vs-c-pow${stale ? " vs-stale" : ""}"${staleTitle}>${kw(c.current_power_w)}</span>
+          <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           <span class="vs-c-today">${kwh0(c.produced_today_kwh)}</span>
           <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
           <span class="vs-c-fresh${isStale(c) ? " vs-stale-syn" : ""}">${esc(freshness(c))}</span>
