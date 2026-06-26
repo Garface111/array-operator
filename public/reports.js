@@ -2171,11 +2171,35 @@
   // Switch the whole approval section to a chosen offtaker. If they already have a
   // pending draft, show it instantly; otherwise mint one on demand (idempotent — the
   // backend reuses/refreshes the period's draft) and refetch so it carries its live
+  // Silently re-pull the latest GMP bill + recompute this offtaker's draft (the backend
+  // /draft endpoint pulls the bound account fresh before computing), then refresh the
+  // inbox so the figures update in place. Best-effort + debounced ≤1/min per offtaker so
+  // browsing never stacks pulls; on any failure the cached draft stands (no error shown).
+  const _bgRefreshed = {};   // subId -> last bg-refresh ms
+  async function backgroundRefreshDraft(subId) {
+    subId = String(subId);
+    if (!authHeaders()) return;                          // demo / signed-out
+    const nowMs = Date.now();
+    if (_bgRefreshed[subId] && nowMs - _bgRefreshed[subId] < 60000) return;
+    _bgRefreshed[subId] = nowMs;
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft",
+        { method: "POST", headers: authHeaders() });
+      if (!r.ok) return;
+    } catch (_) { return; }
+    if (String(ACTIVE_SUB_ID) === subId) { _pinActiveSub = true; await refreshInbox(); }
+  }
+
   // envelope fields. `force` re-mints even when a draft already exists.
   async function selectOfftaker(subId, force) {
     subId = String(subId);
     if (DRAFT_BY_SUB[subId] && !force) {
-      ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody(); return;
+      ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody();
+      // Show the cached draft instantly, but ALSO pull the latest GMP bill + recompute in
+      // the BACKGROUND so a newly-released statement is reflected without a manual
+      // regenerate — the figures refresh in place if anything changed.
+      backgroundRefreshDraft(subId);
+      return;
     }
     // Signed-out DEMO: never mint via the backend (it would 401). Just switch to the
     // offtaker; ones without a pre-built draft show the graceful empty state.
