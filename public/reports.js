@@ -2955,9 +2955,13 @@
           // (or changing it) updates the preview live — otherwise the local draft kept
           // the old budget and the two-row "Budgeted amount" display stayed stale until
           // a hard refresh re-fetched the draft.
+          // Include net_rate_per_kwh + discount_pct so the calc dashboard reflects a
+          // freshly-typed Solar credit rate LIVE — without these the local draft kept the
+          // old rate and the dashboard fell back to the effective (post-discount) rate
+          // instead of showing the rate the operator just set.
           ["array_total_kwh", "allocation_pct", "customer_kwh", "amount_usd",
            "invoice_number", "period_label", "budget_amount_usd",
-           "solar_credit_value"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
+           "solar_credit_value", "net_rate_per_kwh", "discount_pct"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
           applyDraftFigures(card, d);
           setSt("rb-status rb-ok", "Saved · figures updated.");
         } else {
