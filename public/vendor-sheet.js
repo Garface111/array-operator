@@ -198,6 +198,53 @@
   // routes through it (opening the portal also arms a fresh capture) instead of a plain tab.
   function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
 
+  // ── "Sync all" — one click opens EVERY connected, extension-captured vendor in the
+  // BACKGROUND, captures the latest readings, and self-closes — without leaving this page
+  // or stealing focus. Fronius/SMA ride background tabs; Chint rides its v1.9.77 per-site
+  // walk (also background); all via the extension's SYNC_ALL_VENDORS path. SolarEdge is
+  // server-polled (no portal open needed), so it's intentionally excluded.
+  const SYNCABLE = new Set(["fronius", "sma", "chint"]);
+  function connectedSyncable() {
+    try {
+      const cols = (window.FleetStore && FleetStore.toColumns().columns) || [];
+      const set = new Set();
+      cols.forEach(c => { const v = (c.vendor || "").toLowerCase(); if (SYNCABLE.has(v)) set.add(v); });
+      return [...set];
+    } catch (_) { return []; }
+  }
+  // Show the button only when the extension is present AND there's a syncable vendor.
+  function _toggleSyncAll() {
+    const b = $("#vsSyncAll");
+    if (b) b.hidden = !(extPresent() && connectedSyncable().length);
+  }
+  let _syncAllBusy = false;
+  function doSyncAll(btn) {
+    if (_syncAllBusy || !extPresent()) return;
+    const vendors = connectedSyncable();
+    if (!vendors.length) return;
+    _syncAllBusy = true;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "↻ Syncing…";
+    const reqId = "vsall-" + Date.now();
+    const finish = (label) => {
+      window.removeEventListener("message", onDone);
+      clearTimeout(to);
+      _syncAllBusy = false; btn.disabled = false;
+      btn.textContent = label || orig;
+      if (label) setTimeout(() => { if (btn.textContent === label) btn.textContent = orig; }, 4500);
+    };
+    // SO_SYNC_ALL_DONE fires once the background surfaces are OPEN (fast) — the captures
+    // then land over the next ~minute and refresh each row's freshness on their own.
+    const onDone = (e) => {
+      if (e.source !== window || !e.data || e.data.type !== "SO_SYNC_ALL_DONE" || e.data.reqId !== reqId) return;
+      finish("↻ Syncing in background");
+    };
+    window.addEventListener("message", onDone);
+    const to = setTimeout(() => finish(), 9000);   // don't leave the button hung if the bridge is silent
+    try { window.postMessage({ type: "SO_SYNC_ALL", vendors, reqId }, window.location.origin); }
+    catch (_) { finish(); }
+  }
+
   const _expanded = {};                       // array_id -> bool (survives re-renders)
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
   let _query = "";                            // search filter (lowercased)
@@ -304,6 +351,7 @@
         <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
           <div class="vs-hint">To refresh a vendor, open its portal — click the vendor name or its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
         <div class="vs-actions">
+          <button type="button" class="vs-syncall" id="vsSyncAll" hidden title="Open every connected vendor in the background, capture the latest readings, and close — all without leaving this page.">↻ Sync all</button>
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
           <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
             placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
@@ -324,6 +372,9 @@
       if (window.__aoAddArray) window.__aoAddArray();
       else location.hash = "#arrays";   // defensive: sandbox owns the modal
     };
+    const sab = host.querySelector("#vsSyncAll");
+    if (sab) sab.onclick = () => doSyncAll(sab);
+    _toggleSyncAll();
     host.querySelectorAll("[data-sort]").forEach(b => {
       const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
       b.addEventListener("click", go);
@@ -344,6 +395,7 @@
     const data = FleetStore.toColumns();
     const all = (data && data.columns) || [];
     const cols = all.filter(c => matches(c, _query));
+    _toggleSyncAll();   // reveal/hide "Sync all" as syncable vendors come and go
     const cnt = $("#vsCount");
     if (cnt) {
       const invShown = cols.reduce((t, c) => t + (c.inverter_count || 0), 0);
@@ -532,7 +584,7 @@
     if (window.__AO_EXT_PRESENT) _extPresent = true;
     window.addEventListener("message", (e) => {
       if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
-      if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") _extPresent = true;
+      if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") { _extPresent = true; _toggleSyncAll(); }
     });
     try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, window.location.origin); } catch (_) {}
     window.addEventListener("resize", sizeScroll);

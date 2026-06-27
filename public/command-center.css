@@ -1140,6 +1140,15 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   box-shadow:0 4px 14px -4px rgba(29,78,216,.45); transition:filter .12s, transform .04s; }
 .vs-addbtn:hover{ filter:brightness(1.06); }
 .vs-addbtn:active{ transform:translateY(1px); }
+/* "Sync all" — secondary/outline action beside the primary "+ Add vendor". */
+.vs-syncall{ display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  border:1px solid var(--line,#cbd5e1); border-radius:9px; padding:9px 14px; font:inherit;
+  font-size:13px; font-weight:600; white-space:nowrap; color:var(--ink,#0f172a);
+  background:var(--card,#fff); transition:filter .12s, transform .04s, border-color .12s, color .12s; }
+.vs-syncall:hover{ border-color:#3b82f6; color:#1d4ed8; }
+.vs-syncall:active{ transform:translateY(1px); }
+.vs-syncall:disabled{ opacity:.6; cursor:default; }
+.vs-syncall[hidden]{ display:none; }   /* respect the hidden attr despite the display above */
 .vs-search{ width:280px; max-width:48vw; font:inherit; font-size:13px; color:var(--ink,#0f172a);
   padding:8px 12px; border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff);
   transition:border-color .12s, box-shadow .12s; }
