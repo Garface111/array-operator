@@ -109,6 +109,52 @@
     return Math.round(a / 1440) + "d ago";
   }
 
+  // ── Sync recency (OUR capture clock) vs source-data freshness ──────────────
+  // The freshness COLUMN shows when WE last captured (sync_status.age_min) — which
+  // advances on every auto-login / keep-warm / live capture, even overnight when the
+  // vendor SOURCE's own clock is frozen because the panels are asleep. So a successful
+  // sync is visible the instant it lands, faithfully mirroring the back end. "live"
+  // still wins when the source data itself is current; the tooltip spells out BOTH
+  // clocks so nothing is ambiguous. (freshness() above stays SOURCE-age — it's the
+  // honest "this power reading is from X ago" basis, a different question.)
+  function _fmtAge(min) {
+    if (min == null) return "";
+    if (min < 1) return "now";
+    if (min < 90) return Math.round(min) + " min ago";
+    if (min < 1440) return Math.round(min / 60) + "h ago";
+    return Math.round(min / 1440) + "d ago";
+  }
+  function _syncAgeMin(c) { const m = (c.sync_status || {}).age_min; return m == null ? null : m; }
+  // Compact age for the narrow freshness column: "now" / "3m" / "2h" / "1d".
+  function _fmtAgeShort(min) {
+    if (min == null) return "";
+    if (min < 1) return "now";
+    if (min < 60) return Math.round(min) + "m";
+    if (min < 1440) return Math.round(min / 60) + "h";
+    return Math.round(min / 1440) + "d";
+  }
+  // Our pipeline is "behind" when we haven't captured in ~3 keep-warm cycles (~30 min).
+  function syncStale(c) { const s = _syncAgeMin(c); return s != null && s >= 30; }
+  function syncFreshness(c) {
+    const src = _ageMin(c), syn = _syncAgeMin(c);
+    if (src != null && src < _liveWindowMin(c)) return "live";        // the source data itself is current
+    if (syn != null) return syn < 1 ? "synced now" : "synced " + _fmtAgeShort(syn);  // our capture recency (updates every sync)
+    if (src != null) return _fmtAgeShort(src) + " ago";              // legacy rows without a sync clock
+    return "";
+  }
+  function freshTip(c) {
+    const syn = _syncAgeMin(c), src = _ageMin(c), v = vlabel(c.vendor);
+    const parts = [];
+    if (syn != null) parts.push("We last synced this array " + _fmtAge(syn) + ".");
+    if (src != null) {
+      parts.push(src < _liveWindowMin(c)
+        ? "The " + v + " data is live."
+        : "The " + v + " portal's own data is from " + _fmtAge(src)
+          + (c.is_daylight === false ? " — it pauses overnight while the panels aren't producing." : "."));
+    }
+    return parts.join(" ");
+  }
+
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
   // recapture alarms — surfaced so owners know how far behind real time a reading
   // can be. Chint recaptures every ~4 min; Fronius/SMA every ~6 min.
@@ -447,7 +493,7 @@
         // live number and flag its age so a paused feed never masquerades as current.
         const stale = isStale(c) && c.current_power_w != null;
         const allocArr = isArrayAllocatedPower(c);
-        const staleMsg = stale ? `Last reading ${freshness(c)} — live feed may be paused (sign back into the vendor portal, or hit ${vlabel(v)}'s refresh)` : "";
+        const staleMsg = stale ? `This live number is from ${freshness(c)} — it refreshes on the next auto-sync; open ${vlabel(v)} to refresh now.` : "";
         const powTitle = (allocArr || stale)
           ? ` title="${esc([allocArr ? ARR_ALLOC_TIP(c.vendor) : "", staleMsg].filter(Boolean).join(" "))}"`
           : "";
@@ -459,7 +505,7 @@
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           <span class="vs-c-today">${kwh0(c.produced_today_kwh)}</span>
           <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
-          <span class="vs-c-fresh${isStale(c) ? " vs-stale-syn" : ""}">${esc(freshness(c))}</span>
+          <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
         </button>`;
         if (open) {
           h += `<div class="vs-inv-wrap">`;
@@ -467,9 +513,9 @@
           // path back to fresh data right where the owner notices it — open the
           // vendor portal (extension re-captures on open). Reuses the existing
           // [data-vportal] click delegation, so no extra handler is wired.
-          if (isStale(c) && _portal) {
+          if (syncStale(c) && _portal) {
             h += `<div class="vs-src-recover">
-              <span class="vs-src-recover-txt">Your ${esc(vlabel(v))} feed paused — readings here are from ${esc(freshness(c))}. Open the portal to sync the latest.</span>
+              <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — auto-sync may need a hand. Open the portal to capture the latest.</span>
               <button type="button" class="vs-src-recover-btn" data-vportal="${esc(v)}">↗ Open ${esc(vlabel(v))} to sync</button>
             </div>`;
           }
