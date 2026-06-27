@@ -394,13 +394,15 @@
           <div class="vs-hint">To refresh a vendor, open its portal — click its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
         <div class="vs-actions">
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
-          <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
-            placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
-          <button type="button" class="vs-syncall" id="vsSyncAll"
-            title="Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.">↻ Sync all vendors</button>
-          <button type="button" class="vs-closetabs" id="vsCloseTabs"
-            title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>
+          <div class="vs-actions-right">
+            <button type="button" class="vs-syncall" id="vsSyncAll"
+              title="Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.">↻ Sync all vendors</button>
+            <button type="button" class="vs-closetabs" id="vsCloseTabs"
+              title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>
+          </div>
         </div>
+        <div class="vs-searchrow"><input type="search" class="vs-search" id="vsSearch"
+          placeholder="Search arrays, vendors, or inverters…" autocomplete="off" spellcheck="false"></div>
       </div>
       <div class="vs-scroll" id="vsScroll">
         <div class="vs-table">
