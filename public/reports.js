@@ -1510,6 +1510,10 @@
   function renderAccordion(subs, arrs, utilAccts, drafts) {
     const list = $("#rbList");
     if (!list) return;
+    parkTpl();   // move #rbTpl to its standalone home BEFORE wiping #rbList — else a box
+                 // currently folded into an open card is destroyed with the list and
+                 // never comes back (the "showed up then disappeared on reload" bug). The
+                 // re-expanded card re-folds it; if none re-opens it stays visible at home.
     ACC_ARRS = arrs || [];
     // Index the drafts (newest per offtaker) + build the dropdown-free OFFTAKERS list.
     _indexInbox(drafts || [], subs || []);
