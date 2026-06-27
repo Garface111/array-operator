@@ -638,6 +638,11 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-track-stat.rb-err{ color:#dc2626; }
 .rb-track-warn{ font-size:11px; color:#9a6a00; background:#fff8e8;
   border:1px solid #f1e2bd; border-radius:8px; padding:6px 9px; }
+/* Each offtaker's OWN sheet, nested inside its accordion card. A blue left accent
+   marks it as nested; the operator-wide MASTER sheet sits at the top of the page. */
+.rb-track-sub{ margin-top:12px; border-left:3px solid #2563eb;
+  background:linear-gradient(168deg,#f7fafc,#eef4fb); }
+.rb-track-sub[hidden]{ display:none !important; }
 
 .rb-listwrap{ margin-top:8px; }
 .rb-sub{ display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;

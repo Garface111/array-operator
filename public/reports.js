@@ -440,10 +440,11 @@
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
-        <!-- GLOBAL generation-spreadsheet tracker — one operator-wide sheet for
-             the whole fleet, pinned at the top of the Offtaker Invoice Generator.
-             Hidden until the tenant tracker endpoint is live (404/network → stays
-             hidden). Reuses the shared renderTracker/wireTracker helpers. -->
+        <!-- MASTER generation spreadsheet — one operator-wide sheet (auto-built
+             per-array, or the operator's own uploaded layout) pinned at the top.
+             Each offtaker ALSO gets its OWN sheet inside its accordion card
+             (.rb-track-sub). Self-hides on flag-off/404/network. Reuses the shared
+             renderTracker/wireTracker helpers via loadTrackerInto. -->
         <div class="rb-track rb-track-global rep-card" id="rbGlobalTracker" hidden></div>
         <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
         <div id="rbCustManual"></div>
@@ -1904,6 +1905,9 @@
     const regen = wrap.querySelector("[data-regen]");
     if (regen) regen.onclick = () => selectOfftaker(regen.getAttribute("data-regen"), true);
     wireOfftakerEditors(wrap);
+    // Load THIS offtaker's own generation spreadsheet card (self-hides if the
+    // feature flag is off). The operator-wide master sheet loads once at page top.
+    wrap.querySelectorAll(".rb-track-sub").forEach(loadTrackerInto);
     // Consolidate: drop the (already-wired) invoice-template box at the bottom of
     // the open card so the page reads as one element.
     foldTplIntoInbox(wrap.querySelector(".rb-acc-inner"));
@@ -2412,7 +2416,13 @@
             <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
         <span class="rb-status rb-offedit-status"></span>
-      </div>`;
+      </div>
+      <!-- THIS offtaker's own generation spreadsheet — upload a sheet in whatever
+           format they use; we match it and append a row each month as their GMP
+           bills land. Self-hides on flag-off/404/network (loadTrackerInto). The
+           operator-wide MASTER sheet lives at the top of the page (#rbGlobalTracker). -->
+      <div class="rb-track rb-track-sub" data-tracker-base="${API}/subscriptions/${sid}/tracker"
+           data-tracker-scope="offtaker" data-tracker-name="${esc(d.customer_name || "")}" hidden></div>`;
   }
 
   // ── Bring-your-own generation spreadsheet ("our magic" auto-updater) ────────
@@ -2439,15 +2449,17 @@
     } catch (e) { return ""; }
   }
 
-  // Load the single operator-wide tracker into #rbGlobalTracker. Tenant
-  // endpoint; on 404 / disabled / network-error the box stays hidden (safe to
-  // deploy before the backend route is live).
-  async function loadGlobalTracker() {
-    const box = $("#rbGlobalTracker");
+  // Generic tracker loader. The box carries its OWN endpoint + scope on data-
+  // attributes (data-tracker-base / -scope / -name), so the SAME renderer drives
+  // the MASTER operator-wide sheet (#rbGlobalTracker, pinned at the top) AND each
+  // offtaker's OWN sheet (.rb-track-sub, inside its accordion). On 404 / disabled
+  // / network the box stays hidden (safe to ship ahead of the flag; demo/out).
+  async function loadTrackerInto(box) {
     if (!box) return;
+    const base = box.dataset.trackerBase || TRACKER_BASE;
     if (!authHeaders()) { box.hidden = true; return; }   // demo / signed-out
     try {
-      const r = await fetch(TRACKER_BASE, { headers: authHeaders() });
+      const r = await fetch(base, { headers: authHeaders() });
       if (!r.ok) { box.hidden = true; return; }           // flag off / not found → hide
       const j = await r.json();
       const t = j && (j.tracker || j);                    // accept {tracker:{…}} or flat shape
@@ -2457,14 +2469,31 @@
     } catch (e) { box.hidden = true; }                    // network — leave hidden
   }
 
+  // The MASTER sheet pinned at the top of the Offtaker Invoice Generator.
+  function loadGlobalTracker() {
+    const box = $("#rbGlobalTracker");
+    if (box) { box.dataset.trackerBase = TRACKER_BASE; box.dataset.trackerScope = "global"; }
+    return loadTrackerInto(box);
+  }
+
   function trackerMapTable(t) {
     if (!t.has_sheet) return "";
     const heads = t.headers || [];
     const cols = t.columns || {};
-    const chips = ["period", "generation", "consumption", "rate", "amount"]
-      .filter(f => cols[f] != null)
-      .map(f => `<span class="rb-track-chip"><b>${FIELD_LABEL[f]}</b> ← ${esc(heads[cols[f]] || ("col " + (cols[f] + 1)))}</span>`)
-      .join("");
+    let chips;
+    if (t.auto) {
+      // The auto-built master sheet's columns ARE the arrays (+ Period/Total), not
+      // detected logical fields — summarize its shape instead of a field map.
+      const nArr = Math.max(0, (heads.length || 0) - 2);   // minus Period + Total
+      const nMon = t.data_rows || 0;
+      chips = `<span class="rb-track-chip"><b>${nArr}</b> array${nArr === 1 ? "" : "s"}</span>`
+            + `<span class="rb-track-chip"><b>${nMon}</b> month${nMon === 1 ? "" : "s"}</span>`;
+    } else {
+      chips = ["period", "generation", "consumption", "rate", "amount"]
+        .filter(f => cols[f] != null)
+        .map(f => `<span class="rb-track-chip"><b>${FIELD_LABEL[f]}</b> ← ${esc(heads[cols[f]] || ("col " + (cols[f] + 1)))}</span>`)
+        .join("");
+    }
     const last = t.last_period ? `Last row: <b>${esc(t.last_period)}</b>` : "No data rows yet";
     const upd = t.updated_at ? " · updated " + relTime(t.updated_at) : "";
     return `
@@ -2474,23 +2503,57 @@
       </div>`;
   }
 
+  // Scope-aware copy. A box is either the MASTER (operator-wide) sheet at the top
+  // or one OFFTAKER's own sheet inside its accordion. The master is auto-built
+  // from the operator's arrays unless they upload their own layout to override it.
+  function trackerCopy(box, t) {
+    const scope = box.dataset.trackerScope || "global";
+    const name = (box.dataset.trackerName || "").trim();
+    const has = !!t.has_sheet;
+    if (scope === "offtaker") {
+      const who = name || "this offtaker";
+      return {
+        title: name ? `${name}’s generation spreadsheet` : "This offtaker’s generation spreadsheet",
+        hint: has
+          ? `We add a new row to ${who}’s sheet each month as their GMP bills land.`
+          : `Upload ${name ? name + "’s" : "this offtaker’s"} own tracking sheet — we’ll match its format and add a row each month as their GMP bills land.`,
+      };
+    }
+    // master / operator-wide
+    if (t.auto) return {
+      title: "Master generation spreadsheet",
+      hint: "Auto-built from all your arrays — a column per array, a row per month, always current. Download anytime, or upload your own master layout to override it.",
+    };
+    return {
+      title: "Master generation spreadsheet",
+      hint: has
+        ? "Your uploaded master sheet — we add a row each month as GMP bills land. Remove it to fall back to the auto-built sheet."
+        : "Upload your operator-wide generation tracking sheet — we’ll detect its columns and keep it current as GMP bills land.",
+    };
+  }
+
   function renderTracker(box, t) {
     const has = !!t.has_sheet;
+    const isAuto = !!t.auto;
+    const canRemove = has && !isAuto;                 // the auto master sheet has nothing to remove
+    const upLabel = !has ? "Upload spreadsheet" : (isAuto ? "Upload your own" : "Replace");
+    const upTitle = isAuto ? "Upload your own sheet to override the auto-built one"
+                           : (has ? "Replace the tracked sheet" : "Upload a spreadsheet");
+    const dlLabel = isAuto ? "Download spreadsheet ↓" : "Download latest spreadsheet ↓";
+    const { title, hint } = trackerCopy(box, t);
     box.innerHTML = `
       <div class="rb-track-h">
-        <span class="rl">Your generation spreadsheet</span>
-        <span class="rb-track-hint">${has
-          ? "We add a new row automatically each month as your GMP bills land — one operator-wide sheet for all your offtakers."
-          : "Upload your operator-wide generation tracking sheet — we'll detect its columns and keep it current as GMP bills land."}</span>
+        <span class="rl">${esc(title)}</span>
+        <span class="rb-track-hint">${esc(hint)}</span>
       </div>
       ${trackerMapTable(t)}
       <div class="rb-track-actions">
-        ${has ? `<button type="button" class="rb-track-dl" data-tdl="1">Download latest spreadsheet ↓</button>` : ""}
-        <label class="rb-track-up" title="${has ? "Replace the tracked sheet" : "Upload a spreadsheet"}">
-          ${has ? "Replace" : "Upload spreadsheet"}
+        ${has ? `<button type="button" class="rb-track-dl" data-tdl="1">${dlLabel}</button>` : ""}
+        <label class="rb-track-up" title="${esc(upTitle)}">
+          ${upLabel}
           <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-tup="1" hidden>
         </label>
-        ${has ? `<button type="button" class="rb-track-rm" data-trm="1">Remove</button>` : ""}
+        ${canRemove ? `<button type="button" class="rb-track-rm" data-trm="1">Remove</button>` : ""}
         <span class="rb-status rb-track-stat"></span>
       </div>
       ${(t.warnings && t.warnings.length) ? `<div class="rb-track-warn">${esc(t.warnings.join(" "))}</div>` : ""}`;
@@ -2498,6 +2561,7 @@
   }
 
   function wireTracker(box) {
+    const base = box.dataset.trackerBase || TRACKER_BASE;
     const stat = box.querySelector(".rb-track-stat");
     const setS = (cls, txt) => { if (stat) { stat.className = "rb-status rb-track-stat " + (cls || ""); stat.textContent = txt || ""; } };
     const up = box.querySelector("[data-tup]");
@@ -2507,7 +2571,7 @@
       setS("rb-busy", "Reading your sheet…");
       const fd = new FormData(); fd.append("file", f);
       try {
-        const r = await fetch(TRACKER_BASE, { method: "POST", headers: authHeaders(), body: fd });
+        const r = await fetch(base, { method: "POST", headers: authHeaders(), body: fd });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setS("rb-err", (j && j.detail) ? j.detail : "Couldn't read that sheet."); return; }
         renderTracker(box, (j && (j.tracker || j)) || {});
@@ -2517,7 +2581,7 @@
     if (dl) dl.onclick = async () => {
       setS("rb-busy", "Building latest…");
       try {
-        const r = await fetch(TRACKER_BASE + "/download", { headers: authHeaders() });
+        const r = await fetch(base + "/download", { headers: authHeaders() });
         if (!r.ok) { setS("rb-err", "Download failed."); return; }
         const blob = await r.blob();
         const cd = r.headers.get("Content-Disposition") || "";
@@ -2529,7 +2593,7 @@
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         setS("rb-ok", "Downloaded.");
         // Refresh the card so a just-appended period shows as the new last row.
-        const rr = await fetch(TRACKER_BASE, { headers: authHeaders() });
+        const rr = await fetch(base, { headers: authHeaders() });
         const jj = await rr.json().catch(() => ({}));
         const tt = jj && (jj.tracker || jj);
         if (rr.ok && tt && tt.enabled) renderTracker(box, tt);
@@ -2539,10 +2603,15 @@
     if (rm) rm.onclick = async () => {
       setS("rb-busy", "Removing…");
       try {
-        const r = await fetch(TRACKER_BASE, { method: "DELETE", headers: authHeaders() });
-        const j = await r.json().catch(() => ({}));
+        const r = await fetch(base, { method: "DELETE", headers: authHeaders() });
         if (!r.ok) { setS("rb-err", "Couldn't remove."); return; }
-        renderTracker(box, (j && (j.tracker || j)) || { enabled: true, has_sheet: false });
+        // Re-fetch so the master reverts to its auto-built sheet (and an offtaker
+        // box returns to its empty upload state) — the DELETE body alone can't
+        // tell us the post-removal shape for the master.
+        const rr = await fetch(base, { headers: authHeaders() });
+        const jj = await rr.json().catch(() => ({}));
+        const tt = (jj && (jj.tracker || jj)) || { enabled: true, has_sheet: false };
+        renderTracker(box, tt);
       } catch (e) { setS("rb-err", "Network error."); }
     };
   }
