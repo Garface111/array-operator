@@ -886,6 +886,9 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-btn-lg{ font-size:14px; font-weight:760; padding:11px 22px; }
 .rb-email-saved{ font-size:11px; font-weight:600; color:var(--good,#0a7d4f); text-transform:none; letter-spacing:0; }
 .rb-calc{ background:#fff; border:1px solid #e6edf3; border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,32,43,.04); }
+/* The calc dashboard now sits in the form column between the offtaker name and the
+   cover email — give it breathing room above (the email block supplies the gap below). */
+.rb-draft .rb-calc{ margin-top:12px; }
 .rb-calc-h{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#5a6b7b; font-weight:700; margin-bottom:8px; }
 .rb-calc-row{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid #eef2f6; }
 .rb-calc-row:last-child{ border-bottom:0; }

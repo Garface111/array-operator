@@ -1888,6 +1888,7 @@
     // Live preview + review header (actions + calc dashboard).
     renderDraftDoc();
     renderReviewTop();
+    wireCalcLinks(wrap);                 // calc dashboard now lives in the form column
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
       autoGrowMsg(ta);
       const did = ta.getAttribute("data-draftmsg");
@@ -2143,17 +2144,25 @@
       </div>`;
   }
 
-  // Render the review header (actions + calc dashboard) above the live preview. Kept in
-  // its OWN container so it repaints only when figures change — not on every keystroke.
+  // The calc dashboard's "view ↓" bill button. The dashboard now lives in the FORM
+  // column (between the offtaker name and the cover email), so wire its link wherever
+  // the dashboard is (re)rendered — initial body render + post-recompute repaint.
+  function wireCalcLinks(root) {
+    if (!root) return;
+    root.querySelectorAll(".rb-calc-link[data-dl]").forEach(b => b.onclick = () =>
+      downloadAttachment(b.getAttribute("data-dl"), b.getAttribute("data-fn")));
+  }
+
+  // Render the review ACTIONS (Approve & send …) above the live preview. Kept in its
+  // OWN container so it repaints only when figures change — not on every keystroke.
+  // (The calc dashboard moved to the form column; see draftCard.)
   function renderReviewTop() {
     const top = $("#rbReviewTop");
     if (!top) return;
     const d = activeDraft();
     if (!d) { top.innerHTML = ""; return; }
-    top.innerHTML = reviewActions(d, VIEWING_VERSION_ID != null) + calcDashboard(d);
+    top.innerHTML = reviewActions(d, VIEWING_VERSION_ID != null);
     top.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
-    top.querySelectorAll("[data-dl]").forEach(b => b.onclick = () =>
-      downloadAttachment(b.getAttribute("data-dl"), b.getAttribute("data-fn")));
   }
 
   function renderDraftDoc() {
@@ -2349,6 +2358,7 @@
           <div class="rb-draft-name">${esc(d.customer_name)}</div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
+        ${calcDashboard(d)}
         <div class="rb-draft-email">
           <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
           <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
@@ -2773,7 +2783,11 @@
         autoGrowMsg(ta);                              // re-fit after the note grows/shrinks
       }
     }
-    renderReviewTop();                                // calc dashboard reflects the new figures
+    if (card) {                                       // the calc dashboard now lives in the form col;
+      const calcEl = card.querySelector(".rb-calc");  // repaint it in place from the new figures
+      if (calcEl) { calcEl.outerHTML = calcDashboard(d); wireCalcLinks(card); }
+    }
+    renderReviewTop();                                // repaint the action buttons
     renderDraftDoc();
   }
 
