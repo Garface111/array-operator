@@ -312,11 +312,12 @@
   }
 
   // ── "Sync all vendors": refresh every vendor with one click ────────────────
-  // Each silent-capable vendor (Fronius/SMA/SolarEdge) is recaptured through the
-  // extension — it opens the portal in a BACKGROUND tab on the existing signed-in
-  // session, grabs fresh readings, and CLOSES the tab automatically. The extension is
-  // single-flight, so we run them back-to-back. Chint can't be captured silently (it
-  // needs a per-site click), so we open its portal at the end to finish.
+  // Each vendor is recaptured through the extension — it opens the portal on the
+  // existing signed-in session, grabs fresh readings, and CLOSES the surface itself.
+  // Fronius/SMA/SolarEdge ride background tabs; Chint rides its v1.9.77 per-site route
+  // walk in a minimized, unfocused popup (ext v1.9.80) — so it NO LONGER needs a
+  // foreground "open its portal to finish" (which used to pull the operator to the Chint
+  // tab). openChint() is kept only as the fallback for older extensions that can't.
   let _syncing = false;
   function recaptureVendorViaBridge(vendor, timeoutMs = 120000) {
     return new Promise((resolve) => {
@@ -355,10 +356,9 @@
     btn.innerHTML = `<span class="vs-spin"></span> Syncing all vendors…`;
     // Prefer the CONCURRENT path: extension v1.9.70+ opens every portal at ONCE and
     // auto-closes each as its data lands. Falls back to one-at-a-time on older versions.
-    const concurrent = await tryConcurrentSync(silent);
+    const concurrent = await tryConcurrentSync(present);
     if (concurrent) {
-      if (hasChint) openChint();
-      btn.innerHTML = `✓ Syncing in background${hasChint ? " · Chint opened" : ""}`;
+      btn.innerHTML = `✓ Syncing in background`;
       [6000, 14000, 25000].forEach(t => setTimeout(() => { try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {} }, t));
     } else {
       let okCount = 0;
