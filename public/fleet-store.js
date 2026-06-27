@@ -292,6 +292,7 @@ window.FleetStore = (function(){
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
       source_status: a.source_status || null,  // vendor-side data freshness → outage banner
+      sync_status: a.sync_status || null,       // OUR capture recency → "synced Xm ago" column
       // Server-computed array live power + today's kWh (forwarded so the card
       // reads ONE authoritative number and can show "produced today" when live≈0).
       current_power_w: (a.current_power_w != null ? a.current_power_w : null),
@@ -743,6 +744,11 @@ window.FleetStore = (function(){
       // Source-data freshness {state:ok|stale|none,last_report,age_hours}. Carried
       // through so the card can flag a VENDOR-side reporting outage (not ours).
       source_status: c.source_status || null,
+      // OUR capture recency {synced_at, age_min} — advances every successful capture
+      // (incl. overnight) so the freshness column shows "synced Xm" distinct from the
+      // vendor source age. Forwarded from the backend; FleetStore must carry it through
+      // or vendor-sheet falls back to source age and never shows "synced".
+      sync_status: c.sync_status || null,
       // Server-computed ARRAY live power (W, sum of live inverters; null = no live
       // feed) + today's generated kWh from daily history. The card uses the latter
       // to show "produced today" instead of "not producing" when live≈0 (a flaky
