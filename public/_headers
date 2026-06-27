@@ -1,0 +1,15 @@
+# Security headers for Array Operator (Netlify serves these on every static path).
+# CSP note: the app uses inline <script>/<style> + onclick= handlers heavily, so
+# 'unsafe-inline' is required until those are refactored to nonces. The policy
+# still hardens real attack surface: it locks SCRIPT/CONNECT/FRAME/WORKER sources
+# to a known allowlist, forbids plugins (object-src), <base> hijack (base-uri),
+# and embedding (frame-ancestors → clickjacking). External allowances are exactly
+# what the app loads: pdf.js from cdnjs (+ its blob worker), the open-meteo weather
+# fetch, and the Railway API origin.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://web-production-49c83.up.railway.app; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
