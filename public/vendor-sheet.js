@@ -513,9 +513,13 @@
       const lagChip = (_portal && CADENCE_MIN[v])
         ? `<button type="button" class="vs-vlag" data-vportal="${esc(v)}" title="Opens your ${esc(vlabel(v))} portal in a new tab. Sign in there and your latest readings sync here automatically — the EnergyAgent extension captures them.">↗ Open ${esc(vlabel(v))} to sync</button>`
         : "";
-      // The vendor NAME is just the group label — clicking it must NOT open the portal /
-      // pull the owner back here. Only the explicit "↗ Open <Vendor> to sync" chip does that.
-      const badge = `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
+      // The vendor NAME opens that vendor's portal in a plain NEW TAB (data-vopen) — a normal
+      // navigation that does NOT route through the extension, so it takes the owner to the
+      // vendor site WITHOUT pulling them back to Array Operator. Only the "↗ Open <Vendor> to
+      // sync" chip below (data-vportal) uses the extension flow that captures + syncs back here.
+      const badge = _portal
+        ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vopen="${esc(v)}" title="Open the ${esc(vlabel(v))} portal in a new tab (just visit — won't sync or pull you back here)">${esc(vlabel(v))}</button>`
+        : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
       h += `<div class="vs-vgroup">
@@ -593,10 +597,16 @@
       b.onclick = go;
       b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     });
-    // Only the "↗ Open <Vendor> to sync" chip opens that vendor's monitoring portal — the
-    // vendor NAME itself is now an inert label (above), so it never pulls the owner back here.
-    // With the extension present, route through it (so opening the portal also arms a fresh
-    // capture); otherwise open the site in a new tab.
+    // The vendor NAME (data-vopen) opens the vendor's portal in a plain new tab — a normal
+    // navigation, NOT the extension flow — so it takes the owner to the vendor site WITHOUT
+    // pulling them back to Array Operator (even when the extension is installed).
+    body.querySelectorAll("[data-vopen]").forEach(btn => btn.onclick = () => {
+      const url = VENDOR_PORTAL[btn.getAttribute("data-vopen")];
+      if (url) { try { window.open(url, "_blank", "noopener"); } catch (_) {} }
+    });
+    // The "↗ Open <Vendor> to sync" chip (data-vportal) opens the portal THROUGH the
+    // extension when present (so it also arms a fresh capture and syncs back here);
+    // otherwise it falls back to a plain new tab.
     body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = () => {
       const v = btn.getAttribute("data-vportal");
       const url = VENDOR_PORTAL[v];
