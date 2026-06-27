@@ -345,7 +345,7 @@
     host.innerHTML = `
       <div class="vs-topbar">
         <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
-          <div class="vs-hint">To refresh a vendor, open its portal — click the vendor name or its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
+          <div class="vs-hint">To refresh a vendor, open its portal — click its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
         <div class="vs-actions">
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
           <div class="vs-searchwrap"><input type="search" class="vs-search" id="vsSearch"
@@ -432,9 +432,9 @@
       const lagChip = (_portal && CADENCE_MIN[v])
         ? `<button type="button" class="vs-vlag" data-vportal="${esc(v)}" title="Opens your ${esc(vlabel(v))} portal in a new tab. Sign in there and your latest readings sync here automatically — the EnergyAgent extension captures them.">↗ Open ${esc(vlabel(v))} to sync</button>`
         : "";
-      const badge = _portal
-        ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vportal="${esc(v)}" title="Open the ${esc(vlabel(v))} portal">${esc(vlabel(v))}</button>`
-        : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
+      // The vendor NAME is just the group label — clicking it must NOT open the portal /
+      // pull the owner back here. Only the explicit "↗ Open <Vendor> to sync" chip does that.
+      const badge = `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
       h += `<div class="vs-vgroup">
@@ -511,10 +511,10 @@
       b.onclick = go;
       b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     });
-    // Clicking a vendor NAME (badge) or its "Open to sync" chip opens that vendor's
-    // monitoring portal. With the extension
-    // present, route through it (so opening the portal also arms a fresh capture);
-    // otherwise open the site in a new tab.
+    // Only the "↗ Open <Vendor> to sync" chip opens that vendor's monitoring portal — the
+    // vendor NAME itself is now an inert label (above), so it never pulls the owner back here.
+    // With the extension present, route through it (so opening the portal also arms a fresh
+    // capture); otherwise open the site in a new tab.
     body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = () => {
       const v = btn.getAttribute("data-vportal");
       const url = VENDOR_PORTAL[v];
