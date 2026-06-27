@@ -222,7 +222,19 @@ const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.h
   : "";
 const STEPS = ["Welcome", "Connect", "Your arrays", "Done"];
 let step = 0;
-let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"" };
+// Bump when the Terms / Privacy / authorization language materially changes; the
+// version a user accepted is persisted server-side at account creation for audit.
+const CONSENT_VERSION = "2026-06-27";
+let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"", consent:false };
+
+// The required agree-to-terms + authorize-account-access gate shown at the email
+// (account-creation) step. Themed via the same CSS vars as the rest of the flow.
+function consentField(){
+  return `<label class="fld" id="consentFld" style="display:flex;gap:.55rem;align-items:flex-start;margin-top:1.1rem;cursor:pointer">
+    <input type="checkbox" id="consentChk" onchange="state.consent=this.checked;syncClaim()" ${state.consent?"checked":""} style="width:auto;margin-top:.15rem;flex:0 0 auto;accent-color:var(--good)">
+    <span class="hint" style="margin-top:0">I agree to the <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--good);text-decoration:underline">Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--good);text-decoration:underline">Privacy Policy</a>, and I authorize EnergyAgent to access the accounts I connect, on my behalf, to read my production and billing data.</span>
+  </label>`;
+}
 
 // Inverter vendors — mirrors the backend registry order + metadata from
 // api/inverters/ (VENDORS / vendor_catalog). SolarEdge is the only vendor with
@@ -677,6 +689,7 @@ function gmpScreen(){
       <span class="hint">Your email is your login. Free 14-day trial — no card needed.</span>
       <input type="email" id="email" placeholder="you@example.com" value="${state.email||''}" oninput="state.email=this.value;syncClaim()">
     </label>
+    ${consentField()}
     <div class="row">
       <button class="btn btn-ghost" onclick="go(1)">← Back</button>
       <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Create my account &amp; connect GMP →</button>
@@ -719,6 +732,7 @@ function arraysScreen(){
       <span class="hint">Your email is your login. We'll start your free 14-day trial — no card needed.</span>
       <input type="email" id="email" placeholder="you@example.com" value="${state.email||''}" oninput="state.email=this.value;syncClaim()">
     </label>
+    ${consentField()}
     <div class="row">
       <button class="btn btn-ghost" onclick="go(1)">← Connect a different brand</button>
       <button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">${real?"Start my free trial →":"Take me to my dashboard →"}</button>
@@ -732,8 +746,12 @@ function syncClaim(){
   const claim = document.getElementById("claimBtn");
   if(!claim) return;
   const emailOk = /.+@.+\..+/.test(state.email||"");
-  claim.style.opacity = emailOk ? "1" : ".5";
-  claim.style.pointerEvents = emailOk ? "auto" : "none";
+  // Only gate on consent where the checkbox is rendered (the account-creation step).
+  const chk = document.getElementById("consentChk");
+  const consentOk = chk ? chk.checked : true;
+  const ok = emailOk && consentOk;
+  claim.style.opacity = ok ? "1" : ".5";
+  claim.style.pointerEvents = ok ? "auto" : "none";
 }
 
 function cascadeArrays(){
@@ -859,6 +877,7 @@ async function finish(){
         company,
         array_count: Math.max(state.sites.length, 1),
         product: "array_operator",
+        consent_version: CONSENT_VERSION,
         ...(state.password ? { password: state.password } : {}),
       })
     });
