@@ -186,19 +186,52 @@
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
   let _query = "";                            // search filter (lowercased)
 
-  // A tiny bar sparkline of an inverter's recent daily output (last ~14 days).
-  function sparkline(daily) {
+  // Shared y-scale + per-day neighbor average for one array's inverter cohort, so the
+  // per-inverter sparkline can show an underperformer's bars sitting BELOW its peers.
+  // (Each chart used to self-normalize to its own peak, which made very different output
+  // render identically — the exact thing that hid why an inverter was flagged.)
+  function cohortSpark(invs) {
+    const byDate = {};
+    let peak = 0;
+    (invs || []).forEach(iv => (iv.daily || []).forEach(d => {
+      if (!d || d.kwh == null) return;
+      if (d.kwh > peak) peak = d.kwh;
+      if (d.date == null) return;
+      const k = String(d.date), e = byDate[k] || (byDate[k] = { sum: 0, n: 0 });
+      e.sum += d.kwh; e.n += 1;
+    }));
+    return { peak, byDate };
+  }
+  // A tiny bar sparkline of an inverter's recent daily output (last ~14 days). When a
+  // `cohort` is passed, bars are scaled to the COHORT peak (shared with its neighbors)
+  // and a faint dashed line traces the neighbor average each day (excluding this unit),
+  // so the gap that drives the underperforming verdict is visible across all weather.
+  function sparkline(daily, cohort) {
     const pts = (daily || []).filter(d => d && d.kwh != null).slice(-14);
     if (pts.length < 2) return `<div class="vs-id-nospark">Not enough history yet — a sparkline needs a couple of days of capture.</div>`;
-    const W = 240, H = 40, max = Math.max(...pts.map(p => p.kwh), 0.001), bw = W / pts.length;
+    const W = 240, H = 40, bw = W / pts.length;
+    const ownMax = Math.max(...pts.map(p => p.kwh), 0.001);
+    const max = (cohort && cohort.peak > 0) ? cohort.peak : ownMax;   // shared scale, else self
     const bars = pts.map((p, i) => {
       const bh = Math.max(1.5, (p.kwh / max) * (H - 6));
       return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - bh).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1"/>`;
     }).join("");
-    return `<svg class="vs-id-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days">${bars}</svg>`;
+    let peerLine = "";
+    const by = cohort && cohort.byDate;
+    if (by) {
+      const xy = pts.map((p, i) => {
+        const e = p.date != null ? by[String(p.date)] : null;
+        if (!e || e.n < 2) return null;                         // need >= 1 neighbor that day
+        const avg = (e.sum - p.kwh) / (e.n - 1);                // peers only (exclude self)
+        const y = H - Math.max(1.5, (avg / max) * (H - 6));
+        return `${(i * bw + bw / 2).toFixed(1)},${y.toFixed(1)}`;
+      }).filter(Boolean);
+      if (xy.length >= 2) peerLine = `<polyline class="vs-id-peerline" fill="none" points="${xy.join(" ")}"><title>Neighbor average</title></polyline>`;
+    }
+    return `<svg class="vs-id-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days, against the neighbor average">${bars}${peerLine}</svg>`;
   }
   // The detail panel shown when an inverter row is clicked open.
-  function invDetailHTML(iv) {
+  function invDetailHTML(iv, cohort) {
     const cell = (k, val) => (val == null || val === "") ? "" :
       `<div class="vs-id-cell"><span class="vs-id-k">${k}</span><span class="vs-id-v">${val}</span></div>`;
     const _alloc = isAllocatedPower(iv);
@@ -225,7 +258,7 @@
     const diag = iv.diagnosis ? `<div class="vs-id-diag">${esc(iv.diagnosis)}</div>` : "";
     return `<div class="vs-inv-detail">${diag}
       <div class="vs-id-grid">${cells}</div>
-      <div class="vs-id-sparkwrap"><div class="vs-id-sparklabel">Daily output · last 14 days</div>${sparkline(iv.daily)}</div>
+      <div class="vs-id-sparkwrap"><div class="vs-id-sparklabel">Daily output · last 14 days${(cohort && cohort.peak > 0) ? ` <span class="vs-id-peerkey">— dashed: neighbor avg</span>` : ""}</div>${sparkline(iv.daily, cohort)}</div>
     </div>`;
   }
   let _sort = { key: "name", dir: "asc" };    // sort within each vendor group
@@ -525,6 +558,7 @@
           if (!invs.length) {
             h += `<div class="vs-inv-empty">No inverters captured for this array yet.</div>`;
           } else {
+            const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters
             invs.forEach(iv => {
               const ist = invStatus(iv);
               const meta = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null].filter(Boolean).join(" · ");
@@ -538,7 +572,7 @@
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
-              if (iopen) h += invDetailHTML(iv);
+              if (iopen) h += invDetailHTML(iv, cohortScale);
             });
           }
           h += `</div>`;
