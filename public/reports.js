@@ -452,7 +452,10 @@
       </div>
       <!-- The invoice-template box lives here by default; when an offtaker card is
            expanded it is relocated to the BOTTOM of that card (one consolidated
-           element) and parked back here when the card collapses. -->
+           element) and parked back here when the card collapses. While an OPEN card
+           re-renders, it's stashed in #rbTplStash (hidden) so it doesn't flash up here
+           and back on every pass. -->
+      <div id="rbTplStash" hidden></div>
       <div id="rbTplHome">
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
@@ -1716,6 +1719,14 @@
     const home = $("#rbTplHome"), tpl = $("#rbTpl");
     if (home && tpl && tpl.parentElement !== home) home.appendChild(tpl);
   }
+  // During an OPEN card's re-render (fired several times in a burst as the draft,
+  // versions, and the background GMP re-pull resolve), stash #rbTpl in a HIDDEN holder
+  // rather than the visible home — else it flashes to the top of the page and back on
+  // every pass (the flicker). collapseAccordion still parks it to the visible home.
+  function stashTpl() {
+    const stash = $("#rbTplStash"), tpl = $("#rbTpl");
+    if (stash && tpl && tpl.parentElement !== stash) stash.appendChild(tpl);
+  }
   function foldTplIntoInbox(inboxCard) {
     const tpl = $("#rbTpl");
     if (!inboxCard || !tpl) return;
@@ -1823,7 +1834,7 @@
     if (!card) return;
     const wrap = card.querySelector("[data-accbody]");
     if (!wrap) return;
-    parkTpl();                          // protect the wired template box before any wipe
+    stashTpl();                         // hide-stash the wired box before the wipe (no flash to the top)
     const activeOf = OFFTAKERS.find(s => String(s.id) === sid) || { id: sid };
     const active = activeDraft();       // reads ACTIVE_SUB_ID / VIEWING_VERSION_ID
 
