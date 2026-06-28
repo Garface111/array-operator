@@ -2679,13 +2679,23 @@
     if (up) up.onchange = async () => {
       const f = up.files && up.files[0];
       if (!f) return;
-      setS("rb-busy", "Reading your sheet…");
+      setS("rb-busy", "Processing your sheet — building the updated spreadsheet…");
       const fd = new FormData(); fd.append("file", f);
       try {
         const r = await fetch(base, { method: "POST", headers: authHeaders(), body: fd });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setS("rb-err", (j && j.detail) ? j.detail : "Couldn't read that sheet."); return; }
         renderTracker(box, (j && (j.tracker || j)) || {});
+        // Transparency: confirm we processed it + produced an updated spreadsheet, and name the
+        // months added. renderTracker rebuilt the box, so re-query the (fresh) status span.
+        const p = j && j.processed;
+        const st2 = box.querySelector(".rb-track-stat");
+        if (st2) {
+          st2.className = "rb-status rb-track-stat rb-ok";
+          st2.textContent = (p && p.added_count > 0)
+            ? "✓ Updated spreadsheet produced — added " + p.added.join(", ") + ". Download it below."
+            : "✓ Processed — your spreadsheet is up to date through the latest bill.";
+        }
       } catch (e) { setS("rb-err", "Upload failed."); }
     };
     const dl = box.querySelector("[data-tdl]");
