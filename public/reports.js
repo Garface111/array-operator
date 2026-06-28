@@ -460,17 +460,18 @@
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
-      <!-- The invoice-template box lives here by default; when an offtaker card is
-           expanded it is relocated to the BOTTOM of that card (one consolidated
-           element) and parked back here when the card collapses. While an OPEN card
-           re-renders, it's stashed in #rbTplStash (hidden) so it doesn't flash up here
-           and back on every pass. -->
+      <!-- ONE wired invoice-template box, PER-OFFTAKER: it folds into whichever
+           offtaker card is open and rebinds to that offtaker's own template
+           (foldTplIntoInbox → rebindTpl). Parked here (#rbTplHome, kept HIDDEN) when
+           no card is open, and stashed in #rbTplStash during an open card's
+           re-render so it doesn't flash. Each offtaker has its own template; this box
+           hits per-subscription endpoints (see tplApi). -->
       <div id="rbTplStash" hidden></div>
-      <div id="rbTplHome">
+      <div id="rbTplHome" hidden>
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
-          <h3>Your invoice template</h3>
-          <p>Upload your own invoice and every offtaker invoice will reproduce your exact format — PDF, Word, HTML, an image, or an Excel workbook (we'll find the invoice sheet inside it).</p>
+          <h3>This offtaker’s invoice template</h3>
+          <p>Upload an invoice and <b>this offtaker’s</b> invoices reproduce that exact format — PDF, Word, HTML, an image, or an Excel workbook (we'll find the invoice sheet inside it). Leave it on Default to use the standard format.</p>
         </div>
         <div class="rb-tpl-ctl">
           <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls,.xlsm" hidden>
@@ -703,8 +704,8 @@
       const has = t && t.has_template;
       status.textContent = has
         ? "On file: " + (t.filename || "your template") + ". " +
-          (t.enabled ? "Used for your offtaker invoices." : "Saved — turn on below to use it.")
-        : "No template yet — offtaker invoices use the standard format.";
+          (t.enabled ? "Used for this offtaker’s invoices." : "Saved — turn on below to use it.")
+        : "No template yet — this offtaker’s invoices use the standard format.";
       status.className = "rb-tpl-status" + (has ? " rb-tpl-have" : "");
       if (view) view.hidden = !(t && t.filename);
       if (del) del.hidden = !has;
@@ -783,22 +784,27 @@
       showFmt("repro");   // default inline view = the reproduced template
     }
     async function refresh() {
+      const base = tplApi();
+      if (!base || !authHeaders()) { paint(null); return; }   // no offtaker bound (parked) / demo
       try {
-        const r = await fetch(API + "/invoice-template", { headers: authHeaders() });
+        const r = await fetch(base, { headers: authHeaders() });
         const d = await r.json().catch(() => ({}));
         paint(r.ok ? d.template : null);
       } catch (e) { paint(null); }
       // keep the Master Account file library in sync after upload/remove/enable
       try { if (window.__aoReloadFiles) window.__aoReloadFiles(); } catch (e) {}
     }
+    _tplRefresh = refresh;        // rebindTpl(sid) calls this when a card folds in
     await refresh();
     pick.onclick = () => fileIn.click();
     async function doUpload(f) {
       if (!f) return;
       status.textContent = "Uploading " + f.name + "…"; status.className = "rb-tpl-status rb-busy";
       const fd = new FormData(); fd.append("file", f);
+      const base = tplApi();
+      if (!base) { status.textContent = "Open an offtaker to set its template."; status.className = "rb-tpl-status rb-err"; return; }
       try {
-        const r = await fetch(API + "/invoice-template", { method: "POST", headers: authHeaders(), body: fd });
+        const r = await fetch(base, { method: "POST", headers: authHeaders(), body: fd });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { status.textContent = (d && d.detail) || "Upload failed."; status.className = "rb-tpl-status rb-err"; }
         else { if (htmlBox) htmlBox.dataset.dirty = ""; await refresh(); }
@@ -833,16 +839,19 @@
       } catch (e) {}
     };
     if (del) del.onclick = async () => {
-      if (!confirm("Remove your invoice template? Offtaker invoices go back to the standard format.")) return;
-      try { await fetch(API + "/invoice-template", { method: "DELETE", headers: authHeaders() }); } catch (e) {}
+      if (!confirm("Remove this offtaker’s invoice template? Their invoices go back to the standard format.")) return;
+      const base = tplApi();
+      try { if (base) await fetch(base, { method: "DELETE", headers: authHeaders() }); } catch (e) {}
       if (htmlBox) { htmlBox.value = ""; htmlBox.dataset.dirty = ""; }
       await refresh();
     };
     if (htmlBox) htmlBox.oninput = () => { htmlBox.dataset.dirty = "1"; };
     async function savePut(body, okMsg) {
       if (estatus) { estatus.textContent = "Saving…"; estatus.className = "rb-tpl-estatus rb-busy"; }
+      const base = tplApi();
+      if (!base) { if (estatus) { estatus.textContent = "Open an offtaker first."; estatus.className = "rb-tpl-estatus rb-err"; } return false; }
       try {
-        const r = await fetch(API + "/invoice-template", { method: "PUT", headers: jsonHdr(), body: JSON.stringify(body) });
+        const r = await fetch(base, { method: "PUT", headers: jsonHdr(), body: JSON.stringify(body) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { if (estatus) { estatus.textContent = (d && d.detail) || "Save failed."; estatus.className = "rb-tpl-estatus rb-err"; } return false; }
         if (htmlBox) htmlBox.dataset.dirty = "";
@@ -1703,6 +1712,20 @@
   // preview renders THIS (their exact format) instead of the generic mock, so an
   // uploaded template propagates into the preview immediately.
   let TEMPLATE_STATE = null;
+  // Per-offtaker invoice template: the single wired #rbTpl box is rebound to whichever
+  // offtaker card is open (TPL_SID) so its upload/toggle/remove hit that offtaker's
+  // own per-subscription endpoints. Parked (no card open) → TPL_SID null → hidden.
+  let TPL_SID = null;
+  let _tplRefresh = null;
+  function tplApi(suffix) {
+    return TPL_SID != null
+      ? (API + "/subscriptions/" + TPL_SID + "/invoice-template" + (suffix || ""))
+      : null;
+  }
+  function rebindTpl(sid) {
+    TPL_SID = (sid == null || sid === "") ? null : sid;
+    if (_tplRefresh) _tplRefresh();
+  }
 
   // Fill {{ tokens }} in a template with a draft's known numbers (graceful: an
   // unknown token renders blank, exactly like the backend's ChainableUndefined).
@@ -1796,6 +1819,10 @@
     div.className = "rb-tpl-divider";
     col.appendChild(div);
     col.appendChild(tpl);
+    // Rebind the (single, wired) box to THIS offtaker so its upload/toggle/remove hit
+    // the per-subscription endpoints and it shows this offtaker's own template.
+    const oe = inboxCard.querySelector("[data-offedit]");
+    rebindTpl(oe ? oe.getAttribute("data-offedit") : null);
   }
 
   // refreshInbox() is retained as the canonical "re-pull drafts + re-render the
