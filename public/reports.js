@@ -340,12 +340,8 @@
       list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
         OFFTAKERS.map(s => subCard(s, demoArrays, demoUtil)).join("");
       wireAccordionHeaders(list);
-      // Open the first offtaker awaiting approval, just like the live app.
-      const firstWithDraft = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
-      ACTIVE_SUB_ID = String(firstWithDraft.id);
-      const ad = DRAFT_BY_SUB[ACTIVE_SUB_ID];
-      if (ad) ACTIVE_DRAFT_ID = ad.id;
-      expandAccordion(ACTIVE_SUB_ID, { silent: true });
+      // Leave every offtaker collapsed on load — matches the live app (no auto-open).
+      ACTIVE_SUB_ID = null;
       // Intercept send/save actions to a sign-in nudge (no live fetch in the demo);
       // local toggles (autogmp/summary) + the accordion expand/collapse stay live.
       const reintercept = () => {
@@ -1563,13 +1559,10 @@
     const headLine = pending
       ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send — nothing sends until you approve.`
       : `Click an offtaker to review &amp; send their invoice — nothing sends until you approve.`;
-    // Default selection: keep the currently-open card if it still exists, else the
-    // first offtaker awaiting approval (preserve today's default-selection logic).
+    // Keep the currently-open card open across refreshes, but do NOT auto-open one on a
+    // fresh load — every offtaker starts collapsed until the operator clicks one (Ford).
     const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
-    if (!stillOpen) {
-      const def = OFFTAKERS.find(s => DRAFT_BY_SUB[String(s.id)]) || OFFTAKERS[0];
-      ACTIVE_SUB_ID = def ? String(def.id) : null;
-    }
+    if (!stillOpen) ACTIVE_SUB_ID = null;
     list.innerHTML =
       `<div class="rb-acc-lead">${headLine}</div>` +
       OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
