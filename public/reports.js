@@ -2419,9 +2419,8 @@
               <option value="">${d.utility_account_id ? "— keep current —" : "Select a GMP bill…"}</option>
               ${billOpts}
             </select></label>` : ""}
-          ${wb ? "" : `
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>`}
+            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10"></label>
           <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
