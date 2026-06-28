@@ -1538,8 +1538,34 @@
       `<div class="rb-acc-lead">${headLine}</div>` +
       OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
     wireAccordionHeaders(list);
+    // Per-offtaker delete (🗑 on the header). stopPropagation so the click deletes
+    // instead of toggling the card open.
+    list.querySelectorAll("[data-del-offtaker]").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      deleteOfftaker(b.getAttribute("data-del-offtaker"));
+    });
     // Open the default card inline.
     if (ACTIVE_SUB_ID != null) expandAccordion(ACTIVE_SUB_ID, { silent: true });
+  }
+
+  // Soft-delete an offtaker (DELETE /subscriptions/{id} dismisses its drafts too), then
+  // refresh the list. Names the offtaker in the confirm so a misclick is obvious.
+  async function deleteOfftaker(id) {
+    const card = document.querySelector(`.rb-acc[data-id="${id}"]`);
+    let name = "this offtaker";
+    if (card) {
+      const n = card.querySelector(".rb-acc-name");
+      if (n && n.childNodes[0]) name = (n.childNodes[0].textContent || name).trim() || name;
+    }
+    if (!confirm(`Delete ${name} and their invoice schedule? This can't be undone.`)) return;
+    try {
+      const r = await fetch(API + "/subscriptions/" + id, { method: "DELETE", headers: authHeaders() });
+      if (!r.ok) { alert("Couldn't delete the offtaker (HTTP " + r.status + ")."); return; }
+      if (String(ACTIVE_SUB_ID) === String(id)) ACTIVE_SUB_ID = null;
+      await refreshList();
+    } catch (e) {
+      alert("Network error — the offtaker wasn't deleted. Try again.");
+    }
   }
 
   const MODE_LABEL = { to_me: "To me", to_client: "To client", to_both: "To both" };
@@ -1605,6 +1631,8 @@
             <div class="rb-acc-sentence">${sentence}</div>
             <div class="rb-acc-meta">Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null && !draft ? " · ~" + money(prev.amount_owed) : ""}</div>
           </div>
+          <button class="rb-acc-del" data-del-offtaker="${s.id}" title="Delete this offtaker" aria-label="Delete offtaker"
+                  style="margin-left:auto;align-self:center;flex:none;background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;line-height:1;padding:6px 9px;border-radius:6px">🗑</button>
         </div>
         <div class="rb-acc-body" id="rbAccBody-${s.id}" data-accbody="${s.id}" hidden></div>
       </div>`;
