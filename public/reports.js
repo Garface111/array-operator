@@ -2398,7 +2398,12 @@
       const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
       return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
     }).join("");
-    const showBillPicker = !wb && (utilAccts || []).length > 0;
+    // Show the GMP-bill link for EVERY offtaker, INCLUDING workbook offtakers. The linked
+    // utility_account_id drives the GMP-bill auto-attach (api/billing/delivery.py); it does
+    // NOT change a workbook offtaker's amount (that bills from source_workbook, which takes
+    // precedence) — it only sets which GMP bill attaches. Was gated on !wb, so workbook
+    // offtakers (e.g. Paul's Valley Cares) had no way to link a utility bill at all.
+    const showBillPicker = (utilAccts || []).length > 0;
     return `
       <div class="rb-offedit" data-offedit="${sid}">
         <div class="rb-offedit-h">
