@@ -2010,12 +2010,31 @@
     const nowMs = Date.now();
     if (_bgRefreshed[subId] && nowMs - _bgRefreshed[subId] < 60000) return;
     _bgRefreshed[subId] = nowMs;
+    let dg;
     try {
       const r = await fetch(API + "/subscriptions/" + subId + "/draft",
         { method: "POST", headers: authHeaders() });
       if (!r.ok) return;
+      dg = await r.json().catch(() => ({}));
     } catch (_) { return; }
-    if (String(ACTIVE_SUB_ID) === subId) { _pinActiveSub = true; await refreshInbox(); }
+    // Update the figures IN PLACE — and ONLY if this offtaker is still open on its LATEST
+    // version AND a figure actually changed. The usual case (the GMP bill hasn't moved) is
+    // a no-op that touches NOTHING, so the page never silently rebuilds under the operator.
+    // (Was: an unconditional refreshInbox() that wiped + rebuilt the whole accordion a few
+    // seconds after every open — the "random refresh / jitter / reload" Ford reported.)
+    if (!dg || !dg.draft || VIEWING_VERSION_ID != null || String(ACTIVE_SUB_ID) !== subId) return;
+    const d = activeDraft();
+    if (!d) return;
+    const keys = ["array_total_kwh", "allocation_pct", "customer_kwh", "amount_usd",
+      "invoice_number", "period_label", "budget_amount_usd", "solar_credit_value",
+      "net_rate_per_kwh", "discount_pct", "has_gmp_pdf", "gmp_auto_status"];
+    const changed = keys.some(k => (k in dg.draft) && dg.draft[k] !== d[k]);
+    if (!changed) return;                                // nothing new → no repaint, no jitter
+    keys.forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
+    const card = document.querySelector(`.rb-acc[data-id="${subId}"] .rb-draft[data-did="${d.id}"]`);
+    applyDraftFigures(card, d);                          // calc + preview only — never a list rebuild
+    const pill = document.querySelector(`.rb-acc[data-id="${subId}"] .rb-chip-ready`);
+    if (pill && d.amount_usd != null) pill.textContent = money(d.amount_usd) + " ready";
   }
 
   // envelope fields. `force` re-mints even when a draft already exists.
