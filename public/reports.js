@@ -1049,6 +1049,9 @@
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
+            <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
+              <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="blank = auto from bill">
+              <span class="rb-fld-hint">Leave blank to use the credit rate from the GMP bill.</span></label>
             <label class="rep-fld"><span class="rl">Client email</span>
               <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
           </div>
@@ -1165,6 +1168,7 @@
     const utilityId = $("#rbmUtility").value;
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
+    const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
     // The "Send to" slider was removed — offtaker invoices go to the offtaker and
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
@@ -1182,6 +1186,13 @@
         st.className = "rb-status rb-err"; st.textContent = "Discount must be a number 0–99 (% off), or blank."; return;
       }
     }
+    let creditRateNum = null;
+    if (creditRateRaw !== "") {
+      creditRateNum = Number(creditRateRaw);
+      if (isNaN(creditRateNum) || creditRateNum < 0) {
+        st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be a number ≥ 0 ($/kWh), or blank."; return;
+      }
+    }
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
       st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
     }
@@ -1191,6 +1202,7 @@
     fd.append("utility_account_id", utilityId);          // offtaker ↔ utility bill (utility data ONLY)
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
     if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
+    if (creditRateNum !== null) fd.append("net_rate_per_kwh", String(creditRateNum));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
     fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
     fd.append("send_mode", mode);
