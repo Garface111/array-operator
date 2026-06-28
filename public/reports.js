@@ -1993,6 +1993,8 @@
       cb.addEventListener("change", () => renderDraftDoc()));
     wrap.querySelectorAll("[data-gmpupload]").forEach(inp =>
       inp.addEventListener("change", () => uploadGmpBill(inp)));
+    wrap.querySelectorAll("[data-vecbillfile]").forEach(inp =>
+      inp.addEventListener("change", () => uploadVecBill(inp)));
     const regen = wrap.querySelector("[data-regen]");
     if (regen) regen.onclick = () => selectOfftaker(regen.getAttribute("data-regen"), true);
     wireOfftakerEditors(wrap);
@@ -2096,6 +2098,43 @@
       const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
       if (d) { d.has_gmp_pdf = true; d.gmp_filename = (jr.draft && jr.draft.gmp_filename) || file.name; }
       renderInboxBody();   // chip flips to "✓ attached"; the live preview now shows the GMP bill
+    } catch (e) { setStat("rb-err", "Network error — try again."); inp.value = ""; }
+  }
+
+  // Upload a VEC/SmartHub bill PDF for a bound utility account. The backend parses
+  // the generation + the bill's own net-metering credit rate off the PDF into a
+  // settled Bill, so the offtaker invoice auto-prices from it (like GMP). On
+  // success we regenerate this offtaker's draft so the figures flip live.
+  async function uploadVecBill(inp) {
+    const uaid = inp.getAttribute("data-vecbillfile");
+    const sid = inp.getAttribute("data-vbsid");
+    const file = inp.files && inp.files[0];
+    if (!file || !uaid) return;
+    const box = inp.closest(".rb-vecbill");
+    const stat = box && box.querySelector(".rb-vecbill-stat");
+    const setStat = (cls, txt) => { if (stat) { stat.className = "rb-status rb-vecbill-stat " + (cls || ""); stat.textContent = txt; } };
+    if (file.type && file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+      setStat("rb-err", "Please choose a PDF."); inp.value = ""; return;
+    }
+    setStat("rb-busy", "Reading the bill…");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(API + "/utility-accounts/" + uaid + "/vec-bill",
+        { method: "POST", headers: authHeaders(), body: fd });
+      const jr = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setStat("rb-err", (jr && jr.detail) ? jr.detail : ("Couldn't read that bill (HTTP " + r.status + ")."));
+        inp.value = ""; return;
+      }
+      const p = (jr && jr.parsed) || {};
+      const kwh = p.kwh_generated != null ? fmt0(p.kwh_generated) + " kWh" : "bill";
+      const rt = p.credit_rate != null ? " @ $" + p.credit_rate + "/kWh" : "";
+      setStat("rb-ok", "✓ Read " + kwh + rt + " — recomputing the invoice…");
+      // The new settled bill changes the math — regenerate this offtaker's draft.
+      if (sid != null && sid !== "" && typeof selectOfftaker === "function") {
+        selectOfftaker(String(sid), true);
+      }
     } catch (e) { setStat("rb-err", "Network error — try again."); inp.value = ""; }
   }
 
@@ -2463,6 +2502,12 @@
     const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
     const cad = d.cadence || "monthly";
     const sm = d.send_mode || "to_me";
+    // Is the bound account a VEC/SmartHub one? Those bills don't expose the credit
+    // rate in the portal, so we offer a bill-PDF upload that reads the generation +
+    // net-metering rate off the PDF (then the invoice auto-prices like GMP).
+    const boundAcct = (utilAccts || []).find(a => String(a.utility_account_id) === String(d.utility_account_id));
+    const boundProv = boundAcct ? (boundAcct.provider || "gmp").toLowerCase() : "";
+    const isSmartHubBound = !!boundProv && boundProv !== "gmp";
     const billOpts = (utilAccts || []).map(a => {
       // Provider-aware: GMP shows its paper-bill count; VEC/SmartHub shows a "VEC ·"
       // tag (it has no GMP-shaped bill — it bills from measured generation × rate).
@@ -2526,6 +2571,16 @@
           <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
             <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
+        ${isSmartHubBound ? `
+        <div class="rb-vecbill">
+          <div class="rb-vecbill-h"><span class="rl">${esc(boundProv.toUpperCase())} bill — we read the rate from the PDF</span></div>
+          <span class="rb-fld-hint">${esc(boundProv.toUpperCase())}'s portal doesn't publish the credit rate, so upload this account's bill PDF — we read the generation + net-metering credit rate off it and the invoice prices itself (no rate to enter).</span>
+          <div class="rb-vecbill-row">
+            <label class="rb-track-up">📄 Upload ${esc(boundProv.toUpperCase())} bill (PDF)
+              <input type="file" accept="application/pdf,.pdf" data-vecbillfile="${d.utility_account_id}" data-vbsid="${sid}" hidden></label>
+            <span class="rb-status rb-vecbill-stat"></span>
+          </div>
+        </div>` : ""}
         <span class="rb-status rb-offedit-status"></span>
       </div>
       <!-- THIS offtaker's own generation spreadsheet — upload a sheet in whatever
