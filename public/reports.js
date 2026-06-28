@@ -1041,9 +1041,9 @@
           <div class="rb-mform-grid">
             <label class="rep-fld"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
-              <select id="rbmUtility"><option value="">Loading utility bills…</option></select>
-              <span class="rb-fld-hint">Offtaker invoices are generated from this GMP account's utility bills only.</span></label>
+            <label class="rep-fld"><span class="rl">Which utility account?</span>
+              <select id="rbmUtility"><option value="">Loading utility accounts…</option></select>
+              <span class="rb-fld-hint">GMP offtakers bill from the paper bill; VEC/SmartHub offtakers bill from measured generation × the credit rate you set.</span></label>
             <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
               <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
@@ -1138,13 +1138,18 @@
           }
           return;
         }
-        sel.innerHTML = `<option value="">Choose a GMP utility bill…</option>` +
+        sel.innerHTML = `<option value="">Choose a utility account…</option>` +
           accts.map(a => {
-            const label = a.nickname || (a.array_name ? a.array_name : ("GMP " + a.account_number));
-            const billNote = a.has_bill
-              ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}`
-              : "no bill on file yet";
-            return `<option value="${a.utility_account_id}">${esc(label)} · acct ${esc(a.account_number)} (${esc(billNote)})</option>`;
+            const prov = (a.provider || "gmp").toLowerCase();
+            const isGmp = prov === "gmp";
+            const tag = isGmp ? "" : prov.toUpperCase() + " · ";
+            const label = a.nickname || a.array_name || ((isGmp ? "GMP " : prov.toUpperCase() + " ") + a.account_number);
+            // GMP bills from the paper bill; VEC/SmartHub bills from measured
+            // generation × the rate you set (no GMP-shaped bill on file for them).
+            const note = isGmp
+              ? (a.has_bill ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}` : "no bill on file yet")
+              : "bills from measured generation × your rate";
+            return `<option value="${a.utility_account_id}">${esc(tag + label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
           }).join("");
       });
     } else {
@@ -2417,12 +2422,19 @@
     const cad = d.cadence || "monthly";
     const sm = d.send_mode || "to_me";
     const billOpts = (utilAccts || []).map(a => {
-      const bills = a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
-        : (a.has_bill ? " (bill on file)" : "");
-      // Label by the array name the bill feeds (recognizable site), not the raw
-      // GMP account number. Fall back to nickname, then the account number.
+      // Provider-aware: GMP shows its paper-bill count; VEC/SmartHub shows a "VEC ·"
+      // tag (it has no GMP-shaped bill — it bills from measured generation × rate).
+      const prov = (a.provider || "gmp").toLowerCase();
+      const isGmp = prov === "gmp";
+      const bills = isGmp
+        ? (a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
+                                : (a.has_bill ? " (bill on file)" : ""))
+        : "";
+      const tag = isGmp ? "" : prov.toUpperCase() + " · ";
+      // Label by the array name the account feeds (recognizable site), not the raw
+      // account number. Fall back to nickname, then the account number.
       const nm = a.array_name || a.nickname;
-      const lbl = nm ? (nm + bills) : ("GMP · acct " + (a.account_number || "?") + bills);
+      const lbl = nm ? (tag + nm + bills) : (tag + "acct " + (a.account_number || "?") + bills);
       const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
       return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
     }).join("");
@@ -2442,9 +2454,9 @@
           <label class="rep-fld"><span class="rl">Offtaker name</span>
             <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
           ${showBillPicker ? `
-          <label class="rep-fld"><span class="rl">Which GMP utility bill?</span>
+          <label class="rep-fld"><span class="rl">Which utility account?</span>
             <select data-of="utility_account_id">
-              <option value="">${d.utility_account_id ? "— keep current —" : "Select a GMP bill…"}</option>
+              <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
               ${billOpts}
             </select></label>` : ""}
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
