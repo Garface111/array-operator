@@ -1797,13 +1797,11 @@
   function foldTplIntoInbox(inboxCard) {
     const tpl = $("#rbTpl");
     if (!inboxCard || !tpl) return;
-    // Drop it into the LEFT column (under the offtaker editor), filling the empty
-    // space beside the taller invoice preview — not the full-width card bottom.
-    const col = inboxCard.querySelector(".rb-col-form") || inboxCard;
-    const div = document.createElement("div");
-    div.className = "rb-tpl-divider";
-    col.appendChild(div);
-    col.appendChild(tpl);
+    // Drop the single wired template box into the "Invoice template" section's slot
+    // (falls back to the form column if the slot isn't present).
+    const slot = inboxCard.querySelector(".rb-tpl-slot")
+      || inboxCard.querySelector(".rb-col-form") || inboxCard;
+    slot.appendChild(tpl);
     // Rebind the (single, wired) box to THIS offtaker so its upload/toggle/remove hit
     // the per-subscription endpoints and it shows this offtaker's own template.
     const oe = inboxCard.querySelector("[data-offedit]");
@@ -1929,10 +1927,10 @@
     wrap.innerHTML = `
       <div class="rb-acc-inner">
         ${verPickerHTML(sid)}
+        <div id="rbReviewTop" class="rb-reviewbar"></div>
         <div class="rb-layout">
           <div class="rb-col-form">${bodyCol}</div>
           <aside class="rb-col-doc">
-            <div id="rbReviewTop"></div>
             <div id="rbDraftDocPane"></div>
           </aside>
         </div>
@@ -2267,7 +2265,13 @@
     if (!top) return;
     const d = activeDraft();
     if (!d) { top.innerHTML = ""; return; }
-    top.innerHTML = reviewActions(d, VIEWING_VERSION_ID != null);
+    // A one-line "what gets sent" summary sits beside the send actions in the top bar,
+    // so the operator can review-and-send without expanding anything below.
+    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const src = d.utility_account_name || d.array_name || "";
+    const summary = `<div class="rb-reviewbar-sum">Receives <b>${pct != null ? pct + "%" : "a share"}</b>${src ? " of " + esc(src) : ""}`
+      + ` &middot; ${esc(d.period_label || "latest period")} &middot; <b>${money(d.amount_usd)} due</b></div>`;
+    top.innerHTML = summary + reviewActions(d, VIEWING_VERSION_ID != null);
     top.querySelectorAll("[data-dact]").forEach(b => b.onclick = onDraftAction);
   }
 
@@ -2458,24 +2462,44 @@
              </div>`
           : ""}
       </div>`;
+    // Simplified expanded card (Ford 2026-06-28): the send decision + a one-line summary
+    // live in the top bar (renderReviewTop) and the live email+invoice preview stays on
+    // the right; everything else folds into collapsed <details> sections here. Native
+    // <details> keeps every element in the DOM, so all the existing wiring (auto-save,
+    // toggles, offtaker editor, tracker, template fold, calc link) still finds + wires
+    // them — they're just hidden until the operator opens the section.
+    const sid = d.subscription_id;
+    const sec = (title, body, sub, open) =>
+      `<details class="rb-sec"${open ? " open" : ""}>
+        <summary class="rb-sec-h"><span class="rb-sec-caret" aria-hidden="true">▸</span><span class="rb-sec-t">${title}</span>${sub ? `<span class="rb-sec-sub">${esc(sub)}</span>` : ""}</summary>
+        <div class="rb-sec-body">${body}</div>
+      </details>`;
+    const emailBody = `
+      <div class="rb-draft-email">
+        <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
+        <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="6"
+          placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
+        <span class="rb-draft-msg-hint">Saves automatically as you type. The invoice${d.has_gmp_pdf ? " + GMP bill are" : " is"} attached for you.</span>
+      </div>`;
+    // The per-offtaker template box (#rbTpl) is folded into .rb-tpl-slot by foldTplIntoInbox.
+    const tplSlot = `<div class="rb-tpl-slot"></div>`;
+    const trackerBox = sid
+      ? `<div class="rb-track rb-track-sub" data-tracker-base="${API}/subscriptions/${sid}/tracker" data-tracker-scope="offtaker" data-tracker-name="${esc(d.customer_name || "")}" hidden></div>`
+      : `<p class="rb-sec-empty">Save this offtaker to add a generation spreadsheet.</p>`;
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
           <div class="rb-draft-name">${esc(d.customer_name)}</div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
-        ${calcDashboard(d)}
-        <div class="rb-draft-email">
-          <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
-          <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="5"
-            placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
-          <span class="rb-draft-msg-hint">Saves automatically as you type. The invoice${d.has_gmp_pdf ? " + GMP bill are" : " is"} attached for you.</span>
-        </div>
-        ${attachBox}
-        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting below,
+        ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false)}
+        ${sec("Edit email", emailBody, "the note your offtaker sees", false)}
+        ${sec("Invoice template", tplSlot, "PDF / Excel format", false)}
+        ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false)}
+        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false)}
+        <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
            with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
-           <b>Nothing sends until you click Approve &amp; send</b> (top-right).</p>
-        ${offtakerEditor(d, utilAccts)}
+           <b>Nothing sends until you click Approve &amp; send</b> (at the top).</p>
       </div>`;
   }
 
@@ -2576,12 +2600,7 @@
           </div>
         </div>` : ""}
         <span class="rb-status rb-offedit-status"></span>
-      </div>
-      <!-- THIS offtaker's own generation spreadsheet — upload a sheet in whatever
-           format they use; we match it and append a row each month as their GMP
-           bills land. Self-hides on flag-off/404/network (loadTrackerInto). -->
-      <div class="rb-track rb-track-sub" data-tracker-base="${API}/subscriptions/${sid}/tracker"
-           data-tracker-scope="offtaker" data-tracker-name="${esc(d.customer_name || "")}" hidden></div>`;
+      </div>`;
   }
 
   // ── Bring-your-own generation spreadsheet ("our magic" auto-updater) ────────
