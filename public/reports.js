@@ -186,6 +186,14 @@
         if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
         else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
       };
+      // "Link VEC utility bills" — same flow for Vermont Electric Coop (SmartHub):
+      // opens the VEC portal so the extension captures the owner's VEC accounts,
+      // which then appear in the offtaker utility-account picker.
+      const linkVecBtn = $("#rbLinkVec");
+      if (linkVecBtn) linkVecBtn.onclick = () => {
+        if (window.__aoConnectVec) { window.__aoConnectVec(); }
+        else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
+      };
       el.dataset.rbBuilt = "1";
     }
     // Heavy invoice-template preview: wire ONCE, and only when the tab is really
@@ -355,9 +363,10 @@
       });
     }
 
-    // Wire the "Add an offtaker" + "Link GMP" header buttons to the sign-in nudge.
+    // Wire the "Add an offtaker" + "Link GMP" + "Link VEC" header buttons to the sign-in nudge.
     const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
     const linkBtn = $("#rbLinkGmp"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
+    const linkVec = $("#rbLinkVec"); if (linkVec) linkVec.onclick = () => demoNudge(linkVec);
   }
 
   // A gentle, in-place "this is a demo" affordance — no fetch, no error.
@@ -436,6 +445,7 @@
             <h3>Your offtakers</h3>
           </div>
           <div class="rb-head-actions">
+            <button class="ao-btn rb-btn" id="rbLinkVec" type="button" title="Connect Vermont Electric Cooperative (SmartHub) so your VEC accounts flow in — VEC offtakers bill from measured generation × the credit rate you set">🔗 Link VEC utility bills</button>
             <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>

@@ -3432,6 +3432,18 @@
       // "add the 1-click helper" path — leave it so the owner installs it first.
     }, 60);
   };
+  // Same flow for VEC (Vermont Electric Cooperative, on NISC SmartHub): opens the
+  // VEC portal so the extension captures the owner's VEC accounts, which then show
+  // up in the offtaker utility-account picker. When the extension isn't installed,
+  // openAddArrayModal surfaces the install step (identical to the GMP path).
+  window.__aoConnectVec = function(){
+    openAddArrayModal();
+    setTimeout(() => {
+      if(EXT_PRESENT){
+        try { openPortalLogin("vec"); } catch(e){}
+      }
+    }, 60);
+  };
 
   // Generic global so other surfaces (the Vendor-data Spreadsheet view's
   // "+ Add vendor" button) open the SAME add-array modal — one flow, never a
