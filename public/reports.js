@@ -2773,6 +2773,18 @@
             ? "✓ Updated spreadsheet produced — added " + p.added.join(", ") + ". Download it below."
             : "✓ Processed — your spreadsheet is up to date through the latest bill.";
         }
+        // AI review gate: when the model planned the rows, show its plain-English read + a sanity
+        // verdict. Not-sane = amber "review before sending"; sane = green "looks consistent".
+        if (p && p.ai && p.ai.explanation) {
+          let note = box.querySelector(".rb-track-ai");
+          if (!note) { note = document.createElement("div"); note.className = "rb-track-ai"; box.appendChild(note); }
+          const ok = p.ai.sane !== false;
+          note.style.cssText = "margin-top:9px;padding:9px 12px;border-radius:8px;font-size:13px;line-height:1.5;"
+            + (ok ? "background:rgba(30,150,80,.10);color:#1c7a43;border:1px solid rgba(30,150,80,.30);"
+                  : "background:rgba(200,130,0,.12);color:#8a5a00;border:1px solid rgba(200,130,0,.45);");
+          note.textContent = (ok ? "✓ AI reviewed — looks consistent. " : "⚠ AI flagged this — review before sending. ")
+            + p.ai.explanation;
+        }
       } catch (e) { setS("rb-err", "Upload failed."); }
     };
     const dl = box.querySelector("[data-tdl]");
