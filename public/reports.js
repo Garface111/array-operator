@@ -200,10 +200,6 @@
     // being viewed (skip during an idle prefetch so we never render a PDF for
     // users who never open Reports).
     if (!_tplWired && !prefetch) { _tplWired = true; wireInvoiceTemplate(); }
-    // Global generation-spreadsheet tracker — fetch on a real view (not idle
-    // prefetch). Self-hides on 404/disabled/network-error so deploying before
-    // the tenant endpoint is live is safe.
-    if (!prefetch) { loadGlobalTracker().catch(() => {}); }
     // Data sections: fill on first build; quiet background refresh when the cache
     // is stale. Fire-and-forget so the tab paints instantly (refreshList et al.
     // fetch-then-fill in place, so this never re-blanks a rendered tab).
@@ -446,12 +442,9 @@
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
-        <!-- MASTER generation spreadsheet — one operator-wide sheet (auto-built
-             per-array, or the operator's own uploaded layout) pinned at the top.
-             Each offtaker ALSO gets its OWN sheet inside its accordion card
-             (.rb-track-sub). Self-hides on flag-off/404/network. Reuses the shared
-             renderTracker/wireTracker helpers via loadTrackerInto. -->
-        <div class="rb-track rb-track-global rep-card" id="rbGlobalTracker" hidden></div>
+        <!-- The operator-wide MASTER generation spreadsheet card was removed from the top
+             (Ford 2026-06-28 — it didn't pull its weight and cluttered the main screen).
+             Each offtaker still has its OWN sheet inside its accordion card (.rb-track-sub). -->
         <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
         <div id="rbCustManual"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
@@ -2585,8 +2578,7 @@
       </div>
       <!-- THIS offtaker's own generation spreadsheet — upload a sheet in whatever
            format they use; we match it and append a row each month as their GMP
-           bills land. Self-hides on flag-off/404/network (loadTrackerInto). The
-           operator-wide MASTER sheet lives at the top of the page (#rbGlobalTracker). -->
+           bills land. Self-hides on flag-off/404/network (loadTrackerInto). -->
       <div class="rb-track rb-track-sub" data-tracker-base="${API}/subscriptions/${sid}/tracker"
            data-tracker-scope="offtaker" data-tracker-name="${esc(d.customer_name || "")}" hidden></div>`;
   }
@@ -2596,11 +2588,10 @@
   // we detect its structure and append a new row each month as fresh GMP bills
   // land. A "Download latest spreadsheet" button streams the kept-current file.
   //
-  // ONE GLOBAL operator-wide sheet for the whole fleet — pinned at the top of
-  // the Offtaker Invoice Generator (#rbGlobalTracker), wired to the TENANT
-  // tracker endpoints (no subscription id). The box self-hides on
-  // 404/disabled/network so deploying ahead of the backend is safe.
-  const TRACKER_BASE = "/v1/array-operator/tracker";   // tenant-level (no /billing, no sid)
+  // Each offtaker has its OWN sheet inside its accordion card (.rb-track-sub).
+  // (The operator-wide MASTER sheet card was removed from the top — Ford 2026-06-28;
+  // TRACKER_BASE stays as the tenant-level fallback used by loadTrackerInto.)
+  const TRACKER_BASE = "/v1/array-operator/tracker";   // tenant-level fallback (no /billing, no sid)
   const FIELD_LABEL = { period: "Period", generation: "Generation kWh",
     consumption: "Consumption", rate: "Credit rate", amount: "Amount $" };
 
@@ -2617,9 +2608,8 @@
 
   // Generic tracker loader. The box carries its OWN endpoint + scope on data-
   // attributes (data-tracker-base / -scope / -name), so the SAME renderer drives
-  // the MASTER operator-wide sheet (#rbGlobalTracker, pinned at the top) AND each
-  // offtaker's OWN sheet (.rb-track-sub, inside its accordion). On 404 / disabled
-  // / network the box stays hidden (safe to ship ahead of the flag; demo/out).
+  // each offtaker's OWN sheet (.rb-track-sub, inside its accordion). On 404 /
+  // disabled / network the box stays hidden (safe to ship ahead of the flag; demo/out).
   async function loadTrackerInto(box) {
     if (!box) return;
     const base = box.dataset.trackerBase || TRACKER_BASE;
@@ -2633,13 +2623,6 @@
       box.hidden = false;
       renderTracker(box, t);
     } catch (e) { box.hidden = true; }                    // network — leave hidden
-  }
-
-  // The MASTER sheet pinned at the top of the Offtaker Invoice Generator.
-  function loadGlobalTracker() {
-    const box = $("#rbGlobalTracker");
-    if (box) { box.dataset.trackerBase = TRACKER_BASE; box.dataset.trackerScope = "global"; }
-    return loadTrackerInto(box);
   }
 
   function trackerMapTable(t) {
