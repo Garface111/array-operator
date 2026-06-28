@@ -1653,8 +1653,7 @@
             <div class="rb-acc-sentence">${sentence}</div>
             <div class="rb-acc-meta">Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null && !draft ? " · ~" + money(prev.amount_owed) : ""}</div>
           </div>
-          <button class="rb-acc-del" data-del-offtaker="${s.id}" title="Delete this offtaker" aria-label="Delete offtaker"
-                  style="margin-left:auto;align-self:center;flex:none;background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;line-height:1;padding:6px 9px;border-radius:6px">🗑</button>
+          <button class="rb-acc-del" data-del-offtaker="${s.id}" title="Delete this offtaker" aria-label="Delete offtaker">🗑</button>
         </div>
         <div class="rb-acc-body" id="rbAccBody-${s.id}" data-accbody="${s.id}" hidden></div>
       </div>`;
@@ -2529,6 +2528,8 @@
         <div class="rb-offedit-h">
           <span class="rl">Offtaker details</span>
           <span class="rb-offedit-hint">Edits save to this offtaker and update the preview live.</span>
+          <button type="button" class="rb-offedit-del" data-del-offtaker="${sid}"
+                  title="Permanently delete this offtaker">🗑 Delete offtaker</button>
         </div>
         <div class="rb-cust-grid rb-offedit-grid">
           <label class="rep-fld"><span class="rl">Offtaker name</span>
@@ -2792,6 +2793,10 @@
         inp.addEventListener("input", h);
         inp.addEventListener("change", h);
       });
+      // The labeled "Delete offtaker" button lives inside the editor (rendered into the
+      // expanded body, so the list-level [data-del-offtaker] wiring never sees it).
+      const del = box.querySelector(".rb-offedit-del[data-del-offtaker]");
+      if (del) del.onclick = () => deleteOfftaker(del.getAttribute("data-del-offtaker"));
     });
   }
 

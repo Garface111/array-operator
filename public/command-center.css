@@ -714,6 +714,20 @@ body.sb-fs-lock{ overflow:hidden; }
   transition:transform .15s ease, color .12s ease; }
 .rb-acc[data-open="true"] .rb-acc-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
 .rb-acc-head-main{ flex:1 1 auto; min-width:0; }
+/* Delete-offtaker controls — made discoverable (Paul couldn't find delete). The row
+   icon is muted at rest but lights up red the moment you hover the row; the expanded
+   card carries a clearly-labeled "Delete offtaker" button. */
+.rb-acc-del{ margin-left:auto; align-self:center; flex:none; background:none; border:0;
+  color:var(--faint,#94a3b8); cursor:pointer; font-size:16px; line-height:1; padding:6px 9px;
+  border-radius:7px; transition:background .12s ease, color .12s ease, transform .12s ease; }
+.rb-acc-head:hover .rb-acc-del{ color:var(--bad,#e5484d); }
+.rb-acc-del:hover{ background:rgba(229,72,77,.12); color:var(--bad,#e5484d); transform:scale(1.08); }
+.rb-offedit-del{ margin-left:auto; align-self:center; flex:none; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; background:transparent;
+  border:1px solid rgba(229,72,77,.5); color:var(--bad,#e5484d);
+  font:600 12px/1 inherit; padding:7px 12px; border-radius:8px;
+  transition:background .12s ease, border-color .12s ease; }
+.rb-offedit-del:hover{ background:rgba(229,72,77,.12); border-color:var(--bad,#e5484d); }
 .rb-acc-name{ font-size:15px; font-weight:700; color:var(--ink,#0f172a); display:flex; align-items:center;
   gap:7px; flex-wrap:wrap; line-height:1.3; }
 .rb-acc-sentence{ font-size:13px; line-height:1.5; color:var(--muted,#475569); margin:5px 0 4px; }
