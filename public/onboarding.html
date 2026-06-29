@@ -373,7 +373,7 @@ function loginWithSolarEdge(){
 }
 
 function onSolarEdgeCapture(d){
-  if (state.syncingAll){ onSyncSolarEdge(d); return; }
+  if (state.syncMode){ onSyncSolarEdge(d); return; }   // accept late captures too (corrects a settled false "none")
   if (!state.userConnect) return;   // passive background capture — don't yank past the Connect screen / sync-all button
   state.vendor = "solaredge";
   const scan = document.getElementById("scanArea");
@@ -423,7 +423,7 @@ function openPortalLogin(vendor, url, label){
 // SolarEdge we don't call /public/preview. We render the captured systems, stash
 // the raw capture, and POST it to /v1/array-owners/inverter-capture after signup.
 function onReadingsCapture(d, vendor, label){
-  if (state.syncingAll){ onSyncCapture(vendor, label, Array.isArray(d.sites)?d.sites:[], "readings"); return; }
+  if (state.syncMode){ onSyncCapture(vendor, label, Array.isArray(d.sites)?d.sites:[], "readings"); return; }   // accept late captures too (corrects a settled false "none")
   if (!state.userConnect) return;   // passive background capture — don't yank past the Connect screen / sync-all button
   state.vendor = vendor;
   const scan = document.getElementById("scanArea");
@@ -480,7 +480,7 @@ function startSyncAll(){
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
-  _syncAllTimer = setTimeout(finishSyncAll, 65000);   // honest stop — matches the extension's parallel-sweep watchdog
+  _syncAllTimer = setTimeout(finishSyncAll, 130000);   // honest stop — Chint's route walk + a lapsed-session auto-login can run ~60-110s
 }
 
 // Readings vendors (Fronius/SMA/Chint) land their sites directly; merge + keep
