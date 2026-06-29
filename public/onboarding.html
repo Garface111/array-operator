@@ -356,6 +356,9 @@ window.addEventListener("message", (e) => {
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "sma") onReadingsCapture(d, "sma", "SMA Sunny Portal");
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "chint") onReadingsCapture(d, "chint", "Chint Connect");
   if (d.type === "SO_CAPTURE_FAILED") onCaptureFailed(d);
+  // The extension tells us a portal needs a sign-in (no live session / no saved
+  // password). During a sync, surface a one-click "Sign in to add" for that vendor.
+  if (d.type === "SO_LOGIN_STATE") onSyncLoginState(d);
   // SO_SYNC_ALL_DONE fires the instant the extension OPENS the portal tabs — not
   // when captures land (those stream in over the next 10–90s). So we only settle
   // early if the sync FAILED to start; otherwise captures drive the screen and an
@@ -530,7 +533,7 @@ async function onSyncSolarEdge(d){
 // Once every platform has reported in (found or explicitly empty), settle a beat
 // later — no need to hold the full timeout when there's clearly nothing more coming.
 function maybeSettleSoon(){
-  const pending = SYNC_ALL_VENDORS.some(v => !state.syncStatus[v] || state.syncStatus[v].state === "checking");
+  const pending = SYNC_ALL_VENDORS.some(v => { const s = state.syncStatus[v]; return !s || s.state === "checking" || s.state === "signing"; });
   if (!pending){
     if (_settleTimer) clearTimeout(_settleTimer);
     _settleTimer = setTimeout(finishSyncAll, 2500);   // grace for a last straggler
@@ -542,7 +545,8 @@ function finishSyncAll(){
   state.syncingAll = false;
   if (_syncAllTimer){ clearTimeout(_syncAllTimer); _syncAllTimer = null; }
   if (_settleTimer){ clearTimeout(_settleTimer); _settleTimer = null; }
-  SYNC_ALL_VENDORS.forEach(v => { if (state.syncStatus[v] && state.syncStatus[v].state === "checking") state.syncStatus[v] = { state:"none" }; });
+  // Anything that didn't capture (no live session) → offer a one-click sign-in, not a dead "none".
+  SYNC_ALL_VENDORS.forEach(v => { const s = state.syncStatus[v]; if (!s || s.state === "checking" || s.state === "none") state.syncStatus[v] = { state:"needs_signin" }; });
   let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
   state.totals = kw>0 ? { peak_power_kw: Math.round(kw*10)/10, annual_value_usd: 0 } : null;
   if (step === 2) render();    // re-render arraysScreen in its settled state
@@ -555,8 +559,14 @@ function renderSyncStatus(){
   bar.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin:1rem 0";
   bar.innerHTML = SYNC_ALL_VENDORS.map(v => {
     const st = state.syncStatus[v] || { state:"checking" };
+    if (st.state === "needs_signin"){
+      // No live session / saved password — the extension can't read this portal silently.
+      // One click opens it; the owner signs in once and it pulls in (+ stays connected).
+      return `<button type="button" onclick="syncSignIn('${v}')" style="display:flex;align-items:center;gap:8px;background:var(--card,#f4f7fb);border:1px solid var(--line,#dbe4ee);border-radius:10px;padding:9px 11px;font-size:12.5px;cursor:pointer;text-align:left;color:var(--ink,#1e293b)"><b style="color:var(--accent,#2563eb)">↪</b> Sign in to add <b>${SYNC_ALL_LABEL[v]}</b></button>`;
+    }
     let icon, txt, col;
     if (st.state === "found"){ icon="✓"; txt = st.count + (st.count===1?" array":" arrays"); col="var(--good,#16a34a)"; }
+    else if (st.state === "signing"){ icon="◌"; txt="signing in…"; col="var(--ink2,#64748b)"; }
     else if (st.state === "none"){ icon="·"; txt="none"; col="var(--faint,#94a3b8)"; }
     else { icon="◌"; txt="checking…"; col="var(--ink2,#64748b)"; }
     return `<span style="display:flex;align-items:center;gap:8px;background:var(--card,#f4f7fb);border-radius:10px;padding:9px 11px;font-size:12.5px"><b style="color:${col}">${icon}</b> ${SYNC_ALL_LABEL[v]} <span style="margin-left:auto;color:var(--faint,#94a3b8)">${txt}</span></span>`;
@@ -598,6 +608,31 @@ function syncBackToConnect(){
   if (_settleTimer){ clearTimeout(_settleTimer); _settleTimer = null; }
   state.sites = []; state.captures = {}; state.syncStatus = {}; state.realSites = false;
   go(0);   // back to Welcome (step 1 would just auto-restart the sync)
+}
+
+// The extension says a portal needs a sign-in (no live session / no saved password).
+// Flip that vendor to a one-click "Sign in to add" instead of grinding to a false "none".
+function onSyncLoginState(d){
+  if (!state.syncMode) return;
+  const v = (d.provider || "").toLowerCase();
+  if (!SYNC_ALL_VENDORS.includes(v)) return;
+  if (d.state !== "login_required") return;
+  const cur = state.syncStatus[v] && state.syncStatus[v].state;
+  if (cur === "found" || cur === "signing") return;   // don't clobber a capture or an in-progress sign-in
+  state.syncStatus[v] = { state:"needs_signin" };
+  renderSyncStatus();
+}
+
+// One-click sign-in for a vendor with no live session: open its portal foreground; the
+// owner logs in once, the capture lands via the same sync path, and it stays connected.
+function syncSignIn(vendor){
+  state.syncMode = true;
+  state.syncStatus[vendor] = { state:"signing" };
+  renderSyncStatus();
+  if (vendor === "solaredge") loginWithSolarEdge();
+  else if (vendor === "fronius") loginWithFronius();
+  else if (vendor === "sma") loginWithSMA();
+  else if (vendor === "chint") loginWithChint();
 }
 
 // Utility path: owners who track production via their Green Mountain Power
@@ -841,13 +876,17 @@ function arraysScreen(){
 function arraysScreenSyncAll(){
   const n = state.sites.length;
   const plats = new Set(state.sites.map(s => s.vendor).filter(Boolean)).size;
+  const needSignin = SYNC_ALL_VENDORS.filter(v => state.syncStatus[v] && state.syncStatus[v].state === "needs_signin").length;
   const h1 = state.syncingAll ? "Finding every array you own…"
-           : (n ? "There they all are." : "We couldn't reach a platform yet.");
+           : (n ? "There they are — your arrays." : (needSignin ? "Almost — sign in to pull them in." : "We couldn't reach a platform yet."));
   const lede = state.syncingAll
     ? "Checking every platform at once — SolarEdge, Fronius, SMA, Chint. No need to pick; we'll bring in whatever you're already signed into."
-    : (n ? `${n===1?"1 array":n+" arrays"} across ${plats} ${plats===1?"platform":"platforms"}, pulled straight from your monitoring logins. Nothing's saved yet — this is a preview.`
-         : "We didn't reach any of your platforms. Make sure you're signed into your inverter portals in this browser, then search again — or connect one brand at a time below.");
-  const primary = (!state.syncingAll && n===0)
+    : (n
+        ? `${n===1?"1 array":n+" arrays"} across ${plats} ${plats===1?"platform":"platforms"}, pulled straight from your monitoring logins.${needSignin?` Sign into the platform${needSignin>1?"s":""} below to add the rest.`:""} Nothing's saved yet — this is a preview.`
+        : (needSignin
+            ? "We grabbed everything you're signed into. For the rest, one click to sign in — your arrays pull in automatically and stay connected after."
+            : "We didn't reach any of your platforms. Make sure you're signed into your inverter portals in this browser, then search again."));
+  const primary = (!state.syncingAll && n===0 && !needSignin)
     ? `<button class="btn btn-primary btn-lg" onclick="startSyncAll()">↻ Search again</button>`
     : `<button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Start my free trial →</button>`;
   return `<div class="card animate">
