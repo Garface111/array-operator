@@ -130,6 +130,16 @@
 
   function root() { return document.getElementById("reportsRoot"); }
 
+  // Canonical GMP-bill attachment name: gmp_utility_bill_<offtaker>_<period>.pdf —
+  // matches the invoice's own name so the offtaker gets a self-describing file, not
+  // the operator's raw upload name. Mirrors the backend (delivery.py generate_files).
+  function gmpBillFilename(d) {
+    const slug = String((d && d.customer_name) || "offtaker").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "offtaker";
+    const suf = (d && d.invoice_number) ? "_" + d.invoice_number : "";
+    return `gmp_utility_bill_${slug}${suf}.pdf`;
+  }
+
   // ---- top-level entry -------------------------------------------------------
   // load() runs on every Reports tab activation. It used to rebuild the whole
   // shell + re-fetch everything (including the heavy invoice-template PDF
@@ -2244,7 +2254,7 @@
       <div class="rb-calc">
         <div class="rb-calc-h">How we calculated this invoice</div>
         <div class="rb-calc-row"><span class="rb-calc-k">Latest GMP bill</span>
-          <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(d.gmp_filename || "gmp_bill.pdf")}">view ↓</button>` : ""}</span></div>
+          <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(gmpBillFilename(d))}">view ↓</button>` : ""}</span></div>
         <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(d.array_total_kwh)} kWh</span></div>
         <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share</span>
           <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
@@ -2342,7 +2352,7 @@
       url: sid ? `${API}/subscriptions/${sid}/preview?kind=summary&fmt=pdf` : null,
     });
     if (d.has_gmp_pdf || (autoOn && d.gmp_auto_status === "ready")) atts.push({
-      ico: "🧾", name: esc(d.gmp_filename || "gmp_utility_bill.pdf"),
+      ico: "🧾", name: gmpBillFilename(d),
       sub: "the GMP bill behind this invoice", state: "ready",
       url: `${API}/drafts/${d.id}/gmp-bill`,
     });
