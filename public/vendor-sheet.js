@@ -744,7 +744,7 @@
           : "";
         const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
-          <span class="vs-c-name"><span class="vs-caret">▸</span>${esc(c.array_name || "Array")}</span>
+          <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
@@ -775,7 +775,7 @@
               const ikey = c.array_id + ":" + iv.inverter_id;
               const iopen = !!_invExpanded[ikey];
               h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
-                <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span>${esc(iv.name || iv.sn || "Inverter")}${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
+                <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(iv.name || iv.sn || "Inverter")}</span>${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate capacity">· ${Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100)}% of rated</span>` : ""}</span>
                 <span class="vs-c-today"></span>
@@ -826,7 +826,77 @@
       }
       try { window.open(url, "_blank", "noopener"); } catch (_) {}
     });
+    // Inline rename: click an array or inverter name → edit in place. Persists
+    // through FleetStore (→ backend), so the rename also shows in the Sandbox view
+    // and survives a reload. stopPropagation keeps the click from toggling the
+    // row's expand/collapse.
+    body.querySelectorAll("[data-edit-arr]").forEach(node =>
+      wireVsEditable(node, "arrays", node.getAttribute("data-edit-arr")));
+    body.querySelectorAll("[data-edit-inv]").forEach(node =>
+      wireVsEditable(node, "inverters", node.getAttribute("data-edit-inv")));
     renderPanel();   // tabbed Fleet-insights panel below the rows — re-renders with the fleet
+  }
+
+  // Make one name cell editable in place. Mirrors sandbox.js makeEditable: click →
+  // contenteditable; Enter / blur commits; Escape / empty reverts. The commit goes
+  // through FleetStore.rename{Array,Inverter} which notify()s → both views repaint
+  // and the backend persists. mousedown/pointerdown/click are stopped so editing a
+  // name never toggles the enclosing row's expand/collapse.
+  function wireVsEditable(node, kind, id) {
+    if (!node || node._editWired) return;
+    node._editWired = true;
+    ["mousedown", "pointerdown"].forEach(ev =>
+      node.addEventListener(ev, e => e.stopPropagation()));
+    node.addEventListener("click", e => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (node.isContentEditable) return;
+      beginEdit();
+    });
+    // The row is keyboard-activatable (Enter/Space toggles it); swallow those keys
+    // on the name when NOT editing so focus landing here doesn't toggle the row.
+    node.addEventListener("keydown", e => {
+      if (!node.isContentEditable && (e.key === "Enter" || e.key === " ")) e.stopPropagation();
+    });
+
+    function beginEdit() {
+      const original = node.textContent;
+      node.dataset.orig = original;
+      node.setAttribute("contenteditable", "true");
+      node.classList.add("vs-editing");
+      node.focus();
+      try {
+        const r = document.createRange(); r.selectNodeContents(node);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      } catch (_) {}
+      let done = false;
+      const finish = (commit) => {
+        if (done) return; done = true;
+        node.removeAttribute("contenteditable");
+        node.classList.remove("vs-editing");
+        node.removeEventListener("keydown", onKey);
+        node.removeEventListener("blur", onBlur);
+        const val = node.textContent.trim();
+        if (commit && val && val !== (node.dataset.orig || original)) {
+          node.textContent = val;
+          if (id != null && id !== "" && window.FleetStore) {
+            if (kind === "arrays" && FleetStore.renameArray) FleetStore.renameArray(id, val);
+            else if (kind === "inverters" && FleetStore.renameInverter) FleetStore.renameInverter(id, val);
+          }
+        } else {
+          node.textContent = node.dataset.orig || original;   // revert (cancel / empty / unchanged)
+        }
+        delete node.dataset.orig;
+      };
+      const onKey = e => {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); node.blur(); }
+        else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      };
+      const onBlur = () => finish(true);
+      node.addEventListener("keydown", onKey);
+      node.addEventListener("blur", onBlur);
+    }
   }
 
   // Size the scroll region to fill the viewport below it, so the column header can

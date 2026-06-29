@@ -1240,6 +1240,15 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-caret{ display:inline-block; width:13px; color:var(--faint); transition:transform .15s ease; }
 .vs-arr.open .vs-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
 .vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Inline-editable array / inverter names (Spreadsheet view) — mirrors .sb-editable.
+   A faint hover affordance (underline + a small pencil) signals the name is editable;
+   editing gets a clear focus outline. The pencil is on the editable span only, so the
+   caret + meta don't pick it up. */
+.vs-editable{ cursor:text; border-radius:5px; padding:0 3px; margin:0 -3px; outline:1px solid transparent; outline-offset:1px; transition:outline-color .12s, background-color .12s; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.vs-editable:hover{ outline-color:rgba(37,99,235,.30); text-decoration:underline dotted rgba(37,99,235,.45); text-underline-offset:3px; }
+.vs-editable:hover::after{ content:"✎"; font-size:10px; color:var(--good,#2563eb); margin-left:5px; opacity:.7; }
+.vs-editable.vs-editing{ outline:1px solid var(--good,#2563eb); outline-offset:1px; background:rgba(37,99,235,.08); text-decoration:none; cursor:text; }
+.vs-editable.vs-editing::after{ content:none; }
 .vs-c-inv, .vs-c-pow, .vs-c-today{ font-variant-numeric:tabular-nums; color:var(--ink); }
 .vs-c-fresh{ font-size:11.5px; color:var(--faint); }
 /* Frozen feed: dim the stale live value, amber the "N min ago" so a paused feed never reads as current. */

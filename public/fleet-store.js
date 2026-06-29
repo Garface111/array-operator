@@ -445,6 +445,50 @@ window.FleetStore = (function(){
     }
   }
 
+  // Rename an array (inline edit in EITHER dashboard view). Optimistic local
+  // update + notify (so the OTHER view repaints the new name instantly), records
+  // an undoable inverse, then persists to the backend; a refetch reconciles to
+  // the authoritative name. No-op when empty or unchanged. Mirrors the backend's
+  // per-tenant name-uniqueness — a 409 clash reverts via the catch→refetch.
+  function renameArray(id, name){
+    const a = findArray(id); if(!a) return;
+    const next = String(name == null ? "" : name).trim();
+    if(!next || next === a.name) return;                   // empty / unchanged → no-op
+    const prev = a.name;
+    a.name = next;
+    notify();
+    pushHistory({
+      redo: () => renameArray(id, next),
+      undo: () => renameArray(id, prev),
+    });
+    if(isLive()){
+      apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/name", { name: next })
+        .then(() => refetch()).catch(() => refetch());
+    }
+  }
+
+  // Rename an inverter (inline edit in EITHER view). Same optimistic-then-persist
+  // shape as renameArray. Inverter names may repeat across arrays, so there is no
+  // uniqueness check; the backend marks the name owner-set so a telemetry sync
+  // never clobbers it.
+  function renameInverter(id, name){
+    const hit = findInv(id); if(!hit) return;
+    const { i } = hit;
+    const next = String(name == null ? "" : name).trim();
+    if(!next || next === i.name) return;                   // empty / unchanged → no-op
+    const prev = i.name;
+    i.name = next;
+    notify();
+    pushHistory({
+      redo: () => renameInverter(id, next),
+      undo: () => renameInverter(id, prev),
+    });
+    if(isLive()){
+      apiPost("/v1/array-owners/inverters/" + encodeURIComponent(id) + "/name", { name: next })
+        .then(() => refetch()).catch(() => refetch());
+    }
+  }
+
   function createArray(name){
     const id = "new-" + (_invSeq++);
     state.arrays.push({ id, name, region:"—", host:"", vendor:"", inverters:[] });
@@ -836,6 +880,7 @@ window.FleetStore = (function(){
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
+    renameArray, renameInverter,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,

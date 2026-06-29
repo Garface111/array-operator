@@ -449,36 +449,55 @@
 
   // ---- saved inline renames (localStorage) ----
   // Owner-edited array / inverter names, keyed by stable id, re-applied every render.
-  function loadRenames(){
-    try {
-      const v = JSON.parse(localStorage.getItem(RENAME_KEY)) || {};
-      return { arrays: (v.arrays && typeof v.arrays==="object") ? v.arrays : {},
-               inverters: (v.inverters && typeof v.inverters==="object") ? v.inverters : {} };
-    } catch(e){ _warnLS(RENAME_KEY, e); return { arrays:{}, inverters:{} }; }
-  }
-  function saveRename(kind, id, name){
-    if(id==null || id==="") return;
-    const all = loadRenames();
-    const bucket = all[kind] || (all[kind] = {});
-    const v = String(name==null ? "" : name).trim();
-    if(v) bucket[String(id)] = v; else delete bucket[String(id)];
-    try { localStorage.setItem(RENAME_KEY, JSON.stringify(all)); } catch(e){}
-  }
-  // Re-apply stored renames to the freshly-rendered DOM (runs on every render).
-  function applyRenames(host){
-    const all = loadRenames();
-    host.querySelectorAll(".sb-col").forEach(col => {
-      const nm = all.arrays[String(col.dataset.arrayId)];
-      if(nm){ const t = col.querySelector(".sb-array-name"); if(t) t.textContent = nm; }
+  // ---- ONE-TIME localStorage → backend rename migration --------------------
+  // Renames used to live ONLY in localStorage (RENAME_KEY = "ao_renames"), so
+  // they never reached the backend or the Spreadsheet view and didn't survive a
+  // reload. Renames are now persisted server-side via FleetStore. On the first
+  // LIVE load we push each still-relevant local rename to the backend (so Ford
+  // doesn't lose his current custom names), then drop the local store. Guarded by
+  // a one-time flag so it runs exactly once; after that the backend is the source
+  // of truth and the local store is gone.
+  const RENAME_MIGRATED_KEY = "ao_renames_migrated_v1";
+  function migrateLocalRenames(){
+    if(!(window.FleetStore && FleetStore.isLive && FleetStore.isLive())) return;  // live only
+    let migrated = false;
+    try { migrated = localStorage.getItem(RENAME_MIGRATED_KEY) === "1"; } catch(_){}
+    if(migrated) return;
+    let raw = null;
+    try { raw = localStorage.getItem(RENAME_KEY); } catch(e){ _warnLS(RENAME_KEY, e); }
+    if(!raw){
+      try { localStorage.setItem(RENAME_MIGRATED_KEY, "1"); } catch(_){}
+      return;
+    }
+    let store = {};
+    try { store = JSON.parse(raw) || {}; } catch(e){ _warnLS(RENAME_KEY, e); }
+    const arrays = (store.arrays && typeof store.arrays === "object") ? store.arrays : {};
+    const inverters = (store.inverters && typeof store.inverters === "object") ? store.inverters : {};
+    const snap = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
+    // index current FleetStore names by id so we only push renames that (a) match
+    // a real loaded array/inverter and (b) actually differ from the live name.
+    const arrName = new Map(), invName = new Map();
+    snap.forEach(a => {
+      arrName.set(String(a.id), a.name);
+      (a.inverters || []).forEach(iv => invName.set(String(iv.id), iv.name));
     });
-    host.querySelectorAll(".sb-inv").forEach(card => {
-      const nm = all.inverters[String(card.dataset.invId)];
-      if(nm){
-        const t = card.querySelector(".sb-inv-name");
-        if(t) t.textContent = nm;
-        card.dataset.name = nm;     // keep detail-line / alerts in sync with the rename
+    let pushed = 0;
+    Object.keys(arrays).forEach(id => {
+      const want = String(arrays[id] || "").trim();
+      if(want && arrName.has(id) && arrName.get(id) !== want && FleetStore.renameArray){
+        FleetStore.renameArray(id, want); pushed++;
       }
     });
+    Object.keys(inverters).forEach(id => {
+      const want = String(inverters[id] || "").trim();
+      if(want && invName.has(id) && invName.get(id) !== want && FleetStore.renameInverter){
+        FleetStore.renameInverter(id, want); pushed++;
+      }
+    });
+    // Backend is now the authority — drop the local store + set the one-time flag.
+    try { localStorage.removeItem(RENAME_KEY); } catch(_){}
+    try { localStorage.setItem(RENAME_MIGRATED_KEY, "1"); } catch(_){}
+    if(pushed){ try { console.info("[sandbox] migrated " + pushed + " local rename(s) to the backend"); } catch(_){} }
   }
 
   // ---- inline-rename editing for array & inverter names -------------------
@@ -537,7 +556,15 @@
         if(commit && val){
           node.textContent = val;
           const id = getId && getId();
-          saveRename(kind, id, val);
+          // Persist through FleetStore → backend (was localStorage-only). This
+          // updates shared state + notify()s, so the OTHER view (Spreadsheet)
+          // repaints the new name instantly, and a reload reads it from the
+          // backend. The store no-ops an unchanged value, so re-committing the
+          // same text is harmless.
+          if(id != null && id !== "" && window.FleetStore){
+            if(kind === "arrays" && FleetStore.renameArray) FleetStore.renameArray(id, val);
+            else if(kind === "inverters" && FleetStore.renameInverter) FleetStore.renameInverter(id, val);
+          }
           if(kind === "inverters" && idEl) idEl.dataset.name = val;   // keep detail-line in sync
         } else {
           node.textContent = node.dataset.orig || original;           // revert (cancel / empty)
@@ -1972,8 +1999,8 @@
     wireDrag(host);       // whole-column reorder (drag the .sb-array node)
     wireInvDrag(host);    // per-inverter reorder + cross-array move (PERSISTED to backend)
     wireInvToggle(host);  // expand/collapse each array's inverter comb (persisted)
-    applyRenames(host);   // re-apply owner inline renames (array & inverter names)
-    wireRenames(host);    // click-to-edit array & inverter names (persisted to localStorage)
+    migrateLocalRenames(); // one-time: push legacy localStorage renames to the backend, then drop them
+    wireRenames(host);    // click-to-edit array & inverter names (persisted to the backend via FleetStore)
     startLiveTicker();    // keep each card's "kW now" reading live
     wirePanZoom(host);    // drag empty space to pan, wheel to zoom the fleet canvas
     wireCardButton(host); // "+ Card" menu (Note / Data)
@@ -2621,7 +2648,7 @@
   }
   function arrayCount(){ return String(document.querySelectorAll("#sandbox .sb-col").length); }
 
-  // ---- card storage (localStorage; mirrors saveOrder / saveRename style) ----
+  // ---- card storage (localStorage; mirrors the saveOrder style) ----
   function loadCards(){
     try {
       const v = JSON.parse(localStorage.getItem(CARDS_KEY));
