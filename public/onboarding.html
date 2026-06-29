@@ -372,7 +372,7 @@ function loginWithSolarEdge(){
   state.userConnect = true;
   const scan = document.getElementById("scanArea");
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening SolarEdge — sign in there and your arrays appear here automatically.</div>`;
-  extSend("SO_OPEN_PORTAL", { url: "https://monitoring.solaredge.com/", active: true });
+  extSend("SO_OPEN_PORTAL", { url: "https://monitoring.solaredge.com/", active: true, provider: "solaredge" });
 }
 
 function onSolarEdgeCapture(d){
@@ -417,8 +417,8 @@ function loginWithChint(){
 function openPortalLogin(vendor, url, label){
   state.userConnect = true;
   const scan = document.getElementById("scanArea");
-  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and your inverters appear here automatically.</div>`;
-  extSend("SO_OPEN_PORTAL", { url, active: true });
+  if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and we'll bring you right back here.</div>`;
+  extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor });
 }
 
 // Readings-capture vendors (Fronius, SMA): the extension ships the READINGS
