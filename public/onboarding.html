@@ -479,11 +479,15 @@ function startSyncAll(){
   state.realSites = true;
   state.totals = null;
   state.syncStatus = {};
-  // Chint can't auto-capture in a background surface (its app only runs in a visible tab), so
-  // it's click-to-connect from the start; the others auto-attempt.
-  SYNC_ALL_VENDORS.forEach(v => state.syncStatus[v] = { state: v === "chint" ? "needs_signin" : "checking" });
+  SYNC_ALL_VENDORS.forEach(v => state.syncStatus[v] = { state:"checking" });
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
+  // Chint can't ride the silent background-tab path (its app only renders in a VISIBLE tab), so
+  // AUTO-FIRE its connect alongside the others a beat later (once the screen is up): it opens
+  // monitor.chintpowersystems.com in a foreground tab, the walk captures using the existing
+  // login, then so_return_tab brings the owner back here. No click needed. If it doesn't land,
+  // the timeout drops it to a "Sign in to add Chint" fallback.
+  setTimeout(() => { if (state.syncMode && state.syncStatus.chint && state.syncStatus.chint.state === "checking") syncSignIn("chint"); }, 900);
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
   _syncAllTimer = setTimeout(finishSyncAll, 190000);   // honest stop — Chint's login + per-site route walk can run ~3min; fast vendors land in seconds
 }
