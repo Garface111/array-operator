@@ -410,6 +410,19 @@ function loginWithChint(){
   // (The #/pv/sites route + custom-routing detours were my own divergence and the bug.)
   openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
   if (_chintTimer) clearTimeout(_chintTimer);
+  // In SYNC mode, never leave the tile spinning "signing in…" forever: if the capture hasn't
+  // landed in ~75s (a generous window for the login + multi-site route walk), resolve it to a
+  // one-click "Sign in to add Chint" so the owner always has a clear next action.
+  if (state.syncMode){
+    _chintTimer = setTimeout(() => {
+      if (state.syncMode && state.syncStatus.chint && state.syncStatus.chint.state === "signing"){
+        state.syncStatus.chint = { state:"needs_signin" };
+        renderSyncStatus();
+        maybeSettleSoon();
+      }
+    }, 75000);
+    return;
+  }
   _chintTimer = setTimeout(() => {
     const s = document.getElementById("scanArea");
     if (s && /Opening Chint/.test(s.innerHTML)) {
@@ -487,13 +500,37 @@ function startSyncAll(){
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
   // Chint can't ride the silent background-tab path (its app only renders in a VISIBLE tab), so
-  // AUTO-FIRE its connect alongside the others a beat later (once the screen is up): it opens
-  // monitor.chintpowersystems.com in a foreground tab, the walk captures using the existing
-  // login, then so_return_tab brings the owner back here. No click needed. If it doesn't land,
-  // the timeout drops it to a "Sign in to add Chint" fallback.
-  setTimeout(() => { if (state.syncMode && state.syncStatus.chint && state.syncStatus.chint.state === "checking") syncSignIn("chint"); }, 900);
+  // its connect is a FOREGROUND open of monitor.chintpowersystems.com (the walk captures on the
+  // existing login, then so_return_tab brings the owner back). CRITICAL: open it SOLO, only once
+  // the fast vendors have settled — NOT concurrently. Firing it at 900ms while SolarEdge/Fronius/
+  // SMA were all mid-SSO-login made the extension misread Chint's half-loaded page as logged-out
+  // (a FALSE login_required ~200ms after open) and the capture never fired → eternal "signing in".
+  // A solo open is exactly the dashboard's working "Open Chint to sync". maybeStartChint() fires
+  // it as the fast vendors finish; this fallback opens it anyway if a slow vendor stalls.
+  state._chintStarted = false;
+  setTimeout(() => {
+    if (state.syncMode && !state._chintStarted && state.syncStatus.chint && state.syncStatus.chint.state === "checking") {
+      state._chintStarted = true; syncSignIn("chint");
+    }
+  }, 12000);
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
   _syncAllTimer = setTimeout(finishSyncAll, 190000);   // honest stop — Chint's login + per-site route walk can run ~3min; fast vendors land in seconds
+}
+
+// Open Chint's connect SOLO, the moment the fast portal vendors (everything but Chint) have each
+// reached a terminal state — found / none / needs-sign-in. Gives Chint the clean, uncontended
+// foreground open its SPA needs (the concurrent open tripped a false logged-out read). Idempotent.
+function maybeStartChint(){
+  if (!state.syncMode || state._chintStarted) return;
+  const cs = state.syncStatus.chint;
+  if (!cs || cs.state !== "checking") return;
+  const fastSettled = SYNC_ALL_VENDORS.filter(v => v !== "chint").every(v => {
+    const s = state.syncStatus[v];
+    return s && (s.state === "found" || s.state === "none" || s.state === "needs_signin");
+  });
+  if (!fastSettled) return;
+  state._chintStarted = true;
+  syncSignIn("chint");
 }
 
 // Readings vendors (Fronius/SMA/Chint) land their sites directly; merge + keep
@@ -516,6 +553,7 @@ function onSyncCapture(vendor, label, caps, kind){
     state.syncStatus[vendor] = { state:"none" };
   }
   renderSyncStatus();
+  maybeStartChint();   // a fast vendor just settled → Chint may now open solo
   maybeSettleSoon();
 }
 
@@ -537,6 +575,7 @@ async function onSyncSolarEdge(d){
   if (Array.isArray(d.sites) && d.sites.length){ onSyncCapture("solaredge","SolarEdge", d.sites, "solaredge"); return; }
   if (!state.syncStatus.solaredge || state.syncStatus.solaredge.state !== "found") state.syncStatus.solaredge = { state:"none" };
   renderSyncStatus();
+  maybeStartChint();
   maybeSettleSoon();
 }
 
@@ -555,8 +594,9 @@ function finishSyncAll(){
   state.syncingAll = false;
   if (_syncAllTimer){ clearTimeout(_syncAllTimer); _syncAllTimer = null; }
   if (_settleTimer){ clearTimeout(_settleTimer); _settleTimer = null; }
-  // Anything that didn't capture (no live session) → offer a one-click sign-in, not a dead "none".
-  SYNC_ALL_VENDORS.forEach(v => { const s = state.syncStatus[v]; if (!s || s.state === "checking" || s.state === "none") state.syncStatus[v] = { state:"needs_signin" }; });
+  // Anything that didn't capture (no live session, or a sign-in that never landed) → offer a
+  // one-click sign-in, not a dead "none" or an eternal "signing in…".
+  SYNC_ALL_VENDORS.forEach(v => { const s = state.syncStatus[v]; if (!s || s.state === "checking" || s.state === "none" || s.state === "signing") state.syncStatus[v] = { state:"needs_signin" }; });
   let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
   state.totals = kw>0 ? { peak_power_kw: Math.round(kw*10)/10, annual_value_usd: 0 } : null;
   if (step === 2) render();    // re-render arraysScreen in its settled state
@@ -631,6 +671,7 @@ function onSyncLoginState(d){
   if (cur === "found" || cur === "signing") return;   // don't clobber a capture or an in-progress sign-in
   state.syncStatus[v] = { state:"needs_signin" };
   renderSyncStatus();
+  maybeStartChint();   // a fast vendor just resolved to needs-sign-in → Chint may now open solo
 }
 
 // One-click sign-in for a vendor with no live session: open its portal foreground; the
