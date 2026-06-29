@@ -348,7 +348,8 @@ window.addEventListener("message", (e) => {
   if (e.source !== window || e.origin !== window.location.origin) return;
   const d = e.data; if (!d || typeof d !== "object") return;
   if (d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)) {
-    if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1) render(); }   // reveal the one-click path
+    // Auto-sync the moment the extension installs — no button, no brand picker.
+    if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1 && !state.syncMode) startSyncAll(); }
   }
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onReadingsCapture(d, "fronius", "Fronius Solar.web");
@@ -594,8 +595,9 @@ function appendArrayChips(){
 function syncBackToConnect(){
   state.syncingAll = false; state.syncMode = false;
   if (_syncAllTimer){ clearTimeout(_syncAllTimer); _syncAllTimer = null; }
+  if (_settleTimer){ clearTimeout(_settleTimer); _settleTimer = null; }
   state.sites = []; state.captures = {}; state.syncStatus = {}; state.realSites = false;
-  go(1);
+  go(0);   // back to Welcome (step 1 would just auto-restart the sync)
 }
 
 // Utility path: owners who track production via their Green Mountain Power
@@ -645,106 +647,31 @@ function welcomeScreen(){
 }
 
 function connectScreen(){
-  const v = vendorByCode(state.vendor);
-  const cards = VENDORS.map(vd=>{
-    const sel = vd.code===state.vendor ? " sel" : "";
-    const soon = vd.available ? "" : " soon";
-    const tag = vd.discover ? `<span class="vtag">1 key</span>` : (vd.available ? "" : `<span class="vtag">soon</span>`);
-    const rad = (vd.available && !vd.discover) ? `<span class="vrad">${sel?"●":"○"}</span>` : "";
-    const onclick = vd.available ? `selectVendor('${vd.code}')` : "";
-    return `<button type="button" class="vend${sel}${soon}" ${vd.available?`onclick="${onclick}"`:"aria-disabled=\"true\""}>
-      ${tag}${rad}
-      <span class="vn">${vd.label}</span>
-      <span class="vmeta">${vd.meta}</span>
-    </button>`;
-  }).join("");
-
-  const fieldsHtml = (v.fields||[]).map(f=>`
-    <label class="fld">
-      <span class="lab">${f.label}</span>
-      ${f.hint?`<span class="hint">${f.hint}</span>`:""}
-      <input type="${f.secret?"text":"text"}" id="fld_${f.name}" placeholder="${f.ph||""}"
-             value="${(state.vendor==="solaredge"&&f.name==="apiKey")?state.apiKey:(state.fields[f.name]||"")}"
-             oninput="setField('${f.name}',this.value)">
-      ${f.help?`<div class="helper">${f.help}</div>`:""}
-    </label>`).join("");
-
-  const noteHtml = v.note ? `<div class="vendnote">${v.note}</div>` : "";
-  const btnLabel = v.discover ? "Discover my arrays →" : (v.available ? "Connect my array →" : "Choose another brand");
-  const lede = v.discover
-    ? "Paste a single SolarEdge account key and every array on your account propagates in automatically — no site IDs, no per-panel setup, no logging in five times."
-    : (v.loginOnly
-        ? `Sign into the ${v.label} monitoring portal you already use — no keys, no spreadsheets. Your inverters appear here on their own.`
-        : (v.available
-            ? `Enter your ${v.label} credentials and we'll connect your ${v.label} sites and start watching them.`
-            : `${v.label} doesn't offer a live connection yet.`));
-
+  // The extension is present → render() auto-starts the sync; this only flashes
+  // for an instant before startSyncAll() advances to the "Finding…" screen.
+  if (EXT_PRESENT){
+    return `<div class="card animate"><div class="center" style="padding:2rem 0">
+      <div class="scan"><span class="ring"></span> Starting — finding every array you own…</div>
+    </div></div>`;
+  }
+  // No extension yet → the ONE thing this step asks: add it. The moment it's
+  // installed we auto-sync every platform. No brand picker, no keys, no clutter.
   return `<div class="card animate">
-    <h1>Connect once. We'll find them all.</h1>
-    <p class="lede">${lede}</p>
+    <h1>Add the extension. We'll find every array.</h1>
+    <p class="lede">Array Operator reads your arrays straight from the inverter logins you already use. Add the free EnergyAgent helper once — then sit back while we pull in every array across every platform, automatically.</p>
 
-    ${EXT_PRESENT ? `
-    <div class="callout" style="margin-top:1.25rem">
-      <div class="t">✓ EnergyAgent extension installed — you're ready</div>
-      <div class="s">One click and we'll check <b>every platform at once</b> — SolarEdge, Fronius, SMA, Chint — and bring in every array you're signed into. Make sure you're logged into your monitoring portals in this browser, then:</div>
-      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="startSyncAll()">✨ Find all my arrays →</button>
-      <div class="s" style="margin-top:.7rem;opacity:.8">Checks all your platforms in the background — no need to pick a brand. Prefer one at a time? Use the picker below.</div>
-    </div>` : `
-    <div class="callout" style="margin-top:1.25rem">
-      <div class="t">⚡ Step 1 — add the EnergyAgent extension <span style="opacity:.7;font-weight:600">(required)</span></div>
-      <div class="s">It's the free Chrome helper that reads your arrays straight from the inverter login you already use — no API keys to hunt down, nothing to paste. Add it once and every brand below connects with a single click.</div>
+    <div class="callout" style="margin-top:1.5rem">
+      <div class="t">⚡ Add the EnergyAgent extension</div>
+      <div class="s">The free Chrome helper that reads your arrays from the inverter portals you already use — no API keys to hunt down, nothing to paste.</div>
       <div class="s" style="margin-top:.6rem">Browser extensions are normal operating flow these days — and this one runs <b>entirely on your device</b>. It has the access it needs to read your portals, and your logins are stored locally on your computer; they never leave it or reach our servers.</div>
-      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
-      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
-    </div>`}
-
-    <div class="fld" style="margin-top:1.5rem">
-      <span class="lab">${EXT_PRESENT ? "Or connect a specific brand" : "Then — which inverter brand?"}</span>
-      <span class="hint">Pick your monitoring platform — no sign-up needed yet. Connect and see your arrays first.</span>
-      <div class="vendgrid">${cards}</div>
+      <a class="btn btn-primary btn-lg" style="margin-top:1.1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
+      <div class="s" id="extWatch" style="margin-top:.8rem">The moment it's installed we'll start finding your arrays — no need to refresh.</div>
     </div>
-
-    ${v.code === "solaredge" ? (EXT_PRESENT ? `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ One-click connect — no API key needed</div>
-      <div class="s">Your EnergyAgent helper is installed. Click below, sign into SolarEdge the way you always do, and your arrays appear here automatically.</div>
-      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSolarEdge()">Log in with SolarEdge →</button>
-    </div>
-    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>` : `
-    <div class="helper" style="margin-top:1.25rem;text-align:center">Add the extension above for one-click connect — or paste your account API key below.</div>`) : ""}
-
-    ${v.code === "fronius" && EXT_PRESENT ? `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ One-click connect — no API key needed</div>
-      <div class="s">Your EnergyAgent helper is installed. Click below, sign into Fronius Solar.web the way you always do, and your inverters appear here automatically — each one, individually.</div>
-      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithFronius()">Log in with Fronius →</button>
-    </div>
-    <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your Solar.web keys below —</div>` : ""}
-
-    ${v.code === "sma" && EXT_PRESENT ? `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ One-click connect — no API key needed</div>
-      <div class="s">Your EnergyAgent helper is installed. Click below, sign into SMA Sunny Portal the way you always do, and your inverters appear here automatically — each one, individually.</div>
-      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSMA()">Log in with SMA →</button>
-    </div>
-    <div class="helper" style="margin-top:1.25rem;text-align:center">— or enter your SMA developer keys below —</div>` : ""}
-
-    ${v.code === "chint" ? (EXT_PRESENT ? `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ One-click connect — no API key needed</div>
-      <div class="s">Your EnergyAgent helper is installed. Click below, sign into your Chint Connect monitoring portal the way you always do, and your inverters appear here automatically.</div>
-      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithChint()">Log in with Chint →</button>
-    </div>` : `
-    <div class="helper" style="margin-top:1.25rem;text-align:center">Chint connects through the EnergyAgent extension above — add it, then sign in with Chint Connect.</div>`) : ""}
-
-    ${fieldsHtml}
-    ${noteHtml}
 
     <div id="scanArea"></div>
 
     <div class="row">
       <button class="btn btn-ghost" onclick="go(0)">← Back</button>
-      ${v.loginOnly ? "" : `<button class="btn btn-primary btn-lg" id="discoverBtn" disabled onclick="connectVendor()">${btnLabel}</button>`}
     </div>
   </div>`;
 }
@@ -936,7 +863,7 @@ function arraysScreenSyncAll(){
     </label>
     ${consentField()}
     <div class="row">
-      <button class="btn btn-ghost" onclick="syncBackToConnect()">← Connect a brand manually</button>
+      <button class="btn btn-ghost" onclick="syncBackToConnect()">← Back</button>
       ${primary}
     </div>
   </div>`;
@@ -1247,7 +1174,7 @@ function burst(){
 
 function render(){
   if(step===0) main.innerHTML = welcomeScreen();
-  else if(step===1){ state.userConnect = false; main.innerHTML = connectScreen(); syncConnect(); }
+  else if(step===1){ state.userConnect = false; if(EXT_PRESENT && !state.syncMode){ startSyncAll(); return; } main.innerHTML = connectScreen(); }
   else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else if(state.syncMode){ renderSyncStatus(); appendArrayChips(); syncClaim(); } else { cascadeArrays(); } }
   else if(step===3) main.innerHTML = doneScreen();
 }
