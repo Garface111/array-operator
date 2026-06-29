@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Set up your array · Array Operator</title>
+<title>Set up your arrays · Array Operator</title>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
 <script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -451,17 +451,17 @@ function go(n){ step=n; renderStepper(); render(); window.scrollTo({top:0,behavi
 // ---------- screens ----------
 function welcomeScreen(){
   return `<div class="card animate">
-    <h1>Your array, finally working for you.</h1>
-    <p class="lede">Connect once, and your agent watches every panel for you — catching the quiet underperformer the day it starts, drafting the warranty claim when one dies, and showing you what your array is really worth. No spreadsheets. No installer jargon. No second-guessing.</p>
+    <h1>Your arrays, finally working for you.</h1>
+    <p class="lede">Connect once, and your agent watches every array and inverter across your sites — comparing each one against its peers to catch the quiet underperformer the day it slips, and turning that production into offtaker invoices automatically. No spreadsheets. No installer jargon. No second-guessing.</p>
     <div class="callout">
       <div class="t">Free to set up · connect in under a minute · your data is yours</div>
-      <div class="s">We only read your inverter's production data. Disconnect anytime and we purge it within 24 hours.</div>
+      <div class="s">We only read your inverters' production data. Disconnect anytime and we purge it within 24 hours.</div>
     </div>
     <div class="feats">
-      <div class="feat"><span class="ck">✓</span>One credential — every array appears</div>
-      <div class="feat"><span class="ck">✓</span>Ground-truth, per-inverter health</div>
+      <div class="feat"><span class="ck">✓</span>One login — every array &amp; inverter appears</div>
+      <div class="feat"><span class="ck">✓</span>Each inverter ranked against its peers — health &amp; capacity</div>
+      <div class="feat"><span class="ck">✓</span>Offtaker invoices created automatically</div>
       <div class="feat"><span class="ck">✓</span>Plain-English alerts, in dollars</div>
-      <div class="feat"><span class="ck">✓</span>Warranty claims drafted for you</div>
     </div>
     <div class="row">
       <span></span>
@@ -680,7 +680,7 @@ function demoSites(){
 function gmpScreen(){
   return `<div class="card animate">
     <h1>Log in with Green Mountain Power</h1>
-    <p class="lede">No inverter portal needed — we bring in each array's solar production straight from your Green Mountain Power bills. First, your email starts your free 14-day trial (no card); then you'll sign into GMP and we read it automatically.</p>
+    <p class="lede">No inverter portal needed — we bring in each array's solar production straight from your Green Mountain Power bills, and turn it into your offtaker invoices automatically. First, your email starts your free 14-day trial (no card); then you'll sign into GMP and we read it automatically.</p>
     <label class="fld" id="emailFld" style="margin-top:1.5rem">
       <span class="lab">Where should we send your reports?</span>
       <span class="hint">Your email is your login. Free 14-day trial — no card needed.</span>
@@ -836,8 +836,8 @@ function doneScreen(){
     <div class="done-h">${existing ? "Welcome back." : (created ? "You're set. We've got it from here." : "Almost there.")}</div>
     <div class="done-s">${trialLine}</div>
     ${existing ? "" : `<div class="done-s">${state.arraysConnected
-      ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — weather-normalized, per-inverter, in dollars.`
-      : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — weather-normalized, per-inverter, in dollars.`}</div>`}
+      ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — every inverter ranked against its peers, in dollars, and your offtaker invoices generated for you.`
+      : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — every inverter ranked against its peers, in dollars, and your offtaker invoices generated for you.`}</div>`}
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
       ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard</a>` : ""}
