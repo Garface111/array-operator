@@ -365,6 +365,7 @@ window.addEventListener("message", (e) => {
 extSend("SO_STATUS_REQUEST");
 
 function loginWithSolarEdge(){
+  state.userConnect = true;
   const scan = document.getElementById("scanArea");
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening SolarEdge — sign in there and your arrays appear here automatically.</div>`;
   extSend("SO_OPEN_PORTAL", { url: "https://monitoring.solaredge.com/", active: true });
@@ -372,6 +373,7 @@ function loginWithSolarEdge(){
 
 function onSolarEdgeCapture(d){
   if (state.syncingAll){ onSyncSolarEdge(d); return; }
+  if (!state.userConnect) return;   // passive background capture — don't yank past the Connect screen / sync-all button
   state.vendor = "solaredge";
   const scan = document.getElementById("scanArea");
   if (d.apiKey){
@@ -409,6 +411,7 @@ function loginWithChint(){
 }
 
 function openPortalLogin(vendor, url, label){
+  state.userConnect = true;
   const scan = document.getElementById("scanArea");
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and your inverters appear here automatically.</div>`;
   extSend("SO_OPEN_PORTAL", { url, active: true });
@@ -420,6 +423,7 @@ function openPortalLogin(vendor, url, label){
 // the raw capture, and POST it to /v1/array-owners/inverter-capture after signup.
 function onReadingsCapture(d, vendor, label){
   if (state.syncingAll){ onSyncCapture(vendor, label, Array.isArray(d.sites)?d.sites:[], "readings"); return; }
+  if (!state.userConnect) return;   // passive background capture — don't yank past the Connect screen / sync-all button
   state.vendor = vendor;
   const scan = document.getElementById("scanArea");
   const caps = Array.isArray(d.sites) ? d.sites : [];
@@ -781,6 +785,7 @@ function syncConnect(){
 //  - Locus(no partner) / Fronius / SMA → preview the one named system
 // Falls back to the demo cascade only when the backend is unreachable.
 async function connectVendor(){
+  state.userConnect = true;
   const v = vendorByCode(state.vendor);
   const scan = document.getElementById("scanArea");
   const btn = document.getElementById("discoverBtn");
@@ -1242,7 +1247,7 @@ function burst(){
 
 function render(){
   if(step===0) main.innerHTML = welcomeScreen();
-  else if(step===1){ main.innerHTML = connectScreen(); syncConnect(); }
+  else if(step===1){ state.userConnect = false; main.innerHTML = connectScreen(); syncConnect(); }
   else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else if(state.syncMode){ renderSyncStatus(); appendArrayChips(); syncClaim(); } else { cascadeArrays(); } }
   else if(step===3) main.innerHTML = doneScreen();
 }
