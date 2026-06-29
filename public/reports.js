@@ -1053,7 +1053,8 @@
               <select id="rbmUtility"><option value="">Loading utility accounts…</option></select>
               <span class="rb-fld-hint">GMP offtakers bill from the paper bill; VEC/SmartHub offtakers bill from measured generation × the credit rate you set.</span></label>
             <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-              <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25"></label>
+              <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25">
+              <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
@@ -2584,7 +2585,8 @@
               ${billOpts}
             </select></label>` : ""}
           <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25"></label>
+            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25">
+            <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10"></label>
           <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
