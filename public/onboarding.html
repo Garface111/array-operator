@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Set up your arrays · Array Operator</title>
-<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
-<script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
+<!-- Day mode only — set the attribute BEFORE first paint so there's no flash. -->
+<script>document.documentElement.setAttribute("data-theme","day");</script>
 <link rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is the default skin -->
 <style>
   /* Design language matched to array-operator-ea.netlify.app (styles.css):
@@ -141,14 +141,7 @@
     text-shadow:0 0 24px rgba(63,214,138,.3);font-variant-numeric:tabular-nums}
   .vh-sub{color:var(--muted);font-size:.78rem;margin-top:.45rem;line-height:1.5}
 
-  /* Day/night toggle control (top bar, right) */
-  .theme-toggle{margin-left:auto;cursor:pointer;border:1px solid var(--line);background:var(--card);
-    color:var(--muted);width:34px;height:34px;border-radius:10px;display:inline-grid;place-items:center;
-    font-size:15px;line-height:1;transition:color .15s,border-color .15s,background .15s}
-  .theme-toggle:hover{color:var(--good);border-color:var(--good)}
-  .theme-toggle .tt-ico{line-height:1;pointer-events:none}
-
-  /* ===== DAY MODE (default) — utility-blue on cool slate ===== */
+  /* ===== DAY MODE (the only mode now) — utility-blue on cool slate ===== */
   html[data-theme="day"]{
     --bg:#f6f8fb; --bg2:#eef2f7; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
     --gold:#d97706; --gold2:#b45309; --sky:#0891b2; --good:#2563eb; --good2:#0ea5e9;
@@ -181,29 +174,7 @@
 </head>
 <body>
 <div class="shell">
-  <div class="topbar"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span>
-    <button class="theme-toggle" id="themeToggle" type="button"
-            title="Toggle day / night" aria-label="Toggle day or night theme">
-      <span class="tt-ico" aria-hidden="true">☾</span>
-    </button>
-  </div>
-  <script>
-    /* Day/night toggle — persists in localStorage (ao_theme), shared sitewide. */
-    (function(){
-      var btn = document.getElementById("themeToggle");
-      function read(){ try { return localStorage.getItem("ao_theme") !== "night"; } catch(e){ return true; } }
-      function apply(day){
-        document.documentElement.setAttribute("data-theme", day ? "day" : "night");
-        if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
-      }
-      var day = read(); apply(day);
-      if (btn) btn.addEventListener("click", function(){
-        day = !day;
-        try { localStorage.setItem("ao_theme", day ? "day" : "night"); } catch(e){}
-        apply(day);
-      });
-    })();
-  </script>
+  <div class="topbar"><span class="logo"></span><span>Array Operator<small>by EnergyAgent</small></span></div>
   <nav aria-label="Setup progress">
     <ol class="stepper" id="stepper"></ol>
   </nav>
@@ -980,19 +951,18 @@ function cascadeArrays(){
   const claim = document.getElementById("claimBtn");
   const vlabel = vendorByCode(state.vendor).label;
   const real = state.realSites;
-  let totalKw = 0;
   state.sites.forEach((s,i)=>{
-    totalKw += s.peak_power_kw||0;
     const brand = s.vendor || vlabel;
     const el = document.createElement("div");
     el.className = "achip";
     el.style.animationDelay = (i*0.16)+"s";
-    const kw = (s.peak_power_kw||0) > 0 ? `${(s.peak_power_kw||0).toFixed(1)} kW` : "";
-    // Real previews carry a per-array annual $ estimate from the backend.
+    // Per-array kW was dropped (Ford: "the total kilowatt per array doesn't make
+    // sense"). The chip keeps the array name + vendor; real previews still show the
+    // annual $ estimate (that's value, not a kW figure).
     const val = (real && s.annual_value_usd>0)
       ? `<span class="kw">~$${Number(s.annual_value_usd).toLocaleString()}/yr</span>`
-      : (kw ? `<span class="kw">${kw}</span>` : "");
-    const meta = [brand, kw && real ? kw : (real?"":""), "site "+s.site_id].filter(Boolean).join(" · ");
+      : "";
+    const meta = [brand, "site "+s.site_id].filter(Boolean).join(" · ");
     el.innerHTML = `<span class="dot"></span>
       <div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>
       ${val}<span class="ck">✓</span>`;
@@ -1000,8 +970,7 @@ function cascadeArrays(){
   });
   const settle = state.sites.length*160 + 500;
   setTimeout(()=>{
-    const kwTxt = totalKw>0 ? ` · <b>${totalKw.toFixed(1)} kW</b>` : "";
-    tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kwTxt} ${real?"ready":"in preview"}. Weather-normalized, per-inverter, in dollars.`;
+    tally.innerHTML = `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b> ${real?"ready":"in preview"}. Weather-normalized, per-inverter, in dollars.`;
     syncClaim();                              // CTA unlocks once a valid email is entered
     const em = document.getElementById("email"); if(em) em.focus();
     // Count the annual-value hero up to the real total for the sublime reveal.
@@ -1031,6 +1000,18 @@ function doneScreen(){
   const existing = !!state.existing;
   const created = !!state.onboardingToken && !existing;
   const signedIn = created && !!state.sessionToken;
+  // While finish() is still awaiting /onboarding/start + /complete, NOTHING has
+  // resolved yet (no token, not existing, no failure recorded). Render a neutral
+  // "setting up" state for that window instead of the "couldn't reach our servers"
+  // error — otherwise a SUCCESSFUL finish flashes that error for a beat before the
+  // success re-render lands. The real failure copy only shows once finish() has
+  // actually failed (state.finishFailed) — a genuine error still surfaces.
+  if(!existing && !created && state.finishing && !state.finishFailed){
+    return `<div class="card animate"><div class="center">
+      <div class="scan" style="justify-content:center"><span class="ring"></span> Setting up your account…</div>
+      <div class="done-s">One moment — we're creating your trial and connecting your arrays.</div>
+    </div></div>`;
+  }
   const trialLine = existing
     ? `You already have an Array Operator account. We just emailed <b>${state.email}</b> a secure sign-in link — open it to pick up right where you left off.`
     : (!created
@@ -1080,9 +1061,18 @@ function goDashboard(){
 // offer the add-card step inline. The trial is identical to NEPOOL (14 days,
 // no card). On any network/CORS failure we fail gracefully — nothing stored.
 async function finish(){
+  // Mark the finish in-flight so doneScreen() shows a neutral "setting up" state
+  // (not the "couldn't reach our servers" error) while /onboarding/start +
+  // /complete are still pending. Cleared on success; set finishFailed on failure.
+  state.finishing = true;
+  state.finishFailed = false;
   go(3);
   burst();
-  const company = state.sites.length ? `${vendorByCode(state.vendor).label} owner` : null;
+  // Leave the company name blank — the owner fills it in themselves in Master
+  // Account → Company (it starts empty with an "Add your company name" prompt).
+  // We deliberately do NOT seed a derived "<vendor> owner" here; a pre-filled junk
+  // value just makes them clear it. (null → backend stores no company_name.)
+  const company = null;
   // Name was removed from the funnel; derive a sane full_name from the email's
   // local part (backend requires >=2 chars). The owner can edit it later in
   // Master Account → Name.
@@ -1217,8 +1207,14 @@ async function finish(){
           body: JSON.stringify({ email: state.email.trim(), product: "array_operator" })
         });
       }catch(e){ /* link send is best-effort; copy still routes them to sign in */ }
+    } else {
+      // start failed and it wasn't a 409 (existing account) — the account was NOT
+      // created. Flag the failure so doneScreen shows the honest retry copy, not the
+      // transient "setting up" state.
+      state.finishFailed = true;
     }
-  }catch(e){ /* CORS/offline — doneScreen shows the graceful retry path */ }
+  }catch(e){ state.finishFailed = true; /* CORS/offline — doneScreen shows the graceful retry path */ }
+  state.finishing = false;
   // Re-render the done screen now that we know whether the account was created.
   if(step===3) main.innerHTML = doneScreen();
 }

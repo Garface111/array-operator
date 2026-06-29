@@ -10,8 +10,8 @@
 <!-- Day mode only (the night toggle was removed) — set before first paint, no flash. -->
 <script>document.documentElement.setAttribute("data-theme","day");</script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="command-center.css?v=15">
+<link rel="stylesheet" href="styles.css?v=20260629c">
+<link rel="stylesheet" href="command-center.css?v=16">
 <link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
@@ -158,7 +158,7 @@
          the TABS["trends"] route + #trends deep-link, and the backend fleet-trends endpoint
          are all kept intact — re-add this <a> to restore the tab. -->
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
-    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account</a>
+    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
     <!-- Signed-in identity chip — which account am I in. Top-right, next to the
@@ -284,11 +284,11 @@
      Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
-<script src="app.js"></script>
-<script src="sandbox.js?v=20260629b"></script>
-<script src="vendor-sheet.js?v=20260629b"></script>
+<script src="app.js?v=20260629c"></script>
+<script src="sandbox.js?v=20260629c"></script>
+<script src="vendor-sheet.js?v=20260629c"></script>
 <script src="command-center.js?v=5"></script>
-<script src="reports.js?v=20"></script>
+<script src="reports.js?v=21"></script>
 <script src="trends-core.js"></script>
 <script src="trends-analytics.js"></script>
 <script src="trends-report.js"></script>

@@ -855,6 +855,14 @@
   .tab.active{color:var(--good)}
   .tab.active::after{background:linear-gradient(90deg,var(--good),var(--good2));
     box-shadow:0 0 12px rgba(63,214,138,.5)}
+  /* "There's something to do here" dot on the Master Account tab — subtle, cold
+     accent (--good = blue in day mode). Hidden by default; app.js/sandbox.js
+     adds .tab-dot--on once the owner is signed in, and clears it (via the
+     ao_seen_account flag) the first time they open Master Account. */
+  .tab-dot{display:none;width:6px;height:6px;border-radius:50%;margin-left:5px;
+    vertical-align:2px;background:var(--good);
+    box-shadow:0 0 0 3px rgba(37,99,235,.16),0 0 7px rgba(37,99,235,.55)}
+  .tab-dot.tab-dot--on{display:inline-block}
   /* Right-aligned tabbar items: sign-in prompt + signed-in identity chip.
      Both size to content (not flex:1) and hug the right edge next to Reports. */
   #tabSignIn{flex:0 0 auto}

@@ -135,6 +135,14 @@
     // host serves many co-ops; vendor disambiguates vec vs wec vs a bill-only login).
     extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor, vendor: vendor });
   }
+  // Tell the rest of the app the operator's set of UTILITY accounts may have
+  // changed (a GMP/VEC bill-link capture just landed). The offtaker editor
+  // (reports.js) listens for this and repopulates its #rbmUtility picker in place
+  // if it's open — so a freshly-linked account appears without a page refresh.
+  function notifyUtilityAccountsChanged(){
+    try { window.dispatchEvent(new CustomEvent("ao:utility-accounts-changed")); } catch(_){}
+  }
+
   // A capture landed from the extension. Owner is already signed in (dashboard),
   // so attach straight to their account: SolarEdge by its account key,
   // Fronius/SMA by ingesting the per-inverter readings the extension shipped.
@@ -163,6 +171,7 @@
       } catch(e){}
       try { if(typeof updateGmpGate === "function") updateGmpGate(getSession()); } catch(e){}
       try { if(window.__aoRefreshGmpGate) window.__aoRefreshGmpGate(); } catch(e){}
+      notifyUtilityAccountsChanged();   // repopulate the offtaker utility picker if it's open
       closeAddModal();
       if(typeof toast === "function"){
         toast(nAcct ? `Connected ${nAcct} ${esc(BRAND[d.provider]||d.provider)} account${nAcct===1?"":"s"} — your bills are syncing in.` : `Connected your ${esc(BRAND[d.provider]||d.provider)} account — your bills are syncing in.`, "ok");
@@ -229,6 +238,9 @@
             }
           }
         } catch(e){}
+        // A meter capture (GMP/VEC/WEC) may have added new utility accounts — let
+        // the offtaker editor's utility picker repopulate in place if it's open.
+        if(isMeter) notifyUtilityAccountsChanged();
         closeAddModal();
         if(typeof toast === "function"){
           if(isMeter){
@@ -4077,9 +4089,17 @@
     // ran before the session was ready (else the Plan row read null → "Choose your
     // plan" for an operator who's already on Both).
     if(a && a.plan_features){ _entitlement = a.plan_features; applyTabGating(); }
-    const company  = pick(a, ["company_name","company"], "");
     const operator = pick(a, ["operator_name","name","owner_name"], "");
     const email    = pick(a, ["email","operator_email"], "");
+    // Company starts BLANK until the owner fills it in (Ford). New signups no longer
+    // seed it, but accounts created by the old onboarding carry a derived junk value
+    // ("<Vendor> owner", or the email-derived operator name). Treat those as unset so
+    // the field shows its "Add your company name" prompt instead of junk to clear.
+    let company = pick(a, ["company_name","company"], "");
+    if(company && (/^\s*(SolarEdge|Fronius|SMA|Chint|Locus|Enphase|Solis|Tigo|AlsoEnergy)\s+owner\s*$/i.test(company)
+                   || (operator && company.trim() === operator.trim()))){
+      company = "";
+    }
 
     // One flat list of rows: identity → login & password → auto-refresh → bill → payment.
     list.innerHTML =
@@ -4744,8 +4764,24 @@
     if(h === "#arrays" || h === "#sandbox") return "arrays";
     if(h === "#trends")  return "trends";
     if(h === "#reports") return "reports";
-    return "dashboard";   // #dashboard + empty + legacy aliases → owner health home
+    if(h === "#dashboard") return "dashboard";   // explicit deep-link → owner health home
+    // Empty/legacy hash → land on the Inverter Dashboard (Spreadsheet sub-view) per Ford,
+    // not Fleet Health. applyTabGating() bounces a plan that can't use it to an allowed tab.
+    return "arrays";
   }
+
+  // Master Account "you have something to do here" dot. Shown only to a SIGNED-IN
+  // owner who hasn't opened Master Account yet (e.g. to add a card / set their
+  // company name); cleared the first time they open the tab (ao_seen_account).
+  function updateAccountDot(){
+    const dot = document.getElementById("acctDot");
+    if(!dot) return;
+    let signedIn = false, seen = false;
+    try { signedIn = !!localStorage.getItem("so_session"); } catch(_){}
+    try { seen = localStorage.getItem("ao_seen_account") === "1"; } catch(_){}
+    dot.classList.toggle("tab-dot--on", signedIn && !seen);
+  }
+  try { window.__aoUpdateAccountDot = updateAccountDot; } catch(_){}
 
   let _firstApply = true;
   function applyView(){
@@ -4769,6 +4805,9 @@
       if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
     } else if(active === "account"){
       loadAccount();
+      // They've now seen Master Account — clear the "something to do here" dot.
+      try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
+      updateAccountDot();
     } else if(active === "trends"){
       if(window.__aoLoadTrends) window.__aoLoadTrends();
     } else if(active === "reports"){
@@ -4947,7 +4986,17 @@
   window.__aoLoadEntitlement = loadEntitlement;
 
   window.addEventListener("hashchange", applyView);
-  document.addEventListener("DOMContentLoaded", () => { applyView(); wireTabGateClicks(); loadEntitlement(); });
+  // First-visit landing: with NO explicit hash (no deep-link), a brand-new owner
+  // should land on the Inverter Dashboard (#arrays → Spreadsheet sub-view), not Fleet
+  // Health — that's where they see their arrays appear. An explicit #dashboard /
+  // #account / #reports deep-link is always respected (we only default the EMPTY hash).
+  function landDefaultTab(){
+    if(!location.hash){
+      try { location.replace("#arrays"); }   // replace → no extra Back-button history entry
+      catch(_){ location.hash = "#arrays"; }
+    }
+  }
+  document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); });
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
   // QA/debug hook: render a fleet-tree payload directly (used by the offline

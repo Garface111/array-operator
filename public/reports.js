@@ -1033,6 +1033,69 @@
     } catch (e) { return []; }
   }
 
+  // Build the #rbmUtility <option> list from utility accounts. When `keep` is set
+  // (the value selected before a refresh), it's re-selected if it still exists, so
+  // an in-flight new-offtaker form never loses the operator's pick mid-edit.
+  function fillUtilitySelect(sel, accts, keep) {
+    const fld = sel.closest(".rep-fld");
+    // Remove any stale "link first" helper button — once accounts exist it's noise.
+    const oldBtn = fld && fld.querySelector(".rbm-link-gmp");
+    if (!accts.length) {
+      sel.innerHTML = `<option value="">No utility bills yet — link GMP or VEC first</option>`;
+      // Make the empty state ACTIONABLE: drop a Link-GMP button right here so the
+      // operator can connect without hunting for it.
+      if (fld && !oldBtn) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ao-btn rb-btn rbm-link-gmp";
+        btn.textContent = "🔗 Link GMP utility bills";
+        btn.style.marginTop = "6px";
+        btn.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+        fld.appendChild(btn);
+      }
+      return;
+    }
+    if (oldBtn) oldBtn.remove();   // accounts arrived — the link prompt is no longer needed
+    sel.innerHTML = `<option value="">Choose a utility account…</option>` +
+      accts.map(a => {
+        const prov = (a.provider || "gmp").toLowerCase();
+        const isGmp = prov === "gmp";
+        const tag = isGmp ? "" : prov.toUpperCase() + " · ";
+        const label = a.nickname || a.array_name || ((isGmp ? "GMP " : prov.toUpperCase() + " ") + a.account_number);
+        // GMP bills from the paper bill; VEC/SmartHub bills from measured
+        // generation × the rate you set (no GMP-shaped bill on file for them).
+        const note = isGmp
+          ? (a.has_bill ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}` : "no bill on file yet")
+          : "bills from measured generation × your rate";
+        return `<option value="${a.utility_account_id}">${esc(tag + label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
+      }).join("");
+    // Preserve the operator's selection across a rebuild if it's still valid.
+    if (keep && sel.querySelector(`option[value="${(window.CSS && CSS.escape) ? CSS.escape(keep) : keep}"]`)) {
+      sel.value = keep;
+    }
+  }
+
+  // Fetch utility accounts and (re)fill #rbmUtility in place. `preserveCurrent`
+  // keeps whatever the operator already picked. Used both on first render and when
+  // a new bill-link capture lands while the add-offtaker panel is open.
+  function refreshUtilitySelect(preserveCurrent) {
+    const sel = $("#rbmUtility");
+    if (!sel) return;                                  // add panel not open
+    const keep = preserveCurrent ? sel.value : "";
+    fetchUtilityAccounts().then(accts => {
+      const s = $("#rbmUtility");                      // re-query: the panel may have closed mid-fetch
+      if (s) fillUtilitySelect(s, accts, keep);
+    });
+  }
+
+  // When the extension lands a GMP/VEC bill capture, sandbox.js dispatches
+  // ao:utility-accounts-changed. If the new-offtaker form is open, repopulate the
+  // utility picker in place (preserving the current pick) so the freshly-linked
+  // account appears without a manual page refresh.
+  window.addEventListener("ao:utility-accounts-changed", () => {
+    if (MANUAL_OPEN && $("#rbmUtility")) refreshUtilitySelect(true);
+  });
+
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
   function renderManual() {
     const host = $("#" + MANUAL_HOST_ID);
@@ -1139,41 +1202,12 @@
         if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
       }));
       $("#rbmSave").onclick = saveManual;
-      // Populate the GMP utility-bill picker. Offtakers bind to a GMP account;
-      // their invoice is generated from THAT account's utility bills only.
-      fetchUtilityAccounts().then(accts => {
-        const sel = $("#rbmUtility");
-        if (!sel) return;
-        const fld = sel.closest(".rep-fld");
-        if (!accts.length) {
-          sel.innerHTML = `<option value="">No GMP utility bills yet — link GMP first</option>`;
-          // Make the empty state ACTIONABLE: drop a Link-GMP button right here so
-          // the operator can connect without hunting for it.
-          if (fld && !fld.querySelector(".rbm-link-gmp")) {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "ao-btn rb-btn rbm-link-gmp";
-            btn.textContent = "🔗 Link GMP utility bills";
-            btn.style.marginTop = "6px";
-            btn.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
-            fld.appendChild(btn);
-          }
-          return;
-        }
-        sel.innerHTML = `<option value="">Choose a utility account…</option>` +
-          accts.map(a => {
-            const prov = (a.provider || "gmp").toLowerCase();
-            const isGmp = prov === "gmp";
-            const tag = isGmp ? "" : prov.toUpperCase() + " · ";
-            const label = a.nickname || a.array_name || ((isGmp ? "GMP " : prov.toUpperCase() + " ") + a.account_number);
-            // GMP bills from the paper bill; VEC/SmartHub bills from measured
-            // generation × the rate you set (no GMP-shaped bill on file for them).
-            const note = isGmp
-              ? (a.has_bill ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}` : "no bill on file yet")
-              : "bills from measured generation × your rate";
-            return `<option value="${a.utility_account_id}">${esc(tag + label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
-          }).join("");
-      });
+      // Populate the GMP/VEC utility-bill picker. Offtakers bind to a utility
+      // account; their invoice is generated from THAT account only. Fetch + fill
+      // via the shared refreshUtilitySelect so an extension capture (linking new
+      // bills) can rebuild this in place without a page refresh (see the
+      // ao:utility-accounts-changed listener below).
+      refreshUtilitySelect(false);
     } else {
       // Upload path: wire the dropzone + paint the live doc-preview placeholder.
       wireUpload();
