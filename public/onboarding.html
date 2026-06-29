@@ -404,11 +404,11 @@ function loginWithSMA(){ openPortalLogin("sma", "https://ennexos.sunnyportal.com
 // nothing lands.
 let _chintTimer = null;
 function loginWithChint(){
-  // Open DIRECTLY on the sites-list route, not the root. The root lands on #/dashboard/overview
-  // and the in-app hop to #/pv/sites serves a CACHED page with no fresh /retrieve fetch — so the
-  // site list is never observed + the walk never kicks (the "stuck on the sites page" bug). A
-  // fresh load of #/pv/sites fetches the list, which the hook observes → the walk runs.
-  openPortalLogin("chint", "https://monitor.chintpowersystems.com/#/pv/sites", "Chint Power Monitor");
+  // EXACT reuse of the dashboard's working "Open Chint to sync" (vendor-sheet.js openChint):
+  // the ROOT portal URL + the plain SO_OPEN_PORTAL post, nothing else. openPortalLogin already
+  // sends {url, active:true, provider:"chint"} — identical to the spreadsheet view that works.
+  // (The #/pv/sites route + custom-routing detours were my own divergence and the bug.)
+  openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
   if (_chintTimer) clearTimeout(_chintTimer);
   _chintTimer = setTimeout(() => {
     const s = document.getElementById("scanArea");
