@@ -480,7 +480,7 @@ function startSyncAll(){
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
-  _syncAllTimer = setTimeout(finishSyncAll, 90000);   // honest stop if a platform never answers
+  _syncAllTimer = setTimeout(finishSyncAll, 120000);   // honest stop — the sweep is serial (one portal at a time) + Chint last
 }
 
 // Readings vendors (Fronius/SMA/Chint) land their sites directly; merge + keep
