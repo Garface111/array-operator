@@ -483,7 +483,7 @@ function startSyncAll(){
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
-  _syncAllTimer = setTimeout(finishSyncAll, 130000);   // honest stop — Chint's route walk + a lapsed-session auto-login can run ~60-110s
+  _syncAllTimer = setTimeout(finishSyncAll, 190000);   // honest stop — Chint's login + per-site route walk can run ~3min; fast vendors land in seconds
 }
 
 // Readings vendors (Fronius/SMA/Chint) land their sites directly; merge + keep
@@ -893,6 +893,7 @@ function arraysScreenSyncAll(){
     <h1>${h1}</h1>
     <p class="lede">${lede}</p>
     <div id="syncStatus"></div>
+    ${state.syncingAll ? `<div class="helper" style="margin:-.2rem 0 .4rem;font-size:11.5px;opacity:.72">Heads up — Chint opens its own small sign-in window; sign in once and it closes on its own.</div>` : ""}
     <div class="arrays" id="arrays"></div>
     <div class="tally" id="tally"></div>
     <label class="fld" id="emailFld" style="margin-top:1.5rem;${n?'':'display:none'}">
