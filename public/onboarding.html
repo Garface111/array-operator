@@ -479,7 +479,9 @@ function startSyncAll(){
   state.realSites = true;
   state.totals = null;
   state.syncStatus = {};
-  SYNC_ALL_VENDORS.forEach(v => state.syncStatus[v] = { state:"checking" });
+  // Chint can't auto-capture in a background surface (its app only runs in a visible tab), so
+  // it's click-to-connect from the start; the others auto-attempt.
+  SYNC_ALL_VENDORS.forEach(v => state.syncStatus[v] = { state: v === "chint" ? "needs_signin" : "checking" });
   go(2);                                       // arraysScreen renders the live sync
   extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
   if (_syncAllTimer) clearTimeout(_syncAllTimer);
