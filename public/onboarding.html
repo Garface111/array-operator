@@ -225,7 +225,26 @@ let step = 0;
 // Bump when the Terms / Privacy / authorization language materially changes; the
 // version a user accepted is persisted server-side at account creation for audit.
 const CONSENT_VERSION = "2026-06-27";
-let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"", consent:false };
+let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"", consent:false, syncingAll:false, captures:{}, syncStatus:{} };
+// ── "Find all my arrays" — the one-click wow ────────────────────────────────
+// After the extension is installed, one click fans it out across EVERY
+// extension-login vendor at once. Captures ACCUMULATE (deduped) across vendors
+// into state.sites instead of the last one winning, so the final count reflects
+// every array on every platform. state.captures keeps each vendor's raw payload
+// so finish() can persist them all after signup.
+const SYNC_ALL_VENDORS = ["solaredge","fronius","sma","chint"];
+const SYNC_ALL_LABEL = { solaredge:"SolarEdge", fronius:"Fronius", sma:"SMA", chint:"Chint" };
+let _syncAllTimer = null, _settleTimer = null;
+function _siteKey(s, label){ return String(s.site_id)+"|"+(label||s.vendor||""); }
+function mergeSites(newSites, label){
+  let added = 0;
+  const have = new Set(state.sites.map(s => _siteKey(s)));
+  (newSites||[]).forEach(s => {
+    const k = _siteKey(s, label);
+    if (!have.has(k)) { state.sites.push(Object.assign({}, s, label?{vendor:label}:{})); have.add(k); added++; }
+  });
+  return added;
+}
 
 // The required agree-to-terms + authorize-account-access gate shown at the email
 // (account-creation) step. Themed via the same CSS vars as the rest of the flow.
@@ -336,6 +355,11 @@ window.addEventListener("message", (e) => {
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "sma") onReadingsCapture(d, "sma", "SMA Sunny Portal");
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "chint") onReadingsCapture(d, "chint", "Chint Connect");
   if (d.type === "SO_CAPTURE_FAILED") onCaptureFailed(d);
+  // SO_SYNC_ALL_DONE fires the instant the extension OPENS the portal tabs — not
+  // when captures land (those stream in over the next 10–90s). So we only settle
+  // early if the sync FAILED to start; otherwise captures drive the screen and an
+  // all-resolved/timeout settles it.
+  if (d.type === "SO_SYNC_ALL_DONE" && d.ok === false) finishSyncAll();
 });
 // The bridge announces at document_start (before this runs), so ask explicitly too.
 extSend("SO_STATUS_REQUEST");
@@ -347,6 +371,7 @@ function loginWithSolarEdge(){
 }
 
 function onSolarEdgeCapture(d){
+  if (state.syncingAll){ onSyncSolarEdge(d); return; }
   state.vendor = "solaredge";
   const scan = document.getElementById("scanArea");
   if (d.apiKey){
@@ -394,6 +419,7 @@ function openPortalLogin(vendor, url, label){
 // SolarEdge we don't call /public/preview. We render the captured systems, stash
 // the raw capture, and POST it to /v1/array-owners/inverter-capture after signup.
 function onReadingsCapture(d, vendor, label){
+  if (state.syncingAll){ onSyncCapture(vendor, label, Array.isArray(d.sites)?d.sites:[], "readings"); return; }
   state.vendor = vendor;
   const scan = document.getElementById("scanArea");
   const caps = Array.isArray(d.sites) ? d.sites : [];
@@ -419,9 +445,153 @@ function onReadingsCapture(d, vendor, label){
 // reason instead of leaving it spinning.
 function onCaptureFailed(d){
   if (d && d.provider === "chint" && _chintTimer){ clearTimeout(_chintTimer); _chintTimer = null; }
+  if (state.syncingAll){
+    const v = d && d.provider;
+    if (v && (!state.syncStatus[v] || state.syncStatus[v].state !== "found")) state.syncStatus[v] = { state:"none" };
+    renderSyncStatus();
+    maybeSettleSoon();
+    return;
+  }
   const scan = document.getElementById("scanArea");
   const label = ({solaredge:"SolarEdge",fronius:"Fronius Solar.web",sma:"SMA Sunny Portal",chint:"Chint Connect"})[d && d.provider] || (d && d.provider) || "the portal";
   if (scan) scan.innerHTML = `<div class="helper" style="color:var(--warn)">${label} didn't connect: ${(d && d.reason)||"unknown error"}. Make sure you're signed in on the portal tab, then click the login button again.</div>`;
+}
+
+// ── Sync-all orchestration ──────────────────────────────────────────────────
+// One click → SO_SYNC_ALL fans the extension out across every vendor at once.
+// Each vendor's capture lands here, ACCUMULATES (deduped) into state.sites, and
+// streams into the "Your arrays" screen live. SO_SYNC_ALL_DONE (or a timeout)
+// settles it.
+function startSyncAll(){
+  if (!EXT_PRESENT) return;
+  state.syncMode = true;
+  state.syncingAll = true;
+  state.captures = {};
+  state.sites = [];
+  state.realSites = true;
+  state.totals = null;
+  state.syncStatus = {};
+  SYNC_ALL_VENDORS.forEach(v => state.syncStatus[v] = { state:"checking" });
+  go(2);                                       // arraysScreen renders the live sync
+  extSend("SO_SYNC_ALL", { vendors: SYNC_ALL_VENDORS });
+  if (_syncAllTimer) clearTimeout(_syncAllTimer);
+  _syncAllTimer = setTimeout(finishSyncAll, 90000);   // honest stop if a platform never answers
+}
+
+// Readings vendors (Fronius/SMA/Chint) land their sites directly; merge + keep
+// the raw payload so finish() can persist it after signup.
+function onSyncCapture(vendor, label, caps, kind){
+  const brand = SYNC_ALL_LABEL[vendor] || (label||"").split(" ")[0] || vendor;
+  if (caps && caps.length){
+    const mapped = caps.map(s => ({
+      site_id: s.site_id, name: s.name,
+      peak_power_kw: Number(s.peak_power_kw)||0,
+      vendor: brand,
+      inverter_count: (s.inverters||[]).length || s.inverter_count || null,
+      annual_value_usd: Number(s.annual_value_usd)||0
+    }));
+    const added = mergeSites(mapped, brand);
+    if (kind === "readings") state.captures[vendor] = { provider: vendor, sites: caps };
+    state.syncStatus[vendor] = { state:"found", count: state.sites.filter(s => s.vendor === brand).length };
+    if (added) appendArrayChips();
+  } else if (!state.syncStatus[vendor] || state.syncStatus[vendor].state !== "found"){
+    state.syncStatus[vendor] = { state:"none" };
+  }
+  renderSyncStatus();
+  maybeSettleSoon();
+}
+
+// SolarEdge lands a durable account key, not sites — fetch its preview to show
+// the arrays, and stash the key for finish() to attach the whole account.
+async function onSyncSolarEdge(d){
+  if (d.apiKey){
+    state.captures.solaredge = { apiKey: d.apiKey };
+    try{
+      const r = await fetch(`${API_BASE}/v1/array-owners/public/preview`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ vendor:"solaredge", config:{ api_key: d.apiKey } })
+      });
+      const pd = await r.json().catch(()=>({}));
+      onSyncCapture("solaredge", "SolarEdge", Array.isArray(pd.sites)?pd.sites:[], "solaredge");
+      return;
+    }catch(e){}
+  }
+  if (Array.isArray(d.sites) && d.sites.length){ onSyncCapture("solaredge","SolarEdge", d.sites, "solaredge"); return; }
+  if (!state.syncStatus.solaredge || state.syncStatus.solaredge.state !== "found") state.syncStatus.solaredge = { state:"none" };
+  renderSyncStatus();
+  maybeSettleSoon();
+}
+
+// Once every platform has reported in (found or explicitly empty), settle a beat
+// later — no need to hold the full timeout when there's clearly nothing more coming.
+function maybeSettleSoon(){
+  const pending = SYNC_ALL_VENDORS.some(v => !state.syncStatus[v] || state.syncStatus[v].state === "checking");
+  if (!pending){
+    if (_settleTimer) clearTimeout(_settleTimer);
+    _settleTimer = setTimeout(finishSyncAll, 2500);   // grace for a last straggler
+  }
+}
+
+function finishSyncAll(){
+  if (!state.syncingAll) return;
+  state.syncingAll = false;
+  if (_syncAllTimer){ clearTimeout(_syncAllTimer); _syncAllTimer = null; }
+  if (_settleTimer){ clearTimeout(_settleTimer); _settleTimer = null; }
+  SYNC_ALL_VENDORS.forEach(v => { if (state.syncStatus[v] && state.syncStatus[v].state === "checking") state.syncStatus[v] = { state:"none" }; });
+  let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
+  state.totals = kw>0 ? { peak_power_kw: Math.round(kw*10)/10, annual_value_usd: 0 } : null;
+  if (step === 2) render();    // re-render arraysScreen in its settled state
+}
+
+// Per-vendor status chips above the cascading arrays.
+function renderSyncStatus(){
+  const bar = document.getElementById("syncStatus");
+  if (!bar) return;
+  bar.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin:1rem 0";
+  bar.innerHTML = SYNC_ALL_VENDORS.map(v => {
+    const st = state.syncStatus[v] || { state:"checking" };
+    let icon, txt, col;
+    if (st.state === "found"){ icon="✓"; txt = st.count + (st.count===1?" array":" arrays"); col="var(--good,#16a34a)"; }
+    else if (st.state === "none"){ icon="·"; txt="none"; col="var(--faint,#94a3b8)"; }
+    else { icon="◌"; txt="checking…"; col="var(--ink2,#64748b)"; }
+    return `<span style="display:flex;align-items:center;gap:8px;background:var(--card,#f4f7fb);border-radius:10px;padding:9px 11px;font-size:12.5px"><b style="color:${col}">${icon}</b> ${SYNC_ALL_LABEL[v]} <span style="margin-left:auto;color:var(--faint,#94a3b8)">${txt}</span></span>`;
+  }).join("");
+}
+
+// Append only the arrays not yet on screen (idempotent), then refresh the tally
+// + reveal the email field.
+function appendArrayChips(){
+  const wrap = document.getElementById("arrays");
+  if (!wrap) return;
+  const start = wrap.childElementCount;
+  state.sites.slice(start).forEach((s,i) => {
+    const el = document.createElement("div");
+    el.className = "achip";
+    el.style.animationDelay = (i*0.12)+"s";
+    const kw = (s.peak_power_kw||0) > 0 ? `${(s.peak_power_kw||0).toFixed(1)} kW` : "";
+    const val = kw ? `<span class="kw">${kw}</span>` : "";
+    const meta = [s.vendor, "site "+s.site_id].filter(Boolean).join(" · ");
+    el.innerHTML = `<span class="dot"></span><div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>${val}<span class="ck">✓</span>`;
+    wrap.appendChild(el);
+  });
+  const tally = document.getElementById("tally");
+  if (tally){
+    let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
+    const plats = new Set(state.sites.map(s => s.vendor).filter(Boolean)).size;
+    const more = state.syncingAll ? " so far…" : ".";
+    tally.innerHTML = state.sites.length
+      ? `<b>${state.sites.length} ${state.sites.length===1?"array":"arrays"}</b>${kw>0?` · <b>${kw.toFixed(1)} kW</b>`:""} across <b>${plats} ${plats===1?"platform":"platforms"}</b>${more}`
+      : "";
+  }
+  const em = document.getElementById("emailFld"); if (em && state.sites.length) em.style.display = "";
+  syncClaim();
+}
+
+function syncBackToConnect(){
+  state.syncingAll = false; state.syncMode = false;
+  if (_syncAllTimer){ clearTimeout(_syncAllTimer); _syncAllTimer = null; }
+  state.sites = []; state.captures = {}; state.syncStatus = {}; state.realSites = false;
+  go(1);
 }
 
 // Utility path: owners who track production via their Green Mountain Power
@@ -511,8 +681,10 @@ function connectScreen(){
 
     ${EXT_PRESENT ? `
     <div class="callout" style="margin-top:1.25rem">
-      <div class="t">✓ EnergyAgent extension installed — you're ready to connect</div>
-      <div class="s">Pick your brand below and sign in the way you always do. Your arrays appear here on their own — no keys to find, nothing to paste.</div>
+      <div class="t">✓ EnergyAgent extension installed — you're ready</div>
+      <div class="s">One click and we'll check <b>every platform at once</b> — SolarEdge, Fronius, SMA, Chint — and bring in every array you're signed into. Make sure you're logged into your monitoring portals in this browser, then:</div>
+      <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="startSyncAll()">✨ Find all my arrays →</button>
+      <div class="s" style="margin-top:.7rem;opacity:.8">Checks all your platforms in the background — no need to pick a brand. Prefer one at a time? Use the picker below.</div>
     </div>` : `
     <div class="callout" style="margin-top:1.25rem">
       <div class="t">⚡ Step 1 — add the EnergyAgent extension <span style="opacity:.7;font-weight:600">(required)</span></div>
@@ -523,7 +695,7 @@ function connectScreen(){
     </div>`}
 
     <div class="fld" style="margin-top:1.5rem">
-      <span class="lab">${EXT_PRESENT ? "Which inverter brand?" : "Then — which inverter brand?"}</span>
+      <span class="lab">${EXT_PRESENT ? "Or connect a specific brand" : "Then — which inverter brand?"}</span>
       <span class="hint">Pick your monitoring platform — no sign-up needed yet. Connect and see your arrays first.</span>
       <div class="vendgrid">${cards}</div>
     </div>
@@ -689,6 +861,7 @@ function gmpScreen(){
 
 function arraysScreen(){
   if(state.gmpPath) return gmpScreen();
+  if(state.syncMode) return arraysScreenSyncAll();
   const n = state.sites.length;
   const v = vendorByCode(state.vendor);
   const real = state.realSites;
@@ -730,6 +903,40 @@ function arraysScreen(){
   </div>`;
 }
 
+// The "find everything" variant of the arrays screen: a live per-platform status
+// bar above the arrays that stream in across vendors, then the same email + trial
+// CTA. Populated by renderSyncStatus()/appendArrayChips() after render.
+function arraysScreenSyncAll(){
+  const n = state.sites.length;
+  const plats = new Set(state.sites.map(s => s.vendor).filter(Boolean)).size;
+  const h1 = state.syncingAll ? "Finding every array you own…"
+           : (n ? "There they all are." : "We couldn't reach a platform yet.");
+  const lede = state.syncingAll
+    ? "Checking every platform at once — SolarEdge, Fronius, SMA, Chint. No need to pick; we'll bring in whatever you're already signed into."
+    : (n ? `${n===1?"1 array":n+" arrays"} across ${plats} ${plats===1?"platform":"platforms"}, pulled straight from your monitoring logins. Nothing's saved yet — this is a preview.`
+         : "We didn't reach any of your platforms. Make sure you're signed into your inverter portals in this browser, then search again — or connect one brand at a time below.");
+  const primary = (!state.syncingAll && n===0)
+    ? `<button class="btn btn-primary btn-lg" onclick="startSyncAll()">↻ Search again</button>`
+    : `<button class="btn btn-primary btn-lg" id="claimBtn" onclick="finish()" style="opacity:.5;pointer-events:none">Start my free trial →</button>`;
+  return `<div class="card animate">
+    <h1>${h1}</h1>
+    <p class="lede">${lede}</p>
+    <div id="syncStatus"></div>
+    <div class="arrays" id="arrays"></div>
+    <div class="tally" id="tally"></div>
+    <label class="fld" id="emailFld" style="margin-top:1.5rem;${n?'':'display:none'}">
+      <span class="lab">Save these arrays — where should we send your reports?</span>
+      <span class="hint">Your email is your login. We'll start your free 14-day trial — no card needed.</span>
+      <input type="email" id="email" placeholder="you@example.com" value="${state.email||''}" oninput="state.email=this.value;syncClaim()">
+    </label>
+    ${consentField()}
+    <div class="row">
+      <button class="btn btn-ghost" onclick="syncBackToConnect()">← Connect a brand manually</button>
+      ${primary}
+    </div>
+  </div>`;
+}
+
 // Enable the claim/trial CTA only once a valid email is entered (the email is the
 // account identity now that it's collected here instead of on the connect step).
 function syncClaim(){
@@ -739,7 +946,7 @@ function syncClaim(){
   // Only gate on consent where the checkbox is rendered (the account-creation step).
   const chk = document.getElementById("consentChk");
   const consentOk = chk ? chk.checked : true;
-  const ok = emailOk && consentOk;
+  const ok = emailOk && consentOk && (!state.syncMode || state.sites.length>0);
   claim.style.opacity = ok ? "1" : ".5";
   claim.style.pointerEvents = ok ? "auto" : "none";
 }
@@ -899,7 +1106,33 @@ async function finish(){
           const v = vendorByCode(state.vendor);
           const hdr = {"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`};
           let conn, cd;
-          if(state.readingsCapture && (state.vendor==="fronius" || state.vendor==="sma" || state.vendor==="chint")){
+          if(state.syncMode){
+            // Sync-all: persist EVERY captured vendor — SolarEdge by its account
+            // key, readings vendors (Fronius/SMA/Chint) by their captured sites.
+            let connectedAny = false;
+            for(const vendor of Object.keys(state.captures||{})){
+              const cap = state.captures[vendor]; if(!cap) continue;
+              try{
+                if(vendor==="solaredge" && cap.apiKey){
+                  const r = await fetch(`${API_BASE}/v1/array-owners/solaredge/connect-account`, {
+                    method:"POST", headers:hdr, body: JSON.stringify({api_key: cap.apiKey})
+                  });
+                  const cr = await r.json().catch(()=>({}));
+                  if(r.ok && (cr.connected || cr.created || cr.matched)) connectedAny = true;
+                } else if(cap.sites && cap.sites.length){
+                  const r = await fetch(`${API_BASE}/v1/array-owners/inverter-capture`, {
+                    method:"POST", headers:hdr, body: JSON.stringify({ provider: vendor, sites: cap.sites })
+                  });
+                  const cr = await r.json().catch(()=>({}));
+                  const nInv = (typeof cr.inverters_persisted === "number")
+                    ? cr.inverters_persisted
+                    : ((cr.sites||[]).reduce((t,s)=>t+(s.inverters_persisted||0),0));
+                  if(r.ok && cr.ok && cr.sites_captured && nInv>0) connectedAny = true;
+                }
+              }catch(e){ /* one vendor failing never blocks the rest */ }
+            }
+            state.arraysConnected = connectedAny;
+          } else if(state.readingsCapture && (state.vendor==="fronius" || state.vendor==="sma" || state.vendor==="chint")){
             // Extension-captured readings (no key to attach) — ingest them so the
             // dashboard + sandbox comb populate the instant they sign in.
             conn = await fetch(`${API_BASE}/v1/array-owners/inverter-capture`, {
@@ -1010,7 +1243,7 @@ function burst(){
 function render(){
   if(step===0) main.innerHTML = welcomeScreen();
   else if(step===1){ main.innerHTML = connectScreen(); syncConnect(); }
-  else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else { cascadeArrays(); } }
+  else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else if(state.syncMode){ renderSyncStatus(); appendArrayChips(); syncClaim(); } else { cascadeArrays(); } }
   else if(step===3) main.innerHTML = doneScreen();
 }
 
