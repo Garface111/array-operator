@@ -6,7 +6,7 @@
 <title>Set up your arrays · Array Operator</title>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
 <script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is the default skin -->
 <style>
   /* Design language matched to array-operator-ea.netlify.app (styles.css):
      sun-mirror DARK palette — #0a0e14 radial bg, #3fd68a green accent,
@@ -509,8 +509,21 @@ function connectScreen(){
     <h1>Connect once. We'll find them all.</h1>
     <p class="lede">${lede}</p>
 
-    <div class="fld">
-      <span class="lab">Which inverter brand?</span>
+    ${EXT_PRESENT ? `
+    <div class="callout" style="margin-top:1.25rem">
+      <div class="t">✓ EnergyAgent extension installed — you're ready to connect</div>
+      <div class="s">Pick your brand below and sign in the way you always do. Your arrays appear here on their own — no keys to find, nothing to paste.</div>
+    </div>` : `
+    <div class="callout" style="margin-top:1.25rem">
+      <div class="t">⚡ Step 1 — add the EnergyAgent extension <span style="opacity:.7;font-weight:600">(required)</span></div>
+      <div class="s">It's the free Chrome helper that reads your arrays straight from the inverter login you already use — no API keys to hunt down, nothing to paste. Add it once and every brand below connects with a single click.</div>
+      <div class="s" style="margin-top:.6rem">Browser extensions are normal operating flow these days — and this one runs <b>entirely on your device</b>. It has the access it needs to read your portals, and your logins are stored locally on your computer; they never leave it or reach our servers.</div>
+      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
+      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
+    </div>`}
+
+    <div class="fld" style="margin-top:1.5rem">
+      <span class="lab">${EXT_PRESENT ? "Which inverter brand?" : "Then — which inverter brand?"}</span>
       <span class="hint">Pick your monitoring platform — no sign-up needed yet. Connect and see your arrays first.</span>
       <div class="vendgrid">${cards}</div>
     </div>
@@ -522,13 +535,7 @@ function connectScreen(){
       <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithSolarEdge()">Log in with SolarEdge →</button>
     </div>
     <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>` : `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ Skip the API key — add our 1-click helper</div>
-      <div class="s">A free Chrome extension reads your arrays straight from your SolarEdge login — nothing to find, nothing to paste. It's <b>EnergyAgent</b>, the helper that powers Array Operator. Add it, come back here, and your arrays appear on their own.</div>
-      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
-      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
-    </div>
-    <div class="helper" style="margin-top:1.25rem;text-align:center">— or paste your account API key —</div>`) : ""}
+    <div class="helper" style="margin-top:1.25rem;text-align:center">Add the extension above for one-click connect — or paste your account API key below.</div>`) : ""}
 
     ${v.code === "fronius" && EXT_PRESENT ? `
     <div class="callout" style="margin-top:1.5rem">
@@ -552,12 +559,7 @@ function connectScreen(){
       <div class="s">Your EnergyAgent helper is installed. Click below, sign into your Chint Connect monitoring portal the way you always do, and your inverters appear here automatically.</div>
       <button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="loginWithChint()">Log in with Chint →</button>
     </div>` : `
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">⚡ Connect Chint without hunting for keys</div>
-      <div class="s">Chint/CPS has no public API — but our free Chrome helper reads your inverters straight from your Chint Connect login. Add it, come back here, and your arrays appear on their own.</div>
-      <a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
-      <div class="s" id="extWatch" style="margin-top:.7rem">We'll notice the moment it's installed — no need to refresh.</div>
-    </div>`) : ""}
+    <div class="helper" style="margin-top:1.25rem;text-align:center">Chint connects through the EnergyAgent extension above — add it, then sign in with Chint Connect.</div>`) : ""}
 
     ${fieldsHtml}
     ${noteHtml}
