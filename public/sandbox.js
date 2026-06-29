@@ -128,14 +128,8 @@
     const isMeter = vendor === "gmp" || vendor === "vec" || vendor === "wec";
     if(note){
       note.className = "sb-note";
-      // Chint reports its inverters per SITE, and the extension only sees a
-      // site's inverters once the owner OPENS that site. Multi-site owners (e.g.
-      // Bruce/GMCS) must click into each site once — so spell that out here.
-      const chintTip = vendor === "chint"
-        ? ` <b>Open each of your sites once</b> — every site you open brings in all of its inverters automatically (you don't need to click into individual inverters). Visit every site so none are left behind.`
-        : "";
       const what = isMeter ? "solar production" : "inverters";
-      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.${chintTip}`;
+      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.`;
     }
     // Pass the provider so the extension arms the right capture intent (a SmartHub
     // host serves many co-ops; vendor disambiguates vec vs wec vs a bill-only login).
@@ -206,16 +200,15 @@
       const isMeter = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
       if(ok){
         // HONEST GATE: an inverter capture can return ok/200 with site(s) but ZERO
-        // inverters persisted — e.g. CHINT's portal SPA hadn't loaded its device
-        // list (busTypeDevices) when capture fired, so we saw the site but no
-        // inverters. Don't claim "inverters on the canvas" when nothing landed;
-        // tell the owner to fully open each site and let them retry.
+        // inverters persisted — e.g. the portal SPA hadn't loaded its device list
+        // (busTypeDevices) when capture fired, so we saw the site but no inverters.
+        // Don't claim "inverters on the canvas" when nothing landed; ask for a retry.
         if(!isMeter){
           const nInv = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
           if(!nInv){
             const B = esc(BRAND[d.provider]||d.provider);
             if(note){ note.className = "sb-note err"; note.innerHTML =
-              `We reached ${B} but didn't see any inverters yet — open each site fully in the ${B} portal so its inverter list loads, then sync again.`; }
+              `We reached ${B} but didn't see any inverters yet — make sure you're signed in to ${B}, then sync again.`; }
             return;   // keep the modal open for a retry; no false "on the canvas" toast
           }
         }
@@ -3735,7 +3728,7 @@
         // clean row-card with a brand badge + chevron. The repetitive "utility
         // meter" copy now lives once in the section subtitle, not on every row.
         const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", gmp:"GMP", vec:"VEC", wec:"WEC" };
-        const SUBS  = { chint:"Open each site once — all its inverters come in together." };
+        const SUBS  = {};   // (Chint used to need a per-site note; it auto-walks every site now)
         const card = code => `
           <button type="button" class="sb-login-btn" data-login="${code}">
             <span class="sb-login-ico ${code}">${esc(ICONS[code] || (BRAND[code]||code).slice(0,2))}</span>
