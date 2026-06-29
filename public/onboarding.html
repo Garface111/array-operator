@@ -451,17 +451,17 @@ function go(n){ step=n; renderStepper(); render(); window.scrollTo({top:0,behavi
 // ---------- screens ----------
 function welcomeScreen(){
   return `<div class="card animate">
-    <h1>Your arrays, finally working for you.</h1>
-    <p class="lede">Connect once, and your agent watches every array and inverter across your sites — comparing each one against its peers to catch the quiet underperformer the day it slips, and turning that production into offtaker invoices automatically. No spreadsheets. No installer jargon. No second-guessing.</p>
+    <h1>Your arrays, all in one place.</h1>
+    <p class="lede">Every array and inverter across your sites, together in one dashboard — each inverter ranked against its peers to catch the quiet underperformer the day it slips, your offtaker invoices generated automatically, and a plain-English digest in your inbox every morning. No spreadsheets. No installer jargon. No second-guessing.</p>
     <div class="callout">
       <div class="t">Free to set up · connect in under a minute · your data is yours</div>
       <div class="s">We only read your inverters' production data. Disconnect anytime and we purge it within 24 hours.</div>
     </div>
     <div class="feats">
-      <div class="feat"><span class="ck">✓</span>One login — every array &amp; inverter appears</div>
+      <div class="feat"><span class="ck">✓</span>Every array &amp; inverter in one place</div>
       <div class="feat"><span class="ck">✓</span>Each inverter ranked against its peers — health &amp; capacity</div>
       <div class="feat"><span class="ck">✓</span>Offtaker invoices created automatically</div>
-      <div class="feat"><span class="ck">✓</span>Plain-English alerts, in dollars</div>
+      <div class="feat"><span class="ck">✓</span>A plain-English digest every morning</div>
     </div>
     <div class="row">
       <span></span>
@@ -836,8 +836,8 @@ function doneScreen(){
     <div class="done-h">${existing ? "Welcome back." : (created ? "You're set. We've got it from here." : "Almost there.")}</div>
     <div class="done-s">${trialLine}</div>
     ${existing ? "" : `<div class="done-s">${state.arraysConnected
-      ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — every inverter ranked against its peers, in dollars, and your offtaker invoices generated for you.`
-      : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — every inverter ranked against its peers, in dollars, and your offtaker invoices generated for you.`}</div>`}
+      ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`
+      : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`}</div>`}
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
       ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard</a>` : ""}
