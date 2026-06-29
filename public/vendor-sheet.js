@@ -171,12 +171,10 @@
     locus: "https://app.locusenergy.com/",
   };
 
-  // Per-vendor sync caveats shown under the group header. Chint reports inverters
-  // PER SITE — the portal only loads a site's inverters once you open that site, so
-  // landing on the dashboard alone won't sync them.
-  const SYNC_NOTE = {
-    chint: "Chint syncs per site: after you open the portal, click into each of your sites so its inverters load.",
-  };
+  // Per-vendor sync caveats shown under the group header (vnote). None currently:
+  // Chint used to need a manual per-site click, but the extension now walks every
+  // site automatically (background refresh + auto-login), so that caveat was removed.
+  const SYNC_NOTE = {};
 
   // True when the EnergyAgent extension is detected on this page, so "Open to sync"
   // routes through it (opening the portal also arms a fresh capture) instead of a plain tab.
