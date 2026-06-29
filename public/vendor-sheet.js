@@ -648,7 +648,7 @@
   }
   function tabReceiv(items){
     let h='<div class="vsi-hero"><div><div class="vsi-k">Offtaker billing</div><div class="vsi-sum dim">If you sell your generation, your splits and invoices live in Reports.</div></div></div>';
-    h+='<div class="vsi-note" style="text-align:left;padding:11px 0">Per-array offtaker splits and one-click invoices aren’t wired into this panel yet — they live in <a href="#reports" class="vsi-link">Reports</a>, priced off your real GMP bills (never a fabricated split).</div>';
+    h+='<div class="vsi-note" style="text-align:left;padding:11px 0">Per-array offtaker splits and one-click invoices aren’t wired into this panel yet — they live in <a href="#reports" class="vsi-link">Reports</a>, priced off your real GMP bills.</div>';
     h+='<a href="#reports" class="vsi-btn" style="text-decoration:none;display:inline-block">Open Reports → offtakers</a>';
     return h;
   }
