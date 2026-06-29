@@ -564,15 +564,6 @@ function connectScreen(){
     ${fieldsHtml}
     ${noteHtml}
 
-    <div class="callout" style="margin-top:1.5rem">
-      <div class="t">No inverter portal? Connect your utility instead</div>
-      <div class="s">If you track your arrays through your <b>Green Mountain Power</b> bills rather than an inverter monitoring portal, log in with GMP and we'll bring in each array's solar production automatically.</div>
-      ${EXT_PRESENT
-        ? `<button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" onclick="startGmpPath()">Log in with Green Mountain Power →</button>`
-        : `<a class="btn btn-primary btn-lg" style="margin-top:1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add the free helper to connect GMP →</a>
-           <div class="helper" style="margin-top:.6rem">Green Mountain Power bills come in through our free 1-click helper. Add it, then log in with GMP.</div>`}
-    </div>
-
     <div id="scanArea"></div>
 
     <div class="row">
