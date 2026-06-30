@@ -75,8 +75,19 @@
     if (a.level === "warn" || (c.source_status || {}).state === "stale") return 2;
     return 0;
   }
-  function invStatus(iv) {
+  function invStatus(iv, cohort, isDaylight) {
     const s = iv.status || "ok";
+    // LIVE-DARK overlay: an inverter the 14-day peer verdict calls "ok" but that is producing ZERO
+    // right now while >=2 of its daylight neighbors ARE producing — the exact live anomaly the
+    // email alert fires on. Without this the table shows a bare "OK" for the very inverter we just
+    // emailed about going dark (the contradiction Bruce hit). Shared FleetStore.liveVerdict — same
+    // classifier as command-center.js + the sandbox cards. Deliberately a WATCH-level "Dark now",
+    // not a red fault: the 14-day health is still fine, so it's likely a brief outage.
+    if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict
+        && FleetStore.liveVerdict(iv, cohort, isDaylight) === "dark") {
+      return { label: "Dark now", cls: "warn",
+        tip: "Producing nothing right now while its neighbors are — the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
+    }
     if (s === "dead") return { label: "Stopped", cls: "bad" };
     if (s === "fault") return { label: "Fault", cls: "bad" };
     if (s === "underperforming") return { label: "Underperforming", cls: "warn" };
@@ -238,7 +249,7 @@
     return `<svg class="vs-id-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days, against the neighbor average">${bars}${peerLine}</svg>`;
   }
   // The detail panel shown when an inverter row is clicked open.
-  function invDetailHTML(iv, cohort) {
+  function invDetailHTML(iv, cohort, peers, isDaylight) {
     const cell = (k, val) => (val == null || val === "") ? "" :
       `<div class="vs-id-cell"><span class="vs-id-k">${k}</span><span class="vs-id-v">${val}</span></div>`;
     const _alloc = isAllocatedPower(iv);
@@ -260,7 +271,14 @@
       cell("Model", iv.model ? esc(iv.model) : null),
       cell("Rated", iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null),
     ].join("");
-    const diag = iv.diagnosis ? `<div class="vs-id-diag">${esc(iv.diagnosis)}</div>` : "";
+    // When the inverter is dark RIGHT NOW (live anomaly), lead the detail with that — matching the
+    // status pill + the alert email — and keep the 14-day stats below so the owner sees both the
+    // live problem AND that its longer-term health is still fine.
+    const _liveDark = (iv.status === "ok" || iv.status == null) && peers && window.FleetStore && FleetStore.liveVerdict
+      && FleetStore.liveVerdict(iv, peers, isDaylight) === "dark";
+    const diag = _liveDark
+      ? `<div class="vs-id-diag vs-id-diag-dark" style="color:var(--warn,#d97706);font-weight:650">⚠ Dark right now — no output while its neighbors are producing. This is the live anomaly we flagged you about. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically.</div>`
+      : (iv.diagnosis ? `<div class="vs-id-diag">${esc(iv.diagnosis)}</div>` : "");
     return `<div class="vs-inv-detail">${diag}
       <div class="vs-id-grid">${cells}</div>
       <div class="vs-id-sparkwrap"><div class="vs-id-sparklabel">Daily output · last 14 days${(cohort && cohort.peak > 0) ? ` <span class="vs-id-peerkey">— dashed: neighbor avg</span>` : ""}</div>${sparkline(iv.daily, cohort)}</div>
@@ -569,7 +587,7 @@
           } else {
             const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters
             invs.forEach(iv => {
-              const ist = invStatus(iv);
+              const ist = invStatus(iv, invs, c.is_daylight);
               const meta = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null].filter(Boolean).join(" · ");
               const ikey = c.array_id + ":" + iv.inverter_id;
               const iopen = !!_invExpanded[ikey];
@@ -581,7 +599,7 @@
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;
-              if (iopen) h += invDetailHTML(iv, cohortScale);
+              if (iopen) h += invDetailHTML(iv, cohortScale, invs, c.is_daylight);
             });
           }
           h += `</div>`;
