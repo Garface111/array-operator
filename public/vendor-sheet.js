@@ -210,6 +210,9 @@
   function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
 
   const _expanded = {};                       // array_id -> bool (survives re-renders)
+  const _vendorCollapsed = {};                // vendor code -> bool, collapses ALL its arrays at once
+                                               // (Ford: "I have 56 arrays in Chint, I should be able to
+                                               // click next to Chint and collapse all of them")
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
   let _query = "";                            // search filter (lowercased)
 
@@ -554,10 +557,15 @@
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
-      h += `<div class="vs-vgroup">
-        <div class="vs-vhead">${badge}
+      const vCollapsed = !!_vendorCollapsed[v];
+      h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
+        <div class="vs-vhead">
+          <button type="button" class="vs-vcollapse" data-vcollapse="${esc(v)}" aria-expanded="${!vCollapsed}"
+                  title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array"><span class="vs-vcollapse-caret">▾</span></button>
+          ${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
-          <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span></div>${vnote}`;
+          <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span></div>${vnote}
+        <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
       list.forEach(c => {
         const st = arrStatus(c);
         // Frozen feed: a reading older than the vendor's live window. Dim the (stale)
@@ -614,12 +622,21 @@
           h += `</div>`;
         }
       });
-      h += `</div>`;
+      h += `</div></div>`;   // close .vs-vgroup-rows, then .vs-vgroup
     });
     body.innerHTML = h;
     body.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
       const id = b.getAttribute("data-arr");
       _expanded[id] = !_expanded[id];
+      renderBody();
+    });
+    // Collapse/expand every array under one vendor at once (Ford: "I have 56 arrays
+    // in Chint, I should be able to click next to Chint and collapse all of them").
+    // stopPropagation so this never also triggers the vendor-name [data-vopen] portal link.
+    body.querySelectorAll("[data-vcollapse]").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      const v = b.getAttribute("data-vcollapse");
+      _vendorCollapsed[v] = !_vendorCollapsed[v];
       renderBody();
     });
     // Click an inverter row → toggle its detail panel (diagnosis, peer comparison,

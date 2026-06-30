@@ -1710,6 +1710,60 @@
     }
   }
 
+  // Group offtakers by the utility account they share (Ford, 2026-06-30: "when you
+  // get above five offtakers, they should be sorted by utility account... so if I
+  // have five offtakers with one utility bill, they should all be sorted together").
+  // Only kicks in above the 5-offtaker threshold — below that, the flat draft-first/
+  // alphabetical list (the existing behavior) is already easy to scan.
+  // Returns null when grouping doesn't apply; otherwise an ORDERED array of
+  // {key, label, pctSum, hasDraft, rows}. Groups with a pending draft sort first
+  // (matches the existing "important things first" rule), then alphabetically by
+  // label; legacy array-bound subs with no utility_account_id group by array_id
+  // instead (so nothing is silently dropped from the list).
+  function groupOfftakersByUtility(rows, utilAccts) {
+    if (!rows || rows.length <= 5) return null;
+    const acctById = {};
+    (utilAccts || []).forEach(a => { if (a.utility_account_id != null) acctById[String(a.utility_account_id)] = a; });
+    const groups = {};
+    const order = [];
+    rows.forEach(s => {
+      const key = s.utility_account_id != null ? "u:" + s.utility_account_id
+        : s.array_id != null ? "a:" + s.array_id
+        : "u:none";
+      if (!groups[key]) {
+        const acct = s.utility_account_id != null ? acctById[String(s.utility_account_id)] : null;
+        const label = acct
+          ? `${(acct.provider || "").toUpperCase()} · ${acct.nickname || acct.account_number || s.utility_account_id}`
+          : (s.utility_account_name || ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name || "Ungrouped");
+        groups[key] = { key, label, pctSum: 0, hasDraft: false, rows: [] };
+        order.push(key);
+      }
+      const g = groups[key];
+      g.rows.push(s);
+      g.pctSum += Number(s.allocation_pct) || 0;
+      if (DRAFT_BY_SUB[String(s.id)]) g.hasDraft = true;
+    });
+    const list = order.map(k => groups[k]);
+    list.sort((a, b) => {
+      const ap = a.hasDraft ? 0 : 1, bp = b.hasDraft ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return a.label.localeCompare(b.label);
+    });
+    return list;
+  }
+
+  // The "do this utility account's offtaker shares add up to 100%?" pill shown on
+  // each group header — the direct answer to "an indicator that shows me how all
+  // of those offtakers add up to a hundred percent" (Ford). A small epsilon absorbs
+  // float/rounding noise from percent-entry; real over/under-allocation still shows.
+  function pctSumPill(pctSum) {
+    const pct = Math.round(pctSum * 1000) / 10;   // fraction -> 1-decimal percent
+    const within = Math.abs(pct - 100) <= 0.5;
+    if (within) return `<span class="rb-grp-pct rb-grp-pct-ok">✓ ${pct}% allocated</span>`;
+    const word = pct > 100 ? "over-allocated" : "under-allocated";
+    return `<span class="rb-grp-pct rb-grp-pct-warn">⚠ ${pct}% allocated — ${word}</span>`;
+  }
+
   // Render every offtaker as a collapsed accordion card, preserve which one is
   // open across refreshes, and auto-open the default (first awaiting approval) on
   // a fresh load. The expanded body is filled lazily by expandAccordion().
@@ -1738,9 +1792,22 @@
     // fresh load — every offtaker starts collapsed until the operator clicks one (Ford).
     const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
     if (!stillOpen) ACTIVE_SUB_ID = null;
-    list.innerHTML =
-      `<div class="rb-acc-lead">${headLine}</div>` +
-      OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
+    // Above 5 offtakers, group by shared utility account (Ford) — each group gets a
+    // header naming the utility account + a "do these shares add up to 100%" pill,
+    // with the existing draft-first/alphabetical order preserved WITHIN each group.
+    const groups = groupOfftakersByUtility(OFFTAKERS, utilAccts);
+    const body = groups
+      ? groups.map(g => `
+          <div class="rb-grp">
+            <div class="rb-grp-head">
+              <span class="rb-grp-label">${esc(g.label)}</span>
+              <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
+              ${pctSumPill(g.pctSum)}
+            </div>
+            ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
+          </div>`).join("")
+      : OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
+    list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` + body;
     wireAccordionHeaders(list);
     // Per-offtaker delete (🗑 on the header). stopPropagation so the click deletes
     // instead of toggling the card open.
