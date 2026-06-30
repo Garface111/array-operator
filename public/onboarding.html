@@ -370,7 +370,7 @@ function onSolarEdgeCapture(d){
   }
   // No durable key (rare) — fall back to the site list if we got one, else prompt.
   if (Array.isArray(d.sites) && d.sites.length){
-    state.sites = d.sites.map(s => ({ site_id: s.site_id, name: s.name, peak_power_kw: s.peak_power_kw }));
+    state.sites = d.sites.map(s => ({ site_id: s.site_id, name: s.name, peak_power_kw: s.peak_power_kw, inverters: s.inverters || [] }));
     state.realSites = true; state.totals = null;
     go(2);
     return;
@@ -421,22 +421,23 @@ function openPortalLogin(vendor, url, label){
 }
 
 // Array CAPACITY for the kW total. Vendors differ: SolarEdge/Locus/Fronius report a
-// peak_power_kw, but SMA and Chint report NONE — so summing peak_power_kw alone
-// UNDERCOUNTS (a "776.9 kW" total that silently ignored the SMA + Chint arrays — Bruce
-// caught it). Fall back to the size the owner labeled in the array NAME ("Timberworks
-// 150kW", "Londonderry 186" = its 50+50+50+36 inverters) so the total reflects every
-// array shown. Best-effort + only used when the vendor reports no peak.
-function parseKwFromName(name){
-  if(!name) return 0;
-  const s = String(name);
-  let m = s.match(/(\d+(?:[.,]\d+)?)\s*kW\b/i);          // explicit "<N> kW" / "<N>kW"
-  if(m) return parseFloat(m[1].replace(/,/g, "")) || 0;
-  m = s.match(/\b(\d{2,4})\b/);                           // else a standalone size labeled in the name
+// site peak_power_kw, but Chint device-only sites (and any vendor that doesn't) report
+// none — so summing peak_power_kw alone UNDERCOUNTS (a "776.9 kW" total that silently
+// ignored the SMA + Chint arrays — Bruce caught it). ROBUST fix: when the vendor gives
+// no site peak, sum the ACTUAL inverter nameplates — the captured nameplate_kw
+// (Fronius/SMA), or parsed from the inverter model for Chint (SCA50KTL=50, SC36KTL=36,
+// mirroring the backend's _nameplate_from_model). No name-parsing.
+const _CHINT_MODEL_KW = /SC[A-Z]{0,3}(\d{1,3}(?:\.\d+)?)KTL/i;
+function invNameplateKw(iv){
+  if(!iv) return 0;
+  const n = Number(iv.nameplate_kw); if(n > 0) return n;     // captured (Fronius / SMA)
+  const m = String(iv.model || "").match(_CHINT_MODEL_KW);   // Chint model → rated kW
   return m ? (parseFloat(m[1]) || 0) : 0;
 }
 function siteKw(s){
   const p = Number(s && s.peak_power_kw) || 0;
-  return p > 0 ? p : parseKwFromName(s && s.name);
+  if(p > 0) return p;                                         // vendor-reported site peak
+  return ((s && s.inverters) || []).reduce((t, iv) => t + invNameplateKw(iv), 0);
 }
 
 // Readings-capture vendors (Fronius, SMA): the extension ships the READINGS
@@ -457,6 +458,7 @@ function onReadingsCapture(d, vendor, label){
   state.readingsCapture = { provider: vendor, sites: caps };
   state.sites = caps.map(s=>{
     return { site_id: s.site_id, name: s.name, peak_power_kw: Number(s.peak_power_kw)||0, vendor: label.split(" ")[0],
+             inverters: s.inverters || [],   // kept so siteKw() can sum the real nameplates when no site peak
              inverter_count: (s.inverters||[]).length || s.inverter_count || null };
   });
   state.realSites = true;
@@ -542,6 +544,7 @@ function onSyncCapture(vendor, label, caps, kind){
       site_id: s.site_id, name: s.name,
       peak_power_kw: Number(s.peak_power_kw)||0,
       vendor: brand,
+      inverters: s.inverters || [],   // kept so siteKw() can sum the real nameplates when no site peak
       inverter_count: (s.inverters||[]).length || s.inverter_count || null,
       annual_value_usd: Number(s.annual_value_usd)||0
     }));
