@@ -100,6 +100,38 @@
     // (same window, same origin), so location.origin reaches it and nothing else.
     try { window.postMessage(Object.assign({ type, reqId: String(Date.now())+Math.random() }, extra||{}), window.location.origin); } catch(e){}
   }
+  // ── Supported-utility catalog — data-driven from the backend's GET /v1/providers,
+  // the SAME single source of truth (api/data/providers/*.csv) the NEPOOL extension
+  // uses. Lets an operator connect ANY of the ~470 LIVE utilities (mostly NISC
+  // SmartHub co-ops nationwide), not just the hardcoded VT trio. The generic
+  // SmartHub adapter + is_smarthub_provider offtaker routing already handle them
+  // server-side, so the frontend just has to OFFER them + open the right portal.
+  let _provCache = null, _provFetch = null;
+  async function getProviders(){
+    if(_provCache) return _provCache;
+    if(_provFetch) return _provFetch;
+    _provFetch = (async () => {
+      try {
+        const r = await fetch("/v1/providers");
+        if(r.ok){
+          const d = await r.json();
+          const list = (d && d.providers) || (Array.isArray(d) ? d : []);
+          _provCache = list.filter(p => p && p.code && p.scrape_status === "live" && (p.smarthub_host || p.portal_url));
+        }
+      } catch(_){}
+      _provFetch = null;
+      return _provCache || [];
+    })();
+    return _provFetch;
+  }
+  function providerByCode(code){ const c = String(code||"").toLowerCase(); return (_provCache||[]).find(p => p.code === c) || null; }
+  function provLabel(code){ const c = String(code||"").toLowerCase(); return BRAND[c] || (providerByCode(c)||{}).label || c; }
+  function providerUrl(code){
+    const c = String(code||"").toLowerCase();
+    if(PORTAL_URL[c]) return PORTAL_URL[c];                       // inverter vendors + the VT trio
+    const p = providerByCode(c);
+    return p ? (p.portal_url || (p.smarthub_host ? "https://" + p.smarthub_host + "/" : null)) : null;
+  }
   // AUTO-PAIR: the extension needs this tenant's long-lived key to capture/refresh
   // at all. A freshly-(re)loaded extension starts with EMPTY storage → "Not connected"
   // and the whole capture pipeline goes dark. So the dashboard re-pairs the extension
@@ -122,18 +154,21 @@
     try { const key = await fetchPairKey(); if(key) extSend("SO_PAIR", { tenantKey: key }); } catch(_){}
   }
   function openPortalLogin(vendor){
-    const url = PORTAL_URL[vendor];
+    const code = String(vendor||"").toLowerCase();
+    const url = providerUrl(code);
     if(!url) return;
     const note = _ov && _ov.querySelector("#sbNote");
-    const isMeter = vendor === "gmp" || vendor === "vec" || vendor === "wec";
+    // Every provider that ISN'T an inverter portal is a utility meter — derive it
+    // instead of hardcoding the trio, so any of the ~470 utilities reads correctly.
+    const isMeter = !["solaredge","fronius","sma","chint"].includes(code);
     if(note){
       note.className = "sb-note";
       const what = isMeter ? "solar production" : "inverters";
-      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(BRAND[vendor]||vendor)} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.`;
+      note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(provLabel(code))} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.`;
     }
-    // Pass the provider so the extension arms the right capture intent (a SmartHub
-    // host serves many co-ops; vendor disambiguates vec vs wec vs a bill-only login).
-    extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor, vendor: vendor });
+    // Pass the provider CODE so the extension arms the right capture intent — a
+    // single SmartHub host serves every co-op, so the code disambiguates which one.
+    extSend("SO_OPEN_PORTAL", { url, active: true, provider: code, vendor: code });
   }
   // Tell the rest of the app the operator's set of UTILITY accounts may have
   // changed (a GMP/VEC bill-link capture just landed). The offtaker editor
@@ -161,7 +196,7 @@
     // with an accountCount but NO accounts[] (and no kind:"utility_meter"). That's
     // a SUCCESS for connecting GMP — not a failure. Recognize it, refresh, and let
     // the live-usage capture (which DOES carry accounts[]) flow through below.
-    const isMeterProvider = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
+    const isMeterProvider = !["solaredge","fronius","sma","chint"].includes(d.provider);
     const hasAccounts = Array.isArray(d.accounts) && d.accounts.length > 0;
     if(isMeterProvider && !hasAccounts && d.ok !== false && d.kind !== "utility_meter"){
       const nAcct = (typeof d.accountCount === "number") ? d.accountCount : 0;
@@ -206,7 +241,7 @@
       }
       data = {}; try { data = await r.json(); } catch(e){}
       const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured || data.accounts_captured);
-      const isMeter = d.provider === "gmp" || d.provider === "vec" || d.provider === "wec";
+      const isMeter = !["solaredge","fronius","sma","chint"].includes(d.provider);
       if(ok){
         // HONEST GATE: an inverter capture can return ok/200 with site(s) but ZERO
         // inverters persisted — e.g. the portal SPA hadn't loaded its device list
@@ -3782,9 +3817,32 @@
             <div class="sb-login-sec-h">${title}${note ? `<span>${note}</span>` : ""}</div>
             <div class="sb-login-grid">${codes.map(card).join("")}</div>
           </div>`;
+        // Utility meter: the common VT trio stay as one-tap quick-picks, and a search
+        // covers the other ~470 live utilities (mostly NISC SmartHub co-ops nationwide)
+        // straight from /v1/providers — too many to list as buttons.
+        const utilFeatured = ["gmp","vec","wec"];
+        const utilCard = p => `
+          <button type="button" class="sb-login-btn" data-login="${esc(p.code)}">
+            <span class="sb-login-ico" style="background:var(--accent,#2563eb);color:#fff">${esc(String(p.label||p.code).replace(/[^A-Za-z]/g,"").slice(0,2).toUpperCase())}</span>
+            <span class="sb-login-main">
+              <span class="sb-login-name">${esc(p.label||p.code)}</span>
+              <span class="sb-login-sub">${esc(p.state||"")}${p.smarthub_host?" · SmartHub":""}</span>
+            </span>
+            <span class="sb-login-go">Log in <span class="sb-login-arrow">→</span></span>
+          </button>`;
+        const utilSection = `
+          <div class="sb-login-sec">
+            <div class="sb-login-sec-h">Utility meter<span>whole-array production · for arrays with no inverter portal</span></div>
+            <div class="sb-login-grid">${utilFeatured.map(card).join("")}</div>
+            <div style="margin-top:.55rem">
+              <input type="text" id="sbUtilSearch" placeholder="Other utility? Search your co-op or company name…" autocomplete="off" spellcheck="false"
+                     style="width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid var(--line,#dbe4ee);border-radius:10px;font-size:14px;background:var(--card,#fff);color:var(--ink,#1e293b)">
+              <div id="sbUtilResults" style="margin-top:.5rem"></div>
+            </div>
+          </div>`;
         const loginSections =
-          section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) +
-          section("Utility meter", "whole-array production · for arrays with no inverter portal", ["gmp","vec","wec"]);
+          section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
+        getProviders();   // warm the catalog so the first search is instant
         const extBlock = EXT_PRESENT
           ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
              ${loginSections}`
@@ -3799,6 +3857,28 @@
         body.querySelectorAll("[data-login]").forEach(b => {
           b.onclick = () => openPortalLogin(b.dataset.login);
         });
+        // Live utility search → render matching co-ops as the SAME login cards.
+        const utilSearch = body.querySelector("#sbUtilSearch");
+        const utilResults = body.querySelector("#sbUtilResults");
+        if(utilSearch && utilResults){
+          let _ut = null;
+          utilSearch.addEventListener("input", () => {
+            clearTimeout(_ut);
+            _ut = setTimeout(async () => {
+              const q = utilSearch.value.trim().toLowerCase();
+              if(q.length < 2){ utilResults.innerHTML = ""; return; }
+              const provs = await getProviders();
+              const feat = new Set(utilFeatured);
+              const m = provs.filter(p => !feat.has(p.code) &&
+                ((p.label||"").toLowerCase().includes(q) || (p.code||"").includes(q) || (p.state||"").toLowerCase() === q)
+              ).slice(0, 25);
+              utilResults.innerHTML = m.length
+                ? `<div class="sb-login-grid">${m.map(utilCard).join("")}</div>`
+                : `<div class="sb-login-sub" style="padding:.5rem .25rem">No live match for “${esc(utilSearch.value)}”. If your utility isn't here yet, tell us and we'll add it.</div>`;
+              utilResults.querySelectorAll("[data-login]").forEach(b => { b.onclick = () => openPortalLogin(b.dataset.login); });
+            }, 180);
+          });
+        }
         const recheck = body.querySelector("#sbRecheck");
         if(recheck) recheck.onclick = () => extSend("SO_STATUS_REQUEST");
         body.querySelector("#sbManualToggle").onclick = () => { manual = true; renderAddModalBody(); };
