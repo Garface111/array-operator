@@ -1753,15 +1753,34 @@
   }
 
   // The "do this utility account's offtaker shares add up to 100%?" pill shown on
-  // each group header — the direct answer to "an indicator that shows me how all
-  // of those offtakers add up to a hundred percent" (Ford). A small epsilon absorbs
-  // float/rounding noise from percent-entry; real over/under-allocation still shows.
-  function pctSumPill(pctSum) {
-    const pct = Math.round(pctSum * 1000) / 10;   // fraction -> 1-decimal percent
+  // each group header — the direct answer to "an indicator that shows me how all of
+  // those offtakers add up to a hundred percent" (Ford). Hovering it reveals a
+  // breakdown popover ("show me how it was calculated"): every offtaker's share,
+  // listed, then summed. A small epsilon absorbs float/rounding noise from
+  // percent-entry; real over/under-allocation still shows as a warning.
+  function pctSumPill(group) {
+    const pct = Math.round((group.pctSum || 0) * 1000) / 10;   // fraction -> 1-decimal percent
     const within = Math.abs(pct - 100) <= 0.5;
-    if (within) return `<span class="rb-grp-pct rb-grp-pct-ok">✓ ${pct}% allocated</span>`;
-    const word = pct > 100 ? "over-allocated" : "under-allocated";
-    return `<span class="rb-grp-pct rb-grp-pct-warn">⚠ ${pct}% allocated — ${word}</span>`;
+    const cls = within ? "rb-grp-pct-ok" : "rb-grp-pct-warn";
+    const label = within
+      ? `✓ ${pct}% allocated`
+      : `⚠ ${pct}% allocated — ${pct > 100 ? "over-allocated" : "under-allocated"}`;
+    // Breakdown rows — each offtaker's share, biggest first so the math reads top-down.
+    const rows = (group.rows || []).slice().sort((a, b) =>
+      (Number(b.allocation_pct) || 0) - (Number(a.allocation_pct) || 0));
+    const rowHtml = rows.map(s => {
+      const p = s.allocation_pct != null ? Math.round(s.allocation_pct * 1000) / 10 : 0;
+      return `<span class="rb-grp-pop-row"><span class="rb-grp-pop-who">${esc(s.customer_name || "(unnamed)")}</span><span class="rb-grp-pop-pct">${p}%</span></span>`;
+    }).join("");
+    const sumCls = within ? "rb-grp-pop-sum-ok" : "rb-grp-pop-sum-warn";
+    return `<span class="rb-grp-pctwrap">
+      <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
+      <span class="rb-grp-pct-pop" role="tooltip">
+        <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} on this utility bill</span>
+        ${rowHtml}
+        <span class="rb-grp-pop-row rb-grp-pop-sum ${sumCls}"><span class="rb-grp-pop-who">Total allocated</span><span class="rb-grp-pop-pct">${pct}%</span></span>
+      </span>
+    </span>`;
   }
 
   // Render every offtaker as a collapsed accordion card, preserve which one is
@@ -1802,7 +1821,7 @@
             <div class="rb-grp-head">
               <span class="rb-grp-label">${esc(g.label)}</span>
               <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
-              ${pctSumPill(g.pctSum)}
+              ${pctSumPill(g)}
             </div>
             ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
           </div>`).join("")

@@ -725,9 +725,29 @@ body.sb-fs-lock{ overflow:hidden; }
   margin-bottom:6px; border-bottom:1px solid var(--line,#e2e8f0); }
 .rb-grp-label{ font-size:12.5px; font-weight:750; color:var(--ink,#0f172a); letter-spacing:-.005em; }
 .rb-grp-count{ font-size:11.5px; color:var(--faint,#94a3b8); }
-.rb-grp-pct{ margin-left:auto; font-size:11px; font-weight:650; padding:3px 9px; border-radius:20px; }
+.rb-grp-pctwrap{ margin-left:auto; position:relative; display:inline-flex; }
+.rb-grp-pct{ font-size:11px; font-weight:650; padding:3px 9px; border-radius:20px; cursor:default; }
 .rb-grp-pct-ok{ background:rgba(37,99,235,.10); color:var(--good,#2563eb); }
 .rb-grp-pct-warn{ background:rgba(255,107,107,.12); color:var(--bad,#dc2626); }
+/* Hover/focus breakdown popover — "show me how it was calculated" (Ford). Each
+   offtaker's share listed, then summed. Pure CSS reveal; appears above the pill. */
+.rb-grp-pct-pop{ display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:40;
+  min-width:230px; max-width:300px; padding:9px 11px; border-radius:11px;
+  background:var(--card,#fff); border:1px solid var(--line,#e2e8f0);
+  box-shadow:0 10px 30px rgba(15,23,42,.16); font-weight:500; cursor:default;
+  flex-direction:column; gap:3px; }
+.rb-grp-pctwrap:hover .rb-grp-pct-pop,
+.rb-grp-pctwrap:focus-within .rb-grp-pct-pop{ display:flex; }
+.rb-grp-pop-title{ font-size:10.5px; font-weight:700; letter-spacing:.01em; color:var(--faint,#94a3b8);
+  text-transform:uppercase; margin-bottom:4px; line-height:1.35; }
+.rb-grp-pop-row{ display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  font-size:12px; color:var(--ink,#0f172a); }
+.rb-grp-pop-who{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rb-grp-pop-pct{ font-variant-numeric:tabular-nums; font-weight:650; color:var(--muted,#475569); flex:none; }
+.rb-grp-pop-sum{ margin-top:5px; padding-top:6px; border-top:1px solid var(--line,#e2e8f0); font-weight:750; }
+.rb-grp-pop-sum .rb-grp-pop-who{ color:var(--ink,#0f172a); }
+.rb-grp-pop-sum-ok .rb-grp-pop-pct{ color:var(--good,#2563eb); }
+.rb-grp-pop-sum-warn .rb-grp-pop-pct{ color:var(--bad,#dc2626); }
 .rb-acc{ border:1px solid var(--line,#e2e8f0); border-radius:13px; background:var(--card,#fff);
   margin-bottom:9px; overflow:hidden; transition:border-color .13s ease, box-shadow .13s ease; }
 .rb-acc.rb-paused{ opacity:.6; }
