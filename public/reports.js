@@ -186,22 +186,14 @@
       MANUAL_OPEN = false;
       const addBtn = $("#rbCustAdd");
       if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
-      // "Link GMP utility bills" — launches the REAL GMP connect flow (opens
-      // greenmountainpower.com; the extension captures + lands the bills here).
-      // Offtaker invoices bill from these utility bills only, so this is how the
-      // operator gets bills to link an offtaker to. Reuses the same flow as the
-      // onboarding gate's "Connect GMP" CTA (window.__aoConnectGmp).
-      const linkGmpBtn = $("#rbLinkGmp");
-      if (linkGmpBtn) linkGmpBtn.onclick = () => {
-        if (window.__aoConnectGmp) { window.__aoConnectGmp(); }
-        else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
-      };
-      // "Link VEC utility bills" — same flow for Vermont Electric Coop (SmartHub):
-      // opens the VEC portal so the extension captures the owner's VEC accounts,
-      // which then appear in the offtaker utility-account picker.
-      const linkVecBtn = $("#rbLinkVec");
-      if (linkVecBtn) linkVecBtn.onclick = () => {
-        if (window.__aoConnectVec) { window.__aoConnectVec(); }
+      // "Link utility bills" — ONE button opens the utility picker (every supported
+      // utility, searchable — GMP/VEC/WEC quick-picks + ~470 SmartHub co-ops from
+      // /v1/providers). The owner picks theirs; the extension opens that portal and
+      // captures the bills, which then appear in the offtaker utility-account picker.
+      // Offtaker invoices bill from these utility bills only.
+      const linkUtilBtn = $("#rbLinkUtility");
+      if (linkUtilBtn) linkUtilBtn.onclick = () => {
+        if (window.__aoLinkUtility) { window.__aoLinkUtility(); }
         else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
       };
       el.dataset.rbBuilt = "1";
@@ -259,25 +251,25 @@
     // role="button" anchors carry no href, so they aren't keyboard-focusable or
     // Enter/Space-activatable by default. Wire click AND keyboard so a keyboard
     // user gets the same affordance as a mouse user (WCAG button pattern).
-    const wireConnectGmp = () => {
+    const wireConnectUtility = () => {
       const a = $("#rbGmpInlineLink");
       if (!a) return;
-      const go = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+      const go = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
       a.onclick = go;
       a.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     };
     if (!accts.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
-        <span>No GMP utility bills connected yet — offtaker invoices bill from GMP utility bills, so connect GMP to link them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link GMP utility bills →</a></div>`;
-      wireConnectGmp();
+        <span>No utility bills connected yet — offtaker invoices bill from your utility bills, so link a utility to get started.</span>
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>`;
+      wireConnectUtility();
     } else if (!withBills.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
-        <span>${accts.length} GMP account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open GMP once more so the extension captures them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Open GMP →</a></div>`;
-      wireConnectGmp();
+        <span>${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open your utility portal once more so the extension captures them.</span>
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>`;
+      wireConnectUtility();
     } else {
-      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} GMP utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
+      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
     }
   }
 
@@ -317,7 +309,7 @@
     // The GMP-bills status line: show the "connected" affordance (offtakers bill from bills).
     const gmpStatus = $("#rbGmpBillsStatus");
     if (gmpStatus) gmpStatus.innerHTML =
-      `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from this operator's GMP utility bills.</div>`;
+      `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from this operator's utility bills.</div>`;
 
     // ── Offtaker accordion — same cards as the live app, with demo arrays/accts. ──
     const demoArrays = [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
@@ -365,10 +357,9 @@
       });
     }
 
-    // Wire the "Add an offtaker" + "Link GMP" + "Link VEC" header buttons to the sign-in nudge.
+    // Wire the "Add an offtaker" + "Link utility bills" header buttons to the sign-in nudge.
     const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
-    const linkBtn = $("#rbLinkGmp"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
-    const linkVec = $("#rbLinkVec"); if (linkVec) linkVec.onclick = () => demoNudge(linkVec);
+    const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
   }
 
   // A gentle, in-place "this is a demo" affordance — no fetch, no error.
@@ -447,8 +438,7 @@
             <h3>Your offtakers</h3>
           </div>
           <div class="rb-head-actions">
-            <button class="ao-btn rb-btn" id="rbLinkVec" type="button" title="Connect Vermont Electric Cooperative (SmartHub) so your VEC accounts flow in — VEC offtakers bill from measured generation × the credit rate you set">🔗 Link VEC utility bills</button>
-            <button class="ao-btn rb-btn" id="rbLinkGmp" type="button" title="Connect Green Mountain Power so your utility bills flow in — offtakers bill from these bills only">🔗 Link GMP utility bills</button>
+            <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
@@ -1041,16 +1031,16 @@
     // Remove any stale "link first" helper button — once accounts exist it's noise.
     const oldBtn = fld && fld.querySelector(".rbm-link-gmp");
     if (!accts.length) {
-      sel.innerHTML = `<option value="">No utility bills yet — link GMP or VEC first</option>`;
-      // Make the empty state ACTIONABLE: drop a Link-GMP button right here so the
-      // operator can connect without hunting for it.
+      sel.innerHTML = `<option value="">No utility bills yet — link your utility first</option>`;
+      // Make the empty state ACTIONABLE: drop a Link-utility button right here so the
+      // operator can connect their utility (any supported one) without hunting for it.
       if (fld && !oldBtn) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "ao-btn rb-btn rbm-link-gmp";
-        btn.textContent = "🔗 Link GMP utility bills";
+        btn.textContent = "🔗 Link utility bills";
         btn.style.marginTop = "6px";
-        btn.onclick = () => { if (window.__aoConnectGmp) window.__aoConnectGmp(); else location.hash = "#arrays"; };
+        btn.onclick = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
         fld.appendChild(btn);
       }
       return;

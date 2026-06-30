@@ -3515,7 +3515,11 @@
   // Generic global so other surfaces (the Vendor-data Spreadsheet view's
   // "+ Add vendor" button) open the SAME add-array modal — one flow, never a
   // parallel mechanism.
-  window.__aoAddArray = openAddArrayModal;
+  window.__aoAddArray = function(){ openAddArrayModal(); };
+  // The offtaker page's single "Link utility bills" button → the SAME modal in
+  // utilities-only mode (every supported utility, searchable). One button replaces
+  // the old hardcoded GMP + VEC pair, matching the NEPOOL Operator utility picker.
+  window.__aoLinkUtility = function(){ openAddArrayModal({ utilityOnly: true }); };
 
   /* ---- 'Reset layout' — snap inverters back to their discovered grouping.
    * Goes through the store (which persists to the server when live). ---- */
@@ -3766,16 +3770,18 @@
     if(_escH){ document.removeEventListener("keydown", _escH); _escH = null; }
   }
 
-  function openAddArrayModal(){
+  function openAddArrayModal(opts){
     const ov = ensureOv();
+    const utilityOnly = !!(opts && opts.utilityOnly);   // offtaker "Link utility bills" → utilities only
+    const _modalTitle = utilityOnly ? "Link utility bills" : "Add an array";
     let vendor = "solaredge";
     let manual = false;                // false = one-click login view; true = paste-keys view
     const fields = {};                 // field name -> current value (manual mode)
 
     ov.innerHTML = `
-      <div class="sb-modal" role="dialog" aria-modal="true" aria-label="Add an array">
+      <div class="sb-modal" role="dialog" aria-modal="true" aria-label="${_modalTitle}">
         <div class="sb-modal-head">
-          <div class="sb-modal-title">Add an array</div>
+          <div class="sb-modal-title">${_modalTitle}</div>
           <button class="sb-modal-x" type="button" aria-label="Close">&times;</button>
         </div>
         <div class="sb-modal-body" id="sbModalBody"></div>
@@ -3840,18 +3846,27 @@
               <div id="sbUtilResults" style="margin-top:.5rem"></div>
             </div>
           </div>`;
-        const loginSections =
-          section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
+        const loginSections = utilityOnly
+          ? utilSection
+          : section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
         getProviders();   // warm the catalog so the first search is instant
+        const _lede = utilityOnly
+          ? (EXT_PRESENT
+              ? "Connect the utility whose bills you invoice your offtakers against — we pull the bills in automatically. Pick yours below (any of ~470 supported utilities)."
+              : "Connect the utility whose bills you invoice your offtakers against. Add the free helper, then pick your utility and we pull the bills in automatically.")
+          : (EXT_PRESENT
+              ? "Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find."
+              : "Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.");
         const extBlock = EXT_PRESENT
-          ? `<p class="sb-modal-lede">Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find.</p>
+          ? `<p class="sb-modal-lede">${_lede}</p>
              ${loginSections}`
-          : `<p class="sb-modal-lede">Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.</p>
+          : `<p class="sb-modal-lede">${_lede}</p>
              <a class="sb-mbtn primary sb-login-install" href="${EXT_STORE_URL}" target="_blank" rel="noopener">Add the 1-click helper — free →</a>
              <div class="sb-login-hint">Already added it? <button type="button" class="sb-linkbtn" id="sbRecheck">Re-check</button></div>`;
-        body.innerHTML = extBlock +
+        // Utilities have no manual key-entry path (it's an inverter-API-key flow), so hide it.
+        body.innerHTML = extBlock + (utilityOnly ? "" :
           `<div class="sb-or"><span>or</span></div>
-           <button type="button" class="sb-mbtn ghost sb-manual-toggle" id="sbManualToggle">Enter keys manually instead</button>`;
+           <button type="button" class="sb-mbtn ghost sb-manual-toggle" id="sbManualToggle">Enter keys manually instead</button>`);
         foot.innerHTML = `<button class="sb-mbtn ghost" type="button" id="sbCancel">Close</button>`;
 
         body.querySelectorAll("[data-login]").forEach(b => {
@@ -3881,7 +3896,8 @@
         }
         const recheck = body.querySelector("#sbRecheck");
         if(recheck) recheck.onclick = () => extSend("SO_STATUS_REQUEST");
-        body.querySelector("#sbManualToggle").onclick = () => { manual = true; renderAddModalBody(); };
+        const _mt = body.querySelector("#sbManualToggle");   // absent in utility-only mode
+        if(_mt) _mt.onclick = () => { manual = true; renderAddModalBody(); };
       } else {
         // ── Manual key-entry view (buried behind the button) ──
         body.innerHTML = `
