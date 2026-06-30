@@ -420,6 +420,25 @@ function openPortalLogin(vendor, url, label){
   extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor });
 }
 
+// Array CAPACITY for the kW total. Vendors differ: SolarEdge/Locus/Fronius report a
+// peak_power_kw, but SMA and Chint report NONE — so summing peak_power_kw alone
+// UNDERCOUNTS (a "776.9 kW" total that silently ignored the SMA + Chint arrays — Bruce
+// caught it). Fall back to the size the owner labeled in the array NAME ("Timberworks
+// 150kW", "Londonderry 186" = its 50+50+50+36 inverters) so the total reflects every
+// array shown. Best-effort + only used when the vendor reports no peak.
+function parseKwFromName(name){
+  if(!name) return 0;
+  const s = String(name);
+  let m = s.match(/(\d+(?:[.,]\d+)?)\s*kW\b/i);          // explicit "<N> kW" / "<N>kW"
+  if(m) return parseFloat(m[1].replace(/,/g, "")) || 0;
+  m = s.match(/\b(\d{2,4})\b/);                           // else a standalone size labeled in the name
+  return m ? (parseFloat(m[1]) || 0) : 0;
+}
+function siteKw(s){
+  const p = Number(s && s.peak_power_kw) || 0;
+  return p > 0 ? p : parseKwFromName(s && s.name);
+}
+
 // Readings-capture vendors (Fronius, SMA): the extension ships the READINGS
 // themselves (no API key — their official APIs are paid/high-friction), so unlike
 // SolarEdge we don't call /public/preview. We render the captured systems, stash
@@ -436,13 +455,12 @@ function onReadingsCapture(d, vendor, label){
   }
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Got your ${label} account — reading your inverters…</div>`;
   state.readingsCapture = { provider: vendor, sites: caps };
-  let totalKw = 0;
   state.sites = caps.map(s=>{
-    const kw = Number(s.peak_power_kw)||0; totalKw += kw;
-    return { site_id: s.site_id, name: s.name, peak_power_kw: kw, vendor: label.split(" ")[0],
+    return { site_id: s.site_id, name: s.name, peak_power_kw: Number(s.peak_power_kw)||0, vendor: label.split(" ")[0],
              inverter_count: (s.inverters||[]).length || s.inverter_count || null };
   });
   state.realSites = true;
+  const totalKw = state.sites.reduce((t,s)=>t+siteKw(s),0);   // peak_power_kw, else the size in the name (SMA/Chint report none)
   state.totals = totalKw>0 ? { peak_power_kw: Math.round(totalKw*10)/10, annual_value_usd: 0 } : null;
   go(2);
 }
@@ -579,7 +597,7 @@ function finishSyncAll(){
   // Anything that didn't capture (no live session, or a sign-in that never landed) → offer a
   // one-click sign-in, not a dead "none" or an eternal "signing in…".
   SYNC_ALL_VENDORS.forEach(v => { const s = state.syncStatus[v]; if (!s || s.state === "checking" || s.state === "none" || s.state === "signing") state.syncStatus[v] = { state:"needs_signin" }; });
-  let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
+  let kw = 0; state.sites.forEach(s => kw += siteKw(s));   // peak, else the size labeled in the name (SMA/Chint report no peak)
   state.totals = kw>0 ? { peak_power_kw: Math.round(kw*10)/10, annual_value_usd: 0 } : null;
   if (step === 2) render();    // re-render arraysScreen in its settled state
 }
@@ -624,7 +642,7 @@ function appendArrayChips(){
   });
   const tally = document.getElementById("tally");
   if (tally){
-    let kw = 0; state.sites.forEach(s => kw += s.peak_power_kw||0);
+    let kw = 0; state.sites.forEach(s => kw += siteKw(s));   // peak, else the size labeled in the name (SMA/Chint report no peak)
     const plats = new Set(state.sites.map(s => s.vendor).filter(Boolean)).size;
     const more = state.syncingAll ? " so far…" : ".";
     tally.innerHTML = state.sites.length
