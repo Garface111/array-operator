@@ -604,10 +604,11 @@ function appendArrayChips(){
     const el = document.createElement("div");
     el.className = "achip";
     el.style.animationDelay = (i*0.12)+"s";
-    const kw = (s.peak_power_kw||0) > 0 ? `${(s.peak_power_kw||0).toFixed(1)} kW` : "";
-    const val = kw ? `<span class="kw">${kw}</span>` : "";
+    // Per-array kW + the per-card checkmark removed (Ford) — the cards are a clean name + source
+    // list; the kW total still shows in the tally line below. (Matches cascadeArrays, which had
+    // already dropped per-array kW.)
     const meta = [s.vendor, "site "+s.site_id].filter(Boolean).join(" · ");
-    el.innerHTML = `<span class="dot"></span><div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>${val}<span class="ck">✓</span>`;
+    el.innerHTML = `<span class="dot"></span><div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>`;
     wrap.appendChild(el);
   });
   const tally = document.getElementById("tally");
@@ -965,7 +966,7 @@ function cascadeArrays(){
     const meta = [brand, "site "+s.site_id].filter(Boolean).join(" · ");
     el.innerHTML = `<span class="dot"></span>
       <div><div class="nm">${(s.name||("Site "+s.site_id))}</div><div class="me">${meta}</div></div>
-      ${val}<span class="ck">✓</span>`;
+      ${val}`;
     wrap.appendChild(el);
   });
   const settle = state.sites.length*160 + 500;
