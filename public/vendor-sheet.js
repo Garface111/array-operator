@@ -25,11 +25,20 @@
   // splits it across inverters by today's energy share — so a per-inverter "kW now"
   // is an ESTIMATE, not a measured per-device reading (data-honesty audit #5). The
   // sandbox marks it "~" + a tip; the spreadsheet must apply the same treatment so it
-  // can't read as an exact measured value. (A "% of rated" built on an estimated
-  // numerator also reads as exact, so we drop it for these vendors.)
+  // can't read as an exact measured value.
   function isAllocatedPower(iv) {
     return iv && iv.current_power_w != null &&
       (iv.vendor === "fronius" || iv.vendor === "sma" || iv.vendor === "chint");
+  }
+  // Current power as a % of the inverter's rated nameplate — "% of max", mirroring the
+  // Sandbox card (Ford/Bruce: show it in the spreadsheet rows too). Shown for ALLOCATED
+  // vendors (Chint/Fronius/SMA) as well — the ~ on the kW + the allocated tooltip already
+  // flag the reading as a split estimate, exactly as the sandbox does (which is why this
+  // is honest to show). null when no nameplate is known. The allocation is by ENERGY
+  // share, not nameplate, so the % varies per inverter and is meaningful.
+  function pctOfMax(iv) {
+    return (iv && iv.nameplate_kw && iv.current_power_w != null)
+      ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of max" : null;
   }
   const ALLOC_TIP = v =>
     `${vlabel(v)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.`;
@@ -233,13 +242,11 @@
     const cell = (k, val) => (val == null || val === "") ? "" :
       `<div class="vs-id-cell"><span class="vs-id-k">${k}</span><span class="vs-id-v">${val}</span></div>`;
     const _alloc = isAllocatedPower(iv);
-    // % of rated is only honest off a measured numerator — drop it for allocated vendors.
-    const pct = (iv.nameplate_kw && iv.current_power_w != null && !_alloc)
-      ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "%" : null;
+    const _pm = pctOfMax(iv);   // "% of max" — shown for allocated vendors too (the ~ flags the split estimate)
     const live = iv.current_power_w != null
       ? (_alloc
-          ? `<span title="${esc(ALLOC_TIP(iv.vendor))}">~${esc(kw(iv.current_power_w))}</span>`
-          : esc(kw(iv.current_power_w) + (pct ? ` · ${pct} of rated` : "")))
+          ? `<span title="${esc(ALLOC_TIP(iv.vendor))}">~${esc(kw(iv.current_power_w))}${_pm ? ` · ${_pm}` : ""}</span>`
+          : esc(kw(iv.current_power_w) + (_pm ? ` · ${_pm}` : "")))
       : null;
     const peer = iv.peer_index != null ? esc(iv.peer_index.toFixed(2) + "× its neighbors") : null;
     const win = iv.window_kwh != null ? esc(Math.round(iv.window_kwh).toLocaleString() + " kWh") : null;
@@ -569,7 +576,7 @@
               h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
                 <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(iv.name || iv.sn || "Inverter")}</span>${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
                 <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
-                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${(iv.nameplate_kw && iv.current_power_w != null && !isAllocatedPower(iv)) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate capacity">· ${Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100)}% of rated</span>` : ""}</span>
+                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${pctOfMax(iv) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate (its max)">· ${pctOfMax(iv)}</span>` : ""}</span>
                 <span class="vs-c-today"></span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
