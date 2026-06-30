@@ -1820,6 +1820,11 @@
           // The WHOLE group header toggles collapse of its offtaker cards (Ford:
           // "click on GMP Appalachian Community Array 1 and it should collapse all
           // of the offtakers into it"). Same gesture as the vendor-sheet collapse.
+          // Groups DEFAULT to collapsed (Ford: "everything on the offtaker invoice
+          // generator should default to being collapsed") — a fresh load shows just
+          // the utility-bill headers; expand the one you want. First-seen key inits
+          // to collapsed; after that the toggle owns its state.
+          if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;
           const collapsed = !!GROUP_COLLAPSED[g.key];
           return `
           <div class="rb-grp${collapsed ? " collapsed" : ""}">
@@ -1984,9 +1989,11 @@
   let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
   let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
   let GROUP_COLLAPSED = {};     // utility-account group key -> bool; collapses every offtaker
-                                // card under one utility bill at once. Persists across refreshes
-                                // (module-level, keyed by stable utility_account_id), un-persisted
-                                // across reloads — same pattern as the vendor-sheet collapse.
+                                // card under one utility bill at once. DEFAULTS to collapsed
+                                // (each first-seen group key inits to true in renderAccordion).
+                                // Persists across refreshes (module-level, keyed by stable
+                                // utility_account_id), un-persisted across reloads — so a fresh
+                                // load always opens fully collapsed. Same map as vendor-sheet.
   let GENERATING_SUB_ID = null; // the offtaker whose draft is being minted right now (loading state)
   let GEN_FAIL = {};            // subscription_id -> why its on-demand draft couldn't be built
   let _pinActiveSub = false;    // keep refreshInbox from auto-advancing off a just-selected offtaker
