@@ -1,0 +1,47 @@
+/* ============================================================================
+ * Array Operator — Analysis tab shell (analysis.css)
+ *
+ * Page frame ONLY. Each section module (analysis-*.js) injects its own scoped
+ * <style> for its internals; this file styles the wrapper, header, and the
+ * generic .an-block card frame they all sit in. Uses the shared day-mode tokens
+ * (--ink/--muted/--line/--card/--good[blue]/--warn/--bad) so it follows the
+ * existing Array Operator palette and never bolts on a foreign look.
+ * ========================================================================== */
+
+#panelAnalysis .an-wrap { max-width: 1320px; margin: 0 auto; padding: 18px 0 60px; }
+
+/* header */
+.an-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 4px 0 18px; }
+.an-head-main { min-width: 0; }
+.an-head h2 { font-size: 22px; font-weight: 780; letter-spacing: -.01em; color: var(--ink); margin: 0; }
+.an-head .an-sub { color: var(--muted); font-size: 13.5px; margin-top: 3px; max-width: 70ch; }
+.an-asof { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.an-livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--good2); box-shadow: 0 0 0 3px rgba(14, 165, 233, .15); animation: anPulse 2.4s ease-in-out infinite; }
+.an-livedot.demo { background: var(--warn); box-shadow: 0 0 0 3px rgba(217, 119, 6, .14); }
+@keyframes anPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* section stack + the generic card frame each module renders into */
+.an-sections { display: flex; flex-direction: column; gap: 18px; }
+.an-block { min-width: 0; }
+.an-block[data-failed] { opacity: .8; }
+.an-block-err { border: 1px solid var(--line); border-radius: 14px; padding: 16px; color: var(--muted); font-size: 13px; background: var(--card); }
+
+/* shared card chrome the modules can opt into (.an-card / .an-card-head) */
+.an-card { background: linear-gradient(168deg, var(--card), var(--card2)); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.an-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.an-card-head h3 { font-size: 15px; font-weight: 720; color: var(--ink); margin: 0; letter-spacing: -.005em; }
+.an-card-head .an-card-sub { font-size: 12px; color: var(--faint); }
+
+/* shared segmented toggle (PI ↔ CF, view switches) — matches command-center chips */
+.an-seg { display: inline-flex; gap: 4px; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.an-seg-btn { border: 0; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 640; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.an-seg-btn:hover { color: var(--ink); }
+.an-seg-btn.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
+
+/* tabular numerics everywhere in this tab */
+#panelAnalysis { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+  #panelAnalysis .an-wrap { padding: 12px 0 48px; }
+  .an-head h2 { font-size: 19px; }
+}

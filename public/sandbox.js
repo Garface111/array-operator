@@ -4851,6 +4851,7 @@
     dashboard: { panel: "panelDashboard", tab: "tabDashboard" },
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
+    analysis:{ panel: "panelAnalysis",tab: "tabAnalysis"},
     trends:  { panel: "panelTrends",  tab: "tabTrends"  },
     reports: { panel: "panelReports", tab: "tabReports" },
   };
@@ -4858,6 +4859,7 @@
     const h = location.hash;
     if(h === "#account") return "account";
     if(h === "#arrays" || h === "#sandbox") return "arrays";
+    if(h === "#analysis") return "analysis";
     if(h === "#trends")  return "trends";
     if(h === "#reports") return "reports";
     if(h === "#dashboard") return "dashboard";   // explicit deep-link → owner health home
@@ -4904,6 +4906,8 @@
       // They've now seen Master Account — clear the "something to do here" dot.
       try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
       updateAccountDot();
+    } else if(active === "analysis"){
+      if(window.__aoLoadAnalysis) window.__aoLoadAnalysis();
     } else if(active === "trends"){
       if(window.__aoLoadTrends) window.__aoLoadTrends();
     } else if(active === "reports"){
@@ -4919,7 +4923,7 @@
    * locked tab is greyed; clicking it offers an upgrade. Managed in Master Account.
    * ========================================================================== */
   let _entitlement = null;   // { plan, plan_chosen, vendor_data, invoicing } | null
-  const TAB_FEATURE = { dashboard: "vendor_data", arrays: "vendor_data", trends: "vendor_data", reports: "invoicing" };
+  const TAB_FEATURE = { dashboard: "vendor_data", arrays: "vendor_data", analysis: "vendor_data", trends: "vendor_data", reports: "invoicing" };
   const PLAN_LABEL  = { monitoring: "Live vendor data", invoicing: "Offtaker invoices", both: "Both" };
   const FEAT_LABEL  = { vendor_data: "Live vendor data", invoicing: "Offtaker invoices" };
 

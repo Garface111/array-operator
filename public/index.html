@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="command-center.css?v=22">
 <link rel="stylesheet" href="theme-day.css"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
+<link rel="stylesheet" href="analysis.css?v=1"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
 <meta name="theme-color" content="#f6f8fb">
 <style>
@@ -157,6 +158,7 @@
     <!-- Trends tab removed for now (Ford). The portal is gone, but #panelTrends, trends.js,
          the TABS["trends"] route + #trends deep-link, and the backend fleet-trends endpoint
          are all kept intact — re-add this <a> to restore the tab. -->
+    <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
@@ -257,6 +259,17 @@
 
   </section>
 
+  <!-- ============================ TAB: ANALYSIS ============================ -->
+  <!-- PowerTrack-style fleet NOC: a portfolio rollup strip, a sortable Sites grid
+       (weather-adjusted actual-vs-expected), a Performance Index / Capacity Factor
+       panel, an Operations alarm rollup, and an inverter Hardware list. Composed
+       from self-contained section modules (analysis-*.js) that register on
+       window.AnalysisSections; analysis.js (window.__aoLoadAnalysis) builds the
+       shared ctx (FleetStore + /v1/array-owners/forecast-fleet) and renders them. -->
+  <section class="panel" id="panelAnalysis" role="tabpanel" aria-label="Analysis">
+    <div id="analysisRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading analysis…</div></div>
+  </section>
+
   <!-- ============================ TAB: TRENDS ============================ -->
   <!-- Portfolio-wide multi-year production trends (Paul Bozuwa's "macro-level
        tab for multi-year trend lines"): total fleet kWh by year + seasonal
@@ -289,6 +302,14 @@
 <script src="vendor-sheet.js?v=20260630b"></script>
 <script src="command-center.js?v=6"></script>
 <script src="reports.js?v=26"></script>
+<!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
+     self-contained section modules (each registers on window.AnalysisSections). -->
+<script src="analysis.js?v=1"></script>
+<script src="analysis-fleet-summary.js?v=1"></script>
+<script src="analysis-sites-grid.js?v=1"></script>
+<script src="analysis-performance.js?v=1"></script>
+<script src="analysis-alarms.js?v=1"></script>
+<script src="analysis-hardware.js?v=1"></script>
 <script src="trends-core.js"></script>
 <script src="trends-analytics.js"></script>
 <script src="trends-report.js"></script>
