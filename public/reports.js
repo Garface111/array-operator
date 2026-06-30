@@ -1816,18 +1816,43 @@
     // with the existing draft-first/alphabetical order preserved WITHIN each group.
     const groups = groupOfftakersByUtility(OFFTAKERS, utilAccts);
     const body = groups
-      ? groups.map(g => `
-          <div class="rb-grp">
-            <div class="rb-grp-head">
+      ? groups.map(g => {
+          // The WHOLE group header toggles collapse of its offtaker cards (Ford:
+          // "click on GMP Appalachian Community Array 1 and it should collapse all
+          // of the offtakers into it"). Same gesture as the vendor-sheet collapse.
+          const collapsed = !!GROUP_COLLAPSED[g.key];
+          return `
+          <div class="rb-grp${collapsed ? " collapsed" : ""}">
+            <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
+                 aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers on this utility bill">
+              <span class="rb-grp-caret" aria-hidden="true">▾</span>
               <span class="rb-grp-label">${esc(g.label)}</span>
               <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
               ${pctSumPill(g)}
             </div>
-            ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
-          </div>`).join("")
+            <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
+              ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
+            </div>
+          </div>`;
+        }).join("")
       : OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
     list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` + body;
     wireAccordionHeaders(list);
+    // Collapse/expand all offtakers under one utility-bill group. Whole header is the
+    // target; the pill's hover-breakdown still works (the pill wrapper stops propagation
+    // below so reading the breakdown never also collapses). Keyboard-accessible.
+    list.querySelectorAll("[data-grpcollapse]").forEach(h => {
+      const go = () => {
+        const k = h.getAttribute("data-grpcollapse");
+        GROUP_COLLAPSED[k] = !GROUP_COLLAPSED[k];
+        renderAccordion(subs, arrs, utilAccts, drafts);
+      };
+      h.onclick = go;
+      h.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    });
+    // The allocation pill is an info affordance (hover shows the breakdown) — clicking
+    // it should NOT also collapse the group it sits inside.
+    list.querySelectorAll(".rb-grp-pctwrap").forEach(p => p.addEventListener("click", e => e.stopPropagation()));
     // Per-offtaker delete (🗑 on the header). stopPropagation so the click deletes
     // instead of toggling the card open.
     list.querySelectorAll("[data-del-offtaker]").forEach(b => b.onclick = (e) => {
@@ -1958,6 +1983,10 @@
   let OFFTAKERS = [];           // enabled subscriptions (+ any with a pending draft) = dropdown rows
   let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
   let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
+  let GROUP_COLLAPSED = {};     // utility-account group key -> bool; collapses every offtaker
+                                // card under one utility bill at once. Persists across refreshes
+                                // (module-level, keyed by stable utility_account_id), un-persisted
+                                // across reloads — same pattern as the vendor-sheet collapse.
   let GENERATING_SUB_ID = null; // the offtaker whose draft is being minted right now (loading state)
   let GEN_FAIL = {};            // subscription_id -> why its on-demand draft couldn't be built
   let _pinActiveSub = false;    // keep refreshInbox from auto-advancing off a just-selected offtaker
