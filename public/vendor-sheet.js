@@ -558,10 +558,14 @@
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
       const vCollapsed = !!_vendorCollapsed[v];
+      // The WHOLE header row toggles collapse (Ford: "click anywhere in the row of the
+      // vendor and have it expand or collapse, not just this tiny button"). The portal
+      // buttons inside (vendor-name [data-vopen], the ↗ "Open to sync" [data-vportal]
+      // chip) stopPropagation in their own handlers so a sync-click never also collapses.
       h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
-        <div class="vs-vhead">
-          <button type="button" class="vs-vcollapse" data-vcollapse="${esc(v)}" aria-expanded="${!vCollapsed}"
-                  title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array"><span class="vs-vcollapse-caret">▾</span></button>
+        <div class="vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
+             aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
+          <span class="vs-vcollapse-caret" aria-hidden="true">▾</span>
           ${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
           <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span></div>${vnote}
@@ -630,14 +634,18 @@
       _expanded[id] = !_expanded[id];
       renderBody();
     });
-    // Collapse/expand every array under one vendor at once (Ford: "I have 56 arrays
-    // in Chint, I should be able to click next to Chint and collapse all of them").
-    // stopPropagation so this never also triggers the vendor-name [data-vopen] portal link.
-    body.querySelectorAll("[data-vcollapse]").forEach(b => b.onclick = (e) => {
-      e.stopPropagation();
-      const v = b.getAttribute("data-vcollapse");
-      _vendorCollapsed[v] = !_vendorCollapsed[v];
-      renderBody();
+    // Collapse/expand every array under one vendor at once. The WHOLE header row is the
+    // target now (Ford: "click anywhere in the row of the vendor... not just this tiny
+    // button"); the portal buttons inside it stopPropagation below so they still work.
+    // Keyboard-accessible (Enter/Space), matching the inverter-row affordance.
+    body.querySelectorAll("[data-vcollapse]").forEach(b => {
+      const go = () => {
+        const v = b.getAttribute("data-vcollapse");
+        _vendorCollapsed[v] = !_vendorCollapsed[v];
+        renderBody();
+      };
+      b.onclick = go;
+      b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     });
     // Click an inverter row → toggle its detail panel (diagnosis, peer comparison,
     // 14-day output + sparkline). Keyboard-accessible (Enter/Space).
@@ -649,14 +657,16 @@
     // The vendor NAME (data-vopen) opens the vendor's portal in a plain new tab — a normal
     // navigation, NOT the extension flow — so it takes the owner to the vendor site WITHOUT
     // pulling them back to Array Operator (even when the extension is installed).
-    body.querySelectorAll("[data-vopen]").forEach(btn => btn.onclick = () => {
+    body.querySelectorAll("[data-vopen]").forEach(btn => btn.onclick = (e) => {
+      e.stopPropagation();   // inside the now-clickable vendor header — don't also collapse
       const url = VENDOR_PORTAL[btn.getAttribute("data-vopen")];
       if (url) { try { window.open(url, "_blank", "noopener"); } catch (_) {} }
     });
     // The "↗ Open <Vendor> to sync" chip (data-vportal) opens the portal THROUGH the
     // extension when present (so it also arms a fresh capture and syncs back here);
     // otherwise it falls back to a plain new tab.
-    body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = () => {
+    body.querySelectorAll("[data-vportal]").forEach(btn => btn.onclick = (e) => {
+      e.stopPropagation();   // inside the now-clickable vendor header — don't also collapse
       const v = btn.getAttribute("data-vportal");
       const url = VENDOR_PORTAL[v];
       if (!url) return;
