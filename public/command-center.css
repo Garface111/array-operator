@@ -1424,6 +1424,33 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ft-note{ font-size:11.5px; color:var(--faint); line-height:1.5; margin-top:9px; }
 .ft-note b{ color:var(--muted); font-weight:650; }
 .ft-cov{ display:block; margin-top:3px; opacity:.85; }
+/* ── weather-aware predicted-vs-actual additions ── */
+.fc-badge{ display:inline-block; margin-left:7px; padding:2px 7px; border-radius:999px;
+  font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--good2,#2563eb); background:rgba(37,99,235,.10); vertical-align:middle; }
+.fc-spot{ margin:2px 0 9px; padding:8px 11px; border-radius:10px; font-size:12px; line-height:1.5;
+  color:var(--muted); background:rgba(245,200,66,.10); border:1px solid rgba(234,179,8,.22); }
+.fc-spot-ic{ margin-right:4px; }
+.fc-spot b{ color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums; }
+.fc-spot b.good{ color:var(--good,#137a4a); } .fc-spot b.bad{ color:#b45309; }
+.fc-toggle{ display:inline; margin-left:6px; padding:0; border:0; background:none; cursor:pointer;
+  font:inherit; font-size:11.5px; font-weight:650; color:var(--good2,#2563eb); text-decoration:underline;
+  text-underline-offset:2px; }
+.fc-toggle:hover{ opacity:.8; }
+.fc-how{ margin-top:11px; padding-top:11px; border-top:1px dashed var(--line,#e2e8f0); }
+.fc-how-eq{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--muted);
+  background:var(--card2,#f8fafc); border:1px solid var(--line,#e2e8f0); border-radius:8px;
+  padding:8px 10px; margin-bottom:11px; line-height:1.5; overflow-x:auto; }
+.fc-how-dl{ display:grid; grid-template-columns:auto 1fr; gap:5px 14px; margin:0; }
+.fc-how-dl dt{ font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--faint); white-space:nowrap; padding-top:1px; }
+.fc-how-dl dd{ margin:0; font-size:12px; line-height:1.55; color:var(--muted); }
+.fc-how-dl dd b{ color:var(--ink); font-weight:680; }
+.fc-how-dl dd em{ font-style:italic; color:var(--faint); }
+.fc-how-foot{ margin-top:11px; font-size:11.5px; line-height:1.55; color:var(--faint); }
+.fc-how-foot b{ color:var(--muted); font-weight:650; }
+@media(max-width:560px){ .fc-how-dl{ grid-template-columns:1fr; gap:2px 0; }
+  .fc-how-dl dt{ margin-top:7px; } }
 /* The triage queue + commander card were authored for the dark marketing surface; on the
    day-themed dashboard, repaint their translucent-white chrome with theme tokens so it reads. */
 #panelDashboard .cc-tablewrap{ background:var(--card,#fff); border-color:var(--line); }
