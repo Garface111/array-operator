@@ -262,6 +262,17 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-sample-link{ color:var(--sky); font-weight:600; text-decoration:none; }
 .rb-sample-link:hover{ text-decoration:underline; }
 
+/* ---- bulk offtaker import (review table) ---- */
+.rb-bulk-tablewrap{ margin-top:14px; max-height:360px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
+.rb-bulk-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.rb-bulk-table th{ position:sticky; top:0; background:var(--card2,var(--card)); text-align:left;
+  padding:8px 10px; font-weight:650; color:var(--muted); border-bottom:1px solid var(--line); }
+.rb-bulk-table td{ padding:7px 10px; border-bottom:1px solid var(--line); color:var(--ink); white-space:nowrap; }
+.rb-bulk-table td:nth-child(5), .rb-bulk-table td:nth-child(6){ white-space:normal; }
+.rb-bulk-table tr.rb-bulk-ok td:last-child{ color:var(--good); }
+.rb-bulk-table tr.rb-bulk-err{ background:rgba(220,38,38,.05); }
+.rb-bulk-table tr.rb-bulk-err td:last-child{ color:var(--bad); }
+
 /* ---- add a customer manually ---- */
 .rb-manual-toggle{ margin-top:18px; display:flex; align-items:center; justify-content:space-between;
   gap:16px; flex-wrap:wrap; }

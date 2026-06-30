@@ -185,7 +185,12 @@
       MANUAL_AFTER_ADD = refreshList;
       MANUAL_OPEN = false;
       const addBtn = $("#rbCustAdd");
-      if (addBtn) addBtn.onclick = () => { MANUAL_OPEN = true; renderManual(); };
+      if (addBtn) addBtn.onclick = () => { BULK_OPEN = false; renderBulkImport(); MANUAL_OPEN = true; renderManual(); };
+      // "⬆ Bulk import" — a CSV roster (name/percent/account number) creates many
+      // offtakers at once instead of one at a time. Closes the manual panel if open
+      // (the two are mutually exclusive — never two add-flows stacked at once).
+      const bulkBtn = $("#rbBulkImport");
+      if (bulkBtn) bulkBtn.onclick = () => { MANUAL_OPEN = false; renderManual(); BULK_OPEN = true; renderBulkImport(); };
       // "Link utility bills" — ONE button opens the utility picker (every supported
       // utility, searchable — GMP/VEC/WEC quick-picks + ~470 SmartHub co-ops from
       // /v1/providers). The owner picks theirs; the extension opens that portal and
@@ -439,6 +444,7 @@
           </div>
           <div class="rb-head-actions">
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
+            <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster — name, percent share, and (ideally) account number.">⬆ Bulk import</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
@@ -447,6 +453,7 @@
              Each offtaker still has its OWN sheet inside its accordion card (.rb-track-sub). -->
         <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
         <div id="rbCustManual"></div>
+        <div id="rbBulkHost"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       <!-- ONE wired invoice-template box, PER-OFFTAKER: it folds into whichever
@@ -1265,6 +1272,146 @@
       else await refreshList();
     } catch (e) {
       st.className = "rb-status rb-err"; st.textContent = "Network error while adding.";
+    }
+  }
+
+  // ---- bulk offtaker import (CSV roster → many offtakers at once) -----------
+  let BULK_OPEN = false;
+  let BULK_PREVIEW = null;   // the dry-run preview from the server: {rows, summary}
+  let BULK_FILE = null;      // the File we previewed, re-sent on confirm
+
+  function renderBulkImport() {
+    const host = $("#rbBulkHost");
+    if (!host) return;
+    if (!BULK_OPEN) { host.innerHTML = ""; BULK_PREVIEW = null; BULK_FILE = null; return; }
+
+    if (!BULK_PREVIEW) {
+      // ── Step 1: drop the CSV ──
+      host.innerHTML = `
+        <div class="rep-card rb-manual-form rb-add-panel">
+          <div class="rb-add-head">
+            <h3>Bulk import offtakers</h3>
+            <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
+          </div>
+          <p class="rb-add-sub">A CSV roster — one row per offtaker. We'll show you exactly what we
+            matched before creating anything.</p>
+          <div class="rb-upload" id="rbBulkDrop">
+            <label class="rb-drop" id="rbBulkDropZone">
+              <input type="file" id="rbBulkFile" accept=".csv,.txt" hidden>
+              <span class="rb-drop-ico">⬆</span>
+              <span class="rb-drop-main">Choose a CSV or drop it here</span>
+              <span class="rb-drop-sub">.csv — exported from Excel or Google Sheets</span>
+            </label>
+            <p class="rb-sample-hint">Columns we recognize (any order, header row required):
+              <b>Name</b>, <b>Percent</b> (e.g. 25 or 25%), and ideally <b>Account Number</b>
+              (so each offtaker links to the right utility bill — skip it only if you have
+              just one utility account connected). <b>Email</b> and <b>Discount</b> are optional.</p>
+            <div class="rb-status" id="rbBulkStatus"></div>
+          </div>
+        </div>`;
+      $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
+      const input = $("#rbBulkFile"), drop = $("#rbBulkDropZone");
+      const go = (f) => { if (f) bulkPreviewFile(f); };
+      input.addEventListener("change", () => go(input.files[0]));
+      ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => {
+        e.preventDefault(); drop.classList.add("rb-drop-over");
+      }));
+      ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => {
+        e.preventDefault(); drop.classList.remove("rb-drop-over");
+      }));
+      drop.addEventListener("drop", e => go(e.dataTransfer && e.dataTransfer.files[0]));
+      return;
+    }
+
+    // ── Step 2: review the match table, then confirm ──
+    const rows = BULK_PREVIEW.rows || [];
+    const s = BULK_PREVIEW.summary || {};
+    const rowHtml = rows.map(r => {
+      const ok = !r.errors.length;
+      const pctTxt = r.allocation_pct != null ? Math.round(r.allocation_pct * 1000) / 10 + "%" : "—";
+      return `<tr class="${ok ? "rb-bulk-ok" : "rb-bulk-err"}">
+        <td>${r.row}</td>
+        <td>${esc(r.name || "—")}</td>
+        <td>${esc(r.email || "—")}</td>
+        <td>${esc(pctTxt)}</td>
+        <td>${esc(r.matched_account_label || (r.account_number ? "no match for “" + r.account_number + "”" : "—"))}</td>
+        <td>${ok ? "✓ ready" : "⚠ " + esc(r.errors.join("; "))}</td>
+      </tr>`;
+    }).join("");
+    host.innerHTML = `
+      <div class="rep-card rb-manual-form rb-add-panel">
+        <div class="rb-add-head">
+          <h3>Bulk import — review</h3>
+          <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
+        </div>
+        <p class="rb-add-sub">
+          <b>${s.ready || 0} of ${s.total || 0}</b> ready to import.
+          ${s.needs_attention ? `<b>${s.needs_attention}</b> need attention and won't be created — fix your CSV and re-upload, or import the rest now and add those by hand.` : ""}
+        </p>
+        <div class="rb-bulk-tablewrap">
+          <table class="rb-bulk-table">
+            <thead><tr><th>Row</th><th>Name</th><th>Email</th><th>%</th><th>Utility account</th><th>Status</th></tr></thead>
+            <tbody>${rowHtml}</tbody>
+          </table>
+        </div>
+        <div class="rb-actions">
+          <button class="ao-btn ao-btn-ghost" id="rbBulkBack" type="button">← Choose a different file</button>
+          <button class="ao-btn ao-btn-primary rb-save" id="rbBulkConfirm" type="button"
+                  ${s.ready ? "" : "disabled"}>Import ${s.ready || 0} offtaker${s.ready === 1 ? "" : "s"}</button>
+          <span class="rb-status" id="rbBulkStatus2"></span>
+        </div>
+      </div>`;
+    $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
+    $("#rbBulkBack").onclick = () => { BULK_PREVIEW = null; BULK_FILE = null; renderBulkImport(); };
+    $("#rbBulkConfirm").onclick = bulkConfirmImport;
+  }
+
+  async function bulkPreviewFile(file) {
+    BULK_FILE = file;
+    const status = $("#rbBulkStatus");
+    if (status) { status.className = "rb-status rb-busy"; status.textContent = "Reading " + file.name + "…"; }
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("dry_run", "true");
+      const r = await fetch(API + "/subscriptions/bulk-import", { method: "POST", headers: authHeaders(), body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        if (status) {
+          status.className = "rb-status rb-err";
+          status.textContent = (data && data.detail) ? data.detail : "Couldn't read that file (HTTP " + r.status + ").";
+        }
+        return;
+      }
+      BULK_PREVIEW = data;
+      renderBulkImport();
+    } catch (e) {
+      if (status) { status.className = "rb-status rb-err"; status.textContent = "Network error while reading the file."; }
+    }
+  }
+
+  async function bulkConfirmImport() {
+    const st = $("#rbBulkStatus2");
+    if (!BULK_FILE) return;
+    if (st) { st.className = "rb-status rb-busy"; st.textContent = "Importing…"; }
+    const btn = $("#rbBulkConfirm"); if (btn) btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append("file", BULK_FILE);
+      fd.append("dry_run", "false");
+      const r = await fetch(API + "/subscriptions/bulk-import", { method: "POST", headers: authHeaders(), body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Import failed (HTTP " + r.status + ")."; }
+        if (btn) btn.disabled = false;
+        return;
+      }
+      BULK_OPEN = false; BULK_PREVIEW = null; BULK_FILE = null;
+      renderBulkImport();
+      await refreshList();
+    } catch (e) {
+      if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error during import."; }
+      if (btn) btn.disabled = false;
     }
   }
 
