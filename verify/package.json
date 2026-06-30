@@ -1,0 +1,14 @@
+{
+  "name": "ao-onboarding-verify",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Closed-loop invariant verification for the Array Operator onboarding sync. Replays the EnergyAgent extension's messages against the live page and asserts the guarantees we earned debugging the Chint hang.",
+  "scripts": {
+    "verify": "node onboarding-sync.mjs",
+    "verify:headed": "HEADED=1 node onboarding-sync.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
