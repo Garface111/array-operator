@@ -67,6 +67,15 @@
     // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
     // matches that recoverable state; "offline" wrongly implied a hard outage.
     if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn" };
+    // A live-dark inverter (dark RIGHT NOW while >=2 daylight peers produce) the 14-day alert
+    // hasn't flagged yet should still surface here — otherwise the array reads "All clear" while a
+    // card inside shows "Dark now" (and we emailed about it). Checked AFTER source-paused so a
+    // stale feed's 0 isn't mistaken for a live anomaly. Same FleetStore.liveVerdict classifier.
+    const _invs = c.inverters || [];
+    const _darkNow = _invs.filter(iv => (iv.status === "ok" || iv.status == null)
+      && window.FleetStore && FleetStore.liveVerdict
+      && FleetStore.liveVerdict(iv, _invs, c.is_daylight) === "dark").length;
+    if (_darkNow) return { label: _darkNow + " dark now", cls: "warn" };
     return { label: "All clear", cls: "ok" };
   }
   function statusRank(c) {
