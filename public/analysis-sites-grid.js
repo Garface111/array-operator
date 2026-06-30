@@ -26,6 +26,12 @@
   var sortKey = "ratio";   // default: surface the worst performers first
   var sortDir = "asc";     // ratio asc → low % at the top (PowerTrack default)
   var searchText = "";
+  var groupBy = "none";          // "none" | "portfolio" | "vendor"
+  var collapsedGroups = {};      // {mode: Set(groupKey)} — per-mode collapse state
+  function collapsedSetFor(mode) {
+    if (!collapsedGroups[mode]) collapsedGroups[mode] = Object.create(null);
+    return collapsedGroups[mode];
+  }
 
   // ---- one-time scoped stylesheet --------------------------------------------
   function injectCSS() {
@@ -94,7 +100,38 @@
       // footer totals
       ".ansg-table tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:700;color:var(--ink);background:var(--card2);padding-top:11px;padding-bottom:11px}",
       ".ansg-table tfoot .ansg-tlabel{color:var(--muted);font-weight:740;font-size:11px;letter-spacing:.05em;text-transform:uppercase}",
-      ".ansg-empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:13px}"
+      ".ansg-empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:13px}",
+      // group-by control (right side of toolbar)
+      ".ansg-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}",
+      ".ansg-groupctl{display:flex;align-items:center;gap:7px}",
+      ".ansg-groupctl > span{color:var(--faint);font-size:10.5px;font-weight:740;letter-spacing:.06em;text-transform:uppercase}",
+      // group header rows
+      ".ansg-grouphead{cursor:pointer;user-select:none}",
+      ".ansg-grouphead td{background:var(--bg2);border-bottom:1px solid var(--line);border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px}",
+      ".ansg-grouphead:hover td{background:var(--card2)}",
+      ".ansg-ghd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}",
+      ".ansg-chev{flex:0 0 auto;width:11px;height:11px;color:var(--muted);transition:transform .15s}",
+      ".ansg-grouphead.ansg-collapsed .ansg-chev{transform:rotate(-90deg)}",
+      ".ansg-gname{font-weight:760;color:var(--ink);font-size:13px;letter-spacing:.01em}",
+      ".ansg-gname.ansg-unassigned{color:var(--muted);font-weight:680}",
+      ".ansg-gcount{color:var(--faint);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}",
+      ".ansg-groll{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px;font-variant-numeric:tabular-nums}",
+      ".ansg-groll .ansg-gm{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap}",
+      ".ansg-groll .ansg-gm i{font-style:normal;color:var(--faint);font-size:10px;font-weight:740;letter-spacing:.04em;text-transform:uppercase}",
+      ".ansg-groll .ansg-gm b{color:var(--ink);font-weight:680}",
+      ".ansg-gpct{font-weight:760}",
+      ".ansg-gpct.over{color:var(--good)}",
+      ".ansg-gpct.bad{color:var(--bad)}",
+      ".ansg-gpct.neutral{color:var(--muted)}",
+      ".ansg-galarm{display:inline-flex;align-items:center;gap:4px;font-weight:740;color:var(--faint)}",
+      ".ansg-galarm.warn{color:var(--warn)}",
+      ".ansg-galarm.bad{color:var(--bad)}",
+      // assign-to-portfolio affordance in the Site cell
+      ".ansg-assign{appearance:none;background:transparent;border:1px dashed var(--line);color:var(--faint);border-radius:6px;font:inherit;font-size:10px;font-weight:700;line-height:1.4;padding:1px 6px;cursor:pointer;opacity:0;transition:opacity .12s,border-color .12s,color .12s;flex:0 0 auto}",
+      ".ansg-table tbody tr:hover .ansg-assign{opacity:1}",
+      ".ansg-assign:hover{border-color:var(--good2);color:var(--good2);border-style:solid}",
+      ".ansg-assign.ansg-has{opacity:.65;border-style:solid;border-color:var(--line)}",
+      ".ansg-table tbody tr:hover .ansg-assign.ansg-has{opacity:1}"
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -165,6 +202,50 @@
     return "bad";
   }
 
+  // ---- grouping ---------------------------------------------------------------
+  var UNASSIGNED = "Unassigned";
+  // canonical display names for known vendor keys (Title-case per Ford's spec)
+  var VENDOR_LABEL = {
+    solaredge: "SolarEdge", fronius: "Fronius", sma: "SMA", chint: "CHINT",
+    locus: "Locus", cps: "CPS", enphase: "Enphase"
+  };
+  function vendorLabel(key) {
+    if (!key) return "Other";
+    return VENDOR_LABEL[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+  }
+  // group key + display label + sort hint for a row, per the active mode
+  function groupKeyFor(r, mode) {
+    if (mode === "portfolio") {
+      return r.portfolio ? { key: r.portfolio, label: r.portfolio, last: false }
+                         : { key: UNASSIGNED, label: UNASSIGNED, last: true };
+    }
+    // vendor
+    var label = vendorLabel(r.vendor);
+    return { key: label, label: label, last: label === "Other" };
+  }
+  // rollup the measured + forecast aggregates for one group's rows
+  function groupRollup(rs, ctx) {
+    var cap = 0, hasCap = false, win = 0, hasWin = false;
+    var actSum = 0, expSum = 0, modeled = 0, alarms = 0;
+    rs.forEach(function (r) {
+      if (r.cap != null) { cap += r.cap; hasCap = true; }
+      if (r.win != null) { win += r.win; hasWin = true; }
+      if (r.alertCount) alarms += r.alertCount;
+      // group performance: sum measured actual ÷ sum matched expected, only for
+      // rows that actually have a forecast (never fabricate)
+      var fc = ctx.forecastByArray[r.aid];
+      if (fc) {
+        var a = num(fc.actual_kwh), e = num(fc.expected_kwh);
+        if (a != null && e != null && e > 0) { actSum += a; expSum += e; modeled++; }
+      }
+    });
+    var pct = (modeled > 0 && expSum > 0) ? Math.round(actSum / expSum * 100) : null;
+    return { cap: cap, hasCap: hasCap, win: win, hasWin: hasWin, pct: pct, alarms: alarms, count: rs.length };
+  }
+  function chevronSvg() {
+    return '<svg class="ansg-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+  }
+
   // ---- build one row's data model (measured + optional forecast) --------------
   function rowModel(col, ctx) {
     var aid = String(col.array_id);
@@ -191,17 +272,23 @@
 
     // region only if it's a real value (real columns carry "—"); look up canonical
     var region = null;
+    var arr = null;
     if (Array.isArray(ctx.arrays)) {
-      var a = null;
-      for (var i = 0; i < ctx.arrays.length; i++) { if (String(ctx.arrays[i].id) === aid) { a = ctx.arrays[i]; break; } }
-      if (a && a.region && a.region !== "—") region = a.region;
+      for (var i = 0; i < ctx.arrays.length; i++) { if (String(ctx.arrays[i].id) === aid) { arr = ctx.arrays[i]; break; } }
+      if (arr && arr.region && arr.region !== "—") region = arr.region;
     }
+
+    // portfolio label: prefer the column's, fall back to the canonical array's
+    var pf = col.portfolio_name;
+    if (pf == null && arr) pf = arr.portfolio_name;
+    pf = (typeof pf === "string") ? pf.trim() : "";
 
     return {
       col: col,
       aid: aid,
       name: col.array_name || "Site",
       vendor: vendorTag(col.vendor),
+      portfolio: pf,                 // "" → Unassigned bucket
       region: region,
       level: (col.alert && col.alert.level) || "ok",
       alertCount: (col.alert && num(col.alert.count)) || 0,
@@ -262,7 +349,14 @@
   function cellName(r, ctx) {
     var tag = r.vendor ? '<span class="ansg-vtag">' + ctx.esc(r.vendor) + '</span>' : "";
     var region = r.region ? '<span class="ansg-region">' + ctx.esc(r.region) + '</span>' : "";
-    return '<td><div class="ansg-name-row"><span class="ansg-name" title="' + ctx.esc(r.name) + '">' + ctx.esc(r.name) + '</span>' + tag + '</div>' + region + '</td>';
+    // assign-to-portfolio: only when signed in AND the mutator exists (no anon demo)
+    var assign = "";
+    if (ctx.signedIn && ctx.live && ctx.live.setArrayPortfolio) {
+      assign = r.portfolio
+        ? '<button type="button" class="ansg-assign ansg-has" data-assign="' + ctx.esc(r.aid) + '" title="Change portfolio · ' + ctx.esc(r.portfolio) + '">' + ctx.esc(r.portfolio) + '</button>'
+        : '<button type="button" class="ansg-assign" data-assign="' + ctx.esc(r.aid) + '" title="Assign to a portfolio">+ portfolio</button>';
+    }
+    return '<td><div class="ansg-name-row"><span class="ansg-name" title="' + ctx.esc(r.name) + '">' + ctx.esc(r.name) + '</span>' + tag + assign + '</div>' + region + '</td>';
   }
   function cellTrend(r) {
     return '<td>' + sparkline(r.series) + '</td>';
@@ -329,6 +423,19 @@
     });
     var fleetPct = (ctx.forecast && num(ctx.forecast.ratio_pct) != null) ? num(ctx.forecast.ratio_pct) : null;
 
+    // ---- group-by segmented control (reuses the global .an-seg classes) -------
+    var GROUP_OPTS = [
+      { v: "none", label: "None" },
+      { v: "portfolio", label: "Portfolio" },
+      { v: "vendor", label: "Vendor" }
+    ];
+    var groupCtlHtml =
+      '<div class="ansg-groupctl"><span>Group</span><div class="an-seg" role="tablist">' +
+      GROUP_OPTS.map(function (o) {
+        return '<button type="button" class="an-seg-btn' + (groupBy === o.v ? " on" : "") + '" data-group-by="' + o.v + '">' + ctx.esc(o.label) + '</button>';
+      }).join("") +
+      '</div></div>';
+
     // honest sub-line: how many sites can't be weather-modeled yet
     var unmodeled = rows.filter(function (r) { return !r.hasForecast; }).length;
     var subline;
@@ -352,16 +459,70 @@
     }).join("");
 
     // ---- body -----------------------------------------------------------------
+    function siteRow(r) {
+      return '<tr>' +
+        cellStatus(r) + cellName(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
+        cellExpected(r, ctx) + cellRatio(r, ctx) + cellWindow(r, ctx) + cellCap(r, ctx) +
+        '</tr>';
+    }
+    // a group header row spanning the table, with rollup metrics
+    function groupHeaderRow(label, isUnassigned, roll, collapsed) {
+      var pctHtml;
+      if (roll.pct != null) {
+        var bucket = ratioBucket(roll.pct);
+        var pc = roll.pct > 115 ? "over" : bucket === "bad" ? "bad" : bucket === "neutral" ? "neutral" : "";
+        pctHtml = '<span class="ansg-gpct ' + pc + '">' + roll.pct + '%</span>';
+      } else {
+        pctHtml = '<span class="ansg-faint">—</span>';
+      }
+      var alarmCls = roll.alarms > 0 ? (roll.alarms >= 3 ? "bad" : "warn") : "";
+      var alarmHtml = '<span class="ansg-galarm ' + alarmCls + '" title="Open alarms in this group">● ' + roll.alarms + '</span>';
+      return '<tr class="ansg-grouphead' + (collapsed ? " ansg-collapsed" : "") + '" data-group="' + ctx.esc(label) + '">' +
+        '<td colspan="' + COLS.length + '">' +
+        '<div class="ansg-ghd">' +
+        chevronSvg() +
+        '<span class="ansg-gname' + (isUnassigned ? " ansg-unassigned" : "") + '">' + ctx.esc(label) + '</span>' +
+        '<span class="ansg-gcount">' + roll.count + ' site' + (roll.count === 1 ? "" : "s") + '</span>' +
+        '<span class="ansg-groll">' +
+        '<span class="ansg-gm"><i>cap</i><b>' + (roll.hasCap ? ctx.esc(ctx.fmt.kw(roll.cap)) : "—") + '</b></span>' +
+        '<span class="ansg-gm"><i>window</i><b>' + (roll.hasWin ? ctx.esc(ctx.fmt.kwh(roll.win)) : "—") + '</b></span>' +
+        '<span class="ansg-gm"><i>vs exp</i>' + pctHtml + '</span>' +
+        '<span class="ansg-gm"><i>alarms</i>' + alarmHtml + '</span>' +
+        '</span>' +
+        '</div>' +
+        '</td></tr>';
+    }
+
     var bodyHtml;
     if (!shown.length) {
       var msg = q ? 'No sites match "' + ctx.esc(searchText) + '".' : "No sites in this fleet yet.";
       bodyHtml = '<tr><td class="ansg-empty" colspan="' + COLS.length + '">' + msg + '</td></tr>';
+    } else if (groupBy === "none") {
+      bodyHtml = shown.map(siteRow).join("");
     } else {
-      bodyHtml = shown.map(function (r) {
-        return '<tr>' +
-          cellStatus(r) + cellName(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
-          cellExpected(r, ctx) + cellRatio(r, ctx) + cellWindow(r, ctx) + cellCap(r, ctx) +
-          '</tr>';
+      // partition the already-filtered+sorted rows into groups, preserving the
+      // per-group sort. Order groups: "last" buckets (Unassigned/Other) sink,
+      // the rest alphabetically.
+      var order = [];          // group keys in display order
+      var buckets = {};        // key -> { label, last, rows: [] }
+      shown.forEach(function (r) {
+        var g = groupKeyFor(r, groupBy);
+        if (!buckets[g.key]) { buckets[g.key] = { label: g.label, last: g.last, rows: [] }; order.push(g.key); }
+        buckets[g.key].rows.push(r);
+      });
+      order.sort(function (ka, kb) {
+        var a = buckets[ka], b = buckets[kb];
+        if (a.last !== b.last) return a.last ? 1 : -1;     // last buckets to the end
+        return a.label.localeCompare(b.label);
+      });
+      var collapsedSet = collapsedSetFor(groupBy);
+      bodyHtml = order.map(function (key) {
+        var g = buckets[key];
+        var roll = groupRollup(g.rows, ctx);
+        var collapsed = !!collapsedSet[key];
+        var head = groupHeaderRow(g.label, g.last && g.label === UNASSIGNED, roll, collapsed);
+        var body = collapsed ? "" : g.rows.map(siteRow).join("");
+        return head + body;
       }).join("");
     }
 
@@ -396,7 +557,10 @@
       '        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
       '        <input type="text" class="ansg-q" placeholder="Filter sites…" value="' + ctx.esc(searchText) + '" />' +
       '      </div>' +
-      '      <span class="ansg-count">' + shown.length + (q ? " of " + rows.length : "") + ' shown</span>' +
+      '      <div class="ansg-tools">' +
+      groupCtlHtml +
+      '        <span class="ansg-count">' + shown.length + (q ? " of " + rows.length : "") + ' shown</span>' +
+      '      </div>' +
       '    </div>' +
       '  </div>' +
       '  <div class="ansg-wrap">' +
@@ -436,6 +600,50 @@
         render(container, ctx);
         var ni = container.querySelector(".ansg-q");
         if (ni) { ni.focus(); try { ni.setSelectionRange(pos, pos); } catch (_) { } }
+      });
+    }
+
+    // group-by segmented control → switch partition mode
+    var grpCtl = container.querySelector(".ansg-groupctl");
+    if (grpCtl) {
+      grpCtl.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-group-by]");
+        if (!btn) return;
+        var v = btn.getAttribute("data-group-by");
+        if (v === groupBy) return;
+        groupBy = v;
+        render(container, ctx);
+      });
+    }
+
+    // group header row → toggle collapse for that group (per-mode state)
+    var body = container.querySelector("tbody");
+    if (body) {
+      body.addEventListener("click", function (e) {
+        var gh = e.target.closest(".ansg-grouphead");
+        if (!gh) return;
+        var key = gh.getAttribute("data-group");
+        var set = collapsedSetFor(groupBy);
+        if (set[key]) delete set[key]; else set[key] = true;
+        render(container, ctx);
+      });
+    }
+
+    // assign-to-portfolio buttons → prompt + persist via the live mutator.
+    // The FleetStore mutation re-renders the orchestrator, so no manual repaint.
+    if (ctx.signedIn && ctx.live && ctx.live.setArrayPortfolio) {
+      container.querySelectorAll(".ansg-assign").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();   // don't bubble into a group-header collapse
+          var aid = btn.getAttribute("data-assign");
+          var current = "";
+          for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { current = rows[i].portfolio || ""; break; } }
+          var next = window.prompt("Portfolio for this site (leave blank to clear):", current);
+          if (next == null) return;                 // cancelled
+          next = String(next).trim();
+          if (next === current) return;             // no change
+          try { ctx.live.setArrayPortfolio(aid, next); } catch (_) { }
+        });
       });
     }
   }

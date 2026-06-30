@@ -79,6 +79,7 @@ window.FleetStore = (function(){
       region: a.region != null ? _str(a.region, 80) : "—",
       host: _str(a.host, 200),
       vendor: _str(a.vendor, 40),
+      portfolio_name: a.portfolio_name != null ? _str(a.portfolio_name, 80) : null,
       inverters: invs,
     };
   }
@@ -287,6 +288,7 @@ window.FleetStore = (function(){
     const list = (ids && ids.length) ? state.arrays.filter(a => ids.includes(a.id)) : state.arrays;
     const columns = list.map(a => ({
       array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
+      portfolio_name: a.portfolio_name || null,   // Analysis-tab grouping label
       inverter_source: a.vendor || "solaredge", inverter_count: a.inverters.length,
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
@@ -485,6 +487,23 @@ window.FleetStore = (function(){
     });
     if(isLive()){
       apiPost("/v1/array-owners/inverters/" + encodeURIComponent(id) + "/name", { name: next })
+        .then(() => refetch()).catch(() => refetch());
+    }
+  }
+
+  // Assign/clear an array's portfolio label (Analysis-tab grouping). Optimistic
+  // local update + notify (both views repaint), then persist; a refetch reconciles
+  // to the authoritative value. Empty string clears it. Mirrors renameArray's shape
+  // but carries no uniqueness constraint (many arrays share one portfolio).
+  function setArrayPortfolio(id, name){
+    const a = findArray(id); if(!a) return;
+    const next = String(name == null ? "" : name).trim().slice(0,80) || null;
+    if(next === (a.portfolio_name || null)) return;          // unchanged → no-op
+    a.portfolio_name = next;
+    notify();
+    if(isLive()){
+      apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/portfolio",
+              { portfolio_name: next })
         .then(() => refetch()).catch(() => refetch());
     }
   }
@@ -778,6 +797,10 @@ window.FleetStore = (function(){
     return (t.columns||[]).map(c => ({
       id: c.array_id, name: c.array_name, region:"—", host: c.client_name||"",
       vendor: c.vendor||"solaredge",
+      // Operator-assigned portfolio/group label (Analysis-tab fleet hierarchy);
+      // null until grouped. Carried through so both the canonical array and
+      // toColumns expose it without a second fetch.
+      portfolio_name: c.portfolio_name || null,
       // Array-level production history (backend DailyGeneration) — used by the
       // array graph when inverters carry site-level history but no per-inverter
       // series (e.g. Chint weekETrend backfill).
@@ -880,7 +903,7 @@ window.FleetStore = (function(){
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
-    renameArray, renameInverter,
+    renameArray, renameInverter, setArrayPortfolio,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,
