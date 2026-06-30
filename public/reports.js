@@ -1732,10 +1732,14 @@
         : "u:none";
       if (!groups[key]) {
         const acct = s.utility_account_id != null ? acctById[String(s.utility_account_id)] : null;
+        // provider drives the TOP grouping level (GMP / VEC / WEC …); the account
+        // label drops the provider prefix now that it sits UNDER a provider header.
+        const provider = (acct && acct.provider) ? String(acct.provider).toLowerCase() : "";
         const label = acct
-          ? `${(acct.provider || "").toUpperCase()} · ${acct.nickname || acct.account_number || s.utility_account_id}`
+          ? (acct.nickname || acct.account_number || String(s.utility_account_id))
           : (s.utility_account_name || ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name || "Ungrouped");
-        groups[key] = { key, label, pctSum: 0, hasDraft: false, rows: [] };
+        groups[key] = { key, provider, providerLabel: provider ? provider.toUpperCase() : "Other",
+                        label, pctSum: 0, hasDraft: false, rows: [] };
         order.push(key);
       }
       const g = groups[key];
@@ -1748,6 +1752,36 @@
       const ap = a.hasDraft ? 0 : 1, bp = b.hasDraft ? 0 : 1;
       if (ap !== bp) return ap - bp;
       return a.label.localeCompare(b.label);
+    });
+    return list;
+  }
+
+  // Roll the per-utility-account groups UP into provider buckets (Ford: "organized by
+  // utility (GMP VEC WEC etc), and THOSE can be collapsed and expanded as well, so it
+  // goes utility → utility account → offtaker"). Returns an ORDERED array of
+  // {provider, providerLabel, key, groups:[…], offtakerCount, hasDraft}. Buckets with a
+  // pending draft float first (the "important things first" rule again), then alpha by
+  // label; account-group order WITHIN each bucket is preserved from the input.
+  function groupByProvider(accountGroups) {
+    const buckets = {};
+    const order = [];
+    accountGroups.forEach(g => {
+      const p = g.provider || "";
+      if (!buckets[p]) {
+        buckets[p] = { provider: p, providerLabel: g.providerLabel, key: "prov:" + (p || "other"),
+                       groups: [], offtakerCount: 0, hasDraft: false };
+        order.push(p);
+      }
+      const b = buckets[p];
+      b.groups.push(g);
+      b.offtakerCount += g.rows.length;
+      if (g.hasDraft) b.hasDraft = true;
+    });
+    const list = order.map(p => buckets[p]);
+    list.sort((a, b) => {
+      const ap = a.hasDraft ? 0 : 1, bp = b.hasDraft ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return a.providerLabel.localeCompare(b.providerLabel);
     });
     return list;
   }
@@ -1811,41 +1845,69 @@
     // fresh load — every offtaker starts collapsed until the operator clicks one (Ford).
     const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
     if (!stillOpen) ACTIVE_SUB_ID = null;
-    // Above 5 offtakers, group by shared utility account (Ford) — each group gets a
-    // header naming the utility account + a "do these shares add up to 100%" pill,
-    // with the existing draft-first/alphabetical order preserved WITHIN each group.
+    // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
+    // utility account → offtaker. Both upper levels collapse on a whole-header click and
+    // both DEFAULT collapsed, so a fresh load of a big account shows just the provider
+    // headers (GMP / VEC / WEC). Each utility-account header still carries the "do these
+    // shares add up to 100%" pill with its hover breakdown.
     const groups = groupOfftakersByUtility(OFFTAKERS, utilAccts);
-    const body = groups
-      ? groups.map(g => {
-          // The WHOLE group header toggles collapse of its offtaker cards (Ford:
-          // "click on GMP Appalachian Community Array 1 and it should collapse all
-          // of the offtakers into it"). Same gesture as the vendor-sheet collapse.
-          // Groups DEFAULT to collapsed (Ford: "everything on the offtaker invoice
-          // generator should default to being collapsed") — a fresh load shows just
-          // the utility-bill headers; expand the one you want. First-seen key inits
-          // to collapsed; after that the toggle owns its state.
-          if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;
-          const collapsed = !!GROUP_COLLAPSED[g.key];
-          return `
-          <div class="rb-grp${collapsed ? " collapsed" : ""}">
-            <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
-                 aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers on this utility bill">
-              <span class="rb-grp-caret" aria-hidden="true">▾</span>
-              <span class="rb-grp-label">${esc(g.label)}</span>
-              <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
-              ${pctSumPill(g)}
+    // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
+    const acctGroupHTML = (g) => {
+      if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;   // default collapsed
+      const collapsed = !!GROUP_COLLAPSED[g.key];
+      return `
+        <div class="rb-grp${collapsed ? " collapsed" : ""}">
+          <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
+               aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers on this utility bill">
+            <span class="rb-grp-caret" aria-hidden="true">▾</span>
+            <span class="rb-grp-label">${esc(g.label)}</span>
+            <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
+            ${pctSumPill(g)}
+          </div>
+          <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
+            ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
+          </div>
+        </div>`;
+    };
+    let body;
+    if (groups) {
+      const providers = groupByProvider(groups);
+      body = providers.map(pv => {
+        if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = true;   // default collapsed
+        const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
+        const nAcct = pv.groups.length;
+        return `
+          <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
+            <div class="rb-prov-head" data-provcollapse="${esc(pv.key)}" role="button" tabindex="0"
+                 aria-expanded="${!pCollapsed}" title="${pCollapsed ? "Expand" : "Collapse"} all ${esc(pv.providerLabel)} utility accounts">
+              <span class="rb-prov-caret" aria-hidden="true">▾</span>
+              <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
+              <span class="rb-prov-count">${nAcct} utility account${nAcct === 1 ? "" : "s"} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
             </div>
-            <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
-              ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
+            <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
+              ${pv.groups.map(acctGroupHTML).join("")}
             </div>
           </div>`;
-        }).join("")
-      : OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
+      }).join("");
+    } else {
+      body = OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
+    }
     list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` + body;
     wireAccordionHeaders(list);
-    // Collapse/expand all offtakers under one utility-bill group. Whole header is the
-    // target; the pill's hover-breakdown still works (the pill wrapper stops propagation
-    // below so reading the breakdown never also collapses). Keyboard-accessible.
+    // TOP level — provider collapse (GMP / VEC / WEC). Whole header clickable, keyboard-OK.
+    // (.rb-prov-head and .rb-grp-head are siblings' children, not nested, so the two
+    // collapse levels never trigger each other.)
+    list.querySelectorAll("[data-provcollapse]").forEach(h => {
+      const go = () => {
+        const k = h.getAttribute("data-provcollapse");
+        PROVIDER_COLLAPSED[k] = !PROVIDER_COLLAPSED[k];
+        renderAccordion(subs, arrs, utilAccts, drafts);
+      };
+      h.onclick = go;
+      h.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    });
+    // MIDDLE level — utility-account collapse. The pill's hover-breakdown still works
+    // (the pill wrapper stops propagation below so reading it never also collapses).
     list.querySelectorAll("[data-grpcollapse]").forEach(h => {
       const go = () => {
         const k = h.getAttribute("data-grpcollapse");
@@ -1994,6 +2056,9 @@
                                 // Persists across refreshes (module-level, keyed by stable
                                 // utility_account_id), un-persisted across reloads — so a fresh
                                 // load always opens fully collapsed. Same map as vendor-sheet.
+  let PROVIDER_COLLAPSED = {};  // provider bucket key ("prov:gmp") -> bool; the TOP level of the
+                                // utility → utility-account → offtaker hierarchy. Same default-
+                                // collapsed + persist-across-refreshes / reset-on-reload rules.
   let GENERATING_SUB_ID = null; // the offtaker whose draft is being minted right now (loading state)
   let GEN_FAIL = {};            // subscription_id -> why its on-demand draft couldn't be built
   let _pinActiveSub = false;    // keep refreshInbox from auto-advancing off a just-selected offtaker

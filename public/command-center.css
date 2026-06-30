@@ -719,7 +719,24 @@ body.sb-fs-lock{ overflow:hidden; }
   letter-spacing:-.005em; }
 .rb-acc-lead b{ color:var(--ink,#0f172a); font-weight:750; }
 
-/* ---- offtaker list grouped by shared utility account (>5 offtakers) ---- */
+/* ---- offtaker list: utility (provider) → utility account → offtaker (>5 offtakers) ---- */
+/* TOP level — provider bucket (GMP / VEC / WEC). Whole header collapses all its utility
+   accounts at once (Ford: "organized by utility... THOSE can be collapsed and expanded").
+   Heavier than the account header so the hierarchy reads top-down at a glance. */
+.rb-prov{ margin-bottom:16px; }
+.rb-prov-head{ display:flex; align-items:center; gap:10px; padding:9px 10px;
+  background:var(--card2,#f8fafc); border:1px solid var(--line,#e2e8f0); border-radius:10px;
+  cursor:pointer; user-select:none; }
+.rb-prov-head:hover{ background:var(--day-hover,rgba(15,23,42,.05)); }
+.rb-prov.collapsed .rb-prov-head{ }
+.rb-prov-caret{ display:inline-block; width:13px; text-align:center; font-size:12px;
+  color:var(--muted,#475569); transition:transform .15s ease; flex:none; }
+.rb-prov-head[aria-expanded="false"] .rb-prov-caret{ transform:rotate(-90deg); }
+.rb-prov-label{ font-size:13.5px; font-weight:800; letter-spacing:.02em; color:var(--ink,#0f172a); }
+.rb-prov-count{ font-size:11.5px; color:var(--faint,#94a3b8); }
+.rb-prov-rows{ padding:10px 0 2px 14px; }   /* indent the utility accounts under their provider */
+
+/* MIDDLE level — one utility account's offtakers. */
 .rb-grp{ margin-bottom:14px; }
 /* The whole group header collapses/expands its offtaker cards (Ford: "click on GMP
    Appalachian Community Array 1 and it should collapse all of the offtakers into it").
