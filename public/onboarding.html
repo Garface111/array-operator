@@ -311,6 +311,17 @@ function extSend(type, extra){
 function extInstallClicked(){
   const w = document.getElementById("extWatch");
   if (w) w.innerHTML = "Waiting for the helper… once it's added, come back to this tab and your arrays appear automatically — no refresh needed.";
+  // A freshly-installed Chrome extension often lands SWITCHED OFF (Chrome disables a new/low-
+  // reputation extension until the owner enables it). If nothing's announced after a beat, show
+  // a calm, factual nudge so they aren't stranded at a grey toggle. Auto-resolves: render()
+  // advances to the sync the instant the extension announces itself (EXT_PRESENT), replacing this.
+  if (window._extEnableHintTimer) clearTimeout(window._extEnableHintTimer);
+  window._extEnableHintTimer = setTimeout(() => {
+    if (EXT_PRESENT) return;                                  // it showed up — nothing to nudge
+    const el = document.getElementById("extWatch");
+    if (!el) return;
+    el.innerHTML = `Added it but nothing here yet? Chrome sometimes installs a new extension <b>switched off</b>. Open the <b>⧉ extensions</b> menu (the puzzle-piece icon, top-right of Chrome) → <b>Manage extensions</b> — or go to <b>chrome://extensions</b> — and turn <b>EnergyAgent</b> on. We start the moment it's enabled.`;
+  }, 14000);
 }
 window.addEventListener("message", (e) => {
   // Only trust messages the bridge posts back into THIS page (same window + origin).
