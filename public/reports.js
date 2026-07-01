@@ -2154,7 +2154,32 @@
   let BULK_PREVIEW = null;     // the raw dry-run payload {summary, arrays, rows}
   let BULK_ARRAYS = [];        // the pick-list: [{array_id, array_name, utility_account_id, utility_label, provider, has_bill}]
   let BULK_ROWS = [];          // editable per-offtaker state (persists corrections across re-renders)
-  let BULK_FILE = null;        // the File we previewed (kept for a re-upload if they go back)
+  let BULK_FILE = null;        // the File we previewed (kept for a re-upload / re-parse-with-override)
+  // Two-phase review: "columns" = confirm which sheet column is which of OUR fields
+  // (Phase 1, NEW), "rows" = the per-offtaker array-match review (Phase 2, existing).
+  let BULK_PHASE = "columns";
+  let DETECTION = null;        // the backend `detection` block from the first dry-run
+  let COLUMN_MAP = {};         // OUR field -> column index (or null = "not in my sheet")
+
+  // OUR importable fields, in display order. `req` = required (Continue is gated on
+  // all three being mapped). Order/labels are the operator-facing column meanings.
+  const BULK_FIELDS = [
+    { key: "array_name",     label: "Array",          req: true  },
+    { key: "offtaker_name",  label: "Offtaker name",  req: true  },
+    { key: "allocation_pct", label: "Share %",        req: true  },
+    { key: "email",          label: "Email",          req: false },
+    { key: "discount_pct",   label: "Discount %",     req: false },
+    { key: "net_rate",       label: "Rate ($/kWh)",   req: false },
+    { key: "account_number", label: "Account #",      req: false },
+  ];
+
+  // 0 → "A", 1 → "B", … 26 → "AA" — spreadsheet-style column letters for friendliness.
+  function colLetter(idx) {
+    if (idx == null || idx < 0) return "";
+    let n = idx, s = "";
+    do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return s;
+  }
 
   // Index the array pick-list by array_id for O(1) lookups on dropdown change.
   function bulkArrayById(id) {
@@ -2189,7 +2214,7 @@
   function renderBulkImport() {
     const host = $("#rbBulkHost");
     if (!host) return;
-    if (!BULK_OPEN) { host.innerHTML = ""; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; return; }
+    if (!BULK_OPEN) { host.innerHTML = ""; bulkResetState(); return; }
 
     if (!BULK_PREVIEW) {
       // ── Step 1: drop the workbook ──
@@ -2231,8 +2256,15 @@
       return;
     }
 
-    // ── Step 2: REVIEW & CORRECT ──
-    renderBulkReview();
+    // ── Step 2: two-phase review — columns first, then per-row array match ──
+    if (BULK_PHASE === "columns" && DETECTION) renderColumnMapping();
+    else renderBulkReview();
+  }
+
+  // Clear ALL bulk state (upload, preview, phase, detection, column map) in one place.
+  function bulkResetState() {
+    BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null;
+    BULK_PHASE = "columns"; DETECTION = null; COLUMN_MAP = {};
   }
 
   // The pick-list <select> options (shared by every row). `sel` marks the chosen id.
@@ -2257,6 +2289,182 @@
     if (status === "ready") return `<span class="rb-pill rb-pill-ok">Ready</span>`;
     if (status === "needs_review") return `<span class="rb-pill rb-pill-warn">Needs review</span>`;
     return `<span class="rb-pill rb-pill-bad">Blocked</span>`;
+  }
+
+  // ============================================================================
+  // PHASE 1 — column-mapping review (NEW)
+  // Operators upload spreadsheets in ANY layout. The backend detects which column
+  // is which of OUR fields; here the operator confirms/corrects that mapping on a
+  // live-tinted preview of their own data before we parse rows.
+  // ============================================================================
+
+  // Options for a field's column <select>: every sheet column ("{header}" (col A)),
+  // plus a "not in my sheet" escape. `sel` = the currently-assigned index (or null).
+  function colOptions(sel) {
+    const headers = (DETECTION && DETECTION.headers) || [];
+    const opts = headers.map((h, idx) => {
+      const label = `"${(h == null || h === "") ? "(blank)" : h}" (col ${colLetter(idx)})`;
+      return `<option value="${idx}"${String(idx) === String(sel) ? " selected" : ""}>${esc(label)}</option>`;
+    }).join("");
+    const none = `<option value=""${sel == null ? " selected" : ""}>— not in my sheet —</option>`;
+    return opts + none;
+  }
+
+  // Confidence/requirement badge for a field row. Required + unmapped → red "needed".
+  // Otherwise: high=blue check, medium=amber "check this", low/none-but-mapped=grey.
+  function colFieldBadge(field) {
+    const idx = COLUMN_MAP[field.key];
+    if (idx == null) {
+      return field.req
+        ? `<span class="rb-col-badge rb-conf rb-conf-bad" title="Required — pick the column that holds this.">needed</span>`
+        : `<span class="rb-col-badge rb-col-skip" title="Not in your sheet — that's fine.">not mapped</span>`;
+    }
+    // Only trust the detected confidence while the operator keeps the detected column;
+    // a hand-picked column is an explicit choice → treat as confident.
+    const det = (DETECTION && DETECTION.column_map && DETECTION.column_map[field.key]) || null;
+    const kept = det && det.index === idx;
+    const conf = kept ? detConfidence(field.key) : "high";
+    if (conf === "high") return `<span class="rb-col-badge rb-conf rb-conf-ok" title="Confident match.">✓</span>`;
+    if (conf === "medium") return `<span class="rb-col-badge rb-conf rb-conf-warn" title="Medium-confidence match — worth a glance.">check this</span>`;
+    return `<span class="rb-col-badge rb-col-pick" title="Low confidence — confirm this is the right column.">pick a column</span>`;
+  }
+
+  // Which OUR-field (if any) currently owns a given sheet column index → drives the
+  // live preview tint so the operator SEES the mapping on their own data.
+  function fieldForColumn(idx) {
+    for (const f of BULK_FIELDS) if (COLUMN_MAP[f.key] === idx) return f;
+    return null;
+  }
+
+  // Required fields still without a column → the reasons Continue stays disabled.
+  function unmappedRequired() {
+    return BULK_FIELDS.filter(f => f.req && COLUMN_MAP[f.key] == null);
+  }
+
+  function renderColumnMapping() {
+    const host = $("#rbBulkHost");
+    const headers = (DETECTION && DETECTION.headers) || [];
+    const preview = (DETECTION && DETECTION.preview) || [];
+    const via = (DETECTION && DETECTION.via) || "";
+    const viaNote = via === "content" ? "matched by your data"
+      : via === "llm" ? "matched by AI"
+      : via === "mixed" ? "matched by headers + data"
+      : via === "heuristic" ? "matched by column names" : "";
+    const sheetNote = (DETECTION && DETECTION.sheet)
+      ? `Sheet <b>${esc(DETECTION.sheet)}</b>${DETECTION.header_row != null ? `, header on row ${DETECTION.header_row + 1}` : ""}. ` : "";
+    const warnings = (DETECTION && DETECTION.warnings) || [];
+
+    // Field-mapping rows.
+    const fieldRows = BULK_FIELDS.map(f => {
+      const idx = COLUMN_MAP[f.key];
+      return `<tr class="rb-col-frow${f.req ? " rb-col-req" : ""}${f.req && idx == null ? " rb-col-missing" : ""}" data-field="${f.key}">
+        <td class="rb-col-flabel">${esc(f.label)}${f.req ? ` <span class="rb-col-star" title="Required">*</span>` : ""}</td>
+        <td class="rb-col-fsel">
+          <select class="rb-col-select" data-field="${f.key}">${colOptions(idx)}</select>
+        </td>
+        <td class="rb-col-fbadge">${colFieldBadge(f)}</td>
+      </tr>`;
+    }).join("");
+
+    // Live-tinted preview: header row + up to 5 data rows, columns assigned to a
+    // field get that field's tint so the operator confirms on their own data.
+    const previewHead = headers.map((h, idx) => {
+      const f = fieldForColumn(idx);
+      const tag = f ? `<span class="rb-col-ptag">${esc(f.label)}</span>` : "";
+      return `<th class="rb-col-pth${f ? " rb-col-pon" : ""}" data-col="${idx}">
+        <span class="rb-col-pcol">col ${colLetter(idx)}</span>
+        <span class="rb-col-phdr">${(h == null || h === "") ? "&nbsp;" : esc(String(h))}</span>${tag}</th>`;
+    }).join("");
+    const previewBody = preview.map(cells => {
+      const tds = headers.map((h, idx) => {
+        const f = fieldForColumn(idx);
+        const v = (cells && cells[idx] != null) ? String(cells[idx]) : "";
+        return `<td class="rb-col-ptd${f ? " rb-col-pon" : ""}" data-col="${idx}">${esc(v)}</td>`;
+      }).join("");
+      return `<tr>${tds}</tr>`;
+    }).join("");
+
+    const missing = unmappedRequired();
+    const canContinue = missing.length === 0;
+    const gateNote = canContinue ? ""
+      : `<span class="rb-col-gate">Pick a column for: ${missing.map(f => esc(f.label)).join(", ")}</span>`;
+
+    host.innerHTML = `
+      <div class="rep-card rb-manual-form rb-add-panel">
+        <div class="rb-add-head">
+          <h3>We read your spreadsheet</h3>
+          <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
+        </div>
+        <p class="rb-add-sub">${sheetNote}Detected the header row and mapped your columns — confirm or fix
+          each one, then continue.${viaNote ? ` <span class="rb-col-via">(${esc(viaNote)})</span>` : ""}</p>
+        ${warnings.length ? `<div class="rb-col-warns">⚠ ${warnings.map(w => esc(String(w))).join(" · ")}</div>` : ""}
+        <div class="rb-col-grid">
+          <div class="rb-col-mapcard">
+            <table class="rb-col-maptable">
+              <thead><tr><th>Our field</th><th>Your column</th><th></th></tr></thead>
+              <tbody>${fieldRows}</tbody>
+            </table>
+          </div>
+          <div class="rb-col-prevcard">
+            <div class="rb-col-prevlabel">Your data — highlighted columns are the ones you've assigned</div>
+            <div class="rb-col-prevwrap">
+              <table class="rb-col-prevtable">
+                <thead><tr>${previewHead}</tr></thead>
+                <tbody>${previewBody || `<tr><td class="rb-col-prevempty">No preview rows.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="rb-actions">
+          <button class="ao-btn ao-btn-ghost" id="rbColRestart" type="button">↺ Upload a different file</button>
+          <button class="ao-btn ao-btn-primary rb-save" id="rbColContinue" type="button" ${canContinue ? "" : "disabled"}>Looks right — continue →</button>
+          ${gateNote}
+          <span class="rb-status" id="rbColStatus"></span>
+        </div>
+      </div>`;
+
+    $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
+    $("#rbColRestart").onclick = () => { bulkResetState(); renderBulkImport(); };
+
+    // Dropdown change → update COLUMN_MAP, then re-render so the badges + preview
+    // tint update live. Enforce ONE column per field: if the operator assigns a
+    // column already owned by another field, steal it (clear the other) so tints
+    // never double-paint and the re-parse map stays unambiguous.
+    host.querySelectorAll(".rb-col-select").forEach(sel => {
+      sel.onchange = () => {
+        const field = sel.getAttribute("data-field");
+        const val = sel.value === "" ? null : Number(sel.value);
+        if (val != null) {
+          BULK_FIELDS.forEach(f => { if (f.key !== field && COLUMN_MAP[f.key] === val) COLUMN_MAP[f.key] = null; });
+        }
+        COLUMN_MAP[field] = val;
+        renderColumnMapping();
+      };
+    });
+
+    $("#rbColContinue").onclick = () => {
+      if (unmappedRequired().length) return;   // gate: never continue with a required field unmapped
+      // Send only the fields the operator kept (omit "not in my sheet" fields).
+      const override = {};
+      BULK_FIELDS.forEach(f => { if (COLUMN_MAP[f.key] != null) override[f.key] = COLUMN_MAP[f.key]; });
+      bulkPreviewFile(BULK_FILE, override, $("#rbColStatus"));
+    };
+  }
+
+  // Compact "Columns: Array=…, Offtaker=…, %=…  [change]" strip shown atop Phase 2 so
+  // the operator can always see (and reopen) the mapping they confirmed.
+  function bulkColumnSummary() {
+    if (!DETECTION) return "";
+    const headers = (DETECTION && DETECTION.headers) || [];
+    const parts = BULK_FIELDS.filter(f => f.req || COLUMN_MAP[f.key] != null).map(f => {
+      const idx = COLUMN_MAP[f.key];
+      const col = (idx == null) ? "—" : `${esc(String(headers[idx] != null && headers[idx] !== "" ? headers[idx] : "col " + colLetter(idx)))}`;
+      return `<span class="rb-col-sumpart"><b>${esc(f.label)}</b>=${col}</span>`;
+    }).join(`<span class="rb-col-sumsep">·</span>`);
+    return `<div class="rb-col-summary" id="rbColSummary">
+      <span class="rb-col-sumhead">Columns:</span> ${parts}
+      <button type="button" class="rb-col-sumchange" id="rbColChange">change</button>
+    </div>`;
   }
 
   function renderBulkReview() {
@@ -2290,6 +2498,7 @@
           <h3>Bulk import — review &amp; correct</h3>
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
         </div>
+        ${bulkColumnSummary()}
         <div class="rb-rev-summary" id="rbBulkSummary">
           <span class="rb-rev-sum-ok"><b>${c.ready}</b> ready</span>
           <span class="rb-rev-sum-sep">·</span>
@@ -2317,8 +2526,12 @@
       </div>`;
 
     $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
-    $("#rbBulkBack").onclick = () => { BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; renderBulkImport(); };
+    $("#rbBulkBack").onclick = () => { bulkResetState(); renderBulkImport(); };
     $("#rbBulkConfirm").onclick = bulkCommitImport;
+
+    // Reopen Phase 1 (column mapping) with the current DETECTION + COLUMN_MAP intact.
+    const chg = $("#rbColChange");
+    if (chg) chg.onclick = () => { BULK_PHASE = "columns"; renderBulkImport(); };
 
     // "check this ✓" — confirm a medium-confidence guess WITHOUT changing the
     // dropdown (a <select> fires no change event when re-picking the same value,
@@ -2381,13 +2594,23 @@
     if (btn) { btn.disabled = !c.ready; btn.textContent = `Import ${c.ready} offtaker${c.ready === 1 ? "" : "s"}`; }
   }
 
-  async function bulkPreviewFile(file) {
+  // Dry-run the file. First call (no override) also lands the `detection` block and
+  // drops us in Phase 1 (column mapping). A re-parse WITH `columnMap` (field→col-index)
+  // re-POSTs the SAME file so the backend re-parses using the operator's confirmed
+  // columns, then advances to Phase 2 (row review). `statusEl` lets the caller point
+  // errors at whichever status line is on screen for the current phase.
+  async function bulkPreviewFile(file, columnMap, statusEl) {
     BULK_FILE = file;
-    const status = $("#rbBulkStatus");
-    if (status) { status.className = "rb-status rb-busy"; status.textContent = "Reading " + file.name + "…"; }
+    const status = statusEl || $("#rbBulkStatus");
+    const reparse = !!columnMap;
+    if (status) {
+      status.className = "rb-status rb-busy";
+      status.textContent = reparse ? "Re-reading with your columns…" : ("Reading " + file.name + "…");
+    }
     try {
       const fd = new FormData();
       fd.append("file", file);
+      if (columnMap) fd.append("column_map", JSON.stringify(columnMap));
       const r = await fetch(API + "/subscriptions/bulk-import?dry_run=true", { method: "POST", headers: authHeaders(), body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
@@ -2413,10 +2636,42 @@
         errors: r.errors || [],
         _confirmed: (r.confidence === "exact" || r.confidence === "high"),
       }));
+
+      if (reparse) {
+        // Operator confirmed columns → straight to the per-row array review.
+        BULK_PHASE = "rows";
+      } else if (data.detection) {
+        // First read → seed the editable column map from the backend's guesses and
+        // open Phase 1 so the operator can confirm/correct before we trust the rows.
+        DETECTION = data.detection;
+        COLUMN_MAP = seedColumnMap(DETECTION);
+        BULK_PHASE = "columns";
+      } else {
+        // Backend didn't return a detection block (older contract) → skip to rows.
+        DETECTION = null;
+        BULK_PHASE = "rows";
+      }
       renderBulkImport();
     } catch (e) {
       if (status) { status.className = "rb-status rb-err"; status.textContent = "Network error while reading the file."; }
     }
+  }
+
+  // Build COLUMN_MAP {field: index|null} from the backend's detected column_map.
+  function seedColumnMap(det) {
+    const cm = {}, dm = (det && det.column_map) || {};
+    BULK_FIELDS.forEach(f => {
+      const hit = dm[f.key];
+      cm[f.key] = (hit && hit.index != null) ? hit.index : null;
+    });
+    return cm;
+  }
+  // The confidence the backend reported for a field's detected column ("high"|
+  // "medium"|"low"|null). Only meaningful while the operator keeps the detected column.
+  function detConfidence(fieldKey) {
+    const dm = (DETECTION && DETECTION.column_map) || {};
+    const hit = dm[fieldKey];
+    return hit && hit.confidence ? hit.confidence : null;
   }
 
   // Commit: send ONLY the rows the operator hasn't left blocked/needs-review —
@@ -2462,7 +2717,7 @@
       // If nothing failed/skipped, close + refresh. Otherwise keep the panel open and
       // surface the failures inline so the operator can act on them.
       if (!failed.length && !skipped.length) {
-        BULK_OPEN = false; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null;
+        BULK_OPEN = false; bulkResetState();
         renderBulkImport();
         await refreshList();
         return;
@@ -2496,7 +2751,7 @@
           <button class="ao-btn ao-btn-primary rb-save" id="rbBulkClose2" type="button">Done</button>
         </div>
       </div>`;
-    const close = () => { BULK_OPEN = false; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; renderBulkImport(); };
+    const close = () => { BULK_OPEN = false; bulkResetState(); renderBulkImport(); };
     $("#rbBulkClose").onclick = close;
     $("#rbBulkClose2").onclick = close;
   }
