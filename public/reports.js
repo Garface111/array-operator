@@ -27,6 +27,217 @@
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function authHeaders() { const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
 
+  /* ===========================================================================
+   * BILL ACCURACY CHECK — the per-offtaker GMP-allocation cross-check.
+   *
+   * The backend (/reconcile-bills) cross-checks two things per offtaker before the
+   * operator sends an invoice:
+   *   1. Production vs the GMP bill  — our metered kWh vs what GMP's meter says.
+   *   2. GMP allocation cross-check — does the excess GMP credited THIS offtaker
+   *      match (their share × the array bill's stated group excess)? When it
+   *      doesn't, we reverse-solve the group total GMP implied — a number on
+   *      neither bill = a caught billing error (Anna gets $25 per catch).
+   *
+   * Fetched ONCE per page load, cached on the module, indexed by sub_id. Woven into
+   * the invoice-review flow (a "Bill accuracy check" section in each offtaker's
+   * draft card) + a top-level summary chip when anything is flagged. Honest, quiet
+   * treatment for the "check couldn't run yet" states; amber (not red) for soft
+   * flags; the allocation $-mismatch is the one prominent catch.
+   * ==========================================================================*/
+  let RECON = null;                 // full /reconcile-bills payload (cached)
+  let RECON_BY_SUB = {};            // sub_id -> subscription reconcile row
+  let _reconPromise = null;         // in-flight fetch (dedupe concurrent callers)
+  function reconIndex() {
+    RECON_BY_SUB = {};
+    if (RECON && Array.isArray(RECON.subscriptions))
+      RECON.subscriptions.forEach(r => { if (r && r.sub_id != null) RECON_BY_SUB[String(r.sub_id)] = r; });
+  }
+  // Fetch the reconcile payload once; return the cache on repeat calls. Fails soft
+  // (a network/500 error just leaves the accuracy check absent — never blocks the
+  // invoice flow). Refetched naturally on a page reload (module state resets).
+  function loadReconcile() {
+    if (RECON) return Promise.resolve(RECON);
+    if (_reconPromise) return _reconPromise;
+    if (!authHeaders()) return Promise.resolve(null);
+    _reconPromise = fetch(API + "/reconcile-bills", { headers: authHeaders() })
+      .then(r => (r.ok ? r.json().catch(() => null) : null))
+      .then(d => { if (d && d.ok) { RECON = d; reconIndex(); } return RECON; })
+      .catch(() => null)
+      .then(v => { _reconPromise = null; return v; });
+    return _reconPromise;
+  }
+  function reconFor(subId) { return subId == null ? null : RECON_BY_SUB[String(subId)] || null; }
+
+  // Plain-English label + tone for an array-row production-vs-bill verdict.
+  const _ARR_STATUS = {
+    match:           { cls: "ok",   label: "Matches the GMP bill" },
+    mismatch:        { cls: "warn", label: "Differs from the GMP bill" },
+    no_bill:         { cls: "mute", label: "No GMP bill for this period yet" },
+    no_invoice_data: { cls: "mute", label: "No production data yet" },
+  };
+  // The array-level production-vs-bill rows: our metered kWh vs GMP's, per array.
+  function reconArraysHTML(row) {
+    const arrs = (row && row.arrays) || [];
+    if (!arrs.length) return "";
+    const rows = arrs.map(a => {
+      const meta = _ARR_STATUS[a.status] || { cls: "mute", label: a.status || "—" };
+      const dpct = a.delta_pct != null ? (a.delta_pct > 0 ? "+" : "") + Number(a.delta_pct).toFixed(1) + "%" : null;
+      const cmp = (a.status === "match" || a.status === "mismatch")
+        ? `<span class="rb-bac-cmp">${fmt0(a.our_kwh)} <span class="rb-bac-vs">vs</span> ${fmt0(a.gmp_kwh)} kWh${dpct ? ` <span class="rb-bac-delta rb-bac-${meta.cls}">${esc(dpct)}</span>` : ""}</span>`
+        : `<span class="rb-bac-cmp rb-bac-mute">${a.our_kwh != null ? fmt0(a.our_kwh) + " kWh (ours)" : "—"}</span>`;
+      return `<div class="rb-bac-arow">
+          <div class="rb-bac-atop">
+            <span class="rb-bac-aname">${esc(a.array_name || ("Array " + (a.array_id != null ? a.array_id : "")))}</span>
+            <span class="rb-bac-verdict rb-bac-${meta.cls}">${esc(meta.label)}</span>
+          </div>
+          ${cmp}
+          ${a.mismatch_reason ? `<div class="rb-bac-reason">${esc(a.mismatch_reason)}</div>` : ""}
+        </div>`;
+    }).join("");
+    return `<div class="rb-bac-block">
+        <div class="rb-bac-blabel">Production vs GMP bill<small>our metered kWh vs the utility's meter</small></div>
+        ${rows}
+      </div>`;
+  }
+
+  // The GMP allocation cross-check — Bruce's worked example. `note` is authored by
+  // the backend in plain English; we render it, we don't re-derive it. The mismatch
+  // dollar figure is the $25 catch, so it leads; honest non-run states render quietly.
+  const _ALLOC_QUIET = {
+    single_meter:         "This offtaker is on the array's own meter — there's no separate GMP allocation to cross-check.",
+    no_offtaker_account:  "Awaiting this offtaker's own GMP account to cross-check the allocation.",
+    no_offtaker_bill:     "Awaiting a GMP bill on this offtaker's account to cross-check the allocation.",
+    no_array_bill:        "Awaiting the array's GMP bill to cross-check the allocation.",
+    no_share:             "Set this offtaker's share to cross-check the GMP allocation.",
+  };
+  function reconAllocHTML(row) {
+    const al = row && row.allocation;
+    if (!al || !al.status) return "";
+    const note = al.note ? `<div class="rb-bac-note">${esc(al.note)}</div>` : "";
+    if (al.status === "mismatch") {
+      const dollars = al.delta_dollars != null ? money(Math.abs(al.delta_dollars)) : null;
+      return `<div class="rb-bac-block rb-bac-flag">
+          <div class="rb-bac-blabel">
+            <span class="rb-bac-flagicon" aria-hidden="true">⚑</span>GMP allocation cross-check
+            ${dollars ? `<span class="rb-bac-atstake">≈ ${dollars} at stake</span>` : ""}
+          </div>
+          <div class="rb-bac-figs">
+            <div class="rb-bac-fig"><b>${fmt0(al.offtaker_credited_kwh)}</b><span>GMP credited this offtaker</span></div>
+            <div class="rb-bac-fig"><b>${fmt0(al.expected_kwh)}</b><span>expected (share × group excess)</span></div>
+            <div class="rb-bac-fig rb-bac-fig-imp"><b>${fmt0(al.implied_group_total_kwh)}</b><span>group total GMP implied</span></div>
+            <div class="rb-bac-fig"><b>${fmt0(al.array_group_excess_kwh)}</b><span>group excess on the array bill</span></div>
+          </div>
+          ${note}
+        </div>`;
+    }
+    if (al.status === "match") {
+      return `<div class="rb-bac-block">
+          <div class="rb-bac-blabel">GMP allocation cross-check
+            <span class="rb-bac-ok-pill">✓ checks out</span></div>
+          ${note}
+        </div>`;
+    }
+    if (al.status === "error") {
+      return `<div class="rb-bac-block">
+          <div class="rb-bac-blabel rb-bac-mute">GMP allocation cross-check</div>
+          <div class="rb-bac-note rb-bac-mute">${esc(al.note || "Couldn't run this check right now.")}</div>
+        </div>`;
+    }
+    // Honest non-run states — render the note quietly, never as a flag.
+    const quiet = al.note || _ALLOC_QUIET[al.status] || "This check isn't ready to run yet.";
+    return `<div class="rb-bac-block">
+        <div class="rb-bac-blabel rb-bac-mute">GMP allocation cross-check</div>
+        <div class="rb-bac-note rb-bac-mute">${esc(quiet)}</div>
+      </div>`;
+  }
+
+  // The full per-offtaker "Bill accuracy check" body for a draft's subscription.
+  // Returns null when we have no reconcile row for it (so the section can hide).
+  function reconPanelHTML(subId) {
+    const row = reconFor(subId);
+    if (!row) return null;
+    const arrs = reconArraysHTML(row);
+    const alloc = reconAllocHTML(row);
+    if (!arrs && !alloc) return null;
+    return `<div class="rb-bac">${arrs}${alloc}</div>`;
+  }
+  // Does this offtaker's check carry a hard flag (the allocation $-mismatch)?
+  function reconFlagged(subId) {
+    const row = reconFor(subId);
+    return !!(row && row.allocation && row.allocation.status === "mismatch");
+  }
+  // Sub-label for the collapsed section header — surfaces the catch without a click.
+  function reconSecSub(subId) {
+    const row = reconFor(subId);
+    if (!row) return "";
+    if (row.allocation && row.allocation.status === "mismatch") {
+      const d = row.allocation.delta_dollars;
+      return d != null ? "⚑ allocation off by ≈ " + money(Math.abs(d)) : "⚑ allocation mismatch";
+    }
+    const arrMis = (row.arrays || []).some(a => a.status === "mismatch");
+    if (arrMis) return "⚑ differs from the GMP bill";
+    if (row.overall_status === "match") return "✓ reconciles cleanly";
+    return "production vs the utility bill";
+  }
+
+  // The top-level summary strip in the generator hero: a subtle amber chip when
+  // anything is flagged (allocation mismatches + array production-vs-bill
+  // mismatches), or a quiet "bills reconcile cleanly" note when the check ran and
+  // found nothing. Nothing at all before the check has run. Clicking the chip opens
+  // the first flagged offtaker's card so the operator lands straight on the catch.
+  function reconArrayMismatchCount() {
+    if (!RECON || !Array.isArray(RECON.subscriptions)) return 0;
+    return RECON.subscriptions.filter(r =>
+      (r.arrays || []).some(a => a.status === "mismatch")).length;
+  }
+  // The sub_id of the first offtaker carrying a hard flag, for click-to-jump.
+  function firstFlaggedSub() {
+    if (!RECON || !Array.isArray(RECON.subscriptions)) return null;
+    const hit = RECON.subscriptions.find(r =>
+      (r.allocation && r.allocation.status === "mismatch") ||
+      (r.arrays || []).some(a => a.status === "mismatch"));
+    return hit ? hit.sub_id : null;
+  }
+  function bacSummaryHTML() {
+    if (!RECON) return "";                       // check hasn't run yet — show nothing
+    const allocN = RECON.allocation_flagged || 0;
+    const arrN = reconArrayMismatchCount();
+    const dollars = RECON.allocation_dollars_flagged || 0;
+    const flaggedSubs = new Set();
+    (RECON.subscriptions || []).forEach(r => {
+      if ((r.allocation && r.allocation.status === "mismatch") ||
+          (r.arrays || []).some(a => a.status === "mismatch")) flaggedSubs.add(r.sub_id);
+    });
+    const n = flaggedSubs.size;
+    if (!n) {
+      return `<span class="rb-bac-clean" title="Every offtaker's production and GMP allocation reconciles against the utility bill.">✓ Bills reconcile cleanly</span>`;
+    }
+    const dTxt = dollars > 0 ? " · " + money(dollars) : "";
+    const label = `⚑ ${n} bill check${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} review${dTxt}`;
+    const tip = allocN
+      ? `${allocN} GMP allocation mismatch${allocN === 1 ? "" : "es"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""} — click to review.`
+      : `${arrN} offtaker${arrN === 1 ? "" : "s"} differ from the GMP bill — click to review.`;
+    return `<span class="rb-bac-chip" id="rbBacChip" role="button" tabindex="0" title="${esc(tip)}">${label}</span>`;
+  }
+  // Re-render the summary chip in place (after the reconcile data lands post-paint).
+  function refreshBacSummary() {
+    const host = document.getElementById("rbBacSummary");
+    if (!host) return;
+    host.innerHTML = bacSummaryHTML();
+    wireBacChip(host);
+  }
+  function wireBacChip(host) {
+    const chip = host && host.querySelector("#rbBacChip");
+    if (!chip) return;
+    const jump = () => {
+      const sid = firstFlaggedSub();
+      if (sid == null) return;
+      expandAccordion(String(sid));
+    };
+    chip.onclick = jump;
+    chip.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } };
+  }
+
   // ── pdf.js: paint page 1 of a PDF onto a <canvas> inside `paper` — no browser
   //    PDF-viewer chrome. Shared by the template-card preview AND the approval-inbox
   //    draft preview, so both show the REAL reproduced invoice (not lossy token-HTML).
@@ -1705,6 +1916,16 @@
       const drafts = await draftsP;
       INBOX_UTIL_ACCTS = utilAccts || [];
       renderAccordion(subs, arrs, utilAccts, drafts);
+      // Bill accuracy check: fetch the reconcile payload (once, cached) alongside the
+      // list. When it lands, paint the top-level summary chip and — if a card is
+      // already open — fill its "Bill accuracy check" section, no reload needed.
+      if (authHeaders() && !RECON) {
+        loadReconcile().then(r => {
+          if (!r) return;
+          refreshBacSummary();
+          if (ACTIVE_SUB_ID != null) renderAccordionBody(ACTIVE_SUB_ID);
+        });
+      }
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
     }
@@ -1892,7 +2113,9 @@
     } else {
       body = OFFTAKERS.map(s => subCard(s, arrs, utilAccts)).join("");
     }
-    list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` + body;
+    list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
+      `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + body;
+    wireBacChip($("#rbBacSummary"));
     wireAccordionHeaders(list);
     // TOP level — provider collapse (GMP / VEC / WEC). Whole header clickable, keyboard-OK.
     // (.rb-prov-head and .rb-grp-head are siblings' children, not nested, so the two
@@ -2236,6 +2459,14 @@
     // A cached draft is shown instantly; pull the latest GMP bill + recompute in the
     // background so a freshly-released statement is reflected without a manual regen.
     if (DRAFT_BY_SUB[sid] && authHeaders()) backgroundRefreshDraft(sid);
+    // Bill accuracy check: if the reconcile data hasn't landed yet, fetch it and
+    // re-render this card's body once (only while it's still the open card) so the
+    // "Bill accuracy check" section fills in without a reload.
+    if (authHeaders() && !RECON) {
+      loadReconcile().then(r => {
+        if (r && String(ACTIVE_SUB_ID) === sid) { renderAccordionBody(sid); refreshBacSummary(); }
+      });
+    }
     if (!(opts && opts.silent)) {
       requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     }
@@ -2875,6 +3106,16 @@
     const trackerBox = sid
       ? `<div class="rb-track rb-track-sub" data-tracker-base="${API}/subscriptions/${sid}/tracker" data-tracker-scope="offtaker" data-tracker-name="${esc(d.customer_name || "")}" hidden></div>`
       : `<p class="rb-sec-empty">Save this offtaker to add a generation spreadsheet.</p>`;
+    // Bill accuracy check — the production-vs-bill + GMP-allocation cross-check for
+    // THIS offtaker (from /reconcile-bills, indexed by sub_id). Only shown when we
+    // have a reconcile row; opens by default when a hard allocation mismatch was
+    // caught so the $25 catch is visible without a click. If the reconcile data
+    // hasn't arrived yet on first paint, expandAccordion re-renders once it lands.
+    const bacBody = sid != null ? reconPanelHTML(sid) : null;
+    const bacFlagged = sid != null && reconFlagged(sid);
+    const bacSec = bacBody
+      ? sec("Bill accuracy check", bacBody, reconSecSub(sid), bacFlagged)
+      : "";
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
@@ -2886,6 +3127,7 @@
         ${sec("Invoice template", tplSlot, "PDF / Excel format", false)}
         ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false)}
         ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false)}
+        ${bacSec}
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
            with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
            <b>Nothing sends until you click Approve &amp; send</b> (at the top).</p>
