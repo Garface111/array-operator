@@ -412,6 +412,10 @@
         if (window.__aoLinkUtility) { window.__aoLinkUtility(); }
         else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
       };
+      // "⬇ Export to QuickBooks / Xero" — this reaches shell() only on the signed-in
+      // path (the signed-out/demo branch returns earlier), so revealing + wiring the
+      // export box here inherently gates it to authed operators.
+      wireExport();
       el.dataset.rbBuilt = "1";
     }
     // Heavy invoice-template preview: wire ONCE, and only when the tab is really
@@ -487,6 +491,68 @@
     } else {
       host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
     }
+  }
+
+  // ── Export to QuickBooks / Xero ────────────────────────────────────────────
+  // A portfolio-level batch action: download the current period's offtaker invoices
+  // as a QuickBooks/Xero-import CSV. The endpoint requires the Bearer header, so a
+  // plain <a href download> can't carry auth — we do an authenticated fetch → blob →
+  // object-URL download instead. Only revealed for a signed-in operator (the demo/
+  // signed-out path never builds this shell). The optional account-code input maps
+  // solar income to a QB/Xero income account and persists in localStorage.
+  const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
+  function wireExport() {
+    const box = $("#rbExportBox"), btn = $("#rbExportQb"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
+    if (!box || !btn) return;
+    if (!authHeaders()) { box.hidden = true; return; }   // defensive; demo never reaches here
+    box.hidden = false;
+    // Restore the remembered account code.
+    if (acct) {
+      try { acct.value = localStorage.getItem(EXPORT_ACCT_KEY) || ""; } catch (e) {}
+      acct.addEventListener("input", () => {
+        try { localStorage.setItem(EXPORT_ACCT_KEY, acct.value.trim()); } catch (e) {}
+      });
+      // Enter in the account field triggers the export too.
+      acct.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doExport(); } });
+    }
+    const setStat = (cls, msg) => { if (stat) { stat.className = "rb-export-stat" + (cls ? " " + cls : ""); stat.textContent = msg || ""; } };
+    let _busy = false;
+    async function doExport() {
+      if (_busy) return;
+      _busy = true; btn.disabled = true;
+      setStat("rb-busy", "Exporting…");
+      const code = acct && acct.value.trim();
+      const url = API + "/invoice-export.csv" + (code ? "?account_code=" + encodeURIComponent(code) : "");
+      try {
+        const r = await fetch(url, { headers: authHeaders() });
+        if (!r.ok) {
+          // Surface the backend reason when it sends one (e.g. "no invoices this period").
+          let detail = "";
+          try { const d = await r.clone().json(); detail = (d && d.detail) || ""; } catch (e) {}
+          throw new Error(detail || ("Export failed (HTTP " + r.status + ")."));
+        }
+        const count = r.headers.get("X-Invoice-Count");
+        const blob = await r.blob();
+        if (!blob || blob.size === 0) throw new Error("No invoices to export for this period yet.");
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objUrl;
+        a.download = "offtaker-invoices.csv";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
+        const n = count != null ? Number(count) : null;
+        setStat("rb-ok", n != null
+          ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for QuickBooks / Xero.")
+          : "✓ Exported — CSV downloaded.");
+      } catch (e) {
+        setStat("rb-err", (e && e.message) || "Export failed — check your connection.");
+      } finally {
+        _busy = false; btn.disabled = false;
+      }
+    }
+    btn.onclick = doExport;
   }
 
   function signInPrompt() {
@@ -654,6 +720,19 @@
             <h3>Your offtakers</h3>
           </div>
           <div class="rb-head-actions">
+            <!-- Portfolio-level batch export: this period's offtaker invoices as a
+                 QuickBooks/Xero-ready CSV. Authenticated fetch → blob download (the
+                 endpoint needs the Bearer header, so a plain <a download> can't work).
+                 The optional account-code input maps solar income to a QB/Xero account
+                 and persists in localStorage (Anna's ask #3). -->
+            <div class="rb-export" id="rbExportBox" hidden>
+              <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
+                     placeholder="Account code" maxlength="40" autocomplete="off"
+                     title="Optional — the QuickBooks/Xero income account these solar invoices post to (e.g. 4000). Remembered for next time.">
+              <button class="ao-btn rb-btn" id="rbExportQb" type="button"
+                      title="Download all offtaker invoices this period as a CSV for QuickBooks or Xero.">⬇ Export to QuickBooks / Xero</button>
+              <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
+            </div>
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
             <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster — name, percent share, and (ideally) account number.">⬆ Bulk import</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
