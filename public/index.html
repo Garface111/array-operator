@@ -156,10 +156,10 @@
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Health</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverter Dashboard</a>
-    <!-- Trends tab removed for now (Ford). The portal is gone, but #panelTrends, trends.js,
-         the TABS["trends"] route + #trends deep-link, and the backend fleet-trends endpoint
-         are all kept intact — re-add this <a> to restore the tab. -->
     <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
+    <!-- Trends restored for PowerTrack-parity multi-timeframe views (fleet kWh by
+         year + seasonal YoY). Route/panel/JS were kept intact; this <a> re-enables it. -->
+    <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
@@ -292,7 +292,7 @@
 
 </div>
 
-<script src="fleet-store.js?v=20260630a"></script>
+<script src="fleet-store.js?v=20260630b"></script>
 <!-- Anonymous-demo data — a coherent fake operator (Catamount Community Solar, the
      "both" plan) so signed-out visitors see a populated Master Account + Offtaker
      Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
@@ -305,12 +305,14 @@
 <script src="reports.js?v=26"></script>
 <!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
      self-contained section modules (each registers on window.AnalysisSections). -->
-<script src="analysis.js?v=1"></script>
+<script src="analysis.js?v=2"></script>
 <script src="analysis-fleet-summary.js?v=1"></script>
-<script src="analysis-sites-grid.js?v=2"></script>
+<script src="analysis-sites-grid.js?v=3"></script>
 <script src="analysis-performance.js?v=1"></script>
 <script src="analysis-alarms.js?v=1"></script>
+<script src="analysis-events.js?v=1"></script>
 <script src="analysis-hardware.js?v=1"></script>
+<script src="analysis-files.js?v=1"></script>
 <script src="trends-core.js"></script>
 <script src="trends-analytics.js"></script>
 <script src="trends-report.js"></script>

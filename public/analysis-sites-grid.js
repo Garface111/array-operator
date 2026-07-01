@@ -27,6 +27,8 @@
   var sortDir = "asc";     // ratio asc → low % at the top (PowerTrack default)
   var searchText = "";
   var groupBy = "none";          // "none" | "portfolio" | "vendor"
+  var groupBy2 = "none";         // secondary "then by": "none" | "portfolio" | "vendor"
+  var density = "comfortable";   // "comfortable" | "compact" — pure CSS density switch
   var collapsedGroups = {};      // {mode: Set(groupKey)} — per-mode collapse state
   function collapsedSetFor(mode) {
     if (!collapsedGroups[mode]) collapsedGroups[mode] = Object.create(null);
@@ -49,7 +51,7 @@
       ".ansg-search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--faint);pointer-events:none}",
       ".ansg-count{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}",
       // table
-      ".ansg-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;min-width:880px}",
+      ".ansg-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;min-width:1000px}",
       ".ansg-table th,.ansg-table td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}",
       ".ansg-table thead th{position:sticky;top:0;z-index:1;background:var(--card2);color:var(--muted);font-size:10.5px;font-weight:740;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;user-select:none;border-bottom:1px solid var(--line)}",
       ".ansg-table thead th.ansg-sortable:hover{color:var(--ink)}",
@@ -131,7 +133,45 @@
       ".ansg-table tbody tr:hover .ansg-assign{opacity:1}",
       ".ansg-assign:hover{border-color:var(--good2);color:var(--good2);border-style:solid}",
       ".ansg-assign.ansg-has{opacity:.65;border-style:solid;border-color:var(--line)}",
-      ".ansg-table tbody tr:hover .ansg-assign.ansg-has{opacity:1}"
+      ".ansg-table tbody tr:hover .ansg-assign.ansg-has{opacity:1}",
+      // per-site weather icon column (PowerTrack-style)
+      ".ansg-wxcell{width:1%;text-align:center;padding-left:6px;padding-right:6px}",
+      ".ansg-wx{display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;cursor:default}",
+      ".ansg-wx.good{color:var(--good)}",
+      ".ansg-wx.sky{color:var(--sky)}",
+      ".ansg-wx.muted{color:var(--faint)}",
+      ".ansg-wx-none{color:var(--faint)}",
+      // reminders / O&M note column
+      ".ansg-remcell{max-width:190px}",
+      ".ansg-rem{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;color:var(--muted);font-size:12px}",
+      ".ansg-rem.ansg-editable{cursor:pointer;border-bottom:1px dotted var(--line)}",
+      ".ansg-rem.ansg-editable:hover{color:var(--ink);border-bottom-color:var(--good2)}",
+      ".ansg-remadd{appearance:none;background:transparent;border:0;color:var(--faint);font:inherit;font-size:14px;font-weight:700;line-height:1;padding:0 4px;cursor:pointer;opacity:0;transition:opacity .12s,color .12s}",
+      ".ansg-table tbody tr:hover .ansg-remadd{opacity:.8}",
+      ".ansg-remadd:hover{color:var(--good2);opacity:1}",
+      ".ansg-remdot{color:var(--faint)}",
+      // density: compact tightens padding + font on the table wrapper
+      ".ansg-wrap.ansg-compact .ansg-table{font-size:11.5px}",
+      ".ansg-wrap.ansg-compact .ansg-table th,.ansg-wrap.ansg-compact .ansg-table td{padding:5px 9px}",
+      ".ansg-wrap.ansg-compact .ansg-table thead th{font-size:9.5px}",
+      ".ansg-wrap.ansg-compact .ansg-grouphead td{padding-top:5px;padding-bottom:5px}",
+      ".ansg-wrap.ansg-compact .ansg-subhead td{padding-top:4px;padding-bottom:4px}",
+      ".ansg-wrap.ansg-compact .ansg-table tfoot td{padding-top:7px;padding-bottom:7px}",
+      // secondary "then by" selector in the toolbar
+      ".ansg-thenby{display:flex;align-items:center;gap:7px}",
+      ".ansg-thenby > span{color:var(--faint);font-size:10.5px;font-weight:740;letter-spacing:.06em;text-transform:uppercase}",
+      // secondary sub-group header rows (lighter + indented under the primary)
+      ".ansg-subhead{cursor:default;user-select:none}",
+      ".ansg-subhead td{background:var(--card);border-bottom:1px solid var(--line);padding-top:6px;padding-bottom:6px}",
+      ".ansg-shd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-left:22px}",
+      ".ansg-shd::before{content:'';flex:0 0 auto;width:8px;height:8px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);margin-right:2px;transform:translateY(-2px)}",
+      ".ansg-sname{font-weight:700;color:var(--muted);font-size:12px;letter-spacing:.01em}",
+      ".ansg-sname.ansg-unassigned{color:var(--faint);font-weight:640}",
+      ".ansg-scount{color:var(--faint);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}",
+      ".ansg-sroll{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:11.5px;font-variant-numeric:tabular-nums}",
+      ".ansg-sroll .ansg-gm{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap}",
+      ".ansg-sroll .ansg-gm i{font-style:normal;color:var(--faint);font-size:9.5px;font-weight:740;letter-spacing:.04em;text-transform:uppercase}",
+      ".ansg-sroll .ansg-gm b{color:var(--muted);font-weight:680}"
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -269,6 +309,10 @@
 
     var ratio = fc ? num(fc.ratio_pct) : null;
     var expected = fc ? num(fc.expected_kwh) : null;
+    // Open-Meteo weathercode (int) if the forecast row carries one
+    var wxCode = (fc && typeof fc.weather_code === "number" && isFinite(fc.weather_code)) ? fc.weather_code : null;
+    // operator O&M note on the site (string|null); empty string → treated as none
+    var reminder = (typeof col.reminder === "string" && col.reminder.trim()) ? col.reminder.trim() : null;
 
     // region only if it's a real value (real columns carry "—"); look up canonical
     var region = null;
@@ -299,6 +343,8 @@
       expected: expected,
       ratio: ratio,
       hasForecast: !!fc,
+      wxCode: wxCode,
+      reminder: reminder,
       win: win,
       cap: cap
     };
@@ -333,8 +379,10 @@
   var COLS = [
     { key: "status", label: "", sortable: true, cls: "ansg-dotcell" },
     { key: "name", label: "Site", sortable: true },
+    { key: "reminder", label: "Notes", sortable: false, cls: "ansg-remcell" },
     { key: "trend", label: "14-day", sortable: false },
     { key: "now", label: "Producing now", sortable: true, num: true },
+    { key: "wx", label: "Sky", sortable: false, cls: "ansg-wxcell" },
     { key: "expected", label: "Expected", sortable: true, num: true },
     { key: "ratio", label: "Actual vs expected", sortable: true },
     { key: "window", label: "This window", sortable: true, num: true },
@@ -358,8 +406,32 @@
     }
     return '<td><div class="ansg-name-row"><span class="ansg-name" title="' + ctx.esc(r.name) + '">' + ctx.esc(r.name) + '</span>' + tag + assign + '</div>' + region + '</td>';
   }
+  // reminders / O&M note. Editable only when signed in AND the mutator exists;
+  // on the anon demo the note is read-only (shown if present, nothing if not).
+  function cellReminder(r, ctx) {
+    var canEdit = !!(ctx.signedIn && ctx.live && ctx.live.setArrayReminder);
+    if (r.reminder) {
+      var cls = "ansg-rem" + (canEdit ? " ansg-editable" : "");
+      var edit = canEdit ? ' data-reminder="' + ctx.esc(r.aid) + '"' : "";
+      return '<td class="ansg-remcell"><span class="' + cls + '" title="' + ctx.esc(r.reminder) + '"' + edit + '>' + ctx.esc(r.reminder) + '</span></td>';
+    }
+    // empty → a quiet add affordance when editable, otherwise nothing
+    if (canEdit) {
+      return '<td class="ansg-remcell"><button type="button" class="ansg-remadd" data-reminder="' + ctx.esc(r.aid) + '" title="Add an O&amp;M note">＋</button></td>';
+    }
+    return '<td class="ansg-remcell"></td>';
+  }
   function cellTrend(r) {
     return '<td>' + sparkline(r.series) + '</td>';
+  }
+  // per-site weather glyph via ctx.sky(weather_code). null → faint "·" (honest:
+  // nothing rendered when the forecast row has no code).
+  function cellWeather(r, ctx) {
+    var sky = (typeof ctx.sky === "function" && r.wxCode != null) ? ctx.sky(r.wxCode) : null;
+    if (!sky || !sky.glyph) return '<td class="ansg-wxcell"><span class="ansg-wx-none" aria-hidden="true">·</span></td>';
+    var tone = sky.tone === "good" ? "good" : sky.tone === "sky" ? "sky" : sky.tone === "muted" ? "muted" : "";
+    var label = ctx.esc(sky.label || "");
+    return '<td class="ansg-wxcell"><span class="ansg-wx ' + tone + '" title="' + label + '" aria-label="' + label + '" role="img">' + ctx.esc(sky.glyph) + '</span></td>';
   }
   function cellNow(r, ctx) {
     var kw = ctx.fmt.kwFromW(r.powerW);
@@ -436,6 +508,36 @@
       }).join("") +
       '</div></div>';
 
+    // ---- secondary "then by" — only when a primary group is active. Offers
+    // None + whichever of Portfolio/Vendor isn't already the primary. -----------
+    if (groupBy === "none" || (groupBy2 !== "none" && groupBy2 === groupBy)) groupBy2 = "none";
+    var thenByHtml = "";
+    if (groupBy !== "none") {
+      var secondary = groupBy === "portfolio" ? "vendor" : "portfolio";
+      var THEN_OPTS = [
+        { v: "none", label: "None" },
+        { v: secondary, label: secondary.charAt(0).toUpperCase() + secondary.slice(1) }
+      ];
+      thenByHtml =
+        '<div class="ansg-thenby"><span>then by</span><div class="an-seg" role="tablist">' +
+        THEN_OPTS.map(function (o) {
+          return '<button type="button" class="an-seg-btn' + (groupBy2 === o.v ? " on" : "") + '" data-then-by="' + o.v + '">' + ctx.esc(o.label) + '</button>';
+        }).join("") +
+        '</div></div>';
+    }
+
+    // ---- density segmented control (comfortable / compact) --------------------
+    var DENS_OPTS = [
+      { v: "comfortable", label: "Comfortable" },
+      { v: "compact", label: "Compact" }
+    ];
+    var densCtlHtml =
+      '<div class="ansg-groupctl"><span>Density</span><div class="an-seg" role="tablist">' +
+      DENS_OPTS.map(function (o) {
+        return '<button type="button" class="an-seg-btn' + (density === o.v ? " on" : "") + '" data-density="' + o.v + '">' + ctx.esc(o.label) + '</button>';
+      }).join("") +
+      '</div></div>';
+
     // honest sub-line: how many sites can't be weather-modeled yet
     var unmodeled = rows.filter(function (r) { return !r.hasForecast; }).length;
     var subline;
@@ -461,8 +563,8 @@
     // ---- body -----------------------------------------------------------------
     function siteRow(r) {
       return '<tr>' +
-        cellStatus(r) + cellName(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
-        cellExpected(r, ctx) + cellRatio(r, ctx) + cellWindow(r, ctx) + cellCap(r, ctx) +
+        cellStatus(r) + cellName(r, ctx) + cellReminder(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
+        cellWeather(r, ctx) + cellExpected(r, ctx) + cellRatio(r, ctx) + cellWindow(r, ctx) + cellCap(r, ctx) +
         '</tr>';
     }
     // a group header row spanning the table, with rollup metrics
@@ -493,6 +595,35 @@
         '</td></tr>';
     }
 
+    // a lighter secondary sub-group header (mini rollup: count + capacity only)
+    function subGroupHeaderRow(label, isUnassigned, roll) {
+      return '<tr class="ansg-subhead">' +
+        '<td colspan="' + COLS.length + '">' +
+        '<div class="ansg-shd">' +
+        '<span class="ansg-sname' + (isUnassigned ? " ansg-unassigned" : "") + '">' + ctx.esc(label) + '</span>' +
+        '<span class="ansg-scount">' + roll.count + ' site' + (roll.count === 1 ? "" : "s") + '</span>' +
+        '<span class="ansg-sroll">' +
+        '<span class="ansg-gm"><i>cap</i><b>' + (roll.hasCap ? ctx.esc(ctx.fmt.kw(roll.cap)) : "—") + '</b></span>' +
+        '</span>' +
+        '</div>' +
+        '</td></tr>';
+    }
+    // partition a set of rows by a mode into ordered { key,label,last,rows } buckets
+    function partition(rs, mode) {
+      var ord = [], bks = {};
+      rs.forEach(function (r) {
+        var g = groupKeyFor(r, mode);
+        if (!bks[g.key]) { bks[g.key] = { label: g.label, last: g.last, rows: [] }; ord.push(g.key); }
+        bks[g.key].rows.push(r);
+      });
+      ord.sort(function (ka, kb) {
+        var a = bks[ka], b = bks[kb];
+        if (a.last !== b.last) return a.last ? 1 : -1;
+        return a.label.localeCompare(b.label);
+      });
+      return ord.map(function (k) { return bks[k]; });
+    }
+
     var bodyHtml;
     if (!shown.length) {
       var msg = q ? 'No sites match "' + ctx.esc(searchText) + '".' : "No sites in this fleet yet.";
@@ -502,26 +633,25 @@
     } else {
       // partition the already-filtered+sorted rows into groups, preserving the
       // per-group sort. Order groups: "last" buckets (Unassigned/Other) sink,
-      // the rest alphabetically.
-      var order = [];          // group keys in display order
-      var buckets = {};        // key -> { label, last, rows: [] }
-      shown.forEach(function (r) {
-        var g = groupKeyFor(r, groupBy);
-        if (!buckets[g.key]) { buckets[g.key] = { label: g.label, last: g.last, rows: [] }; order.push(g.key); }
-        buckets[g.key].rows.push(r);
-      });
-      order.sort(function (ka, kb) {
-        var a = buckets[ka], b = buckets[kb];
-        if (a.last !== b.last) return a.last ? 1 : -1;     // last buckets to the end
-        return a.label.localeCompare(b.label);
-      });
+      // the rest alphabetically. When a secondary "then by" is active, each
+      // primary group nests sub-group headers before its rows.
+      var useSecondary = groupBy2 !== "none";
       var collapsedSet = collapsedSetFor(groupBy);
-      bodyHtml = order.map(function (key) {
-        var g = buckets[key];
+      bodyHtml = partition(shown, groupBy).map(function (g) {
         var roll = groupRollup(g.rows, ctx);
-        var collapsed = !!collapsedSet[key];
+        var collapsed = !!collapsedSet[g.label];
         var head = groupHeaderRow(g.label, g.last && g.label === UNASSIGNED, roll, collapsed);
-        var body = collapsed ? "" : g.rows.map(siteRow).join("");
+        if (collapsed) return head;
+        var body;
+        if (useSecondary) {
+          body = partition(g.rows, groupBy2).map(function (sg) {
+            var sroll = groupRollup(sg.rows, ctx);
+            return subGroupHeaderRow(sg.label, sg.last && sg.label === UNASSIGNED, sroll) +
+              sg.rows.map(siteRow).join("");
+          }).join("");
+        } else {
+          body = g.rows.map(siteRow).join("");
+        }
         return head + body;
       }).join("");
     }
@@ -533,8 +663,10 @@
         '<tfoot><tr>' +
         '<td class="ansg-dotcell"></td>' +
         '<td class="ansg-tlabel">' + rows.length + ' site' + (rows.length === 1 ? "" : "s") + '</td>' +
+        '<td class="ansg-remcell"></td>' +
         '<td></td>' +
         '<td class="ansg-num"></td>' +
+        '<td class="ansg-wxcell"></td>' +
         '<td class="ansg-num"></td>' +
         '<td class="ansg-ave">' + (fleetPct != null
           ? '<span class="ansg-pct ' + (fleetPct > 115 ? "over" : ratioBucket(fleetPct) === "bad" ? "bad" : ratioBucket(fleetPct) === "neutral" ? "neutral" : "") + '">' + fleetPct + '%</span> <span class="ansg-faint" style="font-weight:600">fleet</span>'
@@ -559,11 +691,13 @@
       '      </div>' +
       '      <div class="ansg-tools">' +
       groupCtlHtml +
+      thenByHtml +
+      densCtlHtml +
       '        <span class="ansg-count">' + shown.length + (q ? " of " + rows.length : "") + ' shown</span>' +
       '      </div>' +
       '    </div>' +
       '  </div>' +
-      '  <div class="ansg-wrap">' +
+      '  <div class="ansg-wrap' + (density === "compact" ? " ansg-compact" : "") + '">' +
       '    <table class="ansg-table">' +
       '      <thead><tr>' + headHtml + '</tr></thead>' +
       '      <tbody>' + bodyHtml + '</tbody>' +
@@ -603,16 +737,29 @@
       });
     }
 
-    // group-by segmented control → switch partition mode
-    var grpCtl = container.querySelector(".ansg-groupctl");
-    if (grpCtl) {
-      grpCtl.addEventListener("click", function (e) {
-        var btn = e.target.closest("[data-group-by]");
-        if (!btn) return;
-        var v = btn.getAttribute("data-group-by");
-        if (v === groupBy) return;
-        groupBy = v;
-        render(container, ctx);
+    // toolbar segmented controls (group-by / then-by / density) → one delegated
+    // listener so every .ansg-groupctl wrapper is covered, not just the first.
+    var tools = container.querySelector(".ansg-tools");
+    if (tools) {
+      tools.addEventListener("click", function (e) {
+        var gb = e.target.closest("[data-group-by]");
+        if (gb) {
+          var gv = gb.getAttribute("data-group-by");
+          if (gv !== groupBy) { groupBy = gv; render(container, ctx); }
+          return;
+        }
+        var tb = e.target.closest("[data-then-by]");
+        if (tb) {
+          var tv = tb.getAttribute("data-then-by");
+          if (tv !== groupBy2) { groupBy2 = tv; render(container, ctx); }
+          return;
+        }
+        var db = e.target.closest("[data-density]");
+        if (db) {
+          var dv = db.getAttribute("data-density");
+          if (dv !== density) { density = dv; render(container, ctx); }
+          return;
+        }
       });
     }
 
@@ -643,6 +790,24 @@
           next = String(next).trim();
           if (next === current) return;             // no change
           try { ctx.live.setArrayPortfolio(aid, next); } catch (_) { }
+        });
+      });
+    }
+
+    // reminders / O&M note → prompt (prefill current) + persist via the live
+    // mutator. Blank clears. FleetStore mutation re-renders the orchestrator.
+    if (ctx.signedIn && ctx.live && ctx.live.setArrayReminder) {
+      container.querySelectorAll("[data-reminder]").forEach(function (el) {
+        el.addEventListener("click", function (e) {
+          e.stopPropagation();   // don't bubble into a group-header collapse
+          var aid = el.getAttribute("data-reminder");
+          var current = "";
+          for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { current = rows[i].reminder || ""; break; } }
+          var next = window.prompt("O&M note for this site (leave blank to clear):", current);
+          if (next == null) return;                 // cancelled
+          next = String(next).trim();
+          if (next === current) return;             // no change
+          try { ctx.live.setArrayReminder(aid, next); } catch (_) { }
         });
       });
     }

@@ -80,6 +80,7 @@ window.FleetStore = (function(){
       host: _str(a.host, 200),
       vendor: _str(a.vendor, 40),
       portfolio_name: a.portfolio_name != null ? _str(a.portfolio_name, 80) : null,
+      reminder: a.reminder != null ? _str(a.reminder, 2000) : null,
       inverters: invs,
     };
   }
@@ -289,6 +290,7 @@ window.FleetStore = (function(){
     const columns = list.map(a => ({
       array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
       portfolio_name: a.portfolio_name || null,   // Analysis-tab grouping label
+      reminder: a.reminder || null,               // Analysis-tab O&M note
       inverter_source: a.vendor || "solaredge", inverter_count: a.inverters.length,
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
@@ -504,6 +506,21 @@ window.FleetStore = (function(){
     if(isLive()){
       apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/portfolio",
               { portfolio_name: next })
+        .then(() => refetch()).catch(() => refetch());
+    }
+  }
+
+  // Assign/clear an array's O&M reminder note (Analysis Sites "Reminder" column).
+  // Optimistic + persist, mirroring setArrayPortfolio. Empty clears.
+  function setArrayReminder(id, note){
+    const a = findArray(id); if(!a) return;
+    const next = String(note == null ? "" : note).trim().slice(0,2000) || null;
+    if(next === (a.reminder || null)) return;                // unchanged → no-op
+    a.reminder = next;
+    notify();
+    if(isLive()){
+      apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/reminder",
+              { reminder: next })
         .then(() => refetch()).catch(() => refetch());
     }
   }
@@ -801,6 +818,7 @@ window.FleetStore = (function(){
       // null until grouped. Carried through so both the canonical array and
       // toColumns expose it without a second fetch.
       portfolio_name: c.portfolio_name || null,
+      reminder: c.reminder || null,   // Analysis Sites O&M "Reminder" note
       // Array-level production history (backend DailyGeneration) — used by the
       // array graph when inverters carry site-level history but no per-inverter
       // series (e.g. Chint weekETrend backfill).
@@ -903,7 +921,7 @@ window.FleetStore = (function(){
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
-    renameArray, renameInverter, setArrayPortfolio,
+    renameArray, renameInverter, setArrayPortfolio, setArrayReminder,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,
