@@ -702,11 +702,13 @@
     const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
     let flagged = 0, crit = 0, lostKwh = 0, liveAnoms = 0;
     for(const inv of invs){
-      // A LIVE anomaly (dark right now while peers produce) the 14-day health
-      // hasn't flagged yet still counts as flagged here — otherwise the tile reads
-      // "all good" while a card inside it shows "Not producing". Shared classifier.
-      const liveBad = inv.status === "ok" && window.FleetStore && FleetStore.liveVerdict
-        && FleetStore.liveVerdict(inv, invs, col.is_daylight) === "dark";
+      // A LIVE anomaly (dark, OR low vs peers, right now while peers produce) the
+      // 14-day health hasn't flagged yet still counts as flagged here — otherwise the
+      // tile reads "all good" while a card inside shows "Not producing"/"Low vs peers".
+      // Shared classifier.
+      const _lvBad = inv.status === "ok" && window.FleetStore && FleetStore.liveVerdict
+        ? FleetStore.liveVerdict(inv, invs, col.is_daylight) : null;
+      const liveBad = _lvBad === "dark" || _lvBad === "low";
       if(inv.status === "ok"){
         if(liveBad){ flagged++; liveAnoms++; }
         continue;
@@ -1127,11 +1129,24 @@
   function liveVerdict(inv, peers, isDaylight){
     if(window.FleetStore && FleetStore.liveVerdict)
       return FleetStore.liveVerdict(inv, peers, isDaylight);
+    // Fallback (FleetStore absent — isolated render test). Mirrors FleetStore.liveVerdict,
+    // including the peer-level "low" check, so surfaces still agree without the store.
     if(isDaylight === false) return "ok";
     const floorOf = i => (i.nameplate_kw != null) ? Math.max(25, i.nameplate_kw*1000*0.01) : 25;
     const producing = i => i.current_power_w != null && i.current_power_w > floorOf(i);
-    if(producing(inv)) return "ok";
-    const litPeers = peers.filter(p =>
+    const pctOfMax = i => (i.nameplate_kw && i.current_power_w!=null) ? i.current_power_w/(i.nameplate_kw*1000) : null;
+    if(producing(inv)){
+      const lit = (peers||[]).filter(p => p.inverter_id !== inv.inverter_id && producing(p));
+      if(lit.length < 2) return "ok";
+      const myPct = pctOfMax(inv);
+      if(myPct == null) return "ok";
+      const peerPcts = lit.map(pctOfMax).filter(v => v != null).sort((a,b) => a-b);
+      if(peerPcts.length < 2) return "ok";
+      const med = peerPcts[Math.floor(peerPcts.length/2)];
+      if(med < 0.30) return "ok";
+      return myPct < med*0.85 ? "low" : "ok";
+    }
+    const litPeers = (peers||[]).filter(p =>
       p.inverter_id !== inv.inverter_id && producing(p)).length;
     if(litPeers < 2) return "ok";
     return (inv.current_power_w != null) ? "dark" : "stale";
@@ -1153,9 +1168,14 @@
   //   asleep    → lavender sun-down resting state (owned by the Sleeping visuals)
   function liveState(inv, peers, isDaylight, sleeping){
     if(sleeping) return { key:"asleep", label:"Asleep", tone:"sleep" };
+    const lv = liveVerdict(inv, peers, isDaylight);
+    // A producing-but-low inverter is still "reporting", so surface the peer-level gap
+    // as its NOW state BEFORE the plain green "Producing" chip — else a 42%-of-max unit
+    // beside 101% peers would read a calm "Producing" (Ford's Waterford case).
+    if(lv === "low")   return { key:"low",   label:"Low vs peers", tone:"warn",
+                                title:"Producing well below its sibling inverters right now (>15% under the peer median for its nameplate)." };
     if(outputState(inv, "ok").reporting)
       return { key:"producing", label:"Producing", tone:"ok" };
-    const lv = liveVerdict(inv, peers, isDaylight);
     if(lv === "dark")  return { key:"dark",  label:"Not producing", tone:"warn",
                                 title:"Dark right now while sibling inverters are producing." };
     if(lv === "stale") return { key:"stale", label:"No signal", tone:"info",
@@ -1171,10 +1191,10 @@
   // zeroes output stays "error" and never masquerades as "sleeping".
   function fourState(inv, peers, isDaylight, statusCls, sleeping){
     // ERROR: the 14-day peer verdict is flagged (underperforming/comm_gap → warn,
-    // dead/fault → bad), OR a live anomaly — dark right now while ≥2 daylight
-    // siblings produce. Either way it is making less than it should (a real loss).
+    // dead/fault → bad), OR a live anomaly — dark, or low vs peers, right now while
+    // ≥2 daylight siblings produce. Either way it is making less than it should.
     const lv = liveVerdict(inv, peers, isDaylight);
-    if(statusCls === "bad" || statusCls === "warn" || lv === "dark")
+    if(statusCls === "bad" || statusCls === "warn" || lv === "dark" || lv === "low")
       return { key:"error", word:"Error", tone:"bad",
                title: inv.diagnosis || "Flagged — producing less than it should." };
     // SLEEPING: sun-down rest (never an alarm).

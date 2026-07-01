@@ -249,16 +249,24 @@ window.FleetStore = (function(){
    * verdict). status answers "healthy over the window?"; liveVerdict answers
    * "producing this instant, vs its daylight peers?". An inverter that just
    * stalled reads status:"ok" for up to ~2 days — liveVerdict catches it now.
-   *   "ok"    producing, OR calmly idle (night / peers idle too / <2 lit peers)
+   *   "ok"    producing at a healthy level, OR calmly idle (night / peers idle / <2 lit peers)
+   *   "low"   producing but >15% below its live peers' output-per-nameplate — a peer-level gap
    *   "dark"  fresh reading ~0 W while >=2 daylight peers produce — a real anomaly
    *   "stale" NO live reading while peers produce — unknown, not a confirmed fault
    * ==========================================================================*/
   const LIVE_FLOOR_W = 25;   // below this (or 1% of rated) = idle, not "producing"
+  const LOW_PEER_GAP = 0.15; // >15% below the peer median pct-of-max = "low" (Ford's threshold)
   function _liveFloor(inv){
     return inv.nameplate_kw!=null ? Math.max(LIVE_FLOOR_W, inv.nameplate_kw*1000*0.01) : LIVE_FLOOR_W;
   }
   function isProducing(inv){
     return inv && inv.current_power_w!=null && inv.current_power_w > _liveFloor(inv);
+  }
+  // Live output as a fraction of nameplate (W ÷ rated W) — the peer-comparable
+  // "how hard is it working" figure. Null when we can't compute it.
+  function _pctOfMax(inv){
+    return (inv && inv.nameplate_kw && inv.current_power_w!=null)
+      ? inv.current_power_w/(inv.nameplate_kw*1000) : null;
   }
   // peers identity: same array of inverter objects across all callers, so
   // reference equality is the primary test; id is a defensive fallback.
@@ -269,15 +277,28 @@ window.FleetStore = (function(){
   }
   function liveVerdict(inv, peers, isDaylight){
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
-    if(isProducing(inv)) return "ok";              // making power — clearly fine
+    if(isProducing(inv)){
+      // Producing — but is it keeping pace with its array peers? An inverter running
+      // far below its neighbors (Ford: >15% under) is underperforming even if it's on.
+      const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p));
+      if(lit.length < 2) return "ok";              // not enough peer signal to judge
+      const myPct = _pctOfMax(inv);
+      if(myPct == null) return "ok";               // no nameplate → can't compare
+      const peerPcts = lit.map(_pctOfMax).filter(v => v != null).sort((a,b) => a-b);
+      if(peerPcts.length < 2) return "ok";
+      const med = peerPcts[Math.floor(peerPcts.length/2)];   // peer median pct-of-max
+      if(med < 0.30) return "ok";                  // cohort not genuinely producing (dawn/dusk) → don't judge
+      if(myPct < med*(1-LOW_PEER_GAP)) return "low";  // >15% below the peer median → underperforming live
+      return "ok";
+    }
     const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p)).length;
     if(lit < 2) return "ok";                       // not enough peer signal to judge
     return (inv.current_power_w != null) ? "dark" : "stale";
   }
   // True when an inverter that 14-day health calls "ok" is actually a live
-  // anomaly RIGHT NOW (dark while peers produce). This is the cross-surface flag.
+  // anomaly RIGHT NOW (dark, or low vs its peers, while peers produce). Cross-surface flag.
   function isLiveAnomaly(inv, peers, isDaylight){
-    return inv.status === "ok" && liveVerdict(inv, peers, isDaylight) === "dark";
+    return inv.status === "ok" && ["dark","low"].includes(liveVerdict(inv, peers, isDaylight));
   }
 
   /* ===========================================================================

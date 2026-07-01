@@ -67,15 +67,30 @@
     // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
     // matches that recoverable state; "offline" wrongly implied a hard outage.
     if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn" };
-    // A live-dark inverter (dark RIGHT NOW while >=2 daylight peers produce) the 14-day alert
-    // hasn't flagged yet should still surface here — otherwise the array reads "All clear" while a
-    // card inside shows "Dark now" (and we emailed about it). Checked AFTER source-paused so a
-    // stale feed's 0 isn't mistaken for a live anomaly. Same FleetStore.liveVerdict classifier.
+    // A live anomaly (dark, or low vs peers, RIGHT NOW while >=2 daylight peers produce) the
+    // 14-day alert hasn't flagged yet should still surface here — otherwise the array reads
+    // "All clear" while a card inside shows "Dark now" / "Low vs peers" (Ford's Waterford case:
+    // one Fronius at 42% but the array said ALL CLEAR). Checked AFTER source-paused so a stale
+    // feed's 0 isn't mistaken for a live anomaly. Same FleetStore.liveVerdict classifier; each
+    // inverter has exactly one verdict, so dark and low never double-count.
     const _invs = c.inverters || [];
-    const _darkNow = _invs.filter(iv => (iv.status === "ok" || iv.status == null)
-      && window.FleetStore && FleetStore.liveVerdict
-      && FleetStore.liveVerdict(iv, _invs, c.is_daylight) === "dark").length;
-    if (_darkNow) return { label: _darkNow + " dark now", cls: "warn" };
+    let _dark = 0, _low = 0;
+    if (window.FleetStore && FleetStore.liveVerdict) {
+      _invs.forEach(iv => {
+        if (iv.status !== "ok" && iv.status != null) return;
+        const _lv = FleetStore.liveVerdict(iv, _invs, c.is_daylight);
+        if (_lv === "dark") _dark++;
+        else if (_lv === "low") _low++;
+      });
+    }
+    const _attn = _dark + _low;
+    if (_attn) {
+      // Name the dominant kind when it's homogeneous; otherwise a combined "N need attention".
+      const label = _dark && _low ? _attn + " need attention"
+        : _dark ? _dark + " dark now"
+        : _low + " low vs peers";
+      return { label, cls: "warn" };
+    }
     return { label: "All clear", cls: "ok" };
   }
   function statusRank(c) {
@@ -92,10 +107,19 @@
     // emailed about going dark (the contradiction Bruce hit). Shared FleetStore.liveVerdict — same
     // classifier as command-center.js + the sandbox cards. Deliberately a WATCH-level "Dark now",
     // not a red fault: the 14-day health is still fine, so it's likely a brief outage.
-    if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict
-        && FleetStore.liveVerdict(iv, cohort, isDaylight) === "dark") {
-      return { label: "Dark now", cls: "warn",
-        tip: "Producing nothing right now while its neighbors are — the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
+    if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict) {
+      const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight);
+      if (_lv === "dark") {
+        return { label: "Dark now", cls: "warn",
+          tip: "Producing nothing right now while its neighbors are — the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
+      }
+      // LIVE-LOW overlay: producing, but >15% below the peer median for its nameplate — a
+      // peer-level gap the DARK check misses (Ford's Waterford case: one Fronius at 42% while
+      // 11 peers run ~101%). Same watch-level treatment as Dark now, not a red fault.
+      if (_lv === "low") {
+        return { label: "Low vs peers", cls: "warn",
+          tip: "Producing well below its neighbors right now (>15% under the peer median for its nameplate) — check for shading, a tripped string, or a failing inverter. Its 14-day health hasn't flagged yet; if the gap persists the verdict escalates." };
+      }
     }
     if (s === "dead") return { label: "Stopped", cls: "bad" };
     if (s === "fault") return { label: "Fault", cls: "bad" };
@@ -283,13 +307,15 @@
       cell("Model", iv.model ? esc(iv.model) : null),
       cell("Rated", iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null),
     ].join("");
-    // When the inverter is dark RIGHT NOW (live anomaly), lead the detail with that — matching the
-    // status pill + the alert email — and keep the 14-day stats below so the owner sees both the
-    // live problem AND that its longer-term health is still fine.
-    const _liveDark = (iv.status === "ok" || iv.status == null) && peers && window.FleetStore && FleetStore.liveVerdict
-      && FleetStore.liveVerdict(iv, peers, isDaylight) === "dark";
-    const diag = _liveDark
+    // When the inverter is a live anomaly RIGHT NOW (dark, or low vs peers), lead the detail with
+    // that — matching the status pill + the alert email — and keep the 14-day stats below so the
+    // owner sees both the live problem AND that its longer-term health is still fine.
+    const _lvDetail = (iv.status === "ok" || iv.status == null) && peers && window.FleetStore && FleetStore.liveVerdict
+      ? FleetStore.liveVerdict(iv, peers, isDaylight) : null;
+    const diag = _lvDetail === "dark"
       ? `<div class="vs-id-diag vs-id-diag-dark" style="color:var(--warn,#d97706);font-weight:650">⚠ Dark right now — no output while its neighbors are producing. This is the live anomaly we flagged you about. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically.</div>`
+      : _lvDetail === "low"
+      ? `<div class="vs-id-diag vs-id-diag-low" style="color:var(--warn,#d97706);font-weight:650">⚠ Low vs peers right now — producing well below its neighbors (>15% under the peer median for its nameplate). Check for shading, a tripped string, or a failing inverter. Its 14-day health hasn't flagged yet; if the gap persists the verdict escalates.</div>`
       : (iv.diagnosis ? `<div class="vs-id-diag">${esc(iv.diagnosis)}</div>` : "");
     return `<div class="vs-inv-detail">${diag}
       <div class="vs-id-grid">${cells}</div>

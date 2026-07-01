@@ -57,18 +57,19 @@
   const STATUS_LABEL = {
     dead:"Stopped earning", fault:"Hardware fault",
     underperforming:"Below its neighbors", comm_gap:"Gone quiet", ok:"Pulling its weight",
-    live_dark:"Not producing now", monitoring:"Monitoring"
+    live_dark:"Not producing now", live_low:"Low vs peers now", monitoring:"Monitoring"
   };
   const SEV = {                                   // status → triage severity bucket
     dead:"crit", fault:"crit", underperforming:"under", comm_gap:"quiet", ok:"ok",
     live_dark:"quiet",   // live anomaly: real but unpriced, like a comms gap — watch bucket
+    live_low:"quiet",    // live peer-level gap: real but unpriced yet — watch bucket
     monitoring:"ok"      // not enough evidence yet — not a flagged row
   };
   const SEV_RANK = { crit:0, under:1, quiet:2, ok:3 };
   const ACTION = {
     dead:"Draft warranty claim", fault:"Draft service request",
     underperforming:"See the diagnosis", comm_gap:"Bring it back online",
-    live_dark:"Check why it stopped"
+    live_dark:"Check why it stopped", live_low:"Check why it's low"
   };
 
   // Each vendor's monitoring portal - every flagged inverter deep-links out so the
@@ -121,29 +122,30 @@
           measuredCount++;
         }
         // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 14-day
-        // peer verdict; a fresh live anomaly (dark now while >=2 daylight peers
-        // produce) isn't caught by it yet, so we promote a status:"ok" inverter to
-        // a "live_dark" row. Shared FleetStore classifier → same logic as the tree
-        // + grid, so the three surfaces never disagree.
+        // peer verdict; a fresh live anomaly (dark now, OR low vs peers, while >=2
+        // daylight peers produce) isn't caught by it yet, so we promote a status:"ok"
+        // inverter to a "live_dark"/"live_low" row. Shared FleetStore classifier →
+        // same logic as the tree + grid, so the three surfaces never disagree.
         let status = inv.status;
-        if(status === "ok" && window.FleetStore && FleetStore.liveVerdict
-           && FleetStore.liveVerdict(inv, a.inverters, a.is_daylight) === "dark"){
-          status = "live_dark";
+        if(status === "ok" && window.FleetStore && FleetStore.liveVerdict){
+          const _lv = FleetStore.liveVerdict(inv, a.inverters, a.is_daylight);
+          if(_lv === "dark") status = "live_dark";
+          else if(_lv === "low") status = "live_low";
         }
         if(status === "ok"){ invHealthy++; return; }
         // "monitoring" = not enough history to judge yet — neutral, never a flagged
         // row. Count it as not-flagged (don't drag the healthy %) and skip the table.
         if(status === "monitoring"){ invHealthy++; return; }
-        // live_dark carries no priced loss yet (unconfirmed, like comm_gap) — the
+        // live_dark/live_low carry no priced loss yet (unconfirmed, like comm_gap) —
         // dollars are claimed once 14-day health confirms it dead/underperforming.
-        const lk = (status === "live_dark") ? 0 : lostKwh(inv, fleetWin, totalNp);
+        const lk = (status === "live_dark" || status === "live_low") ? 0 : lostKwh(inv, fleetWin, totalNp);
         const lossMo = val(lk)/WINDOW_DAYS*30;
         rows.push({
           key:`${a.id}|${inv.name}`, arrayId:a.id, site:a.name, region:a.region, host:a.host, vendor:a.vendor,
           inv:inv.name, model:inv.model, nameplate:inv.nameplate_kw, status,
           sev:SEV[status], pi:inv.peer_index, stale:inv.stale_hours,
           lossMo, lossYr:lossMo*12, lostKwh:lk, windowKwh:inv.window_kwh,
-          live: status === "live_dark",
+          live: status === "live_dark" || status === "live_low",
         });
       });
     });
@@ -628,6 +630,8 @@
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has gone quiet — no telemetry for <b>${r.stale!=null?r.stale+"h":"a while"}</b>. Its neighbors are still reporting, so this reads as a comms dropout, not a power fault. We can't bill lost output until it checks back in.`
       : r.status==="live_dark"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is reading <b>zero output right now</b> while its array neighbors are actively producing under the same sky. This is a LIVE reading — the 14-day health hasn't flagged it yet, so it just stopped. Could be an early-stage fault, a tripped breaker, or a brief dropout; check before it becomes lost revenue.`
+      : r.status==="live_low"
+      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is producing <b>well below its array neighbors right now</b> — more than 15% under the peer median for its nameplate, under the same sky. This is a LIVE reading the 14-day health hasn't flagged yet. Likely shading, a tripped string, or an early-stage fault; check before it becomes lost revenue.`
       : r.status==="dead"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has produced <b>zero</b> for ~${r.stale!=null?Math.round(r.stale/24):"a few"} days while ${peers} kept producing — that rules out weather. Warranty claim is ready with the fault dates and peer-measured lost-kWh evidence.`
       : r.status==="fault"
@@ -637,6 +641,8 @@
       ? `Power-cycle the inverter's gateway / data logger and confirm it rejoins. No telemetry within a day → escalate to a site visit.`
       : r.status==="live_dark"
       ? `Confirm it's still dark (this is a live, possibly brief reading), then check the breaker/disconnect and the inverter's own fault log. If it stays at zero into tomorrow, the 14-day health will escalate it to a warranty-grade claim automatically.`
+      : r.status==="live_low"
+      ? `Check this inverter's strings for shading/soiling and confirm none have tripped, then review its fault log. If the gap vs its neighbors persists, the 14-day health will escalate it automatically.`
       : r.status==="underperforming"
       ? `Schedule a visual + IV-curve check on this inverter's strings. A failed module or cleaning is usually a fast-payback fix.`
       : `Send the drafted ${r.status==="fault"?"service request":"warranty claim"} to the manufacturer — evidence is attached and dated.`;
