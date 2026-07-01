@@ -60,13 +60,88 @@
       .catch(function () { _forecast = null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
   }
 
+  // ---- weather: Open-Meteo weathercode → a compact sky descriptor -------------
+  // Shared by the demo synthesis AND the real per-site weather the backend adds to
+  // forecast rows, so the Sites grid renders one consistent icon set either way.
+  var SKY = {
+    clear:  { glyph: "☀", label: "Clear", tone: "good" },
+    partly: { glyph: "⛅", label: "Partly cloudy", tone: "" },
+    cloudy: { glyph: "☁", label: "Cloudy", tone: "muted" },
+    rain:   { glyph: "🌧", label: "Rain", tone: "sky" },
+    snow:   { glyph: "❄", label: "Snow", tone: "sky" },
+    fog:    { glyph: "🌫", label: "Fog", tone: "muted" }
+  };
+  function skyFromCode(code) {
+    if (code == null) return null;
+    if (code === 0) return SKY.clear;
+    if (code <= 3) return SKY.partly;
+    if (code === 45 || code === 48) return SKY.fog;
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return SKY.snow;
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return SKY.rain;
+    return SKY.cloudy;
+  }
+
+  // ---- simulated forecast for the anonymous DEMO fleet ------------------------
+  // The demo fleet is entirely fake (100 simulated arrays) and has no weather
+  // model, so the flagship weather-adjusted columns would read "not modeled yet".
+  // We synthesize a plausible, deterministic forecast (+ per-site weather) from
+  // the demo's own measured window_kwh so the tab is fully demoable. This is ONLY
+  // built when FleetStore.isSimulated() is true; a real signed-in fleet always
+  // uses the live /forecast-fleet endpoint. Flagged `simulated:true` so sections
+  // can asterisk it as demo data.
+  var _simForecast = null;
+  function _h(n, salt) { var x = ((Number(n) || 0) + (salt || 0)) * 2654435761 % 4294967296; return ((x >>> 0) % 1000) / 1000; }
+  function buildSimulatedForecast(arrays) {
+    var rows = [], sumE = 0, sumA = 0, spotlight = null;
+    var codes = [0, 0, 1, 2, 3, 61, 63, 71];   // weighted toward clearer skies
+    arrays.forEach(function (a) {
+      var np = 0, act = 0;
+      (a.inverters || []).forEach(function (iv) {
+        if (iv.nameplate_kw > 0) np += iv.nameplate_kw;
+        if (iv.window_kwh > 0) act += iv.window_kwh;
+      });
+      if (np <= 0) return;
+      var ratio = Math.round(64 + _h(a.id) * 54);           // 64..118 %
+      var bad = (a.inverters || []).filter(function (iv) { return iv.status === "dead" || iv.status === "fault" || iv.status === "underperforming"; }).length;
+      if (bad) ratio = Math.max(38, ratio - bad * 6);       // ailing sites read lower
+      var exp = act > 0 ? Math.round(act / (ratio / 100)) : Math.round(np * 4.6 * 14);
+      if (act <= 0) act = Math.round(exp * (ratio / 100));
+      var code = codes[Math.floor(_h(a.id, 7) * codes.length)];
+      rows.push({
+        array_id: a.id, array_name: a.name, nameplate_kw: Math.round(np * 10) / 10,
+        expected_kwh: exp, actual_kwh: act, ratio_pct: ratio, measured_days: 14,
+        confidence: "high", tilt_assumed: false, weather_code: code
+      });
+      sumE += exp; sumA += act;
+      if (code === 0 && (!spotlight || ratio > spotlight.ratio_pct)) {
+        spotlight = { array_name: a.name, poa_kwh_m2: 6.2, actual_kwh: act, expected_kwh: exp, ratio_pct: ratio, day: "a recent clear day" };
+      }
+    });
+    var fr = sumE > 0 ? Math.round(sumA / sumE * 100) : null;
+    return {
+      available: true, simulated: true, ratio_pct: fr,
+      performance_ratio_measured: sumE > 0 ? Math.round(sumA / sumE * 1000) / 1000 : null,
+      expected_kwh: Math.round(sumE), actual_kwh: Math.round(sumA), expected_kwh_window: Math.round(sumE),
+      confidence: "high", arrays_modeled: rows.length, arrays_skipped: 0,
+      rows: rows, skipped: [], sunny_spotlight: spotlight,
+      inputs: { simulated: true, pr: 0.84, irradiance_source: "simulated", note: "Demo fleet — simulated weather model" },
+      window: { days: 14 }
+    };
+  }
+
   // ---- build the read-only ctx every section renders against ------------------
   function buildCtx() {
     var snap = (window.FleetStore && FleetStore.snapshot()) || { arrays: [], simulated: false };
     var cols = (window.FleetStore && FleetStore.toColumns()) || { columns: [], summary: { arrays_total: 0, inverters_total: 0, attention: 0 } };
+    // Real signed-in fleet → the live forecast. Anonymous demo → synthesize one
+    // (once) so the flagship renders; a real fleet NEVER gets a synthetic forecast.
+    var forecast = _forecast;
+    if (!forecast && snap.simulated && (snap.arrays || []).length) {
+      forecast = _simForecast || (_simForecast = buildSimulatedForecast(snap.arrays));
+    }
     var forecastByArray = {};
-    if (_forecast && Array.isArray(_forecast.rows)) {
-      _forecast.rows.forEach(function (r) { forecastByArray[String(r.array_id)] = r; });
+    if (forecast && Array.isArray(forecast.rows)) {
+      forecast.rows.forEach(function (r) { forecastByArray[String(r.array_id)] = r; });
     }
     return {
       signedIn: !!getSession(),
@@ -74,8 +149,9 @@
       arrays: snap.arrays || [],                 // canonical: {id,name,region,host,vendor,inverters:[…]}
       columns: cols.columns || [],               // per-array: {array_id,array_name,vendor,alert,current_power_w,produced_today_kwh,sync_status,source_status,is_daylight,inverters:[…]}
       summary: cols.summary || { arrays_total: 0, inverters_total: 0, attention: 0 },
-      forecast: _forecast,                       // fleet-forecast json | null  (null = demo/anon or not-yet-loaded)
-      forecastByArray: forecastByArray,          // {array_id: row}  row={expected_kwh,actual_kwh,ratio_pct,nameplate_kw,measured_days,confidence,…}
+      forecast: forecast,                        // fleet-forecast json | null. May be simulated:true for the demo.
+      forecastByArray: forecastByArray,          // {array_id: row}  row={expected_kwh,actual_kwh,ratio_pct,nameplate_kw,…,weather_code}
+      sky: skyFromCode,                          // (weather_code) → {glyph,label,tone} | null — shared weather icon map
       energyRate: (window.FleetStore && FleetStore.energyRate()) || 0.21,
       recPerMwh: (window.FleetStore && FleetStore.REC_PER_MWH) || 38,
       windowDays: (window.FleetStore && FleetStore.WINDOW_DAYS) || 14,
