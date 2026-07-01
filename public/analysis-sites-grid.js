@@ -543,12 +543,12 @@
     var subline;
     if (!ctx.forecast) {
       subline = ctx.simulated
-        ? "Measured performance across the demo fleet — connect a fleet to add weather-adjusted expected vs actual."
-        : "Measured performance — weather model loading.";
+        ? "Measured performance across the demo fleet — connect a fleet to model expected vs actual."
+        : "Measured performance — not modeled yet.";
     } else if (unmodeled > 0) {
-      subline = rows.length + " sites · " + unmodeled + " not yet weather-modeled";
+      subline = rows.length + " sites · " + unmodeled + " not modeled yet";
     } else {
-      subline = rows.length + " sites · all weather-modeled";
+      subline = rows.length + " sites · all modeled";
     }
 
     // ---- header cells with sort affordance ------------------------------------

@@ -21,7 +21,14 @@
     var s = document.createElement("style");
     s.id = "ansum-css";
     s.textContent = [
-      ".ansum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;}",
+      // The strip always holds exactly 7 KPI tiles (the money/impact figure is a
+      // separate banner below). auto-fit would orphan a lone 7th tile at some
+      // widths (e.g. 6-up → 6+1), so we pick explicit column counts that divide 7
+      // WITHOUT leaving a single card alone on the last row: 7 (one row), 4 (4+3),
+      // or 2 (mobile). We deliberately avoid 6-up and 3-up (both leave a 1-orphan).
+      ".ansum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}",
+      // wide screens: all seven on one dense row
+      "@media (min-width:1360px){.ansum-grid{grid-template-columns:repeat(7,1fr);}}",
       ".ansum-card{position:relative;background:linear-gradient(168deg,var(--card),var(--card2));",
       "  border:1px solid var(--line);border-radius:16px;padding:14px 16px 13px;min-width:0;overflow:hidden;}",
       // a hairline accent rail on the left edge, tinted by health
@@ -42,8 +49,28 @@
       "  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       ".ansum-sub.warn{color:var(--warn);}",
       ".ansum-sub.bad{color:var(--bad);}",
+      // full-width "Energy at risk" impact banner (a money figure, not a KPI tile)
+      ".ansum-banner{margin-top:12px;display:flex;align-items:center;justify-content:space-between;",
+      "  gap:18px;flex-wrap:wrap;padding:13px 18px;border-radius:14px;",
+      "  background:linear-gradient(168deg,var(--card),var(--card2));border:1px solid var(--line);",
+      "  position:relative;overflow:hidden;}",
+      // health rail on the left edge, matching the tile accent language
+      ".ansum-banner::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;",
+      "  border-radius:3px;background:var(--warn);opacity:.85;}",
+      ".ansum-banner.good::before{background:var(--good2);opacity:.55;}",
+      ".ansum-banner-main{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;min-width:0;}",
+      ".ansum-banner-lbl{font-size:10.5px;font-weight:680;letter-spacing:.07em;text-transform:uppercase;",
+      "  color:var(--faint);white-space:nowrap;}",
+      ".ansum-banner-win{color:var(--faint);font-weight:600;letter-spacing:.04em;}",
+      ".ansum-banner-val{font-size:23px;font-weight:760;line-height:1.05;letter-spacing:-.015em;",
+      "  color:var(--warn);font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;",
+      "  align-items:baseline;gap:11px;}",
+      ".ansum-banner.good .ansum-banner-val{color:var(--good);}",
+      ".ansum-banner-money{font-size:14px;font-weight:680;color:var(--muted);letter-spacing:0;}",
+      ".ansum-banner-lede{font-size:12px;color:var(--muted);line-height:1.45;max-width:46ch;",
+      "  text-align:right;margin-left:auto;}",
       // spotlight caption below the strip
-      ".ansum-spot{margin-top:13px;display:flex;align-items:flex-start;gap:8px;padding:11px 14px;",
+      ".ansum-spot{margin-top:12px;display:flex;align-items:flex-start;gap:8px;padding:11px 14px;",
       "  background:var(--bg2);border:1px solid var(--line);border-radius:12px;",
       "  font-size:12.5px;color:var(--muted);line-height:1.5;}",
       ".ansum-spot-ic{color:var(--warn);font-size:14px;line-height:1.25;flex:0 0 auto;}",
@@ -52,8 +79,14 @@
       ".ansum-spot b.bad{color:var(--bad);}",
       "@media (max-width:760px){",
       "  .ansum-grid{grid-template-columns:repeat(2,1fr);gap:10px;}",
+      // 7 tiles in a 2-col grid leaves the 7th alone with a void beside it — let it
+      // span the full width so the odd tile reads as intentional, not orphaned.
+      "  .ansum-grid > .ansum-card:last-child{grid-column:1 / -1;}",
       "  .ansum-card{padding:12px 13px 11px;}",
       "  .ansum-val{font-size:22px;}",
+      "  .ansum-banner{align-items:flex-start;flex-direction:column;gap:8px;}",
+      "  .ansum-banner-lede{text-align:left;margin-left:0;}",
+      "  .ansum-banner-val{font-size:21px;}",
       "}"
     ].join("\n");
     document.head.appendChild(s);
@@ -177,7 +210,7 @@
     // 4. Producing now + % of capacity
     var prodSub = (prodPctOfCap != null)
       ? fmt.pct(prodPctOfCap) + " of capacity"
-      : (sawLive ? "live" : "awaiting live data");
+      : (sawLive ? "live" : "no live reading yet");
     html += card("Producing now",
       prodKw != null ? fmt.kw(prodKw) : "—",
       prodSub,
@@ -199,7 +232,7 @@
       if (modeled != null) perfSub += (perfSub ? " · " : "") + modeled + (modeled === 1 ? " array modeled" : " arrays modeled");
       html += card("Weather-adj. performance", fmt.pct(perfRatio), perfSub || "vs expected", { tone: pTone });
     } else {
-      html += card("Weather-adj. performance", "—", "available once data loads", { tone: "muted" });
+      html += card("Weather-adj. performance", "—", "not modeled yet", { tone: "muted" });
     }
 
     // 7. Active alarms (measured)
@@ -211,7 +244,11 @@
       alarmSub,
       { tone: alarmTone, subTone: alarmArrays === 0 ? "" : (hasCritical ? "bad" : "warn") });
 
-    // 8. At risk / recoverable — ONLY when forecast present (else omit entirely)
+    // Energy at risk (forecast-gated) is NOT a tile — it's a distinct impact/money
+    // figure, so it renders as a full-width banner BELOW the tile grid (built
+    // further down). This also keeps the tile grid an even 7 (or fewer) so the
+    // auto-fit rows never orphan a lone card. Compute it here; render below.
+    var riskBanner = "";
     if (f && f.available && _num(f.expected_kwh) != null && _num(f.actual_kwh) != null) {
       var shortfallKwh = Math.max(0, f.expected_kwh - f.actual_kwh);
       var rate = _num(ctx.energyRate) || 0;
@@ -219,14 +256,21 @@
       // optional REC value on the shortfall MWh
       var recPerMwh = _num(ctx.recPerMwh);
       if (recPerMwh != null) dollars += (shortfallKwh / 1000) * recPerMwh;
-      var sfTone = shortfallKwh > 0 ? "warn" : "good";
-      var sfSub = shortfallKwh > 0
-        ? "≈ " + fmt.money(dollars) + " vs expected, last " + win + "d"
-        : "on or above expected, last " + win + "d";
-      html += card("Energy at risk",
-        shortfallKwh > 0 ? fmt.kwh(shortfallKwh) : "0 kWh",
-        sfSub,
-        { tone: sfTone, subTone: shortfallKwh > 0 ? "warn" : "" });
+      var atRisk = shortfallKwh > 0;
+      var riskMoney = atRisk ? "≈ " + fmt.money(dollars) : null;
+      var riskLede = atRisk
+        ? "Recoverable if the fleet met its weather-adjusted expected output"
+        : "The fleet met or beat its weather-adjusted expected output";
+      riskBanner =
+        '<div class="ansum-banner' + (atRisk ? " warn" : " good") + '">' +
+        '<div class="ansum-banner-main">' +
+        '<div class="ansum-banner-lbl">Energy at risk<span class="ansum-banner-win"> · last ' + win + ' days</span></div>' +
+        '<div class="ansum-banner-val">' +
+        (atRisk ? esc(fmt.kwh(shortfallKwh)) : "0 kWh") +
+        (riskMoney ? '<span class="ansum-banner-money">' + esc(riskMoney) + "</span>" : "") +
+        '</div></div>' +
+        '<div class="ansum-banner-lede">' + esc(riskLede) + "</div>" +
+        "</div>";
     }
 
     // --- spotlight caption (skip silently if absent) -------------------------
@@ -243,7 +287,7 @@
         "</span></div>";
     }
 
-    container.innerHTML = '<div class="ansum-grid">' + html + "</div>" + spotHtml;
+    container.innerHTML = '<div class="ansum-grid">' + html + "</div>" + riskBanner + spotHtml;
   }
 
   window.AnalysisSections = window.AnalysisSections || [];
