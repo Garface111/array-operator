@@ -224,6 +224,26 @@
         : "Last synced: ") + _fmtAge(oldest) + ".",
     };
   }
+  // Vendor-GROUP status rollup for the collapsed header row (Ford: "if one of the
+  // inverters is down, if two of the inverters is down per the vendor, we need to
+  // figure this out" — WITHOUT expanding every array). Sums each array's OWN attention
+  // count (arrStatus already resolves inverter-level dark/low/fault down to a per-array
+  // label like "2 dark now") rather than re-deriving inverter state a second way, so this
+  // can never drift from what expanding the row actually shows.
+  function vendorStatusSummary(list) {
+    let worstCls = "ok", total = 0;
+    list.forEach(c => {
+      const st = arrStatus(c);
+      if (st.cls === "ok") return;
+      if (st.cls === "bad") worstCls = "bad";
+      else if (worstCls !== "bad") worstCls = "warn";
+      const n = /^(\d+)\b/.exec(st.label);           // "3 need attention" / "2 dark now" / etc.
+      total += n ? parseInt(n[1], 10) : 1;            // no leading count (e.g. "Source paused") = 1 flagged array
+    });
+    return total === 0
+      ? { label: "All clear", cls: "ok" }
+      : { label: total + (total === 1 ? " issue" : " issues"), cls: worstCls };
+  }
 
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
   // recapture alarms — surfaced so owners know how far behind real time a reading
@@ -600,6 +620,8 @@
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
+      const vTodayTot = list.reduce((t, c) => t + (c.produced_today_kwh || 0), 0);
+      const vStatus = vendorStatusSummary(list);
       // Vendors DEFAULT to collapsed (Ford: the spreadsheet should "start much less
       // overwhelming" — a fresh view is just the vendor headers, expand what you want).
       // First-seen vendor inits to collapsed; the toggle owns it after. An ACTIVE SEARCH
@@ -612,16 +634,23 @@
       // vendor and have it expand or collapse, not just this tiny button"). The portal
       // buttons inside (vendor-name [data-vopen], the ↗ "Open to sync" [data-vportal]
       // chip) stopPropagation in their own handlers so a sync-click never also collapses.
+      // The header row shares the SAME 7-column grid + column classes as a per-array row
+      // (vs-c-name/vendor/inv/pow/today/status/fresh) — Ford: collapsed you couldn't see
+      // inverter count, live now, today, or status at all, and Synced read cramped against
+      // the kW total. Every column is now a real ROLLUP across the vendor's arrays, so the
+      // collapsed row reads as a genuine summary, not just a label.
       h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
-        <div class="vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
+        <div class="vs-row vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
              aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
-          <span class="vs-vcollapse-caret" aria-hidden="true">▾</span>
-          ${badge}
-          <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
-          <span class="vs-vgroup-right">
-            ${vSync ? `<span class="vs-vsync${vSync.stale ? " vs-stale-syn" : ""}" title="${esc(vSync.title)}">${esc(vSync.text)}</span>` : ""}
-            <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span>
-          </span></div>${vnote}
+          <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}
+            <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
+          <span class="vs-c-vendor">${lagChip}</span>
+          <span class="vs-c-inv">${nInv}</span>
+          <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
+          <span class="vs-c-today">${kwh0(vTodayTot)}</span>
+          <span class="vs-c-status"><span class="vs-pill ${vStatus.cls}">${esc(vStatus.label)}</span></span>
+          <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
+        </div>${vnote}
         <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
       list.forEach(c => {
         const st = arrStatus(c);
