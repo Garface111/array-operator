@@ -273,6 +273,36 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-bulk-table tr.rb-bulk-err{ background:rgba(220,38,38,.05); }
 .rb-bulk-table tr.rb-bulk-err td:last-child{ color:var(--bad); }
 
+/* ---- bulk import: review & correct (correctable array match + confidence) ---- */
+.rb-rev-summary{ display:flex; align-items:center; gap:9px; font-size:13px; margin:6px 2px 2px; }
+.rb-rev-summary b{ font-weight:750; }
+.rb-rev-sum-ok{ color:var(--good); } .rb-rev-sum-warn{ color:var(--warn); } .rb-rev-sum-bad{ color:var(--bad); }
+.rb-rev-sum-sep{ color:var(--faint); }
+.rb-rev-table td{ white-space:normal; vertical-align:top; }
+.rb-rev-table .rb-rev-in{ width:100%; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:8px; color:var(--ink); padding:6px 8px; font:inherit; font-size:12.5px; }
+.rb-rev-table .rb-rev-in:focus{ outline:none; border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
+.rb-rev-table .rb-rev-pct .rb-rev-in, .rb-rev-table .rb-rev-disc .rb-rev-in{ max-width:90px; }
+.rb-rev-name{ min-width:150px; } .rb-rev-arr{ min-width:260px; } .rb-rev-email{ min-width:150px; }
+.rb-rev-arrbox{ display:flex; align-items:center; gap:7px; }
+.rb-rev-arrbox .rb-rev-arrsel{ flex:1 1 auto; cursor:pointer; }
+.rb-rev-raw{ font-size:10.5px; color:var(--faint); margin-top:3px; }
+.rb-rev-err{ font-size:11px; color:var(--bad); margin-top:3px; }
+/* confidence badge */
+.rb-conf{ flex:0 0 auto; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+.rb-conf-ok{ color:var(--sky); background:rgba(94,194,255,.14); }
+.rb-conf-warn{ color:#8a6414; background:rgba(245,158,11,.16); }
+.rb-conf-bad{ color:var(--bad); background:rgba(220,38,38,.12); }
+.rb-conf-confirm{ border:0; cursor:pointer; font:inherit; font-size:10.5px; font-weight:700; }
+.rb-conf-confirm:hover{ background:rgba(245,158,11,.28); }
+/* status pill */
+.rb-pill{ font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; white-space:nowrap; }
+.rb-pill-ok{ color:var(--good); background:rgba(63,214,138,.14); }
+.rb-pill-warn{ color:#8a6414; background:rgba(245,158,11,.16); }
+.rb-pill-bad{ color:var(--bad); background:rgba(220,38,38,.12); }
+.rb-rev-table tr.rb-rev-needs_review{ background:rgba(245,158,11,.05); }
+.rb-rev-table tr.rb-rev-blocked{ background:rgba(220,38,38,.05); }
+
 /* ---- add a customer manually ---- */
 .rb-manual-toggle{ margin-top:18px; display:flex; align-items:center; justify-content:space-between;
   gap:16px; flex-wrap:wrap; }
@@ -313,6 +343,16 @@ body.sb-fs-lock{ overflow:hidden; }
 
 /* ---- field hint (under an input) ---- */
 .rb-fld-hint{ font-size:11px; color:var(--faint); margin-top:3px; line-height:1.4; }
+
+/* ---- array-first "Invoices from:" resolution line + override picker ---- */
+.rb-arr-billline{ display:block; font-size:11.5px; line-height:1.45; margin-top:5px; min-height:0; }
+.rb-arr-billline:empty{ display:none; }
+.rb-arr-billline.rb-arr-hasbill{ color:var(--faint); }
+.rb-arr-billline.rb-arr-hasbill b{ color:var(--sky); font-weight:650; }
+.rb-arr-billline.rb-arr-nobill{ color:#8a6414; background:rgba(245,158,11,.09);
+  border:1px solid rgba(245,158,11,.3); border-radius:8px; padding:6px 9px; margin-top:7px; }
+.rb-arr-override{ margin-top:9px; }
+.rb-arr-override .rl{ font-size:11.5px; color:var(--muted); }
 
 /* ---- BCC info note (add-offtaker form) ---- */
 .rb-bcc-note{ font-size:12.5px; color:var(--faint); line-height:1.5; margin:16px 0 0;
