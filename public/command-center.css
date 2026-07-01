@@ -1634,6 +1634,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-editable:hover::after{ content:"✎"; font-size:10px; color:var(--good,#2563eb); margin-left:5px; opacity:.7; }
 .vs-editable.vs-editing{ outline:1px solid var(--good,#2563eb); outline-offset:1px; background:rgba(37,99,235,.08); text-decoration:none; cursor:text; }
 .vs-editable.vs-editing::after{ content:none; }
+/* Numeric/value columns right-align (header label + every row's figure share the
+   SAME right edge) so a column of different-width numbers reads as one straight
+   line instead of a ragged left edge — standard spreadsheet convention. Applies to
+   the header cells too (COLS reuses these same classes), and to both per-array
+   rows and the vendor-group rollup row, so the whole table stays one consistent
+   grid regardless of row type. */
+.vs-c-inv, .vs-c-pow, .vs-c-today, .vs-c-status, .vs-c-fresh{ text-align:right; }
 .vs-c-inv, .vs-c-pow, .vs-c-today{ font-variant-numeric:tabular-nums; color:var(--ink); }
 .vs-c-fresh{ font-size:11.5px; color:var(--faint); }
 /* Frozen feed: dim the stale live value, amber the "N min ago" so a paused feed never reads as current. */
