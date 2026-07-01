@@ -557,7 +557,13 @@
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
       const vAlloc = isAllocatedVendor(v) && vtot > 0;
-      const vCollapsed = !!_vendorCollapsed[v];
+      // Vendors DEFAULT to collapsed (Ford: the spreadsheet should "start much less
+      // overwhelming" — a fresh view is just the vendor headers, expand what you want).
+      // First-seen vendor inits to collapsed; the toggle owns it after. An ACTIVE SEARCH
+      // overrides collapse so matching arrays are actually visible (cols is already
+      // filtered to matches above, so only vendors that HAVE a match render here).
+      if (_vendorCollapsed[v] === undefined) _vendorCollapsed[v] = true;
+      const vCollapsed = !_query && !!_vendorCollapsed[v];
       // The WHOLE header row toggles collapse (Ford: "click anywhere in the row of the
       // vendor and have it expand or collapse, not just this tiny button"). The portal
       // buttons inside (vendor-name [data-vopen], the ↗ "Open to sync" [data-vportal]
