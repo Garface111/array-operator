@@ -238,6 +238,191 @@
     chip.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } };
   }
 
+  /* ===========================================================================
+   * BILL AUDIT SANDBOX — Ford/Bruce's "organize the fleet the way GMP allocates it
+   * so you can catch GMP's per-offtaker math errors visually".
+   *
+   * Pull the ARRAY's master utility bill (e.g. Londonderry, 100 kWh of group
+   * excess), lay each offtaker's OWN utility bill underneath it (Brooks House 50%
+   * → should show 50, …), and FLAG it when GMP's number doesn't match the math.
+   * Sub-tabs per utility (GMP / VEC / …). Reads GET /audit-by-array (auth), cached,
+   * refetched on reload; signed-in only; fails soft.
+   * ==========================================================================*/
+  let AUDIT = null;                 // /audit-by-array payload (cached)
+  let _auditPromise = null;
+  let AUDIT_PROVIDER = null;        // which utility sub-tab is active (provider string)
+  function loadAudit() {
+    if (AUDIT) return Promise.resolve(AUDIT);
+    if (_auditPromise) return _auditPromise;
+    if (!authHeaders()) return Promise.resolve(null);
+    _auditPromise = fetch(API + "/audit-by-array", { headers: authHeaders() })
+      .then(r => (r.ok ? r.json().catch(() => null) : null))
+      .then(d => { if (d && d.ok) AUDIT = d; return AUDIT; })
+      .catch(() => null)
+      .then(v => { _auditPromise = null; return v; });
+    return _auditPromise;
+  }
+
+  const AUDIT_PROVIDER_LABEL = { gmp: "GMP", vec: "VEC", wec: "WEC", smarthub: "SmartHub/co-op", other: "Other" };
+  function auditProviderLabel(p) {
+    if (!p) return "Other";
+    return AUDIT_PROVIDER_LABEL[String(p).toLowerCase()] || String(p).toUpperCase();
+  }
+  // Honest non-run states → a quiet grey note, never a flag or a fake ✓.
+  const AUDIT_QUIET = {
+    single_meter:        "On the array's own meter — no separate GMP allocation to audit.",
+    no_offtaker_account: "Awaiting this offtaker's own utility account to audit the allocation.",
+    no_offtaker_bill:    "Awaiting a utility bill on this offtaker's account.",
+    no_array_bill:       "Awaiting the array's master utility bill.",
+    no_share:            "Set this offtaker's share to audit the allocation.",
+  };
+
+  // One offtaker row under an array's master bill.
+  function auditOfftakerRow(o) {
+    const sharePct = o.share_pct != null ? (Math.round(o.share_pct * 1000) / 10) + "%" : "—";
+    const credited = o.gmp_credited_kwh != null ? fmt0(o.gmp_credited_kwh) : "—";
+    const should = o.should_be_kwh != null ? fmt0(o.should_be_kwh) : "—";
+    if (o.status === "mismatch") {
+      const dk = o.delta_kwh;
+      const deltaTxt = dk != null ? (dk > 0 ? "+" : "") + fmt0(dk) + " kWh" : "—";
+      const dollars = o.delta_dollars != null ? money(Math.abs(o.delta_dollars)) : null;
+      return `<div class="rb-au-off rb-au-flag">
+          <div class="rb-au-off-top">
+            <span class="rb-au-off-name"><span class="rb-au-flagicon" aria-hidden="true">⚑</span>${esc(o.customer_name || "(unnamed offtaker)")}</span>
+            <span class="rb-au-off-share">${sharePct} share</span>
+          </div>
+          <div class="rb-au-figs">
+            <span class="rb-au-fig"><b>${credited}</b><small>GMP credited</small></span>
+            <span class="rb-au-fig"><b>${should}</b><small>should be</small></span>
+            <span class="rb-au-fig rb-au-fig-delta"><b>${esc(deltaTxt)}</b><small>Δ vs the math</small></span>
+            ${dollars ? `<span class="rb-au-atstake">≈ ${dollars} at stake</span>` : ""}
+          </div>
+          ${o.note ? `<div class="rb-au-note">${esc(o.note)}</div>` : ""}
+        </div>`;
+    }
+    if (o.status === "match") {
+      return `<div class="rb-au-off">
+          <div class="rb-au-off-top">
+            <span class="rb-au-off-name">${esc(o.customer_name || "(unnamed offtaker)")}</span>
+            <span class="rb-au-off-share">${sharePct} share</span>
+          </div>
+          <div class="rb-au-figs">
+            <span class="rb-au-fig"><b>${credited}</b><small>GMP credited</small></span>
+            <span class="rb-au-fig"><b>${should}</b><small>should be</small></span>
+            <span class="rb-au-ok">✓ matches</span>
+          </div>
+        </div>`;
+    }
+    // Honest non-run state — render the note quietly in grey.
+    const quiet = o.note || AUDIT_QUIET[o.status] || "Not enough data to audit this offtaker yet.";
+    return `<div class="rb-au-off rb-au-quiet">
+        <div class="rb-au-off-top">
+          <span class="rb-au-off-name">${esc(o.customer_name || "(unnamed offtaker)")}</span>
+          <span class="rb-au-off-share">${sharePct} share</span>
+        </div>
+        <div class="rb-au-note rb-au-mute">${esc(quiet)}</div>
+      </div>`;
+  }
+
+  // One array card: the MASTER bill row on top + its offtaker rows underneath.
+  function auditArrayCard(a) {
+    const flagged = (a.offtakers || []).filter(o => o.status === "mismatch").length;
+    const rate = a.credit_rate != null ? "$" + Number(a.credit_rate).toFixed(4) + "/kWh" : null;
+    const rows = (a.offtakers || []).map(auditOfftakerRow).join("")
+      || `<div class="rb-au-off rb-au-quiet"><div class="rb-au-note rb-au-mute">No offtakers on this array yet.</div></div>`;
+    return `<div class="rb-au-card${flagged ? " rb-au-card-flag" : ""}">
+        <div class="rb-au-master">
+          <div class="rb-au-master-name">${esc(a.array_name || ("Array " + (a.array_id != null ? a.array_id : "")))}
+            ${flagged ? `<span class="rb-au-card-badge">⚑ ${flagged} flagged</span>` : ""}</div>
+          <div class="rb-au-master-meta">
+            <span class="rb-au-excess">Group excess <b>${a.group_excess_kwh != null ? fmt0(a.group_excess_kwh) + " kWh" : "—"}</b></span>
+            ${rate ? `<span class="rb-au-rate">${esc(rate)}</span>` : ""}
+          </div>
+        </div>
+        <div class="rb-au-offs">${rows}</div>
+      </div>`;
+  }
+
+  // Render the whole Bill-audit view into #rbAuditView (per-utility sub-tabs + array cards).
+  function renderAudit() {
+    const host = document.getElementById("rbAuditView");
+    if (!host) return;
+    if (!authHeaders()) { host.innerHTML = auditEmptyHTML("Sign in to audit GMP's per-offtaker allocation."); return; }
+    if (!AUDIT) {
+      // not loaded yet — kick the fetch, show a light loading state.
+      host.innerHTML = `<div class="rb-au-loading">Loading the bill audit…</div>`;
+      loadAudit().then(a => { if (a) renderAudit(); else host.innerHTML = auditEmptyHTML(); });
+      return;
+    }
+    const utilities = (AUDIT.utilities || []).filter(u => (u.arrays || []).length);
+    if (!utilities.length) {
+      host.innerHTML = auditEmptyHTML();
+      return;
+    }
+    // Which sub-tab is active — default to the first utility (or the last picked, if still present).
+    if (!AUDIT_PROVIDER || !utilities.some(u => u.provider === AUDIT_PROVIDER)) {
+      AUDIT_PROVIDER = utilities[0].provider;
+    }
+    const active = utilities.find(u => u.provider === AUDIT_PROVIDER) || utilities[0];
+
+    // Summary line from the tenant totals.
+    const t = AUDIT.totals || {};
+    const dTxt = t.dollars_flagged ? " · " + money(t.dollars_flagged) : "";
+    const flagClass = t.flagged ? "rb-au-sum-flag" : "";
+    const summary = `<div class="rb-au-summary ${flagClass}">
+        <b>${fmt0(t.arrays || 0)}</b> array${(t.arrays === 1) ? "" : "s"} ·
+        <b>${fmt0(t.offtakers || 0)}</b> offtaker${(t.offtakers === 1) ? "" : "s"} ·
+        <span class="rb-au-sum-flagged">${t.flagged ? "⚑ " : "✓ "}<b>${fmt0(t.flagged || 0)}</b> flagged${esc(dTxt)}</span>
+      </div>`;
+
+    // Per-utility sub-tabs (GMP / VEC / …), each with its own flagged count.
+    const subtabs = utilities.map(u => {
+      const uFlag = (u.arrays || []).reduce((n, a) => n + (a.offtakers || []).filter(o => o.status === "mismatch").length, 0);
+      const on = u.provider === AUDIT_PROVIDER;
+      return `<button type="button" class="rb-au-tab${on ? " on" : ""}" data-au-prov="${esc(u.provider)}">
+          ${esc(auditProviderLabel(u.provider))}${uFlag ? `<span class="rb-au-tab-flag">${uFlag}</span>` : ""}
+        </button>`;
+    }).join("");
+
+    const cards = (active.arrays || []).map(auditArrayCard).join("");
+
+    host.innerHTML = `
+      <div class="rb-au-head">
+        <div class="rb-au-title">Bill audit <span class="rb-au-eyebrow">GMP allocation cross-check</span></div>
+        <p class="rb-au-lead">The array's master utility bill on top; each offtaker's own bill underneath. We flag it when GMP's credited kWh doesn't match <b>their share × the array's group excess</b>.</p>
+      </div>
+      ${summary}
+      <div class="rb-au-tabs" role="tablist">${subtabs}</div>
+      <div class="rb-au-cards">${cards}</div>`;
+
+    // Wire the sub-tabs.
+    host.querySelectorAll("[data-au-prov]").forEach(b => b.onclick = () => {
+      AUDIT_PROVIDER = b.getAttribute("data-au-prov");
+      renderAudit();
+    });
+  }
+  function auditEmptyHTML(msg) {
+    return `<div class="rb-au-empty">${esc(msg || "Connect an array's utility bill + its offtakers' bills to audit GMP's allocation. Once both are on file, this shows the array's group excess with each offtaker's share checked against what GMP actually credited them.")}</div>`;
+  }
+
+  // The "Offtakers | Bill audit" segmented toggle at the top of the generator: swaps
+  // the body between the offtaker list (#rbGenList) and the Bill-audit sandbox
+  // (#rbAuditView). Lazily fetches the audit on first switch. Works in the demo too
+  // (renderAudit shows the sign-in/empty state without a live fetch).
+  function wireGenTabs() {
+    const tabs = Array.from(document.querySelectorAll("#rbGenTabs [data-gentab]"));
+    if (!tabs.length) return;
+    const list = document.getElementById("rbGenList");
+    const audit = document.getElementById("rbAuditView");
+    tabs.forEach(btn => btn.onclick = () => {
+      const v = btn.getAttribute("data-gentab");
+      tabs.forEach(b => b.classList.toggle("on", b === btn));
+      if (list) list.style.display = v === "offtakers" ? "" : "none";
+      if (audit) audit.style.display = v === "audit" ? "" : "none";
+      if (v === "audit") renderAudit();   // lazy render + fetch on first view
+    });
+  }
+
   // ── pdf.js: paint page 1 of a PDF onto a <canvas> inside `paper` — no browser
   //    PDF-viewer chrome. Shared by the template-card preview AND the approval-inbox
   //    draft preview, so both show the REAL reproduced invoice (not lossy token-HTML).
@@ -388,6 +573,7 @@
       // directly: set the global rate, "＋ Add an offtaker", and link GMP bills.
       el.innerHTML = shell();
       wireSubtabs();
+      wireGenTabs();   // "Offtakers | Bill audit" segmented toggle
       wireGlobalRate();
       // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
       // spreadsheet); the upload zone + live doc-preview live inside that panel
@@ -729,6 +915,7 @@
     const D = window.AO_DEMO;
     if (!_demoBuilt) {
       el.innerHTML = shell();
+      wireGenTabs();   // the "Offtakers | Bill audit" toggle works in the demo too (audit shows the sign-in state)
       _demoBuilt = true;
     }
     // A subtle demo affordance above the offtaker list (matches the page's demo banner).
@@ -867,6 +1054,14 @@
   function shell() {
     return `
       <div id="rbSubInvoice" class="rb-subpanel">
+      <!-- Segmented toggle: the offtaker list ↔ the Bill-audit sandbox (organize the
+           fleet the way GMP allocates it, catch GMP's per-offtaker math errors). -->
+      <div class="rb-subtabs rb-subtabs-bare" role="tablist" id="rbGenTabs">
+        <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
+        <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit</button>
+      </div>
+      <div id="rbAuditView" class="rb-au" style="display:none"></div>
+      <div id="rbGenList">
       <div class="rb-listwrap">
         <div class="cc-treedivider rb-list-head">
           <div>
@@ -938,6 +1133,7 @@
         </div>
       </div>
       </div>
+      </div><!-- /rbGenList -->
       </div><!-- /rbSubInvoice -->
       <div id="rbSubQuarterly" class="rb-subpanel" style="display:none"></div>`;
   }
