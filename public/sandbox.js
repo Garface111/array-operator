@@ -247,8 +247,17 @@
         // inverters persisted — e.g. the portal SPA hadn't loaded its device list
         // (busTypeDevices) when capture fired, so we saw the site but no inverters.
         // Don't claim "inverters on the canvas" when nothing landed; ask for a retry.
-        if(!isMeter){
-          const nInv = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
+        // Only the EXTENSION-capture vendors (Fronius/SMA/Chint) return per-site
+        // `inverters_persisted` in the SAME response, so a 0 there is a real "the
+        // portal's device list hadn't loaded — retry" case. SolarEdge's account
+        // connect ATTACHES the arrays and pulls inverters ASYNCHRONOUSLY (a
+        // background job), so it never reports inverters_persisted and 0-right-now
+        // is normal — gating on it here false-errored a successful connect (the
+        // inverters "appear a little later"). So only gate when the response
+        // actually carries per-site inverter counts.
+        const _hasSiteCounts = Array.isArray(data.sites) && data.sites.some(s => s && s.inverters_persisted != null);
+        if(!isMeter && _hasSiteCounts){
+          const nInv = data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0);
           if(!nInv){
             const B = esc(BRAND[d.provider]||d.provider);
             if(note){ note.className = "sb-note err"; note.innerHTML =
@@ -289,7 +298,25 @@
             else toast(noGen ? `Connected GMP — but ${noGen} account${noGen===1?"":"s"} showed no solar production yet.` : `Connected your GMP meter data.`, "ok");
           } else {
             const n = (data.sites && data.sites.reduce ? data.sites.reduce((t,s)=>t+(s.inverters_persisted||0),0) : 0);
-            toast(n ? `Connected — ${n} inverter${n===1?"":"s"} live on your canvas.` : `Connected — your inverters are on the canvas.`, "ok");
+            if(n){
+              toast(`Connected — ${n} inverter${n===1?"":"s"} live on your canvas.`, "ok");
+            } else {
+              // SolarEdge account-connect: arrays attached, inverters pull in the
+              // background — say so honestly instead of claiming they're already here.
+              const nArr = ((data.connected&&data.connected.length)||0)
+                         + ((data.created&&data.created.length)||0)
+                         + ((data.matched&&data.matched.length)||0);
+              toast(nArr
+                ? `Connected ${nArr} array${nArr===1?"":"s"} — your inverters are syncing and will appear in a moment.`
+                : `Connected — your inverters are syncing and will appear in a moment.`, "ok");
+              // The inverters land on a background pull; re-fetch a couple of times
+              // so they show up on their own without the owner hitting refresh.
+              if(window.FleetStore && FleetStore.refetch){
+                setTimeout(() => { try { FleetStore.refetch(); } catch(_){} }, 5000);
+                setTimeout(() => { try { FleetStore.refetch(); } catch(_){} }, 15000);
+                setTimeout(() => { try { FleetStore.refetch(); } catch(_){} }, 30000);
+              }
+            }
           }
         }
         load();   // re-render the (now refreshed) store
