@@ -1570,7 +1570,16 @@ body.sb-fs-lock{ overflow:hidden; }
 .vs-hint strong{ color:var(--good,#2563eb); font-weight:650; }
 .vs-scroll{ overflow-y:auto; border:1px solid var(--line); border-radius:14px;
   background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06); }
-.vs-row{ display:grid; grid-template-columns:minmax(180px,2.2fr) 1fr .8fr .9fr 1fr 1.2fr .8fr;
+/* Each .vs-row is its OWN independent grid (not one shared table grid across all
+   rows), so a bare `Nfr` track's implicit min-content floor lets one row's wide
+   cell content (e.g. the "↗ Open Fronius to sync" button — the longest of the
+   three vendor names that get one) steal extra width for THAT row only, pushing
+   every later column left relative to every other row. minmax(0,Nfr) removes the
+   content-based floor so a track's width depends ONLY on the fixed row width +
+   the fr ratio — identical on every row regardless of what it contains. The
+   Vendor column keeps a small px floor (not 0) sized to its widest real button so
+   that content still fits without wrapping/clipping. */
+.vs-row{ display:grid; grid-template-columns:minmax(180px,2.2fr) minmax(175px,1fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,.8fr);
   align-items:center; gap:10px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
 .vs-colhead{ font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
   color:var(--faint); background:var(--bg2,#eef2f7); border-bottom:1px solid var(--line);
