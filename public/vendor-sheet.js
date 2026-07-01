@@ -456,8 +456,15 @@
     // auto-closes each as its data lands. Falls back to one-at-a-time on older versions.
     const concurrent = await tryConcurrentSync(present);
     if (concurrent) {
-      btn.innerHTML = `✓ Syncing in background`;
-      [6000, 14000, 25000].forEach(t => setTimeout(() => { try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {} }, t));
+      // v1.9.104: the sweep is now a VISIBLE, sequential cycle — hidden tabs captured nothing, so
+      // the extension opens each vendor's portal in a foreground tab, captures, and returns here
+      // when done. Refresh the fleet as readings land AND the moment this tab regains focus.
+      btn.innerHTML = `✓ Syncing — opening each portal…`;
+      const _reload = () => { try { if (window.FleetStore && FleetStore.load) FleetStore.load(); } catch (_) {} };
+      [8000, 20000, 40000, 70000, 110000, 160000].forEach(t => setTimeout(_reload, t));
+      const _onVis = () => { if (document.visibilityState === "visible") { _reload(); setTimeout(_reload, 1500); } };
+      document.addEventListener("visibilitychange", _onVis);
+      setTimeout(() => document.removeEventListener("visibilitychange", _onVis), 200000);
     } else {
       let okCount = 0;
       for (let i = 0; i < silent.length; i++) {
