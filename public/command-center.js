@@ -26,7 +26,7 @@
   const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended offset (demo/anon)
   const energyRate = () => { const s = FS(); return s && s.energyRate ? s.energyRate() : ENERGY_RATE_FALLBACK; };
   const REC_PER_MWH = (FS() && FS().REC_PER_MWH) || 38;   // $/MWh REC value
-  const WINDOW_DAYS = 14;
+  const WINDOW_DAYS = 10;   // Ford: everything on a 10-day window; 14 didn't make sense
 
   // ---- modeled production target (expected vs actual) ----
   // Peer analysis catches ONE inverter lagging its neighbors, but it's blind to a
@@ -121,7 +121,7 @@
           targetKwh   += inv.nameplate_kw * 24 * WINDOW_DAYS * cf;
           measuredCount++;
         }
-        // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 14-day
+        // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 10-day
         // peer verdict; a fresh live anomaly (dark now, OR low vs peers, while >=2
         // daylight peers produce) isn't caught by it yet, so we promote a status:"ok"
         // inverter to a "live_dark"/"live_low" row. Shared FleetStore classifier →
@@ -137,7 +137,7 @@
         // row. Count it as not-flagged (don't drag the healthy %) and skip the table.
         if(status === "monitoring"){ invHealthy++; return; }
         // live_dark/live_low carry no priced loss yet (unconfirmed, like comm_gap) —
-        // dollars are claimed once 14-day health confirms it dead/underperforming.
+        // dollars are claimed once 10-day health confirms it dead/underperforming.
         const lk = (status === "live_dark" || status === "live_low") ? 0 : lostKwh(inv, fleetWin, totalNp);
         const lossMo = val(lk)/WINDOW_DAYS*30;
         rows.push({
@@ -270,7 +270,8 @@
     // On the DASHBOARD tab, surface the combined attention queue (every flagged
     // inverter across the fleet, worst-first); elsewhere keep it empty.
     renderProdKpis();
-    renderProductionTarget();   // modeled expected-vs-actual card (Dashboard only)
+    // The weather-adjusted "Production vs expected" card moved to the Analysis tab
+    // (analysis-forecast.js) — Fleet Health now leads with the Needs-attention queue.
     // Relabel the attention header so a clean fleet doesn't sit under a "Needs
     // attention" heading over an empty list — read it as the all-clear it is.
     const attnH = document.getElementById("dashAttnH");
@@ -368,181 +369,10 @@
       (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``);
   }
 
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-  /* ===========================================================================
-   * WEATHER-AWARE PREDICTED-VS-ACTUAL (feat 2026-06-30)
-   * The "Production vs expected" card. Upgrades the old static-seasonal-CF model
-   * to a real irradiance-driven prediction: GET /v1/array-owners/forecast-fleet
-   * returns expected AC kWh from the ACTUAL sunlight on each array's roof vs the
-   * clean measured generation, plus every input (location, irradiance source +
-   * value, tilt/azimuth + whether assumed, nameplate, PR, days, confidence).
-   * The card shows the headline % AND an expandable "How we calculated this" that
-   * names all of it — Ford: "extreme clarity about how the model is working".
-   * Falls back to the old typical-weather model (MODEL.production) only when the
-   * weather feed is unavailable, so the card is never blank or fabricated.
-   * ==========================================================================*/
-  let FORECAST = null;            // last fleet-forecast payload (null until loaded)
-  let _fcState = "idle";          // idle | loading | ok | error | unavailable
-  let _fcAt = 0;                  // last successful load (ms)
-  let _fcOpen = false;            // is the "how" detail expanded?
-  const FORECAST_TTL_MS = 12 * 60 * 1000;   // irradiance changes slowly; refetch ~hourly-ish
-
-  function loadForecast(force){
-    // Live fleets only — the simulated demo has no real arrays/addresses to model.
-    if(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()) return;
-    const s = getSession(); if(!s) return;
-    if(_fcState === "loading") return;
-    if(!force && _fcAt && (Date.now()-_fcAt) < FORECAST_TTL_MS) return;
-    _fcState = "loading";
-    if(_dashActive()) renderProductionTarget();   // show the loading state immediately
-    fetch("/v1/array-owners/forecast-fleet?window_days=14", { headers:{ Authorization:"Bearer "+s } })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(j => {
-        FORECAST = j;
-        _fcAt = Date.now();
-        _fcState = (j && j.available) ? "ok" : "unavailable";
-        if(_dashActive()) renderProductionTarget();
-      })
-      .catch(() => { _fcState = "error"; if(_dashActive()) renderProductionTarget(); });
-  }
-
-  // Confidence → plain words (matches the live-dark "say why" voice).
-  const CONF_LABEL = { high:"high confidence", medium:"moderate confidence",
-    low:"limited data so far", none:"not enough measured days yet" };
-
-  // The transparent "How we calculated this" panel — every model input, named.
-  function forecastHowHTML(f){
-    const i = f.inputs || {};
-    const loc = i.location || {}, g = i.geometry || {}, ir = i.irradiance || {};
-    const srcName = { census:"street address (rooftop)", nominatim:"street address (OpenStreetMap)",
-      "open-meteo":"town centroid (approximate)", manual:"operator-set" }[loc.geocode_source] || loc.geocode_source || "—";
-    const tiltTxt = g.tilt_deg!=null
-      ? `${g.tilt_deg}° tilt${g.tilt_assumed?" <em>(assumed = your latitude — the usual fixed-tilt optimum)</em>":" (you set this)"}`
-      : "—";
-    const azTxt = g.azimuth_deg!=null
-      ? `facing ${esc(g.azimuth_label||"south")}${g.azimuth_assumed?" <em>(assumed south)</em>":" (you set this)"}`
-      : "—";
-    const rows = [
-      ["Where", `${esc(loc.address||"—")} — ${esc(srcName)} → ${loc.lat!=null?`${loc.lat}, ${loc.lng}`:"—"}`],
-      ["Sunlight", `${esc(ir.source||"Open-Meteo")} for ${esc(ir.window_start||"")}–${esc(ir.window_end||"")}. Best day this window: <b>${ir.best_day_poa_kwh_m2!=null?ir.best_day_poa_kwh_m2:"—"} kWh/m²</b> of plane-of-array sun (vs ${ir.stc_reference_kwh_m2||1} kWh/m² at lab "standard" conditions).`],
-      ["Panel angle", `${tiltTxt}, ${azTxt}`],
-      ["Capacity", `<b>${i.nameplate_kw!=null?i.nameplate_kw:"—"} kW</b> nameplate (sum of this fleet's inverters)`],
-      ["Losses", `Performance ratio <b>${i.performance_ratio!=null?Math.round(i.performance_ratio*100)+"%":"—"}</b> — the standard derate from panel nameplate to delivered AC power (inverter efficiency, wiring, heat, soiling, mismatch).`],
-      ["Measured", `Actual = real metered/inverter kWh only. We <b>exclude</b> monthly utility-bill estimates so a bill can't masquerade as one big day. ${i.measured_days!=null?i.measured_days:"0"} measured day(s) in the window.`],
-    ];
-    return `
-      <div class="fc-how">
-        <div class="fc-how-eq">expected kWh  =  nameplate kW  ×  (sunlight ÷ standard 1 kW/m²)  ×  performance ratio</div>
-        <dl class="fc-how-dl">
-          ${rows.map(([k,v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}
-        </dl>
-        <div class="fc-how-foot">This is a <b>weather-adjusted expected value</b>, not a guarantee — a cloudy stretch runs under, a clear one over. It uses the real sun that fell on your location, so it catches a whole-fleet dip (soiling, snow, smoke, aging) that per-neighbor checks miss. ${f.arrays_skipped?`${f.arrays_skipped} array(s) not yet modeled (no address or capacity on file).`:""}</div>
-      </div>`;
-  }
-
-  // Modeled production target card — actual measured kWh vs what this nameplate
-  // typically makes this month. Honest by construction: "actual" is real measured
-  // window production; "target" is explicitly labeled a typical/seasonal model,
-  // and we only show it once at least one unit has real history. The shortfall
-  // flag is conservative (sustained gap past the noise band).
-  function renderProductionTarget(){
-    const el = document.getElementById("fleetTarget");
-    if(!el) return;
-    // Only on the Dashboard tab + after the fleet loads; otherwise leave it empty.
-    if(!_dashActive() || !MODEL){ el.innerHTML = ""; return; }
-    if(window.FleetStore && FleetStore.isLoaded && !FleetStore.isLoaded()){ el.innerHTML = ""; return; }
-    // Kick the weather-aware fetch (lazy, cached). On a live fleet, prefer it.
-    loadForecast(false);
-
-    // ── Preferred path: the real irradiance-driven forecast ──────────────────
-    const f = FORECAST;
-    if(_fcState === "ok" && f && f.available && f.ratio_pct != null){
-      const pct = f.ratio_pct;
-      const fill = Math.max(0, Math.min(pct, 120));
-      const tone = pct < 82 ? "warn" : (pct >= 92 ? "ok" : "soft");
-      const verdict = pct < 82
-        ? `${100 - pct}% under the sunlight-expected output`
-        : pct >= 100
-          ? `at or above what the actual weather should yield`
-          : `tracking near the sunlight-expected output`;
-      const spot = f.sunny_spotlight;
-      const spotLine = (spot && spot.ratio_pct != null)
-        ? `<div class="fc-spot"><span class="fc-spot-ic">☀</span> Clearest recent day (${esc(spot.day)}, ${spot.poa_kwh_m2} kWh/m² sun): <b>${esc(spot.array_name)}</b> made <b>${Math.round(spot.actual_kwh).toLocaleString()} kWh</b> vs ${Math.round(spot.expected_kwh).toLocaleString()} expected — <b class="${spot.ratio_pct>=92?'good':spot.ratio_pct<82?'bad':''}">${spot.ratio_pct}%</b>.</div>`
-        : "";
-      el.innerHTML = `
-        <div class="ft-card ${tone}">
-          <div class="ft-head">
-            <div class="ft-title">Production vs expected <span class="fc-badge">weather-adjusted</span></div>
-            <div class="ft-pct"><b>${pct}<span>%</span></b><small>of expected</small></div>
-          </div>
-          <div class="ft-track" role="img" aria-label="Fleet made ${pct}% of its weather-expected output">
-            <div class="ft-fill ${tone}" style="width:${fill}%"></div>
-            <span class="ft-mark" style="left:${100/1.2}%" title="100% = the actual weather's expected output"></span>
-          </div>
-          <div class="ft-row">
-            <span class="ft-verdict ${tone}">${pct<82?"⚠ ":""}${esc(verdict)}</span>
-            <span class="ft-nums">${Math.round(f.actual_kwh).toLocaleString()} kWh made · ${Math.round(f.expected_kwh).toLocaleString()} kWh expected</span>
-          </div>
-          ${spotLine}
-          <div class="ft-note">
-            Expected = the <b>real sunlight</b> that fell on your arrays' locations, not a seasonal average — ${esc(CONF_LABEL[f.confidence]||f.confidence)} (${f.arrays_modeled} array${f.arrays_modeled===1?"":"s"} modeled).
-            <button type="button" class="fc-toggle" data-fc-toggle aria-expanded="${_fcOpen}">${_fcOpen?"Hide":"How we calculated this"}</button>
-          </div>
-          ${_fcOpen ? forecastHowHTML(f) : ""}
-        </div>`;
-      el.querySelectorAll("[data-fc-toggle]").forEach(b => b.addEventListener("click", () => {
-        _fcOpen = !_fcOpen; renderProductionTarget();
-      }));
-      return;
-    }
-
-    // ── Loading state (first fetch on a live fleet) ──────────────────────────
-    if(_fcState === "loading" && !(MODEL.production && MODEL.production.ready)){
-      el.innerHTML = `<div class="ft-card"><div class="ft-head"><div class="ft-title">Production vs expected</div></div>
-        <div class="ft-note">Checking the sunlight on your arrays…</div></div>`;
-      return;
-    }
-
-    // ── Fallback: the typical-weather (static seasonal) model ─────────────────
-    // Used when the weather feed is down or the fleet has no addresses yet — the
-    // card degrades to the honest seasonal model rather than going blank.
-    const p = MODEL.production;
-    if(!p || !p.ready){ el.innerHTML = ""; return; }   // no window history yet → say nothing
-
-    const pct = p.pct;                                  // % of modeled target made
-    const fill = Math.max(0, Math.min(pct, 120));
-    const tone = p.short ? "warn" : (pct >= 92 ? "ok" : "soft");
-    const month = MONTHS[new Date().getMonth()];
-    const verdict = p.short
-      ? `${100 - pct}% under its typical ${month} output`
-      : pct >= 100
-        ? `on track — at or above typical ${month} output`
-        : `tracking near typical ${month} output`;
-    const feedDown = _fcState === "error" || _fcState === "unavailable";
-    el.innerHTML = `
-      <div class="ft-card ${tone}">
-        <div class="ft-head">
-          <div class="ft-title">Production vs target</div>
-          <div class="ft-pct"><b>${pct}<span>%</span></b><small>of typical</small></div>
-        </div>
-        <div class="ft-track" role="img" aria-label="Fleet made ${pct}% of its modeled ${esc(month)} target">
-          <div class="ft-fill ${tone}" style="width:${fill}%"></div>
-          <span class="ft-mark" style="left:${100/1.2}%" title="100% = typical ${esc(month)} output"></span>
-        </div>
-        <div class="ft-row">
-          <span class="ft-verdict ${tone}">${p.short?"⚠ ":""}${esc(verdict)}</span>
-          <span class="ft-nums">${Math.round(p.measuredKwh).toLocaleString()} kWh measured · ${Math.round(p.targetKwh).toLocaleString()} kWh typical</span>
-        </div>
-        <div class="ft-note">${p.short
-          ? `A whole-fleet shortfall like this is what peer checks miss — every panel's down together (soiling, snow, smoke, or aging), so neighbors still match. Worth a fleet-wide clean/inspection.`
-          : `Target is a <b>typical-weather model</b> for ${esc(month)} (nameplate × seasonal capacity factor, ${Math.round(p.cf*100)}%), not a guarantee — a cloudy fortnight runs under, a sunny one over. Catches sustained fleet-wide drops peer checks can't.`}
-          ${feedDown ? `<span class="ft-cov">Live weather-adjusted view is momentarily unavailable — showing the seasonal model.</span>` : ""}
-          <span class="ft-cov">Across ${num(p.coveredInverters)} inverter${p.coveredInverters===1?"":"s"} with ${WINDOW_DAYS}-day history.</span>
-        </div>
-      </div>`;
-  }
-
+  // The weather-aware "Production vs expected" card (loadForecast /
+  // forecastHowHTML / renderProductionTarget) was RELOCATED to the Analysis tab
+  // (public/analysis-forecast.js) — Fleet Health now leads with the Needs-attention
+  // queue. The Analysis orchestrator owns the forecast-fleet fetch + ctx.forecast.
   // legacy render kept for reference / other callers
   function renderQueueLEGACY(){
     const h = host(); if(!h || !MODEL) return;
@@ -629,9 +459,9 @@
     const why = r.status==="comm_gap"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has gone quiet — no telemetry for <b>${r.stale!=null?r.stale+"h":"a while"}</b>. Its neighbors are still reporting, so this reads as a comms dropout, not a power fault. We can't bill lost output until it checks back in.`
       : r.status==="live_dark"
-      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is reading <b>zero output right now</b> while its array neighbors are actively producing under the same sky. This is a LIVE reading — the 14-day health hasn't flagged it yet, so it just stopped. Could be an early-stage fault, a tripped breaker, or a brief dropout; check before it becomes lost revenue.`
+      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is reading <b>zero output right now</b> while its array neighbors are actively producing under the same sky. This is a LIVE reading — the 10-day health hasn't flagged it yet, so it just stopped. Could be an early-stage fault, a tripped breaker, or a brief dropout; check before it becomes lost revenue.`
       : r.status==="live_low"
-      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is producing <b>well below its array neighbors right now</b> — more than 15% under the peer median for its nameplate, under the same sky. This is a LIVE reading the 14-day health hasn't flagged yet. Likely shading, a tripped string, or an early-stage fault; check before it becomes lost revenue.`
+      ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> is producing <b>well below its array neighbors right now</b> — more than 15% under the peer median for its nameplate, under the same sky. This is a LIVE reading the 10-day health hasn't flagged yet. Likely shading, a tripped string, or an early-stage fault; check before it becomes lost revenue.`
       : r.status==="dead"
       ? `<b>${esc(r.inv)}</b> at <b>${esc(r.site)}</b> has produced <b>zero</b> for ~${r.stale!=null?Math.round(r.stale/24):"a few"} days while ${peers} kept producing — that rules out weather. Warranty claim is ready with the fault dates and peer-measured lost-kWh evidence.`
       : r.status==="fault"
@@ -640,9 +470,9 @@
     const rec = r.status==="comm_gap"
       ? `Power-cycle the inverter's gateway / data logger and confirm it rejoins. No telemetry within a day → escalate to a site visit.`
       : r.status==="live_dark"
-      ? `Confirm it's still dark (this is a live, possibly brief reading), then check the breaker/disconnect and the inverter's own fault log. If it stays at zero into tomorrow, the 14-day health will escalate it to a warranty-grade claim automatically.`
+      ? `Confirm it's still dark (this is a live, possibly brief reading), then check the breaker/disconnect and the inverter's own fault log. If it stays at zero into tomorrow, the 10-day health will escalate it to a warranty-grade claim automatically.`
       : r.status==="live_low"
-      ? `Check this inverter's strings for shading/soiling and confirm none have tripped, then review its fault log. If the gap vs its neighbors persists, the 14-day health will escalate it automatically.`
+      ? `Check this inverter's strings for shading/soiling and confirm none have tripped, then review its fault log. If the gap vs its neighbors persists, the 10-day health will escalate it automatically.`
       : r.status==="underperforming"
       ? `Schedule a visual + IV-curve check on this inverter's strings. A failed module or cleaning is usually a fast-payback fix.`
       : `Send the drafted ${r.status==="fault"?"service request":"warranty claim"} to the manufacturer — evidence is attached and dated.`;
@@ -829,7 +659,6 @@ Thank you,
     setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
     renderProdKpis();           // keep the live production strip fresh on every beat
-    renderProductionTarget();   // and the modeled expected-vs-actual card
   }
 
   // React to the shared store: a "live" beat just repaints the numbers; any

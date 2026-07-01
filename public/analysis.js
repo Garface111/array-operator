@@ -54,7 +54,7 @@
     var s = getSession(); if (!s) { _forecast = null; return; }   // demo/anon → no forecast
     if (_forecastInFlight) return;
     _forecastInFlight = true;
-    fetch("/v1/array-owners/forecast-fleet?window_days=14", { headers: { Authorization: "Bearer " + s } })
+    fetch("/v1/array-owners/forecast-fleet?window_days=10", { headers: { Authorization: "Bearer " + s } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { _forecast = d || null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); })
       .catch(function () { _forecast = null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
@@ -121,12 +121,12 @@
       var ratio = Math.round(64 + _h(a.id) * 54);           // 64..118 %
       var bad = (a.inverters || []).filter(function (iv) { return iv.status === "dead" || iv.status === "fault" || iv.status === "underperforming"; }).length;
       if (bad) ratio = Math.max(38, ratio - bad * 6);       // ailing sites read lower
-      var exp = act > 0 ? Math.round(act / (ratio / 100)) : Math.round(np * 4.6 * 14);
+      var exp = act > 0 ? Math.round(act / (ratio / 100)) : Math.round(np * 4.6 * 10);
       if (act <= 0) act = Math.round(exp * (ratio / 100));
       var code = codes[Math.floor(_h(a.id, 7) * codes.length)];
       rows.push({
         array_id: a.id, array_name: a.name, nameplate_kw: Math.round(np * 10) / 10,
-        expected_kwh: exp, actual_kwh: act, ratio_pct: ratio, measured_days: 14,
+        expected_kwh: exp, actual_kwh: act, ratio_pct: ratio, measured_days: 10,
         confidence: "high", tilt_assumed: false, weather_code: code
       });
       sumE += exp; sumA += act;
@@ -142,7 +142,7 @@
       confidence: "high", arrays_modeled: rows.length, arrays_skipped: 0,
       rows: rows, skipped: [], sunny_spotlight: spotlight,
       inputs: { simulated: true, pr: 0.84, irradiance_source: "simulated", note: "Demo fleet — simulated weather model" },
-      window: { days: 14 }
+      window: { days: 10 }
     };
   }
 
@@ -180,7 +180,7 @@
       sky: skyFromCode,                          // (weather_code) → {glyph,label,tone} | null — shared weather icon map
       energyRate: (window.FleetStore && FleetStore.energyRate()) || 0.21,
       recPerMwh: (window.FleetStore && FleetStore.REC_PER_MWH) || 38,
-      windowDays: (window.FleetStore && FleetStore.WINDOW_DAYS) || 14,
+      windowDays: 10,                            // Analysis window is 10 days (Ford) — for card copy; independent of the demo simulator's constant
       lastUpdate: (window.FleetStore && FleetStore.lastUpdate()) || Date.now(),
       live: window.FleetStore || null,           // for liveVerdict / isProducing / isLiveAnomaly
       fmt: fmt, esc: esc

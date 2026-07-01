@@ -223,10 +223,9 @@
         <div class="dash-prod" id="dashProd"></div>
       </div>
       <section id="fleetCommander"></section>
-      <!-- Modeled production target (expected vs actual) — catches a whole fleet
-           sagging together (soiling/snow/degradation) that peer analysis misses.
-           Filled by command-center.js → renderProductionTarget(). -->
-      <section id="fleetTarget"></section>
+      <!-- Fleet Health leads with the "which inverters need a crew" queue right under
+           the hero. The weather-adjusted Production-vs-Expected card moved to the
+           Analysis tab (analysis-forecast.js). -->
       <div class="dash-attn"><h3 id="dashAttnH">Needs attention</h3></div>
       <section id="ccQueue"></section>
     </div>
@@ -305,12 +304,13 @@
 <script src="app.js?v=20260629c"></script>
 <script src="sandbox.js?v=20260701b"></script>
 <script src="vendor-sheet.js?v=20260701b"></script>
-<script src="command-center.js?v=7"></script>
+<script src="command-center.js?v=8"></script>
 <script src="reports.js?v=31"></script>
 <!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
      self-contained section modules (each registers on window.AnalysisSections). -->
-<script src="analysis.js?v=3"></script>
+<script src="analysis.js?v=4"></script>
 <script src="analysis-fleet-summary.js?v=2"></script>
+<script src="analysis-forecast.js?v=1"></script>
 <script src="analysis-sites-grid.js?v=5"></script>
 <script src="analysis-performance.js?v=1"></script>
 <script src="analysis-alarms.js?v=1"></script>
