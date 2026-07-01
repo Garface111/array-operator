@@ -60,6 +60,23 @@
       .catch(function () { _forecast = null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
   }
 
+  // Force a fresh forecast fetch (after an array gets a location, so it models).
+  function reloadForecast() { _forecast = null; _simForecast = null; _forecastTried = false; _forecastInFlight = false; loadForecast(); }
+  window.__aoAnalysisReloadForecast = reloadForecast;
+
+  // Give an array a location (place string / coords / use its name) so the weather
+  // model can run, then reload the forecast so its row appears. Used by the Sites
+  // grid's "set location" affordance on arrays skipped as no_location.
+  window.__aoSetArrayLocation = function (arrayId, opts) {
+    var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to set a location"));
+    return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/location", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+      body: JSON.stringify(opts || {})
+    }).then(function (r) {
+      return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.detail || ("Couldn't set location (" + r.status + ")")); });
+    }).then(function (d) { reloadForecast(); return d; });
+  };
+
   // ---- weather: Open-Meteo weathercode → a compact sky descriptor -------------
   // Shared by the demo synthesis AND the real per-site weather the backend adds to
   // forecast rows, so the Sites grid renders one consistent icon set either way.
@@ -143,6 +160,13 @@
     if (forecast && Array.isArray(forecast.rows)) {
       forecast.rows.forEach(function (r) { forecastByArray[String(r.array_id)] = r; });
     }
+    // Why each un-modeled array was skipped (no_location / no_nameplate /
+    // irradiance_unavailable) → lets the Sites grid offer "set location" on the
+    // ones that just need coordinates.
+    var forecastSkipped = {};
+    if (forecast && Array.isArray(forecast.skipped)) {
+      forecast.skipped.forEach(function (s) { forecastSkipped[String(s.array_id)] = s.reason; });
+    }
     return {
       signedIn: !!getSession(),
       simulated: !!snap.simulated,
@@ -151,6 +175,8 @@
       summary: cols.summary || { arrays_total: 0, inverters_total: 0, attention: 0 },
       forecast: forecast,                        // fleet-forecast json | null. May be simulated:true for the demo.
       forecastByArray: forecastByArray,          // {array_id: row}  row={expected_kwh,actual_kwh,ratio_pct,nameplate_kw,…,weather_code}
+      forecastSkipped: forecastSkipped,          // {array_id: "no_location"|"no_nameplate"|"irradiance_unavailable"}
+      setLocation: window.__aoSetArrayLocation,  // (arrayId, {place}|{use_name}|{latitude,longitude}) → Promise; reloads forecast
       sky: skyFromCode,                          // (weather_code) → {glyph,label,tone} | null — shared weather icon map
       energyRate: (window.FleetStore && FleetStore.energyRate()) || 0.21,
       recPerMwh: (window.FleetStore && FleetStore.REC_PER_MWH) || 38,

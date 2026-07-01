@@ -99,6 +99,9 @@
       ".ansg-pct.bad{color:var(--bad)}",
       ".ansg-pct.neutral{color:var(--muted)}",
       ".ansg-nomodel{color:var(--faint);font-style:italic;font-size:12px}",
+      ".ansg-setloc{appearance:none;background:transparent;border:1px dashed var(--good);color:var(--good);border-radius:7px;font:inherit;font-size:11px;font-weight:700;line-height:1.4;padding:2px 9px;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap}",
+      ".ansg-setloc:hover{background:var(--good);color:#fff}",
+      ".ansg-setloc:disabled{opacity:.6;cursor:default}",
       // footer totals
       ".ansg-table tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:700;color:var(--ink);background:var(--card2);padding-top:11px;padding-bottom:11px}",
       ".ansg-table tfoot .ansg-tlabel{color:var(--muted);font-weight:740;font-size:11px;letter-spacing:.05em;text-transform:uppercase}",
@@ -450,6 +453,13 @@
   function cellRatio(r, ctx) {
     // HONESTY: no forecast row → never a bar, never a 0%
     if (!r.hasForecast || r.ratio == null) {
+      // Skipped only for want of a location (inverter-onboarded arrays have no
+      // utility address to geocode) → offer a one-click "set location" instead of
+      // a dead "not modeled yet", so the operator can unblock the weather model.
+      var reason = ctx.forecastSkipped && ctx.forecastSkipped[r.aid];
+      if (reason === "no_location" && ctx.signedIn && ctx.setLocation) {
+        return '<td class="ansg-ave"><button type="button" class="ansg-setloc" data-setloc="' + ctx.esc(r.aid) + '" title="No location on file — add a town or address so the weather model can run">＋ set location</button></td>';
+      }
       return '<td class="ansg-ave"><span class="ansg-nomodel">not modeled yet</span></td>';
     }
     var bucket = ratioBucket(r.ratio);
@@ -808,6 +818,31 @@
           next = String(next).trim();
           if (next === current) return;             // no change
           try { ctx.live.setArrayReminder(aid, next); } catch (_) { }
+        });
+      });
+    }
+
+    // "set location" on arrays skipped as no_location → prompt for a town/address,
+    // geocode + persist via the orchestrator, which reloads the forecast so the
+    // row starts modeling. Defaults the prompt to the site's own name.
+    if (ctx.signedIn && ctx.setLocation) {
+      container.querySelectorAll("[data-setloc]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var aid = btn.getAttribute("data-setloc");
+          var name = "";
+          for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { name = rows[i].name || ""; break; } }
+          var place = window.prompt("Where is “" + name + "”?\nEnter a town or address so the weather model can run — e.g. “Londonderry, VT”:", name);
+          if (place == null) return;                  // cancelled
+          place = String(place).trim();
+          if (!place) return;
+          var prev = btn.textContent;
+          btn.textContent = "locating…"; btn.disabled = true;
+          ctx.setLocation(aid, { place: place }).catch(function (err) {
+            btn.textContent = prev; btn.disabled = false;
+            try { alert(err && err.message ? err.message : "Couldn't find that location — try a nearby town or a full address."); } catch (_) { }
+          });
+          // success path: the orchestrator reloads the forecast and re-renders.
         });
       });
     }
