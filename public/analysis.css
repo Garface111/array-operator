@@ -8,7 +8,25 @@
  * existing Array Operator palette and never bolts on a foreign look.
  * ========================================================================== */
 
-#panelAnalysis .an-wrap { max-width: 1320px; margin: 0 auto; padding: 18px 0 60px; }
+/* Content sits in a comfortable, centered dashboard column with intentional side
+   margins — not near-full-bleed against the window (the app's .wrap is 94vw, which
+   reads as cramped on a ~1440px screen). */
+#panelAnalysis .an-wrap { max-width: 1280px; margin-inline: auto; padding: 22px 4px 64px; }
+
+/* Symmetric side gutters, scrollbar and all. The app's base styles.css sets
+   body{overflow-x:hidden}, which turns BODY into the scroll container — so the
+   vertical scrollbar is carved out of body's right edge and the centered column
+   drifts a scrollbar-width to the left (asymmetric gutters). Two moves fix it
+   without a transform hack:
+     1. body overflow-x: clip — hides horizontal overflow just like `hidden` did,
+        but (unlike hidden) does NOT establish a scroll container, so the scroller
+        returns to <html>.
+     2. html scrollbar-gutter: stable both-edges — reserves equal scrollbar space
+        on both edges of the real scroller, keeping the centered column visually
+        centered against the viewport whether or not the scrollbar is showing.
+   Robust to any scrollbar width; no horizontal scroll is introduced. */
+body { overflow-x: clip; }
+html { scrollbar-gutter: stable both-edges; }
 
 /* header */
 .an-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 4px 0 18px; }
