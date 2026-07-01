@@ -4684,13 +4684,19 @@
         const c    = Number(pick(summary, ["monitoring_total_cents"], 0));
         total += c;
         if(pick(summary, ["monitoring_basis"], "kwh") === "nameplate"){
-          // Per-kW NAMEPLATE: deterministic — kW of registered capacity × rate.
-          const kw   = Number(pick(summary, ["nameplate_kw"], 0));
-          const rate = Number(pick(summary, ["rate_cents_per_kw"], 30));
+          // Per-kW NAMEPLATE, GRADUATED volume discount: rate_cents_per_kw is the
+          // BLENDED rate (total/kW) so "kW × rate" always reproduces the real
+          // charge, even once the fleet has crossed into a discounted tier.
+          const kw     = Number(pick(summary, ["nameplate_kw"], 0));
+          const rate   = Number(pick(summary, ["rate_cents_per_kw"], 15));
+          const full   = Number(pick(summary, ["full_rate_cents_per_kw"], rate));
+          const discounted = full > 0 && rate < full - 0.001;
           lines += billLine("Fleet monitoring",
-            `${kw.toLocaleString(undefined,{maximumFractionDigits:0})} kW × ${usdFromCents(rate)}/kW`,
+            `${kw.toLocaleString(undefined,{maximumFractionDigits:0})} kW × ${discounted?"≈ ":""}${usdFromCents(rate)}/kW`,
             usdFromCents(c),
-            `Live fleet monitoring — billed on your registered nameplate capacity. Charged monthly to your card.`);
+            discounted
+              ? `Live fleet monitoring, billed on your registered nameplate capacity — volume discount applied (headline rate ${usdFromCents(full)}/kW). Charged monthly to your card.`
+              : `Live fleet monitoring — billed on your registered nameplate capacity. Charged monthly to your card.`);
         } else {
           const kwh  = Number(pick(summary, ["mtd_kwh"], 0));
           const rate = Number(pick(summary, ["blended_cents_per_kwh"], pick(summary, ["rate_cents_per_kwh"], 0.5)));
@@ -4701,13 +4707,20 @@
         }
       }
       if(showInv){
-        const n   = Number(pick(summary, ["offtaker_count"], 0));
-        const per = Number(pick(summary, ["invoicing_per_offtaker_cents"], 2000));
-        const c   = Number(pick(summary, ["invoicing_total_cents"], 0));
+        // Per-offtaker, GRADUATED volume discount: invoicing_blended_cents_per_offtaker
+        // is the BLENDED rate (total/count) so "N × rate" always reproduces the real
+        // charge, even once the portfolio has crossed into a discounted tier.
+        const n     = Number(pick(summary, ["offtaker_count"], 0));
+        const full  = Number(pick(summary, ["invoicing_per_offtaker_cents"], 2000));
+        const per   = Number(pick(summary, ["invoicing_blended_cents_per_offtaker"], full));
+        const c     = Number(pick(summary, ["invoicing_total_cents"], 0));
+        const discounted = full > 0 && per < full - 0.001;
         total += c;
         lines += billLine("Offtaker invoices",
-          `${n} offtaker${n===1?"":"s"} × ${usdFromCents(per)}`, usdFromCents(c),
-          `A flat ${usdFromCents(per)} per offtaker you invoice. Charged monthly to your card.`);
+          `${n} offtaker${n===1?"":"s"} × ${discounted?"≈ ":""}${usdFromCents(per)}`, usdFromCents(c),
+          discounted
+            ? `Volume discount applied (headline rate ${usdFromCents(full)}/offtaker). Charged monthly to your card.`
+            : `${usdFromCents(full)} per offtaker you invoice. Charged monthly to your card.`);
       }
     } else if(summary){
       // NEPOOL — per array.
@@ -4999,8 +5012,8 @@
           <p>Pick what you need. You can change or upgrade anytime in Master Account.</p>
         </div>
         <div class="ao-plan-cards">
-          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","$20 per offtaker / mo")}
-          ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","$0.15 / kW · mo")}
+          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","from $20 per offtaker / mo")}
+          ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","from $0.15 / kW · mo")}
           ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together.","Both plans")}
         </div>
         ${opts.change ? `<button type="button" class="ao-plan-close" id="aoPlanClose">Keep my current plan</button>` : ""}
