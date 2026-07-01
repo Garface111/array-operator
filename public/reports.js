@@ -74,6 +74,7 @@
     mismatch:        { cls: "warn", label: "Differs from the GMP bill" },
     no_bill:         { cls: "mute", label: "No GMP bill for this period yet" },
     no_invoice_data: { cls: "mute", label: "No production data yet" },
+    unverified:      { cls: "mute", label: "Awaiting measured data to verify" },
   };
   // The array-level production-vs-bill rows: our metered kWh vs GMP's, per array.
   function reconArraysHTML(row) {
@@ -177,6 +178,7 @@
     const arrMis = (row.arrays || []).some(a => a.status === "mismatch");
     if (arrMis) return "⚑ differs from the GMP bill";
     if (row.overall_status === "match") return "✓ reconciles cleanly";
+    if (row.overall_status === "unverified") return "awaiting measured data to verify";
     return "production vs the utility bill";
   }
 
@@ -204,19 +206,30 @@
     const arrN = reconArrayMismatchCount();
     const dollars = RECON.allocation_dollars_flagged || 0;
     const flaggedSubs = new Set();
+    let unverifiedSubs = 0;
     (RECON.subscriptions || []).forEach(r => {
-      if ((r.allocation && r.allocation.status === "mismatch") ||
-          (r.arrays || []).some(a => a.status === "mismatch")) flaggedSubs.add(r.sub_id);
+      const genuine = (r.allocation && r.allocation.status === "mismatch") ||
+                      (r.arrays || []).some(a => a.status === "mismatch");
+      if (genuine) flaggedSubs.add(r.sub_id);
+      else if ((r.arrays || []).some(a => a.status === "unverified")) unverifiedSubs++;
     });
     const n = flaggedSubs.size;
+    // What this chip is: we cross-check each offtaker's MEASURED production and
+    // GMP's allocation against the actual utility bill, to catch GMP billing
+    // errors. Only a GENUINE discrepancy (real data on both sides) counts as
+    // "to review" — an offtaker we simply can't verify yet (no measured
+    // generation, a prorated estimate) is honestly "awaiting data", not flagged.
     if (!n) {
-      return `<span class="rb-bac-clean" title="Every offtaker's production and GMP allocation reconciles against the utility bill.">✓ Bills reconcile cleanly</span>`;
+      if (unverifiedSubs) {
+        return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill. No discrepancies found; ${unverifiedSubs} can't be fully verified until measured generation data lands.">✓ No billing discrepancies · ${unverifiedSubs} awaiting data</span>`;
+      }
+      return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill — everything reconciles.">✓ Utility bills reconcile</span>`;
     }
     const dTxt = dollars > 0 ? " · " + money(dollars) : "";
-    const label = `⚑ ${n} bill check${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} review${dTxt}`;
+    const label = `⚑ ${n} bill${n === 1 ? "" : "s"} to review — doesn't match GMP${dTxt}`;
     const tip = allocN
-      ? `${allocN} GMP allocation mismatch${allocN === 1 ? "" : "es"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""} — click to review.`
-      : `${arrN} offtaker${arrN === 1 ? "" : "s"} differ from the GMP bill — click to review.`;
+      ? `The utility bill doesn't match our numbers for ${n} offtaker${n === 1 ? "" : "s"}: ${allocN} GMP allocation error${allocN === 1 ? "" : "s"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""}. Click to review.`
+      : `Measured production differs from the GMP bill for ${arrN} offtaker${arrN === 1 ? "" : "s"} — a possible billing error. Click to review.`;
     return `<span class="rb-bac-chip" id="rbBacChip" role="button" tabindex="0" title="${esc(tip)}">${label}</span>`;
   }
   // Re-render the summary chip in place (after the reconcile data lands post-paint).
