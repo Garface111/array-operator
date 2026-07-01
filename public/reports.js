@@ -431,6 +431,12 @@
       // drafts inline) — the old separate approval inbox is gone.
       Promise.all([refreshList(), refreshGmpBillsStatus()]).catch(() => {});
     }
+    // Invoice archive (monthly directory): fetch the manifest once (cached) on a real
+    // view and render the collapsible directory. Skipped during the idle prefetch;
+    // fails soft (fetch error → renderArchive keeps the host hidden).
+    if (!prefetch && authHeaders()) {
+      loadArchive().then(() => renderArchive()).catch(() => {});
+    }
   }
   window.__aoLoadReports = load;
 
@@ -500,6 +506,34 @@
   // object-URL download instead. Only revealed for a signed-in operator (the demo/
   // signed-out path never builds this shell). The optional account-code input maps
   // solar income to a QB/Xero income account and persists in localStorage.
+  // Authenticated file download: the export/archive endpoints require the Bearer
+  // header, so a plain <a href download> can't carry auth. Fetch → blob → object-URL
+  // → click. Reads an optional count header (X-Invoice-Count / X-File-Count) and
+  // returns {ok, count, name}. Surfaces the backend `detail` on failure. Shared by the
+  // QuickBooks/Xero CSV export and the monthly-archive .zip download.
+  async function authBlobDownload(url, fallbackName, countHeader) {
+    const r = await fetch(url, { headers: authHeaders() });
+    if (!r.ok) {
+      let detail = "";
+      try { const d = await r.clone().json(); detail = (d && d.detail) || ""; } catch (e) {}
+      throw new Error(detail || ("Download failed (HTTP " + r.status + ")."));
+    }
+    const count = countHeader ? r.headers.get(countHeader) : null;
+    // Prefer the server's filename from Content-Disposition; else the fallback.
+    let name = fallbackName;
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    if (m && m[1]) { try { name = decodeURIComponent(m[1].trim().replace(/"/g, "")); } catch (e) { name = m[1].trim().replace(/"/g, ""); } }
+    const blob = await r.blob();
+    if (!blob || blob.size === 0) throw new Error("Nothing to download yet.");
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
+    return { ok: true, count: count != null ? Number(count) : null, name };
+  }
+
   const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
   function wireExport() {
     const box = $("#rbExportBox"), btn = $("#rbExportQb"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
@@ -524,25 +558,8 @@
       const code = acct && acct.value.trim();
       const url = API + "/invoice-export.csv" + (code ? "?account_code=" + encodeURIComponent(code) : "");
       try {
-        const r = await fetch(url, { headers: authHeaders() });
-        if (!r.ok) {
-          // Surface the backend reason when it sends one (e.g. "no invoices this period").
-          let detail = "";
-          try { const d = await r.clone().json(); detail = (d && d.detail) || ""; } catch (e) {}
-          throw new Error(detail || ("Export failed (HTTP " + r.status + ")."));
-        }
-        const count = r.headers.get("X-Invoice-Count");
-        const blob = await r.blob();
-        if (!blob || blob.size === 0) throw new Error("No invoices to export for this period yet.");
-        const objUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = objUrl;
-        a.download = "offtaker-invoices.csv";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
-        const n = count != null ? Number(count) : null;
+        const res = await authBlobDownload(url, "offtaker-invoices.csv", "X-Invoice-Count");
+        const n = res.count;
         setStat("rb-ok", n != null
           ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for QuickBooks / Xero.")
           : "✓ Exported — CSV downloaded.");
@@ -553,6 +570,129 @@
       }
     }
     btn.onclick = doExport;
+  }
+
+  /* ===========================================================================
+   * INVOICE ARCHIVE (monthly directory) — Anna's ask #2.
+   *
+   * A browsable, collapsible directory of past billing months → arrays →
+   * offtakers, with honest availability badges (invoice / offtaker bill / array
+   * bill) and a per-month .zip download laid out <month>/<array>/{invoice, each
+   * offtaker bill, the array's own bill}. Portfolio-level month-close surface,
+   * signed-in only. Manifest fetched ONCE, cached (refetched on reload). Fails
+   * soft: a fetch error just leaves the section absent, never blocks the generator.
+   * ==========================================================================*/
+  let ARCHIVE = null;               // /invoice-archive manifest (cached)
+  let _archivePromise = null;
+  let _archiveOpen = false;         // remember the panel's open/closed state across refreshes
+  function loadArchive() {
+    if (ARCHIVE) return Promise.resolve(ARCHIVE);
+    if (_archivePromise) return _archivePromise;
+    if (!authHeaders()) return Promise.resolve(null);
+    _archivePromise = fetch(API + "/invoice-archive", { headers: authHeaders() })
+      .then(r => (r.ok ? r.json().catch(() => null) : null))
+      .then(d => { if (d && d.ok) ARCHIVE = d; return ARCHIVE; })
+      .catch(() => null)
+      .then(v => { _archivePromise = null; return v; });
+    return _archivePromise;
+  }
+
+  // A single availability badge — emerald ✓ when present, muted "—" when not.
+  // Honest: never renders a ✓ for something the backend says isn't available.
+  function archBadge(label, available) {
+    return `<span class="rb-arch-badge ${available ? "rb-arch-yes" : "rb-arch-no"}">${available ? "✓" : "—"} ${esc(label)}</span>`;
+  }
+  function monthLabel(m) {
+    // "2026-06" -> "June 2026" (fall back to the raw string on any parse miss).
+    const mm = String(m || "").match(/^(\d{4})-(\d{2})$/);
+    if (!mm) return String(m || "");
+    const d = new Date(Number(mm[1]), Number(mm[2]) - 1, 1);
+    return isNaN(d) ? String(m) : d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  }
+
+  // Render the archive panel into #rbArchiveHost from the cached manifest. Signed-in
+  // only; hides the host entirely when there's no manifest (fetch failed / demo).
+  function renderArchive() {
+    const host = $("#rbArchiveHost");
+    if (!host) return;
+    if (!authHeaders() || !ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
+    host.hidden = false;
+    const months = ARCHIVE.months || [];
+    const total = ARCHIVE.month_count || 0;
+    // Empty state — honest, quiet.
+    if (!total || !months.length) {
+      host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+        <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+          <span class="rb-arch-t">Invoice archive</span>
+          <span class="rb-arch-sub">monthly directory</span></summary>
+        <div class="rb-arch-body">
+          <p class="rb-arch-empty">No invoices archived yet — they appear here once GMP bills with billable excess land.</p>
+        </div></details>`;
+      wireArchiveToggle();
+      return;
+    }
+    const monthsHtml = months.map(m => {
+      const arrays = m.arrays || [];
+      const arraysHtml = arrays.map(a => {
+        const offs = (a.offtakers || []).map(o =>
+          `<div class="rb-arch-off">
+             <span class="rb-arch-off-name">${esc(o.customer_name || "(unnamed offtaker)")}</span>
+             <span class="rb-arch-badges">
+               ${archBadge("invoice", !!o.invoice_available)}
+               ${archBadge("offtaker bill", !!o.offtaker_bill_available)}
+             </span>
+           </div>`).join("");
+        return `<div class="rb-arch-array">
+            <div class="rb-arch-array-head">
+              <span class="rb-arch-array-name">${esc(a.array_name || ("Array " + (a.array_id != null ? a.array_id : "")))}</span>
+              ${archBadge("array bill", !!a.array_bill_available)}
+            </div>
+            ${offs || `<div class="rb-arch-off rb-arch-off-none">No offtakers on this array this month.</div>`}
+          </div>`;
+      }).join("");
+      const n = m.invoice_count != null ? m.invoice_count : (arrays.reduce((s, a) => s + (a.offtakers || []).length, 0));
+      return `<div class="rb-arch-month">
+          <div class="rb-arch-month-head">
+            <div class="rb-arch-month-title">${esc(monthLabel(m.month))}
+              <span class="rb-arch-month-count">${n} invoice${n === 1 ? "" : "s"}</span></div>
+            <button class="ao-btn rb-btn rb-arch-zip" type="button" data-arch-zip="${esc(m.month)}"
+              title="Download this month's invoices, offtaker bills, and array bills as a .zip (one folder per array).">⬇ Download month (.zip)</button>
+            <span class="rb-arch-zip-stat" data-arch-stat="${esc(m.month)}" aria-live="polite"></span>
+          </div>
+          <div class="rb-arch-arrays">${arraysHtml || `<div class="rb-arch-off-none">No arrays billed this month.</div>`}</div>
+        </div>`;
+    }).join("");
+    host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+      <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+        <span class="rb-arch-t">Invoice archive</span>
+        <span class="rb-arch-sub">${total} month${total === 1 ? "" : "s"} · newest first</span></summary>
+      <div class="rb-arch-body">${monthsHtml}</div></details>`;
+    wireArchiveToggle();
+    // Per-month .zip download (authenticated blob download, same helper as the CSV export).
+    host.querySelectorAll("[data-arch-zip]").forEach(btn => {
+      btn.onclick = () => downloadArchiveMonth(btn.getAttribute("data-arch-zip"), btn, host);
+    });
+  }
+  function wireArchiveToggle() {
+    const det = $("#rbArch");
+    if (det) det.addEventListener("toggle", () => { _archiveOpen = det.open; });
+  }
+  async function downloadArchiveMonth(month, btn, host) {
+    const stat = host.querySelector(`[data-arch-stat="${CSS.escape(month)}"]`);
+    const setStat = (cls, msg) => { if (stat) { stat.className = "rb-arch-zip-stat" + (cls ? " " + cls : ""); stat.textContent = msg || ""; } };
+    if (btn.disabled) return;
+    btn.disabled = true;
+    setStat("rb-busy", "Preparing…");
+    const url = API + "/invoice-archive.zip?month=" + encodeURIComponent(month);
+    try {
+      const res = await authBlobDownload(url, "offtaker-invoices-" + month + ".zip", "X-File-Count");
+      const n = res.count;
+      setStat("rb-ok", n != null ? ("✓ Downloaded " + n + " file" + (n === 1 ? "" : "s") + ".") : "✓ Downloaded.");
+    } catch (e) {
+      setStat("rb-err", (e && e.message) || "Download failed — check your connection.");
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function signInPrompt() {
@@ -742,6 +882,11 @@
              (Ford 2026-06-28 — it didn't pull its weight and cluttered the main screen).
              Each offtaker still has its OWN sheet inside its accordion card (.rb-track-sub). -->
         <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
+        <!-- Invoice archive (monthly directory) — a portfolio-level month-close surface,
+             sits with the export action. A browsable, collapsible directory of past
+             months → arrays → offtakers with availability badges + a per-month .zip
+             download. Signed-in only; filled by loadArchive()/renderArchive(). -->
+        <div id="rbArchiveHost" hidden></div>
         <div id="rbCustManual"></div>
         <div id="rbBulkHost"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>

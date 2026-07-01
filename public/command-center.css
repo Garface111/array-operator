@@ -988,6 +988,48 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-export-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
 .rb-export-stat.rb-err{ color:var(--bad,#e5484d); font-weight:600; }
 @media(max-width:640px){ .rb-export{ width:100%; } .rb-export-acct{ flex:1 1 120px; width:auto; } }
+
+/* ── Invoice archive (monthly directory) ─────────────────────────────────────
+   A collapsible portfolio-level directory: months → arrays → offtakers, with
+   honest availability badges + a per-month .zip download. Day palette, mirrors
+   the .rb-sec collapsible pattern. */
+.rb-arch{ margin:12px 0 4px; border:1px solid var(--line,#e2e8f0); border-radius:12px; background:var(--card,#fff); overflow:hidden; }
+.rb-arch[hidden]{ display:none; }
+.rb-arch-sum{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px;
+  padding:11px 14px; font-size:13px; color:var(--ink,#16202b); user-select:none; }
+.rb-arch-sum::-webkit-details-marker{ display:none; }
+.rb-arch-sum:hover{ background:rgba(37,99,235,.04); }
+.rb-arch[open] > .rb-arch-sum .rb-sec-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.rb-arch-t{ font-weight:700; }
+.rb-arch-sub{ margin-left:auto; font-size:11.5px; color:var(--faint,#94a3b8); }
+.rb-arch[open] > .rb-arch-sum .rb-arch-sub{ display:none; }
+.rb-arch-body{ padding:2px 14px 14px; }
+.rb-arch-empty{ font-size:12.5px; color:var(--faint,#94a3b8); margin:8px 2px 4px; line-height:1.5; }
+/* one month block */
+.rb-arch-month{ border-top:1px solid #eef2f6; padding:12px 0 4px; }
+.rb-arch-month:first-child{ border-top:0; padding-top:6px; }
+.rb-arch-month-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.rb-arch-month-title{ font-size:14px; font-weight:750; color:var(--ink,#16202b); }
+.rb-arch-month-count{ font-size:11.5px; font-weight:600; color:var(--faint,#94a3b8); margin-left:7px; font-variant-numeric:tabular-nums; }
+.rb-arch-zip{ margin-left:auto; white-space:nowrap; }
+.rb-arch-zip-stat{ font-size:11.5px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); flex-basis:100%; text-align:right; }
+.rb-arch-zip-stat:empty{ display:none; }
+.rb-arch-zip-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
+.rb-arch-zip-stat.rb-err{ color:var(--bad,#e5484d); font-weight:600; }
+/* array subdirectory */
+.rb-arch-array{ border:1px solid #eef2f6; border-radius:10px; padding:9px 12px; margin-bottom:8px; background:rgba(2,6,23,.008); }
+.rb-arch-array-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.rb-arch-array-name{ font-size:13px; font-weight:680; color:var(--ink,#16202b); }
+/* offtaker row */
+.rb-arch-off{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 0 4px 12px; border-left:2px solid #eef2f6; }
+.rb-arch-off + .rb-arch-off{ margin-top:2px; }
+.rb-arch-off-name{ font-size:12.5px; color:#41505f; }
+.rb-arch-off-none{ font-size:12px; color:var(--faint,#94a3b8); padding:2px 0 2px 12px; }
+.rb-arch-badges{ display:inline-flex; gap:6px; flex-wrap:wrap; }
+.rb-arch-badge{ font-size:11px; font-weight:650; padding:2px 8px; border-radius:20px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.rb-arch-yes{ color:#0a7d4f; background:rgba(10,125,79,.1); }
+.rb-arch-no{ color:var(--faint,#94a3b8); background:rgba(148,163,184,.12); }
+@media(max-width:640px){ .rb-arch-zip{ margin-left:0; } .rb-arch-off{ flex-direction:column; align-items:flex-start; gap:3px; } }
 /* GMP-bills connection status under the offtakers header */
 .rb-gmpbills-status{ margin:10px 0 4px; }
 .rb-gmpbills-status:empty{ display:none; }
