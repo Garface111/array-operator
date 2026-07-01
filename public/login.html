@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in · Array Operator</title>
+<!-- Per-tab auth session shim — MUST be the very first script so it patches the
+     so_session localStorage routing before anything reads/writes it. See session-tabscope.js. -->
+<script src="/session-tabscope.js?v=1"></script>
 <!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
 <script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">

@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Set up your arrays · Array Operator</title>
+<!-- Per-tab auth session shim — MUST be the very first script so it patches the
+     so_session localStorage routing before anything reads/writes it. See session-tabscope.js. -->
+<script src="/session-tabscope.js?v=1"></script>
 <!-- Day mode only — set the attribute BEFORE first paint so there's no flash. -->
 <script>document.documentElement.setAttribute("data-theme","day");</script>
 <link rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is the default skin -->

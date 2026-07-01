@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Array Operator — your array, working for you</title>
+<!-- Per-tab auth session shim — MUST be the very first script so it patches the
+     so_session localStorage routing before anything reads/writes it. Lets Ford stay
+     signed into different accounts in different tabs. See session-tabscope.js. -->
+<script src="/session-tabscope.js?v=1"></script>
 <!-- Whole-system browser error capture — loaded first so it sees errors from
      every later script. POSTs to the shared backend /v1/client-error. -->
 <script src="error-reporter.js"></script>
