@@ -207,6 +207,23 @@
     }
     return parts.join(" ");
   }
+  // Vendor-GROUP sync summary for the collapsed header row (Ford: "the vendor was
+  // synced — on the collapsed view, so you can see when without expanding it"). Shows
+  // the OLDEST (least-recently-synced) array in the group, not the newest — a lagging
+  // array should surface here even while its siblings are fresh, matching this app's
+  // "flag problems, don't hide them" rule (same reasoning as syncStale's per-array amber).
+  function vendorSyncSummary(list) {
+    const ages = list.map(_syncAgeMin).filter(a => a != null);
+    if (!ages.length) return null;
+    const oldest = Math.max(...ages);
+    return {
+      text: "Synced " + _fmtAge(oldest),
+      stale: oldest >= 30,
+      title: (list.length > 1
+        ? "Oldest sync among these " + list.length + " arrays: "
+        : "Last synced: ") + _fmtAge(oldest) + ".",
+    };
+  }
 
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
   // recapture alarms — surfaced so owners know how far behind real time a reading
@@ -590,6 +607,7 @@
       // filtered to matches above, so only vendors that HAVE a match render here).
       if (_vendorCollapsed[v] === undefined) _vendorCollapsed[v] = true;
       const vCollapsed = !_query && !!_vendorCollapsed[v];
+      const vSync = vendorSyncSummary(list);
       // The WHOLE header row toggles collapse (Ford: "click anywhere in the row of the
       // vendor and have it expand or collapse, not just this tiny button"). The portal
       // buttons inside (vendor-name [data-vopen], the ↗ "Open to sync" [data-vportal]
@@ -600,7 +618,10 @@
           <span class="vs-vcollapse-caret" aria-hidden="true">▾</span>
           ${badge}
           <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"} · ${nInv} inverters</span>${lagChip}
-          <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span></div>${vnote}
+          <span class="vs-vgroup-right">
+            ${vSync ? `<span class="vs-vsync${vSync.stale ? " vs-stale-syn" : ""}" title="${esc(vSync.title)}">${esc(vSync.text)}</span>` : ""}
+            <span class="vs-vtot"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)} now</span>
+          </span></div>${vnote}
         <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
       list.forEach(c => {
         const st = arrStatus(c);
