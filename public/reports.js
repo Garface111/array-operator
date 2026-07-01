@@ -1598,8 +1598,104 @@
   // utility picker in place (preserving the current pick) so the freshly-linked
   // account appears without a manual page refresh.
   window.addEventListener("ao:utility-accounts-changed", () => {
-    if (MANUAL_OPEN && $("#rbmUtility")) refreshUtilitySelect(true);
+    // Re-resolve the array→bill mapping in place if the array-first form is open.
+    if (MANUAL_OPEN && $("#rbmArray")) resolveArrayBills(true);
   });
+
+  // ---- array-FIRST manual add: pick the array, we resolve its utility bill ----
+  // Cache of this tenant's utility accounts (each carries array_id) so we can map
+  // the chosen array → the bill(s) it invoices from without a refetch on every
+  // dropdown change. Refreshed by resolveArrayBills(forceRefetch).
+  let ARR_UTIL_ACCTS = null;
+
+  // Fill #rbmArray from the shared arrays cache (list-bundle .arrays), then wire
+  // its change handler to resolve + display which utility bill invoices from it.
+  function wireArrayFirst() {
+    const sel = $("#rbmArray");
+    if (!sel) return;
+    fetchArrays().then(arrs => {
+      const s = $("#rbmArray");
+      if (!s) return;                                  // panel closed mid-fetch
+      if (!arrs.length) {
+        s.innerHTML = `<option value="">No arrays yet — connect one first</option>`;
+      } else {
+        s.innerHTML = `<option value="">Choose an array…</option>` +
+          arrs.map(a => {
+            const label = a.name || ("Array " + a.id);
+            const client = a.client_name ? ` · ${a.client_name}` : "";
+            return `<option value="${esc(String(a.id))}">${esc(label + client)}</option>`;
+          }).join("");
+      }
+      s.onchange = () => resolveArrayBills(false);
+    });
+    // Prime the utility-account cache so the first array pick resolves instantly.
+    resolveArrayBills(true, true);
+  }
+
+  // Resolve the utility bill(s) for the currently-selected array and paint the
+  // "Invoices from:" line + (multi-bill) override picker / (no-bill) amber note.
+  // `forceRefetch` re-pulls utility accounts (e.g. after an extension capture).
+  // `primeOnly` fetches the cache but skips the paint (used to warm on open).
+  function resolveArrayBills(forceRefetch, primeOnly) {
+    const need = forceRefetch || !ARR_UTIL_ACCTS;
+    const done = () => { if (!primeOnly) paintArrayBills(); };
+    if (need) {
+      fetchUtilityAccounts().then(accts => { ARR_UTIL_ACCTS = accts || []; done(); });
+    } else { done(); }
+  }
+
+  // Given ARR_UTIL_ACCTS + the chosen #rbmArray, render the bill state:
+  //  • exactly one connected bill → silent, show "Invoices from: …"
+  //  • multiple bills → reveal the #rbmUtility override picker (scoped to this array)
+  //  • no bill → amber note "connect one to invoice it"
+  function paintArrayBills() {
+    const arrSel = $("#rbmArray"), line = $("#rbmBillLine");
+    const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
+    if (!arrSel || !line) return;
+    const arrId = arrSel.value;
+    if (!arrId) {
+      line.className = "rb-arr-billline";
+      line.innerHTML = "";
+      if (wrap) wrap.hidden = true;
+      return;
+    }
+    const mine = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
+    if (!mine.length) {
+      line.className = "rb-arr-billline rb-arr-nobill";
+      line.innerHTML = "⚠ This array has no connected utility bill yet — connect one to invoice it.";
+      if (wrap) { wrap.hidden = true; usel.innerHTML = ""; }
+      return;
+    }
+    if (mine.length === 1) {
+      const a = mine[0];
+      line.className = "rb-arr-billline rb-arr-hasbill";
+      line.innerHTML = `Invoices from: <b>${esc(billLabel(a))}</b>`;
+      if (wrap) { wrap.hidden = true; usel.innerHTML =
+        `<option value="${a.utility_account_id}" selected>${esc(billLabel(a))}</option>`; }
+      return;
+    }
+    // Multiple bills → override picker; keep the operator's prior pick if valid.
+    const prev = usel ? usel.value : "";
+    line.className = "rb-arr-billline rb-arr-hasbill";
+    line.innerHTML = `This array has <b>${mine.length} connected bills</b> — pick which one to invoice from:`;
+    if (wrap && usel) {
+      usel.innerHTML = mine.map(a =>
+        `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
+      if (prev && mine.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
+      wrap.hidden = false;
+    }
+  }
+
+  // Human label for a utility account in the array-first bill line / override.
+  function billLabel(a) {
+    const prov = (a.provider || "gmp").toLowerCase();
+    const provTag = prov === "gmp" ? "GMP" : prov.toUpperCase();
+    const name = a.nickname || `${provTag} ${a.account_number || ""}`.trim();
+    const bills = a.has_bill
+      ? ` · ${a.bill_count || 0} bill${a.bill_count === 1 ? "" : "s"}${a.latest_period_label ? " · latest " + a.latest_period_label : ""}`
+      : " · no bill on file yet";
+    return `${provTag} ${name}${bills}`;
+  }
 
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
   function renderManual() {
@@ -1620,16 +1716,19 @@
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
         </div>
         <p class="rb-add-sub">${ADD_MODE === "manual"
-          ? "Bill an offtaker for a share of an array's production — billed <b>only</b> from the GMP utility bill you select below (the paper bill), never from inverter data."
+          ? "Pick the <b>array</b> this offtaker draws from — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
           <div class="rb-mform-grid">
+            <label class="rep-fld"><span class="rl">Array</span>
+              <select id="rbmArray"><option value="">Loading arrays…</option></select>
+              <span class="rb-arr-billline" id="rbmBillLine"></span>
+              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Which utility bill?</span>
+                <select id="rbmUtility"><option value="">Choose a utility bill…</option></select>
+                <span class="rb-fld-hint">This array has more than one connected bill — pick which one to invoice from.</span></label></label>
             <label class="rep-fld"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Which utility account?</span>
-              <select id="rbmUtility"><option value="">Loading utility accounts…</option></select>
-              <span class="rb-fld-hint">GMP offtakers bill from the paper bill; VEC/SmartHub offtakers bill from measured generation × the credit rate you set.</span></label>
             <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
               <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25">
               <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
@@ -1722,12 +1821,10 @@
       // Commission year → live expected-GMP-rate helper next to the rate fields.
       wireCommissionYearHint($("#rbmCommYear"), $("#rbmRateHint"),
         "The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).");
-      // Populate the GMP/VEC utility-bill picker. Offtakers bind to a utility
-      // account; their invoice is generated from THAT account only. Fetch + fill
-      // via the shared refreshUtilitySelect so an extension capture (linking new
-      // bills) can rebuild this in place without a page refresh (see the
-      // ao:utility-accounts-changed listener below).
-      refreshUtilitySelect(false);
+      // Array-FIRST flow: the operator picks the ARRAY, and we resolve which
+      // utility bill it invoices from. The utility <select> is now an OVERRIDE,
+      // shown only when the chosen array has more than one connected bill.
+      wireArrayFirst();
     } else {
       // Upload path: wire the dropzone + paint the live doc-preview placeholder.
       wireUpload();
@@ -1738,7 +1835,13 @@
   async function saveManual() {
     const st = $("#rbmStatus");
     const name = $("#rbmName").value.trim();
-    const utilityId = $("#rbmUtility").value;
+    const arrayId = $("#rbmArray") ? $("#rbmArray").value : "";
+    // The utility <select> is now an OVERRIDE — only meaningful (and visible) when
+    // the chosen array has multiple connected bills. The backend resolves the bill
+    // from array_id; we pass utility_account_id ONLY when the operator overrode.
+    const utilWrap = $("#rbmUtilityWrap");
+    const overrode = utilWrap && !utilWrap.hidden;
+    const utilityId = overrode && $("#rbmUtility") ? $("#rbmUtility").value : "";
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
@@ -1749,8 +1852,16 @@
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
     const clientEmail = $("#rbmEmail").value.trim();
+    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this offtaker draws from."; return; }
+    // Block save when the chosen array has no connected bill (nothing to invoice from).
+    const arrAccts = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrayId));
+    if (!arrAccts.length) {
+      st.className = "rb-status rb-err";
+      st.textContent = "This array has no connected utility bill yet — connect one before invoicing it.";
+      return;
+    }
+    if (overrode && !utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which of this array's bills to invoice from."; return; }
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
-    if (!utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which GMP utility bill connects to this offtaker."; return; }
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
       st.className = "rb-status rb-err"; st.textContent = "Enter their share as a percent between 0 and 100."; return;
@@ -1797,7 +1908,8 @@
     st.className = "rb-status rb-busy"; st.textContent = "Adding offtaker…";
     const fd = new FormData();                       // no file → manual path
     fd.append("customer_name", name);
-    fd.append("utility_account_id", utilityId);          // offtaker ↔ utility bill (utility data ONLY)
+    fd.append("array_id", String(arrayId));              // array-FIRST: backend resolves the bill from the array
+    if (utilityId) fd.append("utility_account_id", utilityId);  // only when the operator overrode the bill
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
     if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
     if (creditRateNum !== null) fd.append("net_rate_per_kwh", String(creditRateNum));
@@ -1818,7 +1930,7 @@
       }
       // Commission year sets the array's in-service date (feeds the GMP rate regime).
       // Best-effort: the offtaker is already created; a failure here shouldn't block it.
-      const newArrayId = data.subscription && data.subscription.array_id;
+      const newArrayId = (data.subscription && data.subscription.array_id) || arrayId;
       if (commYearNum !== null && newArrayId != null) {
         try {
           await fetch(API + "/arrays/" + newArrayId, {
@@ -1837,41 +1949,79 @@
     }
   }
 
-  // ---- bulk offtaker import (CSV roster → many offtakers at once) -----------
+  // ---- bulk offtaker import — upload → REVIEW & CORRECT → commit -------------
+  // The heart of "flawless" import: the operator uploads a workbook (.xlsx/.csv),
+  // the backend dry-runs a fuzzy ARRAY match per row, and we render a review table
+  // where every array match is a CORRECTABLE dropdown with a confidence badge. No
+  // medium/none match is ever auto-imported — the operator must confirm the guess.
   let BULK_OPEN = false;
-  let BULK_PREVIEW = null;   // the dry-run preview from the server: {rows, summary}
-  let BULK_FILE = null;      // the File we previewed, re-sent on confirm
+  let BULK_PREVIEW = null;     // the raw dry-run payload {summary, arrays, rows}
+  let BULK_ARRAYS = [];        // the pick-list: [{array_id, array_name, utility_account_id, utility_label, provider, has_bill}]
+  let BULK_ROWS = [];          // editable per-offtaker state (persists corrections across re-renders)
+  let BULK_FILE = null;        // the File we previewed (kept for a re-upload if they go back)
+
+  // Index the array pick-list by array_id for O(1) lookups on dropdown change.
+  function bulkArrayById(id) {
+    return BULK_ARRAYS.find(a => String(a.array_id) === String(id)) || null;
+  }
+  function bulkArrayLabel(a) {
+    const base = a.array_name || ("Array " + a.array_id);
+    return a.utility_label ? `${base} · ${a.utility_label}` : base;
+  }
+
+  // Derive a per-row status from the CURRENT edited state (not the server's — the
+  // operator may have corrected it). Blocked = missing required (name/array/pct);
+  // Needs review = no utility bill for the chosen array OR a soft (medium/none)
+  // confidence match the operator hasn't corrected; else Ready.
+  function bulkRowStatus(row) {
+    if (!row.offtaker_name || !row.array_id || !(row.allocation_pct > 0)) return "blocked";
+    const a = bulkArrayById(row.array_id);
+    if (!a || !a.utility_account_id || a.has_bill === false) return "needs_review";
+    // Soft match the operator left on the guessed array → make them look at it.
+    if ((row.confidence === "medium" || row.confidence === "none") && !row._confirmed) return "needs_review";
+    return "ready";
+  }
+  function bulkCounts() {
+    let ready = 0, needs = 0, blocked = 0;
+    BULK_ROWS.forEach(r => {
+      const s = bulkRowStatus(r);
+      if (s === "ready") ready++; else if (s === "needs_review") needs++; else blocked++;
+    });
+    return { ready, needs, blocked, total: BULK_ROWS.length };
+  }
 
   function renderBulkImport() {
     const host = $("#rbBulkHost");
     if (!host) return;
-    if (!BULK_OPEN) { host.innerHTML = ""; BULK_PREVIEW = null; BULK_FILE = null; return; }
+    if (!BULK_OPEN) { host.innerHTML = ""; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; return; }
 
     if (!BULK_PREVIEW) {
-      // ── Step 1: drop the CSV ──
+      // ── Step 1: drop the workbook ──
       host.innerHTML = `
         <div class="rep-card rb-manual-form rb-add-panel">
           <div class="rb-add-head">
             <h3>Bulk import offtakers</h3>
             <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
           </div>
-          <p class="rb-add-sub">A CSV roster — one row per offtaker. We'll show you exactly what we
-            matched before creating anything.</p>
+          <p class="rb-add-sub">One row per offtaker — <b>Array</b>, <b>Offtaker</b>, <b>Share %</b>,
+            plus <b>Email</b>/<b>Discount</b> if you have them. We'll match each row to an array and
+            let you review + correct every match before creating anything.</p>
           <div class="rb-upload" id="rbBulkDrop">
             <label class="rb-drop" id="rbBulkDropZone">
-              <input type="file" id="rbBulkFile" accept=".csv,.txt" hidden>
+              <input type="file" id="rbBulkFile" accept=".csv,.xlsx" hidden>
               <span class="rb-drop-ico">⬆</span>
-              <span class="rb-drop-main">Choose a CSV or drop it here</span>
-              <span class="rb-drop-sub">.csv — exported from Excel or Google Sheets</span>
+              <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
+              <span class="rb-drop-sub">.xlsx or .csv — exported from Excel or Google Sheets</span>
             </label>
-            <p class="rb-sample-hint">Columns we recognize (any order, header row required):
-              <b>Name</b>, <b>Percent</b> (e.g. 25 or 25%), and ideally <b>Account Number</b>
-              (so each offtaker links to the right utility bill — skip it only if you have
-              just one utility account connected). <b>Email</b> and <b>Discount</b> are optional.</p>
+            <p class="rb-sample-hint">Not sure of the layout?
+              <a href="#" class="rb-sample-link" id="rbBulkTemplate">Download the template</a>
+              — fill it in and drop it back here.</p>
             <div class="rb-status" id="rbBulkStatus"></div>
           </div>
         </div>`;
       $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
+      const tmpl = $("#rbBulkTemplate");
+      if (tmpl) tmpl.onclick = (e) => { e.preventDefault(); downloadOfftakerTemplate(); };
       const input = $("#rbBulkFile"), drop = $("#rbBulkDropZone");
       const go = (f) => { if (f) bulkPreviewFile(f); };
       input.addEventListener("change", () => go(input.files[0]));
@@ -1885,47 +2035,154 @@
       return;
     }
 
-    // ── Step 2: review the match table, then confirm ──
-    const rows = BULK_PREVIEW.rows || [];
-    const s = BULK_PREVIEW.summary || {};
-    const rowHtml = rows.map(r => {
-      const ok = !r.errors.length;
-      const pctTxt = r.allocation_pct != null ? Math.round(r.allocation_pct * 1000) / 10 + "%" : "—";
-      return `<tr class="${ok ? "rb-bulk-ok" : "rb-bulk-err"}">
-        <td>${r.row}</td>
-        <td>${esc(r.name || "—")}</td>
-        <td>${esc(r.email || "—")}</td>
-        <td>${esc(pctTxt)}</td>
-        <td>${esc(r.matched_account_label || (r.account_number ? "no match for “" + r.account_number + "”" : "—"))}</td>
-        <td>${ok ? "✓ ready" : "⚠ " + esc(r.errors.join("; "))}</td>
+    // ── Step 2: REVIEW & CORRECT ──
+    renderBulkReview();
+  }
+
+  // The pick-list <select> options (shared by every row). `sel` marks the chosen id.
+  function bulkArrayOptions(sel) {
+    return `<option value=""${sel ? "" : " selected"}>— pick an array —</option>` +
+      BULK_ARRAYS.map(a =>
+        `<option value="${esc(String(a.array_id))}"${String(a.array_id) === String(sel) ? " selected" : ""}>${esc(bulkArrayLabel(a))}</option>`
+      ).join("");
+  }
+  // Confidence badge next to the array picker. exact/high = blue check (trust the
+  // guess), medium = amber "check this", none = red "pick the array".
+  function bulkConfBadge(row) {
+    const a = bulkArrayById(row.array_id);
+    const noBill = a && (a.utility_account_id == null || a.has_bill === false);
+    if (noBill) return `<span class="rb-conf rb-conf-warn" title="This array has no connected utility bill yet.">no bill yet</span>`;
+    const c = row._confirmed ? "high" : (row.confidence || "none");
+    if (c === "exact" || c === "high") return `<span class="rb-conf rb-conf-ok" title="Confident match.">✓</span>`;
+    if (c === "medium") return `<button type="button" class="rb-conf rb-conf-warn rb-conf-confirm" title="Low-confidence match — click to confirm this is the right array, or pick a different one.">check this ✓</button>`;
+    return `<span class="rb-conf rb-conf-bad" title="We couldn't confidently match this — pick the array.">pick the array</span>`;
+  }
+  function bulkStatusPill(status) {
+    if (status === "ready") return `<span class="rb-pill rb-pill-ok">Ready</span>`;
+    if (status === "needs_review") return `<span class="rb-pill rb-pill-warn">Needs review</span>`;
+    return `<span class="rb-pill rb-pill-bad">Blocked</span>`;
+  }
+
+  function renderBulkReview() {
+    const host = $("#rbBulkHost");
+    const c = bulkCounts();
+    const rowHtml = BULK_ROWS.map((row, i) => {
+      const status = bulkRowStatus(row);
+      const pctVal = row.allocation_pct != null ? Math.round(row.allocation_pct * 1000) / 10 : "";
+      const discVal = row.discount_pct != null ? Math.round(row.discount_pct * 1000) / 10 : "";
+      const errs = (row.errors || []).length ? `<div class="rb-rev-err">⚠ ${esc(row.errors.join("; "))}</div>` : "";
+      return `<tr class="rb-rev-row rb-rev-${status}" data-i="${i}">
+        <td class="rb-rev-name"><input type="text" class="rb-rev-in" data-f="offtaker_name" value="${esc(row.offtaker_name || "")}" placeholder="Offtaker name"></td>
+        <td class="rb-rev-arr">
+          <div class="rb-rev-arrbox">
+            <select class="rb-rev-in rb-rev-arrsel" data-f="array_id">${bulkArrayOptions(row.array_id)}</select>
+            ${bulkConfBadge(row)}
+          </div>
+          ${row.array_name_raw ? `<div class="rb-rev-raw">from your file: “${esc(row.array_name_raw)}”</div>` : ""}
+          ${errs}
+        </td>
+        <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pctVal}" placeholder="%"></td>
+        <td class="rb-rev-email"><input type="email" class="rb-rev-in" data-f="email" value="${esc(row.email || "")}" placeholder="optional"></td>
+        <td class="rb-rev-disc"><input type="number" class="rb-rev-in" data-f="discount_pct" min="0" max="99" step="1" value="${discVal}" placeholder="—"></td>
+        <td class="rb-rev-stat">${bulkStatusPill(status)}</td>
       </tr>`;
     }).join("");
+
     host.innerHTML = `
       <div class="rep-card rb-manual-form rb-add-panel">
         <div class="rb-add-head">
-          <h3>Bulk import — review</h3>
+          <h3>Bulk import — review &amp; correct</h3>
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
         </div>
-        <p class="rb-add-sub">
-          <b>${s.ready || 0} of ${s.total || 0}</b> ready to import.
-          ${s.needs_attention ? `<b>${s.needs_attention}</b> need attention and won't be created — fix your CSV and re-upload, or import the rest now and add those by hand.` : ""}
-        </p>
+        <div class="rb-rev-summary" id="rbBulkSummary">
+          <span class="rb-rev-sum-ok"><b>${c.ready}</b> ready</span>
+          <span class="rb-rev-sum-sep">·</span>
+          <span class="rb-rev-sum-warn"><b>${c.needs}</b> to review</span>
+          <span class="rb-rev-sum-sep">·</span>
+          <span class="rb-rev-sum-bad"><b>${c.blocked}</b> blocked</span>
+        </div>
+        <p class="rb-add-sub">Check every array match below. A blue ✓ is a confident match; amber
+          <b>“check this”</b> and red <b>“pick the array”</b> need your eyes before importing. Rows with
+          no connected bill can't be invoiced until you connect one.</p>
         <div class="rb-bulk-tablewrap">
-          <table class="rb-bulk-table">
-            <thead><tr><th>Row</th><th>Name</th><th>Email</th><th>%</th><th>Utility account</th><th>Status</th></tr></thead>
+          <table class="rb-bulk-table rb-rev-table">
+            <thead><tr>
+              <th>Offtaker</th><th>Array</th><th>Share %</th><th>Email</th><th>Discount %</th><th>Status</th>
+            </tr></thead>
             <tbody>${rowHtml}</tbody>
           </table>
         </div>
         <div class="rb-actions">
           <button class="ao-btn ao-btn-ghost" id="rbBulkBack" type="button">← Choose a different file</button>
           <button class="ao-btn ao-btn-primary rb-save" id="rbBulkConfirm" type="button"
-                  ${s.ready ? "" : "disabled"}>Import ${s.ready || 0} offtaker${s.ready === 1 ? "" : "s"}</button>
+                  ${c.ready ? "" : "disabled"}>Import ${c.ready} offtaker${c.ready === 1 ? "" : "s"}</button>
           <span class="rb-status" id="rbBulkStatus2"></span>
         </div>
       </div>`;
+
     $("#rbBulkCancel").onclick = () => { BULK_OPEN = false; renderBulkImport(); };
-    $("#rbBulkBack").onclick = () => { BULK_PREVIEW = null; BULK_FILE = null; renderBulkImport(); };
-    $("#rbBulkConfirm").onclick = bulkConfirmImport;
+    $("#rbBulkBack").onclick = () => { BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; renderBulkImport(); };
+    $("#rbBulkConfirm").onclick = bulkCommitImport;
+
+    // "check this ✓" — confirm a medium-confidence guess WITHOUT changing the
+    // dropdown (a <select> fires no change event when re-picking the same value,
+    // so agreeing with the guess needs its own affordance). Honesty preserved: the
+    // operator still had to look and click, never a silent auto-accept.
+    host.querySelectorAll(".rb-conf-confirm").forEach(btn => {
+      const tr = btn.closest("tr");
+      const i = Number(tr.getAttribute("data-i"));
+      btn.onclick = () => { BULK_ROWS[i]._confirmed = true; renderBulkReview(); };
+    });
+
+    // Wire the editable fields — mutate BULK_ROWS in place so corrections persist
+    // across re-renders, and re-render on array change (badge + status recompute).
+    host.querySelectorAll(".rb-rev-in").forEach(el => {
+      const tr = el.closest("tr");
+      const i = Number(tr.getAttribute("data-i"));
+      const f = el.getAttribute("data-f");
+      if (f === "array_id") {
+        el.onchange = () => {
+          const row = BULK_ROWS[i];
+          const newId = el.value ? el.value : null;
+          // Operator picked an array by hand → treat it as confirmed (clears the
+          // medium/none "needs review" flag), and snap its utility_account_id.
+          if (newId && String(newId) !== String(row.array_id || "")) row._confirmed = true;
+          row.array_id = newId;
+          const a = bulkArrayById(newId);
+          row.utility_account_id = a ? a.utility_account_id : null;
+          renderBulkReview();                          // full re-render: badge + pill + summary
+        };
+      } else {
+        // Text/number fields: update state live; refresh the row's pill + summary
+        // without a full re-render so focus/caret isn't lost mid-typing.
+        el.oninput = () => {
+          const row = BULK_ROWS[i];
+          const v = el.value.trim();
+          if (f === "allocation_pct") row.allocation_pct = v === "" ? null : Number(v) / 100;
+          else if (f === "discount_pct") row.discount_pct = v === "" ? null : Number(v) / 100;
+          else row[f] = v;                             // offtaker_name / email
+          refreshBulkRowPill(tr, i);
+        };
+      }
+    });
+  }
+
+  // Live-update one row's status pill + row class + the summary strip (no re-render).
+  function refreshBulkRowPill(tr, i) {
+    const status = bulkRowStatus(BULK_ROWS[i]);
+    tr.className = `rb-rev-row rb-rev-${status}`;
+    const cell = tr.querySelector(".rb-rev-stat");
+    if (cell) cell.innerHTML = bulkStatusPill(status);
+    const c = bulkCounts();
+    const sum = $("#rbBulkSummary");
+    if (sum) sum.innerHTML =
+      `<span class="rb-rev-sum-ok"><b>${c.ready}</b> ready</span>` +
+      `<span class="rb-rev-sum-sep">·</span>` +
+      `<span class="rb-rev-sum-warn"><b>${c.needs}</b> to review</span>` +
+      `<span class="rb-rev-sum-sep">·</span>` +
+      `<span class="rb-rev-sum-bad"><b>${c.blocked}</b> blocked</span>`;
+    const btn = $("#rbBulkConfirm");
+    if (btn) { btn.disabled = !c.ready; btn.textContent = `Import ${c.ready} offtaker${c.ready === 1 ? "" : "s"}`; }
   }
 
   async function bulkPreviewFile(file) {
@@ -1935,8 +2192,7 @@
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("dry_run", "true");
-      const r = await fetch(API + "/subscriptions/bulk-import", { method: "POST", headers: authHeaders(), body: fd });
+      const r = await fetch(API + "/subscriptions/bulk-import?dry_run=true", { method: "POST", headers: authHeaders(), body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
         if (status) {
@@ -1946,34 +2202,140 @@
         return;
       }
       BULK_PREVIEW = data;
+      BULK_ARRAYS = (data.arrays || []).filter(a => a.array_id != null);
+      // Seed the editable row state from the server's matches. Every correction the
+      // operator makes lives here (not in the DOM) so re-renders never lose it.
+      BULK_ROWS = (data.rows || []).map(r => ({
+        offtaker_name: r.offtaker_name || "",
+        array_name_raw: r.array_name_raw || "",
+        array_id: r.matched_array_id != null ? r.matched_array_id : null,
+        utility_account_id: r.matched_utility_account_id != null ? r.matched_utility_account_id : null,
+        allocation_pct: r.allocation_pct != null ? r.allocation_pct : null,
+        email: r.email || "",
+        discount_pct: r.discount_pct != null ? r.discount_pct : null,
+        confidence: r.confidence || "none",
+        errors: r.errors || [],
+        _confirmed: (r.confidence === "exact" || r.confidence === "high"),
+      }));
       renderBulkImport();
     } catch (e) {
       if (status) { status.className = "rb-status rb-err"; status.textContent = "Network error while reading the file."; }
     }
   }
 
-  async function bulkConfirmImport() {
+  // Commit: send ONLY the rows the operator hasn't left blocked/needs-review —
+  // rows with a valid array_id + utility_account_id + positive pct.
+  async function bulkCommitImport() {
     const st = $("#rbBulkStatus2");
-    if (!BULK_FILE) return;
     if (st) { st.className = "rb-status rb-busy"; st.textContent = "Importing…"; }
     const btn = $("#rbBulkConfirm"); if (btn) btn.disabled = true;
+    const ready = BULK_ROWS.filter(r => bulkRowStatus(r) === "ready").map(r => ({
+      offtaker_name: r.offtaker_name,
+      array_id: r.array_id,
+      utility_account_id: r.utility_account_id,
+      allocation_pct: r.allocation_pct,
+      email: r.email || null,
+      discount_pct: r.discount_pct != null ? r.discount_pct : null,
+    }));
+    if (!ready.length) {
+      if (st) { st.className = "rb-status rb-err"; st.textContent = "No rows are ready to import yet."; }
+      if (btn) btn.disabled = false;
+      return;
+    }
     try {
-      const fd = new FormData();
-      fd.append("file", BULK_FILE);
-      fd.append("dry_run", "false");
-      const r = await fetch(API + "/subscriptions/bulk-import", { method: "POST", headers: authHeaders(), body: fd });
+      const body = {
+        rows: ready,
+        cadence: "monthly",
+        delivery_mode: "approval",
+      };
+      const r = await fetch(API + "/subscriptions/bulk-commit", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify(body),
+      });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
         if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Import failed (HTTP " + r.status + ")."; }
         if (btn) btn.disabled = false;
         return;
       }
-      BULK_OPEN = false; BULK_PREVIEW = null; BULK_FILE = null;
-      renderBulkImport();
+      const created = data.created || 0;
+      const failed = data.failed || [];
+      const skipped = data.skipped || [];
+      bulkToast(`Imported ${created} offtaker${created === 1 ? "" : "s"}`);
+      // If nothing failed/skipped, close + refresh. Otherwise keep the panel open and
+      // surface the failures inline so the operator can act on them.
+      if (!failed.length && !skipped.length) {
+        BULK_OPEN = false; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null;
+        renderBulkImport();
+        await refreshList();
+        return;
+      }
       await refreshList();
+      renderBulkCommitResult(created, failed, skipped);
     } catch (e) {
       if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error during import."; }
       if (btn) btn.disabled = false;
+    }
+  }
+
+  // Post-commit summary when some rows failed/skipped — shown IN PLACE of the review.
+  function renderBulkCommitResult(created, failed, skipped) {
+    const host = $("#rbBulkHost");
+    const problem = failed.concat(skipped);
+    const rows = problem.map(p =>
+      `<tr class="rb-bulk-err"><td>${esc(p.offtaker_name || "—")}</td><td>${esc(p.error || p.reason || "skipped")}</td></tr>`
+    ).join("");
+    host.innerHTML = `
+      <div class="rep-card rb-manual-form rb-add-panel">
+        <div class="rb-add-head">
+          <h3>Bulk import — done</h3>
+          <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkClose" type="button">Close</button>
+        </div>
+        <p class="rb-add-sub"><b>${created}</b> offtaker${created === 1 ? "" : "s"} imported.
+          ${problem.length ? `<b>${problem.length}</b> couldn't be created — details below.` : ""}</p>
+        ${problem.length ? `<div class="rb-bulk-tablewrap"><table class="rb-bulk-table">
+          <thead><tr><th>Offtaker</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+        <div class="rb-actions">
+          <button class="ao-btn ao-btn-primary rb-save" id="rbBulkClose2" type="button">Done</button>
+        </div>
+      </div>`;
+    const close = () => { BULK_OPEN = false; BULK_PREVIEW = null; BULK_ROWS = []; BULK_ARRAYS = []; BULK_FILE = null; renderBulkImport(); };
+    $("#rbBulkClose").onclick = close;
+    $("#rbBulkClose2").onclick = close;
+  }
+
+  // Lightweight self-contained toast (reports.js has no shared toast; command-center's
+  // is module-private). Mirrors its look so the confirmation feels native.
+  function bulkToast(msg) {
+    let t = document.getElementById("rbToast");
+    if (!t) {
+      t = document.createElement("div"); t.id = "rbToast";
+      t.setAttribute("style", "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:9998;background:#0e1620;border:1px solid var(--line);color:var(--ink);padding:11px 16px;border-radius:11px;font-size:13px;box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;transition:opacity .2s;");
+      document.body.appendChild(t);
+    }
+    t.textContent = msg; t.style.opacity = "1";
+    clearTimeout(t._tm); t._tm = setTimeout(() => t.style.opacity = "0", 3200);
+  }
+
+  // Download the offtaker import template (.xlsx). The endpoint needs the Bearer
+  // header, so we fetch → blob → object-URL rather than a plain <a download>.
+  async function downloadOfftakerTemplate() {
+    const status = $("#rbBulkStatus");
+    try {
+      const r = await fetch(API + "/offtaker-template.xlsx", { headers: authHeaders() });
+      if (!r.ok) {
+        if (status) { status.className = "rb-status rb-err"; status.textContent = "Couldn't fetch the template (HTTP " + r.status + ")."; }
+        return;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "offtaker-import-template.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      if (status) { status.className = "rb-status rb-err"; status.textContent = "Network error fetching the template."; }
     }
   }
 
