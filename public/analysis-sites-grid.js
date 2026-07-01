@@ -144,15 +144,15 @@
       ".ansg-wx.sky{color:var(--sky)}",
       ".ansg-wx.muted{color:var(--faint)}",
       ".ansg-wx-none{color:var(--faint)}",
-      // reminders / O&M note column
-      ".ansg-remcell{max-width:190px}",
-      ".ansg-rem{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;color:var(--muted);font-size:12px}",
-      ".ansg-rem.ansg-editable{cursor:pointer;border-bottom:1px dotted var(--line)}",
-      ".ansg-rem.ansg-editable:hover{color:var(--ink);border-bottom-color:var(--good2)}",
-      ".ansg-remadd{appearance:none;background:transparent;border:0;color:var(--faint);font:inherit;font-size:14px;font-weight:700;line-height:1;padding:0 4px;cursor:pointer;opacity:0;transition:opacity .12s,color .12s}",
-      ".ansg-table tbody tr:hover .ansg-remadd{opacity:.8}",
-      ".ansg-remadd:hover{color:var(--good2);opacity:1}",
-      ".ansg-remdot{color:var(--faint)}",
+      // O&M reminder note — folded into the Site name row (used to be its own
+      // "Notes" column; removed to give the rest of the table room, same
+      // hover-reveal language as .ansg-assign right above).
+      ".ansg-rem-inline{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:650;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;flex:0 0 auto}",
+      ".ansg-rem-inline.ansg-editable{cursor:pointer}",
+      ".ansg-rem-inline.ansg-editable:hover{color:var(--ink);border-color:var(--good2)}",
+      ".ansg-remadd.ansg-inline{appearance:none;background:transparent;border:1px dashed var(--line);color:var(--faint);border-radius:6px;font:inherit;font-size:10px;font-weight:700;line-height:1.4;padding:1px 6px;cursor:pointer;opacity:0;transition:opacity .12s,border-color .12s,color .12s;flex:0 0 auto}",
+      ".ansg-table tbody tr:hover .ansg-remadd.ansg-inline{opacity:1}",
+      ".ansg-remadd.ansg-inline:hover{border-color:var(--good2);color:var(--good2);border-style:solid}",
       // density: compact tightens padding + font on the table wrapper
       ".ansg-wrap.ansg-compact .ansg-table{font-size:11.5px}",
       ".ansg-wrap.ansg-compact .ansg-table th,.ansg-wrap.ansg-compact .ansg-table td{padding:5px 9px}",
@@ -382,7 +382,6 @@
   var COLS = [
     { key: "status", label: "", sortable: true, cls: "ansg-dotcell" },
     { key: "name", label: "Site", sortable: true },
-    { key: "reminder", label: "Notes", sortable: false, cls: "ansg-remcell" },
     { key: "trend", label: "14-day", sortable: false },
     { key: "now", label: "Producing now", sortable: true, num: true },
     { key: "wx", label: "Sky", sortable: false, cls: "ansg-wxcell" },
@@ -407,22 +406,22 @@
         ? '<button type="button" class="ansg-assign ansg-has" data-assign="' + ctx.esc(r.aid) + '" title="Change portfolio · ' + ctx.esc(r.portfolio) + '">' + ctx.esc(r.portfolio) + '</button>'
         : '<button type="button" class="ansg-assign" data-assign="' + ctx.esc(r.aid) + '" title="Assign to a portfolio">+ portfolio</button>';
     }
-    return '<td><div class="ansg-name-row"><span class="ansg-name" title="' + ctx.esc(r.name) + '">' + ctx.esc(r.name) + '</span>' + tag + assign + '</div>' + region + '</td>';
-  }
-  // reminders / O&M note. Editable only when signed in AND the mutator exists;
-  // on the anon demo the note is read-only (shown if present, nothing if not).
-  function cellReminder(r, ctx) {
-    var canEdit = !!(ctx.signedIn && ctx.live && ctx.live.setArrayReminder);
+    // O&M reminder note — folded in HERE (used to be its own "Notes" column, which
+    // ate a full column of width on an already side-scrolling table — Ford: "delete
+    // the notes column so there's more space"). Same data-reminder attribute + click
+    // wiring as before, just living next to the portfolio-assign chip instead of its
+    // own column. Editable only when signed in AND the mutator exists; on the anon
+    // demo an existing note is read-only, and nothing renders when there's no note.
+    var note = "";
+    var canEditNote = !!(ctx.signedIn && ctx.live && ctx.live.setArrayReminder);
     if (r.reminder) {
-      var cls = "ansg-rem" + (canEdit ? " ansg-editable" : "");
-      var edit = canEdit ? ' data-reminder="' + ctx.esc(r.aid) + '"' : "";
-      return '<td class="ansg-remcell"><span class="' + cls + '" title="' + ctx.esc(r.reminder) + '"' + edit + '>' + ctx.esc(r.reminder) + '</span></td>';
+      var noteCls = "ansg-rem-inline" + (canEditNote ? " ansg-editable" : "");
+      var noteEdit = canEditNote ? ' data-reminder="' + ctx.esc(r.aid) + '"' : "";
+      note = '<span class="' + noteCls + '" title="' + ctx.esc(r.reminder) + '"' + noteEdit + '>📝 ' + ctx.esc(r.reminder) + '</span>';
+    } else if (canEditNote) {
+      note = '<button type="button" class="ansg-remadd ansg-inline" data-reminder="' + ctx.esc(r.aid) + '" title="Add an O&amp;M note">+ note</button>';
     }
-    // empty → a quiet add affordance when editable, otherwise nothing
-    if (canEdit) {
-      return '<td class="ansg-remcell"><button type="button" class="ansg-remadd" data-reminder="' + ctx.esc(r.aid) + '" title="Add an O&amp;M note">＋</button></td>';
-    }
-    return '<td class="ansg-remcell"></td>';
+    return '<td><div class="ansg-name-row"><span class="ansg-name" title="' + ctx.esc(r.name) + '">' + ctx.esc(r.name) + '</span>' + tag + assign + note + '</div>' + region + '</td>';
   }
   function cellTrend(r) {
     return '<td>' + sparkline(r.series) + '</td>';
@@ -573,7 +572,7 @@
     // ---- body -----------------------------------------------------------------
     function siteRow(r) {
       return '<tr>' +
-        cellStatus(r) + cellName(r, ctx) + cellReminder(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
+        cellStatus(r) + cellName(r, ctx) + cellTrend(r) + cellNow(r, ctx) +
         cellWeather(r, ctx) + cellExpected(r, ctx) + cellRatio(r, ctx) + cellWindow(r, ctx) + cellCap(r, ctx) +
         '</tr>';
     }
@@ -673,7 +672,6 @@
         '<tfoot><tr>' +
         '<td class="ansg-dotcell"></td>' +
         '<td class="ansg-tlabel">' + rows.length + ' site' + (rows.length === 1 ? "" : "s") + '</td>' +
-        '<td class="ansg-remcell"></td>' +
         '<td></td>' +
         '<td class="ansg-num"></td>' +
         '<td class="ansg-wxcell"></td>' +
