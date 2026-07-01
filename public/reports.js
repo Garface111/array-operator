@@ -536,40 +536,53 @@
 
   const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
   function wireExport() {
-    const box = $("#rbExportBox"), btn = $("#rbExportQb"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
-    if (!box || !btn) return;
+    const box = $("#rbExportBox"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
+    const btnQb = $("#rbExportQb"), btnXero = $("#rbExportXero");
+    if (!box || (!btnQb && !btnXero)) return;
     if (!authHeaders()) { box.hidden = true; return; }   // defensive; demo never reaches here
     box.hidden = false;
-    // Restore the remembered account code.
+    // Restore the remembered account code (the Xero AccountCode).
     if (acct) {
       try { acct.value = localStorage.getItem(EXPORT_ACCT_KEY) || ""; } catch (e) {}
       acct.addEventListener("input", () => {
         try { localStorage.setItem(EXPORT_ACCT_KEY, acct.value.trim()); } catch (e) {}
       });
-      // Enter in the account field triggers the export too.
-      acct.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doExport(); } });
+      // Enter in the account field triggers the Xero export (that's what it feeds).
+      acct.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doExport("xero", "Xero"); } });
     }
     const setStat = (cls, msg) => { if (stat) { stat.className = "rb-export-stat" + (cls ? " " + cls : ""); stat.textContent = msg || ""; } };
     let _busy = false;
-    async function doExport() {
+    // QuickBooks Online and Xero use DIFFERENT import layouts — one button each,
+    // both hitting /invoice-export.csv?format=<fmt> through the shared auth-download
+    // helper. The account-code input feeds Xero's AccountCode (QuickBooks ignores it).
+    async function doExport(format, label) {
       if (_busy) return;
-      _busy = true; btn.disabled = true;
-      setStat("rb-busy", "Exporting…");
+      _busy = true;
+      if (btnQb) btnQb.disabled = true;
+      if (btnXero) btnXero.disabled = true;
+      setStat("rb-busy", "Exporting to " + label + "…");
       const code = acct && acct.value.trim();
-      const url = API + "/invoice-export.csv" + (code ? "?account_code=" + encodeURIComponent(code) : "");
+      const params = new URLSearchParams({ format: format });
+      if (code) params.set("account_code", code);
+      const url = API + "/invoice-export.csv?" + params.toString();
       try {
-        const res = await authBlobDownload(url, "offtaker-invoices.csv", "X-Invoice-Count");
+        // The backend stamps a per-format filename via Content-Disposition; authBlobDownload
+        // prefers it, so the fallback here is only used if that header is missing.
+        const res = await authBlobDownload(url, "offtaker-invoices-" + format + ".csv", "X-Invoice-Count");
         const n = res.count;
         setStat("rb-ok", n != null
-          ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for QuickBooks / Xero.")
+          ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for " + label + ".")
           : "✓ Exported — CSV downloaded.");
       } catch (e) {
-        setStat("rb-err", (e && e.message) || "Export failed — check your connection.");
+        setStat("rb-err", (e && e.message) || ("Export to " + label + " failed — check your connection."));
       } finally {
-        _busy = false; btn.disabled = false;
+        _busy = false;
+        if (btnQb) btnQb.disabled = false;
+        if (btnXero) btnXero.disabled = false;
       }
     }
-    btn.onclick = doExport;
+    if (btnQb) btnQb.onclick = () => doExport("quickbooks", "QuickBooks");
+    if (btnXero) btnXero.onclick = () => doExport("xero", "Xero");
   }
 
   /* ===========================================================================
@@ -861,16 +874,20 @@
           </div>
           <div class="rb-head-actions">
             <!-- Portfolio-level batch export: this period's offtaker invoices as a
-                 QuickBooks/Xero-ready CSV. Authenticated fetch → blob download (the
-                 endpoint needs the Bearer header, so a plain <a download> can't work).
-                 The optional account-code input maps solar income to a QB/Xero account
-                 and persists in localStorage (Anna's ask #3). -->
+                 CSV in QuickBooks Online OR Xero import layout (they differ, so two
+                 buttons). Authenticated fetch → blob download (the endpoint needs the
+                 Bearer header, so a plain <a download> can't work). The optional
+                 account-code input is the Xero AccountCode; QuickBooks doesn't use it
+                 (defaults to a "Solar Credit" product/service). Persists in localStorage. -->
             <div class="rb-export" id="rbExportBox" hidden>
               <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
-                     placeholder="Account code" maxlength="40" autocomplete="off"
-                     title="Optional — the QuickBooks/Xero income account these solar invoices post to (e.g. 4000). Remembered for next time.">
+                     placeholder="Xero account code" maxlength="40" autocomplete="off"
+                     title="Optional — the Xero AccountCode these solar invoices post to (e.g. 200). QuickBooks doesn't need it (it uses a &quot;Solar Credit&quot; product/service). Remembered for next time.">
+              <span class="rb-export-hint" title="The account code applies to the Xero export only — QuickBooks uses a default &quot;Solar Credit&quot; item.">Xero only</span>
               <button class="ao-btn rb-btn" id="rbExportQb" type="button"
-                      title="Download all offtaker invoices this period as a CSV for QuickBooks or Xero.">⬇ Export to QuickBooks / Xero</button>
+                      title="Download all offtaker invoices this period as a QuickBooks Online import CSV.">⬇ Export to QuickBooks</button>
+              <button class="ao-btn rb-btn" id="rbExportXero" type="button"
+                      title="Download all offtaker invoices this period as a Xero Sales-Invoice import CSV (uses the account code, if set).">⬇ Export to Xero</button>
               <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
             </div>
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>

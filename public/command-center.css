@@ -1004,12 +1004,15 @@ body.sb-fs-lock{ overflow:hidden; }
 /* QuickBooks / Xero batch export cluster (account-code input + button + status). */
 .rb-export{ display:inline-flex; align-items:center; gap:7px; flex-wrap:wrap; }
 .rb-export[hidden]{ display:none; }
-.rb-export-acct{ width:112px; box-sizing:border-box; background:var(--card,#fff); border:1px solid var(--line,#e2e8f0);
+.rb-export-acct{ width:132px; box-sizing:border-box; background:var(--card,#fff); border:1px solid var(--line,#e2e8f0);
   border-radius:9px; padding:7px 10px; color:var(--ink,#16202b); font:inherit; font-size:12.5px; outline:none;
   transition:border-color .12s ease; }
 .rb-export-acct::placeholder{ color:var(--faint,#94a3b8); }
 .rb-export-acct:focus{ border-color:var(--good,#2563eb); }
-.rb-export #rbExportQb{ white-space:nowrap; }
+/* the "Xero only" tag next to the account-code input — the code applies to Xero, not QuickBooks. */
+.rb-export-hint{ font-size:10.5px; font-weight:600; color:var(--faint,#94a3b8); letter-spacing:.02em;
+  margin:0 2px 0 -3px; white-space:nowrap; cursor:default; }
+.rb-export #rbExportQb, .rb-export #rbExportXero{ white-space:nowrap; }
 .rb-export-stat{ font-size:12px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); }
 .rb-export-stat.rb-busy{ color:var(--muted,#475569); }
 .rb-export-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
