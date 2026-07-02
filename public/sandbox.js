@@ -102,8 +102,9 @@
   }
   // ── Supported-utility catalog — data-driven from the backend's GET /v1/providers,
   // the SAME single source of truth (api/data/providers/*.csv) the NEPOOL extension
-  // uses. Lets an operator connect ANY of the ~470 LIVE utilities (mostly NISC
-  // SmartHub co-ops nationwide), not just the hardcoded VT trio. The generic
+  // uses. Lets an operator connect ANY LIVE utility (hundreds of NISC SmartHub co-ops
+  // nationwide — count shown live via provCountLabel), not just the hardcoded VT trio.
+  // The generic
   // SmartHub adapter + is_smarthub_provider offtaker routing already handle them
   // server-side, so the frontend just has to OFFER them + open the right portal.
   let _provCache = null, _provFetch = null;
@@ -123,6 +124,14 @@
       return _provCache || [];
     })();
     return _provFetch;
+  }
+  // Live, capturable-utility count for honest UI copy (no more hardcoded "~470").
+  // Rounds DOWN to a clean floor so the number is never overstated as the catalog grows.
+  function provCountLabel(){
+    const n = (_provCache || []).length;
+    if(!n) return "hundreds of";
+    if(n < 50) return String(n);
+    return (Math.floor(n / 10) * 10) + "+";
   }
   function providerByCode(code){ const c = String(code||"").toLowerCase(); return (_provCache||[]).find(p => p.code === c) || null; }
   function provLabel(code){ const c = String(code||"").toLowerCase(); return BRAND[c] || (providerByCode(c)||{}).label || c; }
@@ -3896,10 +3905,15 @@
         const loginSections = utilityOnly
           ? utilSection
           : section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
-        getProviders();   // warm the catalog so the first search is instant
+        // Warm the catalog, then backfill the live utility count into the lede (no
+        // hardcoded number — it grows as discovery wires more SmartHub hosts).
+        getProviders().then(() => {
+          const el = document.getElementById("sbUtilCount");
+          if(el) el.textContent = provCountLabel();
+        });
         const _lede = utilityOnly
           ? (EXT_PRESENT
-              ? "Connect the utility whose bills you invoice your offtakers against — we pull the bills in automatically. Pick yours below (any of ~470 supported utilities)."
+              ? `Connect the utility whose bills you invoice your offtakers against — we pull the bills in automatically. Pick yours below (any of <span id="sbUtilCount">hundreds of</span> supported utilities).`
               : "Connect the utility whose bills you invoice your offtakers against. Add the free helper, then pick your utility and we pull the bills in automatically.")
           : (EXT_PRESENT
               ? "Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find."
