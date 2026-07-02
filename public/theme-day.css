@@ -467,6 +467,7 @@ html[data-theme="day"] .rb-wiz-gmp-ok{color:var(--good) !important}
 /* GMP empty/none states → quiet slate cards */
 html[data-theme="day"] .rb-gmp-empty,
 html[data-theme="day"] .rb-gmp-none,
+html[data-theme="day"] .rb-gmp-auto-nudge,
 html[data-theme="day"] .rb-wiz-gmp-none,
 html[data-theme="day"] .rb-wiz-gmp-some{
   background:var(--day-surf) !important;border-color:var(--line) !important;color:var(--muted) !important;

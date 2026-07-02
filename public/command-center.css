@@ -1166,6 +1166,10 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-gmp-ok{ color:var(--good,#4caf50); font-size:12.5px; padding:4px 2px; }
 .rb-gmp-inline-link{ color:var(--accent,#FCA617); font-weight:600; cursor:pointer; white-space:nowrap; text-decoration:none; }
 .rb-gmp-inline-link:hover{ text-decoration:underline; }
+/* automation nudge: bills exist but no saved utility login → invoices aren't hands-free yet */
+.rb-gmp-auto-nudge{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px;
+  background:rgba(63,214,138,.07); border:1px solid rgba(63,214,138,.3);
+  color:var(--ink); padding:9px 12px; border-radius:10px; font-size:12.5px; }
 @media(max-width:640px){ .rb-head-actions{ width:100%; justify-content:flex-start; } }
 /* wizard GMP step */
 .rb-wiz-gmp-status{ margin:8px 0 14px; }

@@ -184,6 +184,12 @@
   #rowAutoRefresh .ar-body{cursor:default}
   .ar-body.ar-collapsed{display:none}
   .ar-list{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+  /* grouped credential sections: Inverter portals / Utility portals */
+  .ar-group{display:flex;flex-direction:column;gap:9px}
+  .ar-group + .ar-group{margin-top:8px}
+  .ar-group-head{display:flex;flex-direction:column;gap:2px;margin-bottom:1px}
+  .ar-group-title{font-size:11px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .ar-group-sub{font-size:11.5px;color:var(--faint)}
   .ar-row{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:rgba(255,255,255,.02)}
   .ar-row-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
   .ar-vendor{font-size:14px;font-weight:680;color:var(--ink)}

@@ -664,6 +664,51 @@
 
   // Show whether GMP utility bills are connected (and how many), with a direct
   // link to connect when none are present — answers "why is the dropdown empty?"
+  // ALSO answers "will this run by itself?": bills only refresh when the utility
+  // portal gets opened, so invoices are only AUTOMATIC once the operator saves
+  // their utility login in the extension vault (Account → Auto-refresh). We check
+  // the vault (via sandbox.js's shared __aoVaultStatus) for exactly the providers
+  // this tenant has connected, and nudge — or confirm — accordingly.
+  const _UTIL_LABEL = { gmp: "Green Mountain Power", vec: "Vermont Electric Co-op", wec: "Washington Electric Co-op" };
+  const _utilLabel = (code) => _UTIL_LABEL[code] || String(code || "").replace(/^sh_/, "").toUpperCase();
+  async function utilityAutomationState(accts) {
+    // → {auto:true} all providers have saved logins; {auto:false, missing:[codes]}
+    //   some don't; null = can't know (no extension / vault unreachable / no accounts).
+    try {
+      if (!accts.length || typeof window.__aoVaultStatus !== "function") return null;
+      const status = await window.__aoVaultStatus();
+      if (!status) return null;
+      const providers = [...new Set(accts.map(a => (a.provider || "gmp").toLowerCase()))];
+      const missing = providers.filter(p => !(status[p] && status[p].hasCreds));
+      return missing.length ? { auto: false, missing } : { auto: true };
+    } catch (e) { return null; }
+  }
+  function autoRefreshNudgeHTML(missing) {
+    const names = missing.map(_utilLabel).join(" and ");
+    return `<div class="rb-gmp-auto-nudge">
+      <span>⚡ Invoices update only when you open your utility portal. Save your <b>${esc(names)}</b> login once and they generate automatically every month.</span>
+      <a class="rb-gmp-inline-link" id="rbAutoRefreshLink" role="button" tabindex="0">Set up auto-refresh →</a></div>`;
+  }
+  function wireAutoRefreshLink() {
+    const a = $("#rbAutoRefreshLink");
+    if (!a) return;
+    const go = () => {
+      location.hash = "#account";
+      setTimeout(() => {
+        const row = document.getElementById("rowAutoRefresh");
+        if (!row) return;
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        // land with the panel OPEN — the operator came here to type a password
+        const body = row.querySelector("#arBody");
+        const toggle = row.querySelector("#arToggle");
+        if (body) body.classList.remove("ar-collapsed");
+        if (toggle) { toggle.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); }
+        try { localStorage.setItem("ao_ar_open", "1"); } catch (e) {}
+      }, 150);
+    };
+    a.onclick = go;
+    a.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  }
   async function refreshGmpBillsStatus() {
     const host = $("#rbGmpBillsStatus");
     if (!host) return;
@@ -683,6 +728,7 @@
       a.onclick = go;
       a.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     };
+    const autoState = await utilityAutomationState(accts);
     if (!accts.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
         <span>No utility bills connected yet — offtaker invoices bill from your utility bills, so link a utility to get started.</span>
@@ -691,10 +737,14 @@
     } else if (!withBills.length) {
       host.innerHTML = `<div class="rb-gmp-empty">
         <span>${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open your utility portal once more so the extension captures them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>`;
+        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>` +
+        (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
       wireConnectUtility();
+      wireAutoRefreshLink();
     } else {
-      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} utility bill source${withBills.length === 1 ? "" : "s"} connected — available to link when you add an offtaker.</div>`;
+      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} utility bill source${withBills.length === 1 ? "" : "s"} connected${autoState && autoState.auto ? " · refreshing automatically" : ""} — available to link when you add an offtaker.</div>` +
+        (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
+      wireAutoRefreshLink();
     }
   }
 

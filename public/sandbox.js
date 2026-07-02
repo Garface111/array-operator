@@ -4343,15 +4343,31 @@
     });
   }
 
-  /* ---- Auto-refresh row: manage the EnergyAgent extension's hourly auto-login
-   * so live production stays fresh hands-free. Credentials are stored ENCRYPTED on
-   * the owner's own machine (in the extension) and NEVER sent to our servers — this
-   * row just reads/writes that local vault through the so_bridge postMessage relay.
-   * Auto-refresh is ON by default (opt-out, per vendor). ---------------------- */
-  const AR_VENDORS = [
-    { id: "fronius", label: "Fronius (Solar.web)" },
-    { id: "sma", label: "SMA (Sunny Portal)" },
-    { id: "chint", label: "Chint" },
+  /* ---- Auto-refresh row: manage the EnergyAgent extension's saved portal logins
+   * so BOTH live production (inverter portals) and utility bills (GMP / SmartHub
+   * co-ops — what powers automatic offtaker invoices + billing reports) stay fresh
+   * hands-free. Credentials are stored ENCRYPTED on the owner's own machine (in the
+   * extension) and NEVER sent to our servers — this row just reads/writes that local
+   * vault through the so_bridge postMessage relay. The vault accepts inverter vendor
+   * ids AND utility codes (gmp / vec / wec / discovered sh_* co-ops) with the same
+   * set/clear/optout ops; saving a utility login arms its DAILY background bill
+   * refresh in the extension. Auto-refresh is ON by default (opt-out, per portal). */
+  const AR_GROUPS = [
+    { title: "Inverter portals",
+      sub: "Live production, refreshed automatically every few minutes.",
+      items: [
+        { id: "fronius", label: "Fronius (Solar.web)", ph: "Solar.web username / email" },
+        { id: "sma", label: "SMA (Sunny Portal)", ph: "Sunny Portal username / email" },
+        { id: "chint", label: "Chint", ph: "Chint username / email" },
+      ] },
+    { title: "Utility portals",
+      sub: "Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports.",
+      utility: true,
+      items: [
+        { id: "gmp", label: "Green Mountain Power", ph: "GMP username / email" },
+        { id: "vec", label: "Vermont Electric Co-op (SmartHub)", ph: "SmartHub username / email" },
+        { id: "wec", label: "Washington Electric Co-op (SmartHub)", ph: "SmartHub username / email" },
+      ] },
   ];
   let _vaultReq = {};                       // reqId → resolver, for bridge acks
   function vaultOp(op, extra){
@@ -4368,6 +4384,18 @@
     const d = e.data; if(!d || d.type !== "SO_VAULT_ACK" || !d.reqId) return;
     const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
   });
+
+  // Shared vault-status read for OTHER modules (reports.js's invoice-generator
+  // automation cue) — same cached channel this panel uses, so one query serves
+  // the whole page. Resolves {} when the extension isn't present/reachable, so
+  // callers can distinguish "no creds" from "can't know" via EXT_PRESENT.
+  window.__aoVaultStatus = async function(){
+    if(!EXT_PRESENT) return null;
+    if(_vaultStatusCache) return _vaultStatusCache;
+    const resp = await vaultOp("status");
+    if(resp && resp.ok){ _vaultStatusCache = resp.status || {}; return _vaultStatusCache; }
+    return null;
+  };
 
   // Fill the auto-login hint placeholders on every extension-captured array card.
   // Runs after each canvas render; cached so vault is only queried once per session
@@ -4418,10 +4446,10 @@
       <div class="r-v">
         <button type="button" id="arToggle" class="ar-toggle${collapsed?"":" open"}" aria-expanded="${!collapsed}" aria-controls="arBody">
           <span class="ar-caret" aria-hidden="true">▸</span>
-          <span id="arState">Keeps your live production fresh automatically.</span>
+          <span id="arState">Keeps your live production and utility bills fresh automatically.</span>
         </button>
         <div class="ar-body${collapsed?" ar-collapsed":""}" id="arBody">
-          <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any vendor anytime.</span>
+          <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</span>
           <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
         </div>
       </div>
@@ -4456,7 +4484,7 @@
       return;
     }
     const status = resp.status || {};
-    listEl.innerHTML = AR_VENDORS.map(v => {
+    const credCard = (v) => {
       const st = status[v.id] || { hasCreds:false, enabled:true };
       const on = st.hasCreds && st.enabled;
       const stateTxt = st.hasCreds ? (st.enabled ? "On" : "Off") : "Not set";
@@ -4468,13 +4496,27 @@
           <label class="ar-switch"><input type="checkbox" class="ar-optout" ${st.hasCreds && !st.enabled ? "checked" : ""} ${st.hasCreds ? "" : "disabled"}><span>off</span></label>
         </div>
         <div class="ar-fields">
-          <input class="ar-user" type="text" autocomplete="off" placeholder="Portal username / email">
+          <input class="ar-user" type="text" autocomplete="off" placeholder="${esc(v.ph || "Portal username / email")}">
           <input class="ar-pass" type="password" autocomplete="off" placeholder="${st.hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
           <div class="ar-actions">
             <button class="acct-btn primary ar-save" type="button">Save</button>
             ${st.hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
           </div>
         </div>
+      </div>`;
+    };
+    // Surface any saved utility code we didn't pre-list (a discovered sh_* co-op the
+    // extension minted) so its credential is visible + manageable here too — mirrors
+    // the extension popup's utility-logins group, keyed by the same vault code.
+    const listed = new Set(AR_GROUPS.flatMap(g => g.items.map(v => v.id)));
+    const extraUtils = Object.keys(status).filter(code =>
+      !listed.has(code) && status[code] && status[code].utility && status[code].hasCreds
+    ).map(code => ({ id: code, label: code.replace(/^sh_/, "").toUpperCase() + " (SmartHub)", ph: "SmartHub username / email" }));
+    listEl.innerHTML = AR_GROUPS.map(g => {
+      const items = g.utility ? g.items.concat(extraUtils) : g.items;
+      return `<div class="ar-group">
+        <div class="ar-group-head"><span class="ar-group-title">${esc(g.title)}</span><span class="ar-group-sub">${esc(g.sub)}</span></div>
+        ${items.map(credCard).join("")}
       </div>`;
     }).join("");
 
