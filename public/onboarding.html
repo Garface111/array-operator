@@ -340,7 +340,7 @@ function extInstallClicked(){
     if (EXT_PRESENT) return;                                  // it showed up — nothing to nudge
     const el = document.getElementById("extWatch");
     if (!el) return;
-    el.innerHTML = `Added it but nothing here yet? Chrome sometimes installs a new extension <b>switched off</b>. Open the <b>⧉ extensions</b> menu (the puzzle-piece icon, top-right of Chrome) → <b>Manage extensions</b> — or go to <b>chrome://extensions</b> — and turn <b>EnergyAgent</b> on. We start the moment it's enabled.`;
+    el.innerHTML = `Added it but nothing here yet? Chrome sometimes installs a new extension <b>switched off</b>. Open the <b>Extensions</b> menu (the puzzle-piece icon, top-right of Chrome) &rarr; <b>Manage extensions</b> — or go to <b>chrome://extensions</b> — and turn <b>EnergyAgent</b> on. We start the moment it's enabled.`;
   }, 14000);
 }
 window.addEventListener("message", (e) => {
@@ -1098,27 +1098,22 @@ function doneScreen(){
       <div class="done-s">One moment — we're creating your trial and connecting your arrays.</div>
     </div></div>`;
   }
-  // How their data STAYS current going forward. Browser-read sources
-  // (Fronius/SMA/Chint inverters, GMP/co-op bills) refresh through the extension,
-  // so they need a SAVED login + Chrome open; SolarEdge/Locus pull server-side and
-  // need neither. Name only the sources they actually connected — and only show it
-  // when at least one is browser-read (an all-SolarEdge fleet gets no false "keep
-  // Chrome open" ask).
-  const _vtxt = (state.sites.map(s => (s.vendor || "")).join(" ") + " " +
-                 Object.keys(state.captures || {}).join(" ")).toLowerCase();
-  const browserSrc = [];
-  if (/fronius/.test(_vtxt)) browserSrc.push("Fronius");
-  if (/\bsma\b|sunny/.test(_vtxt)) browserSrc.push("SMA");
-  if (/chint|cps/.test(_vtxt)) browserSrc.push("Chint");
-  if (state.gmpPath) browserSrc.push("your GMP bills");
-  const _srcList = browserSrc.length <= 1 ? (browserSrc[0] || "")
-      : browserSrc.slice(0, -1).join(", ") + " and " + browserSrc.slice(-1);
-  const refreshCallout = (created && browserSrc.length) ? `
+  // How their data STAYS current going forward. Browser-read sources (every vendor
+  // except the server-side API pulls SolarEdge/Locus) refresh through the extension,
+  // so they need a SAVED login + Chrome open. Show the callout whenever ANY such
+  // source is present (an all-SolarEdge/Locus fleet gets no false "keep Chrome open"
+  // ask). The copy is GENERAL — it covers EVERY vendor and never singles one out.
+  const _SERVER_SIDE = ["solaredge", "locus"];
+  const _isBrowserSrc = (v) => { v = String(v || "").toLowerCase(); return !!v && !_SERVER_SIDE.some(s => v.includes(s)); };
+  const hasBrowserVendor = !!state.gmpPath
+    || state.sites.some(s => _isBrowserSrc(s.vendor))
+    || Object.keys(state.captures || {}).some(_isBrowserSrc);
+  const refreshCallout = (created && hasBrowserVendor) ? `
     <div class="callout" style="margin-top:1.35rem;text-align:left">
-      <div class="t">⚡ Keep your ${_srcList} data flowing</div>
-      <div class="s">We read ${_srcList} through your browser, so two things keep it updating on its own — no signing in each time:</div>
-      <div class="s" style="margin-top:.6rem"><b>1 · Save your login in the EnergyAgent extension.</b> Click the ⧉ puzzle-piece icon (top-right of Chrome) → <b>EnergyAgent</b> → <b>Auto-login</b>, and save each portal login. It's encrypted on your own device and never sent to us.</div>
-      <div class="s" style="margin-top:.45rem"><b>2 · Keep Chrome open.</b> Whenever Chrome is running, your data refreshes automatically in the background. If Chrome is closed, new data pauses until you open it again.</div>
+      <div class="t">⚡ Keep your data flowing</div>
+      <div class="s">We read your inverter and utility portals through your browser, so two things keep <b>all your vendors</b> updating on their own — no signing in each time:</div>
+      <div class="s" style="margin-top:.6rem"><b>1 &middot; Save every portal login in the EnergyAgent extension.</b> Open the puzzle-piece (Extensions) icon at the top-right of Chrome, then <b>EnergyAgent</b> &rarr; <b>Auto-login</b>, and save each of your vendor logins. They're encrypted on your own device and never sent to us.</div>
+      <div class="s" style="margin-top:.45rem"><b>2 &middot; Keep Chrome open.</b> Whenever Chrome is running, your data refreshes automatically in the background. If Chrome is closed, new data pauses until you open it again.</div>
     </div>` : "";
   const trialLine = existing
     ? `You already have an Array Operator account. We just emailed <b>${state.email}</b> a secure sign-in link — open it to pick up right where you left off.`
