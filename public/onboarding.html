@@ -1098,6 +1098,28 @@ function doneScreen(){
       <div class="done-s">One moment — we're creating your trial and connecting your arrays.</div>
     </div></div>`;
   }
+  // How their data STAYS current going forward. Browser-read sources
+  // (Fronius/SMA/Chint inverters, GMP/co-op bills) refresh through the extension,
+  // so they need a SAVED login + Chrome open; SolarEdge/Locus pull server-side and
+  // need neither. Name only the sources they actually connected — and only show it
+  // when at least one is browser-read (an all-SolarEdge fleet gets no false "keep
+  // Chrome open" ask).
+  const _vtxt = (state.sites.map(s => (s.vendor || "")).join(" ") + " " +
+                 Object.keys(state.captures || {}).join(" ")).toLowerCase();
+  const browserSrc = [];
+  if (/fronius/.test(_vtxt)) browserSrc.push("Fronius");
+  if (/\bsma\b|sunny/.test(_vtxt)) browserSrc.push("SMA");
+  if (/chint|cps/.test(_vtxt)) browserSrc.push("Chint");
+  if (state.gmpPath) browserSrc.push("your GMP bills");
+  const _srcList = browserSrc.length <= 1 ? (browserSrc[0] || "")
+      : browserSrc.slice(0, -1).join(", ") + " and " + browserSrc.slice(-1);
+  const refreshCallout = (created && browserSrc.length) ? `
+    <div class="callout" style="margin-top:1.35rem;text-align:left">
+      <div class="t">⚡ Keep your ${_srcList} data flowing</div>
+      <div class="s">We read ${_srcList} through your browser, so two things keep it updating on its own — no signing in each time:</div>
+      <div class="s" style="margin-top:.6rem"><b>1 · Save your login in the EnergyAgent extension.</b> Click the ⧉ puzzle-piece icon (top-right of Chrome) → <b>EnergyAgent</b> → <b>Auto-login</b>, and save each portal login. It's encrypted on your own device and never sent to us.</div>
+      <div class="s" style="margin-top:.45rem"><b>2 · Keep Chrome open.</b> Whenever Chrome is running, your data refreshes automatically in the background. If Chrome is closed, new data pauses until you open it again.</div>
+    </div>` : "";
   const trialLine = existing
     ? `You already have an Array Operator account. We just emailed <b>${state.email}</b> a secure sign-in link — open it to pick up right where you left off.`
     : (!created
@@ -1128,6 +1150,7 @@ function doneScreen(){
     ${existing ? "" : `<div class="done-s">${state.arraysConnected
       ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b> — every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`
       : `All ${n} ${n===1?"array is":"arrays are"} queued for watching — every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`}</div>`}
+    ${refreshCallout}
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
       ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard</a>` : ""}
