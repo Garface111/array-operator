@@ -3934,10 +3934,32 @@
               const m = provs.filter(p => !feat.has(p.code) &&
                 ((p.label||"").toLowerCase().includes(q) || (p.code||"").includes(q) || (p.state||"").toLowerCase() === q)
               ).slice(0, 25);
+              // Search miss → a REAL request path, not a dead end: one click files the
+              // utility's name into the feature-suggestion pipeline (internal alert +
+              // agent review queue), so demand for a new adapter is captured the moment
+              // an operator hits the gap. Any *.smarthub.coop co-op already works even
+              // unlisted (the extension mints sh_* on first login) — this is for the
+              // custom-portal utilities we'd have to build bespoke.
               utilResults.innerHTML = m.length
                 ? `<div class="sb-login-grid">${m.map(utilCard).join("")}</div>`
-                : `<div class="sb-login-sub" style="padding:.5rem .25rem">No live match for “${esc(utilSearch.value)}”. If your utility isn't here yet, tell us and we'll add it.</div>`;
+                : `<div class="sb-login-sub" style="padding:.5rem .25rem">No live match for “${esc(utilSearch.value)}”.
+                     <button type="button" class="sb-linkbtn" id="sbUtilRequest" style="font-weight:650">Request ${esc(utilSearch.value)} →</button>
+                     <span style="display:block;margin-top:3px;opacity:.85">We'll add it and email you when it's live. (SmartHub co-ops usually work even when unlisted — try signing in via “Link utility bills” first.)</span></div>`;
               utilResults.querySelectorAll("[data-login]").forEach(b => { b.onclick = () => openPortalLogin(b.dataset.login); });
+              const reqBtn = utilResults.querySelector("#sbUtilRequest");
+              if(reqBtn) reqBtn.onclick = async () => {
+                reqBtn.disabled = true; reqBtn.textContent = "Sending…";
+                try {
+                  const s = localStorage.getItem("so_session") || "";
+                  const r = await fetch("/v1/feature-suggestion", {
+                    method: "POST",
+                    headers: Object.assign({ "Content-Type":"application/json" }, s ? { "Authorization":"Bearer "+s } : {}),
+                    body: JSON.stringify({ text: "UTILITY REQUEST: “" + utilSearch.value.trim() + "” — an operator searched for this utility in the Link-utility picker and it isn't supported yet. Evaluate: SmartHub deployment (promote to catalog) vs custom portal (bespoke adapter)." }),
+                  });
+                  reqBtn.textContent = r.ok ? "✓ Requested — we'll email you when it's live" : "Couldn't send — try again";
+                  if(!r.ok) reqBtn.disabled = false;
+                } catch(e){ reqBtn.textContent = "Couldn't send — try again"; reqBtn.disabled = false; }
+              };
             }, 180);
           });
         }
