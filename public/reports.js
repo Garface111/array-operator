@@ -4824,9 +4824,13 @@
         const st2 = box.querySelector(".rb-track-stat");
         if (st2) {
           st2.className = "rb-status rb-track-stat rb-ok";
-          st2.textContent = (p && p.added_count > 0)
+          // Formatting-normalization transparency: when the pipeline unified mixed
+          // date/number formats on the way in (STEP 1 of the reconcile), say so —
+          // the operator should never wonder why their sheet looks subtly cleaner.
+          const norm = (p && p.normalized > 0) ? " Tidied " + p.normalized + " cells into one consistent format." : "";
+          st2.textContent = ((p && p.added_count > 0)
             ? "✓ Updated spreadsheet produced — added " + p.added.join(", ") + ". Download it below."
-            : "✓ Processed — your spreadsheet is up to date through the latest bill.";
+            : "✓ Processed — your spreadsheet is up to date through the latest bill.") + norm;
         }
         // AI review gate: when the model planned the rows, show its plain-English read + a sanity
         // verdict. Not-sane = amber "review before sending"; sane = green "looks consistent".
