@@ -483,22 +483,15 @@ html[data-theme="day"] .cl-kpi.atstake .v{color:var(--bad) !important}
  * Hardcoded dark gradients & emerald "ok" tints → cool slate + utility blue.
  * ==========================================================================*/
 
-/* ── fleet COMMANDER bar ──────────────────────────────────────────────────── */
-html[data-theme="day"] .fc-card{
+/* ── fleet COMMANDER KPI tiles (base tint; the dashboard-scoped polish for the
+   4×2 tile grid lives in the DIVINE DASHBOARD block further down) ─────────── */
+html[data-theme="day"] .fcg-tile{
   background:linear-gradient(168deg,#ffffff,#f8fafc) !important;color:var(--ink) !important;
   border-color:var(--line) !important;
   box-shadow:0 1px 2px -1px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.07) !important;
 }
-html[data-theme="day"] .fc-card.ok{border-color:rgba(37,99,235,.4) !important;box-shadow:0 1px 3px rgba(15,23,42,.07),0 0 0 1px rgba(37,99,235,.10) !important}
-html[data-theme="day"] .fc-card.warn{border-color:rgba(217,119,6,.4) !important}
-html[data-theme="day"] .fc-card.bad{border-color:rgba(220,38,38,.4) !important}
-html[data-theme="day"] .fc-tank--ok{background:linear-gradient(90deg,rgba(37,99,235,.7),rgba(14,165,233,.5)) !important}
-html[data-theme="day"] .fc-tank--warn{background:linear-gradient(90deg,rgba(217,119,6,.7),rgba(251,191,36,.5)) !important}
-html[data-theme="day"] .fc-tank--bad{background:linear-gradient(90deg,rgba(220,38,38,.68),rgba(248,113,113,.5)) !important}
-html[data-theme="day"] .fc-plate{background:rgba(255,255,255,.7) !important;border-color:rgba(15,23,42,.08) !important}
-html[data-theme="day"] .fc-health-num span,
-html[data-theme="day"] .fc-stats{color:var(--muted) !important}
-html[data-theme="day"] .fc-stat b{color:var(--ink) !important}
+html[data-theme="day"] .fcg-v b{color:var(--ink) !important}
+html[data-theme="day"] .fcg-u{color:var(--muted) !important}
 
 /* ── OVERVIEW GRID tiles ──────────────────────────────────────────────────── */
 html[data-theme="day"] .sb-tile{
@@ -617,12 +610,10 @@ html[data-theme="day"] .sb-state.st-error,
 html[data-theme="day"] .sb-inv.bad .sb-state{background:rgba(220,38,38,.12) !important;color:var(--bad) !important}
 
 /* decorative tank bubbles/stars: green-white → light-blue, read on light glass */
-html[data-theme="day"] .sb-liq-bubbles span,
-html[data-theme="day"] .fc-liq-bubbles span{
+html[data-theme="day"] .sb-liq-bubbles span{
   background-image:radial-gradient(circle at 35% 35%, rgba(219,234,254,.95), rgba(96,165,250,.5)) !important;
 }
-html[data-theme="day"] .sb-liq-stars,
-html[data-theme="day"] .fc-liq-stars{opacity:.25 !important}
+html[data-theme="day"] .sb-liq-stars{opacity:.25 !important}
 
 /* identity chip dot glow + vendor/utility stream toggle (green-400) → blue */
 html[data-theme="day"] .whoami-dot{box-shadow:0 0 8px rgba(37,99,235,.6) !important}
@@ -836,7 +827,9 @@ html[data-theme="day"] #rowAutoRefresh:hover .ar-toggle{ color:#1d4ed8 !importan
  * health tab. Elevates the reused command-center card + attention queue into a
  * refined, layered, expensive-feeling dashboard. Scoped to #panelDashboard so it
  * never touches the marketing command-center; loaded last + !important to beat
- * the base .fc-*/.cc-* rules.
+ * the base .fcg- and .cc- rules. (NB: never write "*" + "/" inside this comment —
+ * an earlier ".fc-*" + "/" here closed the comment early and the parser ate the
+ * :root --dash-shadow rule below, so the dashboard cards lost their shadow.)
  * ==========================================================================*/
 :root{ --dash-shadow:0 1px 2px rgba(15,23,42,.04), 0 22px 48px -28px rgba(15,23,42,.22); }
 
@@ -864,46 +857,41 @@ html[data-theme="day"] #panelDashboard .dash-prod .dp-skel-bar{
   background:linear-gradient(90deg, rgba(15,23,42,.06) 25%, rgba(15,23,42,.13) 37%, rgba(15,23,42,.06) 63%) !important;
   background-size:280% 100% !important; }
 
-/* — HERO HEALTH CARD — layered depth, big gradient %, refined cluster — */
-html[data-theme="day"] #panelDashboard .fc-card{
-  border-radius:22px !important; overflow:hidden !important; padding:0 !important;
-  border:1px solid #e7edf5 !important; background:#fff !important;
+/* — KPI TILE GRID — the hero bar broken into uniform white tiles (2026-07-01):
+   4 × 2 standard sizes, same card language as the .dp stat-pills + queue. — */
+html[data-theme="day"] #panelDashboard .fcg{ gap:14px !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile{
+  background:#fff !important; border:1px solid #e7edf5 !important; border-radius:18px !important;
   box-shadow:var(--dash-shadow), inset 0 1px 0 rgba(255,255,255,.9) !important; }
-html[data-theme="day"] #panelDashboard .fc-card.ok{ box-shadow:var(--dash-shadow), inset 0 0 0 1px rgba(37,99,235,.06) !important; }
-/* the health "tank" → a soft, restrained left-to-right wash behind the plate */
-html[data-theme="day"] #panelDashboard .fc-tank{ opacity:1 !important; filter:none !important; }
-html[data-theme="day"] #panelDashboard .fc-tank--ok{ background:linear-gradient(90deg,rgba(37,99,235,.12),rgba(14,165,233,.045) 70%,transparent) !important; }
-html[data-theme="day"] #panelDashboard .fc-tank--warn{ background:linear-gradient(90deg,rgba(217,119,6,.14),rgba(251,191,36,.05) 70%,transparent) !important; }
-html[data-theme="day"] #panelDashboard .fc-tank--bad{ background:linear-gradient(90deg,rgba(220,38,38,.13),rgba(248,113,113,.05) 70%,transparent) !important; }
-html[data-theme="day"] #panelDashboard .fc-plate{
-  background:transparent !important; border:0 !important; backdrop-filter:none !important;
-  display:grid !important; grid-template-columns:auto 1fr auto !important; align-items:center !important;
-  gap:34px !important; padding:26px 30px !important; }
-/* big health % numeral — gradient-clipped, tight */
-html[data-theme="day"] #panelDashboard .fc-health-num{ display:flex !important; align-items:baseline !important; gap:2px !important; }
-html[data-theme="day"] #panelDashboard .fc-health-num b{
-  font-size:64px !important; font-weight:830 !important; letter-spacing:-.045em !important; line-height:.86 !important;
-  background:linear-gradient(160deg,#3b82f6,#0ea5e9) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
-html[data-theme="day"] #panelDashboard .fc-card.warn .fc-health-num b{ background:linear-gradient(160deg,#f59e0b,#d97706) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
-html[data-theme="day"] #panelDashboard .fc-card.bad .fc-health-num b{ background:linear-gradient(160deg,#f87171,#dc2626) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
-html[data-theme="day"] #panelDashboard .fc-health-num span{ font-size:23px !important; font-weight:760 !important; color:var(--faint) !important; }
-html[data-theme="day"] #panelDashboard .fc-health-lbl{ font-size:10.5px !important; letter-spacing:.14em !important; text-transform:uppercase !important; color:var(--faint) !important; font-weight:750 !important; margin-top:6px !important; }
-/* stats cluster */
-html[data-theme="day"] #panelDashboard .fc-mid{ border-left:1px solid #eef2f7 !important; padding-left:32px !important; }
-html[data-theme="day"] #panelDashboard .fc-stats{ display:flex !important; flex-wrap:wrap !important; align-items:baseline !important; gap:8px !important; color:var(--muted) !important; font-size:13.5px !important; }
-html[data-theme="day"] #panelDashboard .fc-stat b{ color:var(--ink) !important; font-weight:770 !important; font-variant-numeric:tabular-nums !important; }
-html[data-theme="day"] #panelDashboard .fc-stat.flag b{ color:var(--gold2) !important; }
-html[data-theme="day"] #panelDashboard .fc-dot{ color:#cbd5e1 !important; }
-html[data-theme="day"] #panelDashboard .fc-sub{ display:block !important; width:100% !important; color:var(--faint) !important; font-size:12px !important; margin-top:4px !important; letter-spacing:.01em !important; }
-/* $ recoverable highlight */
-html[data-theme="day"] #panelDashboard .fc-right{ text-align:right !important; display:flex !important; flex-direction:column !important; align-items:flex-end !important; gap:8px !important; }
-html[data-theme="day"] #panelDashboard .fc-risk{ display:flex !important; flex-direction:column !important; align-items:flex-end !important; line-height:1.05 !important; }
-html[data-theme="day"] #panelDashboard .fc-risk-k{ font-size:10px !important; letter-spacing:.13em !important; text-transform:uppercase !important; color:var(--faint) !important; font-weight:700 !important; }
-html[data-theme="day"] #panelDashboard .fc-risk b{ font-size:30px !important; font-weight:820 !important; letter-spacing:-.025em !important; color:var(--good) !important; font-variant-numeric:tabular-nums !important; }
-html[data-theme="day"] #panelDashboard .fc-risk-u{ font-size:13px !important; color:var(--muted) !important; font-weight:600 !important; }
-html[data-theme="day"] #panelDashboard .fc-risk-sub{ font-size:11px !important; color:var(--faint) !important; margin-top:2px !important; }
-html[data-theme="day"] #panelDashboard .fc-watch b{ font-size:30px !important; font-weight:820 !important; color:var(--gold2) !important; }
-html[data-theme="day"] #panelDashboard .fc-allclear{ font-size:18px !important; font-weight:760 !important; color:var(--good) !important; }
+html[data-theme="day"] #panelDashboard .fcg-k{ color:var(--faint) !important; font-weight:750 !important; letter-spacing:.13em !important; }
+html[data-theme="day"] #panelDashboard .fcg-v b{ color:var(--ink) !important; font-weight:820 !important; letter-spacing:-.03em !important; }
+html[data-theme="day"] #panelDashboard .fcg-u{ color:var(--muted) !important; }
+html[data-theme="day"] #panelDashboard .fcg-s{ color:var(--faint) !important; }
+/* lead tile: gradient-clipped % over a faint utility-blue wash (day = blue-is-good) */
+html[data-theme="day"] #panelDashboard .fcg-tile--health{ border-color:rgba(37,99,235,.28) !important;
+  background:linear-gradient(135deg,rgba(37,99,235,.07),rgba(14,165,233,.02) 55%,transparent) #fff !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile--health .fcg-v b{
+  background:linear-gradient(160deg,#3b82f6,#0ea5e9) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile--health.warn{ border-color:rgba(217,119,6,.35) !important;
+  background:linear-gradient(135deg,rgba(217,119,6,.08),transparent 55%) #fff !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile--health.warn .fcg-v b{
+  background:linear-gradient(160deg,#f59e0b,#d97706) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile--health.bad{ border-color:rgba(220,38,38,.35) !important;
+  background:linear-gradient(135deg,rgba(220,38,38,.07),transparent 55%) #fff !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile--health.bad .fcg-v b{
+  background:linear-gradient(160deg,#f87171,#dc2626) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+/* the health meter — day track + blue/amber/red fills */
+html[data-theme="day"] #panelDashboard .fcg-meter{ background:rgba(15,23,42,.07) !important; }
+html[data-theme="day"] #panelDashboard .fcg-fill{ background:linear-gradient(90deg,#2563eb,#0ea5e9) !important; }
+html[data-theme="day"] #panelDashboard .fcg-fill--warn{ background:linear-gradient(90deg,#d97706,#fbbf24) !important; }
+html[data-theme="day"] #panelDashboard .fcg-fill--bad{ background:linear-gradient(90deg,#dc2626,#f87171) !important; }
+/* triage + money tones (specificity: .t-warn/.t-bad outrank the --risk base) */
+html[data-theme="day"] #panelDashboard .fcg-tile--risk .fcg-v b{ color:var(--good) !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile.t-warn .fcg-v b{ color:var(--gold2) !important; }
+html[data-theme="day"] #panelDashboard .fcg-tile.t-bad .fcg-v b{ color:#dc2626 !important; }
 html[data-theme="day"] #panelDashboard .fc-asof{ font-size:11px !important; color:var(--faint) !important; }
 html[data-theme="day"] #panelDashboard .fc-alerts-btn{
   background:#fff !important; border:1px solid #e7edf5 !important; border-radius:10px !important;

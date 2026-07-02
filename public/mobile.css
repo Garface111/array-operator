@@ -75,17 +75,15 @@
   .tr-table { min-width: 460px; }            /* keep columns readable; wrap scrolls */
   .tr-table th, .tr-table td { padding: 10px 12px; }
 
-  /* ── Embedded fleet HERO stat plate (the "88% fleet healthy" + counts + $/mo
-     block on the landing demo + command center). On desktop .fc-plate is a
-     no-wrap flex row → the right-hand counts/$ clipped off-screen on a phone.
-     Stack it vertically and let the counts wrap. ─────────────────────────── */
-  .fc-plate { flex-direction: column; align-items: stretch; gap: 12px;
-              padding: 14px 16px; }
-  .fc-plate * { min-width: 0; max-width: 100%; }
-  .fc-stats { font-size: 13.5px; }
-  .fc-stat b { font-size: 17px; }
-  .fc-health-num { font-size: 40px; }
-  .fc-right { align-items: flex-start; }
+  /* ── Fleet-health KPI tile grid ("95% fleet healthy" + counts + $/mo on the
+     landing demo + dashboard): 2-up tiles with slightly smaller numerals so
+     all eight stay scannable without horizontal scroll. ──────────────────── */
+  /* rows size to their own content on a phone — 1fr rows would stretch every
+     tile to the tallest one and leave acres of dead space */
+  .fcg { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; grid-auto-rows: auto; }
+  .fcg-tile { min-height: 88px; padding: 12px 14px 10px; }
+  .fcg-v { flex-wrap: wrap; }          /* "$63,946 /mo" wraps instead of clipping */
+  .fcg-v b { font-size: 24px; }
 }
 
 /* Extra squeeze for the smallest phones. */

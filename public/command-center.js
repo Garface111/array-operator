@@ -205,6 +205,24 @@
    * ==========================================================================*/
   function host(){ return document.getElementById("fleetCommander"); }
 
+  // The money tile keeps the old right-cluster honesty states: a priced $/mo
+  // when the model has real losses, flagged-but-unpriced live anomalies as an
+  // amber "to check", and a clean fleet as a quiet $0 all-clear. Shared by the
+  // full render() and the in-place live repaint (paintKpis).
+  function riskTileHTML(k, riskMo){
+    return riskMo >= 1
+      ? `<div class="fcg-k">Recoverable</div>
+         <div class="fcg-v"><b data-kpi="risk">${usd0(riskMo)}</b><span class="fcg-u">/mo</span></div>
+         <div class="fcg-s">by fixing the flagged inverters</div>`
+      : k.flagged
+        ? `<div class="fcg-k">To check</div>
+           <div class="fcg-v" data-kpi="watch"><b>${num(k.flagged)}</b></div>
+           <div class="fcg-s">live anomalies — no $ lost yet</div>`
+        : `<div class="fcg-k">Recoverable</div>
+           <div class="fcg-v"><b data-kpi="risk">$0</b><span class="fcg-u">/mo</span></div>
+           <div class="fcg-s">nothing leaking — all clear 🌞</div>`;
+  }
+
   function render(){
     const h = host(); if(!h || !MODEL) return;
     const q = document.getElementById("ccQueue");
@@ -217,45 +235,50 @@
       ? `Demo fleet — sign in to load yours`
       : `Live from your connected arrays`;
 
-    // PINNED COMMANDER CARD — whole-fleet health at a single glance. Big health %,
-    // a status-colored meter, the counts, the flagged breakdown, $/mo at stake,
-    // and a live "updated Ns ago". No table, no extra chrome.
+    // KPI TILE GRID — the old single hero bar broken out (Ford, 2026-07-01):
+    // every fleet KPI in its own uniform tile, 4×2 on desktop / 2-up on phones.
+    // Reading order: health → scale (arrays, inverters) → triage (flagged,
+    // critical, watch) → money, with live monitoring status in the last tile.
+    const invHealthy = Math.max(0, k.inverters - k.flagged);
+    const watchN     = Math.max(0, k.flagged - k.crit);
     h.innerHTML = `
-      <div class="fc-card ${healthCls}">
-        <div class="fc-tank fc-tank--${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%" aria-hidden="true">
-          <span class="fc-liq-bubbles">
-            <span style="left:9%;width:5px;height:5px;animation-duration:3.4s;animation-delay:.0s"></span>
-            <span style="left:24%;width:4px;height:4px;animation-duration:4.1s;animation-delay:.7s"></span>
-            <span style="left:41%;width:6px;height:6px;animation-duration:3.0s;animation-delay:1.3s"></span>
-            <span style="left:58%;width:4px;height:4px;animation-duration:4.6s;animation-delay:.4s"></span>
-            <span style="left:73%;width:5px;height:5px;animation-duration:3.7s;animation-delay:1.0s"></span>
-            <span style="left:88%;width:4px;height:4px;animation-duration:4.3s;animation-delay:1.6s"></span>
-          </span>
+      <div class="fcg" role="list" aria-label="Fleet health KPIs">
+        <div class="fcg-tile fcg-tile--health ${healthCls}" role="listitem">
+          <div class="fcg-k">Fleet healthy</div>
+          <div class="fcg-v"><b data-kpi="healthy">${k.healthyPct}</b><span class="fcg-u">%</span></div>
+          <div class="fcg-s">${num(invHealthy)} of ${num(k.inverters)} inverters</div>
+          <div class="fcg-meter" aria-hidden="true"><span class="fcg-fill fcg-fill--${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%"></span></div>
         </div>
-        <div class="fc-plate">
-        <div class="fc-health">
-          <div class="fc-health-num"><b data-kpi="healthy">${k.healthyPct}</b><span>%</span></div>
-          <div class="fc-health-lbl">fleet healthy</div>
+        <div class="fcg-tile" role="listitem">
+          <div class="fcg-k">Arrays</div>
+          <div class="fcg-v"><b data-kpi="sites">${num(k.sites)}</b></div>
+          <div class="fcg-s">connected sites</div>
         </div>
-        <div class="fc-mid">
-          <div class="fc-stats">
-            <span class="fc-stat"><b data-kpi="sites">${num(k.sites)}</b> arrays</span>
-            <span class="fc-dot">·</span>
-            <span class="fc-stat"><b data-kpi="inverters">${num(k.inverters)}</b> inverters</span>
-            <span class="fc-dot">·</span>
-            <span class="fc-stat ${k.flagged?"flag":""}"><b data-kpi="flagged">${num(k.flagged)}</b> flagged</span>
-            <span class="fc-sub" data-kpi="flaggedsub">${k.crit} critical · ${k.flagged-k.crit} watch</span>
-          </div>
+        <div class="fcg-tile" role="listitem">
+          <div class="fcg-k">Inverters</div>
+          <div class="fcg-v"><b data-kpi="inverters">${num(k.inverters)}</b></div>
+          <div class="fcg-s">across ${num(k.sites)} array${k.sites===1?"":"s"}</div>
         </div>
-        <div class="fc-right">
-          ${riskMo>=1
-            ? `<div class="fc-risk"><span class="fc-risk-k">recoverable</span><b data-kpi="risk">${usd0(riskMo)}</b><span class="fc-risk-u">/mo</span><span class="fc-risk-sub">by fixing the flagged inverters</span></div>`
-            : k.flagged
-              ? `<div class="fc-watch" data-kpi="watch"><b>${num(k.flagged)}</b> to check<span class="fc-risk-sub">live anomalies — no $ lost yet</span></div>`
-              : `<div class="fc-allclear">All clear 🌞</div>`}
-          <div class="fc-asof" id="ccAsof">${asofText()}</div>
+        <div class="fcg-tile${k.flagged?" t-warn":""}" role="listitem">
+          <div class="fcg-k">Flagged</div>
+          <div class="fcg-v"><b data-kpi="flagged">${num(k.flagged)}</b></div>
+          <div class="fcg-s">${k.flagged ? "need attention below" : "none right now"}</div>
+        </div>
+        <div class="fcg-tile${k.crit?" t-bad":""}" role="listitem">
+          <div class="fcg-k">Critical</div>
+          <div class="fcg-v"><b data-kpi="crit">${num(k.crit)}</b></div>
+          <div class="fcg-s">${k.crit ? "stopped earning or faulted" : "no outages or faults"}</div>
+        </div>
+        <div class="fcg-tile${watchN?" t-warn":""}" role="listitem">
+          <div class="fcg-k">Watch</div>
+          <div class="fcg-v"><b data-kpi="watchcount">${num(watchN)}</b></div>
+          <div class="fcg-s">${watchN ? "underperforming or gone quiet" : "nothing on watch"}</div>
+        </div>
+        <div class="fcg-tile fcg-tile--risk${riskMo>=1?"":k.flagged?" t-warn":""}" role="listitem">${riskTileHTML(k, riskMo)}</div>
+        <div class="fcg-tile fcg-tile--alerts" role="listitem">
+          <div class="fcg-k">Monitoring</div>
           <button class="fc-alerts-btn" id="fcAlerts" type="button" title="Email me when an inverter goes down or underperforms">🔔 Alerts</button>
-        </div>
+          <div class="fc-asof fcg-s" id="ccAsof">${asofText()}</div>
         </div>
       </div>
       ${MODEL.simulated ? `<div class="fc-note">${esc(simNote)}</div>` : ``}`;
@@ -646,17 +669,48 @@ Thank you,
   }
   function setText(sel, val){ const el = document.querySelector(sel); if(el && el.textContent!==val) el.textContent = val; }
 
-  // recompute KPIs from the store and write them into the existing strip
+  // recompute KPIs from the store and write them into the existing tile grid
+  // IN PLACE — values, subs, and tone classes — so the meter/sheen animations
+  // never restart and the triage queue isn't rebuilt under the user's hands.
   function paintKpis(){
     if(!host()) return;
     MODEL = buildModel(FleetStore.snapshot());   // keep the model fresh for the queue too
     const k = MODEL.kpis;
+    const watchN = Math.max(0, k.flagged - k.crit);
     setText('[data-kpi="sites"]', num(k.sites));
     setText('[data-kpi="inverters"]', num(k.inverters));
-    setText('[data-kpi="healthy"]', k.healthyPct+"%");
-    const meter = document.querySelector('[data-kpi="healthmeter"]'); if(meter) meter.style.width = k.healthyPct+"%";
+    setText('[data-kpi="healthy"]', String(k.healthyPct));   // the tile's unit span owns the "%"
     setText('[data-kpi="flagged"]', num(k.flagged));
-    setText('[data-kpi="flaggedsub"]', `${k.crit} critical · ${k.flagged-k.crit} watch`);
+    setText('[data-kpi="crit"]', num(k.crit));
+    setText('[data-kpi="watchcount"]', num(watchN));
+    const healthCls = k.healthyPct > 80 ? "ok" : "warn";
+    const meter = document.querySelector('[data-kpi="healthmeter"]');
+    if(meter){
+      meter.style.width = k.healthyPct + "%";
+      meter.classList.toggle("fcg-fill--warn", healthCls === "warn");
+    }
+    const tileOf = sel => { const el = document.querySelector(sel); return el ? el.closest(".fcg-tile") : null; };
+    const setSub = (t, txt) => { const s = t && t.querySelector(".fcg-s"); if(s && s.textContent !== txt) s.textContent = txt; };
+    const ht = tileOf('[data-kpi="healthy"]');
+    if(ht){
+      ht.classList.toggle("ok", healthCls === "ok");
+      ht.classList.toggle("warn", healthCls === "warn");
+      setSub(ht, `${num(Math.max(0, k.inverters - k.flagged))} of ${num(k.inverters)} inverters`);
+    }
+    const ft = tileOf('[data-kpi="flagged"]');
+    if(ft){ ft.classList.toggle("t-warn", !!k.flagged); setSub(ft, k.flagged ? "need attention below" : "none right now"); }
+    const ct = tileOf('[data-kpi="crit"]');
+    if(ct){ ct.classList.toggle("t-bad", !!k.crit); setSub(ct, k.crit ? "stopped earning or faulted" : "no outages or faults"); }
+    const wt = tileOf('[data-kpi="watchcount"]');
+    if(wt){ wt.classList.toggle("t-warn", !!watchN); setSub(wt, watchN ? "underperforming or gone quiet" : "nothing on watch"); }
+    // the money tile can switch structure ($/mo ↔ to-check ↔ $0) — rebuild just it
+    const riskMo = Math.round(k.riskMo || 0);
+    const rt = document.querySelector(".fcg-tile--risk");
+    if(rt){
+      rt.classList.toggle("t-warn", riskMo < 1 && !!k.flagged);
+      const html = riskTileHTML(k, riskMo);
+      if(rt.innerHTML !== html) rt.innerHTML = html;
+    }
     const asof = document.getElementById("ccAsof"); if(asof) asof.innerHTML = asofText();
     renderProdKpis();           // keep the live production strip fresh on every beat
   }

@@ -14,12 +14,12 @@
 <!-- Day mode only (the night toggle was removed) — set before first paint, no flash. -->
 <script>document.documentElement.setAttribute("data-theme","day");</script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
-<link rel="stylesheet" href="styles.css?v=20260701a">
+<link rel="stylesheet" href="styles.css?v=20260701b">
 <link rel="stylesheet" href="command-center.css?v=29">
-<link rel="stylesheet" href="theme-day.css?v=20260701a"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
+<link rel="stylesheet" href="theme-day.css?v=20260701b"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
-<link rel="stylesheet" href="mobile.css"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
+<link rel="stylesheet" href="mobile.css?v=20260701a"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
@@ -304,7 +304,7 @@
 <script src="app.js?v=20260629c"></script>
 <script src="sandbox.js?v=20260701e"></script>
 <script src="vendor-sheet.js?v=20260701c"></script>
-<script src="command-center.js?v=8"></script>
+<script src="command-center.js?v=9"></script>
 <script src="reports.js?v=34"></script>
 <!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
      self-contained section modules (each registers on window.AnalysisSections). -->
