@@ -36,6 +36,23 @@
   // ---- helpers ---------------------------------------------------------------
   function num(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
 
+  // Fronius/SMA/Chint expose only ONE site-level instantaneous power; the backend
+  // splits it across inverters by today's energy share — so a per-inverter "kW now"
+  // is an ESTIMATE, not a measured per-device reading (data-honesty audit #5). Mirror
+  // sandbox.js / vendor-sheet.js: mark the kW "~" + an explanatory tip. The per-inverter
+  // `vendor` isn't always populated, so fall back to the site (group) vendor.
+  var ALLOC_VENDORS = { fronius: 1, sma: 1, chint: 1 };
+  function isAllocatedPower(inv, siteVendor) {
+    if (!inv || inv.current_power_w == null) return false;
+    var v = String(inv.vendor || siteVendor || "").toLowerCase();
+    return !!ALLOC_VENDORS[v];
+  }
+  function allocTip(inv, siteVendor) {
+    var v = String(inv.vendor || siteVendor || "vendor");
+    var label = v.charAt(0).toUpperCase() + v.slice(1);
+    return label + " reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.";
+  }
+
   // measured capacity factor % over the analysis window; null when un-computable
   function cfPct(inv, windowDays) {
     var kwh = num(inv.window_kwh), np = num(inv.nameplate_kw), d = num(windowDays);
@@ -150,7 +167,7 @@
   var ICO_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="11" x2="12" y2="16"></line><circle cx="12" cy="7.5" r=".6" fill="currentColor"></circle></svg>';
 
   // ---- one inverter device row ----------------------------------------------
-  function rowHtml(inv, cf, ctx) {
+  function rowHtml(inv, cf, ctx, siteVendor) {
     var esc = ctx.esc, fmt = ctx.fmt;
     var name = esc(inv.name || inv.inverter_id || "Inverter");
     var model = inv.model ? esc(inv.model) : "";
@@ -164,12 +181,17 @@
         '%</div><div class="anhw-cf-l">CF</div></div>';
     }
 
-    // live vs capacity
+    // live vs capacity. For allocated vendors (Fronius/SMA/Chint) the per-inverter
+    // live power is a site-level reading split by energy share — mark it "~" + tip so
+    // it never reads as an exact measured per-device value (audit #5).
     var liveKw = fmt.kwFromW(inv.current_power_w);
     var capKw = num(inv.nameplate_kw);
+    var alloc = isAllocatedPower(inv, siteVendor);
+    var allocTitle = alloc ? ' title="' + esc(allocTip(inv, siteVendor)) + '"' : '';
+    var allocMark = alloc ? '~' : '';
     var capCell;
     if (liveKw != null && capKw != null) {
-      capCell = '<div class="anhw-cap"><b>' + esc(fmt.kw(liveKw)) + '</b> <span class="anhw-of">/ ' +
+      capCell = '<div class="anhw-cap"' + allocTitle + '><b>' + allocMark + esc(fmt.kw(liveKw)) + '</b> <span class="anhw-of">/ ' +
         esc(fmt.kw(capKw)) + ' cap</span></div>';
     } else if (capKw != null) {
       capCell = '<div class="anhw-cap"><span class="anhw-of">' + esc(fmt.kw(capKw)) + ' capacity</span></div>';
@@ -227,7 +249,7 @@
     if (!withCf.length) {
       rows = '<div class="anhw-rows"><div class="anhw-empty">No inverter detail captured for this site yet.</div></div>';
     } else {
-      var body = withCf.map(function (x) { return rowHtml(x.inv, x.cf, ctx); }).join("");
+      var body = withCf.map(function (x) { return rowHtml(x.inv, x.cf, ctx, col.vendor); }).join("");
       rows = '<div class="anhw-rows"><div class="anhw-sort">Sorted by capacity factor</div>' + body + '</div>';
     }
 
