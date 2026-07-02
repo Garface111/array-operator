@@ -4430,6 +4430,28 @@
     const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
   });
 
+  // Extension v1.9.109+: a page-initiated credential save waits for a one-click
+  // confirm in the extension popup. Watch the vault until that vendor's creds
+  // appear (the owner confirmed), then re-render so the row flips to "On" live —
+  // no reload, no extra clicks here. Bounded (~2 min), one watcher per vendor.
+  const _vaultWatch = {};
+  function watchVaultConfirm(vendor){
+    if(_vaultWatch[vendor]) return;
+    let ticks = 0;
+    _vaultWatch[vendor] = setInterval(async () => {
+      ticks++;
+      const resp = await vaultOp("status");
+      const st = resp && resp.ok && resp.status && resp.status[vendor];
+      if(st && st.hasCreds){
+        clearInterval(_vaultWatch[vendor]); delete _vaultWatch[vendor];
+        _vaultStatusCache = null;
+        wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
+      } else if(ticks >= 40){   // ~2 min — stop polling quietly, the note stays
+        clearInterval(_vaultWatch[vendor]); delete _vaultWatch[vendor];
+      }
+    }, 3000);
+  }
+
   // Shared vault-status read for OTHER modules (reports.js's invoice-generator
   // automation cue) — same cached channel this panel uses, so one query serves
   // the whole page. Resolves {} when the extension isn't present/reachable, so
@@ -4577,8 +4599,27 @@
         if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent="Save",1500); return; }
         saveBtn.textContent = "Saving…";
         const r = await vaultOp("set", { vendor, username:u, password:p });
-        saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
         passEl.value = "";
+        // Extension v1.9.109+: a page-initiated save is intent-gated — the extension
+        // stashes it (encrypted) and asks the owner to confirm with one click in the
+        // EnergyAgent popup. Show the one remaining step inline in THIS row (no new
+        // tabs/modals) and watch the vault so the row flips to "On" the moment the
+        // owner confirms. Older extensions still ack ok:true and save immediately.
+        if(r && r.pending){
+          saveBtn.textContent = "One step left";
+          let note = row.querySelector(".ar-pending-note");
+          if(!note){
+            note = document.createElement("div");
+            note.className = "ar-pending-note";
+            const fields = row.querySelector(".ar-fields");
+            if(fields) fields.appendChild(note); else row.appendChild(note);
+          }
+          note.innerHTML = `Click the <b>EnergyAgent</b> icon in your browser toolbar and press <b>Save &amp; turn on</b> — your password stays encrypted on this device.`;
+          _vaultStatusCache = null;
+          watchVaultConfirm(vendor);
+          return;
+        }
+        saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
         _vaultStatusCache = null;  // force re-check so hints disappear on the next render
         setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
