@@ -59,14 +59,19 @@
   }
   function kwh0(n) { return n == null ? "—" : Math.round(n).toLocaleString() + " kWh"; }
 
+  // Each return carries `count` = how many inverters this array is flagging, so the
+  // vendor-group rollup (vendorStatusSummary) can total REAL inverter counts instead
+  // of scraping a leading digit off the display string. Critical headlines like "An
+  // inverter stopped earning" have no digit but alert.count knows the true number
+  // (e.g. 3 dead), so scraping undercounted multi-dead arrays to 1.
   function arrStatus(c) {
     const a = c.alert || {};
-    if (a.level === "critical") return { label: a.headline || "Fault", cls: "bad" };
-    if (a.level === "warn") return { label: a.count ? a.count + " need attention" : (a.headline || "Attention"), cls: "warn" };
+    if (a.level === "critical") return { label: a.headline || "Fault", cls: "bad", count: a.count || 1 };
+    if (a.level === "warn") return { label: a.count ? a.count + " need attention" : (a.headline || "Attention"), cls: "warn", count: a.count || 1 };
     // A stale source is a PAUSED feed (the portal session lapsed, not a vendor API
     // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
     // matches that recoverable state; "offline" wrongly implied a hard outage.
-    if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn" };
+    if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn", count: 1 };
     // A live anomaly (dark, or low vs peers, RIGHT NOW while >=2 daylight peers produce) the
     // 14-day alert hasn't flagged yet should still surface here — otherwise the array reads
     // "All clear" while a card inside shows "Dark now" / "Low vs peers" (Ford's Waterford case:
@@ -89,9 +94,9 @@
       const label = _dark && _low ? _attn + " need attention"
         : _dark ? _dark + " dark now"
         : _low + " low vs peers";
-      return { label, cls: "warn" };
+      return { label, cls: "warn", count: _attn };
     }
-    return { label: "All clear", cls: "ok" };
+    return { label: "All clear", cls: "ok", count: 0 };
   }
   function statusRank(c) {
     const a = c.alert || {};
@@ -237,8 +242,11 @@
       if (st.cls === "ok") return;
       if (st.cls === "bad") worstCls = "bad";
       else if (worstCls !== "bad") worstCls = "warn";
-      const n = /^(\d+)\b/.exec(st.label);           // "3 need attention" / "2 dark now" / etc.
-      total += n ? parseInt(n[1], 10) : 1;            // no leading count (e.g. "Source paused") = 1 flagged array
+      // Read the REAL flagged-inverter count off the status object (arrStatus now
+      // carries it) rather than scraping a leading digit from the display string —
+      // a critical headline like "An inverter stopped earning" has no digit but may
+      // represent several dead inverters (alert.count), which the scrape undercounted.
+      total += st.count > 0 ? st.count : 1;
     });
     return total === 0
       ? { label: "All clear", cls: "ok" }

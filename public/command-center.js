@@ -26,25 +26,19 @@
   const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended offset (demo/anon)
   const energyRate = () => { const s = FS(); return s && s.energyRate ? s.energyRate() : ENERGY_RATE_FALLBACK; };
   const REC_PER_MWH = (FS() && FS().REC_PER_MWH) || 38;   // $/MWh REC value
-  const WINDOW_DAYS = 10;   // Ford: everything on a 10-day window; 14 didn't make sense
+  // The window every window_kwh-derived figure (CF, recoverable-$, days-down, the
+  // emailed "Est. lost value") is normalized over. window_kwh is a SUM the backend
+  // accumulates across peer_analysis.WINDOW_DAYS (=14) days — see array_owners.py
+  // (window_start = today - timedelta(days=peer_analysis.WINDOW_DAYS)) and the
+  // fleet payload summary.window_days (=14). The divisor MUST equal that span or
+  // every derived figure inflates by span/divisor. Sourced from the shared
+  // FleetStore constant so it can never drift from the simulator / sandbox / alarms.
+  const WINDOW_DAYS = (FS() && FS().WINDOW_DAYS) || 14;
 
-  // ---- modeled production target (expected vs actual) ----
-  // Peer analysis catches ONE inverter lagging its neighbors, but it's blind to a
-  // whole fleet sagging together — soiling after a dry spell, snow, smoke, or
-  // slow degradation hits every panel under the same sky, so peers all match and
-  // nothing flags. A modeled target catches that: compare measured production to
-  // what this nameplate SHOULD make in this month.
-  //
-  // Target = nameplate_kW × 24h × days × monthly capacity factor. The CF table is
-  // a typical Northeast-US fixed-tilt PV AC capacity factor by month (NREL PVWatts-
-  // class numbers: ~13-14% annual, summer peak ~18%, winter trough ~7%). It is a
-  // MODEL, never a measurement — the UI labels it "modeled / typical" and the
-  // shortfall flag stays conservative (only a sustained, sizable gap trips it).
-  const CF_BY_MONTH = [0.072,0.095,0.135,0.160,0.175,0.182,0.180,0.168,0.145,0.110,0.072,0.060];
-  const seasonalCF = () => CF_BY_MONTH[new Date().getMonth()] || 0.14;
-  // A gap only reads as a problem past this band — below it is normal model/weather
-  // noise (a clear-vs-cloudy fortnight easily moves ±15%). 18% under target = real.
-  const TARGET_SHORTFALL_PCT = 0.18;
+  // (The weather-adjusted modeled-production target lives on the Analysis tab's
+  // forecast card — analysis-forecast.js — which does it properly against real
+  // Open-Meteo irradiance. The old crude nameplate×CF estimate that used to live
+  // here fed only a MODEL.production object nothing rendered, so it was removed.)
   const val  = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
   const usd0 = n => "$"+Math.round(Number(n)||0).toLocaleString();
   const num  = n => Number(n||0).toLocaleString();
@@ -105,23 +99,13 @@
 
   // flatten → {rows:[…flagged…], kpis:{…}}
   function buildModel(fleet){
-    const rows=[]; let invTotal=0, invHealthy=0;
-    // modeled-target accumulators — only over inverters with REAL window history,
-    // so a freshly-connected (no-history) unit never drags the fleet's actual %.
-    const cf = seasonalCF();
-    let measuredKwh = 0, targetKwh = 0, measuredCount = 0;
+    const rows=[]; let invTotal=0, invHealthy=0, gradeable=0;
     fleet.arrays.forEach(a => {
       const totalNp = a.inverters.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
       const fleetWin = a.inverters.reduce((t,i)=>t+(i.window_kwh||0),0);
       a.inverters.forEach(inv => {
         invTotal++;
-        // Production target: only when we have a real measured window for this unit.
-        if(inv.nameplate_kw > 0 && inv.window_kwh != null && inv.window_kwh > 0){
-          measuredKwh += inv.window_kwh;
-          targetKwh   += inv.nameplate_kw * 24 * WINDOW_DAYS * cf;
-          measuredCount++;
-        }
-        // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the 10-day
+        // Resolve the inverter's EFFECTIVE flagged-status. inv.status is the rolling
         // peer verdict; a fresh live anomaly (dark now, OR low vs peers, while >=2
         // daylight peers produce) isn't caught by it yet, so we promote a status:"ok"
         // inverter to a "live_dark"/"live_low" row. Shared FleetStore classifier →
@@ -132,12 +116,17 @@
           if(_lv === "dark") status = "live_dark";
           else if(_lv === "low") status = "live_low";
         }
-        if(status === "ok"){ invHealthy++; return; }
+        if(status === "ok"){ invHealthy++; gradeable++; return; }
         // "monitoring" = not enough history to judge yet — neutral, never a flagged
-        // row. Count it as not-flagged (don't drag the healthy %) and skip the table.
-        if(status === "monitoring"){ invHealthy++; return; }
+        // row AND never graded. Excluded from BOTH sides of healthyPct (judge % over
+        // gradeable units only) so a brand-new fleet where every unit is "Gathering
+        // data" doesn't read a false "100% healthy" green tank. Skip the table too.
+        if(status === "monitoring"){ return; }
+        // Everything past here is a real, gradeable verdict that failed — count it
+        // toward the denominator (but not the healthy numerator).
+        gradeable++;
         // live_dark/live_low carry no priced loss yet (unconfirmed, like comm_gap) —
-        // dollars are claimed once 10-day health confirms it dead/underperforming.
+        // dollars are claimed once the peer-window health confirms it dead/underperforming.
         const lk = (status === "live_dark" || status === "live_low") ? 0 : lostKwh(inv, fleetWin, totalNp);
         const lossMo = val(lk)/WINDOW_DAYS*30;
         rows.push({
@@ -151,22 +140,16 @@
     });
     const flagged = rows.length;
     const riskMo = rows.reduce((t,r)=>t+r.lossMo,0);
-    // pct of modeled target the fleet actually made over the window (real measured
-    // kWh ÷ modeled target kWh). null when no unit has window history yet.
-    const ratio = targetKwh > 0 ? measuredKwh / targetKwh : null;
-    const production = {
-      ready: measuredCount > 0 && targetKwh > 0,
-      measuredKwh, targetKwh, ratio, cf,
-      pct: ratio == null ? null : Math.round(ratio * 100),
-      coveredInverters: measuredCount,
-      // shortfall is a SUSTAINED, sizable gap (past the noise band) — not a blip
-      short: ratio != null && ratio < (1 - TARGET_SHORTFALL_PCT),
-    };
     return {
-      rows, recovered:fleet.recovered_ytd||0, simulated:fleet.simulated, production,
+      rows, recovered:fleet.recovered_ytd||0, simulated:fleet.simulated,
       kpis:{
         sites:fleet.arrays.length, inverters:invTotal,
-        healthyPct: invTotal? Math.round(invHealthy/invTotal*100):100,
+        // Health % is judged over GRADEABLE units only (those with a real verdict).
+        // "monitoring" (no history yet) units are excluded from both sides, so a
+        // fleet with nothing yet gradeable reports null (→ handled as "gathering
+        // data" by the tile), never a misleading 100% green.
+        gradeable,
+        healthyPct: gradeable ? Math.round(invHealthy/gradeable*100) : null,
         flagged, riskMo, crit: rows.filter(r=>r.sev==="crit").length
       }
     };
@@ -228,8 +211,11 @@
     const q = document.getElementById("ccQueue");
     const k = MODEL.kpis;
     // Fleet-health color (Ford, 2026-06-23): blue = good, all the way down to 80%;
-    // at 80% and below it turns orange. Two states only — no red tier.
-    const healthCls = k.healthyPct > 80 ? "ok" : "warn";
+    // at 80% and below it turns orange. Two states only — no red tier. When nothing
+    // is gradeable yet (every unit still "monitoring"), health is UNKNOWN, not 100%
+    // — a neutral "gathering data" tile, never a false green all-clear.
+    const gathering = k.healthyPct == null;
+    const healthCls = gathering ? "neutral" : (k.healthyPct > 80 ? "ok" : "warn");
     const riskMo = Math.round(MODEL.kpis.riskMo || 0);
     const simNote = MODEL.simulated
       ? `Demo fleet — sign in to load yours`
@@ -245,9 +231,9 @@
       <div class="fcg" role="list" aria-label="Fleet health KPIs">
         <div class="fcg-tile fcg-tile--health ${healthCls}" role="listitem">
           <div class="fcg-k">Fleet healthy</div>
-          <div class="fcg-v"><b data-kpi="healthy">${k.healthyPct}</b><span class="fcg-u">%</span></div>
-          <div class="fcg-s">${num(invHealthy)} of ${num(k.inverters)} inverters</div>
-          <div class="fcg-meter" aria-hidden="true"><span class="fcg-fill fcg-fill--${healthCls}" data-kpi="healthmeter" style="width:${k.healthyPct}%"></span></div>
+          <div class="fcg-v"><b data-kpi="healthy">${gathering ? "—" : k.healthyPct}</b>${gathering ? "" : `<span class="fcg-u">%</span>`}</div>
+          <div class="fcg-s">${gathering ? "gathering data — no history yet" : `${num(invHealthy)} of ${num(k.inverters)} inverters`}</div>
+          <div class="fcg-meter" aria-hidden="true"><span class="fcg-fill fcg-fill--${healthCls}" data-kpi="healthmeter" style="width:${gathering ? 0 : k.healthyPct}%"></span></div>
         </div>
         <div class="fcg-tile" role="listitem">
           <div class="fcg-k">Arrays</div>
@@ -359,26 +345,37 @@
     }
     let cols = [];
     try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
-    let kw = 0, kwh = 0, producing = 0, stale = 0, allocKw = 0;
+    let kw = 0, kwh = 0, producing = 0, stale = 0, asleep = 0, allocKw = 0;
     cols.forEach(c => {
       // A frozen feed's reading isn't live power — exclude it from "kW now" and the
       // producing count so the headline matches the dimmed/stale rows in the sheet.
       // (kWh-today still accrues from the last real cumulative reading, so we keep
       // it — only the instantaneous "now" power is the one that goes false-live.)
       const frozen = _isStale(c);
-      if(frozen) stale++;
+      // Overnight the vendor's source clock is frozen for the WHOLE fleet, so a bare
+      // age check would read every array as "paused" — alarming, and wrong. When the
+      // server says it's sun-down (is_daylight === false) a frozen feed is just
+      // ASLEEP, matching the sandbox card's calm "Sleeping" state. Only a feed frozen
+      // in DAYLIGHT is a genuine "paused" (a lapsed portal session / real dropout).
+      if(frozen){ if(c.is_daylight === false) asleep++; else stale++; }
       // Array live power: prefer the array-level value (real backend), else sum the
       // array's inverters (the demo fleet only carries per-inverter watts).
       let p = c.current_power_w;
       if(p == null) p = (c.inverters || []).reduce((t,i)=>t+(i.current_power_w||0),0);
+      // Clamp to >=0 before it enters the headline. SolarEdge reports a SIGNED
+      // totalActivePower that can go negative at dawn/dusk or during a fault
+      // (inverter drawing, not producing); an unclamped negative would silently
+      // subtract real output from another array's contribution to "kW now". Mirror
+      // the clamps used elsewhere (fair-share/lostKwh all Math.max(0,…)).
+      p = Math.max(0, p || 0);
       if(!frozen){
-        kw += (p || 0);
-        if((p || 0) > 0) producing++;
+        kw += p;
+        if(p > 0) producing++;
         // Fronius/SMA/Chint expose ONE site-level power the backend splits across
         // inverters, so any kW they contribute to this headline is an estimate, not a
         // measured reading. Track how much of "kW now" came from those vendors so we
         // can honestly mark the total with "~" when it's estimate-tainted.
-        if((p || 0) > 0 && _ALLOC_VENDOR[(c.vendor || "").toLowerCase()]) allocKw += p;
+        if(p > 0 && _ALLOC_VENDOR[(c.vendor || "").toLowerCase()]) allocKw += p;
       }
       if(c.produced_today_kwh != null) kwh += c.produced_today_kwh;
     });
@@ -389,7 +386,8 @@
       `<span class="dp"${kwEstimated ? ` title="Some arrays (Fronius, SMA, Chint) report one site-level power we split across inverters — so this fleet 'kW now' total includes estimates, not purely measured readings."` : ``}><b>${kwEstimated ? "~" : ""}${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>` +
-      (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``);
+      (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen in daylight, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``) +
+      (asleep ? `<span class="dp-dot">·</span><span class="dp dp-asleep" title="${asleep} array${asleep===1?"":"s"} asleep — the sun is down at ${asleep===1?"its":"their"} site, so ${asleep===1?"it's":"they're"} resting, not down">${asleep} asleep 🌙</span>` : ``);
   }
 
   // The weather-aware "Production vs expected" card (loadForecast /
@@ -679,14 +677,15 @@ Thank you,
     const watchN = Math.max(0, k.flagged - k.crit);
     setText('[data-kpi="sites"]', num(k.sites));
     setText('[data-kpi="inverters"]', num(k.inverters));
-    setText('[data-kpi="healthy"]', String(k.healthyPct));   // the tile's unit span owns the "%"
+    const gathering = k.healthyPct == null;   // nothing gradeable yet → unknown, not 100%
+    setText('[data-kpi="healthy"]', gathering ? "—" : String(k.healthyPct));   // the tile's unit span owns the "%"
     setText('[data-kpi="flagged"]', num(k.flagged));
     setText('[data-kpi="crit"]', num(k.crit));
     setText('[data-kpi="watchcount"]', num(watchN));
-    const healthCls = k.healthyPct > 80 ? "ok" : "warn";
+    const healthCls = gathering ? "neutral" : (k.healthyPct > 80 ? "ok" : "warn");
     const meter = document.querySelector('[data-kpi="healthmeter"]');
     if(meter){
-      meter.style.width = k.healthyPct + "%";
+      meter.style.width = (gathering ? 0 : k.healthyPct) + "%";
       meter.classList.toggle("fcg-fill--warn", healthCls === "warn");
     }
     const tileOf = sel => { const el = document.querySelector(sel); return el ? el.closest(".fcg-tile") : null; };
@@ -695,7 +694,9 @@ Thank you,
     if(ht){
       ht.classList.toggle("ok", healthCls === "ok");
       ht.classList.toggle("warn", healthCls === "warn");
-      setSub(ht, `${num(Math.max(0, k.inverters - k.flagged))} of ${num(k.inverters)} inverters`);
+      ht.classList.toggle("neutral", gathering);
+      setSub(ht, gathering ? "gathering data — no history yet"
+                           : `${num(Math.max(0, k.inverters - k.flagged))} of ${num(k.inverters)} inverters`);
     }
     const ft = tileOf('[data-kpi="flagged"]');
     if(ft){ ft.classList.toggle("t-warn", !!k.flagged); setSub(ft, k.flagged ? "need attention below" : "none right now"); }

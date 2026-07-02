@@ -298,6 +298,23 @@ const VENDORS = [
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
+// Client-side email sanity check. Deliberately STRICTER than the loose /.+@.+\..+/
+// we used to use — it rejects whitespace (e.g. "jane doe@farm.com") and consecutive
+// dots ("foo@bar..com") so most addresses the backend's Pydantic EmailStr would 422
+// on are caught here first, with a field-level hint, instead of dead-ending in a
+// misleading "couldn't reach our servers". Not a full RFC validator (the backend is
+// the source of truth) — just enough to stop the obvious garbage.
+function emailLooksValid(email){
+  const e = String(email||"").trim();
+  if(!e || /\s/.test(e)) return false;          // no spaces anywhere
+  if(/\.\./.test(e)) return false;              // no consecutive dots
+  const m = e.match(/^[^@]+@([^@]+)$/);          // exactly one @, non-empty both sides
+  if(!m) return false;
+  const domain = m[1];
+  if(domain.startsWith(".") || domain.endsWith(".")) return false;
+  return /^[^.\s]+(\.[^.\s]+)+$/.test(domain);   // domain has a dot-separated TLD, no empty labels
+}
+
 // ── Extension bridge: zero-key SolarEdge connect ──────────────────────────
 // The EnergyAgent extension injects so_bridge.js on arrayoperator.com, which
 // announces SO_EXTENSION_PRESENT and relays SO_CAPTURE_LANDED. When present we
@@ -843,28 +860,37 @@ async function connectVendor(){
       scan.innerHTML = `<div class="helper" style="color:var(--warn)">${data.message}</div>`;
       btn.disabled=false; return;
     } else {
-      // Unexpected/empty — fall through to the demo cascade so the flow still
-      // reaches account creation; the real creds are attached after sign-in.
-      sites = demoSites();
+      // Unexpected/empty response from a reachable backend — DON'T fabricate a
+      // fleet. Show an honest "couldn't read anything back" state and let them
+      // retry; the account is never created from invented arrays.
+      showConnectError(v);
+      return;
     }
   }catch(e){
-    // CORS/network/offline — graceful: show the propagation with sample data.
-    sites = demoSites();
+    // CORS/network/offline — be honest. We used to fall back to 7 fabricated demo
+    // arrays here, which showed a fake fleet and then created an EMPTY account
+    // (credential-attach is gated on realSites). Never present sample arrays as if
+    // they were the owner's — show a clear error and let them try again.
+    showConnectError(v);
+    return;
   }
   state.sites = sites;
   go(2);
 }
 
-function demoSites(){
-  return [
-    {site_id:528411, name:"Barn roof",       peak_power_kw:10.0},
-    {site_id:528412, name:"South field",     peak_power_kw:10.0},
-    {site_id:528413, name:"Garage",          peak_power_kw:10.0},
-    {site_id:528414, name:"Pole mount A",    peak_power_kw:10.0},
-    {site_id:528415, name:"Pole mount B",    peak_power_kw:6.0},
-    {site_id:528416, name:"Workshop",        peak_power_kw:6.0},
-    {site_id:528417, name:"Pond house",      peak_power_kw:4.0},
-  ];
+// Honest failure state on the Connect step: no fabricated arrays, no advancing to
+// "Your arrays". Keep the discover button live so the owner can retry.
+function showConnectError(v){
+  state.realSites = false;
+  state.sites = [];
+  state.totals = null;
+  const scan = document.getElementById("scanArea");
+  const btn = document.getElementById("discoverBtn");
+  if(btn) btn.disabled = false;
+  if(scan){
+    const who = (v && v.label) ? `your ${v.label} portal` : "your inverter portal";
+    scan.innerHTML = `<div class="helper" style="color:var(--warn)">We couldn't reach ${who} just now — nothing was saved. Check your connection and credentials, then try again.</div>`;
+  }
 }
 
 function gmpScreen(){
@@ -972,13 +998,37 @@ function arraysScreenSyncAll(){
 function syncClaim(){
   const claim = document.getElementById("claimBtn");
   if(!claim) return;
-  const emailOk = /.+@.+\..+/.test(state.email||"");
+  const emailOk = emailLooksValid(state.email);
   // Only gate on consent where the checkbox is rendered (the account-creation step).
   const chk = document.getElementById("consentChk");
   const consentOk = chk ? chk.checked : true;
   const ok = emailOk && consentOk && (!state.syncMode || state.sites.length>0);
   claim.style.opacity = ok ? "1" : ".5";
   claim.style.pointerEvents = ok ? "auto" : "none";
+  if(ok) clearFinishMsg();   // clearing a stale validation/error message once the form is valid again
+}
+
+// Inline, field-level message shown next to the claim CTA (invalid email, missing
+// consent, or a distinct server error). Rendered into a slot right below the email
+// field so it reads as a form error, not a page-level toast.
+function showFinishMsg(html, tone){
+  const anchor = document.getElementById("consentFld") || document.getElementById("emailFld");
+  if(!anchor) return;
+  let el = document.getElementById("finishMsg");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "finishMsg";
+    el.className = "helper";
+    el.setAttribute("role", "alert");
+    el.style.marginTop = ".7rem";
+    anchor.insertAdjacentElement("afterend", el);
+  }
+  el.style.color = tone==="bad" ? "var(--bad)" : "var(--warn)";
+  el.innerHTML = html;
+}
+function clearFinishMsg(){
+  const el = document.getElementById("finishMsg");
+  if(el) el.remove();
 }
 
 function cascadeArrays(){
@@ -1097,6 +1147,29 @@ function goDashboard(){
 // offer the add-card step inline. The trial is identical to NEPOOL (14 days,
 // no card). On any network/CORS failure we fail gracefully — nothing stored.
 async function finish(){
+  // Re-validate at submit time — the CTA gate is only CSS (pointer-events), which
+  // is bypassable via devtools / assistive tech, so we NEVER trust it as the sole
+  // check. Consent must be genuinely affirmed (the box actually ticked) and the
+  // email must look valid before we send anything. The retry CTA on the done
+  // screen calls finish() too, so guard against a missing form (step 3) by only
+  // enforcing when the fields are on screen.
+  const onForm = !!document.getElementById("emailFld");
+  if(onForm){
+    if(!emailLooksValid(state.email)){
+      showFinishMsg(`That email doesn't look valid — please check it (no spaces, one “@”, a real domain).`, "bad");
+      const em = document.getElementById("email"); if(em) em.focus();
+      return;
+    }
+    const chk = document.getElementById("consentChk");
+    if(chk && !chk.checked){
+      state.consent = false;
+      showFinishMsg(`Please agree to the Terms & Privacy Policy and authorize account access to continue.`, "bad");
+      return;
+    }
+    // Keep state in sync with the actual checkbox so the payload below is honest.
+    if(chk) state.consent = chk.checked;
+    clearFinishMsg();
+  }
   // Mark the finish in-flight so doneScreen() shows a neutral "setting up" state
   // (not the "couldn't reach our servers" error) while /onboarding/start +
   // /complete are still pending. Cleared on success; set finishFailed on failure.
@@ -1123,7 +1196,11 @@ async function finish(){
         company,
         array_count: Math.max(state.sites.length, 1),
         product: "array_operator",
-        consent_version: CONSENT_VERSION,
+        // ONLY send the consent version when the user genuinely ticked the box —
+        // otherwise we'd hand the backend "proof" of a consent that never happened
+        // (it persists consent_version/at/ip whenever present). No affirmed consent
+        // → no consent_version in the payload.
+        ...(state.consent ? { consent_version: CONSENT_VERSION } : {}),
         ...(state.password ? { password: state.password } : {}),
       })
     });
@@ -1243,10 +1320,29 @@ async function finish(){
           body: JSON.stringify({ email: state.email.trim(), product: "array_operator" })
         });
       }catch(e){ /* link send is best-effort; copy still routes them to sign in */ }
+    } else if(startRes.status === 422){
+      // The backend (Pydantic EmailStr etc.) rejected the input as invalid — most
+      // often an email our looser client check let through. This is NOT a network
+      // failure, so don't show "couldn't reach our servers"; send them back to the
+      // form with an honest, field-level fix-it message.
+      state.finishFailed = true;
+      state.finishFieldError = "email";
+      go(2);
+      showFinishMsg(`That email doesn't look valid — please check it and try again.`, "bad");
+      const em = document.getElementById("email"); if(em) em.focus();
+      state.finishing = false;
+      return;
+    } else if(startRes.status === 429){
+      // Rate-limited — a distinct, honest message (not a network error, not "invalid").
+      state.finishFailed = true;
+      go(2);
+      showFinishMsg((startData && startData.detail) || `Too many attempts — wait a moment, then try again.`, "warn");
+      state.finishing = false;
+      return;
     } else {
-      // start failed and it wasn't a 409 (existing account) — the account was NOT
-      // created. Flag the failure so doneScreen shows the honest retry copy, not the
-      // transient "setting up" state.
+      // start failed and it wasn't a 409/422/429 — the account was NOT created. Flag
+      // the failure so doneScreen shows the honest retry copy, not the transient
+      // "setting up" state.
       state.finishFailed = true;
     }
   }catch(e){ state.finishFailed = true; /* CORS/offline — doneScreen shows the graceful retry path */ }

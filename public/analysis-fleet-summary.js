@@ -249,8 +249,13 @@
     // further down). This also keeps the tile grid an even 7 (or fewer) so the
     // auto-fit rows never orphan a lone card. Compute it here; render below.
     var riskBanner = "";
-    if (f && f.available && _num(f.expected_kwh) != null && _num(f.actual_kwh) != null) {
-      var shortfallKwh = Math.max(0, f.expected_kwh - f.actual_kwh);
+    // actual_kwh covers MEASURED days only; the shortfall must subtract it from the
+    // expected over those SAME matched days (expected_matched_kwh), not the full
+    // window — otherwise unmeasured days inflate the "at risk" dollars (#15).
+    var _expMatched = _num(f && f.expected_matched_kwh);
+    if (_expMatched == null) _expMatched = _num(f && f.expected_kwh);
+    if (f && f.available && _expMatched != null && _num(f.actual_kwh) != null) {
+      var shortfallKwh = Math.max(0, _expMatched - f.actual_kwh);
       var rate = _num(ctx.energyRate) || 0;
       var dollars = shortfallKwh * rate;
       // optional REC value on the shortfall MWh

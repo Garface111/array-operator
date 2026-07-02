@@ -391,6 +391,11 @@
     background:linear-gradient(90deg,rgba(34,210,110,.96),rgba(82,245,158,.86))}
   .fcg-fill--warn{background:linear-gradient(90deg,rgba(245,158,11,.92),rgba(255,193,64,.78))}
   .fcg-fill--bad{background:linear-gradient(90deg,rgba(200,90,40,.86),rgba(255,140,90,.68))}
+  /* neutral = nothing gradeable yet (fresh fleet, all "gathering data"): a calm
+     grey rather than a false full-green tank (#30) */
+  .fcg-fill--neutral{background:linear-gradient(90deg,rgba(148,163,184,.5),rgba(148,163,184,.32))}
+  .fcg-tile--health.neutral{border-color:rgba(148,163,184,.3)}
+  .fcg-tile--health.neutral .fcg-v b{color:var(--muted,#94a3b8)}
   .fcg-fill::after{content:"";position:absolute;top:0;bottom:0;left:0;width:38%;
     background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
     animation:fcgsheen 3.2s linear infinite}

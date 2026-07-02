@@ -278,7 +278,12 @@
       // rows that actually have a forecast (never fabricate)
       var fc = ctx.forecastByArray[r.aid];
       if (fc) {
-        var a = num(fc.actual_kwh), e = num(fc.expected_kwh);
+        // actual_kwh is summed over MEASURED days only, so compare it to the
+        // expected over those SAME matched days (expected_matched_kwh), never the
+        // full-window expected — else a half-measured array is painted red (#15).
+        var a = num(fc.actual_kwh);
+        var e = num(fc.expected_matched_kwh);
+        if (e == null) e = num(fc.expected_kwh);   // fallback for older payloads
         if (a != null && e != null && e > 0) { actSum += a; expSum += e; modeled++; }
       }
     });
@@ -311,7 +316,12 @@
     }
 
     var ratio = fc ? num(fc.ratio_pct) : null;
-    var expected = fc ? num(fc.expected_kwh) : null;
+    // Show expected over the SAME measured days as `win` (actual_kwh), so the
+    // Expected column reconciles with Actual and the ratio badge (#15); full-window
+    // expected here made a half-measured site read e.g. 252 actual / 588 expected
+    // yet a 90% badge. Fall back to full-window only for older payloads.
+    var expected = fc ? (num(fc.expected_matched_kwh) != null
+                          ? num(fc.expected_matched_kwh) : num(fc.expected_kwh)) : null;
     // Open-Meteo weathercode (int) if the forecast row carries one
     var wxCode = (fc && typeof fc.weather_code === "number" && isFinite(fc.weather_code)) ? fc.weather_code : null;
     // operator O&M note on the site (string|null); empty string → treated as none

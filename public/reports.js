@@ -2257,10 +2257,21 @@
   // operator may have corrected it). Blocked = missing required (name/array/pct);
   // Needs review = no utility bill for the chosen array OR a soft (medium/none)
   // confidence match the operator hasn't corrected; else Ready.
+  // Discount is stored as a fraction; valid range mirrors saveManual (0–99% off, so
+  // fraction [0, 1)). Anything the backend would 400 on becomes an inline error here so
+  // the "Ready" count / Import button never include a row the backend will reject.
+  function bulkDiscountError(row) {
+    if (row.discount_pct == null) return "";
+    const d = Number(row.discount_pct);
+    if (isNaN(d) || d < 0 || d >= 1) return "Discount must be 0–99% (or blank).";
+    return "";
+  }
   function bulkRowStatus(row) {
     if (!row.offtaker_name || !row.array_id || !(row.allocation_pct > 0)) return "blocked";
     const a = bulkArrayById(row.array_id);
     if (!a || !a.utility_account_id || a.has_bill === false) return "needs_review";
+    // Discount outside saveManual's 0–99 band → make the operator fix it before import.
+    if (bulkDiscountError(row)) return "needs_review";
     // Soft match the operator left on the guessed array → make them look at it.
     if ((row.confidence === "medium" || row.confidence === "none") && !row._confirmed) return "needs_review";
     return "ready";
@@ -2550,7 +2561,7 @@
         </td>
         <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pctVal}" placeholder="%"></td>
         <td class="rb-rev-email"><input type="email" class="rb-rev-in" data-f="email" value="${esc(row.email || "")}" placeholder="optional"></td>
-        <td class="rb-rev-disc"><input type="number" class="rb-rev-in" data-f="discount_pct" min="0" max="99" step="1" value="${discVal}" placeholder="—"></td>
+        <td class="rb-rev-disc"><input type="number" class="rb-rev-in" data-f="discount_pct" min="0" max="99" step="0.1" value="${discVal}" placeholder="—"><div class="rb-rev-err rb-rev-discerr">${bulkDiscountError(row) ? "⚠ " + esc(bulkDiscountError(row)) : ""}</div></td>
         <td class="rb-rev-stat">${bulkStatusPill(status)}</td>
       </tr>`;
     }).join("");
@@ -2645,6 +2656,12 @@
     tr.className = `rb-rev-row rb-rev-${status}`;
     const cell = tr.querySelector(".rb-rev-stat");
     if (cell) cell.innerHTML = bulkStatusPill(status);
+    // Keep the inline discount error in sync without a full re-render (preserve caret).
+    const discErrEl = tr.querySelector(".rb-rev-discerr");
+    if (discErrEl) {
+      const de = bulkDiscountError(BULK_ROWS[i]);
+      discErrEl.textContent = de ? "⚠ " + de : "";
+    }
     const c = bulkCounts();
     const sum = $("#rbBulkSummary");
     if (sum) sum.innerHTML =
@@ -3263,10 +3280,23 @@
   function pctSumPill(group) {
     const pct = Math.round((group.pctSum || 0) * 1000) / 10;   // fraction -> 1-decimal percent
     const within = Math.abs(pct - 100) <= 0.5;
-    const cls = within ? "rb-grp-pct-ok" : "rb-grp-pct-warn";
-    const label = within
-      ? `✓ ${pct}% allocated`
-      : `⚠ ${pct}% allocated — ${pct > 100 ? "over-allocated" : "under-allocated"}`;
+    const over = !within && pct > 100;                          // REAL over-allocation — would double-bill
+    const overBy = Math.round((pct - 100) * 10) / 10;           // how far past 100% (over case)
+    const unassigned = Math.round((100 - pct) * 10) / 10;       // how far short of 100% (under case)
+    // ~100% = fine; >100% = a genuine double-bill risk (loud warning, guard kept);
+    // <100% = calm info note that some of the meter's excess is simply unassigned.
+    const cls = over ? "rb-grp-pct-warn" : "rb-grp-pct-ok";
+    let label, hint;
+    if (within) {
+      label = `✓ 100% allocated`;
+      hint = "";
+    } else if (over) {
+      label = `⚠ ${pct}% allocated — over-allocated (would double-bill the meter's excess)`;
+      hint = `These shares add to ${overBy}% more than 100%, so part of the meter's excess would be billed to two offtakers at once. Lower a share so the total is 100%.`;
+    } else {
+      label = `ⓘ ${pct}% allocated`;
+      hint = `${unassigned}% of this meter's excess is unassigned — fine if that's intended, or add/raise a share to reach 100%.`;
+    }
     // Breakdown rows — each offtaker's share, biggest first so the math reads top-down.
     const rows = (group.rows || []).slice().sort((a, b) =>
       (Number(b.allocation_pct) || 0) - (Number(a.allocation_pct) || 0));
@@ -3274,13 +3304,14 @@
       const p = s.allocation_pct != null ? Math.round(s.allocation_pct * 1000) / 10 : 0;
       return `<span class="rb-grp-pop-row"><span class="rb-grp-pop-who">${esc(s.customer_name || "(unnamed)")}</span><span class="rb-grp-pop-pct">${p}%</span></span>`;
     }).join("");
-    const sumCls = within ? "rb-grp-pop-sum-ok" : "rb-grp-pop-sum-warn";
+    const sumCls = over ? "rb-grp-pop-sum-warn" : "rb-grp-pop-sum-ok";
     return `<span class="rb-grp-pctwrap">
       <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
       <span class="rb-grp-pct-pop" role="tooltip">
         <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} on this utility bill</span>
         ${rowHtml}
         <span class="rb-grp-pop-row rb-grp-pop-sum ${sumCls}"><span class="rb-grp-pop-who">Total allocated</span><span class="rb-grp-pop-pct">${pct}%</span></span>
+        ${hint ? `<span class="rb-grp-pop-note">${esc(hint)}</span>` : ""}
       </span>
     </span>`;
   }
@@ -4085,7 +4116,14 @@
   function calcDashboard(d) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
     const explicitRate = d.net_rate_per_kwh != null;
-    const disc = d.discount_pct ? Math.round(d.discount_pct * 100) : 0;
+    // 1-decimal, matching the editor (step=0.1) so 12.5% shows "12.5%", not "13%",
+    // and the printed "× (1−X%)" reconciles with the server-computed total.
+    const disc = d.discount_pct ? Math.round(d.discount_pct * 1000) / 10 : 0;
+    // Disclosure: a discount can be applied without the operator setting one (backend
+    // auto-resolves a default). Surface that plainly so this panel never shows a silent
+    // discount. Purely a label — the money is server-computed.
+    const autoDisc = d.discount_pct == null && d.resolved_discount_pct != null && d.resolved_discount_pct > 0;
+    const autoDiscPct = autoDisc ? Math.round(d.resolved_discount_pct * 1000) / 10 : null;
     // A budget bill is keyed on budget_amount_usd ALONE — never inferred from the dollar
     // total. This panel is "how we calculated this invoice": it must ALWAYS land on the
     // genuine production calculation and surface the budget only as a separate override
@@ -4110,13 +4148,18 @@
     const shownRate = explicitRate ? d.net_rate_per_kwh : effRate;
     const ratePfx = explicitRate ? "" : "≈ ";
     const rateTxt = shownRate != null ? `${ratePfx}$${Number(shownRate).toFixed(5)}/kWh` : "—";
+    // Which discount to show as the "− X%" chip: the operator's explicit one, or the
+    // auto-applied default when they set none. (With an implicit bill rate the effective
+    // ≈rate already bakes the discount in, so we disclose it as a note, not a second chip.)
+    const shownDisc = disc || autoDiscPct || 0;
     const rateMath = (shownRate != null && d.customer_kwh != null)
-      ? `${fmt0(d.customer_kwh)} kWh × ${ratePfx}$${Number(shownRate).toFixed(5)}/kWh${(explicitRate && disc) ? ` × (1−${disc}%)` : ""}`
+      ? `${fmt0(d.customer_kwh)} kWh × ${ratePfx}$${Number(shownRate).toFixed(5)}/kWh${(explicitRate && shownDisc) ? ` × (1−${shownDisc}%)` : ""}`
       : (explicitRate ? "" : "from the bill's net-metering credit");
     const rateRow =
       `<div class="rb-calc-row"><span class="rb-calc-k">Solar credit rate`
-      + `${explicitRate ? "" : "<small>effective — from the bill's net-metering credit</small>"}</span>`
-      + `<span class="rb-calc-v">${rateTxt}${(explicitRate && disc) ? ` <span class="rb-calc-eq">− ${disc}%</span>` : ""}</span></div>`;
+      + `${explicitRate ? "" : "<small>effective — from the bill's net-metering credit</small>"}`
+      + `${autoDisc ? `<small>${autoDiscPct}% discount (default — auto-applied)</small>` : ""}</span>`
+      + `<span class="rb-calc-v">${rateTxt}${(explicitRate && shownDisc) ? ` <span class="rb-calc-eq">− ${shownDisc}%</span>` : ""}</span></div>`;
     // The calculated credit value: the genuine number when we have it; "computing…" when a
     // budget is set but the calculated value hasn't landed yet (NEVER the budget amount).
     const creditDue = creditVal != null ? money(creditVal) : "computing…";
@@ -4520,6 +4563,11 @@
     const wb = d.has_workbook === true;        // workbook offtakers bill from the sheet
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : "";
     const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
+    // Disclosure: when the operator never set a discount but one is still applied, the
+    // backend auto-resolves a default (tenant default → 10%). Surface it plainly so the
+    // blank field never hides a live discount the customer is actually billed at.
+    const autoDisc = d.discount_pct == null && d.resolved_discount_pct != null && d.resolved_discount_pct > 0;
+    const autoDiscPct = autoDisc ? Math.round(d.resolved_discount_pct * 1000) / 10 : null;
     const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
     const cad = d.cadence || "monthly";
     const sm = d.send_mode || "to_me";
@@ -4581,7 +4629,8 @@
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25">
             <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
-            <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10"></label>
+            <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
+            ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
           <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
             <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
           ${editArrayId !== "" ? `
@@ -4607,7 +4656,7 @@
             <select data-of="send_mode">
               <option value="to_me" ${sm === "to_me" ? "selected" : ""}>Me (operator copy)</option>
               <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
-              <option value="both" ${sm === "both" ? "selected" : ""}>Both</option>
+              <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
             </select></label>
           <label class="rep-fld"><span class="rl">Offtaker email</span>
             <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com"></label>

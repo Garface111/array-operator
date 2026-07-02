@@ -1037,6 +1037,15 @@
   // We must NOT paint those as the dead "not producing right now": they produced
   // today, we simply have no live wattage. Surface today's REAL kWh instead.
   function liveReadingMissing(inv){ return inv && inv.current_power_w == null; }
+  // Local YYYY-MM-DD (NOT toISOString, which returns the UTC date). The daily series
+  // is keyed by the site's LOCAL calendar day, so comparing it to a UTC date breaks
+  // every evening for US owners: once local time crosses into the next UTC day, the
+  // last point's local date no longer equals the UTC "today" and the card flips to
+  // "no live feed" even though today's kWh is right there.
+  function localDateStr(dt){
+    const y = dt.getFullYear(), m = dt.getMonth() + 1, d = dt.getDate();
+    return y + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d;
+  }
   // Today's produced kWh from the daily series (last point, if it's today's date).
   // Returns null when the series doesn't reach today.
   function todayKwh(inv){
@@ -1044,8 +1053,8 @@
     if(!Array.isArray(d) || !d.length) return null;
     const last = d[d.length - 1];
     if(!last || last.date == null) return null;
-    const iso = new Date().toISOString().slice(0, 10);
-    return String(last.date).slice(0, 10) === iso ? (+last.kwh || 0) : null;
+    const today = localDateStr(new Date());
+    return String(last.date).slice(0, 10) === today ? (+last.kwh || 0) : null;
   }
   function outputState(inv, statusCls){
     const realW = (inv.nameplate_kw != null) ? inv.nameplate_kw * 1000 : null;

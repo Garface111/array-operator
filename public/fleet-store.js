@@ -27,6 +27,29 @@ window.FleetStore = (function(){
   const CACHE_KEY   = "ao_fleet_cache";    // last real fleet tree, for instant paint on reload
   const WINDOW_DAYS = 14;
   const UNDERPERF_PI = 0.85;               // at/above = healthy
+
+  // ---- absolute modeled-target check (for arrays with NO usable peer cohort) ----
+  // Peer analysis needs >=2 inverters with history; a LONE inverter (or one whose
+  // siblings have no history) can never be peer-judged, so without this it would
+  // read "All clear"/"monitoring" forever even while sagging badly. For those units
+  // we fall back to an ABSOLUTE model: compare real production to what this nameplate
+  // typically makes here. Deliberately conservative — a single unit has no weather
+  // control group, so we only flag a CLEAR, LARGE shortfall (well past normal model
+  // + weather noise), never a marginal dip.
+  //
+  // Typical Northeast-US fixed-tilt PV AC capacity factor by month (NREL PVWatts-
+  // class: ~13-14% annual, summer peak ~18%, winter trough ~7%). A MODEL, not a
+  // measurement — hence the wide shortfall band below.
+  const CF_BY_MONTH = [0.072,0.095,0.135,0.160,0.175,0.182,0.180,0.168,0.145,0.110,0.072,0.060];
+  const seasonalCF = () => CF_BY_MONTH[new Date().getMonth()] || 0.14;
+  // Solo units get a much wider tolerance than the peer path (0.85): only below ~55%
+  // of the modeled target — a ~45% shortfall no cloudy fortnight explains — trips it.
+  const SOLO_TARGET_RATIO = 0.55;
+  // Live (instantaneous) absolute floor for a peerless unit: below ~20% of nameplate
+  // at solar noon is a clear sag; we gate it to mid-day (see liveVerdict) so morning/
+  // evening ramp never false-flags.
+  const SOLO_LIVE_PCT = 0.20;
+
   const getSession = () => { try { return localStorage.getItem(SESSION_KEY); } catch(e){ return null; } };
 
   // ---- instant-reload cache --------------------------------------------------
@@ -210,11 +233,28 @@ window.FleetStore = (function(){
     const haveCohort = eligible.length >= 2 && median > 0;
     producing.forEach(i => {
       const hasHistory = i.nameplate_kw>0 && i.window_kwh!=null && i.window_kwh>0;
-      if(!haveCohort || !hasHistory){
-        // Not enough evidence to judge — show neutral, claim nothing.
+      if(!hasHistory){
+        // No usable window at all — show neutral, claim nothing.
         i.status = "monitoring";
         i.peer_index = null;
         i.diagnosis = "Gathering data — not enough history yet to compare against its neighbors.";
+        return;
+      }
+      if(!haveCohort){
+        // We have THIS unit's history but no peer cohort (lone inverter, or siblings
+        // with no history) — peer analysis can't run. Instead of leaving it
+        // "monitoring" forever (blind to a real sag), judge it against an ABSOLUTE
+        // modeled target. Conservative by design: only a clear, large shortfall flags.
+        const target = i.nameplate_kw * 24 * WINDOW_DAYS * seasonalCF();  // typical kWh over the window
+        i.peer_index = null;   // no peer index — this is a model verdict, not a peer one
+        if(target > 0 && i.window_kwh < target * SOLO_TARGET_RATIO){
+          const short = Math.round((1 - i.window_kwh/target) * 100);
+          i.status = "underperforming";
+          i.diagnosis = `Producing ~${short}% below what a ${i.nameplate_kw} kW system typically makes here this month — with no sibling inverter to compare against, this is measured vs a seasonal model. Worth a look: shading, soiling, snow, or a tired string.`;
+        } else {
+          i.status = "ok";
+          i.diagnosis = "Pulling its weight (measured against a seasonal model — no sibling inverter to compare against).";
+        }
         return;
       }
       const pi = (i.window_kwh / i.nameplate_kw) / median;
@@ -275,13 +315,28 @@ window.FleetStore = (function(){
       || (a.inverter_id!=null && a.inverter_id===b.inverter_id)
       || (a.id!=null && a.id===b.id);
   }
+  // A peerless unit has no live control group, so the ONLY conservative live signal
+  // we trust is: it reads a fresh ~0 W in daylight while its OWN history proves it's
+  // normally a real producer (a healthy daily peak). That's a clear "stopped at
+  // noon", not weather (which never zeroes a working array in daylight). We do NOT
+  // attempt a solo "low" verdict live — a partly-cloudy dip on one unit with no
+  // control group is exactly the false alarm to avoid; the 14-day absolute check in
+  // recompute() catches a sustained solo sag instead.
+  function _provenProducer(inv){
+    const vals = (inv.daily || []).map(d => +d.kwh || 0).filter(v => v > 0);
+    if(!vals.length || inv.nameplate_kw == null) return false;
+    const peak = Math.max.apply(null, vals);
+    // A day that reached even a quarter of a typical full day (nameplate*~4.6 kWh/kW)
+    // proves the hardware works — so a current hard zero in daylight is anomalous.
+    return peak >= inv.nameplate_kw * 4.6 * 0.25;
+  }
   function liveVerdict(inv, peers, isDaylight){
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
     if(isProducing(inv)){
       // Producing — but is it keeping pace with its array peers? An inverter running
       // far below its neighbors (Ford: >15% under) is underperforming even if it's on.
       const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p));
-      if(lit.length < 2) return "ok";              // not enough peer signal to judge
+      if(lit.length < 2) return "ok";              // not enough peer signal to judge live "low" (solo sag → recompute's window check)
       const myPct = _pctOfMax(inv);
       if(myPct == null) return "ok";               // no nameplate → can't compare
       const peerPcts = lit.map(_pctOfMax).filter(v => v != null).sort((a,b) => a-b);
@@ -292,8 +347,11 @@ window.FleetStore = (function(){
       return "ok";
     }
     const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p)).length;
-    if(lit < 2) return "ok";                       // not enough peer signal to judge
-    return (inv.current_power_w != null) ? "dark" : "stale";
+    if(lit >= 2) return (inv.current_power_w != null) ? "dark" : "stale";
+    // No peer signal. Solo fallback: a fresh 0 W (not a null/missing feed) in daylight
+    // from a unit its own history proves is a real producer = a live "dark" anomaly.
+    if(inv.current_power_w != null && _provenProducer(inv)) return "dark";
+    return "ok";                                   // otherwise not enough signal to judge
   }
   // True when an inverter that 14-day health calls "ok" is actually a live
   // anomaly RIGHT NOW (dark, or low vs its peers, while peers produce). Cross-surface flag.

@@ -180,7 +180,15 @@
       sky: skyFromCode,                          // (weather_code) → {glyph,label,tone} | null — shared weather icon map
       energyRate: (window.FleetStore && FleetStore.energyRate()) || 0.21,
       recPerMwh: (window.FleetStore && FleetStore.REC_PER_MWH) || 38,
-      windowDays: 10,                            // Analysis window is 10 days (Ford) — for card copy; independent of the demo simulator's constant
+      // The span window_kwh is summed over — MUST match the backend's true window
+      // (peer_analysis.WINDOW_DAYS = 14; the fleet payload's summary.window_days
+      // echoes it). Capacity Factor, lost-$, and every "Production · Nd" label the
+      // analysis submodules derive from window_kwh divide by THIS, so a wrong value
+      // (the old hardcoded 10) inflated them all by 14/10 = 1.4x. Sourced from the
+      // shared FleetStore constant so it can't drift. NOTE: the weather forecast card
+      // is a SEPARATE, genuinely-10-day feature — it reads fc.window.days (=10) from
+      // its own payload, not this, so it stays correct.
+      windowDays: (window.FleetStore && FleetStore.WINDOW_DAYS) || 14,
       lastUpdate: (window.FleetStore && FleetStore.lastUpdate()) || Date.now(),
       live: window.FleetStore || null,           // for liveVerdict / isProducing / isLiveAnomaly
       fmt: fmt, esc: esc
