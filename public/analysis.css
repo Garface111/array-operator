@@ -8,10 +8,22 @@
  * existing Array Operator palette and never bolts on a foreign look.
  * ========================================================================== */
 
-/* Content sits in a comfortable, centered dashboard column with intentional side
-   margins — not near-full-bleed against the window (the app's .wrap is 94vw, which
-   reads as cramped on a ~1440px screen). */
-#panelAnalysis .an-wrap { max-width: 1280px; margin-inline: auto; padding: 22px 4px 64px; }
+/* Full-page card with real breathing room (Ford 2026-07-03: "expand this to
+   the full page" + "breathing room on the left, right, top, and bottom" —
+   supersedes the earlier 1280px centered-column choice). The negative
+   margin-inline breaks out of the app's shared .wrap cap (max-width 1440 +
+   28px padding) to the viewport, leaving a fixed 32px page gutter each side;
+   scrollbar-gutter (below) keeps it symmetric. Interior padding gives the
+   text comfortable air against the card edges on all four sides. */
+#panelAnalysis .an-wrap {
+  max-width: none;
+  margin-inline: calc(50% - 50vw + 32px);
+  padding: 32px 40px 64px;
+}
+@media (max-width: 900px) {
+  /* Small screens: .wrap already hugs the viewport — no breakout needed. */
+  #panelAnalysis .an-wrap { margin-inline: 0; }
+}
 
 /* Symmetric side gutters, scrollbar and all. The app's base styles.css sets
    body{overflow-x:hidden}, which turns BODY into the scroll container — so the
@@ -60,6 +72,6 @@ html { scrollbar-gutter: stable both-edges; }
 #panelAnalysis { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 760px) {
-  #panelAnalysis .an-wrap { padding: 12px 0 48px; }
+  #panelAnalysis .an-wrap { padding: 16px 14px 48px; }
   .an-head h2 { font-size: 19px; }
 }
