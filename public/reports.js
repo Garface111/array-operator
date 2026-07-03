@@ -1797,61 +1797,6 @@
     inputEl.addEventListener("change", debounced);
   }
 
-  // Build the #rbmUtility <option> list from utility accounts. When `keep` is set
-  // (the value selected before a refresh), it's re-selected if it still exists, so
-  // an in-flight new-offtaker form never loses the operator's pick mid-edit.
-  function fillUtilitySelect(sel, accts, keep) {
-    const fld = sel.closest(".rep-fld");
-    // Remove any stale "link first" helper button — once accounts exist it's noise.
-    const oldBtn = fld && fld.querySelector(".rbm-link-gmp");
-    if (!accts.length) {
-      sel.innerHTML = `<option value="">No utility bills yet — link your utility first</option>`;
-      // Make the empty state ACTIONABLE: drop a Link-utility button right here so the
-      // operator can connect their utility (any supported one) without hunting for it.
-      if (fld && !oldBtn) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "ao-btn rb-btn rbm-link-gmp";
-        btn.textContent = "🔗 Link utility bills";
-        btn.style.marginTop = "6px";
-        btn.onclick = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
-        fld.appendChild(btn);
-      }
-      return;
-    }
-    if (oldBtn) oldBtn.remove();   // accounts arrived — the link prompt is no longer needed
-    sel.innerHTML = `<option value="">Choose a utility account…</option>` +
-      accts.map(a => {
-        const prov = (a.provider || "gmp").toLowerCase();
-        const isGmp = prov === "gmp";
-        const tag = isGmp ? "" : prov.toUpperCase() + " · ";
-        const label = a.nickname || a.array_name || ((isGmp ? "GMP " : prov.toUpperCase() + " ") + a.account_number);
-        // GMP bills from the paper bill; VEC/SmartHub bills from measured
-        // generation × the rate you set (no GMP-shaped bill on file for them).
-        const note = isGmp
-          ? (a.has_bill ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}` : "no bill on file yet")
-          : "bills from measured generation × your rate";
-        return `<option value="${a.utility_account_id}">${esc(tag + label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
-      }).join("");
-    // Preserve the operator's selection across a rebuild if it's still valid.
-    if (keep && sel.querySelector(`option[value="${(window.CSS && CSS.escape) ? CSS.escape(keep) : keep}"]`)) {
-      sel.value = keep;
-    }
-  }
-
-  // Fetch utility accounts and (re)fill #rbmUtility in place. `preserveCurrent`
-  // keeps whatever the operator already picked. Used both on first render and when
-  // a new bill-link capture lands while the add-offtaker panel is open.
-  function refreshUtilitySelect(preserveCurrent) {
-    const sel = $("#rbmUtility");
-    if (!sel) return;                                  // add panel not open
-    const keep = preserveCurrent ? sel.value : "";
-    fetchUtilityAccounts().then(accts => {
-      const s = $("#rbmUtility");                      // re-query: the panel may have closed mid-fetch
-      if (s) fillUtilitySelect(s, accts, keep);
-    });
-  }
-
   // When the extension lands a GMP/VEC bill capture, sandbox.js dispatches
   // ao:utility-accounts-changed. If the new-offtaker form is open, repopulate the
   // utility picker in place (preserving the current pick) so the freshly-linked
@@ -1903,10 +1848,15 @@
     } else { done(); }
   }
 
-  // Given ARR_UTIL_ACCTS + the chosen #rbmArray, render the bill state:
-  //  • exactly one connected bill → silent, show "Invoices from: …"
-  //  • multiple bills → reveal the #rbmUtility override picker (scoped to this array)
-  //  • no bill → amber note "connect one to invoice it"
+  // Given ARR_UTIL_ACCTS + the chosen #rbmArray (Net Meter Group), render the bill state:
+  //  • exactly one linked bill → silent, show "Invoices from: …"
+  //  • multiple linked bills  → reveal the #rbmUtility picker scoped to this group
+  //  • NONE linked, but the tenant HAS utility accounts → reveal the picker with
+  //    the FULL account list. A fresh GMP link lands accounts with array_id=null
+  //    until they're matched to an array, so filtering on array_id alone showed
+  //    Bruce an EMPTY select even though every bill was downloaded. The pick is
+  //    sent explicitly on save and the backend links account → group from it.
+  //  • no utility accounts at all → amber note + a link-utility button.
   function paintArrayBills() {
     const arrSel = $("#rbmArray"), line = $("#rbmBillLine");
     const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
@@ -1918,11 +1868,27 @@
       if (wrap) wrap.hidden = true;
       return;
     }
-    const mine = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
-    if (!mine.length) {
+    const accts = ARR_UTIL_ACCTS || [];
+    const mine = accts.filter(a => String(a.array_id) === String(arrId));
+    if (!mine.length && !accts.length) {
+      // Nothing to pick from anywhere — make the empty state ACTIONABLE.
       line.className = "rb-arr-billline rb-arr-nobill";
-      line.innerHTML = "⚠ This array has no connected utility bill yet — connect one to invoice it.";
+      line.innerHTML = "⚠ No utility bills yet — link your utility to invoice this group. ";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ao-btn rb-btn rbm-link-gmp";
+      btn.textContent = "🔗 Link utility bills";
+      btn.onclick = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
+      line.appendChild(btn);
       if (wrap) { wrap.hidden = true; usel.innerHTML = ""; }
+      return;
+    }
+    if (!mine.length) {
+      // Accounts exist but none is matched to this group yet (Bruce's fresh-link
+      // case). Offer the full list instead of a dead end.
+      line.className = "rb-arr-billline rb-arr-hasbill";
+      line.innerHTML = "This group isn't matched to a utility bill yet — pick your offtaker's utility account below and we'll connect it.";
+      showUtilityPicker(wrap, usel, accts, true, arrId);
       return;
     }
     if (mine.length === 1) {
@@ -1933,27 +1899,45 @@
         `<option value="${a.utility_account_id}" selected>${esc(billLabel(a))}</option>`; }
       return;
     }
-    // Multiple bills → override picker; keep the operator's prior pick if valid.
-    const prev = usel ? usel.value : "";
+    // Multiple linked bills → picker scoped to this group's accounts.
     line.className = "rb-arr-billline rb-arr-hasbill";
-    line.innerHTML = `This array has <b>${mine.length} connected bills</b> — pick which one to invoice from:`;
-    if (wrap && usel) {
-      usel.innerHTML = mine.map(a =>
-        `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
-      if (prev && mine.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
-      wrap.hidden = false;
-    }
+    line.innerHTML = `This group has <b>${mine.length} connected utility bills</b> — select which one bills this offtaker:`;
+    showUtilityPicker(wrap, usel, mine, false, arrId);
   }
 
-  // Human label for a utility account in the array-first bill line / override.
+  // Fill + reveal the offtaker-bill picker. `needPick` prepends a placeholder so
+  // the operator must choose explicitly (used when no account is linked to the
+  // group yet); the prior pick survives a repaint. The subtext names the chosen
+  // group (Bruce's copy): "<Group> group has multiple participants. …"
+  function showUtilityPicker(wrap, usel, accts, needPick, arrId) {
+    if (!wrap || !usel) return;
+    const prev = usel.value;
+    usel.innerHTML = (needPick ? `<option value="">Choose a utility account…</option>` : "") +
+      accts.map(a => `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
+    if (prev && accts.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
+    const hint = $("#rbmUtilHint");
+    if (hint) {
+      const arr = (ARRAYS || []).find(x => String(x.id) === String(arrId));
+      hint.textContent = (arr && arr.name ? arr.name + " group" : "This group") +
+        " has multiple participants. Your selection here should be the utility account from this dropdown list.";
+    }
+    wrap.hidden = false;
+  }
+
+  // Human label for a utility account in the bill line / offtaker-bill picker:
+  // "Starlake · GMP acct 43210 · 12 bills · latest 2026-06". Name prefers the
+  // operator's nickname, then the linked array's name; the account number is
+  // always shown so same-named accounts stay tellable-apart.
   function billLabel(a) {
     const prov = (a.provider || "gmp").toLowerCase();
     const provTag = prov === "gmp" ? "GMP" : prov.toUpperCase();
-    const name = a.nickname || `${provTag} ${a.account_number || ""}`.trim();
+    const who = a.nickname || a.array_name;
+    const acctNo = `${provTag} acct ${a.account_number || "?"}`;
+    const name = who ? `${who} · ${acctNo}` : acctNo;
     const bills = a.has_bill
       ? ` · ${a.bill_count || 0} bill${a.bill_count === 1 ? "" : "s"}${a.latest_period_label ? " · latest " + a.latest_period_label : ""}`
       : " · no bill on file yet";
-    return `${provTag} ${name}${bills}`;
+    return name + bills;
   }
 
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
@@ -1984,9 +1968,9 @@
               <select id="rbmArray"><option value="">Loading arrays…</option></select>
               <span class="rb-fld-hint">The array in which your offtaker participates.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
-              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Which utility bill?</span>
-                <select id="rbmUtility"><option value="">Choose a utility bill…</option></select>
-                <span class="rb-fld-hint">This array has more than one connected bill — pick which one to invoice from.</span></label></label>
+              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
+                <select id="rbmUtility"><option value="">Choose a utility account…</option></select>
+                <span class="rb-fld-hint" id="rbmUtilHint">This group has multiple participants. Your selection here should be the utility account from this dropdown list.</span></label></label>
             <label class="rep-fld"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
             <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
@@ -2111,15 +2095,23 @@
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
     const clientEmail = $("#rbmEmail").value.trim();
-    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this offtaker draws from."; return; }
-    // Block save when the chosen array has no connected bill (nothing to invoice from).
+    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which net meter group this offtaker draws from."; return; }
+    // Block save only when the tenant has NO utility accounts at all (nothing to
+    // invoice from). A group with no LINKED account is fine — the picker offered
+    // the full account list and the explicit pick below carries the binding.
     const arrAccts = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrayId));
-    if (!arrAccts.length) {
+    if (!arrAccts.length && !(ARR_UTIL_ACCTS || []).length) {
       st.className = "rb-status rb-err";
-      st.textContent = "This array has no connected utility bill yet — connect one before invoicing it.";
+      st.textContent = "This group has no utility bills yet — link your utility before invoicing it.";
       return;
     }
-    if (overrode && !utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which of this array's bills to invoice from."; return; }
+    if (overrode && !utilityId) {
+      st.className = "rb-status rb-err";
+      st.textContent = arrAccts.length
+        ? "Pick which of this group's bills to invoice from."
+        : "Pick your offtaker's utility account so we know which bill to invoice from.";
+      return;
+    }
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {

@@ -252,6 +252,11 @@
   .rep-card p{color:var(--muted);font-size:13.5px;line-height:1.55}
   .rep-fields{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}
   .rep-fld{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px}
+  /* display:flex above beats the UA's [hidden]{display:none} (author rules always
+     win over UA rules), so JS `el.hidden = true` silently stopped hiding these
+     fields — Bruce saw the add-offtaker "utility bill" picker, emptied, when it
+     was meant to be hidden. Same footgun as .rb-track-global[hidden]. */
+  .rep-fld[hidden]{display:none !important}
   .rep-fld .rl{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
   .rep-fld select,.rep-fld input{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;
     padding:10px 12px;color:var(--ink);font-size:14px}
