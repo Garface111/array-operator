@@ -1989,9 +1989,8 @@
                 <span class="rb-fld-hint">This array has more than one connected bill — pick which one to invoice from.</span></label></label>
             <label class="rep-fld"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-              <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25">
-              <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
+            <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
+              <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
             <label class="rep-fld"><span class="rl">Commission year</span>
               <input type="number" id="rbmCommYear" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
               <span class="rb-fld-hint" id="rbmRateHint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
@@ -2002,8 +2001,8 @@
               <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="blank = auto from bill">
               <span class="rb-fld-hint">Leave blank to use the credit rate from the GMP bill.</span></label>
             <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-                <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from 'share of the array' above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
-              <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.01" placeholder="blank = same as billing share">
+                <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
+              <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.001" placeholder="blank = same as billing share">
               <span class="rb-fld-hint">Optional. Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
             <label class="rep-fld"><span class="rl">Starting invoice #</span>
               <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
@@ -2547,7 +2546,9 @@
     const c = bulkCounts();
     const rowHtml = BULK_ROWS.map((row, i) => {
       const status = bulkRowStatus(row);
-      const pctVal = row.allocation_pct != null ? Math.round(row.allocation_pct * 1000) / 10 : "";
+      // 3-decimal percent (Bruce): 0.24783 → "24.783". A 1-decimal prefill would
+      // silently truncate the stored share on the next edit+save of the row.
+      const pctVal = row.allocation_pct != null ? (row.allocation_pct * 100).toFixed(3) : "";
       const discVal = row.discount_pct != null ? Math.round(row.discount_pct * 1000) / 10 : "";
       const errs = (row.errors || []).length ? `<div class="rb-rev-err">⚠ ${esc(row.errors.join("; "))}</div>` : "";
       return `<tr class="rb-rev-row rb-rev-${status}" data-i="${i}">
@@ -2560,7 +2561,7 @@
           ${row.array_name_raw ? `<div class="rb-rev-raw">from your file: “${esc(row.array_name_raw)}”</div>` : ""}
           ${errs}
         </td>
-        <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pctVal}" placeholder="%"></td>
+        <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.001" value="${pctVal}" placeholder="%"></td>
         <td class="rb-rev-email"><input type="email" class="rb-rev-in" data-f="email" value="${esc(row.email || "")}" placeholder="optional"></td>
         <td class="rb-rev-disc"><input type="number" class="rb-rev-in" data-f="discount_pct" min="0" max="99" step="0.1" value="${discVal}" placeholder="—"><div class="rb-rev-err rb-rev-discerr">${bulkDiscountError(row) ? "⚠ " + esc(bulkDiscountError(row)) : ""}</div></td>
         <td class="rb-rev-stat">${bulkStatusPill(status)}</td>
@@ -4647,7 +4648,10 @@
     const sid = d.subscription_id;
     if (!sid) return "";
     const wb = d.has_workbook === true;        // workbook offtakers bill from the sheet
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : "";
+    // Editor prefills show the FULL 3-decimal percent (Bruce: "e.g. 24.783") —
+    // the old 1-decimal rounding meant any touch of the field saved back 24.8%,
+    // destroying the stored third decimal. Whole shares render as 25.000 (consistent).
+    const pct = d.allocation_pct != null ? (d.allocation_pct * 100).toFixed(3) : "";
     const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
     // Disclosure: when the operator never set a discount but one is still applied, the
     // backend auto-resolves a default (tenant default → 10%). Surface it plainly so the
@@ -4661,7 +4665,7 @@
     // (the draft `d` may not). Look it up from the canonical offtaker list so the edit
     // fields pre-fill. Commission year lives on the array (fetched lazily on wire).
     const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
-    const sharePct = subRec.array_share_pct != null ? Math.round(subRec.array_share_pct * 1000) / 10 : "";
+    const sharePct = subRec.array_share_pct != null ? (subRec.array_share_pct * 100).toFixed(3) : "";
     const invStart = subRec.invoice_number_start != null ? subRec.invoice_number_start : "";
     const editArrayId = subRec.array_id != null ? subRec.array_id : (d.array_id != null ? d.array_id : "");
     // Is the bound account a VEC/SmartHub one? Those bills don't expose the credit
@@ -4711,9 +4715,8 @@
               <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
               ${billOpts}
             </select></label>` : ""}
-          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25">
-            <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
+          <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
+            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
             ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
@@ -4724,8 +4727,8 @@
             <input type="number" class="rb-of-commyear" data-commyear-arr="${editArrayId}" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
             <span class="rb-fld-hint rb-of-ratehint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-              <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from 'share of the array' (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
-            <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.01" value="${sharePct}" placeholder="blank = same as billing share">
+              <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
+            <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.001" value="${sharePct}" placeholder="blank = same as billing share">
             <span class="rb-fld-hint">Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
           <label class="rep-fld"><span class="rl">Starting invoice #</span>
             <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based">
