@@ -3363,9 +3363,31 @@
           ${chip("other", "Other utilities", bucketCounts.other)}
         </div>`;
     })() : "";
-    const viewRows = showFilter && OFFTAKER_FILTER !== "all"
+    const scopeRows = showFilter && OFFTAKER_FILTER !== "all"
       ? OFFTAKERS.filter(s => offtakerProviderBucket(s, bucketCounts.acctById) === OFFTAKER_FILTER)
       : OFFTAKERS;
+    // ── find-an-offtaker search (Anna-scale) ──────────────────────────────────
+    // Big fleets need a lookup tool, not a scroll: match name / email / utility-
+    // account number or nickname. The query lives beside the GMP-vs-other chips
+    // in one tools row over the ONE list (integrate-in-place, no separate page).
+    const acctByIdFull = new Map((utilAccts || []).map(a => [String(a.id), a]));
+    const q = (OFFTAKER_QUERY || "").trim().toLowerCase();
+    const matchesQuery = (s) => {
+      if (!q) return true;
+      const a = s.utility_account_id != null ? acctByIdFull.get(String(s.utility_account_id)) : null;
+      return [s.customer_name, s.client_email, a && a.account_number, a && a.nickname]
+        .some(v => v && String(v).toLowerCase().includes(q));
+    };
+    const viewRows = q ? scopeRows.filter(matchesQuery) : scopeRows;
+    const showSearch = OFFTAKERS.length > 12;
+    const searchHTML = showSearch ? `
+      <div class="rb-osearch">
+        <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
+        <input id="rbOSearch" type="search" placeholder="Find an offtaker — name, email, or account…"
+               value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
+               aria-label="Find an offtaker">
+        ${q ? `<span class="rb-osearch-n">${viewRows.length} match${viewRows.length === 1 ? "" : "es"}</span>` : ""}
+      </div>` : "";
     // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
     // utility account → offtaker. Both upper levels collapse on a whole-header click and
     // both DEFAULT collapsed, so a fresh load of a big account shows just the provider
@@ -3375,7 +3397,7 @@
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;   // default collapsed
-      const collapsed = !!GROUP_COLLAPSED[g.key];
+      const collapsed = q ? false : !!GROUP_COLLAPSED[g.key];   // a search opens its matches
       return `
         <div class="rb-grp${collapsed ? " collapsed" : ""}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
@@ -3395,7 +3417,7 @@
       const providers = groupByProvider(groups);
       body = providers.map(pv => {
         if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = true;   // default collapsed
-        const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
+        const pCollapsed = q ? false : !!PROVIDER_COLLAPSED[pv.key];   // a search opens its matches
         const nAcct = pv.groups.length;
         return `
           <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
@@ -3413,19 +3435,44 @@
     } else {
       body = viewRows.map(s => subCard(s, arrs, utilAccts)).join("");
     }
-    if (showFilter && viewRows.length === 0) {
+    if (q && viewRows.length === 0) {
+      body = `<div class="empty" style="padding:18px 0;color:var(--faint)">No offtaker matches “${esc(OFFTAKER_QUERY)}”.</div>`;
+    } else if (showFilter && viewRows.length === 0) {
       // The filter matched nothing (shouldn't normally happen since chips carry counts,
       // but stay honest rather than render a blank list).
       body = `<div class="empty" style="padding:18px 0;color:var(--faint)">No ${OFFTAKER_FILTER === "gmp" ? "GMP" : "non-GMP"} offtakers.</div>`;
     }
+    const toolsHTML = (filterStripHTML || searchHTML)
+      ? `<div class="rb-listtools">${filterStripHTML}${searchHTML}</div>` : "";
     list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
-      `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + filterStripHTML + body;
+      `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + toolsHTML + body;
     wireBacChip($("#rbBacSummary"));
     // Wire the GMP-vs-non-GMP filter chips — flip the scope + re-render in place.
     list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
       OFFTAKER_FILTER = b.getAttribute("data-ofilter") || "all";
       renderAccordion(subs, arrs, utilAccts, drafts);
     });
+    // Wire the search box — debounced re-render; the innerHTML swap drops focus,
+    // so restore it (with the caret at the end) after each keystroke's render.
+    const se = list.querySelector("#rbOSearch");
+    if (se) {
+      const apply = () => {
+        clearTimeout(se._t);
+        se._t = setTimeout(() => {
+          if ((se.value || "") === OFFTAKER_QUERY) return;
+          OFFTAKER_QUERY = se.value || "";
+          renderAccordion(subs, arrs, utilAccts, drafts);
+          const el = list.querySelector("#rbOSearch");
+          if (el) {
+            el.focus();
+            const n = el.value.length;
+            try { el.setSelectionRange(n, n); } catch (_) { /* type=search quirk */ }
+          }
+        }, 160);
+      };
+      se.oninput = apply;
+      se.onsearch = apply;   // the native ✕ clear control on type=search
+    }
     wireAccordionHeaders(list);
     // TOP level — provider collapse (GMP / VEC / WEC). Whole header clickable, keyboard-OK.
     // (.rb-prov-head and .rb-grp-head are siblings' children, not nested, so the two
@@ -3586,6 +3633,10 @@
                                 // Bruce framed GMP-vs-other as "tabs", but Ford's rule is integrate-
                                 // in-place, so it's a filter that scopes which offtakers render.
                                 // Only shown when the fleet has BOTH GMP and non-GMP offtakers.
+  let OFFTAKER_QUERY = "";      // find-an-offtaker search (Anna-scale fleets: at 800 offtakers,
+                                // scrolling collapsed groups is not a lookup tool). Filters by
+                                // name / email / utility-account; an active query force-expands
+                                // the provider→account hierarchy so matches surface in place.
   let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
   let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
   let GROUP_COLLAPSED = {};     // utility-account group key -> bool; collapses every offtaker
