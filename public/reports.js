@@ -611,6 +611,9 @@
         if (window.__aoLinkUtility) { window.__aoLinkUtility(); }
         else { location.hash = "#arrays"; }   // defensive: sandbox owns the modal
       };
+      // "✉ Customize email" — the MASS offtaker-email template studio.
+      const esBtn = $("#rbEmailStudio");
+      if (esBtn) esBtn.onclick = openEmailStudio;
       // "⬇ Export to QuickBooks / Xero" — this reaches shell() only on the signed-in
       // path (the signed-out/demo branch returns earlier), so revealing + wiring the
       // export box here inherently gates it to authed operators.
@@ -1045,6 +1048,7 @@
     // Wire the "Add an offtaker" + "Link utility bills" header buttons to the sign-in nudge.
     const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
     const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
+    const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
   }
 
   // A gentle, in-place "this is a demo" affordance — no fetch, no error.
@@ -1063,6 +1067,306 @@
     tip.style.opacity = "1";
     clearTimeout(demoNudge._t);
     demoNudge._t = setTimeout(() => { if (tip) tip.style.opacity = "0"; tip.style.transition = "opacity .4s"; }, 3200);
+  }
+
+  // ─── Offtaker email studio — the MASS email customizer (Anna-scale ask) ────
+  // Mirrors the NEPOOL report-email Template Studio against the AO endpoint
+  // suite (GET/PUT/preview/chat/test-send/reset at /email-template*): a live
+  // inbox preview rendered with a REAL sample offtaker's figures, subject/body
+  // merge-tag editors with token chips, the shared operator sign-off, autosave,
+  // "Send myself a test", reset, and the floating Ask-AI assistant. The
+  // template is the letter on EVERY offtaker invoice email; a per-offtaker
+  // edited note still overrides it for that one send.
+  const ES = {
+    subject: "", body: "", signoff: "",
+    dirty: { subject: false, body: false, signoff: false },
+    saveT: null, prevT: null, chat: [], busy: false, target: "body",
+    fromEmail: "", sampleEmail: "",
+  };
+  const ES_TOKENS = ["{{greeting}}", "{{offtaker_first_name}}", "{{offtaker_name}}",
+                     "{{period}}", "{{kwh}}", "{{amount}}", "{{invoice_number}}",
+                     "{{attachments_line}}", "{{signoff}}"];
+  const ES_SIGNOFF_CHIPS = [
+    { label: "Just my name", value: "<p>Thank you,<br>{{tenant_name}}</p>" },
+    { label: "Name + email", value: "<p>Thank you,<br>{{tenant_name}}<br>{{tenant_email}}</p>" },
+  ];
+
+  async function esApi(path, opts) {
+    const r = await fetch(API + "/email-template" + (path || ""), Object.assign({
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+    }, opts || {}));
+    if (!r.ok) {
+      let msg = "Request failed";
+      try { msg = (await r.json()).detail || msg; } catch (_) { /* keep default */ }
+      throw new Error(msg);
+    }
+    return r.json();
+  }
+
+  function esStatus(txt, cls) {
+    const el = document.getElementById("esStatus");
+    if (el) { el.textContent = txt || ""; el.className = "rb-es-status" + (cls ? " " + cls : ""); }
+  }
+
+  async function openEmailStudio() {
+    let ov = document.getElementById("esOverlay");
+    if (!ov) { ov = esBuild(); document.body.appendChild(ov); }
+    ov.hidden = false;
+    document.body.style.overflow = "hidden";
+    esStatus("Loading…");
+    try {
+      const d = await esApi("");
+      ES.subject = d.subject_template || "";
+      ES.body = d.body_template || "";
+      ES.signoff = d.signoff || "";
+      ES.fromEmail = d.from_email || "";
+      ES.sampleEmail = d.sample_client_email || "";
+      ES.dirty = { subject: false, body: false, signoff: false };
+      ES.chat = [];
+      $("#esSubj").value = ES.subject;
+      $("#esBody").value = ES.body;
+      $("#esSignoff").value = ES.signoff;
+      $("#esPrevFrom").textContent = ES.fromEmail || "admin@solaroperator.org";
+      esStatus("Saved");
+      esRenderChat();
+      await esPreview();
+    } catch (e) {
+      esStatus("Couldn't load — " + e.message, "rb-es-err");
+    }
+  }
+
+  function esCloseStudio() {
+    esFlushSave();
+    const ov = document.getElementById("esOverlay");
+    if (ov) ov.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  async function esPreview() {
+    const stat = document.getElementById("esPrevStat");
+    if (stat) stat.hidden = false;
+    try {
+      const r = await esApi("/preview", { method: "POST", body: JSON.stringify({
+        subject_template: ES.subject || null,
+        body_template: ES.body || null,
+        signoff: ES.signoff || null,
+      })});
+      $("#esPrevSubj").textContent = r.subject_rendered || "(subject will appear here)";
+      $("#esPrevBody").innerHTML = r.body_rendered || "<p style='color:var(--faint)'>Preview will appear here.</p>";
+      $("#esPrevTo").textContent = (r.sample_client || "your offtaker")
+        + (ES.sampleEmail ? " <" + ES.sampleEmail + ">" : "");
+      $("#esSampleNote").textContent = r.sample_client
+        ? "Previewing with " + r.sample_client + "'s real figures — every offtaker gets their own."
+        : "";
+    } catch (e) {
+      esStatus("Preview failed — " + e.message, "rb-es-err");
+    } finally {
+      if (stat) stat.hidden = true;
+    }
+  }
+
+  function esSchedulePreview() {
+    clearTimeout(ES.prevT);
+    ES.prevT = setTimeout(() => { esPreview(); }, 300);
+  }
+
+  async function esDoSave() {
+    const dirty = Object.assign({}, ES.dirty);
+    if (!dirty.subject && !dirty.body && !dirty.signoff) return;
+    ES.dirty = { subject: false, body: false, signoff: false };
+    esStatus("Saving…");
+    try {
+      const jobs = [];
+      if (dirty.subject || dirty.body) {
+        jobs.push(esApi("", { method: "PUT", body: JSON.stringify({
+          subject_template: ES.subject, body_template: ES.body }) }));
+      }
+      if (dirty.signoff) {
+        jobs.push(esApi("/signoff", { method: "PUT",
+                                      body: JSON.stringify({ signoff: ES.signoff }) }));
+      }
+      await Promise.all(jobs);
+      esStatus("Saved");
+    } catch (e) {
+      ES.dirty.subject = ES.dirty.subject || dirty.subject;
+      ES.dirty.body = ES.dirty.body || dirty.body;
+      ES.dirty.signoff = ES.dirty.signoff || dirty.signoff;
+      esStatus("Couldn't save — " + e.message, "rb-es-err");
+    }
+  }
+
+  function esScheduleSave() {
+    clearTimeout(ES.saveT);
+    ES.saveT = setTimeout(esDoSave, 800);
+  }
+
+  function esFlushSave() {
+    clearTimeout(ES.saveT);
+    esDoSave();
+  }
+
+  function esInsertToken(tok) {
+    const el = ES.target === "subject" ? $("#esSubj") : $("#esBody");
+    if (!el) return;
+    const start = el.selectionStart != null ? el.selectionStart : el.value.length;
+    const end = el.selectionEnd != null ? el.selectionEnd : el.value.length;
+    el.value = el.value.slice(0, start) + tok + el.value.slice(end);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.focus();
+    try { el.setSelectionRange(start + tok.length, start + tok.length); } catch (_) { /* ok */ }
+  }
+
+  function esRenderChat() {
+    const box = document.getElementById("esChatMsgs");
+    if (!box) return;
+    box.innerHTML = ES.chat.length
+      ? ES.chat.map(m => `<div class="rb-es-msg ${m.role === "user" ? "rb-es-msg-me" : ""}">${esc(m.content)}</div>`).join("")
+      : `<p class="rb-es-chat-hint">Describe the change — “make it warmer”, “add a line about budget billing”, “shorter”. The AI rewrites the template; you review before it sends anywhere.</p>`;
+    if (ES.busy) box.innerHTML += `<div class="rb-es-msg">Drafting…</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function esChatSend() {
+    const input = document.getElementById("esChatInput");
+    const text = (input && input.value || "").trim();
+    if (!text || ES.busy) return;
+    input.value = "";
+    ES.chat.push({ role: "user", content: text });
+    ES.busy = true;
+    esRenderChat();
+    try {
+      const r = await esApi("/chat", { method: "POST", body: JSON.stringify({
+        messages: ES.chat, current_body: ES.body, current_subject: ES.subject }) });
+      ES.chat.push({ role: "assistant", content: r.assistant_reply || "Updated." });
+      if (r.proposed_body) { ES.body = r.proposed_body; $("#esBody").value = ES.body; ES.dirty.body = true; }
+      if (typeof r.proposed_subject === "string") { ES.subject = r.proposed_subject; $("#esSubj").value = ES.subject; ES.dirty.subject = true; }
+      esScheduleSave();
+      esSchedulePreview();
+    } catch (e) {
+      ES.chat.push({ role: "assistant", content: "That didn't work — " + e.message });
+    } finally {
+      ES.busy = false;
+      esRenderChat();
+    }
+  }
+
+  async function esTestSend(btn) {
+    btn.disabled = true;
+    const keep = btn.textContent;
+    btn.textContent = "Sending…";
+    try {
+      const r = await esApi("/test-send", { method: "POST", body: JSON.stringify({
+        subject_template: ES.subject || null, body_template: ES.body || null,
+        signoff: ES.signoff || null }) });
+      esStatus("Test sent to " + (r.sent_to || "you"));
+    } catch (e) {
+      esStatus("Test failed — " + e.message, "rb-es-err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = keep;
+    }
+  }
+
+  async function esReset(btn) {
+    btn.disabled = true;
+    try {
+      await esApi("/reset", { method: "POST", body: "{}" });
+      await openEmailStudio();   // reload defaults + preview
+      esStatus("Reset to the default template");
+    } catch (e) {
+      esStatus("Reset failed — " + e.message, "rb-es-err");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function esBuild() {
+    const ov = document.createElement("div");
+    ov.id = "esOverlay";
+    ov.className = "rb-es-overlay";
+    ov.innerHTML = `
+      <div class="rb-es-head">
+        <div>
+          <b>Customize offtaker email</b>
+          <span class="rb-es-sub">Applies to every offtaker invoice email — merge tags personalize each one. A per-offtaker edited note still overrides it.</span>
+        </div>
+        <span class="rb-es-status" id="esStatus">Saved</span>
+        <button type="button" class="rb-es-x" id="esClose" aria-label="Close email studio">✕</button>
+      </div>
+      <div class="rb-es-cols">
+        <div class="rb-es-left">
+          <div class="rb-es-prevlabel">LIVE PREVIEW <span id="esSampleNote"></span>
+            <span id="esPrevStat" hidden>rendering…</span></div>
+          <div class="rb-es-mail">
+            <div class="rb-es-mail-subj" id="esPrevSubj"></div>
+            <div class="rb-es-mail-env">
+              <div><span class="rb-es-envlab">FROM</span> <span id="esPrevFrom"></span> <span class="rb-es-envvia">via Array Operator</span></div>
+              <div><span class="rb-es-envlab">TO</span> <span id="esPrevTo"></span></div>
+            </div>
+            <div class="rb-es-mail-body" id="esPrevBody"></div>
+            <div class="rb-es-mail-att">📄 the offtaker's invoice PDF &nbsp;·&nbsp; 🧾 the GMP bill behind it — attached automatically, plus the figures table below the letter.</div>
+          </div>
+        </div>
+        <div class="rb-es-right">
+          <div class="rb-es-toklabel">Insert a merge tag into the <b id="esTokTarget">body</b> — click a field, then a chip</div>
+          <div class="rb-es-tokens">${ES_TOKENS.map(t => `<button type="button" class="rb-es-token" data-tok="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+          <label class="rb-es-lab">Subject line</label>
+          <input type="text" id="esSubj" class="rb-es-input" autocomplete="off" spellcheck="false">
+          <label class="rb-es-lab">Body (HTML)</label>
+          <textarea id="esBody" class="rb-es-ta" rows="9" spellcheck="false"></textarea>
+          <p class="rb-es-hint">{{greeting}} auto-picks “Hi Abigail,” for people and “Dear Hartland Feed &amp; Grain,” for organizations. {{attachments_line}} only ever claims files that really attach.</p>
+          <div class="rb-es-signoff">
+            <b>Sign-off</b>
+            <span class="rb-es-hint" style="margin:0">Shared with your NEPOOL report emails — one identity everywhere.</span>
+            <div class="rb-es-tokens">${ES_SIGNOFF_CHIPS.map(c => `<button type="button" class="rb-es-token" data-signoff="${esc(c.value)}">${esc(c.label)}</button>`).join("")}</div>
+            <textarea id="esSignoff" class="rb-es-ta" rows="3" spellcheck="false" placeholder="Paste your sign-off here…"></textarea>
+          </div>
+          <div class="rb-es-actions">
+            <button type="button" class="ao-btn rb-btn" id="esTest">Send myself a test</button>
+            <button type="button" class="rb-es-reset" id="esReset">Reset to default</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="rb-es-ai" id="esAiPill">✦ Ask AI</button>
+      <div class="rb-es-chat" id="esChatPanel" hidden>
+        <div class="rb-es-chat-head">AI assistant <button type="button" class="rb-es-x" id="esChatClose" aria-label="Close AI assistant">✕</button></div>
+        <div class="rb-es-chat-msgs" id="esChatMsgs"></div>
+        <div class="rb-es-chat-in">
+          <input type="text" id="esChatInput" placeholder="Make it warmer…" autocomplete="off">
+          <button type="button" class="ao-btn ao-btn-primary rb-btn" id="esChatSend">Send</button>
+        </div>
+      </div>`;
+
+    // ── wiring ──
+    ov.querySelector("#esClose").onclick = esCloseStudio;
+    ov.addEventListener("keydown", (e) => { if (e.key === "Escape") esCloseStudio(); });
+    const subj = ov.querySelector("#esSubj");
+    const bodyTa = ov.querySelector("#esBody");
+    const sign = ov.querySelector("#esSignoff");
+    subj.addEventListener("focus", () => { ES.target = "subject"; $("#esTokTarget").textContent = "subject"; });
+    bodyTa.addEventListener("focus", () => { ES.target = "body"; $("#esTokTarget").textContent = "body"; });
+    subj.addEventListener("input", () => { ES.subject = subj.value; ES.dirty.subject = true; esScheduleSave(); esSchedulePreview(); });
+    bodyTa.addEventListener("input", () => { ES.body = bodyTa.value; ES.dirty.body = true; esScheduleSave(); esSchedulePreview(); });
+    sign.addEventListener("input", () => { ES.signoff = sign.value; ES.dirty.signoff = true; esScheduleSave(); esSchedulePreview(); });
+    [subj, bodyTa, sign].forEach(el => el.addEventListener("blur", esFlushSave));
+    ov.querySelectorAll("[data-tok]").forEach(b => b.onclick = () => esInsertToken(b.getAttribute("data-tok")));
+    ov.querySelectorAll("[data-signoff]").forEach(b => b.onclick = () => {
+      sign.value = b.getAttribute("data-signoff");
+      sign.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    ov.querySelector("#esTest").onclick = (e) => esTestSend(e.currentTarget);
+    ov.querySelector("#esReset").onclick = (e) => esReset(e.currentTarget);
+    ov.querySelector("#esAiPill").onclick = () => {
+      const p = ov.querySelector("#esChatPanel");
+      p.hidden = !p.hidden;
+      if (!p.hidden) { esRenderChat(); ov.querySelector("#esChatInput").focus(); }
+    };
+    ov.querySelector("#esChatClose").onclick = () => { ov.querySelector("#esChatPanel").hidden = true; };
+    ov.querySelector("#esChatSend").onclick = esChatSend;
+    ov.querySelector("#esChatInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); esChatSend(); }
+    });
+    return ov;
   }
 
   // The draft envelope preview (renderDraftDoc) shows the email; with a null
@@ -1148,6 +1452,7 @@
                       title="Download all offtaker invoices this period as a Xero Sales-Invoice import CSV (uses the account code, if set).">⬇ Export to Xero</button>
               <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
             </div>
+            <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with — greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
             <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster — name, percent share, and (ideally) account number.">⬆ Bulk import</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
@@ -3963,14 +4268,20 @@
       const tag = () => wrap.querySelector(".rb-email-saved");
       const doSave = async () => {
         try {
+          const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+          // An UNTOUCHED default letter never persists as a per-draft note —
+          // saving it would freeze today's mass template onto this draft and
+          // detach it from future template edits. Empty note → the send keeps
+          // using the live template.
+          const untouched = d && d._defaultNote != null && ta.value === d._defaultNote;
+          const noteVal = untouched ? "" : ta.value;
           const r = await fetch(API + "/drafts/" + did, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ note: ta.value }),
+            body: JSON.stringify({ note: noteVal }),
           });
           const t = tag(); if (t) t.textContent = r.ok ? "✓ saved" : "couldn’t save";
-          const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
-          if (d) d.note = ta.value;
+          if (d) d.note = noteVal;
         } catch (_) { const t = tag(); if (t) t.textContent = "couldn’t save"; }
       };
       const queueSave = () => { const t = tag(); if (t) t.textContent = "saving…"; clearTimeout(saveT); saveT = setTimeout(doSave, 700); };
@@ -4317,7 +4628,7 @@
     const layout = pane.closest(".rb-layout");
     const card = layout && layout.querySelector(`.rb-draft[data-did="${d.id}"]`);
     const ta = card && card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
-    const note = ta ? ta.value : (d.note || defaultDraftNote(d));
+    const note = ta ? ta.value : (d.note || d.email_letter_default || defaultDraftNote(d));
     const autoCb = card && card.querySelector('input[data-dact="autogmp"]');
     const autoOn = autoCb ? autoCb.checked : (d.auto_attach_gmp !== false);
     const sumCb = card && card.querySelector('input[data-dact="summary"]');
@@ -4327,8 +4638,11 @@
     const kwh = d.customer_kwh != null ? fmt0(d.customer_kwh) + " kWh" : "—";
 
     // ── Envelope — faithful to the backend's _email_html (subject/from/to). ──
-    const subject = `Your solar credit invoice — ${d.customer_name || "your offtaker"}`
-      + (d.invoice_number ? ` (${d.invoice_number})` : "");
+    // The backend renders the subject from the tenant's mass template
+    // (email_subject_default); fall back to the default construction.
+    const subject = d.email_subject_default
+      || (`Your solar credit invoice — ${d.customer_name || "your offtaker"}`
+          + (d.invoice_number ? ` (${d.invoice_number})` : ""));
     const fromName = d.operator_name || "Your operator account";
     const toClient = !!(d.send_mode && d.send_mode !== "to_me");
     const toLine = toClient
@@ -4464,7 +4778,7 @@
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
     // Remember the auto-written note so a live recompute can re-sync it — but only
     // while the operator hasn't customized it (we compare against this snapshot).
-    d._defaultNote = defaultDraftNote(d);
+    d._defaultNote = d.email_letter_default || defaultDraftNote(d);
     const auto = d.auto_attach_gmp !== false;   // ON by default
     const sumOn = d.include_summary === true;    // OFF by default — AO summary is opt-in (Ford)
     // Honest auto-attach status line (never implies a PDF exists when it doesn't).
@@ -4510,7 +4824,7 @@
       <div class="rb-draft-email">
         <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
         <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="6"
-          placeholder="Write the note your offtaker sees…">${esc(d.note || defaultDraftNote(d))}</textarea>
+          placeholder="Write the note your offtaker sees…">${esc(d.note || d.email_letter_default || defaultDraftNote(d))}</textarea>
         <span class="rb-draft-msg-hint">Saves automatically as you type. The invoice${d.has_gmp_pdf ? " + GMP bill are" : " is"} attached for you.</span>
       </div>`;
     // The per-offtaker template box (#rbTpl) is folded into .rb-tpl-slot by foldTplIntoInbox.
@@ -5166,7 +5480,7 @@
       // the default (never clobber an email the operator has edited).
       const ta = card.querySelector(`textarea[data-draftmsg="${d.id}"]`);
       if (ta && d._defaultNote != null && ta.value === d._defaultNote) {
-        const nn = defaultDraftNote(d);
+        const nn = d.email_letter_default || defaultDraftNote(d);
         ta.value = nn; d._defaultNote = nn;
         autoGrowMsg(ta);                              // re-fit after the note grows/shrinks
       }
@@ -5234,10 +5548,12 @@
       setSt("rb-status rb-busy", "Sending a test to you…");
       try {
         if (ta) {
+          const dd = INBOX_DRAFTS.find(x => String(x.id) === String(id));
+          const untouched = dd && dd._defaultNote != null && ta.value === dd._defaultNote;
           await fetch(API + "/drafts/" + id, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ note: ta.value }),
+            body: JSON.stringify({ note: untouched ? "" : ta.value }),
           });
         }
         const r = await fetch(API + "/drafts/" + id + "/test", { method: "POST", headers: authHeaders() });
@@ -5314,7 +5630,9 @@
     }
     if (act === "savemsg") {
       const ta = card.querySelector(`textarea[data-draftmsg="${id}"]`);
-      const note = ta ? ta.value : "";
+      const _dd = INBOX_DRAFTS.find(x => String(x.id) === String(id));
+      const _untouched = _dd && _dd._defaultNote != null && ta && ta.value === _dd._defaultNote;
+      const note = ta ? (_untouched ? "" : ta.value) : "";
       setSt("rb-status rb-busy", "Saving email…");
       try {
         const r = await fetch(API + "/drafts/" + id, {
