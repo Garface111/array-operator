@@ -23,6 +23,9 @@
   const money = n => n == null ? "—"
     : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmt0 = n => n == null ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  // Whole-dollar money for the GMP $25-per-error stakes ($25 / $1,675 — never $25.00).
+  const money0 = n => n == null ? "—"
+    : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function authHeaders() { const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
@@ -116,11 +119,13 @@
     if (!al || !al.status) return "";
     const note = al.note ? `<div class="rb-bac-note">${esc(al.note)}</div>` : "";
     if (al.status === "mismatch") {
-      const dollars = al.delta_dollars != null ? money(Math.abs(al.delta_dollars)) : null;
+      // The stake is GMP's $25 billing-error credit — the kWh-delta dollars
+      // (often cents) live in the note as the size of the mis-allocation.
+      const stake = money0(al.at_stake_usd != null ? al.at_stake_usd : 25);
       return `<div class="rb-bac-block rb-bac-flag">
           <div class="rb-bac-blabel">
             <span class="rb-bac-flagicon" aria-hidden="true">⚑</span>GMP allocation cross-check
-            ${dollars ? `<span class="rb-bac-atstake">≈ ${dollars} at stake</span>` : ""}
+            <span class="rb-bac-atstake" title="GMP credits $25 per billing error they made — a confirmed catch is worth ${esc(stake)}.">${stake} at stake</span>
           </div>
           <div class="rb-bac-figs">
             <div class="rb-bac-fig"><b>${fmt0(al.offtaker_credited_kwh)}</b><span>GMP credited this offtaker</span></div>
@@ -172,8 +177,8 @@
     const row = reconFor(subId);
     if (!row) return "";
     if (row.allocation && row.allocation.status === "mismatch") {
-      const d = row.allocation.delta_dollars;
-      return d != null ? "⚑ allocation off by ≈ " + money(Math.abs(d)) : "⚑ allocation mismatch";
+      const s = row.allocation.at_stake_usd != null ? row.allocation.at_stake_usd : 25;
+      return "⚑ allocation mismatch — " + money0(s) + " at stake";
     }
     const arrMis = (row.arrays || []).some(a => a.status === "mismatch");
     if (arrMis) return "⚑ differs from the GMP bill";
@@ -204,7 +209,10 @@
     if (!RECON) return "";                       // check hasn't run yet — show nothing
     const allocN = RECON.allocation_flagged || 0;
     const arrN = reconArrayMismatchCount();
-    const dollars = RECON.allocation_dollars_flagged || 0;
+    // The stake is GMP's $25 billing-error credit per catch — NOT the kWh-delta
+    // dollars (that's just the mis-allocation's size, often cents).
+    const atStake = RECON.allocation_at_stake_usd != null
+      ? RECON.allocation_at_stake_usd : allocN * 25;
     const flaggedSubs = new Set();
     let unverifiedSubs = 0;
     (RECON.subscriptions || []).forEach(r => {
@@ -225,12 +233,28 @@
       }
       return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill — everything reconciles.">✓ Utility bills reconcile</span>`;
     }
-    const dTxt = dollars > 0 ? " · " + money(dollars) : "";
+    const dTxt = atStake > 0 ? ` · ≈ ${money0(atStake)} at stake` : "";
     const label = `⚑ ${n} bill${n === 1 ? "" : "s"} to review — doesn't match GMP${dTxt}`;
     const tip = allocN
-      ? `The utility bill doesn't match our numbers for ${n} offtaker${n === 1 ? "" : "s"}: ${allocN} GMP allocation error${allocN === 1 ? "" : "s"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""}. Click to review.`
-      : `Measured production differs from the GMP bill for ${arrN} offtaker${arrN === 1 ? "" : "s"} — a possible billing error. Click to review.`;
+      ? `The utility bill doesn't match our numbers for ${n} offtaker${n === 1 ? "" : "s"}: ${allocN} GMP allocation error${allocN === 1 ? "" : "s"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""}. GMP credits $25 per billing error they made — that's ${money0(atStake)} across these catches. Click to open the Bill audit.`
+      : `Measured production differs from the GMP bill for ${arrN} offtaker${arrN === 1 ? "" : "s"} — a possible billing error. Click to open the Bill audit.`;
     return `<span class="rb-bac-chip" id="rbBacChip" role="button" tabindex="0" title="${esc(tip)}">${label}</span>`;
+  }
+  // Flip the generator to the Bill-audit tab (the flagged chip's destination —
+  // that's where the catches live, organized the way GMP allocates them).
+  function openAuditTab() {
+    const btn = document.querySelector('#rbGenTabs [data-gentab="audit"]');
+    if (btn) { btn.click(); return true; }
+    return false;
+  }
+  // The little flagged-count badge on the "Bill audit" tab label itself —
+  // visible before the tab is ever opened (populated when RECON lands).
+  function updateAuditTabBadge() {
+    const b = document.getElementById("rbAuditTabBadge");
+    if (!b) return;
+    const n = (RECON && RECON.allocation_flagged) || 0;
+    b.hidden = !n;
+    if (n) b.textContent = "⚑ " + n;
   }
   // Re-render the summary chip in place (after the reconcile data lands post-paint).
   function refreshBacSummary() {
@@ -238,11 +262,16 @@
     if (!host) return;
     host.innerHTML = bacSummaryHTML();
     wireBacChip(host);
+    updateAuditTabBadge();
   }
   function wireBacChip(host) {
     const chip = host && host.querySelector("#rbBacChip");
+    updateAuditTabBadge();
     if (!chip) return;
     const jump = () => {
+      // The Bill-audit tab IS the review surface for these catches (Ford,
+      // 2026-07-03) — fall back to the first flagged card if the tab's absent.
+      if (openAuditTab()) return;
       const sid = firstFlaggedSub();
       if (sid == null) return;
       expandAccordion(String(sid));
@@ -298,7 +327,8 @@
     if (o.status === "mismatch") {
       const dk = o.delta_kwh;
       const deltaTxt = dk != null ? (dk > 0 ? "+" : "") + fmt0(dk) + " kWh" : "—";
-      const dollars = o.delta_dollars != null ? money(Math.abs(o.delta_dollars)) : null;
+      // Stake = GMP's $25 billing-error credit (the kWh-delta $ lives in the note).
+      const stake = money0(o.at_stake_usd != null ? o.at_stake_usd : 25);
       return `<div class="rb-au-off rb-au-flag">
           <div class="rb-au-off-top">
             <span class="rb-au-off-name"><span class="rb-au-flagicon" aria-hidden="true">⚑</span>${esc(o.customer_name || "(unnamed offtaker)")}</span>
@@ -308,7 +338,7 @@
             <span class="rb-au-fig"><b>${credited}</b><small>GMP credited</small></span>
             <span class="rb-au-fig"><b>${should}</b><small>should be</small></span>
             <span class="rb-au-fig rb-au-fig-delta"><b>${esc(deltaTxt)}</b><small>Δ vs the math</small></span>
-            ${dollars ? `<span class="rb-au-atstake">≈ ${dollars} at stake</span>` : ""}
+            <span class="rb-au-atstake" title="GMP credits $25 per billing error they made — a confirmed catch is worth ${esc(stake)}.">${stake} at stake</span>
           </div>
           ${o.note ? `<div class="rb-au-note">${esc(o.note)}</div>` : ""}
         </div>`;
@@ -378,14 +408,19 @@
     }
     const active = utilities.find(u => u.provider === AUDIT_PROVIDER) || utilities[0];
 
-    // Summary line from the tenant totals.
+    // Summary line from the tenant totals. The headline $ is the SUM of GMP's
+    // $25 billing-error credits across every flagged bill (Ford: "at the top,
+    // add up all of that so you can see how much is at stake").
     const t = AUDIT.totals || {};
-    const dTxt = t.dollars_flagged ? " · " + money(t.dollars_flagged) : "";
+    const atStake = t.at_stake_usd != null ? t.at_stake_usd : (t.flagged || 0) * 25;
+    const dTxt = t.flagged
+      ? ` · ≈ ${money0(atStake)} at stake <small class="rb-au-sum-why">GMP credits $25 per billing error</small>`
+      : "";
     const flagClass = t.flagged ? "rb-au-sum-flag" : "";
     const summary = `<div class="rb-au-summary ${flagClass}">
         <b>${fmt0(t.arrays || 0)}</b> array${(t.arrays === 1) ? "" : "s"} ·
         <b>${fmt0(t.offtakers || 0)}</b> offtaker${(t.offtakers === 1) ? "" : "s"} ·
-        <span class="rb-au-sum-flagged">${t.flagged ? "⚑ " : "✓ "}<b>${fmt0(t.flagged || 0)}</b> flagged${esc(dTxt)}</span>
+        <span class="rb-au-sum-flagged">${t.flagged ? "⚑ " : "✓ "}<b>${fmt0(t.flagged || 0)}</b> flagged${dTxt}</span>
       </div>`;
 
     // Per-utility sub-tabs (GMP / VEC / …), each with its own flagged count.
@@ -1434,7 +1469,7 @@
            fleet the way GMP allocates it, catch GMP's per-offtaker math errors). -->
       <div class="rb-subtabs rb-subtabs-bare" role="tablist" id="rbGenTabs">
         <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
-        <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit</button>
+        <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
       </div>
       <div id="rbAuditView" class="rb-au" style="display:none"></div>
       <div id="rbGenList">
