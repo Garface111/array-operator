@@ -3209,10 +3209,23 @@
     if (!rows || rows.length <= 5) return null;
     const acctById = {};
     (utilAccts || []).forEach(a => { if (a.utility_account_id != null) acctById[String(a.utility_account_id)] = a; });
+    // Anna-shape fleets: when (nearly) every offtaker bills off their OWN meter,
+    // the utility-account level is 1:1 with offtakers — at 800 offtakers that's
+    // 800 single-card wrapper groups burying the real structure. Group by ARRAY
+    // (the community project) instead, and sum array_share_pct so the pill
+    // answers the question that actually matters there: "is this array fully
+    // allocated?" (allocation_pct is 1.0 of each OWN bill — summing it is
+    // meaningless in this shape).
+    const bound = rows.filter(s => s.utility_account_id != null);
+    const distinctOwn = new Set(bound.map(s => String(s.utility_account_id))).size;
+    const arrayMode = bound.length > 20
+      && distinctOwn / bound.length > 0.9
+      && rows.filter(s => s.array_id != null).length / rows.length > 0.9;
     const groups = {};
     const order = [];
     rows.forEach(s => {
-      const key = s.utility_account_id != null ? "u:" + s.utility_account_id
+      const key = (arrayMode && s.array_id != null) ? "a:" + s.array_id
+        : s.utility_account_id != null ? "u:" + s.utility_account_id
         : s.array_id != null ? "a:" + s.array_id
         : "u:none";
       if (!groups[key]) {
@@ -3220,16 +3233,22 @@
         // provider drives the TOP grouping level (GMP / VEC / WEC …); the account
         // label drops the provider prefix now that it sits UNDER a provider header.
         const provider = (acct && acct.provider) ? String(acct.provider).toLowerCase() : "";
-        const label = acct
-          ? (acct.nickname || acct.account_number || String(s.utility_account_id))
-          : (s.utility_account_name || ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name || "Ungrouped");
+        const arrName = ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name;
+        const label = (arrayMode && key.startsWith("a:") && arrName)
+          ? arrName
+          : acct
+            ? (acct.nickname || acct.account_number || String(s.utility_account_id))
+            : (s.utility_account_name || arrName || "Ungrouped");
         groups[key] = { key, provider, providerLabel: provider ? provider.toUpperCase() : "Other",
-                        label, pctSum: 0, hasDraft: false, rows: [] };
+                        label, pctSum: 0, hasDraft: false, rows: [],
+                        shareMode: (arrayMode && key.startsWith("a:")) ? "array" : "meter" };
         order.push(key);
       }
       const g = groups[key];
       g.rows.push(s);
-      g.pctSum += Number(s.allocation_pct) || 0;
+      g.pctSum += Number(g.shareMode === "array"
+        ? (s.array_share_pct != null ? s.array_share_pct : s.allocation_pct)
+        : s.allocation_pct) || 0;
       if (DRAFT_BY_SUB[String(s.id)]) g.hasDraft = true;
     });
     const list = order.map(k => groups[k]);
@@ -3297,18 +3316,25 @@
       label = `ⓘ ${pct}% allocated`;
       hint = `${unassigned}% of this meter's excess is unassigned — fine if that's intended, or add/raise a share to reach 100%.`;
     }
-    // Breakdown rows — each offtaker's share, biggest first so the math reads top-down.
+    // Breakdown rows — each offtaker's share, biggest first so the math reads
+    // top-down. Array-grouped fleets (own-meter shape) show array_share_pct —
+    // the share of the ARRAY's excess — not the 1.0-of-own-bill multiplier.
+    const rowPct = (s) => group.shareMode === "array"
+      ? (s.array_share_pct != null ? s.array_share_pct : s.allocation_pct)
+      : s.allocation_pct;
     const rows = (group.rows || []).slice().sort((a, b) =>
-      (Number(b.allocation_pct) || 0) - (Number(a.allocation_pct) || 0));
+      (Number(rowPct(b)) || 0) - (Number(rowPct(a)) || 0));
     const rowHtml = rows.map(s => {
-      const p = s.allocation_pct != null ? Math.round(s.allocation_pct * 1000) / 10 : 0;
+      const rp = rowPct(s);
+      const p = rp != null ? Math.round(rp * 1000) / 10 : 0;
       return `<span class="rb-grp-pop-row"><span class="rb-grp-pop-who">${esc(s.customer_name || "(unnamed)")}</span><span class="rb-grp-pop-pct">${p}%</span></span>`;
     }).join("");
     const sumCls = over ? "rb-grp-pop-sum-warn" : "rb-grp-pop-sum-ok";
+    const where = group.shareMode === "array" ? "in this array" : "on this utility bill";
     return `<span class="rb-grp-pctwrap">
       <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
       <span class="rb-grp-pct-pop" role="tooltip">
-        <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} on this utility bill</span>
+        <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} ${where}</span>
         ${rowHtml}
         <span class="rb-grp-pop-row rb-grp-pop-sum ${sumCls}"><span class="rb-grp-pop-who">Total allocated</span><span class="rb-grp-pop-pct">${pct}%</span></span>
         ${hint ? `<span class="rb-grp-pop-note">${esc(hint)}</span>` : ""}
@@ -3401,7 +3427,7 @@
       return `
         <div class="rb-grp${collapsed ? " collapsed" : ""}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
-               aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers on this utility bill">
+               aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers ${g.shareMode === "array" ? "in this array" : "on this utility bill"}">
             <span class="rb-grp-caret" aria-hidden="true">▾</span>
             <span class="rb-grp-label">${esc(g.label)}</span>
             <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
