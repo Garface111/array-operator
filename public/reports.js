@@ -1741,17 +1741,19 @@
     } catch (e) { return []; }
   }
 
-  // GMP expected-rate cross-check (Piece 4). Given a commission year, ask the
-  // backend what GMP's published schedule says the rate should be THIS month, so
-  // the operator can sanity-check the billing rate. Reference only — never
-  // overrides the bill's own billed rate. Returns null on any failure (fail-soft).
-  async function fetchExpectedGmpRate(commissionYear) {
+  // GMP expected-rate cross-check (Piece 4). Given the array's commissioning
+  // DATE (YYYY-MM-DD — day-accurate at the 11-year Rate #1 → Blended boundary,
+  // Bruce's C4 ask), ask the backend what GMP's published schedule says the rate
+  // should be THIS month, so the operator can sanity-check the billing rate.
+  // Reference only — never overrides the bill's own billed rate. Returns null on
+  // any failure (fail-soft).
+  async function fetchExpectedGmpRate(commissionDate) {
     if (!authHeaders()) return null;
     const now = new Date();
     const qs = new URLSearchParams({
       year: String(now.getFullYear()),
       month: String(now.getMonth() + 1),
-      commission_year: String(commissionYear),
+      commission_date: String(commissionDate),
     });
     try {
       const r = await fetch(API + "/gmp-expected-rate?" + qs.toString(), { headers: authHeaders() });
@@ -1768,25 +1770,50 @@
     const total = Number(rate.rate_plus_adder);
     const regime = rate.regime_label || rate.regime || "GMP";
     const adderTxt = adder ? ` +$${adder.toFixed(4)} adder` : "";
+    // Day-accurate 11-year boundary, made visible: when the switch date is known
+    // the operator sees exactly when Rate #1 ends — an array near the mark can't
+    // be silently misread (Bruce: GMP itself has called an array 11 two years early).
+    let boundary = "";
+    if (rate.blended_from) {
+      const bf = docDate(rate.blended_from);
+      boundary = rate.regime === "blended"
+        ? ` · Blended since <b>${esc(bf)}</b>`
+        : ` · Rate #1 until <b>${esc(bf)}</b>`;
+      if (rate.regime_flips_within_month) boundary += " (crosses 11 years this month)";
+      if (rate.year_only_assumed_jan1) boundary += " (from a year-only value — assumed Jan 1; set the exact date to pin the boundary)";
+    }
     const clamped = rate.clamped ? " · <b>schedule clamped</b> (year outside the published range — nearest year used)" : "";
-    return `Expected GMP rate: <b>$${total.toFixed(4)}/kWh</b> ($${base.toFixed(4)} ${esc(regime)}${adderTxt}). Reference only — the invoice always uses the bill's own credit rate.${clamped}`;
+    return `Expected GMP rate: <b>$${total.toFixed(4)}/kWh</b> ($${base.toFixed(4)} ${esc(regime)}${adderTxt})${boundary}. Reference only — the invoice always uses the bill's own credit rate.${clamped}`;
   }
 
-  // Wire a commission-year input to a hint element: on change, look up the expected
-  // GMP rate and render it inline (debounced). `defaultText` is restored when blank.
-  function wireCommissionYearHint(inputEl, hintEl, defaultText) {
+  // Today as a local YYYY-MM-DD (for <input type="date"> max= and validation).
+  function todayISO() {
+    const n = new Date();
+    return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0");
+  }
+
+  // A commissioning date is valid when it parses as YYYY-MM-DD and lands in
+  // 1990-01-01..today (native date inputs already emit this shape or "").
+  function isValidCommissioningDate(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+    const d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return false;
+    return iso >= "1990-01-01" && iso <= todayISO();
+  }
+
+  // Wire a commissioning-date input (native <input type="date">) to a hint
+  // element: on change, look up the expected GMP rate for that exact date and
+  // render it inline (debounced). `defaultText` is restored when blank/invalid.
+  function wireCommissioningDateHint(inputEl, hintEl, defaultText) {
     if (!inputEl || !hintEl) return;
     let timer = null;
     const run = () => {
       const raw = inputEl.value.trim();
-      if (raw === "") { hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); return; }
-      const yr = Number(raw);
-      const yrNow = new Date().getFullYear();
-      if (isNaN(yr) || !Number.isInteger(yr) || yr < 1990 || yr > yrNow) {
+      if (!isValidCommissioningDate(raw)) {
         hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); return;
       }
       hintEl.textContent = "Checking GMP schedule…"; hintEl.classList.add("rb-rate-hint-on");
-      fetchExpectedGmpRate(yr).then(rate => {
+      fetchExpectedGmpRate(raw).then(rate => {
         const html = expectedRateHintHTML(rate);
         if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
         else { hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); }
@@ -1975,9 +2002,9 @@
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
             <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
               <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
-            <label class="rep-fld"><span class="rl">Commission year</span>
-              <input type="number" id="rbmCommYear" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
-              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
+            <label class="rep-fld"><span class="rl">Commissioning Date</span>
+              <input type="date" id="rbmCommDate" min="1990-01-01" max="${todayISO()}">
+              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
@@ -2061,9 +2088,20 @@
         if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
       }));
       $("#rbmSave").onclick = saveManual;
-      // Commission year → live expected-GMP-rate helper next to the rate fields.
-      wireCommissionYearHint($("#rbmCommYear"), $("#rbmRateHint"),
-        "The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).");
+      // Commissioning date → live expected-GMP-rate helper next to the rate fields.
+      const commDefHint = "The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
+      wireCommissioningDateHint($("#rbmCommDate"), $("#rbmRateHint"), commDefHint);
+      // When an array is picked, surface its SAVED commissioning date (if any) so
+      // the operator sees — and can correct — exactly what the rate helper uses.
+      // A hand-typed date survives array switches; prefill never clobbers it.
+      const commArrSel = $("#rbmArray"), commDateEl = $("#rbmCommDate");
+      if (commArrSel && commDateEl) {
+        commDateEl.addEventListener("input", () => { commDateEl.dataset.userEdited = "1"; });
+        commArrSel.addEventListener("change", () => {
+          if (commDateEl.dataset.userEdited) return;
+          prefillCommissioningDate(commArrSel.value, commDateEl, $("#rbmRateHint"), commDefHint, true);
+        });
+      }
       // Array-FIRST flow: the operator picks the ARRAY, and we resolve which
       // utility bill it invoices from. The utility <select> is now an OVERRIDE,
       // shown only when the chosen array has more than one connected bill.
@@ -2090,7 +2128,7 @@
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
     const sharePctRaw = $("#rbmSharePct") ? $("#rbmSharePct").value.trim() : "";
     const invStartRaw = $("#rbmInvStart") ? $("#rbmInvStart").value.trim() : "";
-    const commYearRaw = $("#rbmCommYear") ? $("#rbmCommYear").value.trim() : "";
+    const commDateRaw = $("#rbmCommDate") ? $("#rbmCommDate").value.trim() : "";
     // The "Send to" slider was removed — offtaker invoices go to the offtaker and
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
@@ -2145,13 +2183,12 @@
         st.className = "rb-status rb-err"; st.textContent = "Starting invoice # must be a whole number 0–9999999, or blank."; return;
       }
     }
-    let commYearNum = null;
-    if (commYearRaw !== "") {
-      commYearNum = Number(commYearRaw);
-      const yrNow = new Date().getFullYear();
-      if (isNaN(commYearNum) || !Number.isInteger(commYearNum) || commYearNum < 1990 || commYearNum > yrNow) {
-        st.className = "rb-status rb-err"; st.textContent = `Commission year must be between 1990 and ${yrNow}, or blank.`; return;
+    let commDateVal = null;
+    if (commDateRaw !== "") {
+      if (!isValidCommissioningDate(commDateRaw)) {
+        st.className = "rb-status rb-err"; st.textContent = "Commissioning date must be between Jan 1, 1990 and today, or blank."; return;
       }
+      commDateVal = commDateRaw;
     }
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
       st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
@@ -2179,16 +2216,18 @@
         st.textContent = (data && data.detail) ? data.detail : "Couldn't add (HTTP " + r.status + ").";
         return;
       }
-      // Commission year sets the array's in-service date (feeds the GMP rate regime).
-      // Best-effort: the offtaker is already created; a failure here shouldn't block it.
+      // The commissioning date sets the array's in-service date (feeds the GMP
+      // rate regime, day-accurate at the 11-year boundary). Best-effort: the
+      // offtaker is already created; a failure here shouldn't block it.
       const newArrayId = (data.subscription && data.subscription.array_id) || arrayId;
-      if (commYearNum !== null && newArrayId != null) {
+      if (commDateVal !== null && newArrayId != null) {
         try {
           await fetch(API + "/arrays/" + newArrayId, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ install_year: commYearNum }),
+            body: JSON.stringify({ first_connect_date: commDateVal }),
           });
+          _SETUP_ARRAYS = null;   // the accordion prefill cache is now stale
         } catch (e) { /* non-fatal — offtaker was created */ }
       }
       MANUAL_OPEN = false;
@@ -4655,7 +4694,7 @@
     const sm = d.send_mode || "to_me";
     // The subscription record carries the cross-check share + invoice seed + array id
     // (the draft `d` may not). Look it up from the canonical offtaker list so the edit
-    // fields pre-fill. Commission year lives on the array (fetched lazily on wire).
+    // fields pre-fill. The commissioning date lives on the array (fetched lazily on wire).
     const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
     const sharePct = subRec.array_share_pct != null ? (subRec.array_share_pct * 100).toFixed(3) : "";
     const invStart = subRec.invoice_number_start != null ? subRec.invoice_number_start : "";
@@ -4715,9 +4754,9 @@
           <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
             <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
           ${editArrayId !== "" ? `
-          <label class="rep-fld"><span class="rl">Commission year</span>
-            <input type="number" class="rb-of-commyear" data-commyear-arr="${editArrayId}" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
-            <span class="rb-fld-hint rb-of-ratehint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
+          <label class="rep-fld"><span class="rl">Commissioning Date</span>
+            <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
+            <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
               <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
             <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.001" value="${sharePct}" placeholder="blank = same as billing share">
@@ -4983,31 +5022,31 @@
         inp.addEventListener("input", h);
         inp.addEventListener("change", h);
       });
-      // Commission year is NOT a subscription field — it lives on the ARRAY and
-      // PATCHes /arrays/{id}. Wire it specially: pre-fill from the array's current
-      // setup, save the in-service year on change, and show the expected GMP rate.
-      const commEl = box.querySelector(".rb-of-commyear");
+      // The commissioning date is NOT a subscription field — it lives on the ARRAY
+      // and PATCHes /arrays/{id}. Wire it specially: pre-fill from the array's
+      // current setup, save the in-service DATE on change (day-accurate — it sets
+      // the 11-year Rate #1 → Blended boundary), and show the expected GMP rate.
+      const commEl = box.querySelector(".rb-of-commdate");
       if (commEl) {
-        const arrId = commEl.getAttribute("data-commyear-arr");
+        const arrId = commEl.getAttribute("data-commdate-arr");
         const hintEl = box.querySelector(".rb-of-ratehint");
-        const defHint = "The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
-        // Pre-fill the current commission year from the array setup (best-effort).
-        prefillCommissionYear(arrId, commEl, hintEl, defHint);
-        // Persist on change (debounced) to PATCH /arrays/{id} via install_year.
-        wireCommissionYearHint(commEl, hintEl, defHint);
+        const defHint = "The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
+        // Pre-fill the current commissioning date from the array setup (best-effort).
+        prefillCommissioningDate(arrId, commEl, hintEl, defHint);
+        // Persist on change (debounced) to PATCH /arrays/{id} via first_connect_date.
+        wireCommissioningDateHint(commEl, hintEl, defHint);
         let saveTimer = null;
-        const saveYear = () => {
+        const saveDate = () => {
           const raw = commEl.value.trim();
           if (raw === "") return;                    // don't clear the array's date on blank
-          const yr = Number(raw), yrNow = new Date().getFullYear();
-          if (isNaN(yr) || !Number.isInteger(yr) || yr < 1990 || yr > yrNow) return;
+          if (!isValidCommissioningDate(raw)) return;
           fetch(API + "/arrays/" + arrId, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ install_year: yr }),
+            body: JSON.stringify({ first_connect_date: raw }),
           }).then(() => { _SETUP_ARRAYS = null; }).catch(() => {});
         };
-        commEl.addEventListener("change", () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveYear, 500); });
+        commEl.addEventListener("change", () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveDate, 500); });
       }
       // The labeled "Delete offtaker" button lives inside the editor (rendered into the
       // expanded body, so the list-level [data-del-offtaker] wiring never sees it).
@@ -5016,11 +5055,16 @@
     });
   }
 
-  // Pre-fill the commission-year edit input from the array's current setup, and if a
-  // year is known, immediately render its expected GMP rate. Uses /setup-state (which
-  // lists arrays with their first_connect_date/install_year). Best-effort, fail-soft.
+  // Pre-fill a commissioning-date input from the array's current setup, and if a
+  // date is known, immediately render its expected GMP rate. Uses /setup-state
+  // (which lists arrays with their first_connect_date). Legacy year-only values
+  // were stored as Jan 1 of that year, so they show as YYYY-01-01 — consistent
+  // with the backend's year→Jan-1 boundary reading. `overwrite` repaints the
+  // field even when it already holds a value (used when the picked array CHANGES
+  // in the add-offtaker form); default only fills an empty field. Best-effort,
+  // fail-soft.
   let _SETUP_ARRAYS = null;
-  async function prefillCommissionYear(arrId, inputEl, hintEl, defHint) {
+  async function prefillCommissioningDate(arrId, inputEl, hintEl, defHint, overwrite) {
     if (!authHeaders() || !inputEl) return;
     try {
       if (_SETUP_ARRAYS == null) {
@@ -5029,13 +5073,20 @@
         _SETUP_ARRAYS = (j && j.arrays) || [];
       }
       const a = _SETUP_ARRAYS.find(x => String(x.array_id) === String(arrId));
-      if (a && a.install_year && inputEl.value.trim() === "") {
-        inputEl.value = a.install_year;
-        if (hintEl) {
-          const rate = await fetchExpectedGmpRate(a.install_year);
-          const html = expectedRateHintHTML(rate);
-          if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
+      const fc = a && a.first_connect_date ? String(a.first_connect_date).slice(0, 10) : "";
+      if (!overwrite && inputEl.value.trim() !== "") return;
+      if (!fc) {
+        if (overwrite) {          // switching to an array with no saved date: don't
+          inputEl.value = "";     // let the previous array's date linger and PATCH
+          if (hintEl) { hintEl.innerHTML = defHint; hintEl.classList.remove("rb-rate-hint-on"); }
         }
+        return;
+      }
+      inputEl.value = fc;
+      if (hintEl) {
+        const rate = await fetchExpectedGmpRate(fc);
+        const html = expectedRateHintHTML(rate);
+        if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
       }
     } catch (e) { /* leave blank */ }
   }
