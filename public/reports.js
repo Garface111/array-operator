@@ -1113,6 +1113,10 @@
     if (!ov) { ov = esBuild(); document.body.appendChild(ov); }
     ov.hidden = false;
     document.body.style.overflow = "hidden";
+    // A pending autosave/preview timer from a previous state must never fire
+    // across a (re)load — it would re-save stale content over fresh state.
+    clearTimeout(ES.saveT); clearTimeout(ES.prevT);
+    ES.dirty = { subject: false, body: false, signoff: false };
     esStatus("Loading…");
     try {
       const d = await esApi("");
@@ -1197,6 +1201,7 @@
 
   function esScheduleSave() {
     clearTimeout(ES.saveT);
+    esStatus("Saving…");   // honest immediately — "Saved" only after the PUT lands
     ES.saveT = setTimeout(esDoSave, 800);
   }
 
@@ -1269,6 +1274,10 @@
 
   async function esReset(btn) {
     btn.disabled = true;
+    // Kill any in-flight autosave FIRST — a pending timer firing after the
+    // reset would re-save the pre-reset body as a "custom" template.
+    clearTimeout(ES.saveT); clearTimeout(ES.prevT);
+    ES.dirty = { subject: false, body: false, signoff: false };
     try {
       await esApi("/reset", { method: "POST", body: "{}" });
       await openEmailStudio();   // reload defaults + preview
