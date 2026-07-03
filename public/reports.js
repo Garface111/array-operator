@@ -3419,11 +3419,14 @@
     // both DEFAULT collapsed, so a fresh load of a big account shows just the provider
     // headers (GMP / VEC / WEC). Each utility-account header still carries the "do these
     // shares add up to 100%" pill with its hover breakdown.
-    const groups = groupOfftakersByUtility(viewRows, utilAccts);
+    // An active SEARCH renders its matches FLAT — regrouping 12 matches under
+    // wrapper headers (with pills computed off the filtered subset) is noise;
+    // the operator asked for specific offtakers, show exactly those cards.
+    const groups = q ? null : groupOfftakersByUtility(viewRows, utilAccts);
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;   // default collapsed
-      const collapsed = q ? false : !!GROUP_COLLAPSED[g.key];   // a search opens its matches
+      const collapsed = !!GROUP_COLLAPSED[g.key];
       return `
         <div class="rb-grp${collapsed ? " collapsed" : ""}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
@@ -3443,15 +3446,20 @@
       const providers = groupByProvider(groups);
       body = providers.map(pv => {
         if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = true;   // default collapsed
-        const pCollapsed = q ? false : !!PROVIDER_COLLAPSED[pv.key];   // a search opens its matches
+        const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
         const nAcct = pv.groups.length;
+        // Array-grouped fleets (own-meter shape): the middle level is arrays,
+        // not utility accounts — say so.
+        const grpNoun = pv.groups.length && pv.groups.every(g => g.shareMode === "array")
+          ? `array${nAcct === 1 ? "" : "s"}`
+          : `utility account${nAcct === 1 ? "" : "s"}`;
         return `
           <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
             <div class="rb-prov-head" data-provcollapse="${esc(pv.key)}" role="button" tabindex="0"
                  aria-expanded="${!pCollapsed}" title="${pCollapsed ? "Expand" : "Collapse"} all ${esc(pv.providerLabel)} utility accounts">
               <span class="rb-prov-caret" aria-hidden="true">▾</span>
               <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
-              <span class="rb-prov-count">${nAcct} utility account${nAcct === 1 ? "" : "s"} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
+              <span class="rb-prov-count">${nAcct} ${grpNoun} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
             </div>
             <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
               ${pv.groups.map(acctGroupHTML).join("")}
