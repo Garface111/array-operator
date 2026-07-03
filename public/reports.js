@@ -1975,13 +1975,14 @@
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
         </div>
         <p class="rb-add-sub">${ADD_MODE === "manual"
-          ? "Pick the <b>array</b> this offtaker draws from — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
+          ? "Pick the <b>net meter group</b> your offtaker participates in — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
           <div class="rb-mform-grid">
-            <label class="rep-fld"><span class="rl">Array</span>
+            <label class="rep-fld"><span class="rl">Net Meter Group</span>
               <select id="rbmArray"><option value="">Loading arrays…</option></select>
+              <span class="rb-fld-hint">The array in which your offtaker participates.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
               <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Which utility bill?</span>
                 <select id="rbmUtility"><option value="">Choose a utility bill…</option></select>
@@ -2586,7 +2587,7 @@
         <div class="rb-bulk-tablewrap">
           <table class="rb-bulk-table rb-rev-table">
             <thead><tr>
-              <th>Offtaker</th><th>Array</th><th>Share %</th><th>Email</th><th>Discount %</th><th>Status</th>
+              <th>Offtaker</th><th>Net Meter Group</th><th>Share %</th><th>Email</th><th>Discount %</th><th>Status</th>
             </tr></thead>
             <tbody>${rowHtml}</tbody>
           </table>
