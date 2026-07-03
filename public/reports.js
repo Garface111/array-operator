@@ -2090,17 +2090,19 @@
     } catch (e) { return []; }
   }
 
-  // GMP expected-rate cross-check (Piece 4). Given a commission year, ask the
-  // backend what GMP's published schedule says the rate should be THIS month, so
-  // the operator can sanity-check the billing rate. Reference only — never
-  // overrides the bill's own billed rate. Returns null on any failure (fail-soft).
-  async function fetchExpectedGmpRate(commissionYear) {
+  // GMP expected-rate cross-check (Piece 4). Given the array's commissioning
+  // DATE (YYYY-MM-DD — day-accurate at the 11-year Rate #1 → Blended boundary,
+  // Bruce's C4 ask), ask the backend what GMP's published schedule says the rate
+  // should be THIS month, so the operator can sanity-check the billing rate.
+  // Reference only — never overrides the bill's own billed rate. Returns null on
+  // any failure (fail-soft).
+  async function fetchExpectedGmpRate(commissionDate) {
     if (!authHeaders()) return null;
     const now = new Date();
     const qs = new URLSearchParams({
       year: String(now.getFullYear()),
       month: String(now.getMonth() + 1),
-      commission_year: String(commissionYear),
+      commission_date: String(commissionDate),
     });
     try {
       const r = await fetch(API + "/gmp-expected-rate?" + qs.toString(), { headers: authHeaders() });
@@ -2117,25 +2119,50 @@
     const total = Number(rate.rate_plus_adder);
     const regime = rate.regime_label || rate.regime || "GMP";
     const adderTxt = adder ? ` +$${adder.toFixed(4)} adder` : "";
+    // Day-accurate 11-year boundary, made visible: when the switch date is known
+    // the operator sees exactly when Rate #1 ends — an array near the mark can't
+    // be silently misread (Bruce: GMP itself has called an array 11 two years early).
+    let boundary = "";
+    if (rate.blended_from) {
+      const bf = docDate(rate.blended_from);
+      boundary = rate.regime === "blended"
+        ? ` · Blended since <b>${esc(bf)}</b>`
+        : ` · Rate #1 until <b>${esc(bf)}</b>`;
+      if (rate.regime_flips_within_month) boundary += " (crosses 11 years this month)";
+      if (rate.year_only_assumed_jan1) boundary += " (from a year-only value — assumed Jan 1; set the exact date to pin the boundary)";
+    }
     const clamped = rate.clamped ? " · <b>schedule clamped</b> (year outside the published range — nearest year used)" : "";
-    return `Expected GMP rate: <b>$${total.toFixed(4)}/kWh</b> ($${base.toFixed(4)} ${esc(regime)}${adderTxt}). Reference only — the invoice always uses the bill's own credit rate.${clamped}`;
+    return `Expected GMP rate: <b>$${total.toFixed(4)}/kWh</b> ($${base.toFixed(4)} ${esc(regime)}${adderTxt})${boundary}. Reference only — the invoice always uses the bill's own credit rate.${clamped}`;
   }
 
-  // Wire a commission-year input to a hint element: on change, look up the expected
-  // GMP rate and render it inline (debounced). `defaultText` is restored when blank.
-  function wireCommissionYearHint(inputEl, hintEl, defaultText) {
+  // Today as a local YYYY-MM-DD (for <input type="date"> max= and validation).
+  function todayISO() {
+    const n = new Date();
+    return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0");
+  }
+
+  // A commissioning date is valid when it parses as YYYY-MM-DD and lands in
+  // 1990-01-01..today (native date inputs already emit this shape or "").
+  function isValidCommissioningDate(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+    const d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return false;
+    return iso >= "1990-01-01" && iso <= todayISO();
+  }
+
+  // Wire a commissioning-date input (native <input type="date">) to a hint
+  // element: on change, look up the expected GMP rate for that exact date and
+  // render it inline (debounced). `defaultText` is restored when blank/invalid.
+  function wireCommissioningDateHint(inputEl, hintEl, defaultText) {
     if (!inputEl || !hintEl) return;
     let timer = null;
     const run = () => {
       const raw = inputEl.value.trim();
-      if (raw === "") { hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); return; }
-      const yr = Number(raw);
-      const yrNow = new Date().getFullYear();
-      if (isNaN(yr) || !Number.isInteger(yr) || yr < 1990 || yr > yrNow) {
+      if (!isValidCommissioningDate(raw)) {
         hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); return;
       }
       hintEl.textContent = "Checking GMP schedule…"; hintEl.classList.add("rb-rate-hint-on");
-      fetchExpectedGmpRate(yr).then(rate => {
+      fetchExpectedGmpRate(raw).then(rate => {
         const html = expectedRateHintHTML(rate);
         if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
         else { hintEl.innerHTML = defaultText; hintEl.classList.remove("rb-rate-hint-on"); }
@@ -2144,61 +2171,6 @@
     const debounced = () => { clearTimeout(timer); timer = setTimeout(run, 400); };
     inputEl.addEventListener("input", debounced);
     inputEl.addEventListener("change", debounced);
-  }
-
-  // Build the #rbmUtility <option> list from utility accounts. When `keep` is set
-  // (the value selected before a refresh), it's re-selected if it still exists, so
-  // an in-flight new-offtaker form never loses the operator's pick mid-edit.
-  function fillUtilitySelect(sel, accts, keep) {
-    const fld = sel.closest(".rep-fld");
-    // Remove any stale "link first" helper button — once accounts exist it's noise.
-    const oldBtn = fld && fld.querySelector(".rbm-link-gmp");
-    if (!accts.length) {
-      sel.innerHTML = `<option value="">No utility bills yet — link your utility first</option>`;
-      // Make the empty state ACTIONABLE: drop a Link-utility button right here so the
-      // operator can connect their utility (any supported one) without hunting for it.
-      if (fld && !oldBtn) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "ao-btn rb-btn rbm-link-gmp";
-        btn.textContent = "🔗 Link utility bills";
-        btn.style.marginTop = "6px";
-        btn.onclick = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
-        fld.appendChild(btn);
-      }
-      return;
-    }
-    if (oldBtn) oldBtn.remove();   // accounts arrived — the link prompt is no longer needed
-    sel.innerHTML = `<option value="">Choose a utility account…</option>` +
-      accts.map(a => {
-        const prov = (a.provider || "gmp").toLowerCase();
-        const isGmp = prov === "gmp";
-        const tag = isGmp ? "" : prov.toUpperCase() + " · ";
-        const label = a.nickname || a.array_name || ((isGmp ? "GMP " : prov.toUpperCase() + " ") + a.account_number);
-        // GMP bills from the paper bill; VEC/SmartHub bills from measured
-        // generation × the rate you set (no GMP-shaped bill on file for them).
-        const note = isGmp
-          ? (a.has_bill ? `${a.bill_count} bill${a.bill_count === 1 ? "" : "s"} · latest ${a.latest_period_label || "—"}` : "no bill on file yet")
-          : "bills from measured generation × your rate";
-        return `<option value="${a.utility_account_id}">${esc(tag + label)} · acct ${esc(a.account_number)} (${esc(note)})</option>`;
-      }).join("");
-    // Preserve the operator's selection across a rebuild if it's still valid.
-    if (keep && sel.querySelector(`option[value="${(window.CSS && CSS.escape) ? CSS.escape(keep) : keep}"]`)) {
-      sel.value = keep;
-    }
-  }
-
-  // Fetch utility accounts and (re)fill #rbmUtility in place. `preserveCurrent`
-  // keeps whatever the operator already picked. Used both on first render and when
-  // a new bill-link capture lands while the add-offtaker panel is open.
-  function refreshUtilitySelect(preserveCurrent) {
-    const sel = $("#rbmUtility");
-    if (!sel) return;                                  // add panel not open
-    const keep = preserveCurrent ? sel.value : "";
-    fetchUtilityAccounts().then(accts => {
-      const s = $("#rbmUtility");                      // re-query: the panel may have closed mid-fetch
-      if (s) fillUtilitySelect(s, accts, keep);
-    });
   }
 
   // When the extension lands a GMP/VEC bill capture, sandbox.js dispatches
@@ -2246,16 +2218,69 @@
   // `primeOnly` fetches the cache but skips the paint (used to warm on open).
   function resolveArrayBills(forceRefetch, primeOnly) {
     const need = forceRefetch || !ARR_UTIL_ACCTS;
-    const done = () => { if (!primeOnly) paintArrayBills(); };
+    const done = () => { if (!primeOnly) { paintArrayBills(); paintRateField(); } };
     if (need) {
       fetchUtilityAccounts().then(accts => { ARR_UTIL_ACCTS = accts || []; done(); });
     } else { done(); }
   }
 
-  // Given ARR_UTIL_ACCTS + the chosen #rbmArray, render the bill state:
-  //  • exactly one connected bill → silent, show "Invoices from: …"
-  //  • multiple bills → reveal the #rbmUtility override picker (scoped to this array)
-  //  • no bill → amber note "connect one to invoice it"
+  // ── Solar credit rate slot (Bruce C6) ──────────────────────────────────────
+  // Which utility PROVIDER governs the offtaker being added, from what's already
+  // resolved in the form: an explicit pick in the visible override picker wins;
+  // else the chosen array's bound account(s) when they agree on one provider.
+  // Returns a lowercase provider code ("gmp", "vec", …) or null (nothing chosen
+  // yet / mixed candidates — resolves as soon as the operator picks).
+  function rateSlotProvider() {
+    const accts = ARR_UTIL_ACCTS || [];
+    const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
+    if (wrap && !wrap.hidden && usel && usel.value) {
+      const a = accts.find(x => String(x.utility_account_id) === String(usel.value));
+      if (a) return (a.provider || "gmp").toLowerCase();
+    }
+    const arrSel = $("#rbmArray");
+    const arrId = arrSel ? arrSel.value : "";
+    if (!arrId) return null;
+    const mine = accts.filter(a => String(a.array_id) === String(arrId));
+    const cands = mine.length ? mine : accts;   // fresh-link case offers the full list
+    if (!cands.length) return null;
+    const provs = [...new Set(cands.map(a => (a.provider || "gmp").toLowerCase()))];
+    return provs.length === 1 ? provs[0] : null;
+  }
+
+  // Render the Solar-credit-rate slot to match the resolved provider. Bill-scraped
+  // utilities (GMP) get a read-only truth line — the invoice always prices from the
+  // bill's own net-metering credit rate, so there is nothing to type. VEC/SmartHub
+  // portals publish no usable credit rate, so those offtakers keep the manual
+  // $/kWh input (operator-entered rate model). Mode is memoized on the slot so a
+  // repaint never clobbers a half-typed rate.
+  function paintRateField() {
+    const slot = $("#rbmRateSlot");
+    if (!slot) return;
+    const prov = rateSlotProvider();
+    const mode = (prov && prov !== "gmp") ? "manual:" + prov : "auto:" + (prov || "any");
+    if (slot.dataset.mode === mode) return;    // unchanged — keep typed input intact
+    slot.dataset.mode = mode;
+    if (prov && prov !== "gmp") {
+      const P = esc(prov.toUpperCase());
+      slot.innerHTML = `<span class="rl">Solar credit rate ($/kWh)</span>
+        <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="e.g. 0.14963">
+        <span class="rb-fld-hint">${P}'s portal doesn't publish a usable credit rate — enter the $/kWh you bill at. Leave blank to use your default rate (or upload the ${P} bill PDF later and we'll read its rate).</span>`;
+    } else {
+      const src = prov === "gmp" ? "GMP bill" : "utility bill";
+      slot.innerHTML = `<span class="rl">Solar credit rate</span>
+        <span class="rb-rate-auto">Read from each ${src} automatically — the invoice always uses the bill's own net-metering credit rate.</span>`;
+    }
+  }
+
+  // Given ARR_UTIL_ACCTS + the chosen #rbmArray (Net Meter Group), render the bill state:
+  //  • exactly one linked bill → silent, show "Invoices from: …"
+  //  • multiple linked bills  → reveal the #rbmUtility picker scoped to this group
+  //  • NONE linked, but the tenant HAS utility accounts → reveal the picker with
+  //    the FULL account list. A fresh GMP link lands accounts with array_id=null
+  //    until they're matched to an array, so filtering on array_id alone showed
+  //    Bruce an EMPTY select even though every bill was downloaded. The pick is
+  //    sent explicitly on save and the backend links account → group from it.
+  //  • no utility accounts at all → amber note + a link-utility button.
   function paintArrayBills() {
     const arrSel = $("#rbmArray"), line = $("#rbmBillLine");
     const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
@@ -2267,11 +2292,27 @@
       if (wrap) wrap.hidden = true;
       return;
     }
-    const mine = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
-    if (!mine.length) {
+    const accts = ARR_UTIL_ACCTS || [];
+    const mine = accts.filter(a => String(a.array_id) === String(arrId));
+    if (!mine.length && !accts.length) {
+      // Nothing to pick from anywhere — make the empty state ACTIONABLE.
       line.className = "rb-arr-billline rb-arr-nobill";
-      line.innerHTML = "⚠ This array has no connected utility bill yet — connect one to invoice it.";
+      line.innerHTML = "⚠ No utility bills yet — link your utility to invoice this group. ";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ao-btn rb-btn rbm-link-gmp";
+      btn.textContent = "🔗 Link utility bills";
+      btn.onclick = () => { if (window.__aoLinkUtility) window.__aoLinkUtility(); else location.hash = "#arrays"; };
+      line.appendChild(btn);
       if (wrap) { wrap.hidden = true; usel.innerHTML = ""; }
+      return;
+    }
+    if (!mine.length) {
+      // Accounts exist but none is matched to this group yet (Bruce's fresh-link
+      // case). Offer the full list instead of a dead end.
+      line.className = "rb-arr-billline rb-arr-hasbill";
+      line.innerHTML = "This group isn't matched to a utility bill yet — pick your offtaker's utility account below and we'll connect it.";
+      showUtilityPicker(wrap, usel, accts, true, arrId);
       return;
     }
     if (mine.length === 1) {
@@ -2282,27 +2323,45 @@
         `<option value="${a.utility_account_id}" selected>${esc(billLabel(a))}</option>`; }
       return;
     }
-    // Multiple bills → override picker; keep the operator's prior pick if valid.
-    const prev = usel ? usel.value : "";
+    // Multiple linked bills → picker scoped to this group's accounts.
     line.className = "rb-arr-billline rb-arr-hasbill";
-    line.innerHTML = `This array has <b>${mine.length} connected bills</b> — pick which one to invoice from:`;
-    if (wrap && usel) {
-      usel.innerHTML = mine.map(a =>
-        `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
-      if (prev && mine.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
-      wrap.hidden = false;
-    }
+    line.innerHTML = `This group has <b>${mine.length} connected utility bills</b> — select which one bills this offtaker:`;
+    showUtilityPicker(wrap, usel, mine, false, arrId);
   }
 
-  // Human label for a utility account in the array-first bill line / override.
+  // Fill + reveal the offtaker-bill picker. `needPick` prepends a placeholder so
+  // the operator must choose explicitly (used when no account is linked to the
+  // group yet); the prior pick survives a repaint. The subtext names the chosen
+  // group (Bruce's copy): "<Group> group has multiple participants. …"
+  function showUtilityPicker(wrap, usel, accts, needPick, arrId) {
+    if (!wrap || !usel) return;
+    const prev = usel.value;
+    usel.innerHTML = (needPick ? `<option value="">Choose a utility account…</option>` : "") +
+      accts.map(a => `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
+    if (prev && accts.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
+    const hint = $("#rbmUtilHint");
+    if (hint) {
+      const arr = (ARRAYS || []).find(x => String(x.id) === String(arrId));
+      hint.textContent = (arr && arr.name ? arr.name + " group" : "This group") +
+        " has multiple participants. Your selection here should be the utility account from this dropdown list.";
+    }
+    wrap.hidden = false;
+  }
+
+  // Human label for a utility account in the bill line / offtaker-bill picker:
+  // "Starlake · GMP acct 43210 · 12 bills · latest 2026-06". Name prefers the
+  // operator's nickname, then the linked array's name; the account number is
+  // always shown so same-named accounts stay tellable-apart.
   function billLabel(a) {
     const prov = (a.provider || "gmp").toLowerCase();
     const provTag = prov === "gmp" ? "GMP" : prov.toUpperCase();
-    const name = a.nickname || `${provTag} ${a.account_number || ""}`.trim();
+    const who = a.nickname || a.array_name;
+    const acctNo = `${provTag} acct ${a.account_number || "?"}`;
+    const name = who ? `${who} · ${acctNo}` : acctNo;
     const bills = a.has_bill
       ? ` · ${a.bill_count || 0} bill${a.bill_count === 1 ? "" : "s"}${a.latest_period_label ? " · latest " + a.latest_period_label : ""}`
       : " · no bill on file yet";
-    return `${provTag} ${name}${bills}`;
+    return name + bills;
   }
 
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
@@ -2324,39 +2383,51 @@
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
         </div>
         <p class="rb-add-sub">${ADD_MODE === "manual"
-          ? "Pick the <b>array</b> this offtaker draws from — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
+          ? "Pick the <b>net meter group</b> your offtaker participates in — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
+          <!-- Required-field marking (Bruce C5): .req mirrors saveManual's actual
+               validation — group, name, share %, email, and the bill pick when its
+               picker is visible. Everything else saves blank, so it stays clear. -->
+          <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
           <div class="rb-mform-grid">
-            <label class="rep-fld"><span class="rl">Array</span>
+            <label class="rep-fld req"><span class="rl">Net Meter Group</span>
               <select id="rbmArray"><option value="">Loading arrays…</option></select>
+              <span class="rb-fld-hint">The array in which your offtaker participates.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
-              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Which utility bill?</span>
-                <select id="rbmUtility"><option value="">Choose a utility bill…</option></select>
-                <span class="rb-fld-hint">This array has more than one connected bill — pick which one to invoice from.</span></label></label>
-            <label class="rep-fld"><span class="rl">Offtaker name</span>
+              <label class="rep-fld rb-arr-override req" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
+                <select id="rbmUtility"><option value="">Choose a utility account…</option></select>
+                <span class="rb-fld-hint" id="rbmUtilHint">This group has multiple participants. Your selection here should be the utility account from this dropdown list.</span></label></label>
+            <label class="rep-fld req"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-              <input type="number" id="rbmPct" min="0.01" max="100" step="0.01" placeholder="e.g. 25">
-              <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
-            <label class="rep-fld"><span class="rl">Commission year</span>
-              <input type="number" id="rbmCommYear" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
-              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
+            <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
+                 as one block — "get the solar credit rate right next to or below the
+                 share of array". -->
+            <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
+              <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
+            <!-- Solar credit rate (Bruce C6): NOT an input for bill-scraped utilities.
+                 GMP bills carry their own net-metering credit rate, so the invoice
+                 always prices from the bill — the old manual field was an override
+                 that read as required data entry. This slot is provider-aware
+                 (paintRateField): GMP/unknown → a read-only "read from the bill"
+                 line; VEC/SmartHub (whose portals publish no usable rate) → the
+                 manual $/kWh input, which those offtakers genuinely need. -->
+            <label class="rep-fld rbm-rate-slot" id="rbmRateSlot"></label>
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
-            <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
-              <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="blank = auto from bill">
-              <span class="rb-fld-hint">Leave blank to use the credit rate from the GMP bill.</span></label>
             <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-                <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from 'share of the array' above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
-              <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.01" placeholder="blank = same as billing share">
+                <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
+              <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.001" placeholder="blank = same as billing share">
               <span class="rb-fld-hint">Optional. Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+            <label class="rep-fld"><span class="rl">Commissioning Date</span>
+              <input type="date" id="rbmCommDate" min="1990-01-01" max="${todayISO()}">
+              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
             <label class="rep-fld"><span class="rl">Starting invoice #</span>
               <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
               <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
-            <label class="rep-fld"><span class="rl">Client email</span>
+            <label class="rep-fld req"><span class="rl">Client email</span>
               <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
           </div>
           <div class="rb-controls">
@@ -2426,13 +2497,31 @@
         if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
       }));
       $("#rbmSave").onclick = saveManual;
-      // Commission year → live expected-GMP-rate helper next to the rate fields.
-      wireCommissionYearHint($("#rbmCommYear"), $("#rbmRateHint"),
-        "The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).");
+      // Commissioning date → live expected-GMP-rate helper next to the rate fields.
+      const commDefHint = "The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
+      wireCommissioningDateHint($("#rbmCommDate"), $("#rbmRateHint"), commDefHint);
+      // When an array is picked, surface its SAVED commissioning date (if any) so
+      // the operator sees — and can correct — exactly what the rate helper uses.
+      // A hand-typed date survives array switches; prefill never clobbers it.
+      const commArrSel = $("#rbmArray"), commDateEl = $("#rbmCommDate");
+      if (commArrSel && commDateEl) {
+        commDateEl.addEventListener("input", () => { commDateEl.dataset.userEdited = "1"; });
+        commArrSel.addEventListener("change", () => {
+          if (commDateEl.dataset.userEdited) return;
+          prefillCommissioningDate(commArrSel.value, commDateEl, $("#rbmRateHint"), commDefHint, true);
+        });
+      }
       // Array-FIRST flow: the operator picks the ARRAY, and we resolve which
       // utility bill it invoices from. The utility <select> is now an OVERRIDE,
       // shown only when the chosen array has more than one connected bill.
       wireArrayFirst();
+      // Solar-credit-rate slot: paint the zero state now, and re-resolve whenever
+      // the override utility pick changes (an array change repaints via
+      // resolveArrayBills → paintRateField). The <select> element persists across
+      // option refills, so one listener is enough.
+      paintRateField();
+      const rateUsel = $("#rbmUtility");
+      if (rateUsel) rateUsel.addEventListener("change", paintRateField);
     } else {
       // Upload path: wire the dropzone + paint the live doc-preview placeholder.
       wireUpload();
@@ -2455,20 +2544,28 @@
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
     const sharePctRaw = $("#rbmSharePct") ? $("#rbmSharePct").value.trim() : "";
     const invStartRaw = $("#rbmInvStart") ? $("#rbmInvStart").value.trim() : "";
-    const commYearRaw = $("#rbmCommYear") ? $("#rbmCommYear").value.trim() : "";
+    const commDateRaw = $("#rbmCommDate") ? $("#rbmCommDate").value.trim() : "";
     // The "Send to" slider was removed — offtaker invoices go to the offtaker and
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
     const clientEmail = $("#rbmEmail").value.trim();
-    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which array this offtaker draws from."; return; }
-    // Block save when the chosen array has no connected bill (nothing to invoice from).
+    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which net meter group this offtaker draws from."; return; }
+    // Block save only when the tenant has NO utility accounts at all (nothing to
+    // invoice from). A group with no LINKED account is fine — the picker offered
+    // the full account list and the explicit pick below carries the binding.
     const arrAccts = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrayId));
-    if (!arrAccts.length) {
+    if (!arrAccts.length && !(ARR_UTIL_ACCTS || []).length) {
       st.className = "rb-status rb-err";
-      st.textContent = "This array has no connected utility bill yet — connect one before invoicing it.";
+      st.textContent = "This group has no utility bills yet — link your utility before invoicing it.";
       return;
     }
-    if (overrode && !utilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which of this array's bills to invoice from."; return; }
+    if (overrode && !utilityId) {
+      st.className = "rb-status rb-err";
+      st.textContent = arrAccts.length
+        ? "Pick which of this group's bills to invoice from."
+        : "Pick your offtaker's utility account so we know which bill to invoice from.";
+      return;
+    }
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
     const pctNum = Number(pctRaw);
     if (!pctRaw || isNaN(pctNum) || pctNum <= 0 || pctNum > 100) {
@@ -2502,13 +2599,12 @@
         st.className = "rb-status rb-err"; st.textContent = "Starting invoice # must be a whole number 0–9999999, or blank."; return;
       }
     }
-    let commYearNum = null;
-    if (commYearRaw !== "") {
-      commYearNum = Number(commYearRaw);
-      const yrNow = new Date().getFullYear();
-      if (isNaN(commYearNum) || !Number.isInteger(commYearNum) || commYearNum < 1990 || commYearNum > yrNow) {
-        st.className = "rb-status rb-err"; st.textContent = `Commission year must be between 1990 and ${yrNow}, or blank.`; return;
+    let commDateVal = null;
+    if (commDateRaw !== "") {
+      if (!isValidCommissioningDate(commDateRaw)) {
+        st.className = "rb-status rb-err"; st.textContent = "Commissioning date must be between Jan 1, 1990 and today, or blank."; return;
       }
+      commDateVal = commDateRaw;
     }
     if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
       st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
@@ -2536,16 +2632,18 @@
         st.textContent = (data && data.detail) ? data.detail : "Couldn't add (HTTP " + r.status + ").";
         return;
       }
-      // Commission year sets the array's in-service date (feeds the GMP rate regime).
-      // Best-effort: the offtaker is already created; a failure here shouldn't block it.
+      // The commissioning date sets the array's in-service date (feeds the GMP
+      // rate regime, day-accurate at the 11-year boundary). Best-effort: the
+      // offtaker is already created; a failure here shouldn't block it.
       const newArrayId = (data.subscription && data.subscription.array_id) || arrayId;
-      if (commYearNum !== null && newArrayId != null) {
+      if (commDateVal !== null && newArrayId != null) {
         try {
           await fetch(API + "/arrays/" + newArrayId, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ install_year: commYearNum }),
+            body: JSON.stringify({ first_connect_date: commDateVal }),
           });
+          _SETUP_ARRAYS = null;   // the accordion prefill cache is now stale
         } catch (e) { /* non-fatal — offtaker was created */ }
       }
       MANUAL_OPEN = false;
@@ -2895,7 +2993,9 @@
     const c = bulkCounts();
     const rowHtml = BULK_ROWS.map((row, i) => {
       const status = bulkRowStatus(row);
-      const pctVal = row.allocation_pct != null ? Math.round(row.allocation_pct * 1000) / 10 : "";
+      // 3-decimal percent (Bruce): 0.24783 → "24.783". A 1-decimal prefill would
+      // silently truncate the stored share on the next edit+save of the row.
+      const pctVal = row.allocation_pct != null ? (row.allocation_pct * 100).toFixed(3) : "";
       const discVal = row.discount_pct != null ? Math.round(row.discount_pct * 1000) / 10 : "";
       const errs = (row.errors || []).length ? `<div class="rb-rev-err">⚠ ${esc(row.errors.join("; "))}</div>` : "";
       return `<tr class="rb-rev-row rb-rev-${status}" data-i="${i}">
@@ -2908,7 +3008,7 @@
           ${row.array_name_raw ? `<div class="rb-rev-raw">from your file: “${esc(row.array_name_raw)}”</div>` : ""}
           ${errs}
         </td>
-        <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.01" value="${pctVal}" placeholder="%"></td>
+        <td class="rb-rev-pct"><input type="number" class="rb-rev-in" data-f="allocation_pct" min="0.01" max="100" step="0.001" value="${pctVal}" placeholder="%"></td>
         <td class="rb-rev-email"><input type="email" class="rb-rev-in" data-f="email" value="${esc(row.email || "")}" placeholder="optional"></td>
         <td class="rb-rev-disc"><input type="number" class="rb-rev-in" data-f="discount_pct" min="0" max="99" step="0.1" value="${discVal}" placeholder="—"><div class="rb-rev-err rb-rev-discerr">${bulkDiscountError(row) ? "⚠ " + esc(bulkDiscountError(row)) : ""}</div></td>
         <td class="rb-rev-stat">${bulkStatusPill(status)}</td>
@@ -2935,7 +3035,7 @@
         <div class="rb-bulk-tablewrap">
           <table class="rb-bulk-table rb-rev-table">
             <thead><tr>
-              <th>Offtaker</th><th>Array</th><th>Share %</th><th>Email</th><th>Discount %</th><th>Status</th>
+              <th>Offtaker</th><th>Net Meter Group</th><th>Share %</th><th>Email</th><th>Discount %</th><th>Status</th>
             </tr></thead>
             <tbody>${rowHtml}</tbody>
           </table>
@@ -5000,25 +5100,83 @@
     if (_extPresent && !_resyncFired.has(String(sid))) { _resyncFired.add(String(sid)); run(); }
   }
 
+  // ── Solar credit rate row for the accordion editor (Bruce C6) ──────────────
+  // GMP-bound offtakers price from the BILL's own net-metering credit rate, so the
+  // editable $/kWh field is gone for them (Bruce: "have it only default to rate
+  // scraped from bill"):
+  //   • no override saved → a read-only line showing the bill-derived rate when the
+  //     draft carries enough to compute it (credit ÷ kWh ÷ (1−discount) — exactly
+  //     inverting the invoice math), else an honest "read from each GMP bill";
+  //   • a legacy manual override → its value shown read-only + a one-click "Clear
+  //     override — use the bill rate" (no hidden state, reversible);
+  //   • VEC/SmartHub, unbound, workbook-priced and legacy-flat offtakers keep the
+  //     fully-functional manual input (no bill-scraped rate is their source of truth).
+  function rateFieldHTML(d, utilAccts) {
+    const accts = utilAccts || INBOX_UTIL_ACCTS || [];
+    const boundAcct = accts.find(a => String(a.utility_account_id) === String(d.utility_account_id));
+    const boundProv = boundAcct ? (boundAcct.provider || "gmp").toLowerCase() : "";
+    const subRec = OFFTAKERS.find(x => String(x.id) === String(d.subscription_id)) || {};
+    const wb = d.has_workbook === true;
+    const legacyFlat = subRec.rate_per_kwh != null && subRec.rate_per_kwh > 0;
+    // Bill-scraped = the GMP bill is the pricing source of truth: GMP-bound, no
+    // legacy flat $/kWh, and (for workbook offtakers) an explicit share set — that
+    // combination routes billing through the bill path (delivery.build_manual_match).
+    const billScraped = boundProv === "gmp" && !legacyFlat && (!wb || d.allocation_pct != null);
+    if (!billScraped) {
+      const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
+      return `<label class="rep-fld rb-rate-fld"><span class="rl">Solar credit rate ($/kWh)</span>
+            <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>`;
+    }
+    if (d.net_rate_per_kwh != null) {
+      return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+            <span class="rb-rate-auto rb-rate-warn"><b>$${Number(d.net_rate_per_kwh).toFixed(5)}/kWh</b> — manual override; your GMP bill's own credit rate is ignored while it's set.</span>
+            <button type="button" class="ao-btn rb-btn rb-rate-clear">Clear override — use the bill rate</button></div>`;
+    }
+    // Just-cleared override: the local figures still reflect the override until the
+    // server recompute lands, so deriving now would flash the OLD rate labeled as
+    // the bill's. Show an honest transient instead (applyDraftFigures clears it).
+    if (d._ratePending) {
+      return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+          <span class="rb-rate-auto">Override cleared — recalculating from your GMP bill…</span></div>`;
+    }
+    // Never derive a "rate" from a budget-overridden total — that's not a rate.
+    const budgetSet = d.budget_amount_usd != null;
+    const creditVal = budgetSet ? (d.solar_credit_value != null ? d.solar_credit_value : null) : d.amount_usd;
+    const discFrac = d.discount_pct != null ? d.discount_pct
+      : (subRec.resolved_discount_pct != null ? subRec.resolved_discount_pct : null);
+    let billRate = null;
+    if (creditVal != null && creditVal > 0 && d.customer_kwh > 0
+        && discFrac != null && discFrac >= 0 && discFrac < 1) {
+      billRate = creditVal / d.customer_kwh / (1 - discFrac);
+    }
+    const line = billRate != null
+      ? `<b>$${billRate.toFixed(5)}/kWh</b> — from your GMP bill${d.period_label ? " (" + esc(d.period_label) + ")" : ""}`
+      : `Read from each GMP bill automatically — shows here once a bill settles.`;
+    return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+          <span class="rb-rate-auto">${line}</span></div>`;
+  }
+
   function offtakerEditor(d, utilAccts) {
     const sid = d.subscription_id;
     if (!sid) return "";
     const wb = d.has_workbook === true;        // workbook offtakers bill from the sheet
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : "";
+    // Editor prefills show the FULL 3-decimal percent (Bruce: "e.g. 24.783") —
+    // the old 1-decimal rounding meant any touch of the field saved back 24.8%,
+    // destroying the stored third decimal. Whole shares render as 25.000 (consistent).
+    const pct = d.allocation_pct != null ? (d.allocation_pct * 100).toFixed(3) : "";
     const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
     // Disclosure: when the operator never set a discount but one is still applied, the
     // backend auto-resolves a default (tenant default → 10%). Surface it plainly so the
     // blank field never hides a live discount the customer is actually billed at.
     const autoDisc = d.discount_pct == null && d.resolved_discount_pct != null && d.resolved_discount_pct > 0;
     const autoDiscPct = autoDisc ? Math.round(d.resolved_discount_pct * 1000) / 10 : null;
-    const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
     const cad = d.cadence || "monthly";
     const sm = d.send_mode || "to_me";
     // The subscription record carries the cross-check share + invoice seed + array id
     // (the draft `d` may not). Look it up from the canonical offtaker list so the edit
-    // fields pre-fill. Commission year lives on the array (fetched lazily on wire).
+    // fields pre-fill. The commissioning date lives on the array (fetched lazily on wire).
     const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
-    const sharePct = subRec.array_share_pct != null ? Math.round(subRec.array_share_pct * 1000) / 10 : "";
+    const sharePct = subRec.array_share_pct != null ? (subRec.array_share_pct * 100).toFixed(3) : "";
     const invStart = subRec.invoice_number_start != null ? subRec.invoice_number_start : "";
     const editArrayId = subRec.array_id != null ? subRec.array_id : (d.array_id != null ? d.array_id : "");
     // Is the bound account a VEC/SmartHub one? Those bills don't expose the credit
@@ -5059,31 +5217,34 @@
                   title="Permanently delete this offtaker">🗑 Delete offtaker</button>
         </div>
         ${resyncBanner(d, utilAccts)}
+        <!-- Required-field marking (Bruce C5): .req mirrors ofPatchBody's actual
+             semantics — name / utility account / share % refuse to save blank
+             (return null); every other field persists blank, so it stays clear. -->
+        <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
         <div class="rb-cust-grid rb-offedit-grid">
-          <label class="rep-fld"><span class="rl">Offtaker name</span>
+          <label class="rep-fld req"><span class="rl">Offtaker name</span>
             <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
           ${showBillPicker ? `
-          <label class="rep-fld"><span class="rl">Which utility account?</span>
+          <label class="rep-fld req"><span class="rl">Which utility account?</span>
             <select data-of="utility_account_id">
               <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
               ${billOpts}
             </select></label>` : ""}
-          <label class="rep-fld"><span class="rl">Their share of the array (%)</span>
-            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.01" value="${pct}" placeholder="e.g. 25">
-            <span class="rb-fld-hint">Enter 100% if this offtaker is part of a net-metered group.</span></label>
+          <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
+          <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
+            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
+          ${rateFieldHTML(d, utilAccts)}
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
             ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
-          <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
-            <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
-          ${editArrayId !== "" ? `
-          <label class="rep-fld"><span class="rl">Commission year</span>
-            <input type="number" class="rb-of-commyear" data-commyear-arr="${editArrayId}" min="1990" max="${new Date().getFullYear()}" step="1" placeholder="e.g. 2018">
-            <span class="rb-fld-hint rb-of-ratehint">The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-              <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from 'share of the array' (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
-            <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.01" value="${sharePct}" placeholder="blank = same as billing share">
+              <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
+            <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.001" value="${sharePct}" placeholder="blank = same as billing share">
             <span class="rb-fld-hint">Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+          ${editArrayId !== "" ? `
+          <label class="rep-fld"><span class="rl">Commissioning Date</span>
+            <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
+            <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Starting invoice #</span>
             <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based">
             <span class="rb-fld-hint">Seeds sequential invoice numbering; each send adds 1.</span></label>
@@ -5345,32 +5506,35 @@
         inp.addEventListener("input", h);
         inp.addEventListener("change", h);
       });
-      // Commission year is NOT a subscription field — it lives on the ARRAY and
-      // PATCHes /arrays/{id}. Wire it specially: pre-fill from the array's current
-      // setup, save the in-service year on change, and show the expected GMP rate.
-      const commEl = box.querySelector(".rb-of-commyear");
+      // The commissioning date is NOT a subscription field — it lives on the ARRAY
+      // and PATCHes /arrays/{id}. Wire it specially: pre-fill from the array's
+      // current setup, save the in-service DATE on change (day-accurate — it sets
+      // the 11-year Rate #1 → Blended boundary), and show the expected GMP rate.
+      const commEl = box.querySelector(".rb-of-commdate");
       if (commEl) {
-        const arrId = commEl.getAttribute("data-commyear-arr");
+        const arrId = commEl.getAttribute("data-commdate-arr");
         const hintEl = box.querySelector(".rb-of-ratehint");
-        const defHint = "The array's in-service year — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
-        // Pre-fill the current commission year from the array setup (best-effort).
-        prefillCommissionYear(arrId, commEl, hintEl, defHint);
-        // Persist on change (debounced) to PATCH /arrays/{id} via install_year.
-        wireCommissionYearHint(commEl, hintEl, defHint);
+        const defHint = "The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
+        // Pre-fill the current commissioning date from the array setup (best-effort).
+        prefillCommissioningDate(arrId, commEl, hintEl, defHint);
+        // Persist on change (debounced) to PATCH /arrays/{id} via first_connect_date.
+        wireCommissioningDateHint(commEl, hintEl, defHint);
         let saveTimer = null;
-        const saveYear = () => {
+        const saveDate = () => {
           const raw = commEl.value.trim();
           if (raw === "") return;                    // don't clear the array's date on blank
-          const yr = Number(raw), yrNow = new Date().getFullYear();
-          if (isNaN(yr) || !Number.isInteger(yr) || yr < 1990 || yr > yrNow) return;
+          if (!isValidCommissioningDate(raw)) return;
           fetch(API + "/arrays/" + arrId, {
             method: "PATCH",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-            body: JSON.stringify({ install_year: yr }),
+            body: JSON.stringify({ first_connect_date: raw }),
           }).then(() => { _SETUP_ARRAYS = null; }).catch(() => {});
         };
-        commEl.addEventListener("change", () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveYear, 500); });
+        commEl.addEventListener("change", () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveDate, 500); });
       }
+      // C6: one-click "Clear override — use the bill rate" on a bill-priced offtaker
+      // whose subscription still carries a legacy manual rate.
+      wireRateClear(card);
       // The labeled "Delete offtaker" button lives inside the editor (rendered into the
       // expanded body, so the list-level [data-del-offtaker] wiring never sees it).
       const del = box.querySelector(".rb-offedit-del[data-del-offtaker]");
@@ -5378,11 +5542,39 @@
     });
   }
 
-  // Pre-fill the commission-year edit input from the array's current setup, and if a
-  // year is known, immediately render its expected GMP rate. Uses /setup-state (which
-  // lists arrays with their first_connect_date/install_year). Best-effort, fail-soft.
+  // C6: wire the "Clear override — use the bill rate" button inside a draft card's
+  // editor (if present). Optimistically flips the row to the read-only bill-rate
+  // line, then persists through the SAME debounced money-field pipeline as typing
+  // in the old input did (PATCH {net_rate_per_kwh:null} → draft recompute), so the
+  // figures + calc panel re-derive from the bill's own credit rate.
+  function wireRateClear(card) {
+    const box = card && card.querySelector(".rb-offedit");
+    const btn = box && box.querySelector(".rb-rate-clear");
+    if (!btn) return;
+    const sid = box.getAttribute("data-offedit");
+    const did = card.getAttribute("data-did");
+    btn.onclick = () => {
+      const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+      if (!d) return;
+      d.net_rate_per_kwh = null;
+      d._ratePending = true;              // figures are override-priced until recompute
+      const fld = box.querySelector(".rb-rate-fld");
+      if (fld) fld.outerHTML = rateFieldHTML(d);
+      ACTIVE_DRAFT_ID = did;
+      scheduleOfftakerPatch(card, box, did, sid, { net_rate_per_kwh: null }, true);
+    };
+  }
+
+  // Pre-fill a commissioning-date input from the array's current setup, and if a
+  // date is known, immediately render its expected GMP rate. Uses /setup-state
+  // (which lists arrays with their first_connect_date). Legacy year-only values
+  // were stored as Jan 1 of that year, so they show as YYYY-01-01 — consistent
+  // with the backend's year→Jan-1 boundary reading. `overwrite` repaints the
+  // field even when it already holds a value (used when the picked array CHANGES
+  // in the add-offtaker form); default only fills an empty field. Best-effort,
+  // fail-soft.
   let _SETUP_ARRAYS = null;
-  async function prefillCommissionYear(arrId, inputEl, hintEl, defHint) {
+  async function prefillCommissioningDate(arrId, inputEl, hintEl, defHint, overwrite) {
     if (!authHeaders() || !inputEl) return;
     try {
       if (_SETUP_ARRAYS == null) {
@@ -5391,13 +5583,20 @@
         _SETUP_ARRAYS = (j && j.arrays) || [];
       }
       const a = _SETUP_ARRAYS.find(x => String(x.array_id) === String(arrId));
-      if (a && a.install_year && inputEl.value.trim() === "") {
-        inputEl.value = a.install_year;
-        if (hintEl) {
-          const rate = await fetchExpectedGmpRate(a.install_year);
-          const html = expectedRateHintHTML(rate);
-          if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
+      const fc = a && a.first_connect_date ? String(a.first_connect_date).slice(0, 10) : "";
+      if (!overwrite && inputEl.value.trim() !== "") return;
+      if (!fc) {
+        if (overwrite) {          // switching to an array with no saved date: don't
+          inputEl.value = "";     // let the previous array's date linger and PATCH
+          if (hintEl) { hintEl.innerHTML = defHint; hintEl.classList.remove("rb-rate-hint-on"); }
         }
+        return;
+      }
+      inputEl.value = fc;
+      if (hintEl) {
+        const rate = await fetchExpectedGmpRate(fc);
+        const html = expectedRateHintHTML(rate);
+        if (html) { hintEl.innerHTML = html; hintEl.classList.add("rb-rate-hint-on"); }
       }
     } catch (e) { /* leave blank */ }
   }
@@ -5507,6 +5706,15 @@
           setSt("rb-status rb-ok", "Saved · figures update once a GMP bill lands.");
         }
       } catch (e) { setSt("rb-status rb-ok", "Saved."); }
+      // C6: if a cleared override's transient "recalculating…" rate row is still up
+      // (recompute wasn't possible — e.g. no settled bill yet), settle it to the
+      // honest static line instead of leaving a stuck in-between state.
+      const dp = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+      if (dp && dp._ratePending) {
+        delete dp._ratePending;
+        const fld = card && card.querySelector(".rb-rate-fld[data-rate-readonly]");
+        if (fld) { fld.outerHTML = rateFieldHTML(dp); wireRateClear(card); }
+      }
     } catch (e) { setSt("rb-status rb-err", "Network error."); }
   }
 
@@ -5532,6 +5740,33 @@
     if (card) {                                       // the calc dashboard now lives in the form col;
       const calcEl = card.querySelector(".rb-calc");  // repaint it in place from the new figures
       if (calcEl) { calcEl.outerHTML = calcDashboard(d); wireCalcLinks(card); }
+      // C6: the READ-ONLY solar-credit-rate line derives from the draft figures, so
+      // re-derive it from the fresh numbers. The one case we must NOT touch is
+      // input→input (VEC/SmartHub manual field the operator may be mid-typing in);
+      // every other transition (readonly refresh, input↔readonly after a utility-
+      // account rebind) repaints so the row always shows the true rate source.
+      const rateFld = card.querySelector(".rb-rate-fld");
+      if (rateFld) {
+        delete d._ratePending;             // fresh server figures just merged — derive for real
+        const fresh = rateFieldHTML(d);
+        const wasInput = !rateFld.hasAttribute("data-rate-readonly");
+        const staysInput = fresh.indexOf("data-rate-readonly") === -1;
+        if (!(wasInput && staysInput)) {
+          rateFld.outerHTML = fresh;
+          wireRateClear(card);           // the repaint can (re)introduce the button
+          // A readonly→input repaint (GMP → VEC rebind) mints a fresh manual input
+          // that missed wireOfftakerEditors — wire it here so it saves like the rest.
+          const rateInp = card.querySelector(".rb-rate-fld [data-of]");
+          if (rateInp) {
+            const rbox = card.querySelector(".rb-offedit");
+            const rdid = card.getAttribute("data-did");
+            const rsid = rbox && rbox.getAttribute("data-offedit");
+            const rh = () => onOfftakerEdit(card, rbox, rdid, rsid, rateInp.getAttribute("data-of"), rateInp);
+            rateInp.addEventListener("input", rh);
+            rateInp.addEventListener("change", rh);
+          }
+        }
+      }
     }
     renderReviewTop();                                // repaint the action buttons
     renderDraftDoc();
