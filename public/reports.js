@@ -1869,10 +1869,58 @@
   // `primeOnly` fetches the cache but skips the paint (used to warm on open).
   function resolveArrayBills(forceRefetch, primeOnly) {
     const need = forceRefetch || !ARR_UTIL_ACCTS;
-    const done = () => { if (!primeOnly) paintArrayBills(); };
+    const done = () => { if (!primeOnly) { paintArrayBills(); paintRateField(); } };
     if (need) {
       fetchUtilityAccounts().then(accts => { ARR_UTIL_ACCTS = accts || []; done(); });
     } else { done(); }
+  }
+
+  // ── Solar credit rate slot (Bruce C6) ──────────────────────────────────────
+  // Which utility PROVIDER governs the offtaker being added, from what's already
+  // resolved in the form: an explicit pick in the visible override picker wins;
+  // else the chosen array's bound account(s) when they agree on one provider.
+  // Returns a lowercase provider code ("gmp", "vec", …) or null (nothing chosen
+  // yet / mixed candidates — resolves as soon as the operator picks).
+  function rateSlotProvider() {
+    const accts = ARR_UTIL_ACCTS || [];
+    const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
+    if (wrap && !wrap.hidden && usel && usel.value) {
+      const a = accts.find(x => String(x.utility_account_id) === String(usel.value));
+      if (a) return (a.provider || "gmp").toLowerCase();
+    }
+    const arrSel = $("#rbmArray");
+    const arrId = arrSel ? arrSel.value : "";
+    if (!arrId) return null;
+    const mine = accts.filter(a => String(a.array_id) === String(arrId));
+    const cands = mine.length ? mine : accts;   // fresh-link case offers the full list
+    if (!cands.length) return null;
+    const provs = [...new Set(cands.map(a => (a.provider || "gmp").toLowerCase()))];
+    return provs.length === 1 ? provs[0] : null;
+  }
+
+  // Render the Solar-credit-rate slot to match the resolved provider. Bill-scraped
+  // utilities (GMP) get a read-only truth line — the invoice always prices from the
+  // bill's own net-metering credit rate, so there is nothing to type. VEC/SmartHub
+  // portals publish no usable credit rate, so those offtakers keep the manual
+  // $/kWh input (operator-entered rate model). Mode is memoized on the slot so a
+  // repaint never clobbers a half-typed rate.
+  function paintRateField() {
+    const slot = $("#rbmRateSlot");
+    if (!slot) return;
+    const prov = rateSlotProvider();
+    const mode = (prov && prov !== "gmp") ? "manual:" + prov : "auto:" + (prov || "any");
+    if (slot.dataset.mode === mode) return;    // unchanged — keep typed input intact
+    slot.dataset.mode = mode;
+    if (prov && prov !== "gmp") {
+      const P = esc(prov.toUpperCase());
+      slot.innerHTML = `<span class="rl">Solar credit rate ($/kWh)</span>
+        <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="e.g. 0.14963">
+        <span class="rb-fld-hint">${P}'s portal doesn't publish a usable credit rate — enter the $/kWh you bill at. Leave blank to use your default rate (or upload the ${P} bill PDF later and we'll read its rate).</span>`;
+    } else {
+      const src = prov === "gmp" ? "GMP bill" : "utility bill";
+      slot.innerHTML = `<span class="rl">Solar credit rate</span>
+        <span class="rb-rate-auto">Read from each ${src} automatically — the invoice always uses the bill's own net-metering credit rate.</span>`;
+    }
   }
 
   // Given ARR_UTIL_ACCTS + the chosen #rbmArray (Net Meter Group), render the bill state:
@@ -2008,9 +2056,14 @@
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
-            <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
-              <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="blank = auto from bill">
-              <span class="rb-fld-hint">Leave blank to use the credit rate from the GMP bill.</span></label>
+            <!-- Solar credit rate (Bruce C6): NOT an input for bill-scraped utilities.
+                 GMP bills carry their own net-metering credit rate, so the invoice
+                 always prices from the bill — the old manual field was an override
+                 that read as required data entry. This slot is provider-aware
+                 (paintRateField): GMP/unknown → a read-only "read from the bill"
+                 line; VEC/SmartHub (whose portals publish no usable rate) → the
+                 manual $/kWh input, which those offtakers genuinely need. -->
+            <label class="rep-fld rbm-rate-slot" id="rbmRateSlot"></label>
             <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
                 <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
               <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.001" placeholder="blank = same as billing share">
@@ -2106,6 +2159,13 @@
       // utility bill it invoices from. The utility <select> is now an OVERRIDE,
       // shown only when the chosen array has more than one connected bill.
       wireArrayFirst();
+      // Solar-credit-rate slot: paint the zero state now, and re-resolve whenever
+      // the override utility pick changes (an array change repaints via
+      // resolveArrayBills → paintRateField). The <select> element persists across
+      // option refills, so one listener is enough.
+      paintRateField();
+      const rateUsel = $("#rbmUtility");
+      if (rateUsel) rateUsel.addEventListener("change", paintRateField);
     } else {
       // Upload path: wire the dropzone + paint the live doc-preview placeholder.
       wireUpload();
@@ -4675,6 +4735,62 @@
     if (_extPresent && !_resyncFired.has(String(sid))) { _resyncFired.add(String(sid)); run(); }
   }
 
+  // ── Solar credit rate row for the accordion editor (Bruce C6) ──────────────
+  // GMP-bound offtakers price from the BILL's own net-metering credit rate, so the
+  // editable $/kWh field is gone for them (Bruce: "have it only default to rate
+  // scraped from bill"):
+  //   • no override saved → a read-only line showing the bill-derived rate when the
+  //     draft carries enough to compute it (credit ÷ kWh ÷ (1−discount) — exactly
+  //     inverting the invoice math), else an honest "read from each GMP bill";
+  //   • a legacy manual override → its value shown read-only + a one-click "Clear
+  //     override — use the bill rate" (no hidden state, reversible);
+  //   • VEC/SmartHub, unbound, workbook-priced and legacy-flat offtakers keep the
+  //     fully-functional manual input (no bill-scraped rate is their source of truth).
+  function rateFieldHTML(d, utilAccts) {
+    const accts = utilAccts || INBOX_UTIL_ACCTS || [];
+    const boundAcct = accts.find(a => String(a.utility_account_id) === String(d.utility_account_id));
+    const boundProv = boundAcct ? (boundAcct.provider || "gmp").toLowerCase() : "";
+    const subRec = OFFTAKERS.find(x => String(x.id) === String(d.subscription_id)) || {};
+    const wb = d.has_workbook === true;
+    const legacyFlat = subRec.rate_per_kwh != null && subRec.rate_per_kwh > 0;
+    // Bill-scraped = the GMP bill is the pricing source of truth: GMP-bound, no
+    // legacy flat $/kWh, and (for workbook offtakers) an explicit share set — that
+    // combination routes billing through the bill path (delivery.build_manual_match).
+    const billScraped = boundProv === "gmp" && !legacyFlat && (!wb || d.allocation_pct != null);
+    if (!billScraped) {
+      const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
+      return `<label class="rep-fld rb-rate-fld"><span class="rl">Solar credit rate ($/kWh)</span>
+            <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>`;
+    }
+    if (d.net_rate_per_kwh != null) {
+      return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+            <span class="rb-rate-auto rb-rate-warn"><b>$${Number(d.net_rate_per_kwh).toFixed(5)}/kWh</b> — manual override; your GMP bill's own credit rate is ignored while it's set.</span>
+            <button type="button" class="ao-btn rb-btn rb-rate-clear">Clear override — use the bill rate</button></div>`;
+    }
+    // Just-cleared override: the local figures still reflect the override until the
+    // server recompute lands, so deriving now would flash the OLD rate labeled as
+    // the bill's. Show an honest transient instead (applyDraftFigures clears it).
+    if (d._ratePending) {
+      return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+          <span class="rb-rate-auto">Override cleared — recalculating from your GMP bill…</span></div>`;
+    }
+    // Never derive a "rate" from a budget-overridden total — that's not a rate.
+    const budgetSet = d.budget_amount_usd != null;
+    const creditVal = budgetSet ? (d.solar_credit_value != null ? d.solar_credit_value : null) : d.amount_usd;
+    const discFrac = d.discount_pct != null ? d.discount_pct
+      : (subRec.resolved_discount_pct != null ? subRec.resolved_discount_pct : null);
+    let billRate = null;
+    if (creditVal != null && creditVal > 0 && d.customer_kwh > 0
+        && discFrac != null && discFrac >= 0 && discFrac < 1) {
+      billRate = creditVal / d.customer_kwh / (1 - discFrac);
+    }
+    const line = billRate != null
+      ? `<b>$${billRate.toFixed(5)}/kWh</b> — from your GMP bill${d.period_label ? " (" + esc(d.period_label) + ")" : ""}`
+      : `Read from each GMP bill automatically — shows here once a bill settles.`;
+    return `<div class="rep-fld rb-rate-fld" data-rate-readonly="1"><span class="rl">Solar credit rate</span>
+          <span class="rb-rate-auto">${line}</span></div>`;
+  }
+
   function offtakerEditor(d, utilAccts) {
     const sid = d.subscription_id;
     if (!sid) return "";
@@ -4689,7 +4805,6 @@
     // blank field never hides a live discount the customer is actually billed at.
     const autoDisc = d.discount_pct == null && d.resolved_discount_pct != null && d.resolved_discount_pct > 0;
     const autoDiscPct = autoDisc ? Math.round(d.resolved_discount_pct * 1000) / 10 : null;
-    const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
     const cad = d.cadence || "monthly";
     const sm = d.send_mode || "to_me";
     // The subscription record carries the cross-check share + invoice seed + array id
@@ -4751,8 +4866,7 @@
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
             ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
-          <label class="rep-fld"><span class="rl">Solar credit rate ($/kWh)</span>
-            <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
+          ${rateFieldHTML(d, utilAccts)}
           ${editArrayId !== "" ? `
           <label class="rep-fld"><span class="rl">Commissioning Date</span>
             <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
@@ -5048,11 +5162,37 @@
         };
         commEl.addEventListener("change", () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveDate, 500); });
       }
+      // C6: one-click "Clear override — use the bill rate" on a bill-priced offtaker
+      // whose subscription still carries a legacy manual rate.
+      wireRateClear(card);
       // The labeled "Delete offtaker" button lives inside the editor (rendered into the
       // expanded body, so the list-level [data-del-offtaker] wiring never sees it).
       const del = box.querySelector(".rb-offedit-del[data-del-offtaker]");
       if (del) del.onclick = () => deleteOfftaker(del.getAttribute("data-del-offtaker"));
     });
+  }
+
+  // C6: wire the "Clear override — use the bill rate" button inside a draft card's
+  // editor (if present). Optimistically flips the row to the read-only bill-rate
+  // line, then persists through the SAME debounced money-field pipeline as typing
+  // in the old input did (PATCH {net_rate_per_kwh:null} → draft recompute), so the
+  // figures + calc panel re-derive from the bill's own credit rate.
+  function wireRateClear(card) {
+    const box = card && card.querySelector(".rb-offedit");
+    const btn = box && box.querySelector(".rb-rate-clear");
+    if (!btn) return;
+    const sid = box.getAttribute("data-offedit");
+    const did = card.getAttribute("data-did");
+    btn.onclick = () => {
+      const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+      if (!d) return;
+      d.net_rate_per_kwh = null;
+      d._ratePending = true;              // figures are override-priced until recompute
+      const fld = box.querySelector(".rb-rate-fld");
+      if (fld) fld.outerHTML = rateFieldHTML(d);
+      ACTIVE_DRAFT_ID = did;
+      scheduleOfftakerPatch(card, box, did, sid, { net_rate_per_kwh: null }, true);
+    };
   }
 
   // Pre-fill a commissioning-date input from the array's current setup, and if a
@@ -5196,6 +5336,15 @@
           setSt("rb-status rb-ok", "Saved · figures update once a GMP bill lands.");
         }
       } catch (e) { setSt("rb-status rb-ok", "Saved."); }
+      // C6: if a cleared override's transient "recalculating…" rate row is still up
+      // (recompute wasn't possible — e.g. no settled bill yet), settle it to the
+      // honest static line instead of leaving a stuck in-between state.
+      const dp = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+      if (dp && dp._ratePending) {
+        delete dp._ratePending;
+        const fld = card && card.querySelector(".rb-rate-fld[data-rate-readonly]");
+        if (fld) { fld.outerHTML = rateFieldHTML(dp); wireRateClear(card); }
+      }
     } catch (e) { setSt("rb-status rb-err", "Network error."); }
   }
 
@@ -5221,6 +5370,33 @@
     if (card) {                                       // the calc dashboard now lives in the form col;
       const calcEl = card.querySelector(".rb-calc");  // repaint it in place from the new figures
       if (calcEl) { calcEl.outerHTML = calcDashboard(d); wireCalcLinks(card); }
+      // C6: the READ-ONLY solar-credit-rate line derives from the draft figures, so
+      // re-derive it from the fresh numbers. The one case we must NOT touch is
+      // input→input (VEC/SmartHub manual field the operator may be mid-typing in);
+      // every other transition (readonly refresh, input↔readonly after a utility-
+      // account rebind) repaints so the row always shows the true rate source.
+      const rateFld = card.querySelector(".rb-rate-fld");
+      if (rateFld) {
+        delete d._ratePending;             // fresh server figures just merged — derive for real
+        const fresh = rateFieldHTML(d);
+        const wasInput = !rateFld.hasAttribute("data-rate-readonly");
+        const staysInput = fresh.indexOf("data-rate-readonly") === -1;
+        if (!(wasInput && staysInput)) {
+          rateFld.outerHTML = fresh;
+          wireRateClear(card);           // the repaint can (re)introduce the button
+          // A readonly→input repaint (GMP → VEC rebind) mints a fresh manual input
+          // that missed wireOfftakerEditors — wire it here so it saves like the rest.
+          const rateInp = card.querySelector(".rb-rate-fld [data-of]");
+          if (rateInp) {
+            const rbox = card.querySelector(".rb-offedit");
+            const rdid = card.getAttribute("data-did");
+            const rsid = rbox && rbox.getAttribute("data-offedit");
+            const rh = () => onOfftakerEdit(card, rbox, rdid, rsid, rateInp.getAttribute("data-of"), rateInp);
+            rateInp.addEventListener("input", rh);
+            rateInp.addEventListener("change", rh);
+          }
+        }
+      }
     }
     renderReviewTop();                                // repaint the action buttons
     renderDraftDoc();

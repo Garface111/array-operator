@@ -859,6 +859,18 @@ body.sb-fs-lock{ overflow:hidden; }
   border-left:2px solid var(--octarine,#a368ff); padding-left:8px; margin-left:-2px; }
 .rb-rate-hint-on b{ color:var(--octarine,#a368ff); }
 
+/* Solar-credit-rate read-only line (Bruce C6): for bill-scraped (GMP) offtakers the
+   rate is not typed — it IS the bill's own net-metering credit rate. Same octarine
+   "the system knows this" treatment as the expected-rate helper; the rate value
+   itself carries the accent. */
+.rb-rate-auto{ font-size:12px; line-height:1.5; color:var(--muted,#475569);
+  border-left:2px solid var(--octarine,#a368ff); padding-left:8px; margin-left:-2px; }
+.rb-rate-auto b{ color:var(--octarine,#a368ff); font-weight:700; }
+/* A lingering manual override on a bill-priced offtaker: amber = state to review. */
+.rb-rate-warn{ border-left-color:rgba(245,158,11,.75); }
+.rb-rate-warn b{ color:#b45309; }
+.rb-rate-clear{ align-self:flex-start; margin-top:4px; font-size:11.5px; }
+
 /* ---- offtaker list: utility (provider) → utility account → offtaker (>5 offtakers) ---- */
 /* TOP level — provider bucket (GMP / VEC / WEC). Whole header collapses all its utility
    accounts at once (Ford: "organized by utility... THOSE can be collapsed and expanded").
