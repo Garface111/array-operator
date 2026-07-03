@@ -852,6 +852,9 @@ body.sb-fs-lock{ overflow:hidden; }
       Ask-AI. Day palette, same control language as the rb-* toolbar. ── */
 .rb-es-overlay{ position:fixed; inset:0; z-index:9000; display:flex; flex-direction:column;
   background:var(--bg,#f1f5f9); }
+/* display:flex on these would override the `hidden` attribute's display:none —
+   without this, the hidden chat panel still intercepts clicks over the editor. */
+.rb-es-overlay[hidden], .rb-es-chat[hidden]{ display:none; }
 .rb-es-head{ display:flex; align-items:center; gap:14px; padding:12px 22px;
   background:var(--card,#fff); border-bottom:1px solid var(--line,#e2e8f0); }
 .rb-es-head > div{ flex:1; min-width:0; }
