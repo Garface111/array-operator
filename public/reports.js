@@ -2038,24 +2038,25 @@
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
+          <!-- Required-field marking (Bruce C5): .req mirrors saveManual's actual
+               validation — group, name, share %, email, and the bill pick when its
+               picker is visible. Everything else saves blank, so it stays clear. -->
+          <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
           <div class="rb-mform-grid">
-            <label class="rep-fld"><span class="rl">Net Meter Group</span>
+            <label class="rep-fld req"><span class="rl">Net Meter Group</span>
               <select id="rbmArray"><option value="">Loading arrays…</option></select>
               <span class="rb-fld-hint">The array in which your offtaker participates.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
-              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
+              <label class="rep-fld rb-arr-override req" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
                 <select id="rbmUtility"><option value="">Choose a utility account…</option></select>
                 <span class="rb-fld-hint" id="rbmUtilHint">This group has multiple participants. Your selection here should be the utility account from this dropdown list.</span></label></label>
-            <label class="rep-fld"><span class="rl">Offtaker name</span>
+            <label class="rep-fld req"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
-            <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
+            <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
+                 as one block — "get the solar credit rate right next to or below the
+                 share of array". -->
+            <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
               <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
-            <label class="rep-fld"><span class="rl">Commissioning Date</span>
-              <input type="date" id="rbmCommDate" min="1990-01-01" max="${todayISO()}">
-              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
-            <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
-              <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
-              <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
             <!-- Solar credit rate (Bruce C6): NOT an input for bill-scraped utilities.
                  GMP bills carry their own net-metering credit rate, so the invoice
                  always prices from the bill — the old manual field was an override
@@ -2064,14 +2065,20 @@
                  line; VEC/SmartHub (whose portals publish no usable rate) → the
                  manual $/kWh input, which those offtakers genuinely need. -->
             <label class="rep-fld rbm-rate-slot" id="rbmRateSlot"></label>
+            <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
+              <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
+              <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
             <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
                 <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
               <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.001" placeholder="blank = same as billing share">
               <span class="rb-fld-hint">Optional. Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+            <label class="rep-fld"><span class="rl">Commissioning Date</span>
+              <input type="date" id="rbmCommDate" min="1990-01-01" max="${todayISO()}">
+              <span class="rb-fld-hint" id="rbmRateHint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
             <label class="rep-fld"><span class="rl">Starting invoice #</span>
               <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
               <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
-            <label class="rep-fld"><span class="rl">Client email</span>
+            <label class="rep-fld req"><span class="rl">Client email</span>
               <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
           </div>
           <div class="rb-controls">
@@ -4852,29 +4859,34 @@
                   title="Permanently delete this offtaker">🗑 Delete offtaker</button>
         </div>
         ${resyncBanner(d, utilAccts)}
+        <!-- Required-field marking (Bruce C5): .req mirrors ofPatchBody's actual
+             semantics — name / utility account / share % refuse to save blank
+             (return null); every other field persists blank, so it stays clear. -->
+        <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
         <div class="rb-cust-grid rb-offedit-grid">
-          <label class="rep-fld"><span class="rl">Offtaker name</span>
+          <label class="rep-fld req"><span class="rl">Offtaker name</span>
             <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
           ${showBillPicker ? `
-          <label class="rep-fld"><span class="rl">Which utility account?</span>
+          <label class="rep-fld req"><span class="rl">Which utility account?</span>
             <select data-of="utility_account_id">
               <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
               ${billOpts}
             </select></label>` : ""}
-          <label class="rep-fld"><span class="rl">Expected share of array's net meter group (%)</span>
+          <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
+          <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
+          ${rateFieldHTML(d, utilAccts)}
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
             ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
-          ${rateFieldHTML(d, utilAccts)}
-          ${editArrayId !== "" ? `
-          <label class="rep-fld"><span class="rl">Commissioning Date</span>
-            <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
-            <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
               <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
             <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.001" value="${sharePct}" placeholder="blank = same as billing share">
             <span class="rb-fld-hint">Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+          ${editArrayId !== "" ? `
+          <label class="rep-fld"><span class="rl">Commissioning Date</span>
+            <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
+            <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
           <label class="rep-fld"><span class="rl">Starting invoice #</span>
             <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based">
             <span class="rb-fld-hint">Seeds sequential invoice numbering; each send adds 1.</span></label>

@@ -389,7 +389,12 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-wiz-uplabel b{ color:var(--ink); }
 .rb-wiz-cust-saved{ font-size:11.5px; font-weight:700; color:var(--good);
   background:rgba(63,214,138,.1); border-radius:999px; padding:2px 9px; }
-.rb-mform-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:14px 0 4px; }
+/* Two fixed columns (was auto-fit): at 3+ auto-columns the Solar-credit-rate cell
+   wrapped DIAGONAL to the share field, breaking Bruce's "rate right next to or
+   below the share" (C5). Two columns pin the money pair side by side at every
+   desktop width and mirror the accordion editor's .rb-cust-grid language. */
+.rb-mform-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; margin:14px 0 4px; }
+@media(max-width:680px){ .rb-mform-grid{ grid-template-columns:1fr; } }
 .rb-mform-grid .rep-fld{ display:flex; flex-direction:column; gap:6px; }
 .rb-mform-grid input, .rb-mform-grid select{ width:100%; box-sizing:border-box;
   background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:10px;
@@ -870,6 +875,35 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-rate-warn{ border-left-color:rgba(245,158,11,.75); }
 .rb-rate-warn b{ color:#b45309; }
 .rb-rate-clear{ align-self:flex-start; margin-top:4px; font-size:11.5px; }
+
+/* ---- Required-field marking (Bruce C5) ------------------------------------ */
+/* "Mandatory entries should have a unique coloring, optional ones can be clear."
+   .req is applied ONLY to fields whose blank value actually blocks a save — modal:
+   saveManual's guards (group / bill pick / name / share % / email); accordion
+   editor: the ofPatchBody(null) fields (name / utility account / share %). One flat
+   treatment: a small square chip on the label + a faint accent tint on the control —
+   no glow, no asterisk soup. The accent rides var(--good) (utility blue in the AO
+   day palette, emerald in dark). The conditional bill picker (#rbmUtilityWrap)
+   carries .req but is [hidden] until it's genuinely required, so the marking stays
+   truthful by construction. Optional fields keep the clear default look. */
+.rep-fld.req > .rl::before{ content:""; display:inline-block; width:7px; height:7px;
+  border-radius:2px; background:var(--good,#2563eb); margin-right:6px; }
+.rep-fld.req > input, .rep-fld.req > select{
+  background:rgba(63,214,138,.06); border-color:rgba(63,214,138,.35); }
+/* Keep the form's own focus language (the base rule above otherwise outranks the
+   sheet-order focus rules and would freeze the border on focus). */
+.rep-fld.req > input:focus, .rep-fld.req > select:focus{
+  border-color:rgba(94,194,255,.55); }
+/* Day palette (AO default): blue-tinted white + blue-slate hairline. !important +
+   the extra .req class outrank theme-day's white-field reset; theme-day's :focus
+   rule still wins the cascade at equal specificity, so focus feedback survives. */
+html[data-theme="day"] .rep-fld.req > input,
+html[data-theme="day"] .rep-fld.req > select{
+  background:#eef4ff !important; border-color:#b5c9ec !important; }
+/* Legend — once per form, decodes the chip. Same glyph, same accent. */
+.rb-req-legend{ font-size:11px; color:var(--faint,#94a3b8); margin:0 2px; }
+.rb-req-legend::before{ content:""; display:inline-block; width:7px; height:7px;
+  border-radius:2px; background:var(--good,#2563eb); margin-right:6px; }
 
 /* ---- offtaker list: utility (provider) → utility account → offtaker (>5 offtakers) ---- */
 /* TOP level — provider bucket (GMP / VEC / WEC). Whole header collapses all its utility
