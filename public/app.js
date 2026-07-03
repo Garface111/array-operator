@@ -556,6 +556,11 @@ function adaptOverview(o){
 }
 
 function loadDashboard(){
+  // Stripe checkout return (?card_added=1 / ?reactivated=1 …): parse + scrub
+  // FIRST — before sandbox.js parses and before any /v1/account read — so a
+  // reactivation return suppresses the cancelled gate with no race. No-op
+  // after the first call.
+  try { handleCheckoutReturn(); } catch(e){}
   // A magic-link (or hand-off) may drop a ONE-TIME login token in the URL as
   // ?token=. Exchange it for a real session via /v1/auth/verify (it is NOT a
   // ready session — storing it raw would 401), scrub it from the address bar,
@@ -636,14 +641,190 @@ try {
   };
 } catch(e){}
 
-// -- Trial card-capture nudge ------------------------------------------------
-// Quiet, dismissible bar for a signed-in trialing owner with NO card on file,
-// within ~7 days of trial end. Surfaces the deferred-billing reminder in the UI
-// so engaged owners can add a card at the moment of intent. Dismiss hides it; it
-// reappears ONCE when the trial turns urgent (<=2 days). Never nags daily.
+// -- Trial card-capture nudge + Stripe checkout return -----------------------
+// One quiet bar (#trialNudge) owns the whole card-capture conversation:
+//   • VALUE-ANCHORED ask: once the fleet is live (real kW / kWh / offtakers),
+//     the bar quotes the fleet's actual monthly price from /v1/account/
+//     billing-summary — the same math as the Master Account "Your bill" row —
+//     instead of a vague "add a card". Three dismissible tiers: early (value
+//     reached, >7d left), soft (≤7d), urgent (≤2d); each dismissal holds until
+//     the next tier. Never nags daily.
+//   • CHECKOUT RETURN: landing back from Stripe (?card_added=1&session_id=…)
+//     confirms the card SYNCHRONOUSLY via POST /v1/account/confirm-setup (no
+//     webhook race) and flips the same bar into a success confirmation.
+function aoFmtNudgeDate(d){
+  try { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  catch(e){ return ""; }
+}
+function aoUsd(cents){
+  if(cents == null || isNaN(Number(cents))) return null;
+  return "$" + (Number(cents) / 100).toLocaleString(undefined,
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// The plan's monthly total from a billing-summary payload (AO shapes only).
+function aoBillTotalCents(s){
+  if(!s) return null;
+  const b = s.billing_basis;
+  if(b === "both")      return Number(s.monitoring_total_cents || 0) + Number(s.invoicing_total_cents || 0);
+  if(b === "invoicing") return Number(s.invoicing_total_cents || 0);
+  if(b === "kwh")       return Number(s.monitoring_total_cents || 0);
+  return null;
+}
+// "Fleet is live" = the value moment: anything real is connected/billed.
+function aoValueReached(s){
+  if(!s) return false;
+  return Number(s.nameplate_kw || 0) > 0 || Number(s.mtd_kwh || 0) > 0
+      || Number(s.offtaker_count || 0) > 0;
+}
+// Launch Stripe Checkout (setup mode) from any CTA — shared by every bar state.
+function wireAddCardCta(cta, session){
+  cta.style.display = "";
+  cta.removeAttribute("href");
+  cta.onclick = function(e){
+    e.preventDefault();
+    const orig = cta.textContent;
+    cta.textContent = "Opening…";
+    fetch("/v1/account/add-payment-method", { method:"POST",
+      headers: { "Content-Type":"application/json", Authorization: "Bearer " + session }, body: "{}" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { const u = d && (d.checkout_url || d.url); if(u){ window.location = u; } else { cta.textContent = orig; } })
+      .catch(() => { cta.textContent = orig; });
+  };
+}
+
+// ── Stripe checkout return ──────────────────────────────────────────────────
+// Parse + scrub the return params ONCE at load (before sandbox.js parses, so
+// ?reactivated=1 suppresses the cancelled gate before any /v1/account read).
+function handleCheckoutReturn(){
+  if(window.__aoCheckoutReturn !== undefined) return;
+  window.__aoCheckoutReturn = null;
+  let u = null;
+  try { u = new URL(window.location.href); } catch(e){ return; }
+  const kinds = ["card_added", "card_cancelled", "reactivated", "reactivate_cancelled"];
+  const kind = kinds.find(k => u.searchParams.get(k) === "1");
+  if(!kind) return;
+  const sessionId = u.searchParams.get("session_id") || null;
+  try {
+    kinds.forEach(k => u.searchParams.delete(k));
+    u.searchParams.delete("session_id");
+    window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
+  } catch(e){}
+  window.__aoCheckoutReturn = { kind: kind, sessionId: sessionId, rendered: false };
+  // Suppress the cancelled-account gate while the reactivation webhook lands —
+  // the one thing a just-paid owner must never see is "your subscription is
+  // cancelled".
+  if(kind === "reactivated") window.__aoReactivatePending = true;
+}
+function renderCheckoutReturn(session){
+  const ret = window.__aoCheckoutReturn;
+  if(!ret || ret.rendered) return;
+  const bar = document.getElementById("trialNudge");
+  const copy = document.getElementById("trialNudgeCopy");
+  const cta = document.getElementById("trialNudgeCta");
+  const x = document.getElementById("trialNudgeX");
+  if(!bar || !copy) return;
+  ret.rendered = true;
+  const show = (cls, html) => {
+    bar.classList.remove("success", "neutral", "urgent");
+    if(cls) bar.classList.add(cls);
+    copy.innerHTML = html;
+    if(cta) cta.style.display = "none";
+    if(x) x.onclick = function(){ bar.hidden = true; };
+    bar.hidden = false;
+  };
+  const cardSavedCopy = (d) => {
+    const brandRaw = d && d.card_brand ? String(d.card_brand) : "";
+    const brand = brandRaw ? brandRaw.charAt(0).toUpperCase() + brandRaw.slice(1).toLowerCase() : "";
+    const last4 = d && d.card_last4 ? String(d.card_last4).replace(/\D/g, "") : "";
+    const brief = brand ? (brand + (last4 ? " ···· " + last4 : "")) : "";
+    const ends = d && d.trial_ends_at ? new Date(d.trial_ends_at) : null;
+    let msg = "<b>Card saved" + (brief ? " — " + brief : "") + ".</b> ";
+    if(ends && !isNaN(ends.getTime()) && ends.getTime() > Date.now()){
+      msg += "Your subscription starts automatically when your free trial ends on " +
+             aoFmtNudgeDate(ends) + " — nothing else to do.";
+    } else {
+      msg += "You're all set — billing picks up automatically.";
+    }
+    return msg;
+  };
+  const pollAccount = (pred, tries, delayMs, done, giveUp) => {
+    const tick = (left) => {
+      fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+        .then(r => r.ok ? r.json() : null)
+        .then(a => {
+          if(a && pred(a)){ done(a); return; }
+          if(left <= 1){ giveUp(); return; }
+          setTimeout(() => tick(left - 1), delayMs);
+        })
+        .catch(() => { if(left <= 1){ giveUp(); } else { setTimeout(() => tick(left - 1), delayMs); } });
+    };
+    tick(tries);
+  };
+
+  if(ret.kind === "card_added"){
+    if(!session){
+      show("success", "<b>Card saved.</b> Sign in to see it on your account.");
+      if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
+      return;
+    }
+    show("success", "Confirming your card…");
+    const fallbackPoll = () => pollAccount(
+      a => a.has_payment_method === true, 6, 2000,
+      () => show("success", cardSavedCopy(null)),
+      () => show("success", "<b>Your card was saved with Stripe.</b> It can take a minute to appear here — check Master Account shortly."));
+    if(ret.sessionId){
+      fetch("/v1/account/confirm-setup", { method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
+        body: JSON.stringify({ session_id: ret.sessionId }) })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if(d && d.card_saved){ show("success", cardSavedCopy(d)); }
+          else { fallbackPoll(); }
+        })
+        .catch(fallbackPoll);
+    } else {
+      fallbackPoll();
+    }
+  } else if(ret.kind === "card_cancelled"){
+    show("neutral", "Checkout closed — no card was added and nothing was charged." +
+      (session ? " Add one anytime; your trial keeps running." : ""));
+    if(cta && session){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
+  } else if(ret.kind === "reactivated"){
+    if(!session){
+      show("success", "<b>Card saved.</b> Sign in to finish restarting your subscription.");
+      if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
+      return;
+    }
+    show("success", "Card saved — restarting your subscription…");
+    // Best-effort synchronous card attribution; the WEBHOOK creates the
+    // subscription (deliberately — billing state changes in exactly one place).
+    if(ret.sessionId){
+      fetch("/v1/account/confirm-setup", { method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
+        body: JSON.stringify({ session_id: ret.sessionId }) }).catch(() => {});
+    }
+    pollAccount(
+      a => a.active === true && !(window.aoIsCancelled && window.aoIsCancelled(a)), 15, 2000,
+      () => {
+        window.__aoReactivatePending = false;
+        show("success", "<b>Your subscription is active again.</b> Welcome back — everything is where you left it.");
+        try { renderFromSession(); } catch(e){}
+      },
+      () => show("success", "<b>Card saved.</b> Your subscription is restarting — this can take a minute; refresh to check."));
+  }
+  // reactivate_cancelled: params scrubbed, nothing to show — the cancelled gate
+  // reappears on its own, which is the honest state.
+}
+try {
+  window.__aoHandleCheckoutReturn = handleCheckoutReturn;
+  window.__aoRenderCheckoutReturn = renderCheckoutReturn;
+} catch(e){}
+
 function updateTrialNudge(session){
   const bar = document.getElementById("trialNudge");
   if(!bar) return;
+  // Landing back from Stripe checkout? The return flow owns the bar.
+  if(window.__aoCheckoutReturn) return;
   if(!session){ bar.hidden = true; return; }
   fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
     .then(r => r.ok ? r.json() : null)
@@ -654,8 +835,8 @@ function updateTrialNudge(session){
       const ends = a.trial_ends_at ? new Date(a.trial_ends_at) : null;
       if(hasCard || !ends || isNaN(ends.getTime())){ bar.hidden = true; return; }
       const days = Math.ceil((ends.getTime() - Date.now()) / 86400000);
-      if(days < 0 || days > 7){ bar.hidden = true; return; }
-      const tier = days <= 2 ? "urgent" : "soft";
+      if(days < 0){ bar.hidden = true; return; }
+      const tier = days <= 2 ? "urgent" : (days <= 7 ? "soft" : "early");
       let dis = null;
       const rawDismiss = localStorage.getItem("ao_trialnudge_dismiss");
       try {
@@ -678,38 +859,55 @@ function updateTrialNudge(session){
         console.warn("[trial-nudge] corrupt dismissal state in localStorage, resetting:", e && e.message);
         try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
       }
+      // A dismissal holds through its own tier and every quieter one; the bar
+      // only returns when the ask escalates (early → soft → urgent). Legacy
+      // stored tiers ("soft"/"urgent") rank naturally.
+      const RANK = { early: 0, soft: 1, urgent: 2 };
+      const curRank = RANK[tier];
       if(dis && dis.ends === a.trial_ends_at){
-        if(dis.tier === "urgent"){ bar.hidden = true; return; }
-        if(tier === "soft"){ bar.hidden = true; return; }
+        const disRank = (RANK[dis.tier] != null) ? RANK[dis.tier] : 1;
+        if(curRank <= disRank){ bar.hidden = true; return; }
       }
-      const when = days <= 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
-      const copy = document.getElementById("trialNudgeCopy");
-      if(copy){
-        copy.innerHTML = (tier === "urgent")
-          ? "<b>Your free trial ends " + when + ".</b> Add a card to keep your reports running."
-          : "Your free trial ends " + when + ". Add a card whenever you're ready to keep your reports running after it.";
-      }
-      bar.classList.toggle("urgent", tier === "urgent");
-      const cta = document.getElementById("trialNudgeCta");
-      if(cta){
-        cta.onclick = function(e){
-          e.preventDefault();
-          cta.textContent = "Opening...";
-          fetch("/v1/account/add-payment-method", { method:"POST",
-            headers: { "Content-Type":"application/json", Authorization: "Bearer " + session }, body: "{}" })
-            .then(r => r.ok ? r.json() : null)
-            .then(d => { const u = d && (d.checkout_url || d.url); if(u){ window.location = u; } else { cta.textContent = "Add a card"; } })
-            .catch(() => { cta.textContent = "Add a card"; });
-        };
-      }
-      const x = document.getElementById("trialNudgeX");
-      if(x){
-        x.onclick = function(){
-          try { localStorage.setItem("ao_trialnudge_dismiss", JSON.stringify({ ends: a.trial_ends_at, tier: tier })); } catch(e){}
-          bar.hidden = true;
-        };
-      }
-      bar.hidden = false;
+      // Value-anchor the ask: quote the fleet's REAL monthly price (same math
+      // as the Master Account "Your bill" row). The early tier only exists
+      // once the fleet is live — the card-ask follows the value moment, it
+      // never precedes it.
+      fetch("/v1/account/billing-summary", { headers: { Authorization: "Bearer " + session } })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+        .then(s => {
+          const total = aoBillTotalCents(s);
+          const price = (total != null && total > 0) ? aoUsd(total) : null;
+          if(tier === "early" && (!aoValueReached(s) || !price)){ bar.hidden = true; return; }
+          const when = days <= 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
+          const onDate = aoFmtNudgeDate(ends);
+          const copy = document.getElementById("trialNudgeCopy");
+          if(copy){
+            if(tier === "urgent"){
+              copy.innerHTML = "<b>Your free trial ends " + when + ".</b> Add a card to keep your fleet monitored" +
+                (price ? " — " + price + "/mo" : "") + ".";
+            } else if(tier === "soft"){
+              copy.innerHTML = price
+                ? "Your free trial ends " + when + ". Keep everything running for <b>" + price + "/mo</b> — nothing is charged until " + onDate + "."
+                : "Your free trial ends " + when + ". Add a card whenever you're ready to keep your reports running after it.";
+            } else {
+              copy.innerHTML = "Your fleet is live — after your free trial ends on " + onDate +
+                ", Array Operator runs <b>" + price + "/mo</b> for this fleet. Add a card once and you're set.";
+            }
+          }
+          bar.classList.remove("success", "neutral");
+          bar.classList.toggle("urgent", tier === "urgent");
+          const cta = document.getElementById("trialNudgeCta");
+          if(cta){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
+          const x = document.getElementById("trialNudgeX");
+          if(x){
+            x.onclick = function(){
+              try { localStorage.setItem("ao_trialnudge_dismiss", JSON.stringify({ ends: a.trial_ends_at, tier: tier })); } catch(e){}
+              bar.hidden = true;
+            };
+          }
+          bar.hidden = false;
+        });
     })
     .catch(() => { /* never block the dashboard on the nudge */ });
 }
@@ -727,6 +925,10 @@ function aoIsCancelled(a){
   return a.active === false && (st === "cancelled" || st === "canceled");
 }
 function aoShowCancelledGate(){
+  // Landing back from reactivation checkout: the webhook that flips the tenant
+  // active can lag this page-load by seconds — never greet a just-paid owner
+  // with "your subscription is cancelled". renderCheckoutReturn owns the state.
+  if(window.__aoReactivatePending) return;
   if(document.getElementById("aoCancelledGate")) return;   // already shown
   const el = document.createElement("div");
   el.id = "aoCancelledGate";
@@ -838,6 +1040,8 @@ function renderFromSession(){
   // GMP is connected + at least one array is linked. Signed-out → always hidden.
   try { updateGmpGate(session); } catch(e){}
   try { updateTrialNudge(session); } catch(e){}
+  // Landing back from Stripe checkout → confirmation state in the same bar.
+  try { renderCheckoutReturn(session); } catch(e){}
   // Onboarding GMP handoff: an owner who chose 'Log in with Green Mountain
   // Power' in onboarding lands here signed in; auto-open the proven GMP connect.
   try {
