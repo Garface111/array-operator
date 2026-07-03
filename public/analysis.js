@@ -77,6 +77,24 @@
     }).then(function (d) { reloadForecast(); return d; });
   };
 
+  // Set/clear an array's operator-entered EXPECTED specific yield (kWh per kW
+  // per DAY). null clears → back to the weather model. Used by the kWh/kW
+  // health section's per-row "target" affordance; reloads the forecast so
+  // expected/ratio flip to the new basis everywhere at once.
+  window.__aoSetArrayExpectedRatio = function (arrayId, kwhPerKwDay) {
+    var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to set a target"));
+    return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/expected-ratio", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+      body: JSON.stringify({ expected_kwh_per_kw_day: (kwhPerKwDay == null ? null : Number(kwhPerKwDay)) })
+    }).then(function (r) {
+      return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
+        var msg = e && e.detail;
+        if (msg && typeof msg === "object") msg = msg.message || msg.detail || JSON.stringify(msg);
+        throw new Error(msg || ("Couldn't save the target (" + r.status + ")"));
+      });
+    }).then(function (d) { reloadForecast(); return d; });
+  };
+
   // ---- weather: Open-Meteo weathercode → a compact sky descriptor -------------
   // Shared by the demo synthesis AND the real per-site weather the backend adds to
   // forecast rows, so the Sites grid renders one consistent icon set either way.
@@ -109,7 +127,7 @@
   var _simForecast = null;
   function _h(n, salt) { var x = ((Number(n) || 0) + (salt || 0)) * 2654435761 % 4294967296; return ((x >>> 0) % 1000) / 1000; }
   function buildSimulatedForecast(arrays) {
-    var rows = [], sumE = 0, sumA = 0, spotlight = null;
+    var rows = [], sumE = 0, sumA = 0, sumNp = 0, sumNpDays = 0, spotlight = null;
     var codes = [0, 0, 1, 2, 3, 61, 63, 71];   // weighted toward clearer skies
     arrays.forEach(function (a) {
       var np = 0, act = 0;
@@ -127,9 +145,13 @@
       rows.push({
         array_id: a.id, array_name: a.name, nameplate_kw: Math.round(np * 10) / 10,
         expected_kwh: exp, actual_kwh: act, ratio_pct: ratio, measured_days: 10,
+        // demo kWh/kW (same units as the live payload: kWh per kW per day / per window)
+        kwh_per_kw_day: Math.round(act / np / 10 * 100) / 100,
+        kwh_per_kw_window: Math.round(act / np * 10) / 10,
+        expected_basis: "weather_model", expected_kwh_per_kw_day: null,
         confidence: "high", tilt_assumed: false, weather_code: code
       });
-      sumE += exp; sumA += act;
+      sumE += exp; sumA += act; sumNp += np; sumNpDays += np * 10;
       if (code === 0 && (!spotlight || ratio > spotlight.ratio_pct)) {
         spotlight = { array_name: a.name, poa_kwh_m2: 6.2, actual_kwh: act, expected_kwh: exp, ratio_pct: ratio, day: "a recent clear day" };
       }
@@ -139,7 +161,12 @@
       available: true, simulated: true, ratio_pct: fr,
       performance_ratio_measured: sumE > 0 ? Math.round(sumA / sumE * 1000) / 1000 : null,
       expected_kwh: Math.round(sumE), actual_kwh: Math.round(sumA), expected_kwh_window: Math.round(sumE),
-      confidence: "high", arrays_modeled: rows.length, arrays_skipped: 0,
+      confidence: "high", arrays_modeled: rows.length, arrays_skipped: 0, arrays_ratio_based: 0,
+      kwh_per_kw: {
+        fleet_per_day: sumNpDays > 0 ? Math.round(sumA / sumNpDays * 100) / 100 : null,
+        nameplate_kw: Math.round(sumNp * 10) / 10, arrays_counted: rows.length,
+        units: "kWh per kW per day, averaged over measured days"
+      },
       rows: rows, skipped: [], sunny_spotlight: spotlight,
       inputs: { simulated: true, pr: 0.84, irradiance_source: "simulated", note: "Demo fleet — simulated weather model" },
       window: { days: 10 }
@@ -177,6 +204,7 @@
       forecastByArray: forecastByArray,          // {array_id: row}  row={expected_kwh,actual_kwh,ratio_pct,nameplate_kw,…,weather_code}
       forecastSkipped: forecastSkipped,          // {array_id: "no_location"|"no_nameplate"|"irradiance_unavailable"}
       setLocation: window.__aoSetArrayLocation,  // (arrayId, {place}|{use_name}|{latitude,longitude}) → Promise; reloads forecast
+      setExpectedRatio: window.__aoSetArrayExpectedRatio, // (arrayId, kwhPerKwDay|null) → Promise; reloads forecast
       sky: skyFromCode,                          // (weather_code) → {glyph,label,tone} | null — shared weather icon map
       energyRate: (window.FleetStore && FleetStore.energyRate()) || 0.21,
       recPerMwh: (window.FleetStore && FleetStore.REC_PER_MWH) || 38,

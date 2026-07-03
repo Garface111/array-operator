@@ -183,6 +183,12 @@
         : "";
       var conf = esc(CONF_LABEL[f.confidence] || f.confidence || "");
       var modeled = num(f.arrays_modeled);
+      // honesty footnote: arrays whose "expected" is an operator-entered kWh/kW
+      // target (set in the kWh/kW health card above), not the weather model.
+      var ratioBased = num(f.arrays_ratio_based);
+      var ratioNote = (ratioBased > 0)
+        ? ' ' + ratioBased + ' array' + (ratioBased === 1 ? ' uses' : 's use') + ' your entered kWh/kW target as its expected.'
+        : '';
 
       body =
         '<div class="anfc-head">' +
@@ -196,7 +202,7 @@
         '<div class="anfc-verdict ' + tone + '">' + (pct < 82 ? "⚠ " : "") + esc(verdict) + '</div>' +
         explainHTML(f, ctx) +
         spotLine +
-        '<div class="anfc-note">Expected = the <b>real sunlight</b> that fell on your arrays\' locations, not a seasonal average — ' + conf + (modeled != null ? ' (' + modeled + ' array' + (modeled === 1 ? '' : 's') + ' modeled)' : '') + '.' +
+        '<div class="anfc-note">Expected = the <b>real sunlight</b> that fell on your arrays\' locations, not a seasonal average — ' + conf + (modeled != null ? ' (' + modeled + ' array' + (modeled === 1 ? '' : 's') + ' modeled)' : '') + '.' + esc(ratioNote) +
         '<button type="button" class="anfc-toggle" data-anfc-toggle aria-expanded="' + _open + '">' + (_open ? "Hide" : "How we calculated this") + '</button></div>' +
         (_open ? howHTML(f, ctx) : "");
     }
@@ -218,7 +224,8 @@
     if (t) t.addEventListener("click", function () { _open = !_open; render(container, ctx); });
   }
 
-  // order 15 → right under the Portfolio KPI strip (10), above the Sites grid (20):
-  // the flagship weather-adjusted headline leads the Analysis tab.
-  window.AnalysisSections.push({ id: "forecast", title: "Production vs expected", order: 15, render: render });
+  // order 8 → SECOND, right under the kWh/kW health ranking (order 5) and above
+  // the Portfolio KPI strip (10). Bruce's Analysis order: kWh/kW ratio first
+  // (with flags inline), THEN actual-vs-expected as the second layer.
+  window.AnalysisSections.push({ id: "forecast", title: "Production vs expected", order: 8, render: render });
 })();
