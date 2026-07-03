@@ -251,6 +251,61 @@
     chip.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } };
   }
 
+  /* ── Generation-time cross-check (Bruce, 2026-07) ────────────────────────────
+   * POST /subscriptions/{id}/draft now returns `crosscheck`: the share GMP
+   * effectively used for this offtaker (credited ÷ the array bill's group
+   * excess) vs the share the operator entered, flagged beyond the backend's
+   * SHARE_VARIANCE_THRESHOLD_PCT (or the audit's kWh tolerance). Captured at
+   * EVERY generation site (open-card mint, background refresh, money edits,
+   * quarterly draft) and rendered as an inline strip at the top of the draft
+   * card — the check "pops up when an invoice is generated" (Bruce), always as
+   * fresh as the draft itself (the page-load /reconcile-bills snapshot backs
+   * the fuller "Bill accuracy check" section below it). null = the check can't
+   * run honestly yet (no settled bill / no share / single meter) → no strip,
+   * never a fabricated verdict. */
+  const XCHECK_BY_SUB = {};          // sub_id -> crosscheck object | null
+  // 2-decimal share/variance formatter (25.53%, not 25.5300%).
+  const fmtPct = n => n == null ? "—"
+    : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  // Record a POST /draft response's crosscheck + repaint the open card's strip
+  // in place. Tolerates old/partial responses (no `crosscheck` key → no-op).
+  function noteXcheck(subId, data) {
+    if (!data || typeof data !== "object" || !("crosscheck" in data)) return;
+    XCHECK_BY_SUB[String(subId)] = data.crosscheck;
+    refreshXcheck(subId);
+  }
+  function refreshXcheck(subId) {
+    const host = document.querySelector(`.rb-xcheck-host[data-xcheck="${String(subId)}"]`);
+    if (host) host.innerHTML = xcheckHTML(subId);
+  }
+  function xcheckHTML(subId) {
+    const x = XCHECK_BY_SUB[String(subId)];
+    if (!x) return "";               // not run yet / can't run — honest silence
+    const th = x.threshold_pct != null ? x.threshold_pct : 0.1;
+    if (!x.flagged) {
+      // Quiet green line: the numbers agree — say so with the real shares.
+      return `<div class="rb-xcheck rb-xcheck-ok" role="status">✓ Cross-check — GMP's share matches yours within ${fmtPct(th)}%`
+        + ` <small>(${fmtPct(x.computed_share_pct)}% on the bills · ${fmtPct(x.entered_share_pct)}% entered)</small></div>`;
+    }
+    // Prominent warning strip with the real numbers — the operator sees exactly
+    // what disagrees before Approve & send.
+    const offKwh = x.delta_kwh != null ? Math.abs(Number(x.delta_kwh)) : null;
+    const dollars = x.delta_dollars ? ` ≈ ${money(Math.abs(x.delta_dollars))}` : "";
+    const offLine = offKwh != null
+      ? `Off by ${fmt0(offKwh)} kWh${dollars} · variance ${fmtPct(Math.abs(x.variance_pct))}% (flags beyond ${fmtPct(th)}%). `
+      : "";
+    return `<div class="rb-xcheck rb-xcheck-flag" role="alert">
+        <div class="rb-xcheck-head"><span class="rb-xcheck-ico" aria-hidden="true">⚑</span>Cross-check — GMP's bill doesn't match this offtaker's share</div>
+        <div class="rb-xcheck-figs">
+          <span class="rb-xcheck-fig"><b>${fmtPct(x.computed_share_pct)}%</b><small>share GMP's bills imply</small></span>
+          <span class="rb-xcheck-fig"><b>${fmtPct(x.entered_share_pct)}%</b><small>share you entered</small></span>
+          <span class="rb-xcheck-fig"><b>${fmt0(x.kwh_offtaker_credited)}</b><small>kWh GMP credited them</small></span>
+          <span class="rb-xcheck-fig"><b>${fmt0(x.kwh_offtaker_expected)}</b><small>kWh expected (${fmtPct(x.entered_share_pct)}% × ${fmt0(x.kwh_master)})</small></span>
+        </div>
+        <div class="rb-xcheck-note">${offLine}Check the entered share or GMP's bill before sending — details in the Bill accuracy check below.</div>
+      </div>`;
+  }
+
   /* ===========================================================================
    * BILL AUDIT SANDBOX — Ford/Bruce's "organize the fleet the way GMP allocates it
    * so you can catch GMP's per-offtaker math errors visually".
@@ -1365,7 +1420,20 @@
       const r = await fetch(API + "/subscriptions/" + subId + "/draft", { method: "POST", headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
       if (r.ok && data.ok) {
-        if (st) { st.className = "rb-status rb-ok"; st.textContent = "Added to your approval inbox (Invoice generator tab) — review, edit the email, then send."; }
+        noteXcheck(subId, data);   // the cross-check rides the generation response
+        const xc = data.crosscheck;
+        if (st) {
+          if (xc && xc.flagged) {
+            st.className = "rb-status rb-err";
+            st.textContent = "Drafted — but the cross-check flagged it: GMP's bill doesn't match this offtaker's share ("
+              + fmtPct(xc.computed_share_pct) + "% on the bills vs " + fmtPct(xc.entered_share_pct)
+              + "% entered). Review it in the approval inbox before sending.";
+          } else {
+            st.className = "rb-status rb-ok";
+            st.textContent = (xc && !xc.flagged ? "Cross-check ✓ GMP's numbers match this offtaker's share. " : "")
+              + "Added to your approval inbox (Invoice generator tab) — review, edit the email, then send.";
+          }
+        }
       } else {
         if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft."; }
       }
@@ -4018,6 +4086,10 @@
       if (!r.ok) return;
       dg = await r.json().catch(() => ({}));
     } catch (_) { return; }
+    // The generation-time cross-check rides every /draft response — record it and
+    // repaint the strip in place BEFORE the figures-changed short-circuit below
+    // (the strip must fill in even when the draft numbers themselves didn't move).
+    noteXcheck(subId, dg);
     // Update the figures IN PLACE — and ONLY if this offtaker is still open on its LATEST
     // version AND a figure actually changed. The usual case (the GMP bill hasn't moved) is
     // a no-op that touches NOTHING, so the page never silently rebuilds under the operator.
@@ -4071,6 +4143,10 @@
         const e = await r.json().catch(() => ({}));
         GEN_FAIL[subId] = (e && e.detail) ? e.detail
           : "No billable period yet for this offtaker — its report appears here once a GMP bill lands.";
+      } else {
+        // Record the generation-time cross-check before the inbox re-render below,
+        // so the freshly-minted card paints its verdict strip on first draw.
+        noteXcheck(subId, await r.json().catch(() => ({})));
       }
     } catch (e) { GEN_FAIL[subId] = "Couldn't reach the server — try again."; }
     GENERATING_SUB_ID = null;
@@ -4534,6 +4610,7 @@
           <div class="rb-draft-name">${esc(d.customer_name)}</div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
+        ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
         ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false)}
         ${sec("Edit email", emailBody, "the note your offtaker sees", false)}
         ${sec("Invoice template", tplSlot, "PDF / Excel format", false)}
@@ -4973,7 +5050,10 @@
   // ── Live offtaker-edit wiring ──────────────────────────────────────────────
   // Money fields change the invoiced amount, so a change recomputes the draft;
   // copy fields only repaint the preview envelope.
-  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
+  // array_share_pct IS money: real-math billing charges share × the array's group
+  // excess, and the generation-time cross-check compares GMP's implied share to it
+  // — so a share edit must recompute the draft (and re-run the cross-check) live.
+  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "array_share_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
   const OF_PENDING = {};   // sid -> { body, money, timer, card, box, did }
 
   function wireOfftakerEditors(wrap) {
@@ -5130,6 +5210,9 @@
         const rg = await fetch(API + "/subscriptions/" + sid + "/draft",
           { method: "POST", headers: authHeaders() });
         const dg = await rg.json().catch(() => ({}));
+        // A share/rate edit re-runs the cross-check server-side — flip the strip
+        // live so a just-corrected share clears the flag (or a bad one raises it).
+        if (rg.ok) noteXcheck(sid, dg);
         const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
         if (rg.ok && dg.draft && d) {
           // Include budget_amount_usd + solar_credit_value so CLEARING a budget bill

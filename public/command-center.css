@@ -1278,6 +1278,27 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-bac-clean{ font-size:12px; font-weight:600; color:#0a7d4f; vertical-align:middle; margin-left:2px; }
 @media (max-width:560px){ .rb-bac-figs{ grid-template-columns:1fr; } }
 
+/* ── Generation-time cross-check strip (Bruce) ──────────────────────────────
+   Pops up at the top of the draft card the moment an invoice is generated.
+   Quiet emerald one-liner when GMP's share matches the operator's; a prominent
+   amber warning with the real numbers when it doesn't. Empty host collapses. */
+.rb-xcheck-host:empty{ display:none; }
+.rb-xcheck-host{ display:block; margin:2px 0 10px; }
+.rb-xcheck-ok{ font-size:12.5px; font-weight:650; color:#0a7d4f; padding:7px 11px;
+  background:rgba(10,125,79,.06); border:1px solid rgba(10,125,79,.22); border-radius:10px; }
+.rb-xcheck-ok small{ font-weight:500; color:#4a8a6d; font-variant-numeric:tabular-nums; }
+.rb-xcheck-flag{ border:1px solid rgba(214,158,46,.55); border-radius:12px; padding:11px 14px;
+  background:linear-gradient(180deg,rgba(255,247,232,.95),#fff); box-shadow:0 1px 3px rgba(120,90,20,.08); }
+.rb-xcheck-head{ display:flex; align-items:center; gap:7px; font-size:13px; font-weight:800;
+  color:#8a6414; margin-bottom:8px; }
+.rb-xcheck-ico{ color:#d69e2e; font-size:14px; }
+.rb-xcheck-figs{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px 14px; margin-bottom:7px; }
+.rb-xcheck-fig{ display:flex; flex-direction:column; gap:1px; }
+.rb-xcheck-fig b{ font-size:15px; font-weight:800; color:#16202b; font-variant-numeric:tabular-nums; line-height:1.1; }
+.rb-xcheck-fig small{ font-size:11px; color:#7b8794; line-height:1.35; }
+.rb-xcheck-note{ font-size:12px; line-height:1.5; color:#6b5316; }
+@media (max-width:560px){ .rb-xcheck-figs{ grid-template-columns:1fr; } }
+
 /* ── Bill audit sandbox ──────────────────────────────────────────────────────
    Organize the fleet the way GMP allocates it: the array's MASTER utility bill on
    top, each offtaker's own bill underneath, flagged amber when GMP's credited kWh
