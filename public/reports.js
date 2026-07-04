@@ -914,6 +914,36 @@
     return { ok: true, count: count != null ? Number(count) : null, name };
   }
 
+  // Authenticated download that tolerates a background-computed export: the
+  // register endpoint returns 202 {pending:true} (JSON) while it builds at
+  // scale, then the CSV. Poll the JSON away, then blob-download the CSV.
+  async function exportPoll(url, fallbackName) {
+    for (let i = 0; i < 40; i++) {                 // ≤ ~7 min of 10s polls
+      const r = await fetch(url, { headers: authHeaders() });
+      const ct = r.headers.get("content-type") || "";
+      if (r.status === 202 || ct.includes("application/json")) {
+        let d = null; try { d = await r.json(); } catch (e) {}
+        if (d && d.pending) { await new Promise(res => setTimeout(res, 10000)); continue; }
+        throw new Error((d && d.detail) || "Nothing to export for this period yet.");
+      }
+      if (!r.ok) throw new Error("Download failed (HTTP " + r.status + ").");
+      const count = r.headers.get("X-Invoice-Count");
+      let name = fallbackName;
+      const cd = r.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+      if (m && m[1]) { try { name = decodeURIComponent(m[1].trim().replace(/"/g, "")); } catch (e) { name = m[1].trim().replace(/"/g, ""); } }
+      const blob = await r.blob();
+      if (!blob || blob.size === 0) throw new Error("Nothing to download yet.");
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
+      return { ok: true, count: count != null ? Number(count) : null, name };
+    }
+    throw new Error("Export is taking longer than usual — try again in a moment.");
+  }
+
   const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
   function wireExport() {
     const box = $("#rbExportBox"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
@@ -940,15 +970,16 @@
       _busy = true;
       if (btnQb) btnQb.disabled = true;
       if (btnXero) btnXero.disabled = true;
-      setStat("rb-busy", "Exporting to " + label + "…");
+      setStat("rb-busy", "Preparing your " + label + " export…");
       const code = acct && acct.value.trim();
       const params = new URLSearchParams({ format: format });
       if (code) params.set("account_code", code);
       const url = API + "/invoice-export.csv?" + params.toString();
       try {
-        // The backend stamps a per-format filename via Content-Disposition; authBlobDownload
-        // prefers it, so the fallback here is only used if that header is missing.
-        const res = await authBlobDownload(url, "offtaker-invoices-" + format + ".csv", "X-Invoice-Count");
+        // The register computes in a background sweep at scale (a 202 {pending}
+        // while it runs), so poll until the CSV lands, then download it. The
+        // backend stamps a per-format filename via Content-Disposition.
+        const res = await exportPoll(url, "offtaker-invoices-" + format + ".csv");
         const n = res.count;
         setStat("rb-ok", n != null
           ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for " + label + ".")
@@ -982,11 +1013,21 @@
     if (ARCHIVE) return Promise.resolve(ARCHIVE);
     if (_archivePromise) return _archivePromise;
     if (!authHeaders()) return Promise.resolve(null);
-    _archivePromise = fetch(API + "/invoice-archive", { headers: authHeaders() })
-      .then(r => (r.ok ? r.json().catch(() => null) : null))
-      .then(d => { if (d && d.ok) ARCHIVE = d; return ARCHIVE; })
-      .catch(() => null)
-      .then(v => { _archivePromise = null; return v; });
+    // The manifest computes in a background sweep (a match per offtaker — ~60s
+    // at 800 crossed the edge timeout); {pending:true} means "poll again".
+    _archivePromise = (async () => {
+      for (let i = 0; i < 30; i++) {                 // ≤ ~5 min of 10s polls
+        try {
+          const r = await fetch(API + "/invoice-archive", { headers: authHeaders() });
+          if (!r.ok) return null;
+          const d = await r.json().catch(() => null);
+          if (d && d.ok) { ARCHIVE = d; return ARCHIVE; }
+          if (!d || !d.pending) return null;
+        } catch (e) { return null; }
+        await new Promise(res => setTimeout(res, 10000));
+      }
+      return null;
+    })().then(v => { _archivePromise = null; return v; });
     return _archivePromise;
   }
 
