@@ -59,6 +59,23 @@
   }
   function kwh0(n) { return n == null ? "—" : Math.round(n).toLocaleString() + " kWh"; }
 
+  // "Today" provenance. The backend marks an array's today-kWh as an ESTIMATE when
+  // it was smeared from a utility bill (produced_today_source === "bill_prorate"),
+  // vs a MEASURED reading (vendor telemetry / CSV / GMP / summed live). Surface that
+  // so a prorated estimate can't read as a metered total — same data-honesty rule as
+  // the allocated per-inverter power. Returns {est, tip}.
+  function todayProvenance(c) {
+    const est = !!(c && (c.produced_today_is_estimated || c.produced_today_source === "bill_prorate"))
+      && c.produced_today_kwh != null;
+    return {
+      est,
+      tip: est
+        ? "Estimated from your utility bill (spread evenly across the month), not a measured reading."
+        : "",
+    };
+  }
+
+
   // Each return carries `count` = how many inverters this array is flagging, so the
   // vendor-group rollup (vendorStatusSummary) can total REAL inverter counts instead
   // of scraping a leading digit off the display string. Critical headlines like "An
@@ -683,7 +700,7 @@
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
-          <span class="vs-c-today">${kwh0(c.produced_today_kwh)}</span>
+          ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
           <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
           <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
         </button>`;
