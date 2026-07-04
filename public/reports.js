@@ -263,6 +263,7 @@
     host.innerHTML = bacSummaryHTML();
     wireBacChip(host);
     updateAuditTabBadge();
+    renderKpis();   // the "Doesn't match GMP" KPI tile fills when RECON lands
   }
   function wireBacChip(host) {
     const chip = host && host.querySelector("#rbBacChip");
@@ -708,6 +709,22 @@
       // path (the signed-out/demo branch returns earlier), so revealing + wiring the
       // export box here inherently gates it to authed operators.
       wireExport();
+      // The Export controls now live in ONE popover (approved redesign) —
+      // the button toggles it; any outside click closes it.
+      const xBtn = $("#rb2ExportBtn"), xPop = $("#rb2ExportPop");
+      if (xBtn && xPop) {
+        xBtn.onclick = (e) => {
+          e.stopPropagation();
+          xPop.hidden = !xPop.hidden;
+          xBtn.setAttribute("aria-expanded", String(!xPop.hidden));
+        };
+        document.addEventListener("click", (e) => {
+          if (!xPop.hidden && !xPop.contains(e.target) && e.target !== xBtn) {
+            xPop.hidden = true;
+            xBtn.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
       el.dataset.rbBuilt = "1";
     }
     // Heavy invoice-template preview: wire ONCE, and only when the tab is really
@@ -722,6 +739,8 @@
       // refreshList() now renders the unified accordion (offtaker list + their
       // drafts inline) — the old separate approval inbox is gone.
       Promise.all([refreshList(), refreshGmpBillsStatus()]).catch(() => {});
+      // The send-pipeline band (fire-and-forget; hidden until data lands).
+      loadPipeline();
     }
     // Invoice archive (monthly directory): fetch the manifest once (cached) on a real
     // view and render the collapsible directory. Skipped during the idle prefetch;
@@ -1139,6 +1158,7 @@
     const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
     const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
     const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
+    const exBtn = $("#rb2ExportBtn"); if (exBtn) exBtn.onclick = () => demoNudge(exBtn);
   }
 
   // A gentle, in-place "this is a demo" affordance — no fetch, no error.
@@ -1468,6 +1488,201 @@
     return ov;
   }
 
+  // ─── Send pipeline + KPI band (Ford-approved redesign, 2026-07-03) ─────────
+  // The flow view over the offtaker list: what fired, what's in flight, what
+  // fires next — plus the pipeline controls (Auto-send all / Draft all with
+  // confirms, and the tenant-wide Pause switch). All numbers come from
+  // GET /send-pipeline (cheap column aggregates, no invoice rebuilds).
+  let PIPE = null;
+
+  function _monthName(ym) {           // "2026-06" → "June"
+    if (!ym) return "—";
+    const parts = String(ym).split("-").map(Number);
+    if (!parts[0] || !parts[1]) return "—";
+    return new Date(Date.UTC(parts[0], parts[1] - 1, 1))
+      .toLocaleDateString(undefined, { month: "long", timeZone: "UTC" });
+  }
+  function _fireLabel(iso) {          // "2026-08-01T09:00:00" → "Aug 1"
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return isNaN(d) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  function _daysUntil(iso) {
+    if (!iso) return null;
+    const ms = new Date(iso).getTime() - Date.now();
+    return isNaN(ms) ? null : Math.max(0, Math.ceil(ms / 86400000));
+  }
+
+  async function loadPipeline() {
+    if (!authHeaders()) return;
+    try {
+      const r = await fetch(API + "/send-pipeline", { headers: authHeaders() });
+      if (!r.ok) return;
+      const d = await r.json().catch(() => null);
+      if (d && d.ok) { PIPE = d; renderPipeline(); renderKpis(); }
+    } catch (e) { /* the band stays hidden — never blocks the tab */ }
+  }
+
+  function renderPipeline() {
+    const host = document.getElementById("rb2Pipe");
+    if (!host) return;
+    if (!PIPE || !authHeaders()) { host.hidden = true; return; }
+    const p = PIPE;
+    const paused = !!p.paused;
+    const monthly = p.next_monthly || {}, quarterly = p.next_quarterly || {};
+    const last = p.last || {}, inf = p.inflight || {};
+    const lastRun = last.last_run_at
+      ? new Date(last.last_run_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      : "—";
+    const approvalTotal = (monthly.approval || 0) + (quarterly.approval || 0);
+    const autoTotal = (monthly.auto || 0) + (quarterly.auto || 0);
+    const days = _daysUntil(monthly.fires_at);
+    host.hidden = false;
+    host.className = "rb2-pipe" + (paused ? " paused" : "");
+    host.innerHTML = `
+      <div class="rb2-pipe-label">
+        <h2>Send pipeline</h2>
+        ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : ""}
+        <small class="rb2-rules">monthly invoices fire the 1st · quarterly Jan / Apr / Jul / Oct · an invoice only generates once its utility bill settles</small>
+        <span class="rb2-sp"></span>
+        <small class="rb2-runstamp"><b>last run</b> ${esc(lastRun)} · next ${esc(_fireLabel(monthly.fires_at))}</small>
+        <div class="rb2-pipe-ctl">
+          <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2AutoAll" type="button">Auto-send all</button>
+          <div class="rb2-ctlpop" id="rb2AutoAllPop" hidden>
+            <p><b>${fmt0(approvalTotal)} offtaker${approvalTotal === 1 ? "" : "s"}</b> on draft-for-approval will switch to <b>auto-send</b> — invoices email on schedule, from settled bills, without review. Per-offtaker settings still override.</p>
+            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2AutoAllGo" type="button">Switch ${fmt0(approvalTotal)} to auto</button></div>
+          </div>
+          <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2DraftAll" type="button">Draft all</button>
+          <div class="rb2-ctlpop" id="rb2DraftAllPop" hidden>
+            <p><b>${fmt0(autoTotal)} offtaker${autoTotal === 1 ? "" : "s"}</b> on auto-send will switch to <b>draft for approval</b> — every invoice lands in your inbox for review before anything emails.</p>
+            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2DraftAllGo" type="button">Switch ${fmt0(autoTotal)} to drafts</button></div>
+          </div>
+          <button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="${paused}" type="button">
+            <span class="rb2-knob" aria-hidden="true"></span>${paused ? "Resume sending" : "Pause sending"}
+          </button>
+        </div>
+      </div>
+      <div class="rb2-pipe-row">
+        <div class="rb2-pcell done" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive — download this month as a .zip there.">
+          <div class="rb2-when"><b>${esc(_monthName(last.period_month))} · delivered</b><small>ran ${esc(lastRun)}</small></div>
+          <div class="rb2-big">${fmt0(last.delivered || 0)} <span>of ${fmt0(p.total_enabled || 0)}${last.dollars ? " · " + money0(last.dollars) : ""}</span></div>
+          <div class="rb2-chips"><span class="rb2-pc g">✓ ${fmt0(last.delivered || 0)} sent</span></div>
+        </div>
+        <div class="rb2-nowmark" aria-hidden="true"><em>NOW</em></div>
+        <div class="rb2-pcell now">
+          <div class="rb2-when"><b>In flight</b><small>current period</small></div>
+          <div class="rb2-big">${fmt0(inf.pending_drafts || 0)} <span>awaiting your approval</span></div>
+          <div class="rb2-chips"><span class="rb2-pc a">${fmt0(inf.pending_drafts || 0)} to approve</span><span class="rb2-pc m">${fmt0(inf.waiting || 0)} waiting on bills</span></div>
+        </div>
+        <div class="rb2-pcell sched">
+          <div class="rb2-when"><b>${esc(_fireLabel(monthly.fires_at))} · next run</b><small>${paused ? "paused" : (days != null ? "fires in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</small></div>
+          <div class="rb2-big">${fmt0(monthly.scheduled || 0)} <span>scheduled</span></div>
+          <div class="rb2-chips"><span class="rb2-pc b">${fmt0(monthly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(monthly.approval || 0)} draft for approval</span></div>
+          ${paused ? `<div class="rb2-pausednote">⏸ Paused — this run won't fire until you resume. Manual sends still work.</div>` : ""}
+        </div>
+        <div class="rb2-pcell later">
+          <div class="rb2-when"><b>${esc(_fireLabel(quarterly.fires_at))} · quarterly</b><small>${(quarterly.scheduled || 0) ? "" : "none scheduled"}</small></div>
+          <div class="rb2-big">${fmt0(quarterly.scheduled || 0)} <span>scheduled</span></div>
+          <div class="rb2-chips"><span class="rb2-pc b">${fmt0(quarterly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(quarterly.approval || 0)} draft for approval</span></div>
+        </div>
+      </div>`;
+
+    // ── wiring ──
+    const cellLast = host.querySelector("#rb2CellLast");
+    if (cellLast) cellLast.onclick = () => {
+      const a = document.getElementById("rbArchiveHost");
+      if (a && !a.hidden) a.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    [["rb2AutoAll", "rb2AutoAllPop"], ["rb2DraftAll", "rb2DraftAllPop"]].forEach(([b, pp]) => {
+      const btn = host.querySelector("#" + b), pop = host.querySelector("#" + pp);
+      if (!btn || !pop) return;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        host.querySelectorAll(".rb2-ctlpop").forEach(x => { if (x !== pop) x.hidden = true; });
+        pop.hidden = !pop.hidden;
+      };
+      pop.querySelectorAll("[data-close]").forEach(c => c.onclick = () => { pop.hidden = true; });
+    });
+    const autoGo = host.querySelector("#rb2AutoAllGo");
+    if (autoGo) autoGo.onclick = (e) => bulkDeliveryMode("auto", e.currentTarget);
+    const draftGo = host.querySelector("#rb2DraftAllGo");
+    if (draftGo) draftGo.onclick = (e) => bulkDeliveryMode("approval", e.currentTarget);
+    const pauseBtn = host.querySelector("#rb2Pause");
+    if (pauseBtn) pauseBtn.onclick = async () => {
+      pauseBtn.disabled = true;
+      try {
+        const r = await fetch(API + "/sending-paused", {
+          method: "PATCH",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ paused: !PIPE.paused }),
+        });
+        if (r.ok) {
+          const d = await r.json().catch(() => null);
+          if (d) { PIPE.paused = !!d.paused; renderPipeline(); return; }
+        }
+      } catch (e) { /* leave state as-is */ }
+      pauseBtn.disabled = false;
+    };
+    if (!renderPipeline._closerWired) {
+      renderPipeline._closerWired = true;
+      document.addEventListener("click", (e) => {
+        document.querySelectorAll(".rb2-ctlpop").forEach(x => {
+          if (!x.hidden && !x.contains(e.target) && !e.target.closest(".rb2-ctlbtn")) x.hidden = true;
+        });
+      });
+    }
+  }
+
+  async function bulkDeliveryMode(mode, btn) {
+    btn.disabled = true;
+    const keep = btn.textContent;
+    btn.textContent = "Switching…";
+    try {
+      const r = await fetch(API + "/subscriptions/bulk-delivery-mode", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({ mode }),
+      });
+      if (r.ok) {
+        await loadPipeline();     // re-renders the band with the new splits
+        refreshList();            // cards pick up their new mode chips
+        return;
+      }
+    } catch (e) { /* fall through to restore */ }
+    btn.disabled = false;
+    btn.textContent = keep;
+  }
+
+  function renderKpis() {
+    const host = document.getElementById("rb2Kpis");
+    if (!host) return;
+    if (!authHeaders()) { host.hidden = true; return; }
+    const nOff = (OFFTAKERS || []).length;
+    const nArr = (ACC_ARRS || []).length;
+    const ready = (INBOX_DRAFTS || []).length;   // the pending-drafts inbox
+    const allocN = RECON ? (RECON.allocation_flagged || 0) : null;
+    const atStake = RECON
+      ? (RECON.allocation_at_stake_usd != null ? RECON.allocation_at_stake_usd : (allocN || 0) * 25)
+      : null;
+    const dollars = (PIPE && PIPE.last && PIPE.last.dollars) || null;
+    const month = PIPE && PIPE.last ? _monthName(PIPE.last.period_month) : null;
+    if (!nOff && !ready) { host.hidden = true; return; }
+    host.hidden = false;
+    host.innerHTML = `
+      <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} array${nArr === 1 ? "" : "s"}</small></div>
+      <div class="rb2-kpi"><span>Ready to review</span><b>${fmt0(ready)}</b><small>draft${ready === 1 ? "" : "s"} awaiting approval</small></div>
+      ${allocN
+        ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="GMP credits $25 per billing error they made — ${money0(atStake)} across these catches. Opens the Bill audit.">
+             <span>Doesn't match GMP</span><b>⚑ ${fmt0(allocN)}</b><small>≈ ${money0(atStake)} at stake</small></div>`
+        : `<div class="rb2-kpi"><span>Doesn't match GMP</span><b>${RECON ? "0" : "…"}</b><small>${RECON ? "all allocations check out" : "checking the bills…"}</small></div>`}
+      <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "invoiced · " + esc(month || "") : "no sends yet"}</small></div>`;
+    const flag = host.querySelector("#rb2KpiFlag");
+    if (flag) {
+      flag.onclick = () => openAuditTab();
+      flag.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAuditTab(); } };
+    }
+  }
+
   // The draft envelope preview (renderDraftDoc) shows the email; with a null
   // subscription_id it skips the live PDF pane, so append a clean styled demo
   // invoice underneath so the visitor sees the actual document, not a blank.
@@ -1519,37 +1734,53 @@
 
   function shell() {
     return `
-      <div id="rbSubInvoice" class="rb-subpanel">
-      <!-- Segmented toggle: the offtaker list ↔ the Bill-audit sandbox (organize the
-           fleet the way GMP allocates it, catch GMP's per-offtaker math errors). -->
-      <div class="rb-subtabs rb-subtabs-bare" role="tablist" id="rbGenTabs">
-        <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
-        <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
+      <div id="rbSubInvoice" class="rb-subpanel rb2">
+      <!-- ═ Redesign (Ford-approved mock, 2026-07-03): header band (title + KPIs)
+           + send-pipeline band + connection rail + sticky action bar over the
+           collapsed hierarchy. Every legacy id/host below is PRESERVED — only
+           the frame around them changed, so all existing wiring keeps working. ═ -->
+      <div class="rb2-head">
+        <div class="rb2-id">
+          <h1>Offtaker invoicing</h1>
+          <p>Every offtaker's solar credit invoice, generated from their settled utility bills. Nothing sends until you approve it.</p>
+          <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
+            <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
+            <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
+          </div>
+        </div>
+        <div class="rb2-kpis" id="rb2Kpis" hidden></div>
       </div>
+      <div class="rb2-pipe" id="rb2Pipe" hidden></div>
       <div id="rbAuditView" class="rb-au" style="display:none"></div>
       <div id="rbGenList">
-      <div class="rb-listwrap">
-        <div class="cc-treedivider rb-list-head">
-          <div>
-            <h3>Your offtakers</h3>
-          </div>
-          <div class="rb-head-actions">
-            <!-- Portfolio-level batch export: this period's offtaker invoices as a
-                 CSV in QuickBooks Online OR Xero import layout (they differ, so two
-                 buttons). Authenticated fetch → blob download (the endpoint needs the
-                 Bearer header, so a plain <a download> can't work). The optional
-                 account-code input is the Xero AccountCode; QuickBooks doesn't use it
-                 (defaults to a "Solar Credit" product/service). Persists in localStorage. -->
-            <div class="rb-export" id="rbExportBox" hidden>
-              <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
-                     placeholder="Xero account code" maxlength="40" autocomplete="off"
-                     title="Optional — the Xero AccountCode these solar invoices post to (e.g. 200). QuickBooks doesn't need it (it uses a &quot;Solar Credit&quot; product/service). Remembered for next time.">
-              <span class="rb-export-hint" title="The account code applies to the Xero export only — QuickBooks uses a default &quot;Solar Credit&quot; item.">Xero only</span>
-              <button class="ao-btn rb-btn" id="rbExportQb" type="button"
-                      title="Download all offtaker invoices this period as a QuickBooks Online import CSV.">⬇ Export to QuickBooks</button>
-              <button class="ao-btn rb-btn" id="rbExportXero" type="button"
-                      title="Download all offtaker invoices this period as a Xero Sales-Invoice import CSV (uses the account code, if set).">⬇ Export to Xero</button>
-              <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
+      <div class="rb-listwrap rb2-listwrap">
+        <!-- Connection rail: the plumbing status lines (✓ sources connected +
+             the ⚡ auto-refresh nudge) render into this host as before. -->
+        <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
+        <div class="rb2-controls">
+          <span class="rb2-controls-label">Your offtakers</span>
+          <span class="rb2-sp"></span>
+          <div class="rb-head-actions rb2-actions">
+            <!-- Portfolio-level batch export, now folded into ONE Export popover
+                 (approved mock): same two CSV buttons + the Xero AccountCode
+                 field, same ids, same wiring (wireExport). -->
+            <div class="rb2-exportwrap">
+              <button class="ao-btn rb-btn" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false">⬇ Export</button>
+              <div class="rb2-exportpop" id="rb2ExportPop" hidden>
+                <div class="rb2-exportpop-h">Export this period's invoices</div>
+                <p class="rb2-exportpop-p">One CSV per accounting system — layouts differ, both import directly.</p>
+                <div class="rb-export rb2-export" id="rbExportBox" hidden>
+                  <button class="ao-btn rb-btn" id="rbExportQb" type="button"
+                          title="Download all offtaker invoices this period as a QuickBooks Online import CSV.">⬇ QuickBooks</button>
+                  <button class="ao-btn rb-btn" id="rbExportXero" type="button"
+                          title="Download all offtaker invoices this period as a Xero Sales-Invoice import CSV (uses the account code, if set).">⬇ Xero</button>
+                  <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
+                         placeholder="Xero account code" maxlength="40" autocomplete="off"
+                         title="Optional — the Xero AccountCode these solar invoices post to (e.g. 200). QuickBooks doesn't need it (it uses a &quot;Solar Credit&quot; product/service). Remembered for next time.">
+                  <span class="rb-export-hint" title="The account code applies to the Xero export only — QuickBooks uses a default &quot;Solar Credit&quot; item.">Xero only — QuickBooks uses a "Solar Credit" item</span>
+                  <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
+                </div>
+              </div>
             </div>
             <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with — greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
@@ -1557,14 +1788,7 @@
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
-        <!-- The operator-wide MASTER generation spreadsheet card was removed from the top
-             (Ford 2026-06-28 — it didn't pull its weight and cluttered the main screen).
-             Each offtaker still has its OWN sheet inside its accordion card (.rb-track-sub). -->
-        <div class="rb-gmpbills-status" id="rbGmpBillsStatus"></div>
-        <!-- Invoice archive (monthly directory) — a portfolio-level month-close surface,
-             sits with the export action. A browsable, collapsible directory of past
-             months → arrays → offtakers with availability badges + a per-month .zip
-             download. Signed-in only; filled by loadArchive()/renderArchive(). -->
+        <!-- Invoice archive (monthly directory) — collapsible month-close surface. -->
         <div id="rbArchiveHost" hidden></div>
         <div id="rbCustManual"></div>
         <div id="rbBulkHost"></div>
@@ -3848,8 +4072,12 @@
     }).join("");
     const sumCls = over ? "rb-grp-pop-sum-warn" : "rb-grp-pop-sum-ok";
     const where = group.shareMode === "array" ? "in this array" : "on this utility bill";
+    // Redesign: the pill carries a small allocation METER (fill = % allocated;
+    // green ≈100%, amber over/under) — the number still reads exactly, the bar
+    // makes 26 arrays scannable. Hover breakdown unchanged below.
+    const meter = `<span class="rb2-meter${over ? " warn" : (within ? "" : " under")}" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, pct))}%"></i></span>`;
     return `<span class="rb-grp-pctwrap">
-      <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
+      ${meter}<span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
       <span class="rb-grp-pct-pop" role="tooltip">
         <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} ${where}</span>
         ${rowHtml}
@@ -3970,6 +4198,18 @@
         const grpNoun = pv.groups.length && pv.groups.every(g => g.shareMode === "array")
           ? `array${nAcct === 1 ? "" : "s"}`
           : `utility account${nAcct === 1 ? "" : "s"}`;
+        // Redesign: sent-this-period progress + flagged count on the provider
+        // header — exact period compare against the pipeline's last period.
+        const _lp = PIPE && PIPE.last && PIPE.last.period_end;
+        const sentN = _lp ? pv.groups.reduce((n, g) =>
+          n + g.rows.filter(s => s.last_sent_period_end === _lp).length, 0) : 0;
+        const provBar = (_lp && pv.offtakerCount)
+          ? `<span class="rb2-provbar"><span class="rb2-minitrack"><i style="width:${Math.min(100, Math.round(sentN / pv.offtakerCount * 100))}%"></i></span><small>${fmt0(sentN)} sent · ${esc(_monthName(PIPE.last.period_month))}</small></span>`
+          : "";
+        const provFlagN = RECON ? pv.groups.reduce((n, g) =>
+          n + g.rows.filter(s => reconFlagged(s.id)).length, 0) : 0;
+        const provFlag = provFlagN
+          ? `<span class="rb2-provflag">⚑ ${fmt0(provFlagN)} to review</span>` : "";
         return `
           <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
             <div class="rb-prov-head" data-provcollapse="${esc(pv.key)}" role="button" tabindex="0"
@@ -3977,6 +4217,7 @@
               <span class="rb-prov-caret" aria-hidden="true">▾</span>
               <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
               <span class="rb-prov-count">${nAcct} ${grpNoun} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
+              <span class="rb2-provsp"></span>${provFlag}${provBar}
             </div>
             <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
               ${pv.groups.map(acctGroupHTML).join("")}
@@ -3998,6 +4239,7 @@
     list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
       `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + toolsHTML + body;
     wireBacChip($("#rbBacSummary"));
+    renderKpis();   // the KPI band tracks the freshly-rendered list's counts
     // Wire the GMP-vs-non-GMP filter chips — flip the scope + re-render in place.
     list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
       OFFTAKER_FILTER = b.getAttribute("data-ofilter") || "all";

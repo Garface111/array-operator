@@ -852,6 +852,164 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-osearch-n{ font-size:10.5px; font-weight:700; color:var(--good,#2563eb);
   background:rgba(37,99,235,.12); border-radius:20px; padding:2px 8px; white-space:nowrap; }
 
+/* ═══ Offtaker Invoice Generator redesign (Ford-approved mock, 2026-07-03):
+   header band (title + KPI strip) · send-pipeline band · connection rail ·
+   sticky action bar · restyled hierarchy. Day palette; octarine only as the
+   sheet's top hairline signature. Legacy ids untouched — rb2-* is the frame. ═══ */
+.rb2{position:relative;background:var(--card,#fff);border:1px solid var(--line,#e2e8f0);
+  border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.05);overflow:visible}
+.rb2::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  border-radius:14px 14px 0 0;
+  background:linear-gradient(90deg,var(--good,#2563eb) 0%,var(--octarine,#a368ff) 55%,transparent 85%);
+  opacity:.55;pointer-events:none}
+.rb2-sp{flex:1}
+
+/* header band */
+.rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
+  padding:24px 30px 20px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
+.rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
+.rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
+.rb2-subtabs{margin-top:13px}
+.rb2-kpis{display:grid;grid-template-columns:repeat(4,minmax(126px,1fr));gap:10px;align-self:center}
+.rb2-kpi{border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:11px 15px 10px;
+  background:var(--card2,#f8fafc);min-width:126px}
+.rb2-kpi b{display:block;font-size:19px;font-weight:750;letter-spacing:-.02em;
+  color:var(--ink,#0f172a);font-variant-numeric:tabular-nums}
+.rb2-kpi span{display:block;font:600 10px/1.3 inherit;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--faint,#94a3b8);margin-bottom:4px}
+.rb2-kpi small{color:var(--muted,#475569);font-size:11px}
+.rb2-kpi.flag{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.35);cursor:pointer;
+  transition:transform .15s ease}
+.rb2-kpi.flag:hover{transform:translateY(-1px)}
+.rb2-kpi.flag b,.rb2-kpi.flag small{color:#92600a}
+
+/* send-pipeline band */
+.rb2-pipe{padding:14px 30px 18px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05))}
+.rb2-pipe-label{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;position:relative}
+.rb2-pipe-label h2{margin:0;font:700 10.5px/1 inherit;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint,#94a3b8)}
+.rb2-rules{color:var(--faint,#94a3b8);font-size:10.5px}
+.rb2-runstamp{color:var(--faint,#94a3b8);font-size:10.5px;white-space:nowrap}
+.rb2-runstamp b{color:var(--muted,#475569)}
+.rb2-pipe-ctl{display:flex;align-items:center;gap:7px;position:relative}
+.rb2-ctlbtn{padding:5px 10px;font-size:11px;border-radius:8px}
+.rb2-ctlpop{position:absolute;right:0;top:calc(100% + 8px);width:280px;background:var(--card,#fff);
+  border:1px solid var(--line,#e2e8f0);border-radius:12px;
+  box-shadow:0 12px 40px -12px rgba(15,23,42,.25);padding:13px;z-index:45}
+.rb2-ctlpop p{margin:0 0 11px;font-size:12px;color:var(--muted,#475569);line-height:1.5}
+.rb2-ctlpop p b{color:var(--ink,#0f172a)}
+.rb2-ctlpop-row{display:flex;gap:8px;justify-content:flex-end}
+.rb2-pswitch{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line,#e2e8f0);
+  background:var(--card,#fff);border-radius:999px;padding:4px 10px 4px 5px;
+  font:640 11px/1 inherit;color:var(--muted,#475569);cursor:pointer;
+  transition:border-color .15s,background .15s,color .15s}
+.rb2-knob{width:24px;height:14px;border-radius:999px;background:var(--line,#e2e8f0);
+  position:relative;transition:background .18s;flex:none}
+.rb2-knob::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;
+  border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.3);transition:left .18s}
+.rb2-pipe.paused .rb2-pswitch{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.12);color:#92600a}
+.rb2-pipe.paused .rb2-knob{background:#d97706}
+.rb2-pipe.paused .rb2-knob::after{left:12px}
+.rb2-pausechip{font:700 9.5px/1 inherit;letter-spacing:.07em;color:#92600a;
+  background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);
+  border-radius:999px;padding:4px 9px}
+.rb2-pipe-row{display:flex;align-items:stretch}
+.rb2-pcell{flex:1 1 0;min-width:160px;border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
+  padding:11px 14px 10px;position:relative;transition:background .13s}
+.rb2-pcell:first-child{border-radius:10px 0 0 10px}
+.rb2-pcell:last-child{border-radius:0 10px 10px 0}
+.rb2-pcell + .rb2-pcell{border-left:0}
+.rb2-pcell[role="button"]{cursor:pointer}
+.rb2-pcell[role="button"]:hover{background:var(--card2,#f8fafc)}
+.rb2-pcell::before{content:"";position:absolute;left:-1px;right:-1px;top:-1px;height:3px;
+  border-radius:3px 3px 0 0}
+.rb2-pcell.done::before{background:#047857}
+.rb2-pcell.now::before{background:#d97706}
+.rb2-pcell.sched::before{background:var(--good,#2563eb)}
+.rb2-pcell.later::before{background:var(--line,#e2e8f0)}
+.rb2-when{display:flex;align-items:baseline;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+.rb2-when b{font:700 10.5px/1 inherit;letter-spacing:.06em;text-transform:uppercase}
+.rb2-pcell.done .rb2-when b{color:#047857}
+.rb2-pcell.now .rb2-when b{color:#92600a}
+.rb2-pcell.sched .rb2-when b{color:var(--good,#2563eb)}
+.rb2-pcell.later .rb2-when b{color:var(--faint,#94a3b8)}
+.rb2-when small{color:var(--faint,#94a3b8);font-size:10px}
+.rb2-big{font-size:18px;font-weight:750;letter-spacing:-.02em;color:var(--ink,#0f172a);
+  font-variant-numeric:tabular-nums}
+.rb2-big span{font-size:11.5px;font-weight:600;color:var(--muted,#475569);letter-spacing:0}
+.rb2-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.rb2-pc{font:640 10px/1 inherit;border-radius:999px;padding:4px 8px;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.rb2-pc.g{color:#047857;background:#ecfdf5}
+.rb2-pc.b{color:var(--good,#2563eb);background:rgba(37,99,235,.09)}
+.rb2-pc.m{color:var(--muted,#475569);background:var(--day-hover,rgba(15,23,42,.05))}
+.rb2-pc.a{color:#92600a;background:rgba(245,158,11,.12)}
+.rb2-nowmark{flex:0 0 auto;width:30px;display:flex;align-items:center;justify-content:center;position:relative}
+.rb2-nowmark::before{content:"";position:absolute;top:-5px;bottom:-5px;left:50%;
+  border-left:2px dashed rgba(245,158,11,.5)}
+.rb2-nowmark em{font:700 8.5px/1 inherit;letter-spacing:.08em;color:#92600a;
+  background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);border-radius:999px;
+  padding:3px 6px;font-style:normal;position:relative;z-index:1}
+.rb2-pipe.paused .rb2-pcell.sched::before,.rb2-pipe.paused .rb2-pcell.later::before{background:var(--line,#e2e8f0)}
+.rb2-pipe.paused .rb2-pcell.sched .rb2-when b,.rb2-pipe.paused .rb2-pcell.later .rb2-when b{color:var(--faint,#94a3b8)}
+.rb2-pipe.paused .rb2-pcell.sched .rb2-chips,.rb2-pipe.paused .rb2-pcell.later .rb2-chips{opacity:.5}
+.rb2-pausednote{font:640 10.5px/1.45 inherit;color:#92600a;margin-top:7px}
+
+/* connection rail — the plumbing host restyled as one slim line */
+.rb2-rail{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 14px;background:var(--card2,#f8fafc);
+  border:1px solid var(--day-hover,rgba(15,23,42,.05));border-radius:10px;
+  font-size:12px;margin-bottom:12px}
+.rb2-rail:empty{display:none}
+.rb2-rail > *{margin:0!important}
+.rb2-rail .rb-gmp-auto-nudge{background:none;border:0;padding:0;flex:1 1 auto}
+
+/* sticky action bar */
+.rb2-listwrap{padding:16px 30px 30px}
+.rb2 > .rb-au{padding:16px 30px 30px}   /* the Bill audit view shares the sheet frame */
+.rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
+  padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
+.rb2-controls-label{font-size:14.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#0f172a)}
+.rb2-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rb2-exportwrap{position:relative}
+.rb2-exportpop{position:absolute;left:0;top:calc(100% + 8px);width:300px;background:var(--card,#fff);
+  border:1px solid var(--line,#e2e8f0);border-radius:12px;
+  box-shadow:0 12px 40px -12px rgba(15,23,42,.25);padding:14px;z-index:44}
+.rb2-exportpop-h{font-size:12.5px;font-weight:700;color:var(--ink,#0f172a);margin-bottom:3px}
+.rb2-exportpop-p{margin:0 0 10px;font-size:11px;color:var(--faint,#94a3b8)}
+.rb2-export{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rb2-export .rb-export-acct{width:100%;order:3}
+.rb2-export .rb-export-hint{order:4;font-size:10.5px;color:var(--faint,#94a3b8)}
+.rb2-export .rb-export-stat{order:5;width:100%}
+.rb2-export .rb-btn{flex:1}
+
+/* hierarchy accents */
+.rb2-provsp{flex:1}
+.rb2-provbar{display:inline-flex;align-items:center;gap:8px;margin-left:10px}
+.rb2-minitrack{width:110px;height:5px;border-radius:4px;background:var(--day-hover,rgba(15,23,42,.06));
+  overflow:hidden;display:inline-block}
+.rb2-minitrack i{display:block;height:100%;border-radius:4px;background:var(--good,#2563eb);opacity:.75}
+.rb2-provbar small{color:var(--faint,#94a3b8);font-size:10.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rb2-provflag{font:650 10.5px/1 inherit;color:#92600a;background:rgba(245,158,11,.12);
+  border:1px solid rgba(245,158,11,.3);border-radius:999px;padding:4px 9px;margin-left:10px;white-space:nowrap}
+.rb2-meter{display:inline-block;width:78px;height:5px;border-radius:4px;vertical-align:middle;
+  background:var(--day-hover,rgba(15,23,42,.06));overflow:hidden;margin-right:8px}
+.rb2-meter i{display:block;height:100%;border-radius:4px;background:#047857}
+.rb2-meter.warn i,.rb2-meter.under i{background:#d97706}
+
+@media (max-width:1100px){
+  .rb2-kpis{grid-template-columns:repeat(2,1fr)}
+  .rb2-pipe-row{flex-wrap:wrap;gap:8px}
+  .rb2-pcell{border-radius:10px!important;border-left:1px solid var(--line,#e2e8f0)!important;min-width:150px}
+  .rb2-nowmark{display:none}
+}
+@media (max-width:700px){
+  .rb2-head{padding:18px 16px 14px}
+  .rb2-pipe{padding:12px 16px 14px}
+  .rb2-listwrap{padding:12px 14px 22px}
+}
+
 /* Flagged-count badge on the "Bill audit" tab label — visible before the tab
    is ever opened, so the catches (worth $25 each from GMP) aren't buried. */
 .rb-au-genbadge{ display:inline-flex; align-items:center; margin-left:7px;
