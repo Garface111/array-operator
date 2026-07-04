@@ -1607,6 +1607,7 @@
         ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : ""}
         <small class="rb2-rules">monthly invoices fire the 1st · quarterly Jan / Apr / Jul / Oct · an invoice only generates once its utility bill settles</small>
         <span class="rb2-sp"></span>
+        <span class="rb2-draftstat" id="rb2DraftStatus" hidden></span>
         <small class="rb2-runstamp"><b>last run</b> ${esc(lastRun)} · next ${esc(_fireLabel(monthly.fires_at))}</small>
         <div class="rb2-pipe-ctl">
           <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2AutoAll" type="button">Auto-send all</button>
@@ -1616,8 +1617,8 @@
           </div>
           <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2DraftAll" type="button">Draft all</button>
           <div class="rb2-ctlpop" id="rb2DraftAllPop" hidden>
-            <p><b>${fmt0(autoTotal)} offtaker${autoTotal === 1 ? "" : "s"}</b> on auto-send will switch to <b>draft for approval</b> — every invoice lands in your inbox for review before anything emails.</p>
-            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2DraftAllGo" type="button">Switch ${fmt0(autoTotal)} to drafts</button></div>
+            <p>Generate the latest invoice for <b>all ${fmt0(p.total_enabled || 0)} offtaker${(p.total_enabled === 1) ? "" : "s"}</b> into your review inbox — each drafted from its settled bill, ready to review and approve. <b>Nothing sends</b> until you approve it; an offtaker still waiting on its bill is held, never faked.</p>
+            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2DraftAllGo" type="button">Draft all ${fmt0(p.total_enabled || 0)}</button></div>
           </div>
           <button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="${paused}" type="button">
             <span class="rb2-knob" aria-hidden="true"></span>${paused ? "Resume sending" : "Pause sending"}
@@ -1668,7 +1669,7 @@
     const autoGo = host.querySelector("#rb2AutoAllGo");
     if (autoGo) autoGo.onclick = (e) => bulkDeliveryMode("auto", e.currentTarget);
     const draftGo = host.querySelector("#rb2DraftAllGo");
-    if (draftGo) draftGo.onclick = (e) => bulkDeliveryMode("approval", e.currentTarget);
+    if (draftGo) draftGo.onclick = (e) => bulkDraft(e.currentTarget);
     const pauseBtn = host.querySelector("#rb2Pause");
     if (pauseBtn) pauseBtn.onclick = async () => {
       pauseBtn.disabled = true;
@@ -1713,6 +1714,50 @@
     } catch (e) { /* fall through to restore */ }
     btn.disabled = false;
     btn.textContent = keep;
+  }
+
+  // "Draft all" — GENERATE the latest invoice for every offtaker into the
+  // review inbox (Ford: it should draft the latest for each offtaker, not just
+  // flip a setting). The backend runs it in the background (a draft per
+  // offtaker); we poll the progress and refresh when it finishes.
+  async function bulkDraft(btn) {
+    btn.disabled = true;
+    btn.textContent = "Starting…";
+    try {
+      const r = await fetch(API + "/subscriptions/bulk-draft", {
+        method: "POST", headers: authHeaders(),
+      });
+      if (!r.ok) throw new Error();
+      document.querySelectorAll(".rb2-ctlpop").forEach(x => x.hidden = true);
+      await bulkDraftPoll();       // shows "Drafting X of N…" then the result
+      await loadPipeline();        // in-flight / ready-to-review climb as drafts land
+      refreshList();               // the inbox fills
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = "Draft all";
+    }
+  }
+
+  async function bulkDraftPoll() {
+    const st = document.getElementById("rb2DraftStatus");
+    if (st) { st.hidden = false; st.textContent = "Drafting…"; }
+    for (let i = 0; i < 160; i++) {           // ≤ ~8 min
+      let d = null;
+      try {
+        const r = await fetch(API + "/subscriptions/bulk-draft-status", { headers: authHeaders() });
+        d = await r.json().catch(() => null);
+      } catch (e) { /* keep polling */ }
+      if (d && d.ok) {
+        if (st) {
+          st.textContent = d.running
+            ? `Drafting ${fmt0(d.done)} of ${fmt0(d.total)}…`
+            : `✓ ${fmt0(d.drafted)} drafted${d.held ? " · " + fmt0(d.held) + " waiting on bills" : ""}`;
+        }
+        if (!d.running) { setTimeout(() => { if (st) st.hidden = true; }, 5000); return d; }
+      }
+      await new Promise(res => setTimeout(res, 3000));
+    }
+    if (st) st.hidden = true;
   }
 
   function renderKpis() {
