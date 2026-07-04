@@ -279,15 +279,15 @@ const VENDORS = [
       {name:"password", label:"AlsoEnergy password", secret:true},
       {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
     ] },
-  { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:false,
-    note:"Fronius Solar.web is a paid business API and isn't offered in the USA yet — US arrays may need the local LAN path. Enter your Solar.web keys to try the cloud connection.",
+  { code:"fronius", label:"Fronius", meta:"One account key", available:true, discover:false,
+    note:"Paste your Solar.web REST API keys (Solar.web → Settings → REST API → CREATE NEW KEY) and we'll list every PV system on your account at once — same one-key connect as SolarEdge. US accounts: Fronius enables API access on request; the Query API is a paid Fronius service.",
     fields:[
       {name:"access_key_id", label:"Access Key ID"},
       {name:"access_key_value", label:"Access Key Value", secret:true},
-      {name:"pv_system_id", label:"PV System ID"},
+      {name:"pv_system_id", label:"PV System ID (optional — leave blank to see every system)"},
     ] },
   { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false,
-    note:"SMA needs a developer app registration + owner consent. Endpoints are still being verified — enter your credentials and we'll take it from here.",
+    note:"One-click SMA API linking is coming — our SMA developer-app registration is in progress. Today you can connect instantly by signing into Sunny Portal (the EnergyAgent helper reads your inverters), or paste API credentials if SMA has issued them to you.",
     fields:[
       {name:"client_id", label:"Client ID"},
       {name:"client_secret", label:"Client Secret", secret:true},
@@ -1302,6 +1302,17 @@ async function finish(){
                 client_id: state.fields.client_id, client_secret: state.fields.client_secret,
                 username: state.fields.username, password: state.fields.password,
                 partner_id: parseInt(state.fields.partner_id, 10)
+              })
+            });
+            cd = await conn.json().catch(()=>({}));
+            state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
+          } else if(state.vendor==="fronius" && !(state.fields.pv_system_id||"").trim()){
+            // One-key account cascade — the Solar.web AccessKey lists every PV
+            // system on the account; attach them all, SolarEdge-style.
+            conn = await fetch(`${API_BASE}/v1/array-owners/fronius/connect-account`, {
+              method:"POST", headers:hdr, body: JSON.stringify({
+                access_key_id: (state.fields.access_key_id||"").trim(),
+                access_key_value: (state.fields.access_key_value||"").trim()
               })
             });
             cd = await conn.json().catch(()=>({}));

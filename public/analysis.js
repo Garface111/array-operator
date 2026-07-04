@@ -244,6 +244,37 @@
     return root;
   }
 
+  // ---- header freshness: DATA age, not poll age --------------------------------
+  // "Live · updated Xs ago" used to render ago(FleetStore.lastUpdate()) — the
+  // browser's POLL clock, which keeps ticking even when every feed is frozen — so
+  // a stale fleet read as live. Grade the header off the per-array data age
+  // instead (source_status.age_hours, else sync_status.age_min), deferring to the
+  // spreadsheet's canonical VendorSheet.isStale for the stale count.
+  function colAgeMin(c) {
+    var h = c.source_status && c.source_status.age_hours;
+    if (h != null) return h * 60;
+    var m = c.sync_status && c.sync_status.age_min;
+    return m == null ? null : m;
+  }
+  function fmtAgeMin(m) {
+    if (m < 90) return Math.round(m) + " min ago";
+    if (m < 1440) return Math.round(m / 60) + "h ago";
+    return Math.round(m / 1440) + "d ago";
+  }
+  function asofHtml(ctx) {
+    var oldest = null, staleN = 0;
+    (ctx.columns || []).forEach(function (c) {
+      var a = colAgeMin(c);
+      if (a != null && (oldest == null || a > oldest)) oldest = a;
+      if (window.VendorSheet && VendorSheet.isStale && VendorSheet.isStale(c)) staleN++;
+    });
+    if (staleN === 0 && (oldest == null || oldest <= 60)) {
+      return '<span class="an-livedot"></span> Live · updated ' + esc(fmt.ago(ctx.lastUpdate));
+    }
+    return 'Data as of ' + esc(fmtAgeMin(oldest)) +
+      (staleN ? ' · ' + staleN + (staleN === 1 ? ' array stale' : ' arrays stale') : '');
+  }
+
   // ---- render all registered sections, ordered --------------------------------
   function renderAll() {
     var root = shell(); if (!root) return;
@@ -253,7 +284,7 @@
     if (asof) {
       asof.innerHTML = ctx.simulated
         ? '<span class="an-livedot demo"></span> Live demo fleet'
-        : '<span class="an-livedot"></span> Live · updated ' + esc(fmt.ago(ctx.lastUpdate));
+        : asofHtml(ctx);
     }
     var sub = document.getElementById("anSub");
     if (sub && ctx.signedIn && _forecast && _forecast.arrays_skipped) {

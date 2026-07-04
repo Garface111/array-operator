@@ -663,7 +663,36 @@ Thank you,
   function asofText(){
     const t = (window.FleetStore && FleetStore.lastUpdate) ? FleetStore.lastUpdate() : 0;
     const s = t ? Math.max(0, Math.round((Date.now()-t)/1000)) : 0;
-    return `<b>●</b> ${s<2 ? "updated just now" : "updated "+s+"s ago"}`;
+    // "checked", not "updated": this clock is when the BROWSER last polled the
+    // store — it keeps ticking even when every feed is frozen, so calling it
+    // "updated" let stale data read as current. When any feed is stale (same
+    // VendorSheet.isStale gate as the sheet), append the oldest data age so a
+    // frozen fleet's real freshness is on the tile too.
+    return `<b>●</b> ${s<2 ? "checked just now" : "checked "+s+"s ago"}${_staleAsOf(t)}`;
+  }
+  function _ageTxt(min){
+    if(min < 90) return Math.round(min)+" min ago";
+    if(min < 1440) return Math.round(min/60)+"h ago";
+    return Math.round(min/1440)+"d ago";
+  }
+  // Oldest data age across STALE columns (source_status.age_hours, else
+  // sync_status.age_min), cached per store update — asofText repaints on a 1s
+  // interval and mustn't rebuild toColumns() every tick.
+  let _asofStale = "", _asofStaleAt = -1;
+  function _staleAsOf(t){
+    if(t === _asofStaleAt) return _asofStale;
+    _asofStaleAt = t;
+    let cols = [];
+    try { cols = (FleetStore.toColumns().columns) || []; } catch(_){}
+    let oldest = null;
+    cols.forEach(c => {
+      if(!_isStale(c)) return;
+      const h = (c.source_status || {}).age_hours;
+      const m = h != null ? h*60 : (c.sync_status || {}).age_min;
+      if(m != null && (oldest == null || m > oldest)) oldest = m;
+    });
+    _asofStale = oldest == null ? `` : ` · data as of ${_ageTxt(oldest)}`;
+    return _asofStale;
   }
   function setText(sel, val){ const el = document.querySelector(sel); if(el && el.textContent!==val) el.textContent = val; }
 

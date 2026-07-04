@@ -340,6 +340,13 @@
     if (pf == null && arr) pf = arr.portfolio_name;
     pf = (typeof pf === "string") ? pf.trim() : "";
 
+    // freshness: a stale column's current_power_w is a FROZEN reading, not live —
+    // use the spreadsheet's canonical VendorSheet.isStale (fallback: not stale, the
+    // old behavior) so cellNow can drop the live-dot and show the reading's age.
+    // staleAge is the SOURCE-data age ("3h ago" → "3h"), not our sync clock — the
+    // honest "this number is from X ago" (same basis as the sheet's stale tooltip).
+    var stale = !!(window.VendorSheet && VendorSheet.isStale && VendorSheet.isStale(col));
+
     return {
       col: col,
       aid: aid,
@@ -353,6 +360,9 @@
       powerW: num(col.current_power_w),
       producedToday: num(col.produced_today_kwh),
       isDaylight: col.is_daylight !== false,
+      isStale: stale,
+      staleAge: (stale && window.VendorSheet && VendorSheet.freshness)
+        ? String(VendorSheet.freshness(col)).replace(/\s*ago$/, "") : "",
       expected: expected,
       ratio: ratio,
       hasForecast: !!fc,
@@ -448,6 +458,12 @@
   function cellNow(r, ctx) {
     var kw = ctx.fmt.kwFromW(r.powerW);
     if (kw != null && kw >= 0.05) {
+      // stale feed → the number is frozen, not live: no live-dot, dimmed value,
+      // and an honest "as of" age so it can never be mistaken for current output
+      if (r.isStale) {
+        var age = r.staleAge ? '· as of ' + r.staleAge : '· stale';
+        return '<td class="ansg-num ansg-muted"><b>' + ctx.esc(ctx.fmt.kw(kw)) + '</b> <span class="ansg-faint">' + ctx.esc(age) + '</span></td>';
+      }
       return '<td class="ansg-num"><span class="ansg-now"><span class="ansg-livedot"></span><b>' + ctx.esc(ctx.fmt.kw(kw)) + '</b></span></td>';
     }
     // not producing → honest, contextual muted state

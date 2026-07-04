@@ -929,6 +929,12 @@
   // which feeds are frozen — a single source of truth for "is this reading stale".
   window.VendorSheet = window.VendorSheet || {};
   window.VendorSheet.isStale = isStale;
+  // …and the freshness texts, so those surfaces annotate a frozen reading with the
+  // SAME clocks the sheet renders instead of reinventing them: freshness(c) is the
+  // source-data age ("this reading is from X ago"), syncFreshness(c) is the capture
+  // recency ("live" / "synced Xm").
+  window.VendorSheet.freshness = freshness;
+  window.VendorSheet.syncFreshness = syncFreshness;
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
