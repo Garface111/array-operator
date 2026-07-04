@@ -62,11 +62,21 @@
     if (RECON) return Promise.resolve(RECON);
     if (_reconPromise) return _reconPromise;
     if (!authHeaders()) return Promise.resolve(null);
-    _reconPromise = fetch(API + "/reconcile-bills", { headers: authHeaders() })
-      .then(r => (r.ok ? r.json().catch(() => null) : null))
-      .then(d => { if (d && d.ok) { RECON = d; reconIndex(); } return RECON; })
-      .catch(() => null)
-      .then(v => { _reconPromise = null; return v; });
+    // The server computes the sweep in the background (63s at 800 offtakers
+    // crossed the edge gateway timeout) — {pending:true} means "poll again".
+    _reconPromise = (async () => {
+      for (let i = 0; i < 45; i++) {                 // ≤ ~7.5 min of 10s polls
+        try {
+          const r = await fetch(API + "/reconcile-bills", { headers: authHeaders() });
+          if (!r.ok) return null;
+          const d = await r.json().catch(() => null);
+          if (d && d.ok) { RECON = d; reconIndex(); return RECON; }
+          if (!d || !d.pending) return null;
+        } catch (e) { return null; }
+        await new Promise(res => setTimeout(res, 10000));
+      }
+      return null;
+    })().then(v => { _reconPromise = null; return v; });
     return _reconPromise;
   }
   function reconFor(subId) { return subId == null ? null : RECON_BY_SUB[String(subId)] || null; }
@@ -353,11 +363,20 @@
     if (AUDIT) return Promise.resolve(AUDIT);
     if (_auditPromise) return _auditPromise;
     if (!authHeaders()) return Promise.resolve(null);
-    _auditPromise = fetch(API + "/audit-by-array", { headers: authHeaders() })
-      .then(r => (r.ok ? r.json().catch(() => null) : null))
-      .then(d => { if (d && d.ok) AUDIT = d; return AUDIT; })
-      .catch(() => null)
-      .then(v => { _auditPromise = null; return v; });
+    // Server computes the sweep in the background — {pending:true} = poll again.
+    _auditPromise = (async () => {
+      for (let i = 0; i < 45; i++) {                 // ≤ ~7.5 min of 10s polls
+        try {
+          const r = await fetch(API + "/audit-by-array", { headers: authHeaders() });
+          if (!r.ok) return null;
+          const d = await r.json().catch(() => null);
+          if (d && d.ok) { AUDIT = d; return AUDIT; }
+          if (!d || !d.pending) return null;
+        } catch (e) { return null; }
+        await new Promise(res => setTimeout(res, 10000));
+      }
+      return null;
+    })().then(v => { _auditPromise = null; return v; });
     return _auditPromise;
   }
 
