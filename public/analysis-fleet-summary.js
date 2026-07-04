@@ -146,15 +146,32 @@
       });
     });
 
-    // producing now = sum of live inverter wattage across columns (live liveness)
-    var prodW = 0, sawLive = false;
+    // producing now = sum of live inverter wattage across columns (live liveness).
+    // A stale column's current_power_w is a FROZEN reading, not live output — gate
+    // on the spreadsheet's canonical VendorSheet.isStale so a paused feed never
+    // inflates this KPI (mirrors the Dashboard "kW now" strip in command-center.js,
+    // including its asleep-vs-paused split: a feed frozen because the sun is down
+    // is excluded from the sum but not alarmed as "paused").
+    function _colStale(c) {
+      return !!(window.VendorSheet && VendorSheet.isStale && VendorSheet.isStale(c));
+    }
+    var prodW = 0, sawLive = false, staleW = 0, staleN = 0, pausedN = 0;
     cols.forEach(function (c) {
+      var w = null;
       (c.inverters || []).forEach(function (iv) {
-        var w = _num(iv.current_power_w);
-        if (w != null) { prodW += w; sawLive = true; }
+        var x = _num(iv.current_power_w);
+        if (x != null) w = (w || 0) + x;
       });
+      if (w == null) return;
+      if (_colStale(c)) {
+        staleW += w; staleN++;
+        if (c.is_daylight !== false) pausedN++;
+        return;
+      }
+      prodW += w; sawLive = true;
     });
-    var prodKw = sawLive ? fmt.kwFromW(prodW) : null;
+    var allStale = !sawLive && staleN > 0;   // every feed frozen → last-known, not live
+    var prodKw = sawLive ? fmt.kwFromW(prodW) : (allStale ? fmt.kwFromW(staleW) : null);
     var prodPctOfCap = (sawLive && capKw > 0) ? (prodKw / capKw) * 100 : null;
 
     // production over the window: forecast actual_kwh when present, else sum of
@@ -207,14 +224,19 @@
     // 3. Fleet capacity (auto-MW)
     html += card("Fleet capacity", fmt.kw(capKw), "DC nameplate", { tone: "" });
 
-    // 4. Producing now + % of capacity
-    var prodSub = (prodPctOfCap != null)
-      ? fmt.pct(prodPctOfCap) + " of capacity"
-      : (sawLive ? "live" : "no live reading yet");
+    // 4. Producing now + % of capacity. Stale feeds were excluded from the sum
+    // above; say so in the sub, and when EVERY feed is frozen show the last-known
+    // total muted with "data stale" — a frozen fleet must never read as live green.
+    var prodSub = allStale
+      ? "data stale"
+      : (prodPctOfCap != null)
+        ? fmt.pct(prodPctOfCap) + " of capacity"
+        : (sawLive ? "live" : "no live reading yet");
+    if (!allStale && pausedN) prodSub += " · " + pausedN + " feed" + (pausedN === 1 ? "" : "s") + " paused";
     html += card("Producing now",
       prodKw != null ? fmt.kw(prodKw) : "—",
       prodSub,
-      { tone: prodKw != null ? "good" : "muted" });
+      { tone: sawLive && prodKw != null ? "good" : "muted" });
 
     // 5. Production over the window
     html += card("Production · " + win + "d",
