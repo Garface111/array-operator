@@ -927,7 +927,7 @@
         throw new Error((d && d.detail) || "Nothing to export for this period yet.");
       }
       if (!r.ok) throw new Error("Download failed (HTTP " + r.status + ").");
-      const count = r.headers.get("X-Invoice-Count");
+      const count = r.headers.get("X-Invoice-Count") || r.headers.get("X-File-Count");
       let name = fallbackName;
       const cd = r.headers.get("Content-Disposition") || "";
       const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
@@ -1119,7 +1119,9 @@
     setStat("rb-busy", "Preparing…");
     const url = API + "/invoice-archive.zip?month=" + encodeURIComponent(month);
     try {
-      const res = await authBlobDownload(url, "offtaker-invoices-" + month + ".zip", "X-File-Count");
+      // A month's zip renders hundreds of PDFs at scale → computed in a
+      // background sweep (202 {pending} while it builds); poll, then download.
+      const res = await exportPoll(url, "offtaker-invoices-" + month + ".zip");
       const n = res.count;
       setStat("rb-ok", n != null ? ("✓ Downloaded " + n + " file" + (n === 1 ? "" : "s") + ".") : "✓ Downloaded.");
     } catch (e) {
