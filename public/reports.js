@@ -5343,6 +5343,15 @@
     } catch (e) { /* swallow — never break the preview */ }
   }
 
+  // Initials for the review card's avatar (first + second word, e.g. "Abigail
+  // Ives II II" → "AI"; "Hartland Feed & Grain" → "HF"). Skips a lone "&".
+  function offtakerInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(w => w && w !== "&");
+    if (!parts.length) return "•";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
   function draftCard(d, utilAccts) {
     const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
     // Remember the auto-written note so a live recompute can re-sync it — but only
@@ -5384,9 +5393,11 @@
     // toggles, offtaker editor, tracker, template fold, calc link) still finds + wires
     // them — they're just hidden until the operator opens the section.
     const sid = d.subscription_id;
-    const sec = (title, body, sub, open) =>
-      `<details class="rb-sec"${open ? " open" : ""}>
-        <summary class="rb-sec-h"><span class="rb-sec-caret" aria-hidden="true">▸</span><span class="rb-sec-t">${title}</span>${sub ? `<span class="rb-sec-sub">${esc(sub)}</span>` : ""}</summary>
+    // NEPOOL client-card aesthetic (Ford 2026-07-04): each section is a colour-
+    // dotted, tinted collapsible sub-card. `tone` keys the colour band.
+    const sec = (title, body, sub, open, tone) =>
+      `<details class="rb-sec" data-tone="${tone || "slate"}"${open ? " open" : ""}>
+        <summary class="rb-sec-h"><span class="rb-sec-caret" aria-hidden="true">▸</span><span class="rb-sec-dot" aria-hidden="true"></span><span class="rb-sec-t">${title}</span>${sub ? `<span class="rb-sec-sub">${esc(sub)}</span>` : ""}</summary>
         <div class="rb-sec-body">${body}</div>
       </details>`;
     const emailBody = `
@@ -5409,20 +5420,24 @@
     const bacBody = sid != null ? reconPanelHTML(sid) : null;
     const bacFlagged = sid != null && reconFlagged(sid);
     const bacSec = bacBody
-      ? sec("Bill accuracy check", bacBody, reconSecSub(sid), bacFlagged)
+      ? sec("Bill accuracy check", bacBody, reconSecSub(sid), bacFlagged, bacFlagged ? "amber" : "emerald")
       : "";
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
         <div class="rb-draft-top">
-          <div class="rb-draft-name">${esc(d.customer_name)}</div>
+          <span class="rb-draft-avatar" aria-hidden="true">${esc(offtakerInitials(d.customer_name))}</span>
+          <div class="rb-draft-hd">
+            <span class="rb-draft-eyebrow">Offtaker invoice</span>
+            <div class="rb-draft-name">${esc(d.customer_name)}</div>
+          </div>
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
         ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
-        ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false)}
-        ${sec("Edit email", emailBody, "the note your offtaker sees", false)}
-        ${sec("Invoice template", tplSlot, "PDF / Excel format", false)}
-        ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false)}
-        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false)}
+        ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "amber")}
+        ${sec("Edit email", emailBody, "the note your offtaker sees", false, "emerald")}
+        ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "violet")}
+        ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "sky")}
+        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false, "slate")}
         ${bacSec}
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
            with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
