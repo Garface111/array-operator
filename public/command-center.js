@@ -345,7 +345,7 @@
     }
     let cols = [];
     try { cols = (FleetStore.toColumns().columns) || []; } catch(_){ return; }
-    let kw = 0, kwh = 0, producing = 0, stale = 0, asleep = 0, allocKw = 0;
+    let kw = 0, kwh = 0, producing = 0, stale = 0, asleep = 0, allocKw = 0, estKwh = 0;
     cols.forEach(c => {
       // A frozen feed's reading isn't live power — exclude it from "kW now" and the
       // producing count so the headline matches the dimmed/stale rows in the sheet.
@@ -377,14 +377,23 @@
         // can honestly mark the total with "~" when it's estimate-tainted.
         if(p > 0 && _ALLOC_VENDOR[(c.vendor || "").toLowerCase()]) allocKw += p;
       }
-      if(c.produced_today_kwh != null) kwh += c.produced_today_kwh;
+      if(c.produced_today_kwh != null){
+        kwh += c.produced_today_kwh;
+        // Track kWh whose source is an ESTIMATE (bill_prorate — a utility bill smeared
+        // flat across the month), so the fleet "kWh today" total can be honestly marked
+        // when it's estimate-tainted instead of reading as fully metered production.
+        if(c.produced_today_is_estimated || c.produced_today_source === "bill_prorate") estKwh += c.produced_today_kwh;
+      }
     });
     // The sum is estimate-tainted when an allocated vendor contributes a meaningful
     // slice of it (>1%); a trivial rounding sliver shouldn't slap "~" on a real total.
     const kwEstimated = kw > 0 && allocKw > 0.01 * kw;
+    // "kWh today" is estimate-tainted when a meaningful slice (>1%) was prorated from a
+    // utility bill rather than measured — mark it with "~" + a tip, same honesty rule.
+    const kwhEstimated = kwh > 0 && estKwh > 0.01 * kwh;
     el.innerHTML =
       `<span class="dp"${kwEstimated ? ` title="Some arrays (Fronius, SMA, Chint) report one site-level power we split across inverters — so this fleet 'kW now' total includes estimates, not purely measured readings."` : ``}><b>${kwEstimated ? "~" : ""}${esc(kwFmt(kw))}</b> now</span><span class="dp-dot">·</span>` +
-      `<span class="dp"><b>${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
+      `<span class="dp"${kwhEstimated ? ` title="Some of today's kWh is estimated from a utility bill (spread evenly across the month), not a measured reading."` : ``}><b>${kwhEstimated ? "~" : ""}${Math.round(kwh).toLocaleString()}</b> kWh today</span><span class="dp-dot">·</span>` +
       `<span class="dp"><b>${producing}</b>/${cols.length} arrays producing</span>` +
       (stale ? `<span class="dp-dot">·</span><span class="dp dp-stale" title="${stale} feed${stale===1?"":"s"} paused — last reading is frozen in daylight, so it's left out of 'kW now'">${stale} feed${stale===1?"":"s"} paused</span>` : ``) +
       (asleep ? `<span class="dp-dot">·</span><span class="dp dp-asleep" title="${asleep} array${asleep===1?"":"s"} asleep — the sun is down at ${asleep===1?"its":"their"} site, so ${asleep===1?"it's":"they're"} resting, not down">${asleep} asleep 🌙</span>` : ``);

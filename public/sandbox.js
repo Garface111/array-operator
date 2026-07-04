@@ -32,6 +32,28 @@
   // diagnosable instead of vanishing silently.
   function _warnLS(key, e){ try { console.warn("[sandbox] ignoring unreadable localStorage '" + key + "':", e && e.message); } catch(_){} }
 
+  // ---- memoized JSON-from-localStorage ---------------------------------------
+  // The column order, renames, expanded set, and free cards are JSON.parsed from
+  // localStorage on EVERY render (some loaders run per-array). Re-parsing an
+  // unchanged blob is wasted synchronous work that blocks the paint. Cache the
+  // parsed result keyed by storage key; reparse only when the raw string actually
+  // changes. We compare the raw string (cheap) so a write from ANOTHER tab — which
+  // doesn't go through our setter — still invalidates correctly; a same-tab write
+  // calls _lsInvalidate() in its setter, so the next read re-parses immediately.
+  const _lsCache = Object.create(null);   // key -> { raw, val }
+  function _lsReadJSON(key, parse){
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch(e){ _warnLS(key, e); return parse(null); }
+    const hit = _lsCache[key];
+    if(hit && hit.raw === raw) return hit.val;
+    let val;
+    try { val = parse(raw); }
+    catch(e){ _warnLS(key, e); val = parse(null); }   // parse() owns its own safe default
+    _lsCache[key] = { raw, val };
+    return val;
+  }
+  function _lsInvalidate(key){ delete _lsCache[key]; }
+
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
   const VENDORS = [
@@ -512,12 +534,14 @@
 
   // ---- saved column order (localStorage) ----
   function loadOrder(){
-    try { const v = JSON.parse(localStorage.getItem(ORDER_KEY)); return Array.isArray(v) ? v.map(String) : []; }
-    catch(e){ _warnLS(ORDER_KEY, e); return []; }
+    return _lsReadJSON(ORDER_KEY, raw => {
+      const v = raw == null ? null : JSON.parse(raw);
+      return Array.isArray(v) ? v.map(String) : [];
+    });
   }
   function saveOrder(canvas){
     const ids = [...canvas.querySelectorAll(".sb-col")].map(c => c.dataset.arrayId);
-    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); } catch(e){}
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); _lsInvalidate(ORDER_KEY); } catch(e){}
   }
   // Stable-sort fetched columns by the saved order; unknown/new arrays fall to the end.
   function applyOrder(cols){
@@ -1523,16 +1547,20 @@
   // Persisted as a JSON array of array_id strings under EXPAND_KEY; collapsed is
   // the default so the array cards stay the clean main view.
   function getExpandedSet(){
-    try {
-      const a = JSON.parse(localStorage.getItem(EXPAND_KEY) || "[]");
-      return new Set(Array.isArray(a) ? a.map(String) : []);
-    } catch(e){ _warnLS(EXPAND_KEY, e); return new Set(); }
+    // Cache the parsed ARRAY (the expensive part); build a FRESH Set per call so
+    // callers can freely mutate their copy then saveExpandedSet() without poisoning
+    // the cache.
+    const ids = _lsReadJSON(EXPAND_KEY, raw => {
+      const a = raw == null ? [] : JSON.parse(raw);
+      return Array.isArray(a) ? a.map(String) : [];
+    });
+    return new Set(ids);
   }
   function hasExpandPref(){
     try { return localStorage.getItem(EXPAND_KEY) != null; } catch(e){ return false; }
   }
   function saveExpandedSet(set){
-    try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...set])); } catch(e){}
+    try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...set])); _lsInvalidate(EXPAND_KEY); } catch(e){}
   }
 
   // ---- sandbox orientation (vertical = arrays side-by-side, inverters drop BELOW
@@ -1701,10 +1729,17 @@
     if(!host) return;
     ensureRevealStyle();
     host.classList.add("sb-arrive");
-    host.querySelectorAll(".sb-col").forEach((c, i) => { c.style.animationDelay = Math.min(i * 0.07, 0.42) + "s"; });
+    // Stagger the columns' arrival. Snapshot the NodeList once and apply all the
+    // animation-delay writes inside a single requestAnimationFrame so the browser
+    // coalesces them into one layout/paint instead of thrashing a reflow per column
+    // (which mattered at ~100 columns). Same cleanup batching for the reset.
+    const cols = host.querySelectorAll(".sb-col");
+    requestAnimationFrame(() => {
+      cols.forEach((c, i) => { c.style.animationDelay = Math.min(i * 0.07, 0.42) + "s"; });
+    });
     setTimeout(() => {
       host.classList.remove("sb-arrive");
-      host.querySelectorAll(".sb-col").forEach(c => { c.style.animationDelay = ""; });
+      cols.forEach(c => { c.style.animationDelay = ""; });
     }, 1400);
   }
   let _freshPollOn = false;
@@ -2762,13 +2797,17 @@
 
   // ---- card storage (localStorage; mirrors the saveOrder style) ----
   function loadCards(){
-    try {
-      const v = JSON.parse(localStorage.getItem(CARDS_KEY));
-      return Array.isArray(v) ? v.filter(c => c && c.id && (c.kind==="note"||c.kind==="data")) : [];
-    } catch(e){ _warnLS(CARDS_KEY, e); return []; }
+    // Cache the parsed+validated array; return a SHALLOW COPY so a caller that
+    // push()es/filter()s the result can't mutate the cache. Writers immediately
+    // saveCards() (which invalidates), so the next read re-parses fresh.
+    const v = _lsReadJSON(CARDS_KEY, raw => {
+      const a = raw == null ? null : JSON.parse(raw);
+      return Array.isArray(a) ? a.filter(c => c && c.id && (c.kind==="note"||c.kind==="data")) : [];
+    });
+    return v.slice();
   }
   function saveCards(cards){
-    try { localStorage.setItem(CARDS_KEY, JSON.stringify(cards)); } catch(e){}
+    try { localStorage.setItem(CARDS_KEY, JSON.stringify(cards)); _lsInvalidate(CARDS_KEY); } catch(e){}
   }
   function updateCard(id, patch){
     const cards = loadCards();
@@ -4814,13 +4853,23 @@
     // is a real load failure and must not masquerade as "No charges yet."
     let sumFailed = false, invFailed = false;
     // Signed-out DEMO: serve the canned bill from AO_DEMO (no fetch, which would
-    // 401). Real owners pass real headers and hit the live endpoints below.
+    // 401). This MUST come first so the demo path returns demo data before any
+    // network call. Real owners pass real headers and hit the live endpoints below.
     if(!h && window.AO_DEMO && window.AO_DEMO.billingSummary){
       summary = window.AO_DEMO.billingSummary;
       invoice = window.AO_DEMO.nextInvoice || null;
     } else {
-      try { const r = await fetch("/v1/account/billing-summary", { headers: h }); if(r.ok) summary = await r.json(); else sumFailed = true; } catch(e){ sumFailed = true; }
-      try { const r = await fetch("/v1/account/next-invoice",   { headers: h }); if(r.ok) invoice = await r.json(); else invFailed = true; } catch(e){ invFailed = true; }
+      // Bound each call so a HANGING endpoint (no response, no 5xx) is treated as a
+      // failure and routes into the recovery UI below instead of leaving the billing
+      // box blank forever. AbortSignal.timeout is used when available, with a manual
+      // AbortController fallback for older engines.
+      const _timeoutSignal = (ms) => {
+        try { if(typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms); } catch(_){}
+        try { const ac = new AbortController(); setTimeout(() => ac.abort(), ms); return ac.signal; } catch(_){ return undefined; }
+      };
+      const _fetchBill = (url) => fetch(url, { headers: h, signal: _timeoutSignal(8000) });
+      try { const r = await _fetchBill("/v1/account/billing-summary"); if(r.ok) summary = await r.json(); else sumFailed = true; } catch(e){ sumFailed = true; }
+      try { const r = await _fetchBill("/v1/account/next-invoice");   if(r.ok) invoice = await r.json(); else invFailed = true; } catch(e){ invFailed = true; }
     }
 
     // Both endpoints failed → show an honest error + retry instead of a misleading

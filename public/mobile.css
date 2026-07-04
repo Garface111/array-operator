@@ -90,4 +90,20 @@
 @media (max-width: 380px) {
   .tab { font-size: 10.5px; padding: 11px 1px; }
   .cc-kpi .v { font-size: 20px; }
+
+  /* Feature-suggestion widget: its panel is a fixed 320px (index.html). On the
+     narrowest phones that overflows the safe area even with max-width:calc(100vw
+     - 32px). Pin the wrapper to BOTH edges and let the panel be fluid so it always
+     fits with an even 8px gutter — no horizontal scroll, button still reachable. */
+  #fsWrap { left: 8px; right: 8px; bottom: 8px; }
+  #fsPanel { width: auto; max-width: none; }
+
+  /* Command Center triage search: on the narrowest phones the wrapping flex row can
+     squeeze the field below a usable width. Keep it fat-finger friendly — wide enough
+     to type a full query and ≥44px tall — and let it take a full row if needed.
+     The dashboard scopes its input as #panelDashboard .cc-search input (ID-weighted),
+     so match that specificity or the min-height won't win. */
+  .cc-search { flex: 1 1 100%; min-width: 140px; }
+  .cc-search input,
+  #panelDashboard .cc-search input { min-height: 44px; }
 }

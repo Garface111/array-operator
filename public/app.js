@@ -607,8 +607,8 @@ function updateGmpGate(session){
           (s.unlinked_accounts === 1 ? "it isn't" : "they aren't") +
           " linked to an array yet — so their bills can't flow in. <b>You're not done yet.</b>";
         cta.textContent = "Link accounts →";
-        cta.onclick = null;
-        cta.setAttribute("href", "#account");
+        // cta is a <button> now — navigate to #account in JS (no href to set).
+        cta.onclick = () => { location.hash = "#account"; };
       } else {
         gate.classList.remove("almost");
         badge.textContent = "FINISH SETUP";
@@ -617,9 +617,6 @@ function updateGmpGate(session){
         cta.textContent = "Connect GMP →";
         // Launch the REAL connect flow: opens greenmountainpower.com in a new tab
         // and the extension grabs the bills. NO detour back to onboarding.
-        cta.removeAttribute("href");
-        cta.setAttribute("role", "button");
-        cta.style.cursor = "pointer";
         cta.onclick = (e) => {
           e.preventDefault();
           // Make sure we're on the Arrays tab (where the sandbox + modal live).
