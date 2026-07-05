@@ -860,17 +860,14 @@ body.sb-fs-lock{ overflow:hidden; }
   border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.05);overflow:visible}
 .rb2::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
   border-radius:14px 14px 0 0;
-  background:linear-gradient(90deg,var(--good,#2563eb) 0%,var(--octarine,#a368ff) 55%,transparent 85%);
-  opacity:.55;pointer-events:none}
+  background:var(--good,#2563eb);opacity:.65;pointer-events:none}
 .rb2-sp{flex:1}
 
-/* header band — soft blue ground (the KPI cards lift off it as white) */
+/* header band — flat solid blue ground (KPI cards lift off it as white) */
 .rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
   padding:24px 30px 20px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap;
   border-radius:14px 14px 0 0;
-  background:
-    radial-gradient(135% 135% at 85% 16%, rgba(37,99,235,.15), rgba(37,99,235,.04) 44%, transparent 68%),
-    linear-gradient(180deg, rgba(37,99,235,.06), rgba(37,99,235,.012));}
+  background:rgba(37,99,235,.08);}
 .rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
 .rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
 .rb2-subtabs{margin-top:13px}
@@ -933,11 +930,11 @@ body.sb-fs-lock{ overflow:hidden; }
   border-radius:3px 3px 0 0}
 /* each pipeline part reads as a soft colour zone keyed to its state (Ford:
    "different colours for the different pipeline parts — June is green, etc.") */
-.rb2-pcell.done{background:linear-gradient(180deg,rgba(4,120,87,.09),rgba(4,120,87,.02));border-color:rgba(4,120,87,.2)}
-.rb2-pcell.now{background:linear-gradient(180deg,rgba(217,119,6,.10),rgba(217,119,6,.025));border-color:rgba(217,119,6,.24)}
-.rb2-pcell.sched{background:linear-gradient(180deg,rgba(37,99,235,.09),rgba(37,99,235,.02));border-color:rgba(37,99,235,.2)}
-.rb2-pcell.later{background:linear-gradient(180deg,rgba(100,116,139,.08),rgba(100,116,139,.015));border-color:rgba(100,116,139,.2)}
-.rb2-pcell.done[role="button"]:hover{background:linear-gradient(180deg,rgba(4,120,87,.15),rgba(4,120,87,.05))}
+.rb2-pcell.done{background:rgba(4,120,87,.08);border-color:rgba(4,120,87,.2)}
+.rb2-pcell.now{background:rgba(217,119,6,.09);border-color:rgba(217,119,6,.24)}
+.rb2-pcell.sched{background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2)}
+.rb2-pcell.later{background:rgba(100,116,139,.07);border-color:rgba(100,116,139,.2)}
+.rb2-pcell.done[role="button"]:hover{background:rgba(4,120,87,.14)}
 .rb2-pcell.done::before{background:#047857}
 .rb2-pcell.now::before{background:#d97706}
 .rb2-pcell.sched::before{background:var(--good,#2563eb)}
@@ -982,7 +979,7 @@ body.sb-fs-lock{ overflow:hidden; }
 /* sticky action bar — the offtaker list floats on a soft lime ground (Ford:
    "the offtaker invoice is like lime green"), white rows lifting against it */
 .rb2-listwrap{padding:16px 30px 30px;border-radius:0 0 14px 14px;
-  background:linear-gradient(180deg,rgba(122,196,20,.09),rgba(122,196,20,.03) 32%,rgba(122,196,20,.01) 62%,transparent);}
+  background:rgba(122,196,20,.06);}
 .rb2 > .rb-au{padding:16px 30px 30px}   /* the Bill audit view shares the sheet frame */
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
