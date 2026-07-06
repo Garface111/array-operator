@@ -868,7 +868,7 @@ body.sb-fs-lock{ overflow:hidden; }
 
 /* header band — flat solid blue ground (KPI cards lift off it as white) */
 .rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
-  padding:24px 30px 22px;flex-wrap:wrap;
+  padding:24px 40px 22px;flex-wrap:wrap;
   border:1px solid rgba(37,99,235,.18);border-radius:14px;
   background:rgba(37,99,235,.13);
   box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
@@ -891,7 +891,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-kpi.flag b,.rb2-kpi.flag small{color:#92600a}
 
 /* send-pipeline band — its own floating card */
-.rb2-pipe{padding:16px 30px 18px;
+.rb2-pipe{padding:16px 40px 18px;
   border:1px solid var(--line,#e2e8f0);border-radius:14px;
   background:var(--card,#fff);box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
 .rb2-pipe-label{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;position:relative}
@@ -985,11 +985,11 @@ body.sb-fs-lock{ overflow:hidden; }
 /* sticky action bar — the offtaker list floats on a punchy solarpunk-emerald
    ground (Ford 2026-07-05: dropped the octarine/purple; lime rejected earlier —
    this is the app's own night-theme emerald #10b981, verdant not lime), rows lift */
-.rb2-listwrap{padding:20px 30px 30px;border-radius:14px;
+.rb2-listwrap{padding:20px 40px 30px;border-radius:14px;
   border:1px solid rgba(16,185,129,.26);
   background:rgba(16,185,129,.12);
   box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
-.rb2 > .rb-au{padding:20px 30px 30px;border-radius:14px;   /* Bill audit view = its own floating card too */
+.rb2 > .rb-au{padding:20px 40px 30px;border-radius:14px;   /* Bill audit view = its own floating card too */
   border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
   box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
