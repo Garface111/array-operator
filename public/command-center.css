@@ -863,22 +863,35 @@ body.sb-fs-lock{ overflow:hidden; }
    border and float shadow. display:none children (hidden pipe, inactive tab view)
    are NOT flex items, so gaps only ever fall between the visible cards. */
 .rb2{position:relative;display:flex;flex-direction:column;gap:14px;
-  background:transparent;border:0;box-shadow:none;overflow:visible}
+  background:transparent;border:0;box-shadow:none;overflow:visible;
+  /* ═══ SOLARPUNK NEPOOL-OPERATOR PALETTE, scoped to the generator ═══
+     Ford 2026-07-05: "redesign with the solarpunk NEPOOL operator style".
+     The NEPOOL app (web/app tokens.css + ClientCard.tsx) grounds everything on
+     warm CREAM (#faf8f5) with white inner cards, cream/wood hairlines, and colour
+     only as small emerald/amber/sky accent chips — NOT a saturated colour wash
+     (which is why lime→purple→emerald all felt wrong). We warm every rb-* border
+     and inner surface at once by overriding the shared vars here. */
+  --so-cream:#faf8f5; --so-cream-bd:#e8e2d9; --so-wood:#8c4e1c; --so-wood-bd:#e6d4bd;
+  --so-emerald:#059669; --so-shadow-card:0 2px 8px 0 rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.04);
+  --line:#e8e2d9;                     /* every inner hairline → warm cream */
+  --card2:#ffffff;                    /* inner rows (rail, provider heads) → white on cream */
+  --day-hover:rgba(140,78,28,.06);    /* warm ochre hover, not cool slate */
+}
 .rb2-sp{flex:1}
 
 /* header band — flat solid blue ground (KPI cards lift off it as white) */
 .rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
   padding:24px 40px 22px;flex-wrap:wrap;
-  border:1px solid rgba(37,99,235,.18);border-radius:14px;
-  background:rgba(37,99,235,.13);
-  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
+  border:1px solid var(--so-cream-bd);border-radius:14px;
+  background:var(--so-cream);
+  box-shadow:var(--so-shadow-card)}
 .rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
 .rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
 .rb2-subtabs{margin-top:13px}
 .rb2-kpis{display:grid;grid-template-columns:repeat(4,minmax(126px,1fr));gap:10px;align-self:center}
-.rb2-kpi{border:1px solid rgba(37,99,235,.16);border-radius:10px;padding:11px 15px 10px;
+.rb2-kpi{border:1px solid var(--so-cream-bd);border-radius:12px;padding:11px 15px 10px;
   background:#fff;min-width:126px;
-  box-shadow:0 3px 10px -4px rgba(37,99,235,.28),0 1px 2px rgba(15,23,42,.04)}
+  box-shadow:var(--so-shadow-card)}
 .rb2-kpi b{display:block;font-size:19px;font-weight:750;letter-spacing:-.02em;
   color:var(--ink,#0f172a);font-variant-numeric:tabular-nums}
 .rb2-kpi span{display:block;font:600 10px/1.3 inherit;letter-spacing:.07em;
@@ -890,10 +903,11 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-kpi.flag:hover{transform:translateY(-1px)}
 .rb2-kpi.flag b,.rb2-kpi.flag small{color:#92600a}
 
-/* send-pipeline band — its own floating card */
+/* send-pipeline band — its own floating card, warm cream ground (state cells
+   keep their emerald/amber/blue/slate accent tints) */
 .rb2-pipe{padding:16px 40px 18px;
-  border:1px solid var(--line,#e2e8f0);border-radius:14px;
-  background:var(--card,#fff);box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
+  border:1px solid var(--so-cream-bd);border-radius:14px;
+  background:var(--so-cream);box-shadow:var(--so-shadow-card)}
 .rb2-pipe-label{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;position:relative}
 .rb2-pipe-label h2{margin:0;font:700 10.5px/1 inherit;letter-spacing:.09em;
   text-transform:uppercase;color:var(--faint,#94a3b8)}
@@ -975,9 +989,10 @@ body.sb-fs-lock{ overflow:hidden; }
 
 /* connection rail — the plumbing host restyled as one slim line */
 .rb2-rail{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:9px 14px;background:var(--card2,#f8fafc);
-  border:1px solid var(--day-hover,rgba(15,23,42,.05));border-radius:10px;
-  font-size:12px;margin-bottom:12px}
+  padding:12px 16px;background:#fff;
+  border:1px solid var(--so-cream-bd);border-radius:12px;
+  box-shadow:var(--so-shadow-card);
+  font-size:12px;margin-bottom:14px}
 .rb2-rail:empty{display:none}
 .rb2-rail > *{margin:0!important}
 .rb2-rail .rb-gmp-auto-nudge{background:none;border:0;padding:0;flex:1 1 auto}
@@ -986,12 +1001,12 @@ body.sb-fs-lock{ overflow:hidden; }
    ground (Ford 2026-07-05: dropped the octarine/purple; lime rejected earlier —
    this is the app's own night-theme emerald #10b981, verdant not lime), rows lift */
 .rb2-listwrap{padding:20px 40px 30px;border-radius:14px;
-  border:1px solid rgba(16,185,129,.26);
-  background:rgba(16,185,129,.12);
-  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
+  border:1px solid var(--so-cream-bd);
+  background:var(--so-cream);
+  box-shadow:var(--so-shadow-card)}
 .rb2 > .rb-au{padding:20px 40px 30px;border-radius:14px;   /* Bill audit view = its own floating card too */
-  border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
-  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
+  border:1px solid var(--so-cream-bd);background:var(--so-cream);
+  box-shadow:var(--so-shadow-card)}
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
@@ -1192,10 +1207,11 @@ html[data-theme="day"] .rep-fld.req > select{
    accounts at once (Ford: "organized by utility... THOSE can be collapsed and expanded").
    Heavier than the account header so the hierarchy reads top-down at a glance. */
 .rb-prov{ margin-bottom:16px; }
-.rb-prov-head{ display:flex; align-items:center; gap:10px; padding:9px 10px;
-  background:var(--card2,#f8fafc); border:1px solid var(--line,#e2e8f0); border-radius:10px;
-  cursor:pointer; user-select:none; }
-.rb-prov-head:hover{ background:var(--day-hover,rgba(15,23,42,.05)); }
+.rb-prov-head{ display:flex; align-items:center; gap:10px; padding:12px 15px;
+  background:#fff; border:1px solid var(--so-cream-bd,#e8e2d9);
+  border-left:3px solid var(--so-emerald,#059669); border-radius:12px;
+  box-shadow:var(--so-shadow-card); cursor:pointer; user-select:none; }
+.rb-prov-head:hover{ background:#fffdfa; box-shadow:0 4px 14px -3px rgba(140,78,28,.14); }
 .rb-prov.collapsed .rb-prov-head{ }
 .rb-prov-caret{ display:inline-block; width:13px; text-align:center; font-size:12px;
   color:var(--muted,#475569); transition:transform .15s ease; flex:none; }
