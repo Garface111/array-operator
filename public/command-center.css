@@ -856,18 +856,22 @@ body.sb-fs-lock{ overflow:hidden; }
    header band (title + KPI strip) · send-pipeline band · connection rail ·
    sticky action bar · restyled hierarchy. Day palette; octarine only as the
    sheet's top hairline signature. Legacy ids untouched — rb2-* is the frame. ═══ */
-.rb2{position:relative;background:var(--card,#fff);border:1px solid var(--line,#e2e8f0);
-  border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.05);overflow:visible}
-.rb2::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
-  border-radius:14px 14px 0 0;
-  background:var(--good,#2563eb);opacity:.65;pointer-events:none}
+/* The three bands are now SEPARATE FLOATING CARDS (Ford 2026-07-05: "make these
+   three elements separate — rounded corners, floating cards"). .rb2 is no longer
+   a card itself — it's a transparent column that gaps its children apart; each
+   child (.rb2-head / .rb2-pipe / .rb2-listwrap / .rb-au) carries its own radius,
+   border and float shadow. display:none children (hidden pipe, inactive tab view)
+   are NOT flex items, so gaps only ever fall between the visible cards. */
+.rb2{position:relative;display:flex;flex-direction:column;gap:14px;
+  background:transparent;border:0;box-shadow:none;overflow:visible}
 .rb2-sp{flex:1}
 
 /* header band — flat solid blue ground (KPI cards lift off it as white) */
 .rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
-  padding:24px 30px 20px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap;
-  border-radius:14px 14px 0 0;
-  background:rgba(37,99,235,.13);}
+  padding:24px 30px 22px;flex-wrap:wrap;
+  border:1px solid rgba(37,99,235,.18);border-radius:14px;
+  background:rgba(37,99,235,.13);
+  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
 .rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
 .rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
 .rb2-subtabs{margin-top:13px}
@@ -886,8 +890,10 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-kpi.flag:hover{transform:translateY(-1px)}
 .rb2-kpi.flag b,.rb2-kpi.flag small{color:#92600a}
 
-/* send-pipeline band */
-.rb2-pipe{padding:14px 30px 18px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05))}
+/* send-pipeline band — its own floating card */
+.rb2-pipe{padding:16px 30px 18px;
+  border:1px solid var(--line,#e2e8f0);border-radius:14px;
+  background:var(--card,#fff);box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
 .rb2-pipe-label{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;position:relative}
 .rb2-pipe-label h2{margin:0;font:700 10.5px/1 inherit;letter-spacing:.09em;
   text-transform:uppercase;color:var(--faint,#94a3b8)}
@@ -979,9 +985,13 @@ body.sb-fs-lock{ overflow:hidden; }
 /* sticky action bar — the offtaker list floats on a punchy solarpunk-emerald
    ground (Ford 2026-07-05: dropped the octarine/purple; lime rejected earlier —
    this is the app's own night-theme emerald #10b981, verdant not lime), rows lift */
-.rb2-listwrap{padding:16px 30px 30px;border-radius:0 0 14px 14px;
-  background:rgba(16,185,129,.12);}
-.rb2 > .rb-au{padding:16px 30px 30px}   /* the Bill audit view shares the sheet frame */
+.rb2-listwrap{padding:20px 30px 30px;border-radius:14px;
+  border:1px solid rgba(16,185,129,.26);
+  background:rgba(16,185,129,.12);
+  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
+.rb2 > .rb-au{padding:20px 30px 30px;border-radius:14px;   /* Bill audit view = its own floating card too */
+  border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
+  box-shadow:0 2px 8px -3px rgba(15,23,42,.10)}
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
