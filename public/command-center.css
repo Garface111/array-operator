@@ -976,10 +976,11 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-rail > *{margin:0!important}
 .rb2-rail .rb-gmp-auto-nudge{background:none;border:0;padding:0;flex:1 1 auto}
 
-/* sticky action bar — the offtaker list floats on a punchy octarine/violet
-   ground (Ford 2026-07-04: dropped the lime, wants punchier), white rows lift */
+/* sticky action bar — the offtaker list floats on a punchy solarpunk-emerald
+   ground (Ford 2026-07-05: dropped the octarine/purple; lime rejected earlier —
+   this is the app's own night-theme emerald #10b981, verdant not lime), rows lift */
 .rb2-listwrap{padding:16px 30px 30px;border-radius:0 0 14px 14px;
-  background:rgba(163,104,255,.12);}
+  background:rgba(16,185,129,.12);}
 .rb2 > .rb-au{padding:16px 30px 30px}   /* the Bill audit view shares the sheet frame */
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
