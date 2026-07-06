@@ -867,7 +867,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
   padding:24px 30px 20px;border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap;
   border-radius:14px 14px 0 0;
-  background:rgba(37,99,235,.08);}
+  background:rgba(37,99,235,.13);}
 .rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
 .rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
 .rb2-subtabs{margin-top:13px}
@@ -930,11 +930,11 @@ body.sb-fs-lock{ overflow:hidden; }
   border-radius:3px 3px 0 0}
 /* each pipeline part reads as a soft colour zone keyed to its state (Ford:
    "different colours for the different pipeline parts — June is green, etc.") */
-.rb2-pcell.done{background:rgba(4,120,87,.08);border-color:rgba(4,120,87,.2)}
-.rb2-pcell.now{background:rgba(217,119,6,.09);border-color:rgba(217,119,6,.24)}
-.rb2-pcell.sched{background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.2)}
-.rb2-pcell.later{background:rgba(100,116,139,.07);border-color:rgba(100,116,139,.2)}
-.rb2-pcell.done[role="button"]:hover{background:rgba(4,120,87,.14)}
+.rb2-pcell.done{background:rgba(4,120,87,.13);border-color:rgba(4,120,87,.3)}
+.rb2-pcell.now{background:rgba(217,119,6,.15);border-color:rgba(217,119,6,.34)}
+.rb2-pcell.sched{background:rgba(37,99,235,.13);border-color:rgba(37,99,235,.3)}
+.rb2-pcell.later{background:rgba(100,116,139,.12);border-color:rgba(100,116,139,.28)}
+.rb2-pcell.done[role="button"]:hover{background:rgba(4,120,87,.19)}
 .rb2-pcell.done::before{background:#047857}
 .rb2-pcell.now::before{background:#d97706}
 .rb2-pcell.sched::before{background:var(--good,#2563eb)}
@@ -976,10 +976,10 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-rail > *{margin:0!important}
 .rb2-rail .rb-gmp-auto-nudge{background:none;border:0;padding:0;flex:1 1 auto}
 
-/* sticky action bar — the offtaker list floats on a soft lime ground (Ford:
-   "the offtaker invoice is like lime green"), white rows lifting against it */
+/* sticky action bar — the offtaker list floats on a punchy octarine/violet
+   ground (Ford 2026-07-04: dropped the lime, wants punchier), white rows lift */
 .rb2-listwrap{padding:16px 30px 30px;border-radius:0 0 14px 14px;
-  background:rgba(122,196,20,.06);}
+  background:rgba(163,104,255,.12);}
 .rb2 > .rb-au{padding:16px 30px 30px}   /* the Bill audit view shares the sheet frame */
 .rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
