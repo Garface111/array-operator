@@ -1273,30 +1273,34 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-reviewbar-sum{ font-size:13px; color:var(--ink2,#475569); }
 .rb-reviewbar .rb-review-acts{ margin:0; }
 /* Colour-dotted, tinted collapsible sections — NEPOOL client-card aesthetic
-   (Ford 2026-07-04). Each section carries a tone (emerald/amber/sky/violet/
-   slate): the header sits on the pastel tint with a colour dot + uppercase
-   label; the body is clean white. */
-.rb-sec{ --tone:#94a3b8; --tone-bg:rgba(100,116,139,.06); --tone-bd:rgba(100,116,139,.2); --tone-ink:#475569;
-  border:1px solid var(--tone-bd); border-radius:12px; margin-bottom:8px;
-  background:var(--card,#fff); overflow:hidden; }
-.rb-sec[data-tone="emerald"]{ --tone:#10b981; --tone-bg:rgba(16,185,129,.07); --tone-bd:rgba(16,185,129,.24); --tone-ink:#047857; }
-.rb-sec[data-tone="amber"]{ --tone:#f59e0b; --tone-bg:rgba(245,158,11,.08); --tone-bd:rgba(245,158,11,.28); --tone-ink:#92600a; }
-.rb-sec[data-tone="sky"]{ --tone:#0ea5e9; --tone-bg:rgba(14,165,233,.07); --tone-bd:rgba(14,165,233,.26); --tone-ink:#0369a1; }
-.rb-sec[data-tone="violet"]{ --tone:#8b5cf6; --tone-bg:rgba(139,92,246,.07); --tone-bd:rgba(139,92,246,.26); --tone-ink:#6d28d9; }
+   (Ford 2026-07-04). Each section is a FULLY-TINTED floating card (green /
+   orange / blue), a colour dot + uppercase label in the header, form fields on
+   white pills inside — matching the NEPOOL report card exactly. */
+.rb-sec{ --tone:#94a3b8; --tone-bg:rgba(100,116,139,.09); --tone-bd:rgba(100,116,139,.24); --tone-ink:#475569;
+  border:1px solid var(--tone-bd); border-radius:14px; margin-bottom:11px;
+  background:var(--tone-bg); overflow:hidden;
+  box-shadow:0 1px 2px rgba(15,23,42,.05); }
+.rb-sec[data-tone="emerald"]{ --tone:#10b981; --tone-bg:rgba(16,185,129,.11); --tone-bd:rgba(16,185,129,.28); --tone-ink:#047857; }
+.rb-sec[data-tone="amber"]{ --tone:#f59e0b; --tone-bg:rgba(245,158,11,.12); --tone-bd:rgba(245,158,11,.32); --tone-ink:#92600a; }
+.rb-sec[data-tone="sky"]{ --tone:#0ea5e9; --tone-bg:rgba(14,165,233,.11); --tone-bd:rgba(14,165,233,.3); --tone-ink:#0369a1; }
+.rb-sec[data-tone="violet"]{ --tone:#8b5cf6; --tone-bg:rgba(139,92,246,.11); --tone-bd:rgba(139,92,246,.3); --tone-ink:#6d28d9; }
 .rb-sec > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px;
-  padding:9px 13px; font-size:13px; color:var(--ink,#0f172a); user-select:none;
-  background:var(--tone-bg); }
+  padding:10px 14px; font-size:13px; color:var(--ink,#0f172a); user-select:none; background:transparent; }
 .rb-sec > summary::-webkit-details-marker{ display:none; }
-.rb-sec > summary:hover{ filter:brightness(.975); }
+.rb-sec > summary:hover{ background:rgba(255,255,255,.28); }
 .rb-sec-caret{ font-style:normal; color:var(--tone); font-size:11px; opacity:.85;
   transition:transform .15s ease; }
 .rb-sec[open] > summary .rb-sec-caret{ transform:rotate(90deg); }
 .rb-sec-dot{ width:8px; height:8px; border-radius:50%; background:var(--tone); flex:none;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
 .rb-sec-t{ font-weight:700; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--tone-ink); }
-.rb-sec-sub{ margin-left:auto; font-size:11px; color:var(--faint,#94a3b8); font-weight:500; }
+.rb-sec-sub{ margin-left:auto; font-size:11px; color:var(--tone-ink); opacity:.7; font-weight:600; }
 .rb-sec[open] > summary .rb-sec-sub{ display:none; }
-.rb-sec-body{ padding:12px 13px 14px; background:var(--card,#fff); }
+.rb-sec-body{ padding:4px 14px 14px; background:transparent; }
+/* form fields sit on white pills so they read cleanly on the tint (like the
+   reference card's white TO/CC/EVERY rows) */
+.rb-sec-body input:not([type="checkbox"]):not([type="radio"]),
+.rb-sec-body select, .rb-sec-body textarea{ background:var(--card,#fff); }
 .rb-sec-empty{ font-size:12.5px; color:var(--faint,#94a3b8); margin:6px 0; }
 .rb-sec .rb-calc-h{ display:none; }
 .rb-acc-name{ font-size:15px; font-weight:700; color:var(--ink,#0f172a); display:flex; align-items:center;

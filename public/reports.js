@@ -5420,7 +5420,7 @@
     const bacBody = sid != null ? reconPanelHTML(sid) : null;
     const bacFlagged = sid != null && reconFlagged(sid);
     const bacSec = bacBody
-      ? sec("Bill accuracy check", bacBody, reconSecSub(sid), bacFlagged, bacFlagged ? "amber" : "emerald")
+      ? sec("Bill accuracy check", bacBody, reconSecSub(sid), bacFlagged, bacFlagged ? "amber" : "sky")
       : "";
     return `
       <div class="rb-draft" data-did="${d.id}" data-subid="${d.subscription_id}">
@@ -5433,11 +5433,11 @@
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
         ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
-        ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "amber")}
-        ${sec("Edit email", emailBody, "the note your offtaker sees", false, "emerald")}
-        ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "violet")}
-        ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "sky")}
-        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false, "slate")}
+        ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "emerald")}
+        ${sec("Edit email", emailBody, "the note your offtaker sees", false, "amber")}
+        ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "sky")}
+        ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "emerald")}
+        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false, "amber")}
         ${bacSec}
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
            with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
