@@ -3190,6 +3190,7 @@
       // rate regime, day-accurate at the 11-year boundary). Best-effort: the
       // offtaker is already created; a failure here shouldn't block it.
       const newArrayId = (data.subscription && data.subscription.array_id) || arrayId;
+      const newSubId = data.subscription && data.subscription.id;
       if (commDateVal !== null && newArrayId != null) {
         try {
           await fetch(API + "/arrays/" + newArrayId, {
@@ -3204,6 +3205,14 @@
       renderManual();
       if (MANUAL_AFTER_ADD) await MANUAL_AFTER_ADD();
       else await refreshList();
+      // Reproduce the hard-refresh outcome for the NEW offtaker deterministically:
+      // force-mint its draft fresh (the /draft endpoint re-pulls the bound account +
+      // the commissioning regime we just committed above) and expand it, so its
+      // bill / values / rate are correct on FIRST paint — no manual hard refresh
+      // (Ford 2026-07-07: "shouldn't need to hard refresh to get the newly added
+      // offtaker correct"). Degrades to the honest empty state if no bill has
+      // settled for it yet.
+      if (newSubId != null) { try { await selectOfftaker(String(newSubId), true); } catch (e) { /* the list already refreshed */ } }
     } catch (e) {
       st.className = "rb-status rb-err"; st.textContent = "Network error while adding.";
     }
@@ -4107,6 +4116,7 @@
         st.textContent = (data && data.detail) ? data.detail : "Couldn't save (HTTP " + r.status + ").";
         return;
       }
+      const newSubId = data.subscription && data.subscription.id;
       PENDING = null;
       // Close the add panel and refresh the offtaker list (mirrors the manual
       // path). The panel is the unified "Add an offtaker" surface now.
@@ -4114,6 +4124,9 @@
       renderManual();
       if (MANUAL_AFTER_ADD) await MANUAL_AFTER_ADD();
       else await refreshList();
+      // Same as the manual path: force-mint + expand the new offtaker so it's
+      // correct on first paint without a hard refresh.
+      if (newSubId != null) { try { await selectOfftaker(String(newSubId), true); } catch (e) { /* the list already refreshed */ } }
     } catch (e) {
       st.className = "rb-status rb-err"; st.textContent = "Network error while saving.";
     }
