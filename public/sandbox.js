@@ -1171,6 +1171,9 @@
     const curW = (inv.current_power_w != null) ? inv.current_power_w : null;
     const sleeping = (isDaylight === false) && (curW == null || curW <= 1);
     if(sleeping) return "sleep";
+    // No-energy-register unit: its low/zero live split is an artifact of the dead
+    // meter, not a real fault or low-output — keep the pool calm (never fault/low).
+    if(inv && inv.no_energy_register) return "ok";
     if(statusCls === "bad") return "fault";
     const os = outputState(inv, statusCls);
     if(os.pct != null && os.pct >= 98) return "clip";
@@ -1259,6 +1262,18 @@
   // Precedence ERROR → SLEEPING → PRODUCING → OFFLINE, so a daytime fault that
   // zeroes output stays "error" and never masquerades as "sleeping".
   function fourState(inv, peers, isDaylight, statusCls, sleeping){
+    // NO ENERGY DATA (backend no_energy_register, e.g. Tannery #7, S/N 191213319):
+    // the vendor streams this unit's live POWER but its cumulative-energy register
+    // is dead — no daily history, no peer grade, and its per-inverter power is an
+    // unreliable energy-share split. It is NOT offline and NOT a fault: it's a
+    // metering defect at the source. So it gets its OWN honest, non-alarming state
+    // (never Error/Offline) — matching the morning digest's "SMA reports power but
+    // no energy for this inverter — check its metering" flag. Checked FIRST so the
+    // stale/comm-gap warn and the peer-low verdict can't drag it into red. Live
+    // power (when present) still shows via perfBlock so it doesn't read as dead.
+    if(inv && inv.no_energy_register)
+      return { key:"nometer", word:"No energy data", tone:"info",
+               title:"This inverter reports live power but no cumulative energy — a metering issue at the vendor, not an outage. Its output can't be peer-graded until the energy register is fixed." };
     // ERROR: the 14-day peer verdict is flagged (underperforming/comm_gap → warn,
     // dead/fault → bad), OR a live anomaly — dark, or low vs peers, right now while
     // ≥2 daylight siblings produce. Either way it is making less than it should.
@@ -1346,6 +1361,12 @@
         </div>`;
       }
       return `<div class="sb-perf ok"><div class="sb-perf-main"><b class="sb-perf-pct"${_allocTip}>${curKw!=null?(_allocP?"~":"")+curKw.toFixed(1):"—"}</b><span class="sb-perf-unit">kW now</span></div></div>`;
+    }
+    // NO ENERGY DATA: show the live power we DO have (so it never reads as dead)
+    // plus the honest reason there's no % — the energy register isn't reporting.
+    if(st.key === "nometer"){
+      const line = nowKw ? `${nowKw} · no energy total` : "no energy total from this inverter";
+      return `<div class="sb-perf info"><div class="sb-perf-sub sb-perf-sub--lone" title="The vendor reports this inverter's live power but not its cumulative energy — a metering issue to fix at the source.">${esc(line)}</div></div>`;
     }
     // Non-producing states: an honest line, no %.
     const tk = liveReadingMissing(inv) ? todayKwh(inv) : null;
@@ -1989,8 +2010,11 @@
         // the inverter card (it stays on the array card).
         const st4 = fourState(inv, sortedInvs, col.is_daylight, sCls, sleeping);
         const stateChip = `<div class="sb-state ${st4.tone}"${st4.title?` title="${esc(st4.title)}"`:""}><span class="sb-now-dot"></span>${esc(st4.word)}</div>`;
-        // Whole-card tint: error/offline → red; otherwise the calm live output tone.
-        const cardTone = (st4.key === "error" || st4.key === "offline") ? "bad" : obTone;
+        // Whole-card tint: error/offline → red; no-energy-data stays calm info
+        // (a metering defect must not tint the card red even if its low live split
+        // makes obTone bad); otherwise the calm live output tone.
+        const cardTone = (st4.key === "error" || st4.key === "offline") ? "bad"
+          : st4.key === "nometer" ? "info" : obTone;
         // Cards are FIRM in place — not draggable until the owner picks "Move" from
         // the right-click menu (which sets draggable + .sb-movable). Re-locks on drop.
         return `

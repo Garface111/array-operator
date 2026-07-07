@@ -123,6 +123,13 @@
   }
   function invStatus(iv, cohort, isDaylight) {
     const s = iv.status || "ok";
+    // NO ENERGY REGISTER (e.g. Tannery #7): live power but a dead cumulative-energy
+    // meter → ungradeable, and its per-inverter power is an unreliable energy-share
+    // split. A metering DEFECT at the vendor, not an outage — its own neutral label,
+    // never "Stopped"/"Quiet"/a red fault. Checked FIRST so a comm_gap/stale status
+    // can't drag it into a warn. Mirrors the card's "No energy data" + the digest.
+    if (iv.no_energy_register) return { label: "No energy data", cls: "muted",
+      tip: "Reports live power but no cumulative energy — a metering issue at the vendor, not an outage. Can't be peer-graded until the energy register is fixed." };
     // LIVE-DARK overlay: an inverter the 14-day peer verdict calls "ok" but that is producing ZERO
     // right now while >=2 of its daylight neighbors ARE producing — the exact live anomaly the
     // email alert fires on. Without this the table shows a bare "OK" for the very inverter we just
@@ -208,11 +215,30 @@
     if (min < 1440) return Math.round(min / 60) + "h";
     return Math.round(min / 1440) + "d";
   }
-  // Our pipeline is "behind" when we haven't captured in ~3 keep-warm cycles (~30 min).
-  function syncStale(c) { const s = _syncAgeMin(c); return s != null && s >= 30; }
+  // The freshness column is AMBER when the SOURCE data itself is stale (the honest
+  // "this data is old" signal, matching the array card's source-age banner) OR when
+  // our capture pipeline has fallen behind (~3 keep-warm cycles). Keying the amber on
+  // SOURCE staleness is what stops "synced now" from reading fresh beside the card's
+  // "last reported 21h ago" (Bruce's contradiction) — the two surfaces now agree.
+  function syncStale(c) {
+    if (isStale(c)) return true;                 // the vendor's OWN data is stale
+    const s = _syncAgeMin(c); return s != null && s >= 30;  // our pipeline is behind
+  }
+  // Freshness label. THE HONEST RULE: never imply the data is fresh ("synced now")
+  // while the vendor's own data is stale. When the SOURCE data is current we show
+  // "live"; the moment it goes stale we lead with the SOURCE age ("SMA 21h old") —
+  // the SAME truth the array card's banner shows — so the spreadsheet and the card
+  // can't contradict. Our capture recency ("synced Xm") only shows while the source
+  // is NOT stale (a normal overnight pause), so a successful keep-warm sync is still
+  // visible without ever masking stale source data as fresh.
   function syncFreshness(c) {
     const src = _ageMin(c), syn = _syncAgeMin(c);
     if (src != null && src < _liveWindowMin(c)) return "live";        // the source data itself is current
+    // Source is STALE → tell the source-data truth (matches the card), never "synced now".
+    if (isStale(c)) {
+      const v = vlabel(c.vendor);
+      return v + " " + _fmtAgeShort(src) + " old";                    // e.g. "SMA 21h old"
+    }
     if (syn != null) return syn < 1 ? "synced now" : "synced " + _fmtAgeShort(syn);  // our capture recency (updates every sync)
     if (src != null) return _fmtAgeShort(src) + " ago";              // legacy rows without a sync clock
     return "";
@@ -220,13 +246,17 @@
   function freshTip(c) {
     const syn = _syncAgeMin(c), src = _ageMin(c), v = vlabel(c.vendor);
     const parts = [];
-    if (syn != null) parts.push("We last synced this array " + _fmtAge(syn) + ".");
-    if (src != null) {
-      parts.push(src < _liveWindowMin(c)
-        ? "The " + v + " data is live."
-        : "The " + v + " portal's own data is from " + _fmtAge(src)
-          + (c.is_daylight === false ? " — it pauses overnight while the panels aren't producing." : "."));
+    // When the source is stale, LEAD with the source-data age (the honest headline,
+    // matching the card) so the tooltip can't read as "all fresh" either. Our capture
+    // recency follows as the secondary "we did check recently" reassurance.
+    if (src != null && src >= _liveWindowMin(c)) {
+      parts.push("The " + v + " portal's own data is from " + _fmtAge(src)
+        + (c.is_daylight === false ? " — it pauses overnight while the panels aren't producing." : "."));
+      if (syn != null) parts.push("(We last checked for new data " + _fmtAge(syn) + ".)");
+      return parts.join(" ");
     }
+    if (syn != null) parts.push("We last synced this array " + _fmtAge(syn) + ".");
+    if (src != null) parts.push("The " + v + " data is live.");
     return parts.join(" ");
   }
   // Vendor-GROUP sync summary for the collapsed header row (Ford: "the vendor was
@@ -235,6 +265,25 @@
   // array should surface here even while its siblings are fresh, matching this app's
   // "flag problems, don't hide them" rule (same reasoning as syncStale's per-array amber).
   function vendorSyncSummary(list) {
+    // If ANY array in the group has stale SOURCE data, the collapsed header must say
+    // so — otherwise "Synced 2m" at the group level hides a 21h-stale array inside
+    // (same contradiction, one level up). Lead with the oldest stale source age so
+    // the collapsed row agrees with both the card and the expanded freshness column.
+    const staleSrc = list.map(_ageMin).filter((a, i) => a != null && isStale(list[i]));
+    if (staleSrc.length) {
+      const oldestSrc = Math.max(...staleSrc);
+      const n = staleSrc.length;
+      // Long-form duration WITHOUT the "ago" suffix (_fmtAge appends it) so the title
+      // reads "…is 21h old", not "…is 21h ago old".
+      const longAge = _fmtAge(oldestSrc).replace(/ ago$/, "");
+      return {
+        text: "Source " + _fmtAgeShort(oldestSrc) + " old",
+        stale: true,
+        title: (list.length > 1
+          ? n + " of these " + list.length + " arrays have stale source data — oldest is "
+          : "This array's source data is ") + longAge + " old.",
+      };
+    }
     const ages = list.map(_syncAgeMin).filter(a => a != null);
     if (!ages.length) return null;
     const oldest = Math.max(...ages);

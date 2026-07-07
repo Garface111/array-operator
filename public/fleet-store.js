@@ -331,6 +331,13 @@ window.FleetStore = (function(){
     return peak >= inv.nameplate_kw * 4.6 * 0.25;
   }
   function liveVerdict(inv, peers, isDaylight){
+    // NO ENERGY REGISTER (backend no_energy_register, e.g. Tannery #7): the unit
+    // streams live power but has a dead cumulative-energy register, so it has no
+    // gradeable history AND its per-inverter power is a bogus energy-share split
+    // (zero energy → zero/low share). Neither basis is trustworthy, so we make NO
+    // live verdict on it — a metering defect must never masquerade as a dark/low
+    // FAULT. Surfaces render its own honest "no energy data" state instead.
+    if(inv && inv.no_energy_register) return "ok";
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
     if(isProducing(inv)){
       // Producing — but is it keeping pace with its array peers? An inverter running
@@ -389,6 +396,10 @@ window.FleetStore = (function(){
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
         window_kwh: i.window_kwh, current_power_w: i.current_power_w,
         daily: i.daily || [], min_kwh: i.min_kwh, peak_kwh: i.peak_kwh,
+        // Dead-energy-register flag (live power, no cumulative energy) — MUST ride
+        // through or every surface loses the honest "no energy data" state and #7
+        // falls back to Error/Offline (the bug). Carried like status/peer_index.
+        no_energy_register: !!i.no_energy_register,
         last_mode: i.status==="dead" ? "SHUTDOWN" : i.status==="comm_gap" ? "" : "PRODUCING",
         vendor: a.vendor || "solaredge",
       })),
@@ -935,6 +946,10 @@ window.FleetStore = (function(){
         peer_index: inv.peer_index, status: inv.status, window_kwh: inv.window_kwh,
         current_power_w: inv.current_power_w, stale_hours: inv.stale_hours,
         daily: inv.daily || [], min_kwh: inv.min_kwh, peak_kwh: inv.peak_kwh,
+        // Dead-energy-register flag from the backend (live power but no cumulative
+        // energy) — carry it through so the card/spreadsheet/command-center all
+        // render the honest "no energy data" state instead of Error/Offline.
+        no_energy_register: !!inv.no_energy_register,
         diagnosis: inv.diagnosis || "",
       })),
     }));
