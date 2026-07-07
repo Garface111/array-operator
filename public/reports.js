@@ -2813,7 +2813,7 @@
       const P = esc(prov.toUpperCase());
       slot.innerHTML = `<span class="rl">Solar credit rate ($/kWh)</span>
         <input type="number" id="rbmCreditRate" min="0" step="0.0001" placeholder="e.g. 0.14963">
-        <span class="rb-fld-hint">${P}'s portal doesn't publish a usable credit rate — enter the $/kWh you bill at. Leave blank to use your default rate (or upload the ${P} bill PDF later and we'll read its rate).</span>`;
+        <span class="rb-fld-hint">${P}'s usage data doesn't include a $/kWh rate, but its bill does — enter the rate you bill at, or link/upload a ${P} bill and we'll read the rate straight off it. Blank uses your default until then.</span>`;
     } else {
       const src = prov === "gmp" ? "GMP bill" : "utility bill";
       slot.innerHTML = `<span class="rl">Solar credit rate</span>
@@ -5582,19 +5582,34 @@
     d._defaultNote = d.email_letter_default || defaultDraftNote(d);
     const auto = d.auto_attach_gmp !== false;   // ON by default
     const sumOn = d.include_summary === true;    // OFF by default — AO summary is opt-in (Ford)
+    // Provider-aware auto-attach: the toggle attaches the offtaker's BOUND utility
+    // bill, so label + status must reflect that provider (VEC/WEC/… vs GMP). Prefer
+    // the backend's attach_provider; fall back to the bound util account's provider
+    // (works before the payload field lands + for legacy). Column name on the sub
+    // stays auto_attach_gmp for back-compat; here it's just "the utility bill".
+    const _boundAcct = (utilAccts || []).find(a => String(a.utility_account_id) === String(d.utility_account_id));
+    const _attachProv = (d.attach_provider || (_boundAcct && _boundAcct.provider) || "gmp").toLowerCase();
+    const _isVecAttach = _attachProv !== "gmp";
+    const _provLabel = auditProviderLabel(_attachProv);   // "VEC" / "WEC" / "GMP" / …
     // Honest auto-attach status line (never implies a PDF exists when it doesn't).
-    const autoStatusText = {
-      ready: "✓ GMP bill found — it will attach automatically.",
-      pending: "GMP bill will attach automatically once it's captured (none yet).",
-      no_gmp: "No GMP account on this array yet — connect one to auto-attach.",
-    }[d.gmp_auto_status] || "";
+    const autoStatusText = _isVecAttach
+      ? {
+          ready: `✓ ${_provLabel} bill found — it will attach automatically.`,
+          pending: `${_provLabel} bill will attach automatically once it's pulled or uploaded (none yet).`,
+          no_gmp: `No ${_provLabel} bill on file for this offtaker yet.`,
+        }[d.gmp_auto_status] || ""
+      : {
+          ready: "✓ GMP bill found — it will attach automatically.",
+          pending: "GMP bill will attach automatically once it's captured (none yet).",
+          no_gmp: "No GMP account on this array yet — connect one to auto-attach.",
+        }[d.gmp_auto_status] || "";
     // Attachment controls box — sits beside the send buttons (Ford). Auto-attach the
-    // GMP bill (on by default) + opt-in Array Operator summary data (off by default).
+    // bound utility bill (on by default) + opt-in Array Operator summary data (off by default).
     const attachBox = `
       <div class="rb-draft-attach">
         <label class="rb-gmp-switch">
           <input type="checkbox" data-dact="autogmp" ${auto ? "checked" : ""}>
-          <span>Auto-attach the GMP bill</span>
+          <span>Auto-attach the ${esc(_provLabel)} bill</span>
         </label>
         ${auto && autoStatusText ? `<span class="rb-gmp-auto-status rb-gmp-${esc(d.gmp_auto_status)}">${autoStatusText}</span>` : ""}
         <label class="rb-gmp-switch">
@@ -5934,7 +5949,7 @@
         ${isSmartHubBound ? `
         <div class="rb-vecbill">
           <div class="rb-vecbill-h"><span class="rl">${esc(boundProv.toUpperCase())} bill — we read the rate from the PDF</span></div>
-          <span class="rb-fld-hint">${esc(boundProv.toUpperCase())}'s portal doesn't publish the credit rate, so upload this account's bill PDF — we read the generation + net-metering credit rate off it and the invoice prices itself (no rate to enter).</span>
+          <span class="rb-fld-hint">${esc(boundProv.toUpperCase())}'s usage feed doesn't expose a $/kWh rate, but its bill does. We read the generation + net-metering credit rate straight off the bill — automatically once the ${esc(boundProv.toUpperCase())} login is linked and bills auto-pull, or from a PDF you upload here — and the invoice prices itself (no rate to enter).</span>
           <div class="rb-vecbill-row">
             <label class="rb-track-up">📄 Upload ${esc(boundProv.toUpperCase())} bill (PDF)
               <input type="file" accept="application/pdf,.pdf" data-vecbillfile="${d.utility_account_id}" data-vbsid="${sid}" hidden></label>
