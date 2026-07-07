@@ -1036,31 +1036,37 @@ function aoShowFrozenGate(session){
     "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
     "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
   el.innerHTML =
-    '<div style="width:100%;max-width:440px;background:#fff;color:#16202b;' +
-      'border-radius:18px;padding:34px 30px;text-align:center;' +
-      'box-shadow:0 30px 90px rgba(0,0,0,.5);font-family:inherit;">' +
-      '<div style="margin:0 auto 18px;width:56px;height:56px;border-radius:999px;' +
-        'background:#eef7f1;display:flex;align-items:center;justify-content:center;">' +
-        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#137a4a" ' +
+    // Solarpunk palette (Ford 2026-07-07: "#137a4a is too dark"): warm cream card,
+    // mint lock badge, vibrant emerald-600 accents + a punchy emerald CTA that
+    // brightens to emerald-500 on hover. Matches the app's redesigned surfaces.
+    '<style>#aoFrozenAddCard{transition:transform .12s ease,box-shadow .12s ease,background .12s ease}' +
+    '#aoFrozenAddCard:hover{transform:translateY(-1px);background:#10b981;' +
+    'box-shadow:0 16px 36px -10px rgba(16,185,129,.62)}</style>' +
+    '<div style="width:100%;max-width:440px;background:#faf8f5;color:#16202b;' +
+      'border:1px solid #e8e2d9;border-radius:20px;padding:34px 30px;text-align:center;' +
+      'box-shadow:0 30px 90px rgba(6,20,14,.5);font-family:inherit;">' +
+      '<div style="margin:0 auto 18px;width:58px;height:58px;border-radius:999px;' +
+        'background:#d1fae5;display:flex;align-items:center;justify-content:center;">' +
+        '<svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#059669" ' +
           'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
           '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
-      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
+      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:750;color:#0f2a1e;">' +
         'Your free trial has ended</h1>' +
       '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
         "Fleet monitoring and offtaker invoices are paused. Add a card to pick up " +
         "exactly where you left off — nothing to set up again.</p>" +
-      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
+      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:650;color:#059669;">' +
         "Your data is safe — we haven't deleted anything.</p>" +
       '<button type="button" id="aoFrozenAddCard" ' +
-        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;border:none;' +
-        'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
-        'cursor:pointer;">Add a card to continue →</button>' +
+        'style="display:block;width:100%;box-sizing:border-box;padding:14px 16px;border:none;' +
+        'border-radius:13px;background:#059669;color:#fff;font-size:14.5px;font-weight:700;' +
+        'cursor:pointer;box-shadow:0 10px 26px -8px rgba(16,185,129,.5);">Add a card to continue →</button>' +
       '<div id="aoFrozenMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
-      '<p style="margin:14px 0 0;font-size:12px;color:#9aa6b2;">' +
+      '<p style="margin:14px 0 0;font-size:12px;color:#8a9a90;">' +
         "You're only billed for what you use, monthly — no setup fee, no contract. Cancel anytime.</p>" +
       '<button type="button" id="aoFrozenSignOut" ' +
-        'style="margin-top:16px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
+        'style="margin-top:16px;background:none;border:none;color:#8a9a90;font-size:12px;' +
         'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
     '</div>';
   document.body.appendChild(el);
