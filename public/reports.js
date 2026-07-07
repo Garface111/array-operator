@@ -698,7 +698,11 @@
     const slug = String((d && d.customer_name) || "offtaker").toLowerCase()
       .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "offtaker";
     const suf = (d && d.invoice_number) ? "_" + d.invoice_number : "";
-    return `gmp_utility_bill_${slug}${suf}.pdf`;
+    // Provider-aware: a VEC/SmartHub offtaker's bill is a VEC bill, not a GMP one
+    // (mirrors the backend's vec_utility_bill_… naming in delivery.generate_files).
+    const prov = ((d && d.attach_provider) || "gmp").toLowerCase();
+    const pfx = prov === "gmp" ? "gmp" : prov;
+    return `${pfx}_utility_bill_${slug}${suf}.pdf`;
   }
 
   // ---- top-level entry -------------------------------------------------------
@@ -5481,13 +5485,19 @@
       sub: "generation + savings report", state: "ready",
       url: sid ? `${API}/subscriptions/${sid}/preview?kind=summary&fmt=pdf` : null,
     });
+    // Provider-aware label: a VEC/SmartHub-bound offtaker's bill is a "VEC utility
+    // bill", not a "GMP" one (Ford 2026-07-07: "glover is a VEC offtaker but it's
+    // showing the gmp bill"). attach_provider comes from the backend (_bound_provider);
+    // fall back to the bound utility account's provider, else GMP.
+    const _bAcct = (INBOX_UTIL_ACCTS || []).find(a => String(a.utility_account_id) === String(d.utility_account_id));
+    const _billLbl = auditProviderLabel((d.attach_provider || (_bAcct && _bAcct.provider) || "gmp").toLowerCase());
     if (d.has_gmp_pdf || (autoOn && d.gmp_auto_status === "ready")) atts.push({
       ico: "🧾", name: gmpBillFilename(d),
-      sub: "the GMP bill behind this invoice", state: "ready",
+      sub: `the ${_billLbl} bill behind this invoice`, state: "ready",
       url: `${API}/drafts/${d.id}/gmp-bill`,
     });
     else if (autoOn) atts.push({
-      ico: "🧾", name: "GMP utility bill",
+      ico: "🧾", name: `${_billLbl} utility bill`,
       sub: "attaches automatically once captured", state: "pending", url: null,
     });
     const attChips = atts.map(a => {
