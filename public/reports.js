@@ -4396,12 +4396,11 @@
     }).join("");
     const sumCls = over ? "rb-grp-pop-sum-warn" : "rb-grp-pop-sum-ok";
     const where = group.shareMode === "array" ? "in this array" : "on this utility bill";
-    // Redesign: the pill carries a small allocation METER (fill = % allocated;
-    // green ≈100%, amber over/under) — the number still reads exactly, the bar
-    // makes 26 arrays scannable. Hover breakdown unchanged below.
-    const meter = `<span class="rb2-meter${over ? " warn" : (within ? "" : " under")}" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, pct))}%"></i></span>`;
+    // The "% allocated" chip carries the number on its own; the little meter bar
+    // was removed (Ford 2026-07-07) — it cried wolf (orange for a fine 96%) and
+    // just repeated the chip. Hover breakdown unchanged below.
     return `<span class="rb-grp-pctwrap">
-      ${meter}<span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
+      <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
       <span class="rb-grp-pct-pop" role="tooltip">
         <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} ${where}</span>
         ${rowHtml}
