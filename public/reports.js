@@ -5100,7 +5100,12 @@
       // The honest default-rate provenance (bill vs banked reference) the list
       // payload lacks — merge it so the editable rate field shows the true default.
       "default_net_rate_per_kwh", "default_net_rate_source", "default_net_rate_note",
-      "resolved_net_rate_per_kwh", "resolved_net_rate_source"];
+      "resolved_net_rate_per_kwh", "resolved_net_rate_source",
+      // The server re-renders the email LETTER + SUBJECT with the fresh figures on
+      // every /draft response; merge them so the live preview's letter (kWh + $)
+      // tracks a re-sync/new bill instead of showing the old amount until a hard
+      // refresh (Ford 2026-07-07: "not live updating, requires a refresh").
+      "email_letter_default", "email_subject_default"];
     const changed = keys.some(k => (k in dg.draft) && dg.draft[k] !== d[k]);
     if (!changed) return;                                // nothing new → no repaint, no jitter
     keys.forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
@@ -6438,7 +6443,10 @@
            // Refresh the honest default-rate provenance so the "Override in effect"
            // ↔ "default: $X — <source>" helper tracks the just-saved rate live.
            "default_net_rate_per_kwh", "default_net_rate_source", "default_net_rate_note",
-           "resolved_net_rate_per_kwh", "resolved_net_rate_source"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
+           "resolved_net_rate_per_kwh", "resolved_net_rate_source",
+           // Re-rendered letter/subject so the preview email's kWh + $ update live
+           // on a money edit (not just the figures grid) — no hard refresh.
+           "email_letter_default", "email_subject_default"].forEach(k => { if (k in dg.draft) d[k] = dg.draft[k]; });
           applyDraftFigures(card, d);
           setSt("rb-status rb-ok", "Saved · figures updated.");
         } else {
