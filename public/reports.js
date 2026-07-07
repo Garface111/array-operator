@@ -1721,12 +1721,13 @@
         <span class="rb2-draftstat" id="rb2DraftStatus" hidden></span>
         <small class="rb2-runstamp"><b>last run</b> ${esc(lastRun)} · next ${esc(_fireLabel(monthly.fires_at))}</small>
         <div class="rb2-pipe-ctl">
-          <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2AutoAll" type="button">Auto-send all</button>
-          <div class="rb2-ctlpop" id="rb2AutoAllPop" hidden>
-            <p><b>${fmt0(approvalTotal)} offtaker${approvalTotal === 1 ? "" : "s"}</b> on draft-for-approval will switch to <b>auto-send</b> — invoices email on schedule, from settled bills, without review. Per-offtaker settings still override.</p>
-            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2AutoAllGo" type="button">Switch ${fmt0(approvalTotal)} to auto</button></div>
+          <div class="rb2-modewrap" title="The default for every offtaker once its invoice drafts. Approve to send: it waits for your OK. Auto-send: it emails itself on schedule. Per-offtaker settings still override; real sends stay gated on demo data.">
+            <span class="rb2-modelab">When an invoice is drafted</span>
+            <div class="rb-seg rb-slider rb2-modeslider" id="rb2Mode" role="group" aria-label="Default delivery mode">
+              <button type="button" data-v="approval" class="${(p.default_delivery_mode || 'approval') === 'auto' ? '' : 'on'}">Approve to send</button>
+              <button type="button" data-v="auto" class="${(p.default_delivery_mode || 'approval') === 'auto' ? 'on' : ''}">Auto-send</button>
+            </div>
           </div>
-          <span class="rb2-autodraft" title="Every offtaker's invoice drafts automatically from its settled bill — the moment it's added and whenever a new bill lands. Nothing sends until you approve it.">⚡ Auto-drafting</span>
           <button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="${paused}" type="button">
             <span class="rb2-knob" aria-hidden="true"></span>${paused ? "Resume sending" : "Pause sending"}
           </button>
@@ -1740,9 +1741,26 @@
         </div>
         <div class="rb2-nowmark" aria-hidden="true"><em>NOW</em></div>
         <div class="rb2-pcell now">
-          <div class="rb2-when"><b>In flight</b><small>current period</small></div>
-          <div class="rb2-big">${fmt0(inf.pending_drafts || 0)} <span>awaiting your approval</span></div>
-          <div class="rb2-chips"><span class="rb2-pc a">${fmt0(inf.pending_drafts || 0)} to approve</span><span class="rb2-pc m">${fmt0(inf.waiting || 0)} waiting on bills</span></div>
+          <div class="rb2-when"><b>This cycle</b><small>drafted from settled bills</small></div>
+          ${(() => {
+            // Honest split (Ford 2026-07-07): an auto-send draft is NOT "awaiting
+            // approval" — it sends itself. Lead with what actually needs the operator;
+            // if nothing does, lead with what's flowing automatically.
+            const appr = inf.pending_approval != null ? inf.pending_approval : (inf.pending_drafts || 0);
+            const au = inf.pending_auto || 0;
+            const wait = inf.waiting || 0;
+            const primary = appr > 0
+              ? `${fmt0(appr)} <span>awaiting your approval</span>`
+              : (au > 0 ? `${fmt0(au)} <span>sending automatically</span>`
+                        : `${fmt0(wait)} <span>waiting on bills</span>`);
+            const chips = [
+              appr > 0 ? `<span class="rb2-pc a">${fmt0(appr)} to approve</span>` : "",
+              au > 0 ? `<span class="rb2-pc b">${fmt0(au)} auto-sending</span>` : "",
+              wait > 0 ? `<span class="rb2-pc m">${fmt0(wait)} waiting on bills</span>` : "",
+            ].filter(Boolean).join("");
+            return `<div class="rb2-big">${primary}</div>
+              <div class="rb2-chips">${chips || '<span class="rb2-pc g">✓ all caught up</span>'}</div>`;
+          })()}
         </div>
         <div class="rb2-pcell sched">
           <div class="rb2-when"><b>${esc(_fireLabel(monthly.fires_at))} · next run</b><small>${paused ? "paused" : (days != null ? "fires in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</small></div>
@@ -1763,18 +1781,22 @@
       const a = document.getElementById("rbArchiveHost");
       if (a && !a.hidden) a.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    [["rb2AutoAll", "rb2AutoAllPop"]].forEach(([b, pp]) => {
-      const btn = host.querySelector("#" + b), pop = host.querySelector("#" + pp);
-      if (!btn || !pop) return;
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        host.querySelectorAll(".rb2-ctlpop").forEach(x => { if (x !== pop) x.hidden = true; });
-        pop.hidden = !pop.hidden;
+    // Mode slider — the tenant-wide default. Switching to Auto-send is money-adjacent
+    // (invoices start emailing themselves on schedule), so confirm it; switching back
+    // to Approve-to-send is always safe + instant.
+    const modeSeg = host.querySelector("#rb2Mode");
+    if (modeSeg) modeSeg.querySelectorAll("button[data-v]").forEach(b => {
+      b.onclick = () => {
+        const want = b.getAttribute("data-v");
+        const cur = (PIPE && PIPE.default_delivery_mode) || "approval";
+        if (want === cur) return;
+        if (want === "auto") {
+          const n = (PIPE && PIPE.mode_split && PIPE.mode_split.approval) || 0;
+          if (!confirm(`Switch ${fmt0(n)} offtaker${n === 1 ? "" : "s"} to Auto-send? Their invoices will email automatically on schedule — from settled bills, no review. Per-offtaker settings still override, and real sends stay gated on demo data.`)) return;
+        }
+        setDeliveryModeAll(want);
       };
-      pop.querySelectorAll("[data-close]").forEach(c => c.onclick = () => { pop.hidden = true; });
     });
-    const autoGo = host.querySelector("#rb2AutoAllGo");
-    if (autoGo) autoGo.onclick = (e) => bulkDeliveryMode("auto", e.currentTarget);
     const pauseBtn = host.querySelector("#rb2Pause");
     if (pauseBtn) pauseBtn.onclick = async () => {
       pauseBtn.disabled = true;
@@ -1801,24 +1823,19 @@
     }
   }
 
-  async function bulkDeliveryMode(mode, btn) {
-    btn.disabled = true;
-    const keep = btn.textContent;
-    btn.textContent = "Switching…";
+  // Flip the tenant-wide default delivery mode (the pipeline slider). Optimistically
+  // reflect it, then reload the pipeline (which re-derives the split → the slider +
+  // "This cycle" counts settle to the truth) and refresh the offtaker cards.
+  async function setDeliveryModeAll(mode) {
+    if (PIPE) { PIPE.default_delivery_mode = mode; renderPipeline(); }   // instant slider feedback
     try {
       const r = await fetch(API + "/subscriptions/bulk-delivery-mode", {
         method: "POST",
         headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
         body: JSON.stringify({ mode }),
       });
-      if (r.ok) {
-        await loadPipeline();     // re-renders the band with the new splits
-        refreshList();            // cards pick up their new mode chips
-        return;
-      }
-    } catch (e) { /* fall through to restore */ }
-    btn.disabled = false;
-    btn.textContent = keep;
+      if (r.ok) { await loadPipeline(); refreshList(); }
+    } catch (e) { loadPipeline(); /* re-sync the slider to server truth */ }
   }
 
   // ── Continuous auto-draft (Ford 2026-07-07: "remove the draft button ... have all
@@ -3009,8 +3026,8 @@
             <div class="rb-ctl">
               <span class="rl">When a report is ready</span>
               <div class="rb-seg rb-slider" id="rbmDelivery">
-                <button type="button" data-v="approval" class="on">Draft for my approval</button>
-                <button type="button" data-v="auto">Auto-send</button>
+                <button type="button" data-v="approval" class="${(PIPE && PIPE.default_delivery_mode) === 'auto' ? '' : 'on'}">Draft for my approval</button>
+                <button type="button" data-v="auto" class="${(PIPE && PIPE.default_delivery_mode) === 'auto' ? 'on' : ''}">Auto-send</button>
               </div>
             </div>
             <div class="rb-ctl">
