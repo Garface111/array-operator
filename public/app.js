@@ -1002,6 +1002,81 @@ try {
   window.aoShowCancelledGate = aoShowCancelledGate;
 } catch(e){}
 
+// ── Trial-expired freeze gate (paused_no_card) ─────────────────────────────
+// Ford's paywall model (2026-07-07): the product runs FULLY through the trial —
+// no pricing wall, no nag beyond the soft nudge — then, at expiry with no card,
+// it hard-prompts for a card and freezes. The backend already does the state
+// half: finalize_expired_trials flips an expired card-less trial (that has
+// arrays) to subscription_status "paused_no_card" + active=false, pausing
+// monitoring/invoices and 402-ing every mutation (require_active_subscription).
+// What was missing is the honest FRONT: a frozen owner just saw the app and hit
+// silent failures. This full-viewport gate makes the freeze legible and offers
+// the one way out. Adding a card → /v1/account/add-payment-method (an explicit
+// un-pause path) → Stripe checkout; the webhook un-pauses, so the gate is gone
+// on the next load. Mirrors aoShowCancelledGate exactly for product parity.
+function aoIsPausedNoCard(a){
+  if(!a) return false;
+  const st = String(a.subscription_status || a.status || "").toLowerCase();
+  return a.active === false && st === "paused_no_card";
+}
+function aoShowFrozenGate(session){
+  // Just paid? Don't greet a card-adding owner with "your trial ended" while the
+  // un-pause webhook lands — the checkout-return flow owns the screen.
+  if(window.__aoCheckoutReturn && window.__aoCheckoutReturn.kind === "card_added") return;
+  if(document.getElementById("aoFrozenGate")) return;    // already shown
+  if(document.getElementById("aoCancelledGate")) return; // cancelled gate wins if somehow both
+  if(!session){ try { session = localStorage.getItem("so_session"); } catch(e){} }
+  const el = document.createElement("div");
+  el.id = "aoFrozenGate";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-label", "Free trial ended");
+  el.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
+    "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
+    "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+  el.innerHTML =
+    '<div style="width:100%;max-width:440px;background:#fff;color:#16202b;' +
+      'border-radius:18px;padding:34px 30px;text-align:center;' +
+      'box-shadow:0 30px 90px rgba(0,0,0,.5);font-family:inherit;">' +
+      '<div style="margin:0 auto 18px;width:56px;height:56px;border-radius:999px;' +
+        'background:#eef7f1;display:flex;align-items:center;justify-content:center;">' +
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#137a4a" ' +
+          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
+          '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
+      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
+        'Your free trial has ended</h1>' +
+      '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
+        "Fleet monitoring and offtaker invoices are paused. Add a card to pick up " +
+        "exactly where you left off — nothing to set up again.</p>" +
+      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
+        "Your data is safe — we haven't deleted anything.</p>" +
+      '<button type="button" id="aoFrozenAddCard" ' +
+        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;border:none;' +
+        'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
+        'cursor:pointer;">Add a card to continue →</button>' +
+      '<div id="aoFrozenMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
+      '<p style="margin:14px 0 0;font-size:12px;color:#9aa6b2;">' +
+        "You're only billed for what you use, monthly — no setup fee, no contract. Cancel anytime.</p>" +
+      '<button type="button" id="aoFrozenSignOut" ' +
+        'style="margin-top:16px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
+        'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
+    '</div>';
+  document.body.appendChild(el);
+  try { document.body.style.overflow = "hidden"; } catch(e){}
+  const out = document.getElementById("aoFrozenSignOut");
+  if(out) out.addEventListener("click", () => { aoSignOut(); });
+  // The one way out: add a card. wireAddCardCta POSTs /v1/account/add-payment-method
+  // and redirects to Stripe Checkout (setup mode); the webhook un-pauses the tenant.
+  const btn = document.getElementById("aoFrozenAddCard");
+  if(btn) wireAddCardCta(btn, session);
+}
+try {
+  window.aoIsPausedNoCard = aoIsPausedNoCard;
+  window.aoShowFrozenGate = aoShowFrozenGate;
+} catch(e){}
+
 // Canonical sign-out — clear the session token AND this session's cached fleet
 // tree (so a shared browser never shows the previous owner's arrays after
 // logout), then return to /login. Exposed on window so every surface (the header
@@ -1067,6 +1142,7 @@ function renderFromSession(){
           .then(r => r.ok ? r.json() : null)
           .then(a => {
             if(a && aoIsCancelled(a)){ aoShowCancelledGate(); }
+            if(a && aoIsPausedNoCard(a)){ aoShowFrozenGate(session); }
             if(a && a.email && whoEmail){
               whoEmail.textContent = a.email;
               whoEmail.dataset.real = "1";
