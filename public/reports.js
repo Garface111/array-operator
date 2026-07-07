@@ -124,10 +124,19 @@
     no_array_bill:        "Awaiting the array's GMP bill to cross-check the allocation.",
     no_share:             "Set this offtaker's share to cross-check the GMP allocation.",
   };
+  // The effective variance threshold (percentage points) for this offtaker's
+  // cross-check: their own override, else the fleet default. Bruce 2026-07-07 —
+  // surfaced on the accuracy surfaces so the threshold is always documented.
+  function effXThreshold(subId) {
+    const rec = (OFFTAKERS || []).find(x => String(x.id) === String(subId));
+    const o = rec && rec.crosscheck_threshold_pct;
+    return (o != null && Number(o) > 0) ? Number(o) : XCHECK_DEFAULT_PCT;
+  }
   function reconAllocHTML(row) {
     const al = row && row.allocation;
     if (!al || !al.status) return "";
     const note = al.note ? `<div class="rb-bac-note">${esc(al.note)}</div>` : "";
+    const thr = effXThreshold(row && row.sub_id);
     if (al.status === "mismatch") {
       // The stake is GMP's $25 billing-error credit — the kWh-delta dollars
       // (often cents) live in the note as the size of the mis-allocation.
@@ -143,13 +152,15 @@
             <div class="rb-bac-fig rb-bac-fig-imp"><b>${fmt0(al.implied_group_total_kwh)}</b><span>group total GMP implied</span></div>
             <div class="rb-bac-fig"><b>${fmt0(al.array_group_excess_kwh)}</b><span>group excess on the array bill</span></div>
           </div>
+          <div class="rb-bac-note rb-bac-mute">Flagged because GMP's derived share differs from yours by more than your ${fmtPct(thr)}% threshold.</div>
           ${note}
         </div>`;
     }
     if (al.status === "match") {
       return `<div class="rb-bac-block">
           <div class="rb-bac-blabel">GMP allocation cross-check
-            <span class="rb-bac-ok-pill">✓ checks out</span></div>
+            <span class="rb-bac-ok-pill" title="We derive GMP's actual share (credited ÷ the array's group excess) and compare it to your entered share — it agrees within your ${fmtPct(thr)}% flag threshold.">✓ checks out</span></div>
+          <div class="rb-bac-note rb-bac-mute">Flags if GMP's derived share differs from yours by more than ${fmtPct(thr)}% (set per offtaker above).</div>
           ${note}
         </div>`;
     }
@@ -304,6 +315,10 @@
    * run honestly yet (no settled bill / no share / single meter) → no strip,
    * never a fabricated verdict. */
   const XCHECK_BY_SUB = {};          // sub_id -> crosscheck object | null
+  // The fleet-default cross-check variance threshold (percentage points, Bruce
+  // 2026-07-07). Set from the subscriptions list / list-bundle; the setup + edit
+  // forms show "flags beyond X%" from it when the per-offtaker override is blank.
+  let XCHECK_DEFAULT_PCT = 0.1;
   // 2-decimal share/variance formatter (25.53%, not 25.5300%).
   const fmtPct = n => n == null ? "—"
     : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -1779,9 +1794,9 @@
       <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} array${nArr === 1 ? "" : "s"}</small></div>
       <div class="rb2-kpi"><span>Ready to review</span><b>${fmt0(ready)}</b><small>draft${ready === 1 ? "" : "s"} awaiting approval</small></div>
       ${allocN
-        ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="GMP credits $25 per billing error they made — ${money0(atStake)} across these catches. Opens the Bill audit.">
+        ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">
              <span>Doesn't match GMP</span><b>⚑ ${fmt0(allocN)}</b><small>≈ ${money0(atStake)} at stake</small></div>`
-        : `<div class="rb2-kpi"><span>Doesn't match GMP</span><b>${RECON ? "0" : "…"}</b><small>${RECON ? "all allocations check out" : "checking the bills…"}</small></div>`}
+        : `<div class="rb2-kpi" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and compare it to your entered share automatically — flagging any that differ by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%)."><span>Doesn't match GMP</span><b>${RECON ? "0" : "…"}</b><small>${RECON ? `within ${fmtPct(XCHECK_DEFAULT_PCT)}% — all check out` : "checking the bills…"}</small></div>`}
       <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "invoiced · " + esc(month || "") : "no sends yet"}</small></div>`;
     const flag = host.querySelector("#rb2KpiFlag");
     if (flag) {
@@ -1967,19 +1982,19 @@
     if (!host) return;
     host.innerHTML = `
       <div class="rep-card rb-q-head">
-        <h3>Quarterly performance report</h3>
-        <p>Pick an offtaker and a quarter — we build the produced-kWh invoice for
-           that quarter plus a visual production report, then you review and send it.</p>
+        <h3>Generate a report</h3>
+        <p>Pick an offtaker and the billing period to bill — we build the
+           produced-kWh invoice for that period plus a visual production report,
+           then you review and send it.</p>
         <div class="rb-q-controls">
           <label class="rep-fld"><span class="rl">Offtaker</span>
             <select id="rbqCustomer"><option value="">Loading…</option></select></label>
-          <label class="rep-fld"><span class="rl">Quarter</span>
-            <select id="rbqQuarter"></select></label>
+          <label class="rep-fld"><span class="rl">Billing period
+              <span class="rb-info" tabindex="0" title="Which settled utility bill to invoice. Defaults to the latest — pick an earlier period to draft a past billing cycle.">ⓘ</span></span>
+            <select id="rbqPeriod"><option value="">Latest bill</option></select></label>
         </div>
       </div>
       <div id="rbqBody"></div>`;
-    // Populate quarter options (current + last 7 quarters).
-    fillQuarterOptions($("#rbqQuarter"));
     // Populate customers from the existing subscriptions list.
     try {
       const r = await fetch(API + "/subscriptions", { headers: authHeaders() });
@@ -1991,43 +2006,63 @@
         sel.innerHTML = subs.map(s =>
           `<option value="${s.id}">${esc(s.customer_name)}</option>`).join("");
       }
-      sel.onchange = renderQuarterlyBody;
-      $("#rbqQuarter").onchange = renderQuarterlyBody;
-      if (subs.length) renderQuarterlyBody();
+      // Offtaker change → refresh that offtaker's real billing periods, then re-render.
+      sel.onchange = async () => { await fillPeriodOptions(sel.value); renderQuarterlyBody(); };
+      const psel = $("#rbqPeriod");
+      if (psel) psel.onchange = renderQuarterlyBody;
+      if (subs.length) { await fillPeriodOptions(sel.value); renderQuarterlyBody(); }
     } catch (e) {
       $("#rbqBody").innerHTML = `<div class="empty">Couldn't load offtakers — refresh to retry.</div>`;
     }
   }
 
-  function fillQuarterOptions(sel) {
+  // Populate the Billing-period dropdown from the offtaker's REAL settled bills
+  // (Bruce 2026-07-07, C4) — every billable period, newest first, with the latest
+  // marked as the default. Falls back to a lone "Latest bill" option when the
+  // offtaker has no bill-bound periods (workbook offtakers / no settled bill yet).
+  async function fillPeriodOptions(subId) {
+    const sel = $("#rbqPeriod");
     if (!sel) return;
-    const now = new Date();
-    let y = now.getFullYear(), q = Math.floor(now.getMonth() / 3) + 1;
-    const opts = [];
-    for (let i = 0; i < 8; i++) {
-      opts.push(`<option value="${y}-Q${q}">Q${q} ${y}</option>`);
-      q--; if (q < 1) { q = 4; y--; }
-    }
-    sel.innerHTML = opts.join("");
+    sel.innerHTML = `<option value="">Latest bill</option>`;
+    if (!subId) return;
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/bill-periods", { headers: authHeaders() });
+      if (!r.ok) return;
+      const d = await r.json().catch(() => ({}));
+      const periods = (d && d.periods) || [];
+      if (!periods.length) return;   // keep the implicit "Latest bill" default
+      // Value "" = latest (server default); explicit values pin a historical period.
+      sel.innerHTML = periods.map((p, i) =>
+        `<option value="${esc(p.label)}">${esc(p.pretty)}${i === 0 ? " · latest" : ""}</option>`
+      ).join("");
+    } catch (e) { /* keep the fallback option */ }
   }
 
   async function renderQuarterlyBody() {
     const body = $("#rbqBody");
     const subId = $("#rbqCustomer") && $("#rbqCustomer").value;
-    const quarter = $("#rbqQuarter") && $("#rbqQuarter").value;
+    const period = $("#rbqPeriod") && $("#rbqPeriod").value;   // "" = latest bill
     if (!body || !subId) return;
     teardownQTrends();
     body.innerHTML = `<div class="rep-card"><div class="empty" style="padding:18px 0;color:var(--faint)">Building report…</div></div>`;
 
-    // 1) the quarter's invoice math (real produced kWh × rate; never fabricated).
+    // 1) the period's invoice math (real produced kWh × rate; never fabricated).
+    //    The chosen billing period rides the query so the preview matches the draft.
     let math = null;
+    const pq = period ? ("?period=" + encodeURIComponent(period)) : "";
     try {
-      const r = await fetch(API + "/subscriptions/" + subId + "/preview-math", { headers: authHeaders() });
+      const r = await fetch(API + "/subscriptions/" + subId + "/preview-math" + pq, { headers: authHeaders() });
       if (r.ok) math = await r.json().catch(() => null);
     } catch (e) { /* surfaced below */ }
 
     const cust = $("#rbqCustomer").selectedOptions[0]
       ? $("#rbqCustomer").selectedOptions[0].textContent : "Offtaker";
+    // The chosen period's human label for the heading (the option text, minus the
+    // "· latest" suffix); "" (Latest bill) falls back to the resolved period below.
+    const periodSel = $("#rbqPeriod") && $("#rbqPeriod").selectedOptions[0];
+    const periodLabel = period
+      ? (periodSel ? periodSel.textContent.replace(/\s·\slatest$/, "") : period)
+      : "Latest bill";
     // Honest provenance (audit #8): bill_prorate is an ESTIMATE (a utility bill smeared
     // flat across its days), never "uploaded/measured" data.
     const _ks = math && math.kwh_source;
@@ -2040,7 +2075,7 @@
 
     body.innerHTML = `
       <div class="rep-card rb-q-invoice">
-        <div class="rb-q-inv-h"><h4>${esc(cust)} · ${esc(quarter)}</h4>
+        <div class="rb-q-inv-h"><h4>${esc(cust)} · ${esc(periodLabel)}</h4>
           <span class="rb-q-src">source: ${esc(srcLabel)}</span></div>
         ${hasData ? `
           <div class="rb-q-stats">
@@ -2049,8 +2084,8 @@
             <div class="st"><b>${money(math.amount_usd)}</b><span>amount due</span></div>
           </div>
           <p class="rb-q-math">${fmt0(math.customer_kwh)} kWh × ${math.rate != null ? "$" + Number(math.rate).toFixed(3) : "—"}/kWh = <b>${money(math.amount_usd)}</b>
-             <span class="rb-q-period">· latest period ${esc(math.period_start || "—")} → ${esc(math.period_end || "—")}</span></p>
-        ` : `<div class="rb-warn">No generation data yet for this offtaker's array — no fabricated numbers. Connect data or upload generation to build the quarter's invoice.</div>`}
+             <span class="rb-q-period">· period ${esc(math.period_start || "—")} → ${esc(math.period_end || "—")}</span></p>
+        ` : `<div class="rb-warn">No generation data yet for this offtaker's array for ${esc(periodLabel.toLowerCase())} — no fabricated numbers. Connect data or upload generation to build the invoice.</div>`}
       </div>
       <div class="rep-card rb-q-charts">
         <h4>Production report</h4>
@@ -2065,9 +2100,10 @@
     //    the offtaker reads on their report).
     mountQTrends(subId);
 
-    // 3) "Draft for review" reuses the existing per-subscription draft flow.
+    // 3) "Draft for review" reuses the existing per-subscription draft flow,
+    //    carrying the chosen billing period ("" = latest).
     const draftBtn = $("#rbqDraft");
-    if (draftBtn) draftBtn.onclick = () => quarterlyDraft(subId);
+    if (draftBtn) draftBtn.onclick = () => quarterlyDraft(subId, period);
   }
 
   async function mountQTrends(subId) {
@@ -2093,11 +2129,13 @@
     }
   }
 
-  async function quarterlyDraft(subId) {
+  async function quarterlyDraft(subId, period) {
     const st = $("#rbqStatus");
     if (st) { st.className = "rb-status rb-busy"; st.textContent = "Drafting for review…"; }
+    // The chosen billing period ("" / undefined = latest bill) rides the draft.
+    const pq = period ? ("?period=" + encodeURIComponent(period)) : "";
     try {
-      const r = await fetch(API + "/subscriptions/" + subId + "/draft", { method: "POST", headers: authHeaders() });
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft" + pq, { method: "POST", headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
       if (r.ok && data.ok) {
         noteXcheck(subId, data);   // the cross-check rides the generation response
@@ -2816,10 +2854,10 @@
             <label class="rep-fld"><span class="rl">Discount (% off solar credit rate)</span>
               <input type="number" id="rbmRate" min="0" max="99" step="1" placeholder="blank = use my default">
               <span class="rb-fld-hint">Leave blank to use your default discount (10% off).</span></label>
-            <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-                <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field above (which is the billing multiplier). Leave blank to reuse the billing share.">ⓘ</span></span>
-              <input type="number" id="rbmSharePct" min="0.01" max="100" step="0.001" placeholder="blank = same as billing share">
-              <span class="rb-fld-hint">Optional. Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+            <label class="rep-fld"><span class="rl">Bill-accuracy flag threshold (%)
+                <span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (what GMP credited this offtaker ÷ the array's group excess) and compares it to the Expected share you entered above — no data entry needed. This sets how far the two may differ before it's flagged. Leave blank to use your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
+              <input type="number" id="rbmXThresh" min="0.001" max="100" step="0.001" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)">
+              <span class="rb-fld-hint">Flags when GMP's derived share differs from your entered share by more than this. Blank = ${fmtPct(XCHECK_DEFAULT_PCT)}%.</span></label>
             <label class="rep-fld"><span class="rl">Commissioning Date</span>
               <input type="date" id="rbmCommDate" min="1990-01-01" max="${todayISO()}">
               <span class="rb-fld-hint" id="rbmRateHint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>
@@ -2941,7 +2979,7 @@
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
-    const sharePctRaw = $("#rbmSharePct") ? $("#rbmSharePct").value.trim() : "";
+    const xThreshRaw = $("#rbmXThresh") ? $("#rbmXThresh").value.trim() : "";
     const invStartRaw = $("#rbmInvStart") ? $("#rbmInvStart").value.trim() : "";
     const commDateRaw = $("#rbmCommDate") ? $("#rbmCommDate").value.trim() : "";
     // The "Send to" slider was removed — offtaker invoices go to the offtaker and
@@ -2984,11 +3022,11 @@
         st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be a number ≥ 0 ($/kWh), or blank."; return;
       }
     }
-    let sharePctNum = null;
-    if (sharePctRaw !== "") {
-      sharePctNum = Number(sharePctRaw);
-      if (isNaN(sharePctNum) || sharePctNum <= 0 || sharePctNum > 100) {
-        st.className = "rb-status rb-err"; st.textContent = "Cross-check share must be a percent between 0 and 100, or blank."; return;
+    let xThreshNum = null;
+    if (xThreshRaw !== "") {
+      xThreshNum = Number(xThreshRaw);
+      if (isNaN(xThreshNum) || xThreshNum <= 0 || xThreshNum > 100) {
+        st.className = "rb-status rb-err"; st.textContent = "Flag threshold must be a percent between 0 and 100, or blank."; return;
       }
     }
     let invStartNum = null;
@@ -3016,7 +3054,7 @@
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
     if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
     if (creditRateNum !== null) fd.append("net_rate_per_kwh", String(creditRateNum));
-    if (sharePctNum !== null) fd.append("array_share_pct", String(sharePctNum / 100));  // cross-check share, fraction
+    if (xThreshNum !== null) fd.append("crosscheck_threshold_pct", String(xThreshNum));  // variance flag threshold, pct points
     if (invStartNum !== null) fd.append("invoice_number_start", String(invStartNum));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
     fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
@@ -3990,6 +4028,7 @@
             subs = d.subscriptions || [];
             arrs = ARRAYS = (d.arrays || []).filter(a => a.id != null);   // prime the shared arrays cache
             utilAccts = (d.utility_accounts || []).filter(a => a.utility_account_id != null);
+            if (d.crosscheck_threshold_default_pct != null) XCHECK_DEFAULT_PCT = Number(d.crosscheck_threshold_default_pct);
             bundled = true;
           }
         }
@@ -4003,6 +4042,7 @@
         if (r.status === 401) { list.innerHTML = `<div class="empty">Session expired — please sign in again.</div>`; return; }
         const data = await r.json().catch(() => ({}));
         subs = (data && data.subscriptions) || [];
+        if (data && data.crosscheck_threshold_default_pct != null) XCHECK_DEFAULT_PCT = Number(data.crosscheck_threshold_default_pct);
         arrs = a2; utilAccts = u2;
       }
       const drafts = await draftsP;
@@ -4792,7 +4832,7 @@
 
     wrap.innerHTML = `
       <div class="rb-acc-inner">
-        ${verPickerHTML(sid)}
+        <div class="rb-pickrow">${periodDraftHTML(sid)}${verPickerHTML(sid)}</div>
         <div id="rbReviewTop" class="rb-reviewbar"></div>
         <div class="rb-layout">
           <div class="rb-col-form">${bodyCol}</div>
@@ -4811,6 +4851,11 @@
     _ensureVersions(sid);
     const _vp = wrap.querySelector("#rbVerPick");
     if (_vp) _vp.onchange = () => { VIEWING_VERSION_ID = _vp.value || null; renderAccordionBody(sid); };
+    // Billing-period picker: fetch this offtaker's billable periods (once), wire the
+    // dropdown so choosing one drafts that specific cycle (Bruce 2026-07-07, C4).
+    _ensurePeriods(sid);
+    const _pp = wrap.querySelector("#rbPeriodDraft");
+    if (_pp) _pp.onchange = () => draftForPeriod(sid, _pp.value);
     if (VIEWING_VERSION_ID != null) {
       const form = wrap.querySelector(".rb-col-form");
       if (form) { const b = document.createElement("div"); b.className = "rb-ver-banner";
@@ -4919,6 +4964,7 @@
     subId = String(subId);
     VIEWING_VERSION_ID = null;          // a new offtaker always opens on its LATEST version
     _verFetched.delete(subId);          // re-fetch versions in case a new period landed
+    _periodsFetched.delete(subId);      // re-fetch billable periods in case a new bill landed
     if (DRAFT_BY_SUB[subId] && !force) {
       ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody();
       // Show the cached draft instantly, but ALSO pull the latest GMP bill + recompute in
@@ -5059,6 +5105,71 @@
     }).join("");
     return `<label class="rb-ver-lab">Version <select class="rb-ver-pick" id="rbVerPick" title="View an older invoice version for this offtaker">${opts}</select></label>`;
   }
+
+  // ── Draft a different billing period (Bruce 2026-07-07, C4) ──────────────────
+  // The version picker looks BACK at periods already drafted; this picks which
+  // billing cycle to draft NEXT. The card auto-drafts the latest bill; Bruce
+  // wanted to choose an earlier settled period instead of always the latest.
+  // Fed by GET /bill-periods (every billable period); drafting a chosen period
+  // mints/refreshes its draft, which then also shows in the version picker.
+  const PERIODS_BY_SUB = {};         // subId -> [{label, pretty, is_latest}]
+  const _periodsFetched = new Set(); // subIds whose periods we've fetched this view
+  async function _ensurePeriods(subId) {
+    subId = String(subId);
+    if (!subId || !authHeaders() || _periodsFetched.has(subId)) return;
+    _periodsFetched.add(subId);
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/bill-periods", { headers: authHeaders() });
+      if (!r.ok) return;
+      const j = await r.json();
+      PERIODS_BY_SUB[subId] = j.periods || [];
+      // Repaint so the control appears once its options are known (>1 period to choose).
+      if (String(ACTIVE_SUB_ID) === subId && PERIODS_BY_SUB[subId].length > 1) renderInboxBody();
+    } catch (_) {}
+  }
+  // The "Draft another period" control — only when the offtaker has >1 billable
+  // period (otherwise the auto-drafted latest is the only choice). The currently
+  // drafted period is preselected so it reads as "which cycle am I invoicing".
+  function periodDraftHTML(subId) {
+    const ps = PERIODS_BY_SUB[String(subId)] || [];
+    if (ps.length < 2) return "";
+    // Which period does the live (latest) draft already cover? Match its
+    // period_label ("YYYY-MM-DD → YYYY-MM-DD") to a month/quarter option.
+    const cur = DRAFT_BY_SUB[String(subId)];
+    const curLbl = cur && cur.period_label ? String(cur.period_label) : "";
+    const opts = ps.map(p => {
+      // A YYYY-MM option matches when the drafted end-date's month equals it.
+      const m = curLbl.match(/(\d{4})-(\d{2})-\d{2}\s*(?:→|->)\s*(\d{4})-(\d{2})-\d{2}/);
+      const endYM = m ? `${m[3]}-${m[4]}` : "";
+      const sel = (endYM && endYM === p.label) ? " selected" : "";
+      return `<option value="${esc(p.label)}"${sel}>${esc(p.pretty)}${p.is_latest ? " · latest" : ""}</option>`;
+    }).join("");
+    return `<label class="rb-ver-lab" title="Draft the invoice for a specific billing cycle. Defaults to the latest settled bill — pick an earlier one to invoice a past period.">Billing period <select class="rb-ver-pick" id="rbPeriodDraft">${opts}</select></label>`;
+  }
+  // Draft (or refresh) this offtaker's invoice for the chosen billing period, then
+  // reopen the card on the fresh draft so its figures + cross-check reflect it.
+  async function draftForPeriod(subId, period) {
+    const pq = period ? ("?period=" + encodeURIComponent(period)) : "";
+    const st = document.querySelector(`.rb-offedit[data-offedit="${subId}"] .rb-offedit-status`);
+    if (st) { st.className = "rb-status rb-busy"; st.textContent = "Drafting that period…"; }
+    try {
+      const r = await fetch(API + "/subscriptions/" + subId + "/draft" + pq,
+        { method: "POST", headers: authHeaders() });
+      const dg = await r.json().catch(() => ({}));
+      if (!r.ok || !dg.ok) {
+        if (st) { st.className = "rb-status rb-err"; st.textContent = (dg && dg.detail) || "Couldn't draft that period."; }
+        return;
+      }
+      noteXcheck(subId, dg);           // the chosen period's cross-check rides the response
+      if (dg.draft) DRAFT_BY_SUB[String(subId)] = dg.draft;
+      _verFetched.delete(String(subId)); // a new/updated period → refresh the version list
+      VIEWING_VERSION_ID = null;         // land on the freshly-drafted (latest-selected) period
+      renderInboxBody();
+    } catch (e) {
+      if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error — try again."; }
+    }
+  }
+
   function activeDraft() {
     // A selected OLDER version wins — a read-only look-back at a past invoice.
     if (VIEWING_VERSION_ID != null) {
@@ -5617,7 +5728,7 @@
     // (the draft `d` may not). Look it up from the canonical offtaker list so the edit
     // fields pre-fill. The commissioning date lives on the array (fetched lazily on wire).
     const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
-    const sharePct = subRec.array_share_pct != null ? (subRec.array_share_pct * 100).toFixed(3) : "";
+    const xThresh = subRec.crosscheck_threshold_pct != null ? Number(subRec.crosscheck_threshold_pct) : "";
     const invStart = subRec.invoice_number_start != null ? subRec.invoice_number_start : "";
     const editArrayId = subRec.array_id != null ? subRec.array_id : (d.array_id != null ? d.array_id : "");
     // Is the bound account a VEC/SmartHub one? Those bills don't expose the credit
@@ -5678,10 +5789,10 @@
           <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
             <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
             ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
-          <label class="rep-fld"><span class="rl">Share for accuracy cross-check (%)
-              <span class="rb-info" tabindex="0" title="The offtaker's GMP allocation share of the array's group excess — used by the Bill accuracy check to catch mis-allocations. DISTINCT from the expected-share field (the billing multiplier). Blank reuses the billing share.">ⓘ</span></span>
-            <input type="number" data-of="array_share_pct" min="0.01" max="100" step="0.001" value="${sharePct}" placeholder="blank = same as billing share">
-            <span class="rb-fld-hint">Drives the bill-accuracy cross-check only — not the invoice amount.</span></label>
+          <label class="rep-fld"><span class="rl">Bill-accuracy flag threshold (%)
+              <span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Expected share above — no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
+            <input type="number" data-of="crosscheck_threshold_pct" min="0.001" max="100" step="0.001" value="${xThresh}" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)">
+            <span class="rb-fld-hint">Flags when GMP's derived share differs from your entered share by more than this. Blank = ${fmtPct(XCHECK_DEFAULT_PCT)}%.</span></label>
           ${editArrayId !== "" ? `
           <label class="rep-fld"><span class="rl">Commissioning Date</span>
             <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
@@ -5933,10 +6044,12 @@
   // ── Live offtaker-edit wiring ──────────────────────────────────────────────
   // Money fields change the invoiced amount, so a change recomputes the draft;
   // copy fields only repaint the preview envelope.
-  // array_share_pct IS money: real-math billing charges share × the array's group
-  // excess, and the generation-time cross-check compares GMP's implied share to it
-  // — so a share edit must recompute the draft (and re-run the cross-check) live.
-  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "array_share_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
+  const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
+  // Recheck fields (Bruce 2026-07-07): they don't move the amount, but they DO
+  // change the Bill-accuracy cross-check verdict, so a change re-runs the draft's
+  // cross-check and flips the strip live (the flush treats them like money for the
+  // redraft, just without the "Recalculating" framing).
+  const OF_RECHECK_FIELDS = new Set(["crosscheck_threshold_pct"]);
   const OF_PENDING = {};   // sid -> { body, money, timer, card, box, did }
 
   function wireOfftakerEditors(wrap) {
@@ -6070,7 +6183,8 @@
     renderDraftDoc();
     const body = ofPatchBody(field, raw);
     if (body === null) return;                   // nothing to persist (blank required)
-    scheduleOfftakerPatch(card, box, did, sid, body, OF_MONEY_FIELDS.has(field));
+    scheduleOfftakerPatch(card, box, did, sid, body,
+      OF_MONEY_FIELDS.has(field), OF_RECHECK_FIELDS.has(field));
   }
 
   function ofPatchBody(field, raw) {
@@ -6080,9 +6194,10 @@
       case "discount_pct":       return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
       case "net_rate_per_kwh":   return { net_rate_per_kwh: v === "" ? null : Number(v) };
       case "budget_amount_usd":  return { budget_amount_usd: v === "" ? null : Number(v) };
-      // Cross-check share: percent in the UI → fraction on the wire; blank clears it
-      // (the accuracy check falls back to allocation_pct). Not a money field.
-      case "array_share_pct":    return { array_share_pct: v === "" ? null : Number(v) / 100 };
+      // Bill-accuracy flag threshold (Bruce 2026-07-07): percentage points, sent as-is;
+      // blank clears it (the check falls back to the fleet default). NOT a money field —
+      // it never changes the amount, only how tight the accuracy flag is.
+      case "crosscheck_threshold_pct": return { crosscheck_threshold_pct: v === "" ? null : Number(v) };
       // Sequential-numbering seed: whole number; blank clears (back to date-based).
       case "invoice_number_start": return { invoice_number_start: v === "" ? null : Math.trunc(Number(v)) };
       case "utility_account_id": return v === "" ? null : { utility_account_id: Number(v) };
@@ -6095,11 +6210,12 @@
     }
   }
 
-  function scheduleOfftakerPatch(card, box, did, sid, body, isMoney) {
+  function scheduleOfftakerPatch(card, box, did, sid, body, isMoney, isRecheck) {
     let p = OF_PENDING[sid];
-    if (!p) p = OF_PENDING[sid] = { body: {}, money: false };
+    if (!p) p = OF_PENDING[sid] = { body: {}, money: false, recheck: false };
     Object.assign(p.body, body);
     p.money = p.money || isMoney;
+    p.recheck = p.recheck || !!isRecheck;
     p.card = card; p.box = box; p.did = did;
     clearTimeout(p.timer);
     p.timer = setTimeout(() => flushOfftakerPatch(sid), 600);
@@ -6109,10 +6225,10 @@
     const p = OF_PENDING[sid];
     if (!p) return;
     delete OF_PENDING[sid];
-    const { body, money, card, box, did } = p;
+    const { body, money, recheck, card, box, did } = p;
     const st = box && box.querySelector(".rb-offedit-status");
     const setSt = (cls, txt) => { if (st) { st.className = cls; if (txt !== undefined) st.textContent = txt; } };
-    setSt("rb-status rb-busy", money ? "Recalculating…" : "Saving…");
+    setSt("rb-status rb-busy", money ? "Recalculating…" : recheck ? "Re-checking…" : "Saving…");
     try {
       const r = await fetch(API + "/subscriptions/" + sid, {
         method: "PATCH",
@@ -6123,6 +6239,17 @@
         const e = await r.json().catch(() => ({}));
         setSt("rb-status rb-err", (e && e.detail) ? e.detail : "Couldn't save.");
         return;
+      }
+      // A threshold-only edit doesn't move the amount — re-run just the draft's
+      // cross-check so the strip re-evaluates against the new threshold, then done.
+      if (!money && recheck) {
+        try {
+          const rg = await fetch(API + "/subscriptions/" + sid + "/draft",
+            { method: "POST", headers: authHeaders() });
+          const dg = await rg.json().catch(() => ({}));
+          if (rg.ok) noteXcheck(sid, dg);
+        } catch (e) { /* the strip just keeps its prior verdict */ }
+        setSt("rb-status rb-ok", "Saved."); renderDraftDoc(); return;
       }
       if (!money) { setSt("rb-status rb-ok", "Saved."); renderDraftDoc(); return; }
       // Money changed → recompute the draft figures via the production path

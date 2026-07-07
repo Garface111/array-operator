@@ -1933,6 +1933,9 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-pick-pill.todraft{ color:var(--muted); background:var(--day-chip,#eef2f7); }
 .rb-pick-sub{ font-size:11px; color:var(--faint); }
 /* invoice version-history dropdown (older drafts per offtaker) */
+/* pickers row: "Billing period" (draft which cycle) + "Version" (view an older draft) */
+.rb-pickrow{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-bottom:6px; }
+.rb-pickrow:empty{ display:none; }
 .rb-ver-lab{ font-size:11px; color:var(--faint); display:flex; align-items:center; gap:6px; margin-top:2px; }
 .rb-ver-pick{ font:inherit; font-size:12px; font-weight:600; color:var(--ink); background:var(--card2,#f8fafc);
   border:1px solid var(--line); border-radius:7px; padding:3px 7px; cursor:pointer; max-width:240px; }
