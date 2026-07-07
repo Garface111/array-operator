@@ -444,10 +444,27 @@
 
   // One array card: the MASTER bill row on top + its offtaker rows underneath.
   function auditArrayCard(a) {
-    const flagged = (a.offtakers || []).filter(o => o.status === "mismatch").length;
+    const offs = a.offtakers || [];
+    const flaggedOffs = offs.filter(o => o.status === "mismatch");
+    const okOffs = offs.filter(o => o.status !== "mismatch");
+    const matchN = okOffs.filter(o => o.status === "match").length;
+    const quietN = okOffs.length - matchN;
+    const flagged = flaggedOffs.length;
     const rate = a.credit_rate != null ? "$" + Number(a.credit_rate).toFixed(4) + "/kWh" : null;
-    const rows = (a.offtakers || []).map(auditOfftakerRow).join("")
-      || `<div class="rb-au-off rb-au-quiet"><div class="rb-au-note rb-au-mute">No offtakers on this array yet.</div></div>`;
+    // Only flagged (mismatch) offtakers show by default; matching + awaiting-data
+    // rows collapse into a drawer so they never bury the flags an operator opens
+    // this audit to find.
+    const flaggedRows = flaggedOffs.map(auditOfftakerRow).join("");
+    let okDrawer = "";
+    if (okOffs.length) {
+      const bits = [];
+      if (matchN) bits.push("✓ " + matchN + " reconcile" + (matchN === 1 ? "s" : ""));
+      if (quietN) bits.push(quietN + " awaiting data");
+      okDrawer = `<details class="rb-au-collapsed"><summary class="rb-au-collapsed-sum">${bits.join(" · ")}</summary><div class="rb-au-offs rb-au-offs-drawer">${okOffs.map(auditOfftakerRow).join("")}</div></details>`;
+    }
+    const body = flaggedRows
+      ? `<div class="rb-au-offs">${flaggedRows}</div>` + okDrawer
+      : (okDrawer || `<div class="rb-au-offs"><div class="rb-au-off rb-au-quiet"><div class="rb-au-note rb-au-mute">No offtakers on this array yet.</div></div></div>`);
     return `<div class="rb-au-card${flagged ? " rb-au-card-flag" : ""}">
         <div class="rb-au-master">
           <div class="rb-au-master-name">${esc(a.array_name || ("Array " + (a.array_id != null ? a.array_id : "")))}
@@ -457,7 +474,7 @@
             ${rate ? `<span class="rb-au-rate">${esc(rate)}</span>` : ""}
           </div>
         </div>
-        <div class="rb-au-offs">${rows}</div>
+        ${body}
       </div>`;
   }
 
@@ -507,7 +524,17 @@
         </button>`;
     }).join("");
 
-    const cards = (active.arrays || []).map(auditArrayCard).join("");
+    // Arrays with a flagged offtaker surface as open cards; arrays that
+    // reconcile cleanly collapse into one drawer at the bottom — the operator is
+    // here to find mismatches, not scroll past clean arrays.
+    const _arrs = active.arrays || [];
+    const _hasFlag = x => (x.offtakers || []).some(o => o.status === "mismatch");
+    const flaggedCards = _arrs.filter(_hasFlag).map(auditArrayCard).join("");
+    const _cleanArrs = _arrs.filter(x => !_hasFlag(x));
+    const cleanDrawer = _cleanArrs.length
+      ? `<details class="rb-au-collapsed rb-au-clean-drawer"><summary class="rb-au-collapsed-sum">✓ ${fmt0(_cleanArrs.length)} array${_cleanArrs.length === 1 ? "" : "s"} reconcile cleanly</summary><div class="rb-au-cards rb-au-cards-drawer">${_cleanArrs.map(auditArrayCard).join("")}</div></details>`
+      : "";
+    const cards = (flaggedCards + cleanDrawer) || `<div class="rb-au-empty-clean">✓ Every offtaker's GMP allocation reconciles — nothing to review.</div>`;
 
     host.innerHTML = `
       <div class="rb-au-head">
