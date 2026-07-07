@@ -110,6 +110,13 @@
         // daylight peers produce) isn't caught by it yet, so we promote a status:"ok"
         // inverter to a "live_dark"/"live_low" row. Shared FleetStore classifier →
         // same logic as the tree + grid, so the three surfaces never disagree.
+        // NO ENERGY REGISTER (e.g. Tannery #7): live power but a dead cumulative-
+        // energy meter, so it can't be peer-graded and its per-inverter power is an
+        // unreliable energy-share split. It's a metering DEFECT at the vendor, not a
+        // fleet-health fault — treat it like "monitoring": neutral, never a flagged
+        // row, and out of BOTH sides of healthyPct so it can't fake a red OR green
+        // verdict. (The digest already surfaces it as a metering nudge.)
+        if(inv.no_energy_register){ return; }
         let status = inv.status;
         if(status === "ok" && window.FleetStore && FleetStore.liveVerdict){
           const _lv = FleetStore.liveVerdict(inv, a.inverters, a.is_daylight);
