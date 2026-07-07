@@ -4687,9 +4687,14 @@
     const last = s.last_sent_at ? new Date(s.last_sent_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never";
     const fmts = (s.formats || []).map(f => f.toUpperCase()).join(" + ");
     // ── one plain-English sentence, built from the offtaker's actual choices. ──
-    const srcName = s.utility_account_name
-      || ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name
-      || "the array";
+    const _arrName = ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name;
+    // A sub-metered offtaker's share is OF the net-meter GROUP, so the subject is
+    // the ARRAY — not their own sub-account (they receive ~100% of that). Naming
+    // the sub-account would read "4.6% of <their own meter>'s generation", which is
+    // the phantom-100% confusion. Percent-of-array offtakers name their host meter.
+    const srcName = (s.array_share_pct != null)
+      ? (_arrName || "the array")
+      : (s.utility_account_name || _arrName || "the array");
     const pctTxt = offtakerShareFrac(s) != null ? (Math.round(offtakerShareFrac(s) * 1000) / 10) + "%" : "a share";
     const cadTxt = s.cadence === "quarterly" ? "Quarterly" : s.cadence === "monthly" ? "Monthly" : (s.cadence || "");
     const cc = (s.cc_emails || "").trim();
