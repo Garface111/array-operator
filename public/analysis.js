@@ -50,18 +50,50 @@
   var _forecast = null;          // null = not loaded / demo; object = loaded
   var _forecastTried = false;
   var _forecastInFlight = false;
+
+  // Stale-while-revalidate: the fleet forecast is expensive to compute (weather
+  // model over every site), so a cold Analysis tab used to sit with empty
+  // Expected/Sky columns until the fetch resolved. We stash the last good payload
+  // in sessionStorage keyed to the current session, hydrate it INSTANTLY on load
+  // so the table paints its full weather columns immediately, then revalidate in
+  // the background and repaint when fresh data lands. Bounded to ~6h so a very
+  // stale cache never lingers.
+  var _FC_CACHE_KEY = "ao_forecast_fleet_v1";
+  var _FC_CACHE_MAX_AGE_MS = 6 * 3600 * 1000;
+  function _sessFp(s) { return s ? String(s).slice(-10) : ""; }   // fingerprint, not the token
+  function readForecastCache() {
+    try {
+      var s = getSession(); if (!s) return null;
+      var raw = sessionStorage.getItem(_FC_CACHE_KEY); if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.fp !== _sessFp(s) || !o.data) return null;
+      if ((Date.now() - (o.ts || 0)) > _FC_CACHE_MAX_AGE_MS) return null;
+      return o.data;
+    } catch (e) { return null; }
+  }
+  function writeForecastCache(data) {
+    try {
+      var s = getSession(); if (!s || !data) return;
+      sessionStorage.setItem(_FC_CACHE_KEY, JSON.stringify({ fp: _sessFp(s), ts: Date.now(), data: data }));
+    } catch (e) { /* quota / disabled — cache is best-effort */ }
+  }
+  function clearForecastCache() { try { sessionStorage.removeItem(_FC_CACHE_KEY); } catch (e) { } }
+
   function loadForecast() {
     var s = getSession(); if (!s) { _forecast = null; return; }   // demo/anon → no forecast
+    // Paint the last-known forecast immediately (instant Expected/Sky), then revalidate.
+    if (!_forecast) { var cached = readForecastCache(); if (cached) _forecast = cached; }
     if (_forecastInFlight) return;
     _forecastInFlight = true;
     fetch("/v1/array-owners/forecast-fleet?window_days=10", { headers: { Authorization: "Bearer " + s } })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { _forecast = d || null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); })
-      .catch(function () { _forecast = null; _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
+      .then(function (d) { _forecast = d || _forecast || null; if (d) writeForecastCache(d); _forecastTried = true; _forecastInFlight = false; scheduleRender(); })
+      .catch(function () { _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
   }
 
   // Force a fresh forecast fetch (after an array gets a location, so it models).
-  function reloadForecast() { _forecast = null; _simForecast = null; _forecastTried = false; _forecastInFlight = false; loadForecast(); }
+  // Drops the cached copy too — a just-set location must not be masked by a stale paint.
+  function reloadForecast() { _forecast = null; _simForecast = null; _forecastTried = false; _forecastInFlight = false; clearForecastCache(); loadForecast(); }
   window.__aoAnalysisReloadForecast = reloadForecast;
 
   // Give an array a location (place string / coords / use its name) so the weather
