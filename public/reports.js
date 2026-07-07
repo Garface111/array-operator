@@ -4661,6 +4661,7 @@
               ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
             </div>
             <div class="rb-acc-sentence">${sentence}</div>
+            ${s.template_fit_warning ? `<div class="rb-acc-warn" role="alert" title="${esc(s.template_fit_warning)}">\u26a0 ${esc(s.template_fit_warning)}</div>` : ""}
             <div class="rb-acc-meta">Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null && !draft ? " · ~" + money(prev.amount_owed) : ""}</div>
           </div>
           <button class="rb-acc-del" data-del-offtaker="${s.id}" title="Delete this offtaker" aria-label="Delete offtaker">🗑</button>
