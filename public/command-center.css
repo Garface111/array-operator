@@ -881,16 +881,18 @@ body.sb-fs-lock{ overflow:hidden; }
 }
 .rb2-sp{flex:1}
 
-/* header band — flat solid blue ground (KPI cards lift off it as white) */
-.rb2-head{display:flex;align-items:stretch;justify-content:space-between;gap:26px;
-  padding:24px 40px 22px;flex-wrap:wrap;
+/* header band — title row on top, a full-width KPI strip below (Ford 2026-07-07:
+   the old title-left / KPIs-right split wrapped + left big dead zones on the right;
+   stacking + stretching the 4 KPIs across the full width removes them). */
+.rb2-head{display:flex;flex-direction:column;gap:18px;
+  padding:22px 28px 20px;
   border:1px solid var(--so-cream-bd);border-radius:14px;
   background:var(--so-cream);
   box-shadow:var(--so-shadow-card)}
 .rb2-id h1{margin:0;font-size:20px;font-weight:780;letter-spacing:-.015em;color:var(--ink,#0f172a)}
 .rb2-id p{margin:6px 0 0;color:var(--muted,#475569);font-size:12.5px;max-width:54ch}
 .rb2-subtabs{margin-top:13px}
-.rb2-kpis{display:grid;grid-template-columns:repeat(4,minmax(126px,1fr));gap:10px;align-self:center}
+.rb2-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;width:100%}
 .rb2-kpi{border:1px solid var(--so-cream-bd);border-radius:12px;padding:11px 15px 10px;
   background:#fff;min-width:126px;
   box-shadow:var(--so-shadow-card)}

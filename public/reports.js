@@ -1904,8 +1904,21 @@
     if (!host) return;
     if (!authHeaders()) { host.hidden = true; return; }
     const nOff = (OFFTAKERS || []).length;
-    const nArr = (ACC_ARRS || []).length;
+    // "across N arrays" = distinct arrays that actually HAVE offtakers, not every
+    // array on file (ACC_ARRS counted empty/non-solar ones → the misleading 80).
+    const nArr = new Set((OFFTAKERS || []).map(s => s.array_id).filter(a => a != null)).size
+      || (ACC_ARRS || []).length;
     const ready = (INBOX_DRAFTS || []).length;   // the pending-drafts inbox
+    // Honest cycle split (mirrors the send pipeline): an auto-send draft is NOT
+    // "awaiting approval" — it sends itself. Lead with what actually needs the operator.
+    const inf = (PIPE && PIPE.inflight) || {};
+    const nAppr = inf.pending_approval != null ? inf.pending_approval : ready;
+    const nAuto = inf.pending_auto || 0;
+    const k2 = nAppr > 0
+      ? { lab: "Awaiting approval", big: nAppr, sub: `draft${nAppr === 1 ? "" : "s"} need your OK` }
+      : (nAuto > 0
+          ? { lab: "Auto-sending", big: nAuto, sub: `draft${nAuto === 1 ? "" : "s"} · send on schedule` }
+          : { lab: "This cycle", big: ready, sub: `draft${ready === 1 ? "" : "s"} ready` });
     const allocN = RECON ? (RECON.allocation_flagged || 0) : null;
     const atStake = RECON
       ? (RECON.allocation_at_stake_usd != null ? RECON.allocation_at_stake_usd : (allocN || 0) * 25)
@@ -1916,12 +1929,12 @@
     host.hidden = false;
     host.innerHTML = `
       <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} array${nArr === 1 ? "" : "s"}</small></div>
-      <div class="rb2-kpi"><span>Ready to review</span><b>${fmt0(ready)}</b><small>draft${ready === 1 ? "" : "s"} awaiting approval</small></div>
+      <div class="rb2-kpi"><span>${k2.lab}</span><b>${fmt0(k2.big)}</b><small>${k2.sub}</small></div>
       ${allocN
         ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">
              <span>Doesn't match GMP</span><b>⚑ ${fmt0(allocN)}</b><small>≈ ${money0(atStake)} at stake</small></div>`
         : `<div class="rb2-kpi" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and compare it to your entered share automatically — flagging any that differ by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%)."><span>Doesn't match GMP</span><b>${RECON ? "0" : "…"}</b><small>${RECON ? `within ${fmtPct(XCHECK_DEFAULT_PCT)}% — all check out` : "checking the bills…"}</small></div>`}
-      <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "invoiced · " + esc(month || "") : "no sends yet"}</small></div>`;
+      <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "sent · " + esc(month || "") : "no sends yet"}</small></div>`;
     const flag = host.querySelector("#rb2KpiFlag");
     if (flag) {
       flag.onclick = () => openAuditTab();
