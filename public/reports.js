@@ -1434,7 +1434,7 @@
     const input = document.getElementById("esChatInput");
     const text = (input && input.value || "").trim();
     if (!text || ES.busy) return;
-    input.value = "";
+    input.value = ""; input.style.height = "auto";   // collapse the grown box after send
     ES.chat.push({ role: "user", content: text });
     ES.busy = true;
     esRenderChat();
@@ -1540,7 +1540,7 @@
         <div class="rb-es-chat-head">AI assistant <button type="button" class="rb-es-x" id="esChatClose" aria-label="Close AI assistant">✕</button></div>
         <div class="rb-es-chat-msgs" id="esChatMsgs"></div>
         <div class="rb-es-chat-in">
-          <input type="text" id="esChatInput" placeholder="Make it warmer…" autocomplete="off">
+          <textarea id="esChatInput" placeholder="Make it warmer…" rows="1" autocomplete="off"></textarea>
           <button type="button" class="ao-btn ao-btn-primary rb-btn" id="esChatSend">Send</button>
         </div>
       </div>`;
@@ -1571,8 +1571,15 @@
     };
     ov.querySelector("#esChatClose").onclick = () => { ov.querySelector("#esChatPanel").hidden = true; };
     ov.querySelector("#esChatSend").onclick = esChatSend;
-    ov.querySelector("#esChatInput").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); esChatSend(); }
+    const _esIn = ov.querySelector("#esChatInput");
+    _esIn.addEventListener("keydown", (e) => {
+      // Enter sends; Shift+Enter drops a newline for a longer, multi-line request.
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); esChatSend(); }
+    });
+    // Auto-grow so the whole request stays visible instead of scrolling off the end.
+    _esIn.addEventListener("input", (e) => {
+      const t = e.currentTarget; t.style.height = "auto";
+      t.style.height = Math.min(t.scrollHeight, 132) + "px";
     });
     return ov;
   }
