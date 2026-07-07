@@ -1938,7 +1938,7 @@
       ${allocN
         ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">
              <span>Doesn't match GMP</span><b>⚑ ${fmt0(allocN)}</b><small>≈ ${money0(atStake)} at stake</small></div>`
-        : `<div class="rb2-kpi" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and compare it to your entered share automatically — flagging any that differ by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%)."><span>Doesn't match GMP</span><b>${RECON ? "0" : "…"}</b><small>${RECON ? `within ${fmtPct(XCHECK_DEFAULT_PCT)}% — all check out` : "checking the bills…"}</small></div>`}
+        : `<div class="rb2-kpi${RECON ? "" : " rb2-kpi-checking"}" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and compare it to your entered share automatically — flagging any that differ by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%)."><span>Doesn't match GMP</span><b>${RECON ? "0" : `<span class="rb2-spin" aria-hidden="true"></span>`}</b><small>${RECON ? `within ${fmtPct(XCHECK_DEFAULT_PCT)}% — all check out` : "auditing your bills…"}</small></div>`}
       <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "sent · " + esc(month || "") : "no sends yet"}</small></div>`;
     const flag = host.querySelector("#rb2KpiFlag");
     if (flag) {
@@ -4498,7 +4498,7 @@
         <input id="rbOSearch" type="search" placeholder="Find an offtaker — name, email, or account…"
                value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
                aria-label="Find an offtaker">
-        ${q ? `<span class="rb-osearch-n">${viewRows.length} match${viewRows.length === 1 ? "" : "es"}</span>` : ""}
+        ${q ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>` : ""}
       </div>` : "";
     // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
     // utility account → offtaker. Both upper levels collapse on a whole-header click and

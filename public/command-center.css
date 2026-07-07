@@ -851,8 +851,24 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-osearch input{ border:0; outline:0; background:transparent; flex:1; min-width:120px;
   font:500 12.5px/1.3 inherit; color:var(--ink,#0f172a); }
 .rb-osearch input::placeholder{ color:var(--faint,#94a3b8); }
-.rb-osearch-n{ font-size:10.5px; font-weight:700; color:var(--good,#2563eb);
-  background:rgba(37,99,235,.12); border-radius:20px; padding:2px 8px; white-space:nowrap; }
+/* Search match count — emerald pill, prominent enough to notice while scanning
+   the list (sim finding: the old 10.5px blue pill was easy to miss). "N of M"
+   makes the filtering unmistakable. */
+.rb-osearch-n{ font-size:11.5px; font-weight:750; color:#047857;
+  background:rgba(16,185,129,.15); border:1px solid rgba(16,185,129,.28);
+  border-radius:20px; padding:3px 10px; white-space:nowrap;
+  font-variant-numeric:tabular-nums; }
+
+/* Reconciliation-in-progress: a small spinner + faint pulse so a slow bill audit
+   reads as WORKING, never frozen (sim finding: Paul stared at a static "…" for
+   ~60s on a big fleet and couldn't tell it wasn't stuck). */
+.rb2-spin{ display:inline-block; width:15px; height:15px; border-radius:50%;
+  border:2px solid rgba(16,185,129,.25); border-top-color:#059669;
+  animation:rb2spin .8s linear infinite; vertical-align:-2px; }
+@keyframes rb2spin{ to{ transform:rotate(360deg); } }
+.rb2-kpi-checking{ animation:rb2kpipulse 1.9s ease-in-out infinite; }
+.rb2-kpi-checking small{ color:#047857; }
+@keyframes rb2kpipulse{ 0%,100%{ opacity:1; } 50%{ opacity:.74; } }
 
 /* ═══ Offtaker Invoice Generator redesign (Ford-approved mock, 2026-07-03):
    header band (title + KPI strip) · send-pipeline band · connection rail ·
