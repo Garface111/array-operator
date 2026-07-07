@@ -1943,7 +1943,7 @@
           <tr><td style="padding:5px 0;color:var(--muted)">Array total production</td>
               <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.array_total_kwh)} kWh</td></tr>
           <tr><td style="padding:5px 0;color:var(--muted)">Your share</td>
-              <td style="padding:5px 0;text-align:right;color:var(--ink)">${d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 + "%" : "—"}</td></tr>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 + "%" : "—"}</td></tr>
           <tr><td style="padding:5px 0;color:var(--muted)">Your production</td>
               <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.customer_kwh)} kWh</td></tr>
           <tr><td style="padding:5px 0;color:var(--muted)">Solar-credit rate</td>
@@ -4652,6 +4652,18 @@
   // offtaker editor, attachments, Approve & send) — built lazily into .rb-acc-body
   // by expandAccordion() so it reuses the exact live draft pieces. Clicking the
   // header toggles; expanding one collapses the rest (one open at a time).
+  // The offtaker's ONE share as a FRACTION (or null). For an own-meter (sub-metered)
+  // offtaker the share lives in array_share_pct — their share of the net-metering
+  // GROUP's excess — while allocation_pct is pinned to 1.0 (100% of their own
+  // sub-meter) and would display a meaningless "100%". Percent-of-array offtakers
+  // have no array_share_pct, so this falls back to allocation_pct (their share of
+  // the host meter). Mirrors the backend's reconcile_bills `array_share_pct or
+  // allocation_pct` and the existing pill logic — one number, one meaning.
+  function offtakerShareFrac(x) {
+    return (x && x.array_share_pct != null) ? x.array_share_pct
+         : (x && x.allocation_pct != null) ? x.allocation_pct : null;
+  }
+
   function subCard(s, arrs, utilAccts) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -4661,7 +4673,7 @@
     const srcName = s.utility_account_name
       || ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name
       || "the array";
-    const pctTxt = s.allocation_pct != null ? (Math.round(s.allocation_pct * 1000) / 10) + "%" : "a share";
+    const pctTxt = offtakerShareFrac(s) != null ? (Math.round(offtakerShareFrac(s) * 1000) / 10) + "%" : "a share";
     const cadTxt = s.cadence === "quarterly" ? "Quarterly" : s.cadence === "monthly" ? "Monthly" : (s.cadence || "");
     const cc = (s.cc_emails || "").trim();
     const client = (s.client_email || "").trim();
@@ -4777,7 +4789,7 @@
     let ps = "", pe = "";
     const m = String(d.period_label || "").match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
     if (m) { ps = m[1]; pe = m[2]; }
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
     return {
       amount_due: d.amount_usd != null ? money(d.amount_usd) : "",
       kwh: d.customer_kwh != null ? fmt0(d.customer_kwh) : "",
@@ -5360,7 +5372,7 @@
   // reviewer can trace latest bill → metered generation → their share → the rate math →
   // the solar-credit value (and any fixed budget override). All from the draft's figures.
   function calcDashboard(d) {
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
     const explicitRate = d.net_rate_per_kwh != null;
     // 1-decimal, matching the editor (step=0.1) so 12.5% shows "12.5%", not "13%",
     // and the printed "× (1−X%)" reconciles with the server-computed total.
@@ -5460,7 +5472,7 @@
     if (!d) { top.innerHTML = ""; return; }
     // A one-line "what gets sent" summary sits beside the send actions in the top bar,
     // so the operator can review-and-send without expanding anything below.
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
     const src = d.utility_account_name || d.array_name || "";
     const summary = `<div class="rb-reviewbar-sum">Receives <b>${pct != null ? pct + "%" : "a share"}</b>${src ? " of " + esc(src) : ""}`
       + ` &middot; ${esc(d.period_label || "latest period")} &middot; <b>${money(d.amount_usd)} due</b></div>`;
@@ -5640,7 +5652,7 @@
   }
 
   function draftCard(d, utilAccts) {
-    const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
     // Remember the auto-written note so a live recompute can re-sync it — but only
     // while the operator hasn't customized it (we compare against this snapshot).
     d._defaultNote = d.email_letter_default || defaultDraftNote(d);
@@ -5931,7 +5943,7 @@
     // Editor prefills show the FULL 3-decimal percent (Bruce: "e.g. 24.783") —
     // the old 1-decimal rounding meant any touch of the field saved back 24.8%,
     // destroying the stored third decimal. Whole shares render as 25.000 (consistent).
-    const pct = d.allocation_pct != null ? (d.allocation_pct * 100).toFixed(3) : "";
+    const pct = offtakerShareFrac(d) != null ? (offtakerShareFrac(d) * 100).toFixed(3) : "";
     const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
     // Disclosure: when the operator never set a discount but one is still applied, the
     // backend auto-resolves a default (tenant default → 10%). Surface it plainly so the
@@ -6356,9 +6368,14 @@
     else if (field === "send_mode") d.send_mode = raw;
     else if (field === "cc_emails") d.cc_emails = raw;
     else if (field === "allocation_pct" && raw !== "") {
-      d.allocation_pct = Number(raw) / 100;
+      const frac = Number(raw) / 100;
+      // The share posts as allocation_pct, but on an own-meter (sub-metered)
+      // offtaker it IS the group share (array_share_pct) — update the field the
+      // display reads so the optimistic repaint matches what the backend stores.
+      if (d.array_share_pct != null) d.array_share_pct = frac;
+      else d.allocation_pct = frac;
       const v = card && card.querySelectorAll(".rb-draft-grid .rb-v")[1];
-      if (v) v.textContent = (Math.round(d.allocation_pct * 1000) / 10) + "%";
+      if (v) v.textContent = (Math.round((offtakerShareFrac(d) || 0) * 1000) / 10) + "%";
     }
     renderDraftDoc();
     const body = ofPatchBody(field, raw);
@@ -6475,7 +6492,7 @@
   function applyDraftFigures(card, d) {
     if (card) {
       const vs = card.querySelectorAll(".rb-draft-grid .rb-v");
-      const pct = d.allocation_pct != null ? Math.round(d.allocation_pct * 1000) / 10 : null;
+      const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
       if (vs[0]) vs[0].textContent = fmt0(d.array_total_kwh) + " kWh";
       if (vs[1]) vs[1].textContent = pct != null ? pct + "%" : "—";
       if (vs[2]) vs[2].textContent = fmt0(d.customer_kwh) + " kWh";
