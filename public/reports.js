@@ -2987,6 +2987,9 @@
               <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
             <label class="rep-fld req"><span class="rl">Client email</span>
               <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
+            <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
+              <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = use the calculated amount">
+              <span class="rb-fld-hint">Set a flat amount this offtaker pays — overrides the calculated total (line items still show).</span></label>
           </div>
           <div class="rb-controls">
             <div class="rb-ctl">
@@ -3102,6 +3105,7 @@
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
     const xThreshRaw = $("#rbmXThresh") ? $("#rbmXThresh").value.trim() : "";
     const invStartRaw = $("#rbmInvStart") ? $("#rbmInvStart").value.trim() : "";
+    const budgetRaw = $("#rbmBudget") ? $("#rbmBudget").value.trim() : "";
     const commDateRaw = $("#rbmCommDate") ? $("#rbmCommDate").value.trim() : "";
     // The "Send to" slider was removed — offtaker invoices go to the offtaker and
     // the operator is BCC'd on every send (so they always see what was received).
@@ -3157,6 +3161,13 @@
         st.className = "rb-status rb-err"; st.textContent = "Starting invoice # must be a whole number 0–9999999, or blank."; return;
       }
     }
+    let budgetNum = null;
+    if (budgetRaw !== "") {
+      budgetNum = Number(budgetRaw);
+      if (isNaN(budgetNum) || budgetNum < 0) {
+        st.className = "rb-status rb-err"; st.textContent = "Budget must be a dollar amount ≥ 0, or blank."; return;
+      }
+    }
     let commDateVal = null;
     if (commDateRaw !== "") {
       if (!isValidCommissioningDate(commDateRaw)) {
@@ -3177,6 +3188,7 @@
     if (creditRateNum !== null) fd.append("net_rate_per_kwh", String(creditRateNum));
     if (xThreshNum !== null) fd.append("crosscheck_threshold_pct", String(xThreshNum));  // variance flag threshold, pct points
     if (invStartNum !== null) fd.append("invoice_number_start", String(invStartNum));
+    if (budgetNum !== null) fd.append("budget_amount_usd", String(budgetNum));
     fd.append("cadence", segValue("rbmCadence") || "monthly");
     fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
     fd.append("send_mode", mode);
@@ -6004,16 +6016,6 @@
           <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
             <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
-        ${isSmartHubBound ? `
-        <div class="rb-vecbill">
-          <div class="rb-vecbill-h"><span class="rl">${esc(boundProv.toUpperCase())} bill — we read the rate from the PDF</span></div>
-          <span class="rb-fld-hint">${esc(boundProv.toUpperCase())}'s usage feed doesn't expose a $/kWh rate, but its bill does. We read the generation + net-metering credit rate straight off the bill — automatically once the ${esc(boundProv.toUpperCase())} login is linked and bills auto-pull, or from a PDF you upload here — and the invoice prices itself (no rate to enter).</span>
-          <div class="rb-vecbill-row">
-            <label class="rb-track-up">📄 Upload ${esc(boundProv.toUpperCase())} bill (PDF)
-              <input type="file" accept="application/pdf,.pdf" data-vecbillfile="${d.utility_account_id}" data-vbsid="${sid}" hidden></label>
-            <span class="rb-status rb-vecbill-stat"></span>
-          </div>
-        </div>` : ""}
         <span class="rb-status rb-offedit-status"></span>
       </div>`;
   }
