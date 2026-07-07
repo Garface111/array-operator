@@ -806,6 +806,9 @@
       Promise.all([refreshList(), refreshGmpBillsStatus()]).catch(() => {});
       // The send-pipeline band (fire-and-forget; hidden until data lands).
       loadPipeline();
+      // Auto-draft: kick a draft-all now (from settled bills) + start the poll that
+      // re-drafts as new bills land — no manual button (Ford 2026-07-07).
+      if (!prefetch && authHeaders()) { autoDraftAll({ force: true }); startAutoDraftPoll(); }
     }
     // Invoice archive (monthly directory): fetch the manifest once (cached) on a real
     // view and render the collapsible directory. Skipped during the idle prefetch;
@@ -1723,11 +1726,7 @@
             <p><b>${fmt0(approvalTotal)} offtaker${approvalTotal === 1 ? "" : "s"}</b> on draft-for-approval will switch to <b>auto-send</b> — invoices email on schedule, from settled bills, without review. Per-offtaker settings still override.</p>
             <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2AutoAllGo" type="button">Switch ${fmt0(approvalTotal)} to auto</button></div>
           </div>
-          <button class="ao-btn rb-btn rb2-ctlbtn" id="rb2DraftAll" type="button">Draft all</button>
-          <div class="rb2-ctlpop" id="rb2DraftAllPop" hidden>
-            <p>Generate the latest invoice for <b>all ${fmt0(p.total_enabled || 0)} offtaker${(p.total_enabled === 1) ? "" : "s"}</b> into your review inbox — each drafted from its settled bill, ready to review and approve. <b>Nothing sends</b> until you approve it; an offtaker still waiting on its bill is held, never faked.</p>
-            <div class="rb2-ctlpop-row"><button class="ao-btn rb-btn" data-close type="button">Cancel</button><button class="ao-btn ao-btn-primary rb-btn" id="rb2DraftAllGo" type="button">Draft all ${fmt0(p.total_enabled || 0)}</button></div>
-          </div>
+          <span class="rb2-autodraft" title="Every offtaker's invoice drafts automatically from its settled bill — the moment it's added and whenever a new bill lands. Nothing sends until you approve it.">⚡ Auto-drafting</span>
           <button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="${paused}" type="button">
             <span class="rb2-knob" aria-hidden="true"></span>${paused ? "Resume sending" : "Pause sending"}
           </button>
@@ -1764,7 +1763,7 @@
       const a = document.getElementById("rbArchiveHost");
       if (a && !a.hidden) a.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    [["rb2AutoAll", "rb2AutoAllPop"], ["rb2DraftAll", "rb2DraftAllPop"]].forEach(([b, pp]) => {
+    [["rb2AutoAll", "rb2AutoAllPop"]].forEach(([b, pp]) => {
       const btn = host.querySelector("#" + b), pop = host.querySelector("#" + pp);
       if (!btn || !pop) return;
       btn.onclick = (e) => {
@@ -1776,8 +1775,6 @@
     });
     const autoGo = host.querySelector("#rb2AutoAllGo");
     if (autoGo) autoGo.onclick = (e) => bulkDeliveryMode("auto", e.currentTarget);
-    const draftGo = host.querySelector("#rb2DraftAllGo");
-    if (draftGo) draftGo.onclick = (e) => bulkDraft(e.currentTarget);
     const pauseBtn = host.querySelector("#rb2Pause");
     if (pauseBtn) pauseBtn.onclick = async () => {
       pauseBtn.disabled = true;
@@ -1824,48 +1821,65 @@
     btn.textContent = keep;
   }
 
-  // "Draft all" — GENERATE the latest invoice for every offtaker into the
-  // review inbox (Ford: it should draft the latest for each offtaker, not just
-  // flip a setting). The backend runs it in the background (a draft per
-  // offtaker); we poll the progress and refresh when it finishes.
-  async function bulkDraft(btn) {
-    btn.disabled = true;
-    btn.textContent = "Starting…";
+  // ── Continuous auto-draft (Ford 2026-07-07: "remove the draft button ... have all
+  // offtaker invoices automatically draft when they are added and continuously poll
+  // to see if there's a new bill to draft again"). There is NO manual draft button:
+  // every enabled offtaker drafts from its settled bill on load + on add, and a poll
+  // re-drafts as new bills land. Reuses the server bulk-draft background job with
+  // keep_mode=1 so a poll NEVER flips an auto-send offtaker back to approval. The job
+  // is server-locked (one run per tenant) + idempotent (reuses each period's draft),
+  // and the status chip narrates progress. It never sends — approval still gates.
+  let _autoDraftAt = 0;
+  let _autoDraftBusy = false;
+  const AUTO_DRAFT_MIN_MS = 4 * 60 * 1000;      // don't re-fire more than ~every 4 min
+  async function autoDraftAll(opts) {
+    const force = opts && opts.force;
+    if (!authHeaders() || window.AO_DEMO) return;            // signed-out/demo never drafts
+    if (_autoDraftBusy) return;
+    if (!force && Date.now() - _autoDraftAt < AUTO_DRAFT_MIN_MS) return;
+    _autoDraftBusy = true; _autoDraftAt = Date.now();
+    const st = document.getElementById("rb2DraftStatus");
     try {
-      const r = await fetch(API + "/subscriptions/bulk-draft", {
-        method: "POST", headers: authHeaders(),
-      });
-      if (!r.ok) throw new Error();
-      document.querySelectorAll(".rb2-ctlpop").forEach(x => x.hidden = true);
-      await bulkDraftPoll();       // shows "Drafting X of N…" then the result
-      await loadPipeline();        // in-flight / ready-to-review climb as drafts land
-      refreshList();               // the inbox fills
-    } catch (e) {
-      btn.disabled = false;
-      btn.textContent = "Draft all";
-    }
+      const r = await fetch(API + "/subscriptions/bulk-draft?keep_mode=1",
+        { method: "POST", headers: authHeaders() });
+      if (!r.ok) return;
+      let last = null;
+      for (let i = 0; i < 160; i++) {           // poll to completion, ≤ ~8 min
+        try {
+          const s = await fetch(API + "/subscriptions/bulk-draft-status", { headers: authHeaders() });
+          last = await s.json().catch(() => null);
+        } catch (_) { /* keep polling */ }
+        if (last && last.ok) {
+          if (st) {
+            st.hidden = false;
+            st.textContent = last.running
+              ? `⚡ Drafting ${fmt0(last.done)} of ${fmt0(last.total)}…`
+              : (last.total ? `⚡ ${fmt0(last.drafted)} drafted${last.held ? " · " + fmt0(last.held) + " waiting on bills" : ""}` : "");
+          }
+          if (!last.running) break;
+        }
+        await new Promise(res => setTimeout(res, 3000));
+      }
+      // Reflect new/updated drafts in the inbox — but NEVER while the operator is
+      // mid-edit (a full list re-render would clobber a focused note/rate field);
+      // the next poll picks it up. loadPipeline is cheap + always safe to refresh.
+      loadPipeline();
+      const editing = document.activeElement && document.activeElement.closest &&
+        document.activeElement.closest("#rbList");
+      if (!editing) await refreshList();
+      if (st) setTimeout(() => { if (st && !_autoDraftBusy) st.hidden = true; }, 6000);
+    } catch (_) { /* transient — the next poll retries */ }
+    finally { _autoDraftBusy = false; }
   }
 
-  async function bulkDraftPoll() {
-    const st = document.getElementById("rb2DraftStatus");
-    if (st) { st.hidden = false; st.textContent = "Drafting…"; }
-    for (let i = 0; i < 160; i++) {           // ≤ ~8 min
-      let d = null;
-      try {
-        const r = await fetch(API + "/subscriptions/bulk-draft-status", { headers: authHeaders() });
-        d = await r.json().catch(() => null);
-      } catch (e) { /* keep polling */ }
-      if (d && d.ok) {
-        if (st) {
-          st.textContent = d.running
-            ? `Drafting ${fmt0(d.done)} of ${fmt0(d.total)}…`
-            : `✓ ${fmt0(d.drafted)} drafted${d.held ? " · " + fmt0(d.held) + " waiting on bills" : ""}`;
-        }
-        if (!d.running) { setTimeout(() => { if (st) st.hidden = true; }, 5000); return d; }
-      }
-      await new Promise(res => setTimeout(res, 3000));
-    }
-    if (st) st.hidden = true;
+  // Start the continuous poll ONCE. Visibility-gated so a backgrounded tab stays quiet
+  // (and we don't hammer the server for a tab nobody's looking at).
+  function startAutoDraftPoll() {
+    if (startAutoDraftPoll._on) return;
+    startAutoDraftPoll._on = true;
+    setInterval(() => {
+      if (document.visibilityState === "visible" && authHeaders()) autoDraftAll();
+    }, AUTO_DRAFT_MIN_MS);
   }
 
   function renderKpis() {
@@ -4973,7 +4987,7 @@
       bodyCol = `<div class="rb-draft rb-draft-empty">
         <div class="rb-draft-top"><div class="rb-draft-name">${esc(activeOf.customer_name || "Offtaker")}</div></div>
         <p class="rb-empty-why">${esc(why)}</p>
-        <button class="ao-btn rb-btn" type="button" data-regen="${esc(sid)}">Try drafting this period</button>
+        <p class="rb-empty-auto">⚡ Drafts automatically the moment its bill lands — nothing to click.</p>
       </div>`;
     }
 
