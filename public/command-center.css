@@ -1013,16 +1013,28 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-controls-label{font-size:14.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#0f172a)}
 .rb2-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rb2-exportwrap{position:relative}
-.rb2-exportpop{position:absolute;left:0;top:calc(100% + 8px);width:300px;background:var(--card,#fff);
+.rb2-exportpop{position:absolute;left:0;top:calc(100% + 8px);width:320px;max-width:calc(100vw - 32px);background:var(--card,#fff);
   border:1px solid var(--line,#e2e8f0);border-radius:12px;
   box-shadow:0 12px 40px -12px rgba(15,23,42,.25);padding:14px;z-index:44}
 .rb2-exportpop-h{font-size:12.5px;font-weight:700;color:var(--ink,#0f172a);margin-bottom:3px}
-.rb2-exportpop-p{margin:0 0 10px;font-size:11px;color:var(--faint,#94a3b8)}
-.rb2-export{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.rb2-export .rb-export-acct{width:100%;order:3}
-.rb2-export .rb-export-hint{order:4;font-size:10.5px;color:var(--faint,#94a3b8)}
-.rb2-export .rb-export-stat{order:5;width:100%}
-.rb2-export .rb-btn{flex:1}
+.rb2-exportpop-p{margin:0 0 12px;font-size:11px;color:var(--faint,#94a3b8);line-height:1.45}
+/* Stacked export form: labelled controls, one per row. */
+.rb2-export{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.rb-exf{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;
+  color:var(--ink,#0f172a);letter-spacing:-.005em}
+.rb-exf-opt{font-weight:500;color:var(--faint,#94a3b8)}
+.rb-export-sel,.rb-export-date,.rb-export-acct,.rb-export-memo{
+  width:100%;box-sizing:border-box;height:34px;padding:0 10px;font-size:12.5px;font-weight:500;
+  color:var(--ink,#0f172a);background:var(--day-hover,#f8fafc);
+  border:1px solid var(--line,#e2e8f0);border-radius:8px;appearance:none;outline:none}
+.rb-export-sel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:26px}
+.rb-export-sel:focus,.rb-export-date:focus,.rb-export-acct:focus,.rb-export-memo:focus{
+  border-color:var(--brand,#2563eb);background:var(--card,#fff)}
+.rb-export-note{margin:2px 0 0;font-size:10.5px;line-height:1.4;color:var(--faint,#94a3b8);
+  padding:8px 10px;background:var(--day-hover,rgba(15,23,42,.04));border-radius:8px}
+.rb-export-go{width:100%;justify-content:center;margin-top:2px}
+.rb-export-stat{width:100%;font-size:11px;min-height:1em}
 
 /* hierarchy accents */
 .rb2-provsp{flex:1}
@@ -1478,23 +1490,14 @@ html[data-theme="day"] .rep-fld.req > select{
 /* head-action cluster: Link GMP utility bills + Add an offtaker */
 .rb-head-actions{ display:flex; align-items:center; gap:8px; flex:none; align-self:center; flex-wrap:wrap; justify-content:flex-end; }
 .rb-head-actions > button{ white-space:nowrap; }
-/* QuickBooks / Xero batch export cluster (account-code input + button + status). */
-.rb-export{ display:inline-flex; align-items:center; gap:7px; flex-wrap:wrap; }
+/* Accounting export (QuickBooks Online / Desktop / Xero) — the stacked form
+   lives in the export popover; its field styling is in the .rb2-export block
+   above. These are the shared status-line colors + the [hidden] guard. */
 .rb-export[hidden]{ display:none; }
-.rb-export-acct{ width:132px; box-sizing:border-box; background:var(--card,#fff); border:1px solid var(--line,#e2e8f0);
-  border-radius:9px; padding:7px 10px; color:var(--ink,#16202b); font:inherit; font-size:12.5px; outline:none;
-  transition:border-color .12s ease; }
-.rb-export-acct::placeholder{ color:var(--faint,#94a3b8); }
-.rb-export-acct:focus{ border-color:var(--good,#2563eb); }
-/* the "Xero only" tag next to the account-code input — the code applies to Xero, not QuickBooks. */
-.rb-export-hint{ font-size:10.5px; font-weight:600; color:var(--faint,#94a3b8); letter-spacing:.02em;
-  margin:0 2px 0 -3px; white-space:nowrap; cursor:default; }
-.rb-export #rbExportQb, .rb-export #rbExportXero{ white-space:nowrap; }
-.rb-export-stat{ font-size:12px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); }
+.rb-export-acct::placeholder,.rb-export-memo::placeholder{ color:var(--faint,#94a3b8); }
 .rb-export-stat.rb-busy{ color:var(--muted,#475569); }
 .rb-export-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
 .rb-export-stat.rb-err{ color:var(--bad,#e5484d); font-weight:600; }
-@media(max-width:640px){ .rb-export{ width:100%; } .rb-export-acct{ flex:1 1 120px; width:auto; } }
 
 /* ── Invoice archive (monthly directory) ─────────────────────────────────────
    A collapsible portfolio-level directory: months → arrays → offtakers, with

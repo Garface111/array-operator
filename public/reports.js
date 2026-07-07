@@ -987,55 +987,110 @@
   }
 
   const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
+  const EXPORT_FMT_KEY = "ao_qb_export_format";
+  const EXPORT_MEMO_KEY = "ao_qb_export_memo";
+  // Operator-facing label per format (for the status line + filename fallback).
+  const EXPORT_LABELS = { quickbooks: "QuickBooks Online", iif: "QuickBooks Desktop", xero: "Xero" };
+  const EXPORT_EXT = { iif: "iif" };   // everything else downloads a .csv
   function wireExport() {
     const box = $("#rbExportBox"), acct = $("#rbExportAcct"), stat = $("#rbExportStat");
-    const btnQb = $("#rbExportQb"), btnXero = $("#rbExportXero");
-    if (!box || (!btnQb && !btnXero)) return;
+    const fmtSel = $("#rbExportFmt"), dateInp = $("#rbExportDate"), periodSel = $("#rbExportPeriod");
+    const memoInp = $("#rbExportMemo"), iifNote = $("#rbExportIifNote"), go = $("#rbExportGo");
+    if (!box || !go || !fmtSel) return;
     if (!authHeaders()) { box.hidden = true; return; }   // defensive; demo never reaches here
     box.hidden = false;
-    // Restore the remembered account code (the Xero AccountCode).
-    if (acct) {
-      try { acct.value = localStorage.getItem(EXPORT_ACCT_KEY) || ""; } catch (e) {}
-      acct.addEventListener("input", () => {
-        try { localStorage.setItem(EXPORT_ACCT_KEY, acct.value.trim()); } catch (e) {}
-      });
-      // Enter in the account field triggers the Xero export (that's what it feeds).
-      acct.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doExport("xero", "Xero"); } });
+
+    // Restore remembered choices (format, income account, memo). Default the
+    // invoice date to today so an export is one click from opening the popover.
+    try { const f = localStorage.getItem(EXPORT_FMT_KEY); if (f && EXPORT_LABELS[f]) fmtSel.value = f; } catch (e) {}
+    if (acct) { try { acct.value = localStorage.getItem(EXPORT_ACCT_KEY) || ""; } catch (e) {} }
+    if (memoInp) { try { memoInp.value = localStorage.getItem(EXPORT_MEMO_KEY) || ""; } catch (e) {} }
+    if (dateInp && !dateInp.value) {
+      const d = new Date(); const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString().slice(0, 10);
+      dateInp.value = iso;
     }
+    const persist = (key, v) => { try { localStorage.setItem(key, (v || "").trim()); } catch (e) {} };
+    if (acct) acct.addEventListener("input", () => persist(EXPORT_ACCT_KEY, acct.value));
+    if (memoInp) memoInp.addEventListener("input", () => persist(EXPORT_MEMO_KEY, memoInp.value));
+
+    // The IIF honesty note + the "income account" hint only apply to
+    // QuickBooks Desktop / Xero — QuickBooks Online ignores the account. Reflect
+    // the current format so the operator sees exactly what each field does.
+    function syncFormat() {
+      const fmt = fmtSel.value;
+      persist(EXPORT_FMT_KEY, fmt);
+      if (iifNote) iifNote.hidden = (fmt !== "iif");
+      const acctWrap = $("#rbExportAcctWrap");
+      if (acctWrap) acctWrap.style.display = (fmt === "quickbooks") ? "none" : "";
+    }
+    fmtSel.addEventListener("change", syncFormat);
+    syncFormat();
+
+    // Populate the billing-cycle picker from the fleet's settled periods (union
+    // across offtakers). Keep the implicit "Latest bill per offtaker" default on
+    // top; each option shows how many offtakers have a settled bill for it, so
+    // the operator sees the coverage of a chosen cycle. Best-effort — a failure
+    // just leaves the latest-bill default (the long-standing behavior).
+    if (periodSel && !periodSel.dataset.loaded) {
+      periodSel.dataset.loaded = "1";
+      fetch(API + "/export-periods", { headers: authHeaders() })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          const periods = (d && d.periods) || [];
+          for (const p of periods) {
+            const o = document.createElement("option");
+            o.value = p.label;
+            o.textContent = p.pretty + (p.count ? "  ·  " + p.count + " offtaker" + (p.count === 1 ? "" : "s") : "");
+            periodSel.appendChild(o);
+          }
+        })
+        .catch(() => {});
+    }
+
     const setStat = (cls, msg) => { if (stat) { stat.className = "rb-export-stat" + (cls ? " " + cls : ""); stat.textContent = msg || ""; } };
     let _busy = false;
-    // QuickBooks Online and Xero use DIFFERENT import layouts — one button each,
-    // both hitting /invoice-export.csv?format=<fmt> through the shared auth-download
-    // helper. The account-code input feeds Xero's AccountCode (QuickBooks ignores it).
-    async function doExport(format, label) {
+    // One unified download: the chosen format + invoice date + billing cycle +
+    // memo + income account all hit /invoice-export.csv, which computes in a
+    // background sweep at scale (202 {pending} while it runs) then serves the
+    // file (CSV or, for QuickBooks Desktop, a .iif). The backend stamps the
+    // filename via Content-Disposition.
+    async function doExport() {
       if (_busy) return;
       _busy = true;
-      if (btnQb) btnQb.disabled = true;
-      if (btnXero) btnXero.disabled = true;
+      go.disabled = true;
+      const fmt = fmtSel.value;
+      const label = EXPORT_LABELS[fmt] || fmt;
       setStat("rb-busy", "Preparing your " + label + " export…");
+      const params = new URLSearchParams({ format: fmt });
       const code = acct && acct.value.trim();
-      const params = new URLSearchParams({ format: format });
       if (code) params.set("account_code", code);
+      const memo = memoInp && memoInp.value.trim();
+      if (memo) params.set("memo", memo);
+      const period = periodSel && periodSel.value;
+      if (period) params.set("period", period);
+      const idate = dateInp && dateInp.value;
+      if (idate) params.set("invoice_date", idate);
       const url = API + "/invoice-export.csv?" + params.toString();
+      const ext = EXPORT_EXT[fmt] || "csv";
       try {
-        // The register computes in a background sweep at scale (a 202 {pending}
-        // while it runs), so poll until the CSV lands, then download it. The
-        // backend stamps a per-format filename via Content-Disposition.
-        const res = await exportPoll(url, "offtaker-invoices-" + format + ".csv");
+        const res = await exportPoll(url, "offtaker-invoices-" + fmt + "." + ext);
         const n = res.count;
         setStat("rb-ok", n != null
           ? ("✓ Exported " + n + " invoice" + (n === 1 ? "" : "s") + " for " + label + ".")
-          : "✓ Exported — CSV downloaded.");
+          : "✓ Exported — file downloaded.");
       } catch (e) {
         setStat("rb-err", (e && e.message) || ("Export to " + label + " failed — check your connection."));
       } finally {
         _busy = false;
-        if (btnQb) btnQb.disabled = false;
-        if (btnXero) btnXero.disabled = false;
+        go.disabled = false;
       }
     }
-    if (btnQb) btnQb.onclick = () => doExport("quickbooks", "QuickBooks");
-    if (btnXero) btnXero.onclick = () => doExport("xero", "Xero");
+    go.onclick = doExport;
+    // Enter anywhere in the form triggers the download.
+    box.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target && e.target.tagName === "INPUT") { e.preventDefault(); doExport(); }
+    });
   }
 
   /* ===========================================================================
@@ -1923,17 +1978,40 @@
             <div class="rb2-exportwrap">
               <button class="ao-btn rb-btn" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false">⬇ Export</button>
               <div class="rb2-exportpop" id="rb2ExportPop" hidden>
-                <div class="rb2-exportpop-h">Export this period's invoices</div>
-                <p class="rb2-exportpop-p">One CSV per accounting system — layouts differ, both import directly.</p>
+                <div class="rb2-exportpop-h">Export invoices to accounting</div>
+                <p class="rb2-exportpop-p">Pick your accounting system, the invoice date, and the billing cycle — the batch drafts every offtaker's invoice and downloads a file that imports directly.</p>
                 <div class="rb-export rb2-export" id="rbExportBox" hidden>
-                  <button class="ao-btn rb-btn" id="rbExportQb" type="button"
-                          title="Download all offtaker invoices this period as a QuickBooks Online import CSV.">⬇ QuickBooks</button>
-                  <button class="ao-btn rb-btn" id="rbExportXero" type="button"
-                          title="Download all offtaker invoices this period as a Xero Sales-Invoice import CSV (uses the account code, if set).">⬇ Xero</button>
-                  <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
-                         placeholder="Xero account code" maxlength="40" autocomplete="off"
-                         title="Optional — the Xero AccountCode these solar invoices post to (e.g. 200). QuickBooks doesn't need it (it uses a &quot;Solar Credit&quot; product/service). Remembered for next time.">
-                  <span class="rb-export-hint" title="The account code applies to the Xero export only — QuickBooks uses a default &quot;Solar Credit&quot; item.">Xero only — QuickBooks uses a "Solar Credit" item</span>
+                  <label class="rb-exf" for="rbExportFmt">Accounting system
+                    <select class="rb-export-sel" id="rbExportFmt"
+                            title="QuickBooks Online and Desktop use different import files (Online CSV vs Desktop .IIF); Xero uses its own Sales-Invoice CSV.">
+                      <option value="quickbooks">QuickBooks Online (CSV)</option>
+                      <option value="iif">QuickBooks Desktop (IIF)</option>
+                      <option value="xero">Xero (CSV)</option>
+                    </select>
+                  </label>
+                  <label class="rb-exf" for="rbExportDate">Invoice date
+                    <input class="rb-export-date" id="rbExportDate" type="date" autocomplete="off"
+                           title="The date stamped on every invoice in this export. Defaults to today.">
+                  </label>
+                  <label class="rb-exf" for="rbExportPeriod">Billing cycle
+                    <select class="rb-export-sel" id="rbExportPeriod"
+                            title="Which settled bill period to invoice. “Latest bill per offtaker” drafts each offtaker's most recent settled bill; pick a specific month/quarter to draft that cycle for everyone who has a settled bill for it.">
+                      <option value="">Latest bill per offtaker</option>
+                    </select>
+                  </label>
+                  <label class="rb-exf" for="rbExportMemo">Memo <span class="rb-exf-opt">(optional)</span>
+                    <input class="rb-export-memo" id="rbExportMemo" type="text" inputmode="text"
+                           placeholder="Solar credit — {month}" maxlength="120" autocomplete="off"
+                           title="The description on each invoice line (QuickBooks ItemDescription / Xero Description / IIF memo). Leave blank to use “Solar credit — {month}”.">
+                  </label>
+                  <label class="rb-exf" for="rbExportAcct" id="rbExportAcctWrap">Income account <span class="rb-exf-opt">(optional)</span>
+                    <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
+                           placeholder="e.g. 200 or Solar Credit Income" maxlength="60" autocomplete="off"
+                           title="The account these solar invoices post to — Xero's AccountCode and QuickBooks Desktop's income account. QuickBooks Online ignores it (it uses the “Solar Credit” product/service). Remembered for next time.">
+                  </label>
+                  <p class="rb-export-note" id="rbExportIifNote" hidden>QuickBooks Desktop 2019+ restricts IIF transaction imports by default — you may need File → Utilities → Import to enable it.</p>
+                  <button class="ao-btn ao-btn-primary rb-btn rb-export-go" id="rbExportGo" type="button"
+                          title="Draft every offtaker's invoice for the chosen cycle and download the import file.">⬇ Download export</button>
                   <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
                 </div>
               </div>
