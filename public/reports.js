@@ -73,7 +73,7 @@
           if (d && d.ok) { RECON = d; reconIndex(); return RECON; }
           if (!d || !d.pending) return null;
         } catch (e) { return null; }
-        await new Promise(res => setTimeout(res, 10000));
+        await new Promise(res => setTimeout(res, 2500));
       }
       return null;
     })().then(v => { _reconPromise = null; return v; });
@@ -388,7 +388,7 @@
           if (d && d.ok) { AUDIT = d; return AUDIT; }
           if (!d || !d.pending) return null;
         } catch (e) { return null; }
-        await new Promise(res => setTimeout(res, 10000));
+        await new Promise(res => setTimeout(res, 2500));
       }
       return null;
     })().then(v => { _auditPromise = null; return v; });
@@ -806,6 +806,11 @@
       Promise.all([refreshList(), refreshGmpBillsStatus()]).catch(() => {});
       // The send-pipeline band (fire-and-forget; hidden until data lands).
       loadPipeline();
+      // Kick the bill-audit sweep in PARALLEL from t=0 so its ~11s server compute
+      // (cached 10 min) overlaps the list render instead of starting after it — the
+      // "Doesn't match GMP" tile fills sooner (Ford 2026-07-07: it was slow). It's
+      // memoized (RECON/_reconPromise), so this shares the same sweep as the list.
+      loadReconcile().catch(() => {});
       // Auto-draft: kick a draft-all now (from settled bills) + start the poll that
       // re-drafts as new bills land — no manual button (Ford 2026-07-07).
       if (!prefetch && authHeaders()) { autoDraftAll({ force: true }); startAutoDraftPoll(); }
@@ -972,7 +977,7 @@
       const ct = r.headers.get("content-type") || "";
       if (r.status === 202 || ct.includes("application/json")) {
         let d = null; try { d = await r.json(); } catch (e) {}
-        if (d && d.pending) { await new Promise(res => setTimeout(res, 10000)); continue; }
+        if (d && d.pending) { await new Promise(res => setTimeout(res, 2500)); continue; }
         throw new Error((d && d.detail) || "Nothing to export for this period yet.");
       }
       if (!r.ok) throw new Error("Download failed (HTTP " + r.status + ").");
@@ -1128,7 +1133,7 @@
           if (d && d.ok) { ARCHIVE = d; return ARCHIVE; }
           if (!d || !d.pending) return null;
         } catch (e) { return null; }
-        await new Promise(res => setTimeout(res, 10000));
+        await new Promise(res => setTimeout(res, 2500));
       }
       return null;
     })().then(v => { _archivePromise = null; return v; });
