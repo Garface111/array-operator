@@ -4523,13 +4523,28 @@
             ${pctSumPill(g)}
           </div>
           <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
-            ${g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
+            ${collapsed ? "" : g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
           </div>
         </div>`;
     };
     let body;
     if (groups) {
       const providers = groupByProvider(groups);
+      // LAZY RENDER (perf, Ford 2026-07-07): a collapsed group/provider omits its
+      // offtaker cards from the DOM entirely — at 800 offtakers that's the difference
+      // between painting ~2 provider headers and ~800 cards on load (both default
+      // collapsed). The OPEN card must still render, so force-open the group +
+      // provider that hold ACTIVE_SUB_ID before we build the body.
+      if (ACTIVE_SUB_ID != null) {
+        for (const pv of providers) {
+          for (const g of (pv.groups || [])) {
+            if ((g.rows || []).some(s => String(s.id) === String(ACTIVE_SUB_ID))) {
+              GROUP_COLLAPSED[g.key] = false;
+              PROVIDER_COLLAPSED[pv.key] = false;
+            }
+          }
+        }
+      }
       body = providers.map(pv => {
         if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = true;   // default collapsed
         const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
@@ -4561,7 +4576,7 @@
               <span class="rb2-provsp"></span>${provFlag}${provBar}
             </div>
             <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
-              ${pv.groups.map(acctGroupHTML).join("")}
+              ${pCollapsed ? "" : pv.groups.map(acctGroupHTML).join("")}
             </div>
           </div>`;
       }).join("");
