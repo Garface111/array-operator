@@ -9,7 +9,16 @@
 @media (max-width: 600px) {
   /* Tighter page gutters — 28px each side eats half a phone. */
   .wrap { padding: 0 12px; }
-  body { overflow-x: hidden; }
+  body, html { overflow-x: hidden; }
+
+  /* Provider row (offtaker generator): the sent-progress widget is nowrap and
+     can't shrink, so it pushes the page ~12px past a phone's width (sim persona
+     "Ken" measured scrollW 402 vs 390). Drop the decorative mini-track, let the
+     "N sent · June" text wrap, and let the whole row wrap rather than overflow. */
+  .rb-prov-head { flex-wrap: wrap; }
+  .rb2-minitrack { display: none; }
+  .rb2-provbar { margin-left: auto; gap: 4px; min-width: 0; }
+  .rb2-provbar small { white-space: normal; text-align: right; }
 
   /* ── Tab bar: 4 tabs on line 1; the identity chip wraps to its own line ── */
   .tabbar { gap: 2px; padding: 3px; margin: 10px 0 2px;
