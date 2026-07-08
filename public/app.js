@@ -581,6 +581,21 @@ function loadDashboard(){
   }
   renderFromSession();
 }
+// The GMP-onboarding gate is a BILLING/invoicing nag ("can't audit, reconcile, or
+// bill until GMP bills are connected"), so it belongs ONLY on the Offtaker Invoice
+// Generator tab (#reports) — never on the Inverter Dashboard / Arrays / Analysis /
+// Trends (Ford). We split the two questions: updateGmpGate() decides "should it show
+// at all" (onboarding incomplete, async), and applyGmpGateVisibility() applies "is
+// the invoicing tab active" on every tab change with no re-fetch.
+let _gmpGateWanted = false;
+function aoOnReportsTab(){ return location.hash === "#reports"; }
+function applyGmpGateVisibility(){
+  const gate = document.getElementById("gmpGate");
+  if(!gate) return;
+  gate.hidden = !(_gmpGateWanted && aoOnReportsTab());
+}
+try { window.addEventListener("hashchange", applyGmpGateVisibility); } catch(e){}
+
 // Drive the GMP-onboarding gate banner. A signed-in owner is NOT done until
 // GMP is connected AND ≥1 array is linked. next_step from the backend:
 //   connect_gmp   → amber "Connect GMP to finish setting up"
@@ -589,11 +604,11 @@ function loadDashboard(){
 function updateGmpGate(session){
   const gate = document.getElementById("gmpGate");
   if(!gate) return;
-  if(!session){ gate.hidden = true; return; }
+  if(!session){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
   fetch("/v1/array-owners/onboarding-status", { headers: { Authorization: "Bearer " + session } })
     .then(r => r.ok ? r.json() : null)
     .then(s => {
-      if(!s || !s.ok || s.complete){ gate.hidden = true; return; }
+      if(!s || !s.ok || s.complete){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
       const title = document.getElementById("gmpGateTitle");
       const sub   = document.getElementById("gmpGateSub");
       const badge = document.getElementById("gmpGateBadge");
@@ -625,7 +640,8 @@ function updateGmpGate(session){
           else { location.href = "/onboarding#connect-gmp"; }  // defensive fallback
         };
       }
-      gate.hidden = false;
+      _gmpGateWanted = true;
+      applyGmpGateVisibility();   // only actually visible on the #reports tab
     })
     .catch(() => { /* never block the dashboard on the gate */ });
 }
