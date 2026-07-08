@@ -5175,9 +5175,20 @@
     // Payment state + button. A card exists only on a real paid/active status or an
     // explicit flag — a bare trial does NOT mean a card is on file (that's why the
     // default CTA is "Add credit card").
+    //
+    // The status regex is a FALLBACK ONLY for when the backend hasn't told us either
+    // way (has_payment_method/has_card both missing) — it must never override an
+    // EXPLICIT false. Without this guard, an operator who added a card mid-trial
+    // (status still "trialing", so the regex alone would say no) reads correctly —
+    // but the reverse case (a payload that explicitly says has_payment_method:false
+    // while status happens to read "active", e.g. a lapsed/edge subscription) would
+    // have shown a hard "Card on file" the operator knows is false. Trust an explicit
+    // signal over an inferred one, always.
     const sStatus = String(status || "");
-    const hasCard = (summary && (summary.has_payment_method === true || summary.has_card === true))
-      || /active|past_due|paid/i.test(sStatus);
+    const pmField = summary && (summary.has_payment_method === true || summary.has_card === true) ? true
+      : summary && (summary.has_payment_method === false || summary.has_card === false) ? false
+      : null;   // backend didn't say — fall back to the status inference below
+    const hasCard = pmField != null ? pmField : /active|past_due|paid/i.test(sStatus);
     const payState = document.getElementById("payState");
     const btn = document.getElementById("billManage");
     if(payState){

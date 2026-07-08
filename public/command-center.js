@@ -245,7 +245,7 @@
         <div class="fcg-tile" role="listitem">
           <div class="fcg-k">Arrays</div>
           <div class="fcg-v"><b data-kpi="sites">${num(k.sites)}</b></div>
-          <div class="fcg-s">connected sites</div>
+          <div class="fcg-s" title="Every array on file, including utility-meter-only ones with no live telemetry. The Vendor Data spreadsheet's 'monitored arrays' count is a narrower subset — those with a live vendor connection.">arrays on file</div>
         </div>
         <div class="fcg-tile" role="listitem">
           <div class="fcg-k">Inverters</div>

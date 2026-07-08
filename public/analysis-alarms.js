@@ -89,11 +89,13 @@
       ".analm-badge.b-under  {color:var(--warn);background:rgba(217,119,6,.12);}",
       ".analm-badge.b-comm   {color:var(--sky); background:rgba(8,145,178,.12);}",
       ".analm-badge.b-dark   {color:var(--warn);background:rgba(217,119,6,.12);}",
+      ".analm-badge.b-new    {color:var(--sky); background:rgba(8,145,178,.12);}",
       ".analm-badge.b-dead   .d{background:var(--bad);}",
       ".analm-badge.b-fault  .d{background:var(--bad);}",
       ".analm-badge.b-under  .d{background:var(--warn);}",
       ".analm-badge.b-comm   .d{background:var(--sky);}",
       ".analm-badge.b-dark   .d{background:var(--warn);}",
+      ".analm-badge.b-new    .d{background:var(--sky);}",
 
       /* right rail: $ impact + last-seen */
       ".analm-right{text-align:right;white-space:nowrap;padding-top:1px;}",
@@ -131,6 +133,13 @@
     var st = inv.status;
     if (st === "dead" || st === "fault") return "critical";
     if (st === "underperforming" || st === "comm_gap") return "warning";
+    // "monitoring" = too new for 14-day grading (no history yet) — the same
+    // vocabulary as Hardware's neutral "Monitoring" pill. It matches none of the
+    // branches above, so without this it silently counted as "healthy" — a
+    // brand-new, never-verified device inflating "All systems nominal" (found
+    // live: Paul's West Glover array reads 0W in daylight, only signal is
+    // status=monitoring). Never let an unverified device read as graded-healthy.
+    if (st === "monitoring") return "warning";
     // live-dark: an ok-status inverter dark right now while peers produce
     if (st === "ok" && live && typeof live.liveVerdict === "function") {
       try {
@@ -149,6 +158,7 @@
       case "fault":          return { cls: "b-fault", label: "Fault" };
       case "underperforming":return { cls: "b-under", label: "Underperforming" };
       case "comm_gap":       return { cls: "b-comm",  label: "Gone quiet" };
+      case "monitoring":     return { cls: "b-new",   label: "Too new to grade" };
       default:               return { cls: "b-dark",  label: "Dark now" };
     }
   }
@@ -290,12 +300,19 @@
       selectedSeverity = "all";
     }
 
+    // A cold sign-in's ctx.columns is empty for the exact same shape as a fleet
+    // with nothing flagged — without this the panel races FleetStore.load() and
+    // paints "All systems nominal" before a single inverter has been checked.
+    var notLoadedYet = !ctx.loaded && ctx.columns.length === 0;
+
     var html = '';
     html += '<div class="an-card">';
     html += '  <div class="an-card-head">';
     html += '    <h3>Operations</h3>';
     html += '    <div class="an-card-sub">' +
-            (totalFlagged
+            (notLoadedYet
+              ? '<span class="analm-hcount">Checking your fleet…</span>'
+              : totalFlagged
               ? '<span class="analm-hcount">' + totalFlagged + ' inverter' + (totalFlagged === 1 ? '' : 's') + ' need attention</span>'
               : '<span class="analm-hcount zero">All systems nominal</span>') +
             '</div>';
@@ -318,7 +335,9 @@
     }
 
     // ---- list or empty state ----
-    if (totalFlagged === 0) {
+    if (notLoadedYet) {
+      html += loadingState();
+    } else if (totalFlagged === 0) {
       html += emptyState();
     } else {
       var visible = data.rows.filter(function (r) {
@@ -407,6 +426,18 @@
              '<div>' +
                '<h4>All clear</h4>' +
                '<p>Every inverter is producing as expected — no active alarms across the fleet.</p>' +
+             '</div>' +
+           '</div>';
+  }
+
+  // Neutral "still checking" — NEVER the green checkmark. A cold sign-in races
+  // FleetStore.load(); this is what renders until the first real fleet snapshot
+  // lands, so "All clear" is never claimed before anything's actually been checked.
+  function loadingState() {
+    return '<div class="analm-clear-state analm-loading-state">' +
+             '<div>' +
+               '<h4>Checking your fleet…</h4>' +
+               '<p>Pulling the latest reading from every inverter — this takes a few seconds.</p>' +
              '</div>' +
            '</div>';
   }

@@ -229,6 +229,12 @@
     return {
       signedIn: !!getSession(),
       simulated: !!snap.simulated,
+      // Has the fleet actually finished its first load? A cold sign-in's ctx.columns
+      // is empty for the same reason a genuinely-empty fleet's would be — panels that
+      // treat "0 flagged" as "all clear" must gate on this first, or a race between
+      // FleetStore.load() and the first synchronous renderAll() paints a false-green
+      // "All systems nominal" before a single inverter has been checked.
+      loaded: !!(window.FleetStore && FleetStore.isLoaded && FleetStore.isLoaded()),
       arrays: snap.arrays || [],                 // canonical: {id,name,region,host,vendor,inverters:[…]}
       columns: cols.columns || [],               // per-array: {array_id,array_name,vendor,alert,current_power_w,produced_today_kwh,sync_status,source_status,is_daylight,inverters:[…]}
       summary: cols.summary || { arrays_total: 0, inverters_total: 0, attention: 0 },

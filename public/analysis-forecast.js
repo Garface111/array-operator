@@ -196,8 +196,12 @@
         '  <div class="anfc-nums"><b>' + Math.round(f.actual_kwh).toLocaleString() + ' kWh</b> made<br>' + Math.round(f.expected_kwh).toLocaleString() + ' kWh expected</div>' +
         '</div>' +
         '<div class="anfc-track" role="img" aria-label="Fleet made ' + pct + '% of its weather-expected output">' +
-        '  <div class="anfc-fill ' + tone + '" style="width:' + fill + '%"></div>' +
-        '  <span class="anfc-mark" style="left:' + (100 / 1.2) + '%" title="100% = the actual weather\'s expected output"></span>' +
+        // fill is clamped 0-120 (a fleet CAN beat weather-expected); the track is a
+        // 0-100% CSS width, so fill/tick must share the same /120 normalization or
+        // exactly-100% overshoots its own "100%" tick — a fleet dead on target reads
+        // as visibly over-performing. Matches the sibling Sites-grid bar's math.
+        '  <div class="anfc-fill ' + tone + '" style="width:' + (fill / 1.2).toFixed(1) + '%"></div>' +
+        '  <span class="anfc-mark" style="left:' + (100 / 1.2).toFixed(1) + '%" title="100% = the actual weather\'s expected output"></span>' +
         '</div>' +
         '<div class="anfc-verdict ' + tone + '">' + (pct < 82 ? "⚠ " : "") + esc(verdict) + '</div>' +
         explainHTML(f, ctx) +
