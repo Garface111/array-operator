@@ -4673,15 +4673,24 @@
   function maybeDeepLink() {
     if (_deepLinkDone) return;
     _deepLinkDone = true;
-    let id = null;
-    try { id = new URLSearchParams(location.search).get("draft"); } catch (_) { }
-    if (!id) return;
+    let id = null, review = null;
+    try {
+      const p = new URLSearchParams(location.search);
+      id = p.get("draft"); review = p.get("review");
+    } catch (_) { }
+    if (!id && !review) return;
     try {
       const u = new URL(location.href);
-      u.searchParams.delete("draft");
+      u.searchParams.delete("draft"); u.searchParams.delete("review");
       history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
     } catch (_) { }
-    setTimeout(() => deepLinkOpen(String(id), 25), 120);
+    if (id) { setTimeout(() => deepLinkOpen(String(id), 25), 120); return; }
+    // A batch digest ("?review=1", many offtakers ready): scroll to the offtaker
+    // list so the operator lands on the review queue, not the top of the page.
+    setTimeout(() => {
+      const el = document.getElementById("rbList") || document.querySelector(".rb2-listwrap");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 420);
   }
   function deepLinkOpen(subId, tries) {
     const list = document.getElementById("rbList");
