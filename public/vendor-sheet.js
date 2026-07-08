@@ -113,6 +113,20 @@
         : _low + " low vs peers";
       return { label, cls: "warn", count: _attn };
     }
+    // UNVERIFIED-ZERO: a brand-new array whose only signal so far is "monitoring"
+    // (too new for 14-day grading — the dark/low overlay above SKIPS non-"ok"
+    // inverters by design) can report a hard 0 W in daylight with zero evidence
+    // it's actually clear. "All clear" there is a false green — live-confirmed on
+    // a real account: a fresh CHINT connection read 0 kW at midday, freshly
+    // synced (not stale), badged "All clear" with no data to support it. Say what
+    // it actually is: unverified, not fine. Checked only when nothing already
+    // graded "ok" (a mixed fleet with a healthy peer stays "All clear").
+    const _anyOk = _invs.some(iv => iv.status === "ok");
+    const _newZero = !_anyOk && _invs.some(iv =>
+      iv.status === "monitoring" && iv.current_power_w === 0 && !iv.no_energy_register);
+    if (_newZero && c.is_daylight !== false) {
+      return { label: "New — no output yet", cls: "warn", count: 0 };
+    }
     return { label: "All clear", cls: "ok", count: 0 };
   }
   function statusRank(c) {
@@ -668,8 +682,8 @@
     if (cnt) {
       const invShown = cols.reduce((t, c) => t + (c.inverter_count || 0), 0);
       cnt.textContent = _query
-        ? `${cols.length} of ${all.length} arrays match "${_query}"`
-        : `${all.length} array${all.length === 1 ? "" : "s"} · ${(data.summary || {}).inverters_total || invShown} inverters`;
+        ? `${cols.length} of ${all.length} monitored arrays match "${_query}"`
+        : `${all.length} monitored array${all.length === 1 ? "" : "s"} · ${(data.summary || {}).inverters_total || invShown} inverters`;
     }
     if (!cols.length) {
       body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
