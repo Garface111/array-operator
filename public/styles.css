@@ -1185,34 +1185,6 @@
     animation:sb-spin .7s linear infinite}
   @keyframes sb-spin{to{transform:rotate(360deg)}}
 
-  /* ===== SMA owner-consent flow (email → approve → live) ===== */
-  .sb-sma{margin-top:4px}
-  .sb-sma-loading{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);
-    padding:16px 2px}
-  .sb-sma-loading::before{content:"";flex:0 0 auto;width:14px;height:14px;
-    border:2px solid rgba(63,214,138,.3);border-top-color:var(--good);border-radius:50%;
-    animation:sb-spin .7s linear infinite}
-  /* waiting-for-approval card */
-  .sb-sma-wait{display:flex;align-items:flex-start;gap:13px;margin-top:14px;padding:15px 15px;
-    border:1px solid var(--line);border-radius:14px;
-    background:linear-gradient(165deg,rgba(63,214,138,.06),rgba(63,214,138,.02))}
-  .sb-sma-spin{flex:0 0 auto;width:22px;height:22px;margin-top:2px;
-    border:2.5px solid rgba(63,214,138,.25);border-top-color:var(--good);border-radius:50%;
-    animation:sb-spin .8s linear infinite}
-  .sb-sma-wait-main{flex:1 1 auto;min-width:0}
-  .sb-sma-wait-h{font-size:14px;font-weight:740;color:var(--ink);line-height:1.25}
-  .sb-sma-wait-sub{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px}
-  .sb-sma-wait-sub a{color:var(--good);font-weight:640}
-  /* connected ✓ card */
-  .sb-sma-done{display:flex;align-items:flex-start;gap:13px;margin-top:14px;padding:15px 15px;
-    border:1px solid rgba(63,214,138,.4);border-radius:14px;background:rgba(63,214,138,.09)}
-  .sb-sma-check{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--good);
-    color:#06140d;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;
-    margin-top:1px}
-  .sb-sma-done-main{flex:1 1 auto;min-width:0}
-  .sb-sma-done-h{font-size:14px;font-weight:760;color:var(--ink);line-height:1.25}
-  .sb-sma-done-sub{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px}
-
   /* ===== Free-form cards on the canvas (note / data, free / fixed) ===== */
   /* "+ Card" head button + its pop-up kind menu */
   .sb-cardbtn-wrap{position:relative;display:inline-flex}
