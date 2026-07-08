@@ -1933,7 +1933,7 @@
     if (!nOff && !ready) { host.hidden = true; return; }
     host.hidden = false;
     host.innerHTML = `
-      <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} array${nArr === 1 ? "" : "s"}</small></div>
+      <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} billed array${nArr === 1 ? "" : "s"}</small></div>
       <div class="rb2-kpi"><span>${k2.lab}</span><b>${fmt0(k2.big)}</b><small>${k2.sub}</small></div>
       ${allocN
         ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">
