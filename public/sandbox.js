@@ -77,12 +77,11 @@
         {name:"password", label:"AlsoEnergy password", secret:true},
         {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
       ] },
-    { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:false,
-      note:"Fronius Solar.web is a paid business API and isn't offered in the USA yet — US arrays may need the local LAN path. Enter your Solar.web keys to try the cloud connection.",
+    { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:true,
+      note:"One key unlocks every PV system on your Solar.web account — verified working for US arrays. Find it (or create one) at api-mgmt.solarweb.com, under your account's API keys.",
       fields:[
-        {name:"access_key_id", label:"Access Key ID"},
+        {name:"access_key_id", label:"Access Key ID", hint:"36 characters, starts with “FKIA”."},
         {name:"access_key_value", label:"Access Key Value", secret:true},
-        {name:"pv_system_id", label:"PV System ID"},
       ] },
     { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false,
       note:"Have your own SMA developer-app credentials? Paste them here. Everyone else: use the one-click SMA login above — no keys, no typing.",
@@ -4141,9 +4140,10 @@
       function validate(){
         const v = vendorByCode(vendor);
         if(!v.available){ connectBtn.disabled = true; return; }
-        let ok;
-        if(v.discover) ok = (fields.apiKey||"").trim().length > 3;
-        else ok = (v.fields||[]).every(f => /optional/i.test(f.label) || (fields[f.name]||"").trim().length > 0);
+        // Discover-mode (SolarEdge, Fronius) and manual-connect vendors both just
+        // need every non-optional field filled — one required field (SolarEdge's
+        // apiKey) or several (Fronius's key id + value) work the same way.
+        const ok = (v.fields||[]).every(f => /optional/i.test(f.label) || (fields[f.name]||"").trim().length > 0);
         connectBtn.disabled = !ok;
       }
 
@@ -4169,6 +4169,12 @@
       if(vendor==="solaredge"){
         url = "/v1/array-owners/solaredge/connect-account";
         body2 = { api_key: config.api_key };
+      } else if(vendor==="fronius"){
+        // One key, discover + attach every PV system on the account — same
+        // "1 key" shape as SolarEdge (verified live against a real account
+        // 2026-07-08; see /v1/array-owners/fronius/connect-account).
+        url = "/v1/array-owners/fronius/connect-account";
+        body2 = { access_key_id: config.access_key_id, access_key_value: config.access_key_value };
       } else if(vendor==="locus" && (fields.partner_id||"").trim()){
         url = "/v1/array-owners/locus/connect-account";
         body2 = { client_id: fields.client_id, client_secret: fields.client_secret,

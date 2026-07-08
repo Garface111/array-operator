@@ -374,10 +374,10 @@ window.FleetStore = (function(){
   function toColumns(ids){
     const list = (ids && ids.length) ? state.arrays.filter(a => ids.includes(a.id)) : state.arrays;
     const columns = list.map(a => ({
-      array_id: a.id, array_name: a.name, vendor: a.vendor || "solaredge",
+      array_id: a.id, array_name: a.name, vendor: a.vendor || null,
       portfolio_name: a.portfolio_name || null,   // Analysis-tab grouping label
       reminder: a.reminder || null,               // Analysis-tab O&M note
-      inverter_source: a.vendor || "solaredge", inverter_count: a.inverters.length,
+      inverter_source: a.vendor || null, inverter_count: a.inverters.length,
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
@@ -401,7 +401,7 @@ window.FleetStore = (function(){
         // falls back to Error/Offline (the bug). Carried like status/peer_index.
         no_energy_register: !!i.no_energy_register,
         last_mode: i.status==="dead" ? "SHUTDOWN" : i.status==="comm_gap" ? "" : "PRODUCING",
-        vendor: a.vendor || "solaredge",
+        vendor: a.vendor || null,
       })),
     }));
     const invTotal = list.reduce((t,a)=>t+a.inverters.length,0);
@@ -907,7 +907,13 @@ window.FleetStore = (function(){
   function adaptTree(t){
     return (t.columns||[]).map(c => ({
       id: c.array_id, name: c.array_name, region:"—", host: c.client_name||"",
-      vendor: c.vendor||"solaredge",
+      // Honest unknown, never a guessed vendor: a freshly-connected array with
+      // no inverters polled yet (fleet-tree derives `vendor` from the inverter
+      // rows) reports null here — defaulting that to "solaredge" mislabeled
+      // every non-SolarEdge connection's portal link ("Open in SolarEdge ↗")
+      // until its first poll populated real inverters. Found 2026-07-08 while
+      // verifying the Fronius account-connect flow live.
+      vendor: c.vendor || null,
       // Operator-assigned portfolio/group label (Analysis-tab fleet hierarchy);
       // null until grouped. Carried through so both the canonical array and
       // toColumns expose it without a second fetch.
