@@ -84,13 +84,9 @@
         {name:"access_key_value", label:"Access Key Value", secret:true},
         {name:"pv_system_id", label:"PV System ID"},
       ] },
-    { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false,
-      note:"SMA needs a developer app registration + owner consent. Endpoints are still being verified — enter your credentials and we'll take it from here.",
-      fields:[
-        {name:"client_id", label:"Client ID"},
-        {name:"client_secret", label:"Client Secret", secret:true},
-        {name:"system_id", label:"Plant / System ID"},
-      ] },
+    { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false, consent:true,
+      note:"Connect SMA the way you connect SolarEdge — no keys. Enter the email on your SMA / Sunny Portal account, approve the one-time request inside SMA, and every plant on your account comes in and updates live.",
+      consentEmailLabel:"Your SMA / Sunny Portal email" },
     { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false,
       note:"Chint/CPS has no key to paste — use the one-click 'Log in with Chint' option above. Support is in final verification against live accounts." },
   ];
@@ -3882,6 +3878,8 @@
    * already-deployed connect endpoints. On success it re-loads the fleet tree.
    * ==========================================================================*/
   let _ov = null, _escH = null;
+  let _smaPollHandle = null;       // SMA consent status poll; cleared on close/vendor-switch
+  function _smaStopPoll(){ if(_smaPollHandle){ clearInterval(_smaPollHandle); _smaPollHandle = null; } }
   let renderAddModalBody = null;   // assigned when the Add-array modal opens; the
                                    // extension-present listener calls it to re-render.
   function ensureOv(){
@@ -3893,6 +3891,7 @@
   }
   function closeAddModal(){
     if(!_ov) return;
+    _smaStopPoll();                // never leave an SMA status poll running
     _ov.classList.remove("open");
     _ov.innerHTML = "";
     if(_escH){ document.removeEventListener("keydown", _escH); _escH = null; }
@@ -4098,6 +4097,14 @@
       }
       function renderFields(){
         const v = vendorByCode(vendor);
+        // SMA connects by owner CONSENT, not by pasted keys — same "one step, then
+        // live" shape as SolarEdge. Render the email→approve flow inline and hand
+        // the footer button over to it (it has its own send/connect lifecycle).
+        if(v.consent){
+          renderSmaConsent(fieldsBox);
+          return;
+        }
+        _smaStopPoll();   // switched away from the consent vendor — halt its poll
         const flds = (v.fields||[]).map(f => `
           <label class="sb-fld">
             <span class="lab">${esc(f.label)}</span>
@@ -4110,17 +4117,188 @@
         fieldsBox.querySelectorAll("input[data-name]").forEach(inp => {
           inp.oninput = () => { fields[inp.dataset.name] = inp.value; validate(); };
         });
+        connectBtn.style.display = "";
         connectBtn.textContent = v.available ? (v.discover ? "Discover & connect" : "Connect array") : "Not available yet";
+        connectBtn.onclick = submitConnect;
         validate();
       }
       function validate(){
         const v = vendorByCode(vendor);
+        if(v.consent){ return; }   // consent flow owns its own buttons
         if(!v.available){ connectBtn.disabled = true; return; }
         let ok;
         if(v.discover) ok = (fields.apiKey||"").trim().length > 3;
         else ok = (v.fields||[]).every(f => /optional/i.test(f.label) || (fields[f.name]||"").trim().length > 0);
         connectBtn.disabled = !ok;
       }
+
+      /* ---- SMA owner-consent flow (SolarEdge-parity: one step, then live) ----
+       * Owner enters their SMA / Sunny Portal email → we fire a backchannel
+       * consent request → they approve once inside their SMA account → we poll,
+       * then discover + attach every plant. All inside this same modal, driven
+       * by /v1/array-owners/sma/{available,consent,consent/status,connect-account}.
+       * State machine: idle → sending → waiting(polling) → connecting → done|error. */
+      let _smaEmail = "";
+      function _smaStop(){ _smaStopPoll(); }
+      function renderSmaConsent(boxEl){
+        _smaStop();
+        const v = vendorByCode("sma");
+        // The footer "Connect array" button is not used here — the flow has its own.
+        connectBtn.style.display = "none";
+        note.className = "sb-note"; note.textContent = "";
+        boxEl.innerHTML = `<div class="sb-sma"><div class="sb-sma-body" id="smaBody"></div></div>`;
+        const bodyEl = boxEl.querySelector("#smaBody");
+
+        // Gate on whether our SMA app is live (creds present in the environment).
+        bodyEl.innerHTML = `<div class="sb-sma-loading">Checking SMA…</div>`;
+        (async () => {
+          let configured = false;
+          try {
+            const s = getSession();
+            const r = await fetch("/v1/array-owners/sma/available",
+              { headers: s ? { Authorization:"Bearer "+s } : {} });
+            const d = await r.json().catch(()=>({}));
+            configured = !!(d && d.configured);
+          } catch(_){}
+          configured ? renderEmail() : renderComingSoon();
+        })();
+
+        function renderComingSoon(){
+          bodyEl.innerHTML = `
+            <div class="sb-vendnote">One-click SMA linking is almost live — our SMA developer-app
+              approval is in final review. In the meantime you can connect SMA today by logging into
+              Sunny Portal from the one-click login screen (the EnergyAgent helper reads your inverters).</div>`;
+        }
+
+        function renderEmail(){
+          bodyEl.innerHTML = `
+            <label class="sb-fld">
+              <span class="lab">${esc(v.consentEmailLabel || "Your SMA / Sunny Portal email")}</span>
+              <span class="hint">We'll ask SMA to send a one-time approval request to this account.</span>
+              <input type="email" id="smaEmail" autocomplete="email" spellcheck="false"
+                     placeholder="you@example.com" value="${esc(_smaEmail)}">
+            </label>
+            <div class="sb-vendnote">${v.note || ""}</div>
+            <button type="button" class="sb-mbtn primary" id="smaSend" style="width:100%;margin-top:.25rem" disabled>
+              Send approval request</button>`;
+          const inp = bodyEl.querySelector("#smaEmail");
+          const send = bodyEl.querySelector("#smaSend");
+          const okEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e||"").trim());
+          const sync = () => { _smaEmail = inp.value; send.disabled = !okEmail(inp.value); };
+          inp.oninput = sync; sync();
+          inp.onkeydown = e => { if(e.key === "Enter" && !send.disabled) startConsent(); };
+          send.onclick = startConsent;
+        }
+
+        async function startConsent(){
+          const email = (_smaEmail||"").trim();
+          const s = getSession();
+          if(!s){ note.className="sb-note err";
+            note.innerHTML = `Please sign in first — <a href="onboarding.html">get started →</a>.`; return; }
+          bodyEl.innerHTML = `<div class="sb-sma-loading">Sending the request to SMA…</div>`;
+          try {
+            const r = await fetch("/v1/array-owners/sma/consent", {
+              method:"POST",
+              headers:{ "Content-Type":"application/json", Authorization:"Bearer "+s },
+              body: JSON.stringify({ owner_email: email })
+            });
+            const d = await r.json().catch(()=>({}));
+            if(!r.ok){
+              note.className="sb-note err";
+              note.textContent = (d && (d.message||d.detail)) || `Couldn't start SMA linking (HTTP ${r.status}).`;
+              renderEmail(); return;
+            }
+            // A returning, already-approved owner comes back "accepted" immediately.
+            if(d.status === "accepted"){ connectPlants(); return; }
+            renderWaiting(email);
+          } catch(e){
+            note.className="sb-note err";
+            note.textContent = "We couldn't reach SMA just now — check your network and try again.";
+            renderEmail();
+          }
+        }
+
+        function renderWaiting(email){
+          bodyEl.innerHTML = `
+            <div class="sb-sma-wait">
+              <div class="sb-sma-spin" aria-hidden="true"></div>
+              <div class="sb-sma-wait-main">
+                <div class="sb-sma-wait-h">Check your SMA account and approve the request</div>
+                <div class="sb-sma-wait-sub">We sent an approval request to <b>${esc(email)}</b>. Sign in to
+                  <a href="https://ennexos.sunnyportal.com/" target="_blank" rel="noopener">Sunny Portal</a>
+                  and approve data sharing with EnergyAgent. This updates on its own the moment you do.</div>
+              </div>
+            </div>
+            <button type="button" class="sb-linkbtn" id="smaCancelWait" style="margin-top:.6rem">Use a different email</button>`;
+          bodyEl.querySelector("#smaCancelWait").onclick = () => { _smaStop(); renderEmail(); };
+          // Poll the consent status; flip to connect on approval.
+          _smaStop();
+          _smaPollHandle = setInterval(() => pollStatus(email), 3500);
+          pollStatus(email);
+        }
+
+        async function pollStatus(email){
+          const s = getSession(); if(!s){ _smaStop(); return; }
+          try {
+            const r = await fetch("/v1/array-owners/sma/consent/status?owner_email="
+                                  + encodeURIComponent(email),
+              { headers:{ Authorization:"Bearer "+s } });
+            const d = await r.json().catch(()=>({}));
+            if(!r.ok) return;                        // transient — keep waiting
+            if(d.status === "accepted"){ _smaStop(); connectPlants(); }
+            else if(d.status === "revoked" || d.status === "rejected"){
+              _smaStop();
+              note.className="sb-note err";
+              note.textContent = "That request was declined in your SMA account. You can send it again.";
+              renderEmail();
+            }
+            // "pending"/"unknown" → keep polling.
+          } catch(_){}   // network blip — the next tick retries
+        }
+
+        async function connectPlants(){
+          _smaStop();
+          const s = getSession(); if(!s){ return; }
+          bodyEl.innerHTML = `<div class="sb-sma-loading">Approved — bringing in your plants…</div>`;
+          try {
+            const r = await fetch("/v1/array-owners/sma/connect-account", {
+              method:"POST",
+              headers:{ "Content-Type":"application/json", Authorization:"Bearer "+s },
+              body: JSON.stringify({})    // attach every plant this owner consented to
+            });
+            const d = await r.json().catch(()=>({}));
+            if(!r.ok){
+              note.className="sb-note err";
+              note.textContent = (d && (d.message||d.detail)) || `Connected, but couldn't list your plants (HTTP ${r.status}).`;
+              return;
+            }
+            const n = (d.connected||[]).length;
+            bodyEl.innerHTML = `
+              <div class="sb-sma-done">
+                <div class="sb-sma-check" aria-hidden="true">✓</div>
+                <div class="sb-sma-done-main">
+                  <div class="sb-sma-done-h">Connected — ${n} plant${n===1?"":"s"}, updating live</div>
+                  <div class="sb-sma-done-sub">Your SMA production now flows in on its own, 24/7 — no browser, no keys.</div>
+                </div>
+              </div>`;
+            // Refresh the fleet in place, then close after a beat so the owner sees the ✓.
+            try {
+              if(window.FleetStore && FleetStore.refetch){
+                await FleetStore.refetch();
+                if(FleetStore.setFocus && FleetStore.snapshot){
+                  const all = (FleetStore.snapshot().arrays || []).map(a => a.id);
+                  if(all.length) FleetStore.setFocus(all);
+                }
+              }
+            } catch(e){}
+            setTimeout(() => { closeAddModal(); load(); }, 1400);
+          } catch(e){
+            note.className="sb-note err";
+            note.textContent = "We couldn't finish connecting just now — your approval is saved; try Add array again.";
+          }
+        }
+      }
+
       renderGrid();
       renderFields();
     }
