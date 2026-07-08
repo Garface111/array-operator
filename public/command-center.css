@@ -870,6 +870,15 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-kpi-checking small{ color:#047857; }
 @keyframes rb2kpipulse{ 0%,100%{ opacity:1; } 50%{ opacity:.74; } }
 
+/* Deep-link arrival flash: when a "Review & send" email lands the operator on a
+   specific offtaker's review card, pulse an emerald ring + tint so they land
+   squarely on the right invoice instead of hunting the list. */
+.rb-acc-flash{ animation:rb-acc-flash-kf 1.3s ease-out 2; border-radius:12px; }
+@keyframes rb-acc-flash-kf{
+  0%   { box-shadow:0 0 0 3px rgba(16,185,129,.6);  background-color:rgba(16,185,129,.10); }
+  100% { box-shadow:0 0 0 3px rgba(16,185,129,0);   background-color:transparent; }
+}
+
 /* ═══ Offtaker Invoice Generator redesign (Ford-approved mock, 2026-07-03):
    header band (title + KPI strip) · send-pipeline band · connection rail ·
    sticky action bar · restyled hierarchy. Day palette; octarine only as the

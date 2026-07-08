@@ -4657,6 +4657,56 @@
     });
     // Open the default card inline.
     if (ACTIVE_SUB_ID != null) expandAccordion(ACTIVE_SUB_ID, { silent: true });
+    maybeDeepLink();   // a "Review & send" email's ?draft=<id> → open that exact card
+  }
+
+  // ── Deep-link from a "Review & send" email ─────────────────────────────────
+  // The email links to /?draft=<subscription id>#reports. On arrival we open that
+  // offtaker's review card — expanding any collapsed provider/array groups above
+  // it — then scroll to and flash it, so the operator lands squarely on the
+  // invoice the email was about instead of the whole list. Runs once per load;
+  // the param is scrubbed so a refresh or a re-render never re-triggers it.
+  let _deepLinkDone = false;
+  function _cssq(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\]/g, "\\$&");
+  }
+  function maybeDeepLink() {
+    if (_deepLinkDone) return;
+    _deepLinkDone = true;
+    let id = null;
+    try { id = new URLSearchParams(location.search).get("draft"); } catch (_) { }
+    if (!id) return;
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete("draft");
+      history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
+    } catch (_) { }
+    setTimeout(() => deepLinkOpen(String(id), 25), 120);
+  }
+  function deepLinkOpen(subId, tries) {
+    const list = document.getElementById("rbList");
+    const acc = list && list.querySelector('.rb-acc[data-id="' + _cssq(subId) + '"]');
+    if (!acc) { if (tries > 0) setTimeout(() => deepLinkOpen(subId, tries - 1), 200); return; }
+    // Expand collapsed ancestors first (each click re-renders the list, so we
+    // re-enter to continue once the DOM settles).
+    const prov = acc.closest(".rb-prov");
+    const provHead = prov && prov.querySelector('.rb-prov-head[aria-expanded="false"]');
+    if (provHead) { provHead.click(); setTimeout(() => deepLinkOpen(subId, tries - 1), 130); return; }
+    const grp = acc.closest(".rb-grp");
+    const grpHead = grp && grp.querySelector('.rb-grp-head[aria-expanded="false"]');
+    if (grpHead) { grpHead.click(); setTimeout(() => deepLinkOpen(subId, tries - 1), 130); return; }
+    // Ancestors open (or a flat list). Open the offtaker's review card in place.
+    if (acc.getAttribute("data-open") !== "true") {
+      const head = acc.querySelector(".rb-acc-head");
+      if (head) head.click();
+    }
+    setTimeout(() => {
+      const a = document.querySelector('.rb-acc[data-id="' + _cssq(subId) + '"]');
+      if (!a) return;
+      a.scrollIntoView({ behavior: "smooth", block: "center" });
+      a.classList.add("rb-acc-flash");
+      setTimeout(() => a.classList.remove("rb-acc-flash"), 2600);
+    }, 340);
   }
 
   // Soft-delete an offtaker (DELETE /subscriptions/{id} dismisses its drafts too), then
