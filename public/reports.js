@@ -3625,13 +3625,16 @@
   // OUR importable fields, in display order. `req` = required (Continue is gated on
   // all three being mapped). Order/labels are the operator-facing column meanings.
   const BULK_FIELDS = [
-    { key: "array_name",     label: "Array",          req: true  },
-    { key: "offtaker_name",  label: "Offtaker name",  req: true  },
-    { key: "allocation_pct", label: "Share %",        req: true  },
-    { key: "email",          label: "Email",          req: false },
-    { key: "discount_pct",   label: "Discount %",     req: false },
-    { key: "net_rate",       label: "Rate ($/kWh)",   req: false },
-    { key: "account_number", label: "Account #",      req: false },
+    { key: "array_name",             label: "Array",              req: true  },
+    { key: "master_account_number",  label: "Master account #",   req: false },
+    { key: "offtaker_account_name",  label: "Offtaker GMP name",  req: false },
+    { key: "offtaker_name",          label: "Offtaker name",      req: true  },
+    { key: "allocation_pct",         label: "Share %",            req: true  },
+    { key: "email",                  label: "Email",              req: false },
+    { key: "discount_pct",           label: "Discount %",         req: false },
+    { key: "account_number",         label: "Offtaker account #", req: false },
+    { key: "budget",                 label: "Budget monthly ($)", req: false },
+    { key: "net_rate",               label: "Rate ($/kWh)",       req: false },
   ];
 
   // 0 → "A", 1 → "B", … 26 → "AA" — spreadsheet-style column letters for friendliness.
@@ -4169,9 +4172,15 @@
         allocation_pct: r.allocation_pct != null ? r.allocation_pct : null,
         email: r.email || "",
         discount_pct: r.discount_pct != null ? r.discount_pct : null,
+        budget_amount_usd: r.budget_amount_usd != null ? r.budget_amount_usd : null,
+        offtaker_account_name: r.offtaker_account_name || "",
         confidence: r.confidence || "none",
         errors: r.errors || [],
         _confirmed: (r.confidence === "exact" || r.confidence === "high"),
+        // An exact offtaker-account-number bind is authoritative — treat it as an
+        // explicit pick so name auto-match never second-guesses it.
+        _subPicked: !!r.utility_locked,
+        _subMatched: false,
       }));
 
       // Prime the full utility-account list (shared with the add-offtaker form) so
@@ -4230,6 +4239,7 @@
       allocation_pct: r.allocation_pct,
       email: r.email || null,
       discount_pct: r.discount_pct != null ? r.discount_pct : null,
+      budget_amount_usd: r.budget_amount_usd != null ? r.budget_amount_usd : null,
     }));
     if (!ready.length) {
       if (st) { st.className = "rb-status rb-err"; st.textContent = "No rows are ready to import yet."; }
