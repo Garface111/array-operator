@@ -4496,23 +4496,42 @@
    * ids AND utility codes (gmp / vec / wec / discovered sh_* co-ops) with the same
    * set/clear/optout ops; saving a utility login arms its DAILY background bill
    * refresh in the extension. Auto-refresh is ON by default (opt-out, per portal). */
-  const AR_GROUPS = [
-    { title: "Inverter portals",
-      sub: "Live production, refreshed automatically every few minutes.",
-      items: [
-        { id: "fronius", label: "Fronius (Solar.web)", ph: "Solar.web username / email" },
-        { id: "sma", label: "SMA (Sunny Portal)", ph: "Sunny Portal username / email" },
-        { id: "chint", label: "Chint", ph: "Chint username / email" },
-      ] },
-    { title: "Utility portals",
-      sub: "Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports.",
-      utility: true,
-      items: [
-        { id: "gmp", label: "Green Mountain Power", ph: "GMP username / email" },
-        { id: "vec", label: "Vermont Electric Co-op (SmartHub)", ph: "SmartHub username / email" },
-        { id: "wec", label: "Washington Electric Co-op (SmartHub)", ph: "SmartHub username / email" },
-      ] },
+  // Inverter portals are the only three vendors we integrate, so they stay a
+  // fixed list. Utility portals are DYNAMIC — we support GMP + ~1,600 SmartHub
+  // co-ops/munis (GET /v1/providers), and the extension vault accepts any of
+  // them (and multiple logins per utility). See renderUtilityPortals below.
+  const AR_INVERTERS = [
+    { id: "fronius", label: "Fronius (Solar.web)", ph: "Solar.web username / email" },
+    { id: "sma", label: "SMA (Sunny Portal)", ph: "Sunny Portal username / email" },
+    { id: "chint", label: "Chint", ph: "Chint username / email" },
   ];
+
+  // The utility-provider catalog (code -> label), fetched once from the same
+  // registry the extension uses. Powers the "add a utility login" search over
+  // every co-op we support, not just a hardcoded three.
+  let _utilCatalog = null;      // { code: { label, host, state } }
+  async function loadUtilCatalog(){
+    if(_utilCatalog) return _utilCatalog;
+    const map = {};
+    try {
+      const r = await fetch("/v1/providers", { credentials: "same-origin" });
+      const j = await r.json();
+      (j && j.providers || []).forEach(p => {
+        if(p && p.code) map[p.code] = { label: p.label || p.code, host: p.smarthub_host || "", state: p.state || "" };
+      });
+    } catch(e){ /* offline / not present — fall back to code-derived labels */ }
+    if(!map.gmp) map.gmp = { label: "Green Mountain Power" };   // GMP isn't a co-op registry row
+    _utilCatalog = map;
+    return map;
+  }
+  function utilLabelFor(code, catalog){
+    const c = catalog && catalog[code];
+    if(c && c.label) return c.label + (catalog[code].host ? " (SmartHub)" : "");
+    if(code === "gmp") return "Green Mountain Power";
+    if(/^sh_/.test(code)) return code.replace(/^sh_/, "").replace(/[-_]/g, " ").toUpperCase() + " (SmartHub)";
+    return code.toUpperCase();
+  }
+  const _arAddedUtils = new Set();          // utility codes the operator picked this session (show an empty card to fill)
   let _vaultReq = {};                       // reqId → resolver, for bridge acks
   function vaultOp(op, extra){
     return new Promise((resolve) => {
@@ -4650,60 +4669,109 @@
       return;
     }
     const status = resp.status || {};
-    const credCard = (v) => {
-      const st = status[v.id] || { hasCreds:false, enabled:true };
-      const on = st.hasCreds && st.enabled;
-      const stateTxt = st.hasCreds ? (st.enabled ? "On" : "Off") : "Not set";
-      const stateCls = on ? "on" : (st.hasCreds ? "off" : "");
-      return `<div class="ar-row" data-vendor="${v.id}">
+    const catalog = await loadUtilCatalog();
+
+    // ── a single credential row (save/replace + optional remove) ──
+    // key = the vault key clear/optout act on (an inverter id, or a utility slot).
+    // saveCode = the code `set` writes under (a utility's base code, or the id).
+    // prefillUser = a saved login's username (shown so multiple logins are distinct).
+    const credRow = (opts) => {
+      const { key, saveCode, label, ph, hasCreds, enabled, prefillUser, addLabel } = opts;
+      const on = hasCreds && enabled;
+      const stateTxt = hasCreds ? (enabled ? "On" : "Off") : "";
+      const stateCls = on ? "on" : (hasCreds ? "off" : "");
+      const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
+      return `<div class="ar-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}">
         <div class="ar-row-top">
-          <span class="ar-vendor">${esc(v.label)}</span>
-          <span class="ar-badge ${stateCls}">${stateTxt}</span>
-          <label class="ar-switch"><input type="checkbox" class="ar-optout" ${st.hasCreds && !st.enabled ? "checked" : ""} ${st.hasCreds ? "" : "disabled"}><span>off</span></label>
+          ${label ? `<span class="ar-vendor">${esc(label)}</span>` : ""}
+          ${hasCreds ? `<span class="ar-badge ${stateCls}">${stateTxt}</span>
+          <label class="ar-switch"><input type="checkbox" class="ar-optout" ${!enabled ? "checked" : ""}><span>off</span></label>` : ""}
         </div>
         <div class="ar-fields">
-          <input class="ar-user" type="text" autocomplete="off" placeholder="${esc(v.ph || "Portal username / email")}">
-          <input class="ar-pass" type="password" autocomplete="off" placeholder="${st.hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
+          <input class="ar-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph || "Portal username / email")}">
+          <input class="ar-pass" type="password" autocomplete="off" placeholder="${hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
           <div class="ar-actions">
-            <button class="acct-btn primary ar-save" type="button">Save</button>
-            ${st.hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
+            <button class="acct-btn primary ar-save" type="button">${hasCreds ? "Save" : (addLabel || "Save")}</button>
+            ${hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
           </div>
         </div>
       </div>`;
     };
-    // Surface any saved utility code we didn't pre-list (a discovered sh_* co-op the
-    // extension minted) so its credential is visible + manageable here too — mirrors
-    // the extension popup's utility-logins group, keyed by the same vault code.
-    const listed = new Set(AR_GROUPS.flatMap(g => g.items.map(v => v.id)));
-    const extraUtils = Object.keys(status).filter(code =>
-      !listed.has(code) && status[code] && status[code].utility && status[code].hasCreds
-    ).map(code => ({ id: code, label: code.replace(/^sh_/, "").toUpperCase() + " (SmartHub)", ph: "SmartHub username / email" }));
-    listEl.innerHTML = AR_GROUPS.map(g => {
-      const items = g.utility ? g.items.concat(extraUtils) : g.items;
-      return `<div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">${esc(g.title)}</span><span class="ar-group-sub">${esc(g.sub)}</span></div>
-        ${items.map(credCard).join("")}
-      </div>`;
-    }).join("");
 
+    // Group saved UTILITY logins by their base code (multi-login: a code can own
+    // several "code::username" slots — the vault reports each as its own entry).
+    const utilByCode = {};          // code -> [{ slot, username, enabled }]
+    Object.keys(status).forEach(k => {
+      const s = status[k];
+      if(!s || !s.utility || !s.hasCreds) return;
+      const code = s.code || k;
+      (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false });
+    });
+    // Which utilities to show as cards: GMP (common default) + every one with a
+    // saved login + anything the operator just picked from the catalog this session.
+    const shownCodes = [];
+    const pushCode = (c) => { if(c && shownCodes.indexOf(c) === -1) shownCodes.push(c); };
+    pushCode("gmp");
+    Object.keys(utilByCode).sort().forEach(pushCode);
+    (_arAddedUtils || []).forEach(pushCode);
+
+    const utilCard = (code) => {
+      const logins = utilByCode[code] || [];
+      const name = utilLabelFor(code, catalog);
+      const savedRows = logins.map(l => credRow({
+        key: l.slot, saveCode: code, label: "", ph: "username / email",
+        hasCreds: true, enabled: l.enabled, prefillUser: l.username,
+      })).join("");
+      const addRow = credRow({
+        key: code + "::__new__", saveCode: code, label: "",
+        ph: logins.length ? "another username / email" : "portal username / email",
+        hasCreds: false, addLabel: logins.length ? "Add login" : "Save",
+      });
+      return `<div class="ar-util" data-code="${esc(code)}">
+        <div class="ar-util-name">${esc(name)}</div>
+        ${savedRows}${addRow}
+      </div>`;
+    };
+
+    listEl.innerHTML = `
+      <div class="ar-group">
+        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Live production, refreshed automatically every few minutes.</span></div>
+        ${AR_INVERTERS.map(v => {
+          const st = status[v.id] || { hasCreds:false, enabled:true };
+          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false });
+        }).join("")}
+      </div>
+      <div class="ar-group">
+        <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
+        ${shownCodes.map(utilCard).join("")}
+        <div class="ar-addutil">
+          <button type="button" class="acct-btn ar-addutil-btn">+ Add a utility login</button>
+          <div class="ar-picker" hidden>
+            <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
+            <div class="ar-picker-results"></div>
+          </div>
+        </div>
+      </div>`;
+
+    // ── wire credential rows (inverter + utility) ──
     listEl.querySelectorAll(".ar-row").forEach(row => {
-      const vendor = row.dataset.vendor;
+      const key = row.dataset.key;
+      const saveCode = row.dataset.savecode;
       const userEl = row.querySelector(".ar-user");
       const passEl = row.querySelector(".ar-pass");
       const saveBtn = row.querySelector(".ar-save");
       const clearBtn = row.querySelector(".ar-clear");
       const optEl = row.querySelector(".ar-optout");
+      const savedLabel = saveBtn.textContent;
       saveBtn.addEventListener("click", async () => {
         const u = (userEl.value||"").trim(), p = passEl.value||"";
-        if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent="Save",1500); return; }
+        if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
         saveBtn.textContent = "Saving…";
-        const r = await vaultOp("set", { vendor, username:u, password:p });
+        // Always set() under the base code + username: the vault matches an existing
+        // username to overwrite its slot, or mints a new "code::username" slot for a
+        // NEW login — so "add another login" and "replace password" are the same call.
+        const r = await vaultOp("set", { vendor: saveCode, username:u, password:p });
         passEl.value = "";
-        // Extension v1.9.109+: a page-initiated save is intent-gated — the extension
-        // stashes it (encrypted) and asks the owner to confirm with one click in the
-        // EnergyAgent popup. Show the one remaining step inline in THIS row (no new
-        // tabs/modals) and watch the vault so the row flips to "On" the moment the
-        // owner confirms. Older extensions still ack ok:true and save immediately.
         if(r && r.pending){
           saveBtn.textContent = "One step left";
           let note = row.querySelector(".ar-pending-note");
@@ -4715,23 +4783,62 @@
           }
           note.innerHTML = `Click the <b>EnergyAgent</b> icon in your browser toolbar and press <b>Save &amp; turn on</b> — your password stays encrypted on this device.`;
           _vaultStatusCache = null;
-          watchVaultConfirm(vendor);
+          watchVaultConfirm(saveCode);
           return;
         }
         saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
-        _vaultStatusCache = null;  // force re-check so hints disappear on the next render
+        _vaultStatusCache = null;
         setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
       if(clearBtn) clearBtn.addEventListener("click", async () => {
-        await vaultOp("clear", { vendor });
+        await vaultOp("clear", { vendor: key });
         _vaultStatusCache = null;
         wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
       });
       if(optEl) optEl.addEventListener("change", async () => {
-        await vaultOp("optout", { vendor, optedOut: optEl.checked });
+        await vaultOp("optout", { vendor: key, optedOut: optEl.checked });
         wireAutoRefreshRow();
       });
     });
+
+    // ── wire the "add a utility login" searchable picker over the whole catalog ──
+    const addBtn = listEl.querySelector(".ar-addutil-btn");
+    const picker = listEl.querySelector(".ar-picker");
+    const searchEl = listEl.querySelector(".ar-picker-search");
+    const resultsEl = listEl.querySelector(".ar-picker-results");
+    if(addBtn && picker){
+      addBtn.addEventListener("click", () => {
+        picker.hidden = !picker.hidden;
+        if(!picker.hidden) setTimeout(() => searchEl && searchEl.focus(), 30);
+      });
+    }
+    const codes = Object.keys(catalog);
+    if(searchEl && resultsEl){
+      const renderResults = () => {
+        const q = (searchEl.value || "").trim().toLowerCase();
+        if(!q){ resultsEl.innerHTML = `<div class="ar-picker-hint">Type your utility’s name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
+        const hits = codes.filter(c => {
+          const l = (catalog[c].label || "").toLowerCase();
+          return l.includes(q) || c.includes(q) || (catalog[c].state || "").toLowerCase() === q;
+        }).slice(0, 25);
+        if(!hits.length){ resultsEl.innerHTML = `<div class="ar-picker-hint">No match. Not seeing your utility? It may need to be added — tell us and we’ll wire it up.</div>`; return; }
+        resultsEl.innerHTML = hits.map(c =>
+          `<button type="button" class="ar-picker-item" data-code="${esc(c)}">${esc(catalog[c].label)}${catalog[c].state ? ` <span class="ar-picker-state">${esc(catalog[c].state)}</span>` : ""}</button>`
+        ).join("");
+        resultsEl.querySelectorAll(".ar-picker-item").forEach(it => {
+          it.addEventListener("click", () => {
+            _arAddedUtils.add(it.dataset.code);
+            _vaultStatusCache = null;
+            wireAutoRefreshRow().then(() => {
+              const card = listEl.querySelector(`.ar-util[data-code="${CSS.escape(it.dataset.code)}"]`);
+              if(card){ card.scrollIntoView({ behavior:"smooth", block:"center" }); const u = card.querySelector(".ar-row:last-child .ar-user"); if(u) u.focus(); }
+            });
+          });
+        });
+      };
+      searchEl.addEventListener("input", renderResults);
+      renderResults();
+    }
   }
 
   /* ---- Password row: view (masked + show-as-you-type) and set/change it.
