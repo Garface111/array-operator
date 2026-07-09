@@ -5012,16 +5012,55 @@
         `${n} array${Number(n)===1?"":"s"}${full!=null?` × ${usdFromCents(full)}`:""}`, usdFromCents(c));
     }
 
-    // Context line: trial + next-invoice date.
-    const ctx = [];
-    if(onTrial) ctx.push(trialEnds ? `Free trial through ${fmtDate(trialEnds)} — nothing charged yet` : "Free trial — nothing charged yet");
+    // ── Trial / complimentary banner — a PROMINENT element in the bill (Ford).
+    // Two states: a regular trial COUNTS DOWN to its end date; an indefinite tester
+    // (comped, or a trial with no end date) reads as complimentary with no clock —
+    // "trial" undersells an open-ended tester account (Lester / Paul).
+    const isComped = /comped/i.test(String(status)) || (_account && _account.plan === "comped");
+    const daysLeft = (iso) => { const t = new Date(iso).getTime(); return isFinite(t) ? Math.ceil((t - Date.now()) / 86400000) : null; };
+    let trialBanner = "";
+    if(isComped || (onTrial && !trialEnds)){
+      // Indefinite tester — no time limit, never charged. The Monthly bill below is
+      // the plan's list price for reference; the banner makes clear it isn't billed.
+      trialBanner =
+        `<div class="ao-bill-trial ao-bill-trial--comp">` +
+          `<span class="ao-bill-trial-ic" aria-hidden="true">✦</span>` +
+          `<span class="ao-bill-trial-tx"><b>Complimentary access</b>` +
+          `<span>No time limit — nothing charged. You're set up as an EnergyAgent tester.</span></span>` +
+          `<span class="ao-bill-trial-badge">COMPLIMENTARY</span>` +
+        `</div>`;
+    } else if(onTrial && trialEnds){
+      const d = daysLeft(trialEnds);
+      if(d != null && d > 0){
+        trialBanner =
+          `<div class="ao-bill-trial">` +
+            `<span class="ao-bill-trial-ic" aria-hidden="true">🎁</span>` +
+            `<span class="ao-bill-trial-tx"><b>Free trial — ${d === 1 ? "1 day" : d + " days"} left</b>` +
+            `<span>Through ${fmtDate(trialEnds)} — then ${usdFromCents(total)}/mo. Nothing charged yet.</span></span>` +
+            `<span class="ao-bill-trial-badge">TRIAL</span>` +
+          `</div>`;
+      } else if(d != null && d === 0){
+        trialBanner =
+          `<div class="ao-bill-trial">` +
+            `<span class="ao-bill-trial-ic" aria-hidden="true">🎁</span>` +
+            `<span class="ao-bill-trial-tx"><b>Free trial — ends today</b>` +
+            `<span>Add a card to keep your fleet live — then ${usdFromCents(total)}/mo.</span></span>` +
+            `<span class="ao-bill-trial-badge">TRIAL</span>` +
+          `</div>`;
+      }
+    }
+
+    // Context line: next-invoice date only (the trial line is now the banner above).
     // Show the next billing DATE only — NOT a separate Stripe amount, which can lag
     // the computed plan total during a usage-report / plan-change sync gap and read
     // as two disagreeing bills. The "Monthly bill" above is the honest plan estimate.
+    // Comped testers are never charged, so no next-charge date for them.
+    const ctx = [];
     const invDate = invoice ? pick(invoice, ["period_end","due_date","date","next_payment_date"], null) : null;
-    if(invDate) ctx.push(`next charge on ${fmtDate(invDate)}`);
+    if(invDate && !isComped) ctx.push(`next charge on ${fmtDate(invDate)}`);
 
     box.innerHTML =
+      trialBanner +
       (lines || `<div class="ao-bill-empty">No charges yet.</div>`) +
       `<div class="ao-bill-total"><span>Monthly bill</span><span class="ao-bill-tot-v">${usdFromCents(total)}<small>/mo</small></span></div>` +
       (ctx.length ? `<div class="ao-bill-ctx">${ctx.join(" · ")}</div>` : "");
