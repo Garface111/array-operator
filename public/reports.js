@@ -2842,7 +2842,11 @@
         s.innerHTML = `<option value="">Choose a net meter group…</option>` +
           opts.map(o => `<option value="${esc(String(o.value))}">${esc(o.label)}</option>`).join("");
       }
-      s.onchange = () => resolveArrayBills(false);
+      s.onchange = () => {
+        const u = $("#rbmUtility");           // a new group → forget any prior sub-account pick
+        if (u) u.dataset.userPicked = "";
+        resolveArrayBills(false);
+      };
       // Ford 2026-07-09: with tons of arrays the plain dropdown is hard to search —
       // overlay a type-to-filter combobox. The native <select> stays the source of
       // truth (value + onchange untouched); the combobox just mirrors the pick.
@@ -3057,6 +3061,89 @@
     }
   }
 
+  // ── Intelligent sub-account ↔ offtaker matching ────────────────────────────
+  // When a net meter group has multiple GMP sub-accounts, we try to bind the
+  // offtaker to THEIR OWN sub-account (topology A — GMP already allocated that
+  // member's excess, so the invoice AND the bill-accuracy audit both read one
+  // authoritative number) rather than billing a share of the whole group
+  // (topology B). The only signal we have is the operator's own labels: the
+  // offtaker's name vs each account's nickname / service address. We match on
+  // shared significant tokens and accept ONLY a unique, unambiguous winner —
+  // never a coin-flip on a billing path. Keep this normalization in sync with
+  // the backend `_match_offtaker_subaccount` (solar-operator api/billing/routes.py).
+  const _MATCH_STOP = new Set(["the", "a", "an", "of", "and", "at", "llc", "inc",
+    "co", "house", "home", "apartments", "apartment", "apt", "unit", "units",
+    "farm", "barn", "solar", "array", "account", "acct", "meter", "net", "group",
+    "st", "street", "rd", "road", "ave", "avenue", "ln", "lane", "dr", "drive",
+    "vt", "usa"]);
+  function _matchTokens(s) {
+    return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ")
+      .filter(w => w.length >= 3 && !_MATCH_STOP.has(w));
+  }
+  // Returns { account, score } for the UNIQUE best-matching sub-account, or null
+  // when there's no non-trivial, unambiguous winner (0 or 1 accounts, no shared
+  // token, or a tie — all resolve to the safe whole-group fallback instead).
+  function matchSubAccount(name, accounts) {
+    const want = new Set(_matchTokens(name));
+    if (!want.size || !accounts || accounts.length < 2) return null;
+    let best = null, bestScore = 0, tie = false;
+    for (const a of accounts) {
+      const hay = new Set([..._matchTokens(a.nickname), ..._matchTokens(a.service_address)]);
+      let score = 0;
+      for (const w of want) if (hay.has(w)) score++;
+      if (score > bestScore) { best = a; bestScore = score; tie = false; }
+      else if (score === bestScore && score > 0) { tie = true; }
+    }
+    if (!best || bestScore < 1 || tie) return null;
+    return { account: best, score: bestScore };
+  }
+  // The group HOST meter = the lowest utility_account_id sharing the array
+  // (mirrors the backend `_host_id` rule). Billing its excess × share is the
+  // whole-group percentage model (topology B) — the safe auto-match fallback.
+  function hostAccountId(accounts) {
+    let host = null;
+    for (const a of (accounts || [])) {
+      const id = Number(a.utility_account_id);
+      if (host === null || id < host) host = id;
+    }
+    return host === null ? "" : String(host);
+  }
+
+  // Multi-account group: render the OPTIONAL sub-account link with auto-match as
+  // its default first option. An explicit prior pick survives repaints; otherwise
+  // the live matcher (applyAutoMatch) chooses from the offtaker's name.
+  function showSubAccountPicker(wrap, usel, mine, arrId) {
+    if (!wrap || !usel) return;
+    wrap.dataset.needPick = "";
+    wrap.classList.remove("req");
+    const lbl = $("#rbmUtilLabel");
+    if (lbl) lbl.textContent = "Offtaker's sub-account (optional)";
+    const prev = usel.value, userPicked = usel.dataset.userPicked === "1";
+    usel.innerHTML = `<option value="">✨ Auto-match to this offtaker</option>` +
+      mine.map(a => `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
+    if (userPicked && prev && mine.some(a => String(a.utility_account_id) === String(prev))) {
+      usel.value = prev;
+    } else {
+      applyAutoMatch(usel, mine);
+    }
+    wrap.hidden = false;
+  }
+  // Reflect the matcher's current verdict in the (unpicked) dropdown + hint. A
+  // no-op once the operator has explicitly chosen a sub-account.
+  function applyAutoMatch(usel, mine) {
+    if (!usel || usel.dataset.userPicked === "1") return;
+    const nameEl = $("#rbmName");
+    const m = matchSubAccount(nameEl ? nameEl.value.trim() : "", mine || []);
+    const hint = $("#rbmUtilHint");
+    if (m) {
+      usel.value = String(m.account.utility_account_id);
+      if (hint) hint.innerHTML = `✨ Linked to <b>${esc(billLabel(m.account))}</b> — matched by name. Change it if this offtaker meters somewhere else.`;
+    } else {
+      usel.value = "";
+      if (hint) hint.textContent = "Auto-match will bill their share of the whole group bill. Pick a sub-account only if this offtaker has their own meter.";
+    }
+  }
+
   // Given ARR_UTIL_ACCTS + the chosen #rbmArray (Net Meter Group), render the bill state:
   //  • exactly one linked bill → silent, show "Invoices from: …"
   //  • multiple linked bills  → reveal the #rbmUtility picker scoped to this group
@@ -3119,10 +3206,10 @@
         `<option value="${a.utility_account_id}" selected>${esc(billLabel(a))}</option>`; }
       return;
     }
-    // Multiple linked bills → picker scoped to this group's accounts.
+    // Multiple accounts in this group → the OPTIONAL sub-account link + auto-match.
     line.className = "rb-arr-billline rb-arr-hasbill";
-    line.innerHTML = `This group has <b>${mine.length} connected utility bills</b> — select which one bills this offtaker:`;
-    showUtilityPicker(wrap, usel, mine, false, arrId);
+    line.innerHTML = `This group has <b>${mine.length} utility accounts</b>. Link this offtaker to their own sub-account, or let auto-match bill their share of the whole group.`;
+    showSubAccountPicker(wrap, usel, mine, arrId);
   }
 
   // Fill + reveal the offtaker-bill picker. `needPick` prepends a placeholder so
@@ -3131,6 +3218,11 @@
   // group (Bruce's copy): "<Group> group has multiple participants. …"
   function showUtilityPicker(wrap, usel, accts, needPick, arrId) {
     if (!wrap || !usel) return;
+    wrap.dataset.needPick = needPick ? "1" : "";
+    wrap.classList.toggle("req", !!needPick);
+    const lbl = $("#rbmUtilLabel");
+    if (lbl) lbl.textContent = needPick
+      ? "Select your offtaker's utility account" : "Offtaker's sub-account (optional)";
     const prev = usel.value;
     usel.innerHTML = (needPick ? `<option value="">Choose a utility account…</option>` : "") +
       accts.map(a => `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
@@ -3196,9 +3288,9 @@
               <select id="rbmArray"><option value="">Loading net meter groups…</option></select>
               <span class="rb-fld-hint">The utility bill (net meter group) your offtaker draws their share from.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
-              <label class="rep-fld rb-arr-override req" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
-                <select id="rbmUtility"><option value="">Choose a utility account…</option></select>
-                <span class="rb-fld-hint" id="rbmUtilHint">This group has multiple participants. Your selection here should be the utility account from this dropdown list.</span></label></label>
+              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl" id="rbmUtilLabel">Offtaker's sub-account (optional)</span>
+                <select id="rbmUtility"><option value="">✨ Auto-match to this offtaker</option></select>
+                <span class="rb-fld-hint" id="rbmUtilHint">Link this offtaker to their own GMP sub-account, or let auto-match bill their share of the whole group.</span></label></label>
             <label class="rep-fld req"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
             <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
@@ -3300,6 +3392,19 @@
         if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
       }));
       $("#rbmSave").onclick = saveManual;
+      // Live sub-account auto-match: re-run the matcher as the offtaker's name is
+      // typed (unless the operator has explicitly picked a sub-account), and record
+      // an explicit pick so typing never clobbers it.
+      const nameElAM = $("#rbmName"), utilElAM = $("#rbmUtility");
+      if (nameElAM) nameElAM.addEventListener("input", () => {
+        const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
+        if (!wrap || wrap.hidden || wrap.dataset.needPick === "1" || !usel) return;
+        const arrId = $("#rbmArray") ? $("#rbmArray").value : "";
+        applyAutoMatch(usel, (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId)));
+      });
+      if (utilElAM) utilElAM.addEventListener("change", () => {
+        utilElAM.dataset.userPicked = "1"; paintRateField();
+      });
       // Commissioning date → live expected-GMP-rate helper next to the rate fields.
       const commDefHint = "The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
       wireCommissioningDateHint($("#rbmCommDate"), $("#rbmRateHint"), commDefHint);
@@ -3341,12 +3446,16 @@
     // array-first (backend resolves the bill from the array).
     let looseUtilityId = "";
     if (String(arrayId).startsWith("u:")) { looseUtilityId = arrayId.slice(2); arrayId = ""; }
-    // The utility <select> is now an OVERRIDE — only meaningful (and visible) when
-    // the chosen array has multiple connected bills. The backend resolves the bill
-    // from array_id; we pass utility_account_id ONLY when the operator overrode.
+    // The sub-account <select> (when visible) links the offtaker to their OWN GMP
+    // sub-account. Two visible modes: (1) auto-match — value "" resolves below to
+    // the name-matched sub-account, else the group's host bill (their %-of-group);
+    // (2) forced pick — an unmatched group where the operator must choose from the
+    // full account list. A blank value in mode 1 is valid; in mode 2 it errors.
     const utilWrap = $("#rbmUtilityWrap");
-    const overrode = utilWrap && !utilWrap.hidden;
-    const utilityId = overrode && $("#rbmUtility") ? $("#rbmUtility").value : "";
+    const wrapVisible = utilWrap && !utilWrap.hidden;
+    const needPick = wrapVisible && utilWrap.dataset.needPick === "1";
+    const uselEl = $("#rbmUtility");
+    let utilityId = wrapVisible && uselEl ? uselEl.value : "";
     const pctRaw = $("#rbmPct").value.trim();
     const rateRaw = $("#rbmRate").value.trim();
     const creditRateRaw = $("#rbmCreditRate") ? $("#rbmCreditRate").value.trim() : "";
@@ -3368,12 +3477,18 @@
       st.textContent = "This group has no utility bills yet — link your utility before invoicing it.";
       return;
     }
-    if (overrode && !utilityId) {
+    if (needPick && !utilityId) {
       st.className = "rb-status rb-err";
-      st.textContent = arrAccts.length
-        ? "Pick which of this group's bills to invoice from."
-        : "Pick your offtaker's utility account so we know which bill to invoice from.";
+      st.textContent = "Pick your offtaker's utility account so we know which bill to invoice from.";
       return;
+    }
+    // Auto-match (visible picker, blank value, not a forced pick): resolve to the
+    // name-matched sub-account (topology A), else the group host bill (their share
+    // of the whole group, topology B). Never a silent wrong-meter bind.
+    if (wrapVisible && !needPick && !utilityId) {
+      const mineNow = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrayId));
+      const m = matchSubAccount(name, mineNow);
+      utilityId = m ? String(m.account.utility_account_id) : hostAccountId(mineNow);
     }
     if (!name) { st.className = "rb-status rb-err"; st.textContent = "Enter the offtaker's name."; return; }
     const pctNum = Number(pctRaw);
@@ -3429,8 +3544,9 @@
     const fd = new FormData();                       // no file → manual path
     fd.append("customer_name", name);
     if (arrayId) fd.append("array_id", String(arrayId));          // array-FIRST: backend resolves the bill from the array
-    // utility_account_id is sent when the operator overrode the bill OR chose a
-    // freshly-linked (not-yet-matched) account directly — the backend binds by it.
+    // utility_account_id carries the resolved sub-account link: an explicit pick,
+    // the name-matched sub-account, the group host (auto-match fallback), or a
+    // freshly-linked account chosen directly — the backend binds the bill by it.
     const utilToSend = looseUtilityId || utilityId;
     if (utilToSend) fd.append("utility_account_id", utilToSend);
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
