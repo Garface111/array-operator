@@ -4517,7 +4517,15 @@
       const r = await fetch("/v1/providers", { credentials: "same-origin" });
       const j = await r.json();
       (j && j.providers || []).forEach(p => {
-        if(p && p.code) map[p.code] = { label: p.label || p.code, host: p.smarthub_host || "", state: p.state || "" };
+        // Only offer utilities the extension can ACTUALLY capture + auto-refresh:
+        // scrape_status "live" == a real SmartHub host (530) or GMP's own adapter.
+        // The catalog also lists ~1,092 "in-progress"/"manual" targets that have no
+        // portal wired yet — the vault would reject their code, so offering them
+        // would be a dead "Failed". (Not-listed utilities go through the "tell us"
+        // hint instead.)
+        if(p && p.code && p.scrape_status === "live") {
+          map[p.code] = { label: p.label || p.code, host: p.smarthub_host || "", state: p.state || "" };
+        }
       });
     } catch(e){ /* offline / not present — fall back to code-derived labels */ }
     if(!map.gmp) map.gmp = { label: "Green Mountain Power" };   // GMP isn't a co-op registry row
