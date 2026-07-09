@@ -5461,9 +5461,10 @@
     const body = card.querySelector("[data-accbody]");
     if (body) body.hidden = false;
     renderAccordionBody(sid);
-    // A cached draft is shown instantly; pull the latest GMP bill + recompute in the
-    // background so a freshly-released statement is reflected without a manual regen.
-    if (DRAFT_BY_SUB[sid] && authHeaders()) backgroundRefreshDraft(sid);
+    // The cached draft renders instantly; then recompute from the LIVE bill so the email
+    // cover + invoice PDF agree (a draft frozen before newer generation/a new bill landed
+    // otherwise shows a stale amount next to the fresh invoice — Ford 2026-07-09).
+    refreshDraftOnOpen(sid);
     // Bill accuracy check: if the reconcile data hasn't landed yet, fetch it and
     // re-render this card's body once (only while it's still the open card) so the
     // "Bill accuracy check" section fills in without a reload.
@@ -5667,6 +5668,39 @@
     if (pill && d.amount_usd != null) pill.textContent = money(d.amount_usd) + " ready";
   }
 
+  // On OPEN, recompute the draft from the LIVE build_match: POST /draft persists the
+  // fresh figures AND re-renders the email letter, then we re-render the WHOLE body so
+  // the approval-inbox email cover and the attached invoice PDF are both built from one
+  // current computation. Without this a pending draft created BEFORE more generation (or
+  // a new bill) landed stayed frozen — Glover's email showed $24.05 / 121 kWh while the
+  // live invoice PDF showed $32.49 / 164 kWh (Ford 2026-07-09). backgroundRefreshDraft's
+  // surgical applyDraftFigures updated the calc grid but NOT the email pane, and only ran
+  // for the cached-draft path — so the visible letter stayed stale. A full re-render is
+  // safe on a fresh open (nothing is mid-edit); the throttled surgical refresh still
+  // handles later in-place updates without clobbering a half-typed note/rate.
+  async function refreshDraftOnOpen(sid) {
+    sid = String(sid);
+    if (!authHeaders() || VIEWING_VERSION_ID != null) return;   // demo / version look-back: nothing to recompute
+    let dg;
+    try {
+      const r = await fetch(API + "/subscriptions/" + sid + "/draft", { method: "POST", headers: authHeaders() });
+      if (!r.ok) return;
+      dg = await r.json().catch(() => ({}));
+    } catch (_) { return; }
+    if (!dg || !dg.draft) return;
+    if (String(ACTIVE_SUB_ID) !== sid || VIEWING_VERSION_ID != null) return;   // operator moved on mid-fetch
+    noteXcheck(sid, dg);
+    _bgRefreshed[sid] = Date.now();                              // counts as the recent surgical refresh too
+    const cur = DRAFT_BY_SUB[sid];
+    const figKeys = ["amount_usd", "customer_kwh", "array_total_kwh", "period_label",
+      "invoice_number", "email_letter_default", "email_subject_default", "solar_credit_value",
+      "net_rate_per_kwh", "discount_pct", "gmp_auto_status", "has_gmp_pdf"];
+    const changed = !cur || figKeys.some(k => (k in dg.draft) && dg.draft[k] !== cur[k]);
+    if (cur) Object.assign(cur, dg.draft); else DRAFT_BY_SUB[sid] = dg.draft;
+    // Re-render ONLY when something actually moved (no jitter on the common fresh case).
+    if (changed && String(ACTIVE_SUB_ID) === sid) renderAccordionBody(sid);
+  }
+
   // envelope fields. `force` re-mints even when a draft already exists.
   async function selectOfftaker(subId, force) {
     subId = String(subId);
@@ -5675,10 +5709,10 @@
     _periodsFetched.delete(subId);      // re-fetch billable periods in case a new bill landed
     if (DRAFT_BY_SUB[subId] && !force) {
       ACTIVE_SUB_ID = subId; ACTIVE_DRAFT_ID = DRAFT_BY_SUB[subId].id; renderInboxBody();
-      // Show the cached draft instantly, but ALSO pull the latest GMP bill + recompute in
-      // the BACKGROUND so a newly-released statement is reflected without a manual
-      // regenerate — the figures refresh in place if anything changed.
-      backgroundRefreshDraft(subId);
+      // Show the cached draft instantly, then recompute from the LIVE bill so the email
+      // cover + invoice PDF are built from one current computation (re-renders the pane
+      // in place only if a figure actually moved — no jitter otherwise).
+      refreshDraftOnOpen(subId);
       return;
     }
     // Signed-out DEMO: never mint via the backend (it would 401). Just switch to the
