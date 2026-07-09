@@ -4327,7 +4327,9 @@
   async function downloadOfftakerTemplate() {
     const status = $("#rbBulkStatus");
     try {
-      const r = await fetch(API + "/offtaker-template.xlsx", { headers: authHeaders() });
+      // Cache-bust: the template endpoint sits behind an edge cache that would
+      // otherwise serve a stale copy after a template update.
+      const r = await fetch(API + "/offtaker-template.xlsx?v=" + Date.now(), { headers: authHeaders() });
       if (!r.ok) {
         if (status) { status.className = "rb-status rb-err"; status.textContent = "Couldn't fetch the template (HTTP " + r.status + ")."; }
         return;
