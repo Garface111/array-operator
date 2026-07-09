@@ -791,9 +791,9 @@
               const iopen = !!_invExpanded[ikey];
               h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
                 <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(iv.name || iv.sn || "Inverter")}</span>${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
-                <span class="vs-c-vendor"></span><span class="vs-c-inv"></span>
+                <span class="vs-c-vendor">${iv.sn ? `<span class="vs-inv-sn" title="Serial number">${esc(iv.sn)}</span>` : ""}</span><span class="vs-c-inv">${iv.peer_index != null ? `<span class="vs-inv-peer" title="This inverter's 14-day output vs its neighbors — 1.00× is right at the group median">${iv.peer_index.toFixed(2)}× peers</span>` : ""}</span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${pctOfMax(iv) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate (its max)">· ${pctOfMax(iv)}</span>` : ""}</span>
-                <span class="vs-c-today"></span>
+                <span class="vs-c-today">${iv.produced_today_kwh != null ? `<span class="vs-inv-today">${kwh0(iv.produced_today_kwh)}</span>` : ""}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"></span>
               </div>`;

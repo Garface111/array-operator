@@ -85,6 +85,7 @@ window.FleetStore = (function(){
       nameplate_kw: _num(iv.nameplate_kw),
       current_power_w: _num(iv.current_power_w),
       window_kwh: _num(iv.window_kwh),
+      produced_today_kwh: _num(iv.produced_today_kwh),
       peer_index: _num(iv.peer_index),
       last_seen: iv.last_seen != null ? _str(iv.last_seen, 40) : null,
     };
@@ -392,9 +393,9 @@ window.FleetStore = (function(){
       produced_today_source: (a.produced_today_source != null ? a.produced_today_source : null),
       produced_today_is_estimated: a.produced_today_is_estimated === true,
       inverters: a.inverters.map(i => ({
-        inverter_id: i.id, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
+        inverter_id: i.id, sn: i.serial, name: i.name, model: i.model, nameplate_kw: i.nameplate_kw,
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
-        window_kwh: i.window_kwh, current_power_w: i.current_power_w,
+        window_kwh: i.window_kwh, produced_today_kwh: i.produced_today_kwh, current_power_w: i.current_power_w,
         daily: i.daily || [], min_kwh: i.min_kwh, peak_kwh: i.peak_kwh,
         // Dead-energy-register flag (live power, no cumulative energy) — MUST ride
         // through or every surface loses the honest "no energy data" state and #7
