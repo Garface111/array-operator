@@ -97,6 +97,16 @@ window.FleetStore = (function(){
     const invs = Array.isArray(a.inverters)
       ? a.inverters.map(sanitizeInverter).filter(Boolean)
       : [];
+    // Ford 2026-07-09: organize the inverters in each array by size (kW), smallest
+    // at the top. This is the default presentation order everywhere they're listed
+    // (vendor sheet, fleet cards, inverter detail). Unknown-size units sort last;
+    // ties break by name then id so the order is stable across reloads.
+    invs.sort((x, y) => {
+      const xk = x.nameplate_kw == null ? Infinity : x.nameplate_kw;
+      const yk = y.nameplate_kw == null ? Infinity : y.nameplate_kw;
+      if (xk !== yk) return xk - yk;
+      return String(x.name || x.id).localeCompare(String(y.name || y.id));
+    });
     return {
       id: _str(a.id, 64),
       name: _str(a.name, 120),

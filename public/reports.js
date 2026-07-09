@@ -2843,9 +2843,97 @@
           opts.map(o => `<option value="${esc(String(o.value))}">${esc(o.label)}</option>`).join("");
       }
       s.onchange = () => resolveArrayBills(false);
+      // Ford 2026-07-09: with tons of arrays the plain dropdown is hard to search —
+      // overlay a type-to-filter combobox. The native <select> stays the source of
+      // truth (value + onchange untouched); the combobox just mirrors the pick.
+      makeSearchableSelect(s, { placeholder: "Search net meter groups…" });
     });
     // Prime the utility-account cache so the first pick resolves instantly.
     resolveArrayBills(true, true);
+  }
+
+  // Turn a native <select> into a type-to-filter combobox WITHOUT changing its role
+  // as the value/onchange source of truth: the <select> stays in the DOM (visually
+  // hidden), we mirror each pick back into it and dispatch a native 'change', so all
+  // existing logic (resolveArrayBills, .value reads) is untouched. Idempotent — safe
+  // to call again after the options are repopulated (the list is (re)built from the
+  // live <option>s each time it opens). Ford 2026-07-09: "with tons of arrays in the
+  // net meter group dropdown it's hard to find the right one — add search."
+  function makeSearchableSelect(sel, opt) {
+    opt = opt || {};
+    if (!sel) return;
+    if (sel.__combo) { sel.__combo.sync(); return; }   // already enhanced → just resync
+    const wrap = document.createElement("div");
+    wrap.className = "nmg-combo";
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add("nmg-combo-native");             // visually hidden, kept for value/onchange
+
+    const input = document.createElement("input");
+    input.type = "text"; input.className = "nmg-combo-input";
+    input.setAttribute("role", "combobox"); input.setAttribute("autocomplete", "off");
+    input.spellcheck = false; input.placeholder = opt.placeholder || "Search…";
+    const caret = document.createElement("span");
+    caret.className = "nmg-combo-caret"; caret.textContent = "▾";
+    const list = document.createElement("div");
+    list.className = "nmg-combo-list"; list.hidden = true;
+    wrap.appendChild(input); wrap.appendChild(caret); wrap.appendChild(list);
+
+    let open = false, active = -1, items = [];
+
+    const selectedLabel = () => { const o = sel.options[sel.selectedIndex]; return (o && o.value) ? o.textContent : ""; };
+    const syncInputToSelection = () => { input.value = selectedLabel(); };
+
+    const build = (q) => {
+      const needle = String(q || "").trim().toLowerCase();
+      list.innerHTML = ""; items = [];
+      const opts = Array.from(sel.options).filter(o => o.value !== "");   // skip the "Choose…" placeholder
+      for (const o of opts) {
+        const label = o.textContent;
+        if (needle && !label.toLowerCase().includes(needle)) continue;
+        const el = document.createElement("button");
+        el.type = "button"; el.className = "nmg-combo-item"; el.textContent = label;
+        if (o.value === sel.value) el.classList.add("is-sel");
+        el.addEventListener("mousedown", (e) => { e.preventDefault(); pick(o.value, label); });
+        list.appendChild(el); items.push({ value: o.value, label, el });
+      }
+      if (!items.length) {
+        const none = document.createElement("div");
+        none.className = "nmg-combo-none";
+        none.textContent = opts.length ? "No net meter group matches that." : "No net meter groups yet.";
+        list.appendChild(none);
+      }
+      active = -1;
+    };
+
+    const openList = () => { build(input.value === selectedLabel() ? "" : input.value); list.hidden = false; open = true; wrap.classList.add("is-open"); };
+    const closeList = () => { list.hidden = true; open = false; wrap.classList.remove("is-open"); active = -1; };
+
+    function pick(value, label) {
+      if (sel.value !== value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      input.value = label; closeList();
+    }
+
+    input.addEventListener("focus", () => { input.select(); openList(); });
+    input.addEventListener("input", () => { if (!open) openList(); else build(input.value); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault(); if (!open) { openList(); return; }
+        if (!items.length) return;
+        active = e.key === "ArrowDown" ? Math.min(items.length - 1, active + 1) : Math.max(0, active - 1);
+        items.forEach((it, i) => it.el.classList.toggle("is-active", i === active));
+        items[active].el.scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        if (open && active >= 0) { e.preventDefault(); pick(items[active].value, items[active].label); }
+      } else if (e.key === "Escape") {
+        if (open) { e.preventDefault(); closeList(); syncInputToSelection(); }
+      }
+    });
+    input.addEventListener("blur", () => { setTimeout(() => { if (open) { closeList(); syncInputToSelection(); } }, 120); });
+    caret.addEventListener("mousedown", (e) => { e.preventDefault(); if (open) closeList(); else input.focus(); });
+
+    sel.__combo = { sync: syncInputToSelection };
+    syncInputToSelection();
   }
 
   // Build the Net Meter Group option list from utility accounts (vendor-free).

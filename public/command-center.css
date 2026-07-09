@@ -403,6 +403,33 @@ body.sb-fs-lock{ overflow:hidden; }
   border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
 .rb-mform-grid select{ cursor:pointer; }
 
+/* ---- searchable net meter group combobox (Ford 2026-07-09) ----------------
+   Overlays a type-to-filter input on the native <select>, which stays in the DOM
+   (visually hidden) as the value/onchange source of truth. Themed via variables so
+   it reads on both the dark default and the light (day) theme; the .nmg-combo-input
+   also inherits the day-mode `.rep-fld input` white-field rule for free. */
+.nmg-combo{ position:relative; }
+.rb-mform-grid select.nmg-combo-native{ position:absolute; opacity:0; width:1px; height:1px;
+  padding:0; margin:0; border:0; pointer-events:none; }
+.nmg-combo-input{ width:100%; box-sizing:border-box; background:rgba(255,255,255,.04);
+  border:1px solid var(--line); border-radius:10px; color:var(--ink);
+  padding:9px 30px 9px 11px; font:inherit; font-size:13.5px; cursor:text; }
+.nmg-combo-input:focus{ outline:none; border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
+.nmg-combo-caret{ position:absolute; right:11px; top:50%; transform:translateY(-50%);
+  font-size:11px; color:var(--faint); cursor:pointer; transition:transform .12s; }
+.nmg-combo.is-open .nmg-combo-caret{ transform:translateY(-50%) rotate(180deg); }
+.nmg-combo-list{ position:absolute; z-index:46; left:0; right:0; top:calc(100% + 4px);
+  max-height:288px; overflow-y:auto; background:var(--card); border:1px solid var(--line);
+  border-radius:11px; padding:5px; display:flex; flex-direction:column; gap:2px;
+  box-shadow:0 14px 40px -12px rgba(15,23,42,.4); }
+.nmg-combo-item{ display:block; width:100%; text-align:left; border:1px solid transparent;
+  background:transparent; color:var(--ink); font:inherit; font-size:13px; line-height:1.35;
+  padding:8px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; }
+.nmg-combo-item:hover, .nmg-combo-item.is-active{ border-color:rgba(94,194,255,.5); background:rgba(94,194,255,.10); }
+.nmg-combo-item.is-sel{ font-weight:700; }
+.nmg-combo-none{ padding:9px 10px; font-size:12.5px; color:var(--faint); }
+
 /* ---- field hint (under an input) ---- */
 .rb-fld-hint{ font-size:11px; color:var(--faint); margin-top:3px; line-height:1.4; }
 

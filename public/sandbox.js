@@ -4285,13 +4285,15 @@
     </div>`;
   }
   function rowEdit(label, field, value, placeholder){
+    // No Save button (Ford 2026-07-09): identity fields auto-save as you type —
+    // wireAcctEdits debounces the write and shows a quiet "Saved ✓" in .acct-msg.
     return `<div class="acct-row acct-edit" data-field="${esc(field)}">
       <div class="r-k">${esc(label)}</div>
       <div class="r-v">
         <input type="text" autocomplete="off" spellcheck="false" value="${esc(value||"")}" placeholder="${esc(placeholder||"")}">
         <div class="acct-msg"></div>
       </div>
-      <div class="r-a"><button class="acct-btn" type="button">Save</button></div>
+      <div class="r-a"></div>
     </div>`;
   }
 
@@ -4955,17 +4957,29 @@
     };
   }
 
+  // Identity fields (Name / Company / Email) auto-save as you type — no Save button
+  // (Ford 2026-07-09: "remove the save button and have things auto save as you type").
+  // Each keystroke debounces a write (750ms after you stop); leaving the field or
+  // pressing Enter saves immediately. Unchanged or empty values never fire (so a
+  // required field is never wiped), and a partial email waits until it looks valid.
+  // A monotonic seq guards against out-of-order responses when you keep typing.
   function wireAcctEdits(){
     document.querySelectorAll("#acctList .acct-edit").forEach(row => {
       const inp = row.querySelector("input");
-      const btn = row.querySelector(".acct-btn");
       const msg = row.querySelector(".acct-msg");
-      const field = row.dataset.field;             // "company" | "email"
-      btn.onclick = async () => {
+      const field = row.dataset.field;             // "name" | "company" | "email"
+      let saved = inp.value.trim();                // last value successfully stored
+      let timer = null, seq = 0;
+      const setMsg = (t, cls) => { if(msg){ msg.className = "acct-msg" + (cls ? " " + cls : ""); msg.textContent = t; } };
+      const looksLikeEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+      const save = async () => {
         const val = inp.value.trim();
-        if(!val){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Enter a value first."; } return; }
+        if(val === saved) return;                  // nothing changed since last save
+        if(!val){ setMsg("", ""); return; }        // never wipe a required field to blank
+        if(field === "email" && !looksLikeEmail(val)){ setMsg("Keep typing your email…", ""); return; }
         const h = authHeaders();
-        if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+        if(!h){ setMsg("Sign in first.", "err"); return; }
         const url  = field === "company" ? "/v1/account/company-name"
                    : field === "name"    ? "/v1/account/name"
                    : "/v1/account/email";
@@ -4973,25 +4987,33 @@
         // The name + company endpoints want `name` (not `company_name`) — sending the
         // wrong key 422s, which was the "Couldn't save (HTTP 422)" bug.
         const body = (field === "company" || field === "name") ? { name: val } : { email: val };
-        btn.disabled = true;
-        if(msg){ msg.className = "acct-msg"; msg.textContent = "Saving…"; }
+        const mine = ++seq;                        // supersede any in-flight save
+        setMsg("Saving…", "");
         try{
           const r = await fetch(url, { method:"POST",
             headers: Object.assign({ "Content-Type":"application/json" }, h),
             body: JSON.stringify(body) });
+          if(mine !== seq) return;                 // a newer keystroke already fired a save
           if(r.ok){
-            if(msg){ msg.className = "acct-msg ok"; msg.textContent = "Saved."; }
+            saved = val;
+            setMsg("Saved ✓", "ok");
             if(_account){ _account[field === "company" ? "company_name" : field === "name" ? "operator_name" : "email"] = val; }
             // Email is also the login — keep the Login row in sync.
             if(field === "email"){ const lg = document.getElementById("loginEmail"); if(lg) lg.textContent = val; }
+            // Fade the confirmation after a beat so the row stays quiet.
+            setTimeout(() => { if(mine === seq && inp.value.trim() === saved) setMsg("", ""); }, 2200);
           } else {
-            if(msg){ msg.className = "acct-msg err"; msg.textContent = `Couldn't save (HTTP ${r.status}) — try again.`; }
+            const d = await r.json().catch(() => ({}));
+            setMsg((d && d.detail) ? d.detail : `Couldn't save (HTTP ${r.status}) — still trying as you type.`, "err");
           }
         }catch(e){
-          if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't save — check your connection."; }
+          if(mine === seq) setMsg("Couldn't save — check your connection.", "err");
         }
-        btn.disabled = false;
       };
+
+      inp.addEventListener("input", () => { setMsg("", ""); clearTimeout(timer); timer = setTimeout(save, 750); });
+      inp.addEventListener("blur", () => { clearTimeout(timer); save(); });
+      inp.addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); clearTimeout(timer); save(); inp.blur(); } });
     });
   }
 
