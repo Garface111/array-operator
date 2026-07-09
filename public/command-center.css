@@ -424,6 +424,12 @@ body.sb-fs-lock{ overflow:hidden; }
   max-height:288px; overflow-y:auto; background:var(--card); border:1px solid var(--line);
   border-radius:11px; padding:5px; display:flex; flex-direction:column; gap:2px;
   box-shadow:0 14px 40px -12px rgba(15,23,42,.4); }
+/* THE ACTUAL BUG (Ford, 2026-07-09, after 6 rounds of chasing the JS): `display:flex`
+   above is an AUTHOR rule that OVERRIDES the UA `[hidden]{display:none}` (author beats
+   UA at equal specificity), so `list.hidden = true` set the attribute but the list
+   stayed VISIBLE — it never collapsed no matter what the JS did. The exact same trap
+   was already fixed for .rb-track-global higher up. This restores the hide. */
+.nmg-combo-list[hidden]{ display:none !important; }
 /* flex:0 0 auto is load-bearing: the list is a flex column with a max-height, so
    without it the default flex-shrink:1 crushes each row from ~36px down to ~18px
    and clips the text whenever there are more groups than fit — that was the
