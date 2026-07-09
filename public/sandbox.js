@@ -5018,8 +5018,13 @@
     // "trial" undersells an open-ended tester account (Lester / Paul).
     const isComped = /comped/i.test(String(status)) || (_account && _account.plan === "comped");
     const daysLeft = (iso) => { const t = new Date(iso).getTime(); return isFinite(t) ? Math.ceil((t - Date.now()) / 86400000) : null; };
+    const dLeft = trialEnds ? daysLeft(trialEnds) : null;
+    // "Indefinite tester" = comped, a trial with NO end, OR a trial whose end is so far
+    // out (> 60d, vs the real 14-day trial) that it's effectively open-ended — so a
+    // tester never sees an absurd "800 days left" countdown, however they're modeled.
+    const indefinite = isComped || (onTrial && (!trialEnds || (dLeft != null && dLeft > 60)));
     let trialBanner = "";
-    if(isComped || (onTrial && !trialEnds)){
+    if(indefinite){
       // Indefinite tester — no time limit, never charged. The Monthly bill below is
       // the plan's list price for reference; the banner makes clear it isn't billed.
       trialBanner =
@@ -5030,7 +5035,7 @@
           `<span class="ao-bill-trial-badge">COMPLIMENTARY</span>` +
         `</div>`;
     } else if(onTrial && trialEnds){
-      const d = daysLeft(trialEnds);
+      const d = dLeft;
       if(d != null && d > 0){
         trialBanner =
           `<div class="ao-bill-trial">` +
@@ -5057,7 +5062,7 @@
     // Comped testers are never charged, so no next-charge date for them.
     const ctx = [];
     const invDate = invoice ? pick(invoice, ["period_end","due_date","date","next_payment_date"], null) : null;
-    if(invDate && !isComped) ctx.push(`next charge on ${fmtDate(invDate)}`);
+    if(invDate && !indefinite) ctx.push(`next charge on ${fmtDate(invDate)}`);
 
     box.innerHTML =
       trialBanner +
