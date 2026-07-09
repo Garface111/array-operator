@@ -1281,8 +1281,9 @@
 
     // ── Offtaker accordion — same cards as the live app, with demo arrays/accts. ──
     const demoArrays = [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
-    const demoUtil = [{ utility_account_id: 9001, array_name: "Catamount Community Solar",
-      has_bill: true, bill_count: 6, account_number: "GMP-558210" }];
+    const demoUtil = [{ utility_account_id: 9001, array_id: 1, provider: "gmp",
+      nickname: "Catamount Community Solar", service_address: "120 Main St, Waterbury, VT",
+      has_bill: true, bill_count: 6, account_number: "GMP-558210", latest_period_label: "2026-06" }];
 
     // Populate the inbox globals so the accordion renders + expands from the demo data.
     OFFTAKERS = D.offtakers.slice();
@@ -2790,28 +2791,86 @@
   // dropdown change. Refreshed by resolveArrayBills(forceRefetch).
   let ARR_UTIL_ACCTS = null;
 
-  // Fill #rbmArray from the shared arrays cache (list-bundle .arrays), then wire
-  // its change handler to resolve + display which utility bill invoices from it.
+  // Fill #rbmArray (the Net Meter Group picker) from UTILITY DATA ONLY — the paper
+  // bills we invoice from — never the vendor/inverter fleet. Ford 2026-07-09: "there
+  // shouldn't be any vendor info in this part of the system; it should just pull the
+  // utility data to find the arrays." Each option is a net meter group, labeled from
+  // its utility account(s) (nickname → service address → provider + account #, plus
+  // bill status). Matched groups keep array_id as the value — the offtaker binding is
+  // unchanged (backend resolves the bill from the array). A freshly-linked account not
+  // yet tied to an array is still offered as its own group (value "u:<account_id>") so
+  // onboarding is never stranded: the backend's OFFTAKER↔UTILITY-BILL path binds it
+  // directly by account. Arrays with NO connected utility bill don't appear — you
+  // can't invoice an offtaker without a paper bill.
   function wireArrayFirst() {
     const sel = $("#rbmArray");
     if (!sel) return;
-    fetchArrays().then(arrs => {
+    fetchUtilityAccounts().then(accts => {
       const s = $("#rbmArray");
       if (!s) return;                                  // panel closed mid-fetch
-      if (!arrs.length) {
-        s.innerHTML = `<option value="">No arrays yet — connect one first</option>`;
+      ARR_UTIL_ACCTS = accts || [];                    // warm the shared cache
+      const opts = netMeterGroupOptions(ARR_UTIL_ACCTS);
+      if (!opts.length) {
+        s.innerHTML = `<option value="">No utility bills yet — link your utility first</option>`;
       } else {
-        s.innerHTML = `<option value="">Choose an array…</option>` +
-          arrs.map(a => {
-            const label = a.name || ("Array " + a.id);
-            const client = a.client_name ? ` · ${a.client_name}` : "";
-            return `<option value="${esc(String(a.id))}">${esc(label + client)}</option>`;
-          }).join("");
+        s.innerHTML = `<option value="">Choose a net meter group…</option>` +
+          opts.map(o => `<option value="${esc(String(o.value))}">${esc(o.label)}</option>`).join("");
       }
       s.onchange = () => resolveArrayBills(false);
     });
-    // Prime the utility-account cache so the first array pick resolves instantly.
+    // Prime the utility-account cache so the first pick resolves instantly.
     resolveArrayBills(true, true);
+  }
+
+  // Build the Net Meter Group option list from utility accounts (vendor-free).
+  // Matched accounts collapse by array_id → one option per group (value = array_id,
+  // the unchanged billing key); unmatched accounts (array_id null, a fresh link) each
+  // become their own option (value "u:<account_id>"). Returns [{value,label}] by label.
+  function netMeterGroupOptions(accts) {
+    const byArray = new Map();     // array_id -> [accts]
+    const loose = [];              // unmatched accounts (array_id null)
+    for (const a of (accts || [])) {
+      if (a.array_id != null) {
+        const k = String(a.array_id);
+        if (!byArray.has(k)) byArray.set(k, []);
+        byArray.get(k).push(a);
+      } else { loose.push(a); }
+    }
+    const out = [];
+    for (const [arrId, group] of byArray) out.push({ value: arrId, label: nmgGroupLabel(group) });
+    for (const a of loose) out.push({ value: "u:" + a.utility_account_id, label: nmgGroupLabel([a]) + " · needs an array match" });
+    out.sort((x, y) => String(x.label).localeCompare(String(y.label)));
+    return out;
+  }
+
+  // Vendor-FREE identity for a single utility account: operator nickname → utility
+  // service address → provider + account number. NEVER the array/inverter name.
+  function utilityIdentity(a) {
+    const nm = (a.nickname || "").trim();
+    if (nm) return nm;
+    const addr = (a.service_address || "").trim();
+    if (addr) return addr;
+    const prov = (a.provider || "gmp").toLowerCase();
+    const tag = prov === "gmp" ? "GMP" : prov.toUpperCase();
+    return `${tag} acct ${a.account_number || "?"}`;
+  }
+
+  // Vendor-free label for a net meter GROUP (one or more accounts sharing an array),
+  // with bill status so the operator sees it's invoiceable, e.g.
+  // "52 County Rd, Glover, VT · 12 bills · latest 2026-06".
+  function nmgGroupLabel(group) {
+    const named = group.find(a => (a.nickname || "").trim())
+               || group.find(a => (a.service_address || "").trim())
+               || group[0];
+    let name = utilityIdentity(named);
+    if (group.length > 1) name += ` · ${group.length} accounts`;
+    const totalBills = group.reduce((n, a) => n + (a.bill_count || 0), 0);
+    let latest = null;
+    for (const a of group) if (a.latest_period_label && (!latest || a.latest_period_label > latest)) latest = a.latest_period_label;
+    const bills = totalBills > 0
+      ? ` · ${totalBills} bill${totalBills === 1 ? "" : "s"}${latest ? " · latest " + latest : ""}`
+      : " · no bill yet";
+    return name + bills;
   }
 
   // Resolve the utility bill(s) for the currently-selected array and paint the
@@ -2842,6 +2901,11 @@
     const arrSel = $("#rbmArray");
     const arrId = arrSel ? arrSel.value : "";
     if (!arrId) return null;
+    // Directly-chosen unmatched account (value "u:<id>") → its own provider.
+    if (String(arrId).startsWith("u:")) {
+      const a = accts.find(x => String(x.utility_account_id) === String(arrId.slice(2)));
+      return a ? (a.provider || "gmp").toLowerCase() : null;
+    }
     const mine = accts.filter(a => String(a.array_id) === String(arrId));
     const cands = mine.length ? mine : accts;   // fresh-link case offers the full list
     if (!cands.length) return null;
@@ -2899,6 +2963,17 @@
       if (wrap) wrap.hidden = true;
       return;
     }
+    // A freshly-linked account chosen directly (value "u:<id>") — not yet matched to
+    // an array. The net meter group IS that one account; show it as the resolved bill.
+    if (String(arrId).startsWith("u:")) {
+      const uid = arrId.slice(2);
+      const acct = (ARR_UTIL_ACCTS || []).find(a => String(a.utility_account_id) === String(uid));
+      line.className = "rb-arr-billline rb-arr-hasbill";
+      line.innerHTML = acct ? `Invoices from: <b>${esc(billLabel(acct))}</b>` : "";
+      if (wrap) { wrap.hidden = true; if (usel) usel.innerHTML = acct
+        ? `<option value="${acct.utility_account_id}" selected>${esc(billLabel(acct))}</option>` : ""; }
+      return;
+    }
     const accts = ARR_UTIL_ACCTS || [];
     const mine = accts.filter(a => String(a.array_id) === String(arrId));
     if (!mine.length && !accts.length) {
@@ -2948,8 +3023,10 @@
     if (prev && accts.some(a => String(a.utility_account_id) === String(prev))) usel.value = prev;
     const hint = $("#rbmUtilHint");
     if (hint) {
-      const arr = (ARRAYS || []).find(x => String(x.id) === String(arrId));
-      hint.textContent = (arr && arr.name ? arr.name + " group" : "This group") +
+      // Name the group from UTILITY data (vendor-free), not the array/inverter name.
+      const groupAccts = (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
+      const gname = groupAccts.length ? nmgGroupLabel(groupAccts).split(" · ")[0] : "This group";
+      hint.textContent = gname +
         " has multiple participants. Your selection here should be the utility account from this dropdown list.";
     }
     wrap.hidden = false;
@@ -2962,7 +3039,9 @@
   function billLabel(a) {
     const prov = (a.provider || "gmp").toLowerCase();
     const provTag = prov === "gmp" ? "GMP" : prov.toUpperCase();
-    const who = a.nickname || a.array_name;
+    // Vendor-free: operator nickname → utility service address — NEVER the array/
+    // inverter name (Ford 2026-07-09: no vendor info in the offtaker invoice generator).
+    const who = (a.nickname || "").trim() || (a.service_address || "").trim();
     const acctNo = `${provTag} acct ${a.account_number || "?"}`;
     const name = who ? `${who} · ${acctNo}` : acctNo;
     const bills = a.has_bill
@@ -3000,8 +3079,8 @@
           <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
           <div class="rb-mform-grid">
             <label class="rep-fld req"><span class="rl">Net Meter Group</span>
-              <select id="rbmArray"><option value="">Loading arrays…</option></select>
-              <span class="rb-fld-hint">The array in which your offtaker participates.</span>
+              <select id="rbmArray"><option value="">Loading net meter groups…</option></select>
+              <span class="rb-fld-hint">The utility bill (net meter group) your offtaker draws their share from.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
               <label class="rep-fld rb-arr-override req" id="rbmUtilityWrap" hidden><span class="rl">Select your offtaker's utility bill</span>
                 <select id="rbmUtility"><option value="">Choose a utility account…</option></select>
@@ -3142,7 +3221,12 @@
   async function saveManual() {
     const st = $("#rbmStatus");
     const name = $("#rbmName").value.trim();
-    const arrayId = $("#rbmArray") ? $("#rbmArray").value : "";
+    let arrayId = $("#rbmArray") ? $("#rbmArray").value : "";
+    // A directly-chosen unmatched utility account (value "u:<id>") binds by ACCOUNT
+    // (the backend's OFFTAKER↔UTILITY-BILL path) — no array_id. Everything else is
+    // array-first (backend resolves the bill from the array).
+    let looseUtilityId = "";
+    if (String(arrayId).startsWith("u:")) { looseUtilityId = arrayId.slice(2); arrayId = ""; }
     // The utility <select> is now an OVERRIDE — only meaningful (and visible) when
     // the chosen array has multiple connected bills. The backend resolves the bill
     // from array_id; we pass utility_account_id ONLY when the operator overrode.
@@ -3160,7 +3244,7 @@
     // the operator is BCC'd on every send (so they always see what was received).
     const mode = "to_client";
     const clientEmail = $("#rbmEmail").value.trim();
-    if (!arrayId) { st.className = "rb-status rb-err"; st.textContent = "Pick which net meter group this offtaker draws from."; return; }
+    if (!arrayId && !looseUtilityId) { st.className = "rb-status rb-err"; st.textContent = "Pick which net meter group this offtaker draws from."; return; }
     // Block save only when the tenant has NO utility accounts at all (nothing to
     // invoice from). A group with no LINKED account is fine — the picker offered
     // the full account list and the explicit pick below carries the binding.
@@ -3230,8 +3314,11 @@
     st.className = "rb-status rb-busy"; st.textContent = "Adding offtaker…";
     const fd = new FormData();                       // no file → manual path
     fd.append("customer_name", name);
-    fd.append("array_id", String(arrayId));              // array-FIRST: backend resolves the bill from the array
-    if (utilityId) fd.append("utility_account_id", utilityId);  // only when the operator overrode the bill
+    if (arrayId) fd.append("array_id", String(arrayId));          // array-FIRST: backend resolves the bill from the array
+    // utility_account_id is sent when the operator overrode the bill OR chose a
+    // freshly-linked (not-yet-matched) account directly — the backend binds by it.
+    const utilToSend = looseUtilityId || utilityId;
+    if (utilToSend) fd.append("utility_account_id", utilToSend);
     fd.append("allocation_pct", String(pctNum / 100));   // backend wants a fraction in (0,1]
     if (rateNum !== null) fd.append("discount_pct", String(rateNum / 100));
     if (creditRateNum !== null) fd.append("net_rate_per_kwh", String(creditRateNum));
@@ -3256,7 +3343,7 @@
       // offtaker is already created; a failure here shouldn't block it.
       const newArrayId = (data.subscription && data.subscription.array_id) || arrayId;
       const newSubId = data.subscription && data.subscription.id;
-      if (commDateVal !== null && newArrayId != null) {
+      if (commDateVal !== null && newArrayId) {   // truthy: skip when there's no array (a loose-account bind)
         try {
           await fetch(API + "/arrays/" + newArrayId, {
             method: "PATCH",
@@ -3324,8 +3411,10 @@
     return BULK_ARRAYS.find(a => String(a.array_id) === String(id)) || null;
   }
   function bulkArrayLabel(a) {
-    const base = a.array_name || ("Array " + a.array_id);
-    return a.utility_label ? `${base} · ${a.utility_label}` : base;
+    // Vendor-free (Ford 2026-07-09): lead with the utility identity (provider · acct
+    // · nickname); fall back to the array name only when no utility account is linked
+    // yet, so the row is still identifiable.
+    return a.utility_label || a.array_name || ("Array " + a.array_id);
   }
 
   // Derive a per-row status from the CURRENT edited state (not the server's — the
