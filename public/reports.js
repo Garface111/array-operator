@@ -30,6 +30,32 @@
   function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function authHeaders() { const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
 
+  // Extract a HUMAN-READABLE message from an API error body. FastAPI `detail`
+  // comes in three shapes and only the first is a plain string:
+  //   • string  — our HTTPException(400, "…")                     → use as-is
+  //   • object  — a machine-readable body, e.g. require_not_demo's
+  //               {error:"demo-read-only", message:"…", cta_url}  → use .message
+  //   • array   — a 422 validation error: [{msg, loc, …}, …]      → join the msgs
+  // Rendering `data.detail` straight into textContent turned the last two into
+  // the literal string "[object Object]", masking the real reason — most visibly
+  // the demo-read-only 403, so an offtaker create on a demo/scratch tenant showed
+  // "[object Object]" instead of "This is a demo account — sign up…" (Ford,
+  // 2026-07-09). Always route error text through this helper.
+  function apiErr(data, fallback) {
+    const d = data && data.detail;
+    if (typeof d === "string" && d.trim()) return d;
+    if (d && typeof d === "object" && !Array.isArray(d) && typeof d.message === "string" && d.message.trim()) {
+      return d.message;
+    }
+    if (Array.isArray(d)) {
+      const msgs = d.map(e =>
+        (e && typeof e === "object" && typeof e.msg === "string") ? e.msg
+        : (typeof e === "string" ? e : null)).filter(Boolean);
+      if (msgs.length) return msgs.join("; ");
+    }
+    return fallback;
+  }
+
   /* ===========================================================================
    * BILL ACCURACY CHECK — the per-offtaker GMP-allocation cross-check.
    *
@@ -2319,7 +2345,7 @@
           }
         }
       } else {
-        if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Couldn't draft."; }
+        if (st) { st.className = "rb-status rb-err"; st.textContent = apiErr(data, "Couldn't draft."); }
       }
     } catch (e) { if (st) { st.className = "rb-status rb-err"; st.textContent = "Network error."; } }
   }
@@ -2612,7 +2638,7 @@
           await refreshList();   // re-price rows that use the defaults
         } else {
           st.className = "rb-status rb-err";
-          st.textContent = (data && data.detail) ? data.detail : "Couldn't save.";
+          st.textContent = apiErr(data, "Couldn't save.");
         }
       } catch (e) { st.className = "rb-status rb-err"; st.textContent = "Network error."; }
     };
@@ -2629,7 +2655,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
         status.className = "rb-status rb-err";
-        status.textContent = (data && data.detail) ? data.detail : "Couldn't read that file (HTTP " + r.status + ").";
+        status.textContent = apiErr(data, "Couldn't read that file (HTTP " + r.status + ").");
         return;
       }
       const m = data.match;
@@ -3335,7 +3361,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
         st.className = "rb-status rb-err";
-        st.textContent = (data && data.detail) ? data.detail : "Couldn't add (HTTP " + r.status + ").";
+        st.textContent = apiErr(data, "Couldn't add (HTTP " + r.status + ").");
         return;
       }
       // The commissioning date sets the array's in-service date (feeds the GMP
@@ -3862,7 +3888,7 @@
       if (!r.ok || !data.ok) {
         if (status) {
           status.className = "rb-status rb-err";
-          status.textContent = (data && data.detail) ? data.detail : "Couldn't read that file (HTTP " + r.status + ").";
+          status.textContent = apiErr(data, "Couldn't read that file (HTTP " + r.status + ").");
         }
         return;
       }
@@ -3952,7 +3978,7 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
-        if (st) { st.className = "rb-status rb-err"; st.textContent = (data && data.detail) ? data.detail : "Import failed (HTTP " + r.status + ")."; }
+        if (st) { st.className = "rb-status rb-err"; st.textContent = apiErr(data, "Import failed (HTTP " + r.status + ")."); }
         if (btn) btn.disabled = false;
         return;
       }
@@ -4267,7 +4293,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.ok) {
         st.className = "rb-status rb-err";
-        st.textContent = (data && data.detail) ? data.detail : "Couldn't save (HTTP " + r.status + ").";
+        st.textContent = apiErr(data, "Couldn't save (HTTP " + r.status + ").");
         return;
       }
       const newSubId = data.subscription && data.subscription.id;
@@ -6836,7 +6862,7 @@
           const to = (data.result && data.result.to || []).join(", ");
           setSt("rb-status rb-ok", "Test sent to " + (to || "you") + " — check your inbox.");
         } else {
-          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Test send failed.");
+          setSt("rb-status rb-err", apiErr(data, "Test send failed."));
         }
       } catch (err) { setSt("rb-status rb-err", "Network error."); }
       return;
@@ -6883,7 +6909,7 @@
         const r = await fetch(API + "/drafts/" + id + "/ai-email", { method: "POST", headers: authHeaders() });
         const data = await r.json().catch(() => ({}));
         if (!r.ok || !data.email) {
-          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Couldn't write the email.");
+          setSt("rb-status rb-err", apiErr(data, "Couldn't write the email."));
           return;
         }
         if (ta) { ta.value = data.email; autoGrowMsg(ta); }
@@ -6937,7 +6963,7 @@
           setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + ".");
           setTimeout(refreshInbox, 900);
         } else {
-          setSt("rb-status rb-err", (data && data.detail) ? data.detail : "Send failed.");
+          setSt("rb-status rb-err", apiErr(data, "Send failed."));
         }
       } catch (err) { setSt("rb-status rb-err", "Network error."); }
     }
