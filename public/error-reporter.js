@@ -16,33 +16,63 @@
     ? "https://web-production-49c83.up.railway.app" : "";
   var seen = {};            // signature -> last-sent ms (dedupe identical errors)
   var DEDUPE_MS = 60000;    // don't resend the same error within 60s
-  var sentCount = 0, MAX_PER_SESSION = 20;   // hard cap so a loop can't flood
+  // ROLLING-window rate limit (not a session-lifetime cap). This used to be a
+  // `sentCount >= 20` counter that NEVER reset, so after 20 reports the whole error
+  // reporter went permanently silent for the session -- a cascade of DISTINCT errors
+  // (a broken build, a cascading render fault) blew past 20 instantly and then the
+  // worst incident got muted while the app kept breaking. The 60s per-signature
+  // dedupe below already stops same-error floods, so the cap's only job is a burst
+  // ceiling -- make it self-heal (Ford, 2026-07-09: never permanently disarm to
+  // conserve reports to our own Sentry). When the ceiling IS hit, send ONE marker so
+  // the silence is itself a signal, not invisible.
+  var sendTimes = [];       // ms timestamps of recent sends (pruned to the window)
+  var WINDOW_MS = 60000, MAX_PER_WINDOW = 20;
+  var suppressedNotified = false;
+
+  function _send(payload) {
+    // sendBeacon survives page unloads; fall back to fetch.
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(API_BASE + "/v1/client-error",
+        new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch(API_BASE + "/v1/client-error", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: payload, keepalive: true,
+      }).catch(function () {});
+    }
+  }
 
   function report(message, stack, kind) {
     try {
-      if (sentCount >= MAX_PER_SESSION) return;
       message = String(message || "").slice(0, 500);
       stack = String(stack || "").slice(0, 4000);
       if (!message && !stack) return;
       var sig = (kind || "") + "|" + message;
       var now = Date.now();
       if (seen[sig] && now - seen[sig] < DEDUPE_MS) return;
+
+      // Prune sends older than the rolling window, then enforce the burst ceiling.
+      var cutoff = now - WINDOW_MS;
+      while (sendTimes.length && sendTimes[0] < cutoff) sendTimes.shift();
+      if (sendTimes.length >= MAX_PER_WINDOW) {
+        if (!suppressedNotified) {   // one marker per suppression episode, so silence is visible
+          suppressedNotified = true;
+          _send(JSON.stringify({
+            source: SOURCE, kind: "reporter_suppressed",
+            message: "error-reporter hit " + MAX_PER_WINDOW + "/" + (WINDOW_MS / 1000) +
+                     "s burst ceiling; further reports throttled until it drains",
+            url: location.href.slice(0, 300),
+          }));
+        }
+        return;
+      }
+      suppressedNotified = false;   // back under the ceiling -> re-arm the marker
       seen[sig] = now;
-      sentCount++;
-      var payload = JSON.stringify({
+      sendTimes.push(now);
+      _send(JSON.stringify({
         source: SOURCE, message: message, stack: stack,
         url: location.href.slice(0, 300), kind: kind || "error",
-      });
-      // sendBeacon survives page unloads; fall back to fetch.
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(API_BASE + "/v1/client-error",
-          new Blob([payload], { type: "application/json" }));
-      } else {
-        fetch(API_BASE + "/v1/client-error", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: payload, keepalive: true,
-        }).catch(function () {});
-      }
+      }));
     } catch (_) { /* an error reporter must never throw */ }
   }
 
