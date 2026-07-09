@@ -225,6 +225,19 @@
     </div>
   </div>
 
+  <!-- Vault-login reminder — quiet, dismissible, same shape as trialNudge/extLiveNudge.
+       app.js updateVaultLoginNudge shows it when a connected Fronius/SMA/Chint array's
+       portal login hasn't been saved into the extension's Auto-refresh vault — the exact
+       gap that leaves an array stuck on "last live capture: never" (Lester/Brattleboro
+       Solar, 2026-07-08). CTA jumps to Master Account > Auto-refresh, a one-click fix. -->
+  <div class="trial-nudge neutral" id="vaultLoginNudge" role="region" aria-label="Save your login" hidden>
+    <div class="trial-nudge-row">
+      <div class="trial-nudge-copy" id="vaultLoginNudgeCopy"></div>
+      <button type="button" class="trial-nudge-cta" id="vaultLoginNudgeCta">Set up auto-login →</button>
+      <button class="trial-nudge-x" id="vaultLoginNudgeX" aria-label="Dismiss" title="Dismiss">×</button>
+    </div>
+  </div>
+
   <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
   <!-- All business: one flat list of horizontal rows — identity, login & billing.
        Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
@@ -318,7 +331,7 @@
      Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
-<script src="app.js?v=20260708a"></script>
+<script src="app.js?v=20260708b"></script>
 <script src="sandbox.js?v=20260708d"></script>
 <script src="vendor-sheet.js?v=20260708a"></script>
 <script src="command-center.js?v=12"></script>

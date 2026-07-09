@@ -967,6 +967,63 @@ try {
   if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(updateExtLiveNudge); }
 } catch(e){}
 
+// Vault-login reminder — quiet, dismissible, same shape as extLiveNudge/trialNudge.
+// Ford, 2026-07-08: "another toast to pop up that reminds users to enter their
+// logins in the auto refresh in the extension... have it link them to that page
+// in the master account tab." Fires when a connected Fronius/SMA/Chint array's
+// portal login hasn't been saved into the extension's vault yet — exactly the gap
+// that left a real customer's array stuck reporting "last live capture: never"
+// (Lester/Brattleboro Solar, GMP Middlebury, 2026-07-08). Reuses the same
+// window.__aoVaultStatus() cache sandbox.js's per-card hints already query, so
+// this costs no extra vault round trip.
+const _EXT_VENDOR_LABEL = { fronius: "Fronius", sma: "SMA", chint: "Chint" };
+async function updateVaultLoginNudge(){
+  const bar = document.getElementById("vaultLoginNudge");
+  if(!bar) return;
+  if(localStorage.getItem("ao_vaultnudge_dismiss") === "1"){ bar.hidden = true; return; }
+  if(!window.__AO_EXT_PRESENT || !window.__aoVaultStatus){ bar.hidden = true; return; }
+  let connected = [];
+  try {
+    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()){ bar.hidden = true; return; }
+    const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
+    connected = [...new Set(arrays.map(a => a.vendor).filter(v => _EXT_LIVE_VENDORS.has(v)))];
+  } catch(e){ bar.hidden = true; return; }
+  if(!connected.length){ bar.hidden = true; return; }
+  let status = null;
+  try { status = await window.__aoVaultStatus(); } catch(e){ status = null; }
+  if(!status){ bar.hidden = true; return; }
+  const missing = connected.filter(v => !(status[v] && status[v].hasCreds));
+  if(!missing.length){ bar.hidden = true; return; }
+  const copy = document.getElementById("vaultLoginNudgeCopy");
+  if(copy){
+    const label = missing.map(v => _EXT_VENDOR_LABEL[v] || v).join(" / ");
+    copy.innerHTML = `Save your <b>${label}</b> login in Auto-refresh so it updates itself — ` +
+      "right now it only refreshes while you have that portal open in Chrome.";
+  }
+  const cta = document.getElementById("vaultLoginNudgeCta");
+  if(cta){
+    cta.onclick = function(){
+      location.hash = "#account";
+      setTimeout(() => {
+        const row = document.getElementById("rowAutoRefresh");
+        if(row) row.scrollIntoView({ behavior:"smooth", block:"center" });
+      }, 120);
+    };
+  }
+  const x = document.getElementById("vaultLoginNudgeX");
+  if(x){
+    x.onclick = function(){
+      try { localStorage.setItem("ao_vaultnudge_dismiss", "1"); } catch(e){}
+      bar.hidden = true;
+    };
+  }
+  bar.hidden = false;
+}
+try {
+  window.updateVaultLoginNudge = updateVaultLoginNudge;
+  if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(() => { updateVaultLoginNudge(); }); }
+} catch(e){}
+
 // ── Cancelled-account lockout ──────────────────────────────────────────────
 // A cancelled account (subscription_status "cancelled"/"canceled" + active===false)
 // must NOT be able to use the dashboard — otherwise cancelling appears to do
