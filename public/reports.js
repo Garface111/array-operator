@@ -2884,7 +2884,6 @@
     wrap.appendChild(input); wrap.appendChild(caret); wrap.appendChild(list);
 
     let open = false, active = -1, items = [];
-    let lastPickAt = -1e9;   // guards against ANY reopen right after a selection
 
     const selectedLabel = () => { const o = sel.options[sel.selectedIndex]; return (o && o.value) ? o.textContent : ""; };
     const syncInputToSelection = () => { input.value = selectedLabel(); };
@@ -2899,13 +2898,11 @@
         const el = document.createElement("button");
         el.type = "button"; el.className = "nmg-combo-item"; el.textContent = label;
         if (o.value === sel.value) el.classList.add("is-sel");
-        // Select on CLICK, not mousedown — and stop the click from bubbling to the
-        // enclosing <label class="rep-fld">. Without stopPropagation the label
-        // re-focuses the field right after a pick, which reopened the list (Ford
-        // 2026-07-09: "isn't collapsing once a bill is selected"). mousedown only
-        // preventDefaults so the input keeps focus and doesn't flash a blur.
-        el.addEventListener("mousedown", (e) => { e.preventDefault(); });
-        el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); pick(o.value, label); });
+        // Commit on pointerdown (fires before any focus/click churn), preventDefault so
+        // the press never becomes a focus/label event, stopPropagation so it never
+        // reaches the enclosing <label>. One event, done — nothing left to reopen it.
+        el.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); choose(o.value, label); });
+        el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
         list.appendChild(el); items.push({ value: o.value, label, el });
       }
       if (!items.length) {
@@ -2918,24 +2915,25 @@
     };
 
     const openList = () => { build(input.value === selectedLabel() ? "" : input.value); list.hidden = false; open = true; wrap.classList.add("is-open"); };
-    const closeList = () => { list.hidden = true; open = false; wrap.classList.remove("is-open"); active = -1; };
+    const closeList = () => { if (!open) return; list.hidden = true; open = false; wrap.classList.remove("is-open"); active = -1; };
 
-    function pick(value, label) {
-      // Stamp + CLOSE FIRST, before the change handler runs — so no matter what the
-      // onchange re-render (or the enclosing <label> re-focusing the field) does, the
-      // list is already closed and can't reopen for a moment. Ford hit this repeatedly
-      // ("still not going away when I choose an option"): stopPropagation alone wasn't
-      // enough, so this guard is mechanism-independent.
-      lastPickAt = performance.now();
-      input.value = label; closeList();
+    // Commit a selection: mirror into the native <select>, fire change, CLOSE. Because
+    // opening is NOT tied to focus (below), nothing re-opens the list after this.
+    function choose(value, label) {
+      input.value = label;
+      closeList();
       if (sel.value !== value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     }
 
-    // Focus opens the list — EXCEPT in the ~350ms right after a pick, when a stray
-    // focus (label forwarding, an onchange re-render, a programmatic focus) would
-    // otherwise pop it straight back open. Typing (input) always clears the guard.
-    input.addEventListener("focus", () => { input.select(); if (performance.now() - lastPickAt >= 350) openList(); });
-    input.addEventListener("input", () => { lastPickAt = -1e9; if (!open) openList(); else build(input.value); });
+    // ── THE REBUILD (Ford, 2026-07-09, 5th report) ──────────────────────────────
+    // Open the list ONLY on explicit intent — a pointer press on the field/caret, or
+    // typing. NEVER on focus. The old design opened on focus, so the enclosing
+    // <label> (and onchange re-renders) re-focusing the field after a selection popped
+    // it straight back open; stopPropagation/timestamp patches only masked it. With
+    // open decoupled from focus, a stray refocus is simply inert — the bug can't exist.
+    input.addEventListener("pointerdown", () => { if (!open) openList(); });   // press opens; never closes (so you can edit the search)
+    caret.addEventListener("pointerdown", (e) => { e.preventDefault(); if (open) closeList(); else { input.focus(); openList(); } });
+    input.addEventListener("input", () => { if (!open) openList(); else build(input.value); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault(); if (!open) { openList(); return; }
@@ -2944,13 +2942,13 @@
         items.forEach((it, i) => it.el.classList.toggle("is-active", i === active));
         items[active].el.scrollIntoView({ block: "nearest" });
       } else if (e.key === "Enter") {
-        if (open && active >= 0) { e.preventDefault(); pick(items[active].value, items[active].label); }
+        if (open && active >= 0) { e.preventDefault(); choose(items[active].value, items[active].label); }
       } else if (e.key === "Escape") {
         if (open) { e.preventDefault(); closeList(); syncInputToSelection(); }
       }
     });
-    input.addEventListener("blur", () => { setTimeout(() => { if (open) { closeList(); syncInputToSelection(); } }, 120); });
-    caret.addEventListener("mousedown", (e) => { e.preventDefault(); if (open) closeList(); else input.focus(); });
+    // Close when a press lands anywhere outside the combo (capture phase so it wins).
+    document.addEventListener("pointerdown", (e) => { if (open && !wrap.contains(e.target)) closeList(); }, true);
 
     sel.__combo = { sync: syncInputToSelection };
     syncInputToSelection();
