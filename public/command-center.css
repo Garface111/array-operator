@@ -422,13 +422,17 @@ body.sb-fs-lock{ overflow:hidden; }
   max-height:288px; overflow-y:auto; background:var(--card); border:1px solid var(--line);
   border-radius:11px; padding:5px; display:flex; flex-direction:column; gap:2px;
   box-shadow:0 14px 40px -12px rgba(15,23,42,.4); }
-.nmg-combo-item{ display:block; width:100%; text-align:left; border:1px solid transparent;
+/* flex:0 0 auto is load-bearing: the list is a flex column with a max-height, so
+   without it the default flex-shrink:1 crushes each row from ~36px down to ~18px
+   and clips the text whenever there are more groups than fit — that was the
+   overlapping/"messed up" list. Fixed rows keep full height and the list scrolls. */
+.nmg-combo-item{ display:block; width:100%; flex:0 0 auto; text-align:left; border:1px solid transparent;
   background:transparent; color:var(--ink); font:inherit; font-size:13px; line-height:1.35;
   padding:8px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; overflow:hidden;
   text-overflow:ellipsis; }
 .nmg-combo-item:hover, .nmg-combo-item.is-active{ border-color:rgba(94,194,255,.5); background:rgba(94,194,255,.10); }
 .nmg-combo-item.is-sel{ font-weight:700; }
-.nmg-combo-none{ padding:9px 10px; font-size:12.5px; color:var(--faint); }
+.nmg-combo-none{ flex:0 0 auto; padding:9px 10px; font-size:12.5px; color:var(--faint); }
 
 /* ---- field hint (under an input) ---- */
 .rb-fld-hint{ font-size:11px; color:var(--faint); margin-top:3px; line-height:1.4; }
