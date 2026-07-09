@@ -6197,7 +6197,7 @@
     const autoStatusText = _isVecAttach
       ? {
           ready: `✓ ${_provLabel} bill found — it will attach automatically.`,
-          pending: `${_provLabel} bill will attach automatically once it's pulled or uploaded (none yet).`,
+          pending: `${_provLabel} bill will attach automatically once it's pulled (none yet).`,
           no_gmp: `No ${_provLabel} bill on file for this offtaker yet.`,
         }[d.gmp_auto_status] || ""
       : {
@@ -6293,43 +6293,31 @@
   // operator sees stay true. Mirrors the per-offtaker Edit form one-to-one.
   // ── Invoice-time utility resync ──────────────────────────────────────────
   // A utility-bound offtaker's invoice is only as fresh as the last captured bill.
-  // GMP/VEC/WEC bills land via the extension, so when the latest one on file is old
-  // we auto-trigger a HANDS-OFF background re-sync (SO_RECAPTURE → the extension's
-  // recaptureNow, which now auto-logs-in from the saved utility password) and, once
-  // a newer bill lands, offer one-click regenerate. No manual "open the portal +
-  // sign in + refresh" dance. Degrades gracefully: no extension → the banner just
-  // offers the manual button; no creds → the extension surfaces its own sign-in.
+  // GMP/VEC/WEC bills land via the extension. When the latest one on file is old (or
+  // absent), the banner's "Re-sync latest bill" button OPENS the utility portal so the
+  // operator signs in and the extension captures the newest bill — which lands back
+  // here automatically (SO_CAPTURE_LANDED below → refresh in place). No manual
+  // regenerate. Degrades gracefully: no extension → the banner says to install it.
   const RESYNC_STALE_DAYS = 35;          // a monthly bill should have landed by now
   let _extPresent = false;
-  const _resyncFired = new Set();        // offtaker sids we've auto-synced this session
   try {
     window.addEventListener("message", (e) => {
-      if (e.source === window && e.origin === window.location.origin && e.data &&
-          (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK")) _extPresent = true;
+      if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
+      if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") { _extPresent = true; return; }
+      // A utility bill just landed from a portal the operator re-synced → refresh the
+      // roster and the OPEN offtaker so the freshly-captured bill attaches and the
+      // "no bill on file" banner clears, without a manual regenerate.
+      if (e.data.type === "SO_CAPTURE_LANDED" && e.data.ok) {
+        try { window.dispatchEvent(new CustomEvent("ao:utility-accounts-changed")); } catch (_) {}
+        try { refreshList(); } catch (_) {}
+        try { if (ACTIVE_SUB_ID) selectOfftaker(ACTIVE_SUB_ID, true); } catch (_) {}
+      }
     });
   } catch (_) {}
 
   function _billDaysOld(acct) {
     const t = acct && acct.latest_period_end ? Date.parse(acct.latest_period_end) : NaN;
     return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
-  }
-  // Post SO_RECAPTURE to the extension bridge → background recapture (auto-login aware).
-  function requestUtilityResync(provider, timeoutMs = 120000) {
-    return new Promise((resolve) => {
-      const reqId = "rb-resync-" + provider + "-" + Date.now() + "-" + Math.random();
-      let settled = false;
-      const onMsg = (e) => {
-        if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
-        if (e.data.type === "SO_RECAPTURE_DONE" && e.data.reqId === reqId) {
-          settled = true; window.removeEventListener("message", onMsg);
-          resolve({ ok: !!e.data.ok, captured: !!e.data.captured, error: e.data.error || null });
-        }
-      };
-      window.addEventListener("message", onMsg);
-      try { window.postMessage({ type: "SO_RECAPTURE", vendor: provider, reqId }, window.location.origin); }
-      catch (_) { window.removeEventListener("message", onMsg); resolve({ ok: false, error: "post-failed" }); return; }
-      setTimeout(() => { if (!settled) { window.removeEventListener("message", onMsg); resolve({ ok: false, error: "timeout" }); } }, timeoutMs);
-    });
   }
   // The banner HTML — only for a utility-bound offtaker whose latest bill is stale/absent.
   function resyncBanner(d, utilAccts) {
@@ -6348,37 +6336,36 @@
       <button type="button" class="rb-resync-btn" data-resync-go="${sid}">↻ Re-sync latest bill</button>
       <span class="rb-resync-status" aria-live="polite"></span></div>`;
   }
-  // Wire the banner after render: manual button + a one-time hands-off auto-sync on open.
+  // Wire the banner after render. Re-sync = OPEN the offtaker's utility portal in a
+  // FOREGROUND tab so the operator signs in and the EnergyAgent extension captures the
+  // latest bill, which then lands back here automatically (SO_CAPTURE_LANDED → refresh).
+  // The old path posted SO_RECAPTURE for a silent background recapture, but the
+  // extension's recaptureNow only knows inverter vendors (fronius/sma/chint) — for a
+  // UTILITY code (vec/wec/gmp/…) it returned "unsupported-vendor", so clicking did
+  // NOTHING (Ford 2026-07-09). We now reuse the same SO_OPEN_PORTAL machinery as
+  // "Link utility bills" (sandbox.js window.__aoOpenUtilityPortal), which opens the
+  // real VEC/GMP portal, arms the capture intent, and returns to this tab on capture.
   function wireResync(sid) {
     const banner = document.querySelector(`.rb-resync[data-resync-sid="${sid}"]`);
     if (!banner) return;
     const prov = banner.getAttribute("data-resync-prov");
     const statusEl = banner.querySelector(".rb-resync-status");
     const btn = banner.querySelector(".rb-resync-btn");
-    let busy = false;
-    const run = async () => {
-      if (busy) return; busy = true;
-      if (btn) btn.disabled = true;
-      if (statusEl) statusEl.textContent = "Re-syncing your latest bill…";
-      const res = await requestUtilityResync(prov);
-      busy = false; if (btn) btn.disabled = false;
-      if (res.ok && res.captured) {
-        if (statusEl) statusEl.innerHTML = `✓ Latest bill synced — <button type="button" class="rb-resync-regen" data-regen="${esc(String(sid))}">regenerate to use it</button>`;
-        const rg = statusEl.querySelector("[data-regen]");
-        if (rg) rg.onclick = () => selectOfftaker(sid, true);
-        try { window.dispatchEvent(new CustomEvent("ao:utility-accounts-changed")); } catch (_) {}
-        try { await refreshList(); } catch (_) {}
-      } else if (res.ok) {
-        if (statusEl) statusEl.textContent = "No newer bill found yet.";
-      } else if (res.error === "timeout" || res.error === "post-failed") {
-        if (statusEl) statusEl.textContent = "Couldn't reach the portal — open it once and sign in, then it stays hands-off.";
-      } else {
-        if (statusEl) statusEl.textContent = "Re-sync needs the EnergyAgent extension + your saved utility login.";
+    const provLabel = prov === "gmp" ? "GMP" : (prov || "utility").toUpperCase();
+    const run = () => {
+      const open = window.__aoOpenUtilityPortal;
+      if (typeof open !== "function") {
+        if (statusEl) statusEl.textContent = "Re-sync needs the EnergyAgent extension — install it, then click again.";
+        return;
+      }
+      if (statusEl) statusEl.textContent = `Opening ${esc(provLabel)} — sign in there and your latest bill syncs back here automatically.`;
+      try { open(prov); } catch (_) {
+        if (statusEl) statusEl.textContent = "Couldn't open the portal — use the Link utility bills button instead.";
       }
     };
     if (btn) btn.onclick = run;
-    // Hands-off: auto-sync once per offtaker per session when the extension is present.
-    if (_extPresent && !_resyncFired.has(String(sid))) { _resyncFired.add(String(sid)); run(); }
+    // No hands-off auto-open: opening a portal is a foreground action, so it fires ONLY
+    // on an explicit click — we never yank the operator to the portal on page open.
   }
 
   // Honest default-rate helper for a GMP-bound offtaker's Solar-credit-rate field.

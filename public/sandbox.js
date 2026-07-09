@@ -204,6 +204,15 @@
     // single SmartHub host serves every co-op, so the code disambiguates which one.
     extSend("SO_OPEN_PORTAL", { url, active: true, provider: code, vendor: code });
   }
+  // Exposed primitive so OTHER surfaces (e.g. the offtaker Re-sync-latest-bill banner
+  // in reports.js) can open a utility portal directly — same SO_OPEN_PORTAL machinery
+  // as "Link utility bills", but WITHOUT popping the Add-array modal. Loads the
+  // providers catalog first so ANY connected co-op resolves its host, not just the VT
+  // trio. (Ford 2026-07-09: Re-sync must OPEN the utility so the bill can be captured.)
+  window.__aoOpenUtilityPortal = async function(code){
+    try { await getProviders(); } catch(_){}
+    try { openPortalLogin(code); } catch(_){}
+  };
   // Tell the rest of the app the operator's set of UTILITY accounts may have
   // changed (a GMP/VEC bill-link capture just landed). The offtaker editor
   // (reports.js) listens for this and repopulates its #rbmUtility picker in place
