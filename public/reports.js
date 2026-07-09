@@ -2884,6 +2884,7 @@
     wrap.appendChild(input); wrap.appendChild(caret); wrap.appendChild(list);
 
     let open = false, active = -1, items = [];
+    let lastPickAt = -1e9;   // guards against ANY reopen right after a selection
 
     const selectedLabel = () => { const o = sel.options[sel.selectedIndex]; return (o && o.value) ? o.textContent : ""; };
     const syncInputToSelection = () => { input.value = selectedLabel(); };
@@ -2920,12 +2921,21 @@
     const closeList = () => { list.hidden = true; open = false; wrap.classList.remove("is-open"); active = -1; };
 
     function pick(value, label) {
-      if (sel.value !== value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      // Stamp + CLOSE FIRST, before the change handler runs — so no matter what the
+      // onchange re-render (or the enclosing <label> re-focusing the field) does, the
+      // list is already closed and can't reopen for a moment. Ford hit this repeatedly
+      // ("still not going away when I choose an option"): stopPropagation alone wasn't
+      // enough, so this guard is mechanism-independent.
+      lastPickAt = performance.now();
       input.value = label; closeList();
+      if (sel.value !== value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
     }
 
-    input.addEventListener("focus", () => { input.select(); openList(); });
-    input.addEventListener("input", () => { if (!open) openList(); else build(input.value); });
+    // Focus opens the list — EXCEPT in the ~350ms right after a pick, when a stray
+    // focus (label forwarding, an onchange re-render, a programmatic focus) would
+    // otherwise pop it straight back open. Typing (input) always clears the guard.
+    input.addEventListener("focus", () => { input.select(); if (performance.now() - lastPickAt >= 350) openList(); });
+    input.addEventListener("input", () => { lastPickAt = -1e9; if (!open) openList(); else build(input.value); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault(); if (!open) { openList(); return; }
