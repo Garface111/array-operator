@@ -4289,7 +4289,10 @@
   }
 
   function groupOfftakersByUtility(rows, utilAccts) {
-    if (!rows || rows.length <= 5) return null;
+    // Ford, 2026-07-09: the array/utility-organized view is now the DEFAULT for
+    // every fleet, not just 5+ offtakers. (Small fleets default EXPANDED below —
+    // see _smallFleet — so nothing is hidden behind a collapsed header.)
+    if (!rows || !rows.length) return null;
     const acctById = {};
     (utilAccts || []).forEach(a => { if (a.utility_account_id != null) acctById[String(a.utility_account_id)] = a; });
     // Anna-shape fleets: when (nearly) every offtaker bills off their OWN meter,
@@ -4509,9 +4512,13 @@
     // wrapper headers (with pills computed off the filtered subset) is noise;
     // the operator asked for specific offtakers, show exactly those cards.
     const groups = q ? null : groupOfftakersByUtility(viewRows, utilAccts);
+    // Small fleets (<=5 offtakers) default EXPANDED so every card shows on load —
+    // the grouping is just an array/utility label, not a click-to-reveal wall. Larger
+    // fleets default collapsed (lazy-render perf + scannability). Ford, 2026-07-09.
+    const _smallFleet = !q && (viewRows || []).length <= 5;
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
-      if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = true;   // default collapsed
+      if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
       const collapsed = !!GROUP_COLLAPSED[g.key];
       return `
         <div class="rb-grp${collapsed ? " collapsed" : ""}">
@@ -4546,7 +4553,7 @@
         }
       }
       body = providers.map(pv => {
-        if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = true;   // default collapsed
+        if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = !_smallFleet;   // small fleet → expanded
         const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
         const nAcct = pv.groups.length;
         // Array-grouped fleets (own-meter shape): the middle level is arrays,
