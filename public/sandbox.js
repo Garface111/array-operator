@@ -176,7 +176,11 @@
     _pairFetching = true;
     try {
       const r = await fetch("/v1/account", { headers:{ Authorization:"Bearer "+s } });
-      if(r.ok){ const a = await r.json(); if(a && a.tenant_key) _pairKey = a.tenant_key; }
+      // NEVER pair a demo/read-only account: its captures are refused server-side
+      // (403 demo-read-only), so pairing the extension to it just breaks capture for
+      // an operator who happens to also be viewing the demo, or is signed into two
+      // accounts at once. Only a real account may become the extension's capture target.
+      if(r.ok){ const a = await r.json(); if(a && a.tenant_key && !a.is_demo) _pairKey = a.tenant_key; }
     } catch(_){} finally { _pairFetching = false; }
     return _pairKey;
   }
