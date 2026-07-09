@@ -926,6 +926,47 @@ function updateTrialNudge(session){
 }
 try { window.updateTrialNudge = updateTrialNudge; } catch(e){}
 
+// ── Extension-live-data note ────────────────────────────────────────────────
+// Fronius/SMA/Chint have no official cloud API we can poll server-side yet
+// (SolarEdge already does — it never needs this), so their data only refreshes
+// while a signed-in browser with the EnergyAgent extension is open. Ford,
+// 2026-07-08: tell owners plainly, once, quietly — not an urgent/red warning,
+// just context so a closed laptop doesn't read as "the product stopped
+// working." Driven by FleetStore (not a fetch) so it reacts the instant a
+// Fronius/SMA/Chint array is connected, no reload needed.
+const _EXT_LIVE_VENDORS = new Set(["fronius", "sma", "chint"]);
+function _extLiveVendorsPresent(){
+  try {
+    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()) return false;
+    const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
+    return arrays.some(a => _EXT_LIVE_VENDORS.has(a.vendor));
+  } catch(e){ return false; }
+}
+function updateExtLiveNudge(){
+  const bar = document.getElementById("extLiveNudge");
+  if(!bar) return;
+  if(localStorage.getItem("ao_extlivenudge_dismiss") === "1"){ bar.hidden = true; return; }
+  if(!_extLiveVendorsPresent()){ bar.hidden = true; return; }
+  const copy = document.getElementById("extLiveNudgeCopy");
+  if(copy){
+    copy.innerHTML = "While we finish linking SMA's official API, Fronius and SMA portals can only " +
+      "refresh while Chrome is open. Please consider leaving your browser open for live data — " +
+      "<b>this will be resolved soon.</b>";
+  }
+  const x = document.getElementById("extLiveNudgeX");
+  if(x){
+    x.onclick = function(){
+      try { localStorage.setItem("ao_extlivenudge_dismiss", "1"); } catch(e){}
+      bar.hidden = true;
+    };
+  }
+  bar.hidden = false;
+}
+try {
+  window.updateExtLiveNudge = updateExtLiveNudge;
+  if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(updateExtLiveNudge); }
+} catch(e){}
+
 // ── Cancelled-account lockout ──────────────────────────────────────────────
 // A cancelled account (subscription_status "cancelled"/"canceled" + active===false)
 // must NOT be able to use the dashboard — otherwise cancelling appears to do
