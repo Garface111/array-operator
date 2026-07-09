@@ -2898,7 +2898,13 @@
         const el = document.createElement("button");
         el.type = "button"; el.className = "nmg-combo-item"; el.textContent = label;
         if (o.value === sel.value) el.classList.add("is-sel");
-        el.addEventListener("mousedown", (e) => { e.preventDefault(); pick(o.value, label); });
+        // Select on CLICK, not mousedown — and stop the click from bubbling to the
+        // enclosing <label class="rep-fld">. Without stopPropagation the label
+        // re-focuses the field right after a pick, which reopened the list (Ford
+        // 2026-07-09: "isn't collapsing once a bill is selected"). mousedown only
+        // preventDefaults so the input keeps focus and doesn't flash a blur.
+        el.addEventListener("mousedown", (e) => { e.preventDefault(); });
+        el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); pick(o.value, label); });
         list.appendChild(el); items.push({ value: o.value, label, el });
       }
       if (!items.length) {
