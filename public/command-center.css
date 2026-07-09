@@ -286,6 +286,8 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-rev-name{ min-width:150px; } .rb-rev-arr{ min-width:260px; } .rb-rev-email{ min-width:150px; }
 .rb-rev-arrbox{ display:flex; align-items:center; gap:7px; }
 .rb-rev-arrbox .rb-rev-arrsel{ flex:1 1 auto; cursor:pointer; }
+.rb-rev-subbox{ display:flex; align-items:center; gap:7px; margin-top:5px; }
+.rb-rev-subbox .rb-rev-subsel{ flex:1 1 auto; cursor:pointer; }
 .rb-rev-raw{ font-size:10.5px; color:var(--faint); margin-top:3px; }
 .rb-rev-err{ font-size:11px; color:var(--bad); margin-top:3px; }
 /* confidence badge */

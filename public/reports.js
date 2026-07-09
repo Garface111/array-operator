@@ -3646,6 +3646,41 @@
   function bulkArrayById(id) {
     return BULK_ARRAYS.find(a => String(a.array_id) === String(id)) || null;
   }
+  // The net meter group's accounts (sharing array_id) from the full utility-account
+  // list — the sub-accounts a bulk row's offtaker could bill from. Empty until the
+  // review loads ARR_UTIL_ACCTS (bulkPreviewFile primes it).
+  function bulkGroupAccts(arrayId) {
+    if (arrayId == null) return [];
+    return (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrayId));
+  }
+  // Auto-match a bulk row to the offtaker's OWN sub-account by name (unless the
+  // operator picked one). Refines the server's representative account to the
+  // name-matched sub-account when the group has more than one; `_subMatched` drives
+  // the "✨ matched by name" badge. Single-account groups keep their one account.
+  function bulkAutoMatchRow(row) {
+    row._subMatched = false;
+    if (row._subPicked) return;
+    const grp = bulkGroupAccts(row.array_id);
+    if (grp.length < 2) return;
+    const m = matchSubAccount(row.offtaker_name, grp);
+    if (m) { row.utility_account_id = m.account.utility_account_id; row._subMatched = true; }
+    else if (!grp.some(a => String(a.utility_account_id) === String(row.utility_account_id))) {
+      const h = hostAccountId(grp);
+      if (h) row.utility_account_id = Number(h);
+    }
+  }
+  // The optional per-row sub-account picker, shown only when the group has >1
+  // account (the only case a choice exists) — mirrors the add-offtaker flow.
+  function bulkSubAccountCellHTML(row) {
+    const grp = bulkGroupAccts(row.array_id);
+    if (grp.length < 2) return "";
+    const opts = grp.map(a =>
+      `<option value="${a.utility_account_id}"${String(a.utility_account_id) === String(row.utility_account_id) ? " selected" : ""}>${esc(billLabel(a))}</option>`).join("");
+    const badge = row._subMatched
+      ? `<span class="rb-conf rb-conf-ok" title="Matched to this offtaker's own sub-account by name — change it if they meter elsewhere.">✨ matched by name</span>` : "";
+    return `<div class="rb-rev-subbox">
+      <select class="rb-rev-in rb-rev-subsel" data-f="utility_account_id" title="Offtaker's sub-account">${opts}</select>${badge}</div>`;
+  }
   function bulkArrayLabel(a) {
     // Vendor-free (Ford 2026-07-09): lead with the utility identity (provider · acct
     // · nickname); fall back to the array name only when no utility account is linked
@@ -3958,6 +3993,7 @@
             <select class="rb-rev-in rb-rev-arrsel" data-f="array_id">${bulkArrayOptions(row.array_id)}</select>
             ${bulkConfBadge(row)}
           </div>
+          ${bulkSubAccountCellHTML(row)}
           ${row.array_name_raw ? `<div class="rb-rev-raw">from your file: “${esc(row.array_name_raw)}”</div>` : ""}
           ${errs}
         </td>
@@ -4035,7 +4071,17 @@
           row.array_id = newId;
           const a = bulkArrayById(newId);
           row.utility_account_id = a ? a.utility_account_id : null;
+          row._subPicked = false;                      // new group → auto-match its sub-account
+          bulkAutoMatchRow(row);
           renderBulkReview();                          // full re-render: badge + pill + summary
+        };
+      } else if (f === "utility_account_id") {
+        // Explicit sub-account pick → pin it (auto-match stops overriding).
+        el.onchange = () => {
+          const row = BULK_ROWS[i];
+          row.utility_account_id = el.value ? Number(el.value) : null;
+          row._subPicked = true;
+          renderBulkReview();
         };
       } else {
         // Text/number fields: update state live; refresh the row's pill + summary
@@ -4047,6 +4093,15 @@
           else if (f === "discount_pct") row.discount_pct = v === "" ? null : Number(v) / 100;
           else row[f] = v;                             // offtaker_name / email
           refreshBulkRowPill(tr, i);
+        };
+        // Re-run sub-account auto-match when the name settles (blur), for groups
+        // with a real choice and no explicit pick yet.
+        if (f === "offtaker_name") el.onchange = () => {
+          const row = BULK_ROWS[i];
+          if (!row._subPicked && bulkGroupAccts(row.array_id).length > 1) {
+            bulkAutoMatchRow(row);
+            renderBulkReview();
+          }
         };
       }
     });
@@ -4118,6 +4173,12 @@
         errors: r.errors || [],
         _confirmed: (r.confidence === "exact" || r.confidence === "high"),
       }));
+
+      // Prime the full utility-account list (shared with the add-offtaker form) so
+      // each row can offer its group's sub-accounts, then auto-match every row to
+      // the offtaker's OWN sub-account by name.
+      if (!ARR_UTIL_ACCTS) { ARR_UTIL_ACCTS = await fetchUtilityAccounts(); }
+      BULK_ROWS.forEach(bulkAutoMatchRow);
 
       if (reparse) {
         // Operator confirmed columns → straight to the per-row array review.
@@ -6410,22 +6471,12 @@
     const boundAcct = (utilAccts || []).find(a => String(a.utility_account_id) === String(d.utility_account_id));
     const boundProv = boundAcct ? (boundAcct.provider || "gmp").toLowerCase() : "";
     const isSmartHubBound = !!boundProv && boundProv !== "gmp";
+    // Vendor-free labels (billLabel: nickname → service address → provider+acct#,
+    // + bill status) — consistent with the add-offtaker sub-account picker, never
+    // the array/inverter name (Ford 2026-07-09: no vendor info in this generator).
     const billOpts = (utilAccts || []).map(a => {
-      // Provider-aware: GMP shows its paper-bill count; VEC/SmartHub shows a "VEC ·"
-      // tag (it has no GMP-shaped bill — it bills from measured generation × rate).
-      const prov = (a.provider || "gmp").toLowerCase();
-      const isGmp = prov === "gmp";
-      const bills = isGmp
-        ? (a.bill_count != null ? ` (${a.bill_count} bill${a.bill_count === 1 ? "" : "s"})`
-                                : (a.has_bill ? " (bill on file)" : ""))
-        : "";
-      const tag = isGmp ? "" : prov.toUpperCase() + " · ";
-      // Label by the array name the account feeds (recognizable site), not the raw
-      // account number. Fall back to nickname, then the account number.
-      const nm = a.array_name || a.nickname;
-      const lbl = nm ? (tag + nm + bills) : (tag + "acct " + (a.account_number || "?") + bills);
       const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
-      return `<option value="${a.utility_account_id}" ${sel}>${esc(lbl)}</option>`;
+      return `<option value="${a.utility_account_id}" ${sel}>${esc(billLabel(a))}</option>`;
     }).join("");
     // Show the GMP-bill link for EVERY offtaker, INCLUDING workbook offtakers. The linked
     // utility_account_id drives the GMP-bill auto-attach (api/billing/delivery.py); it does
@@ -6450,11 +6501,13 @@
           <label class="rep-fld req"><span class="rl">Offtaker name</span>
             <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
           ${showBillPicker ? `
-          <label class="rep-fld req"><span class="rl">Which utility account?</span>
+          <label class="rep-fld req"><span class="rl">Offtaker's sub-account</span>
             <select data-of="utility_account_id">
               <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
+              <option value="__auto__">✨ Auto-match to this offtaker</option>
               ${billOpts}
-            </select></label>` : ""}
+            </select>
+            <span class="rb-fld-hint">Link this offtaker to their own GMP sub-account, or ✨ Auto-match by name. Changing it re-derives their group share automatically.</span></label>` : ""}
           <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
           <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
@@ -6800,6 +6853,12 @@
     if (!d) return;
     const raw = inp.value;
     ACTIVE_DRAFT_ID = did;                       // preview tracks the edited draft
+    // "✨ Auto-match" chosen in the sub-account picker → resolve by name, don't
+    // persist the literal sentinel.
+    if (field === "utility_account_id" && raw === "__auto__") {
+      applyEditAutoMatch(card, box, did, sid, d, inp);
+      return;
+    }
     // Optimistic repaint for what the preview/grid can honestly show right now.
     if (field === "customer_name") {
       d.customer_name = raw;
@@ -6827,6 +6886,33 @@
     if (body === null) return;                   // nothing to persist (blank required)
     scheduleOfftakerPatch(card, box, did, sid, body,
       OF_MONEY_FIELDS.has(field), OF_RECHECK_FIELDS.has(field));
+  }
+
+  // Edit-tab "✨ Auto-match": resolve the offtaker's OWN sub-account by matching
+  // their name against their net meter group's accounts, then PATCH the binding
+  // (the backend re-routes the group share into array_share_pct). No unique match
+  // → revert the select + say so; never bind a guess on a billing path.
+  function applyEditAutoMatch(card, box, did, sid, d, inp) {
+    const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
+    const arrId = subRec.array_id != null ? subRec.array_id : d.array_id;
+    const grp = (INBOX_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
+    const st = box && box.querySelector(".rb-offedit-status");
+    const m = matchSubAccount(d.customer_name || "", grp);
+    if (m) {
+      const uid = m.account.utility_account_id;
+      inp.value = String(uid);                   // reflect the resolved pick in the select
+      d.utility_account_id = uid;
+      renderDraftDoc();
+      scheduleOfftakerPatch(card, box, did, sid, { utility_account_id: Number(uid) }, true, true);
+      if (st) { st.className = "rb-status rb-ok"; st.textContent =
+        "✨ Linked to " + (m.account.nickname || m.account.service_address
+          || ("acct " + (m.account.account_number || "?"))) + " by name."; }
+    } else {
+      inp.value = d.utility_account_id != null ? String(d.utility_account_id) : "";  // revert
+      if (st) { st.className = "rb-status"; st.textContent = grp.length > 1
+        ? "No confident name match — pick a sub-account above."
+        : "This group has a single utility account — nothing to auto-match."; }
+    }
   }
 
   function ofPatchBody(field, raw) {
