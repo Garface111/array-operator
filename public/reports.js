@@ -3216,13 +3216,28 @@
   // Master + sub <option> lists for the two-dropdown picker. Both list EVERY
   // account; the current binding preselects the MASTER dropdown when it's a group
   // host others share, else the SUB dropdown (an individual own meter).
-  function masterSubOptions(accts, offtakers, boundId) {
+  function masterSubOptions(accts, offtakers, boundId, groupArrayId) {
     const masters = masterAccountIds(offtakers);
     const bound = boundId != null && boundId !== "" ? String(boundId) : "";
     const boundIsMaster = !!bound && masters.has(bound);
+    // Which account preselects in the MASTER dropdown:
+    //   1. the bound account itself, when it IS the group host (a %-share offtaker with
+    //      no own meter bills the master directly); else
+    //   2. derive the group's host from the offtaker's array_id — a SUB-metered offtaker
+    //      (own meter, allocation_pct=1.0) is bound to their OWN account, so the master
+    //      can't come from the bound account; it lives on the GROUP (array_id). Without
+    //      this the master read "— none —" even though the group was set — Bruce's "St J
+    //      Pump Plant" (bound to sub 'St J Main St', group = Timberworks). Ford 2026-07-10.
+    let masterSel = boundIsMaster ? bound : "";
+    if (!masterSel && groupArrayId != null && groupArrayId !== "") {
+      const groupHosts = (accts || []).filter(a =>
+        a && a.array_id != null && String(a.array_id) === String(groupArrayId)
+        && String(a.utility_account_id) !== bound);   // never the offtaker's own sub-account
+      const host = hostAccountId(groupHosts);
+      if (host) masterSel = host;
+    }
     return {
-      masterHTML: accountOptionsFlat(accts, boundIsMaster ? bound : "",
-        `<option value="">— none —</option>`),
+      masterHTML: accountOptionsFlat(accts, masterSel, `<option value="">— none —</option>`),
       subHTML: accountOptionsFlat(accts, (bound && !boundIsMaster) ? bound : "",
         `<option value="">— none (bill their share of the master) —</option>`),
     };
@@ -6667,7 +6682,7 @@
     // the array/inverter name (Ford 2026-07-09: no vendor info in this generator).
     // Two dropdowns (Ford 2026-07-10): master account (group host) + optional
     // sub-account (own meter). The bound account preselects whichever it is.
-    const msOpts = masterSubOptions(utilAccts, OFFTAKERS, d.utility_account_id);
+    const msOpts = masterSubOptions(utilAccts, OFFTAKERS, d.utility_account_id, editArrayId);
     // Show the GMP-bill link for EVERY offtaker, INCLUDING workbook offtakers. The linked
     // utility_account_id drives the GMP-bill auto-attach (api/billing/delivery.py); it does
     // NOT change a workbook offtaker's amount (that bills from source_workbook, which takes
