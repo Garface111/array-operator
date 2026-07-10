@@ -4983,12 +4983,23 @@
     // offtaker Anna shape) still paints ~2 headers, not ~800 cards.
     const AUTO_EXPAND_MAX = 40;
     const _smallFleet = !q && (viewRows || []).length <= AUTO_EXPAND_MAX;
+    // Each master net-meter group gets a stable, distinct background tint (Ford
+    // 2026-07-10) so masters read apart at a glance — the colour is keyed off the
+    // array_id (mod the palette) so a group keeps its colour across renders.
+    const GRP_TONES = 8;
+    const grpToneIndex = (key) => {
+      const m = /^a:(\d+)/.exec(key || "");
+      let n;
+      if (m) { n = parseInt(m[1], 10); }
+      else { n = 0; for (const c of String(key || "")) n = (n * 31 + c.charCodeAt(0)) >>> 0; }
+      return ((n % GRP_TONES) + GRP_TONES) % GRP_TONES;
+    };
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
       const collapsed = !!GROUP_COLLAPSED[g.key];
       return `
-        <div class="rb-grp${collapsed ? " collapsed" : ""}">
+        <div class="rb-grp rb-grp-tinted${collapsed ? " collapsed" : ""}" data-grp-tone="${grpToneIndex(g.key)}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
                aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers ${g.shareMode === "array" ? "in this array" : "on this utility bill"}">
             <span class="rb-grp-caret" aria-hidden="true">▾</span>

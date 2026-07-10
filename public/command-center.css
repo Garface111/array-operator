@@ -1334,6 +1334,25 @@ html[data-theme="day"] .rep-fld.req > select{
   color:var(--faint,#94a3b8); transition:transform .15s ease; flex:none; }
 .rb-grp-head[aria-expanded="false"] .rb-grp-caret{ transform:rotate(-90deg); }
 .rb-grp.collapsed .rb-grp-head{ border-bottom-color:transparent; margin-bottom:0; }
+/* Each master net-meter group is a subtly-tinted floating card (Ford 2026-07-10),
+   like the offtaker-details sections — so the masters (Chester / Londonderry /
+   Waterford …) read apart at a glance. Colour is stable per array. The offtaker
+   cards inside stay white, sitting on the tint (same as the sections' white pills). */
+.rb-grp-tinted{ padding:6px 12px 8px; border-radius:14px; margin-bottom:14px;
+  border:1px solid var(--grp-bd,rgba(100,116,139,.22));
+  background:var(--grp-bg,rgba(100,116,139,.06)); box-shadow:0 1px 2px rgba(15,23,42,.04); }
+.rb-grp-tinted .rb-grp-head{ border-bottom-color:var(--grp-bd,rgba(100,116,139,.22)); }
+.rb-grp-tinted .rb-grp-label{ color:var(--grp-ink,var(--ink,#0f172a)); }
+.rb-grp-tinted .rb-grp-caret{ color:var(--grp-ink,var(--faint,#94a3b8)); }
+.rb-grp-tinted .rb-grp-head:hover{ background:rgba(255,255,255,.35); }
+.rb-grp-tinted[data-grp-tone="0"]{ --grp-bg:rgba(16,185,129,.09);  --grp-bd:rgba(16,185,129,.26); --grp-ink:#047857; }
+.rb-grp-tinted[data-grp-tone="1"]{ --grp-bg:rgba(14,165,233,.09);  --grp-bd:rgba(14,165,233,.26); --grp-ink:#0369a1; }
+.rb-grp-tinted[data-grp-tone="2"]{ --grp-bg:rgba(245,158,11,.10);  --grp-bd:rgba(245,158,11,.30); --grp-ink:#92600a; }
+.rb-grp-tinted[data-grp-tone="3"]{ --grp-bg:rgba(139,92,246,.09);  --grp-bd:rgba(139,92,246,.28); --grp-ink:#6d28d9; }
+.rb-grp-tinted[data-grp-tone="4"]{ --grp-bg:rgba(244,63,94,.08);   --grp-bd:rgba(244,63,94,.24);  --grp-ink:#be123c; }
+.rb-grp-tinted[data-grp-tone="5"]{ --grp-bg:rgba(20,184,166,.09);  --grp-bd:rgba(20,184,166,.27); --grp-ink:#0f766e; }
+.rb-grp-tinted[data-grp-tone="6"]{ --grp-bg:rgba(99,102,241,.09);  --grp-bd:rgba(99,102,241,.27); --grp-ink:#4338ca; }
+.rb-grp-tinted[data-grp-tone="7"]{ --grp-bg:rgba(217,70,239,.08);  --grp-bd:rgba(217,70,239,.24); --grp-ink:#a21caf; }
 .rb-grp-label{ font-size:12.5px; font-weight:750; color:var(--ink,#0f172a); letter-spacing:-.005em; }
 .rb-grp-count{ font-size:11.5px; color:var(--faint,#94a3b8); }
 .rb-grp-pctwrap{ margin-left:auto; position:relative; display:inline-flex; }
