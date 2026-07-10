@@ -4507,14 +4507,15 @@
       company = "";
     }
 
-    // One flat list of rows: identity → login & password → auto-refresh → bill → payment.
+    // Auto-refresh LEADS (Ford: it's the heart of the service) as a full-width panel, then
+    // the identity → login & password → plan → bill → payment rows below it.
     list.innerHTML =
+      autoRefreshRow() +
       rowEdit("Name", "name", operator, "Your name") +
       rowEdit("Company", "company", company, "Add your company name") +
       rowEdit("Email", "email", email, "you@example.com") +
       rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
       passwordRow(a) +
-      autoRefreshRow() +
       planRow() +
       rowStatic("Your bill",
         `<div class="ao-bill" id="aoBill"><span class="ao-bill-load">Loading…</span></div>`) +
@@ -4750,22 +4751,23 @@
     });
   }
 
+  // Auto-refresh is the heart of the service, so it leads the Master Account tab as its
+  // own full-width panel (Ford 2026-07-10) — not a cramped 2-column acct-row that left the
+  // label column empty. Header states the value + privacy; the body lays the portals out in
+  // a responsive grid so there's no dead space.
   function autoRefreshRow(){
-    let collapsed = true;   // collapsed by default — the vendor cards are bulky
-    try { collapsed = localStorage.getItem("ao_ar_open") !== "1"; } catch(e){}
-    return `<div class="acct-row" id="rowAutoRefresh">
-      <div class="r-k">Auto-refresh</div>
-      <div class="r-v">
-        <button type="button" id="arToggle" class="ar-toggle${collapsed?"":" open"}" aria-expanded="${!collapsed}" aria-controls="arBody">
-          <span class="ar-caret" aria-hidden="true">▸</span>
-          <span id="arState">Keeps your live production and utility bills fresh automatically.</span>
-        </button>
-        <div class="ar-body${collapsed?" ar-collapsed":""}" id="arBody">
-          <span class="r-sub">Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</span>
-          <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+    return `<section class="ar-panel">
+      <div class="ar-panel-head">
+        <span class="ar-panel-ic" aria-hidden="true">↻</span>
+        <div class="ar-panel-hd">
+          <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
+          <p>Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
         </div>
       </div>
-    </div>`;
+      <div class="ar-body" id="arBody">
+        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+      </div>
+    </section>`;
   }
 
   async function wireAutoRefreshRow(){
@@ -4879,6 +4881,16 @@
           </div>
         </div>
       </div>`;
+
+    // Panel stat — how many portals are actively refreshing (a quiet health signal).
+    const statEl = document.getElementById("arPanelStat");
+    if(statEl){
+      let on = 0;
+      AR_INVERTERS.forEach(v => { const s = status[v.id]; if(s && s.hasCreds && s.enabled !== false) on++; });
+      Object.keys(status).forEach(k => { const s = status[k]; if(s && s.utility && s.hasCreds && s.enabled !== false) on++; });
+      statEl.textContent = on ? `${on} portal${on === 1 ? "" : "s"} refreshing` : "";
+      statEl.className = "ar-panel-stat" + (on ? " on" : "");
+    }
 
     // ── wire credential rows (inverter + utility) ──
     listEl.querySelectorAll(".ar-row").forEach(row => {

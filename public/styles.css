@@ -184,6 +184,31 @@
   #rowAutoRefresh .ar-body{cursor:default}
   .ar-body.ar-collapsed{display:none}
   .ar-list{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+  /* Auto-refresh as the LEAD full-width panel of Master Account (Ford 2026-07-10): a real
+     card with a header + value/privacy line, portals laid out in a responsive grid so the
+     whole thing packs snugly with no dead left column. */
+  .ar-panel{background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px 20px;margin:0 0 22px}
+  .ar-panel-head{display:flex;gap:14px;align-items:flex-start}
+  .ar-panel-ic{flex:0 0 auto;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+    font-size:19px;color:var(--good,#2563eb);background:rgba(37,99,235,.10);border:1px solid rgba(37,99,235,.22)}
+  .ar-panel-hd{min-width:0}
+  .ar-panel-hd h3{margin:0;font-size:16.5px;font-weight:770;letter-spacing:-.01em;color:var(--ink);
+    display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  .ar-panel-hd p{margin:5px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5;max-width:82ch}
+  .ar-panel-hd p b{color:var(--ink);font-weight:650}
+  .ar-panel-stat{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 10px;border-radius:999px;color:var(--faint)}
+  .ar-panel-stat.on{color:#047857;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.30)}
+  .ar-panel .ar-body{margin-top:17px;cursor:default}
+  .ar-panel .ar-list{margin-top:0;display:flex;flex-direction:column;gap:20px}
+  /* Each group: head spans the row, portal cards flow into a 2-up responsive grid. */
+  .ar-panel .ar-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px;align-items:start}
+  .ar-panel .ar-group + .ar-group{margin-top:0}
+  .ar-panel .ar-group-head{grid-column:1/-1;margin-bottom:0}
+  .ar-panel .ar-addutil{grid-column:1/-1}
+  .ar-panel .ar-row{background:rgba(15,23,42,.018)}
+  .ar-panel .ar-util{grid-column:auto}
+  @media(max-width:640px){ .ar-panel{padding:15px 15px 16px} .ar-panel .ar-group{grid-template-columns:1fr} }
   /* grouped credential sections: Inverter portals / Utility portals */
   .ar-group{display:flex;flex-direction:column;gap:9px}
   .ar-group + .ar-group{margin-top:8px}
