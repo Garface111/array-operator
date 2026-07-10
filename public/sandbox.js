@@ -4710,6 +4710,26 @@
     return null;
   };
 
+  // Live-sync with the EnergyAgent popup (Ford 2026-07-10: "fill it in one place, it
+  // should show in the other"). The popup writes the SAME vault, but it lives in a
+  // separate window — the page never hears about a save/remove made there. So whenever
+  // this tab regains focus (returning from the popup) and the Auto-refresh panel is on
+  // screen, drop the cached status and re-query, so a login just saved in the extension
+  // appears here without a manual reload. Debounced; a no-op when the panel isn't shown.
+  let _arFocusQueued = false;
+  function _arRefreshOnFocus(){
+    if(_arFocusQueued) return;
+    if(location.hash !== "#account" || !document.getElementById("arList")) return;
+    _arFocusQueued = true;
+    setTimeout(() => {
+      _arFocusQueued = false;
+      _vaultStatusCache = null;
+      if(location.hash === "#account" && document.getElementById("arList")) wireAutoRefreshRow();
+    }, 150);
+  }
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") _arRefreshOnFocus(); });
+  window.addEventListener("focus", _arRefreshOnFocus);
+
   // Fill the auto-login hint placeholders on every extension-captured array card.
   // Runs after each canvas render; cached so vault is only queried once per session
   // (invalidated by vault save so the hints disappear immediately after credentials are saved).
@@ -4867,7 +4887,10 @@
         <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Live production, refreshed automatically every few minutes.</span></div>
         ${AR_INVERTERS.map(v => {
           const st = status[v.id] || { hasCreds:false, enabled:true };
-          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false });
+          // Show the saved username (Ford 2026-07-10) so a login saved in the extension
+          // popup reads as clearly present here, not a blank row. Needs the extension's
+          // status() to return `username` for inverters (v1.9.120+); harmless before then.
+          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "" });
         }).join("")}
       </div>
       <div class="ar-group">
