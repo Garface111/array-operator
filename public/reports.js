@@ -3123,6 +3123,71 @@
     return host === null ? "" : String(host);
   }
 
+  // ── Parent ↔ child (master ↔ sub) account grouping ─────────────────────────
+  // GMP publishes NO net-meter group-membership table (verified against Bruce's
+  // real bills — the bill JSON has no allocation/member list, and the isPrimary
+  // flag is unset on virtually every account). So "master vs sub" can only be
+  // derived from the operator's OWN offtaker setup: an account that ≥2 offtakers
+  // bill off — or that ANY offtaker bills a FRACTIONAL (<100%) share off — is a
+  // MASTER / group host (e.g. "Chester", whose five LRHC offtakers each take
+  // 1–25% of its group excess). Every other account is an individual sub-meter an
+  // offtaker can bill directly off (topology A). We surface BOTH as a two-level
+  // <optgroup> hierarchy so the operator always sees the master account and the
+  // sub-accounts and can pick either (Ford 2026-07-10).
+  function masterAccountIds(offtakers) {
+    const byAcct = new Map();                       // utility_account_id -> [shares]
+    for (const o of (offtakers || [])) {
+      const uid = o && o.utility_account_id;
+      if (uid == null) continue;
+      const k = String(uid);
+      if (!byAcct.has(k)) byAcct.set(k, []);
+      byAcct.get(k).push(o.allocation_pct);
+    }
+    const masters = new Set();
+    for (const [k, shares] of byAcct) {
+      const fractional = shares.some(p => p != null && Number(p) > 0 && Number(p) < 0.999);
+      if (shares.length >= 2 || fractional) masters.add(k);   // shared host OR a %-share host
+    }
+    return masters;
+  }
+
+  // Build the grouped <option>/<optgroup> HTML for an offtaker's utility-account
+  // <select>. Splits the accounts into ⭐ Master (group host) and 🏠 Individual
+  // meters, floats a name-matched own-meter to the top of the sub list (✨), and
+  // preselects `selectedId`. `leadHTML` is prepended verbatim (the placeholder /
+  // "Auto-match" rows). Falls back to one flat, alphabetized list when there isn't
+  // enough signal to split (no offtakers yet, or every account is a master).
+  function groupedAccountOptions(accts, offtakers, cfg) {
+    cfg = cfg || {};
+    const list = (accts || []).filter(a => a && a.utility_account_id != null);
+    const masters = masterAccountIds(offtakers);
+    const selStr = cfg.selectedId != null && cfg.selectedId !== "" ? String(cfg.selectedId) : "";
+    const nameMatch = cfg.offtakerName ? matchSubAccount(cfg.offtakerName, list) : null;
+    const matchedId = nameMatch ? String(nameMatch.account.utility_account_id) : "";
+    const byLabel = (x, y) => billLabel(x).localeCompare(billLabel(y));
+    const opt = (a) => {
+      const id = String(a.utility_account_id);
+      const star = (id === matchedId && id !== selStr) ? "✨ " : "";
+      return `<option value="${id}"${id === selStr ? " selected" : ""}>${star}${esc(billLabel(a))}</option>`;
+    };
+    const masterAccts = list.filter(a => masters.has(String(a.utility_account_id))).sort(byLabel);
+    const subAccts = list.filter(a => !masters.has(String(a.utility_account_id))).sort((x, y) => {
+      const xm = String(x.utility_account_id) === matchedId ? 0 : 1;   // own-meter match floats up
+      const ym = String(y.utility_account_id) === matchedId ? 0 : 1;
+      return (xm - ym) || byLabel(x, y);
+    });
+    let html = cfg.leadHTML || "";
+    if (masterAccts.length && subAccts.length) {
+      html += `<optgroup label="⭐ Master accounts — bill a share of the whole group">`
+            + masterAccts.map(opt).join("") + `</optgroup>`
+            + `<optgroup label="🏠 Individual meters — bill directly off their own account">`
+            + subAccts.map(opt).join("") + `</optgroup>`;
+    } else {
+      html += list.slice().sort(byLabel).map(opt).join("");
+    }
+    return html;
+  }
+
   // Multi-account group: render the OPTIONAL sub-account link with auto-match as
   // its default first option. An explicit prior pick survives repaints; otherwise
   // the live matcher (applyAutoMatch) chooses from the offtaker's name.
@@ -3133,8 +3198,12 @@
     const lbl = $("#rbmUtilLabel");
     if (lbl) lbl.textContent = "Offtaker's sub-account (optional)";
     const prev = usel.value, userPicked = usel.dataset.userPicked === "1";
-    usel.innerHTML = `<option value="">✨ Auto-match to this offtaker</option>` +
-      mine.map(a => `<option value="${a.utility_account_id}">${esc(billLabel(a))}</option>`).join("");
+    // Same parent↔child hierarchy as the edit panel: ⭐ master vs 🏠 own meter.
+    usel.innerHTML = groupedAccountOptions(mine, OFFTAKERS, {
+      selectedId: userPicked ? prev : "",
+      offtakerName: ($("#rbmName") ? $("#rbmName").value.trim() : ""),
+      leadHTML: `<option value="">✨ Auto-match to this offtaker</option>`,
+    });
     if (userPicked && prev && mine.some(a => String(a.utility_account_id) === String(prev))) {
       usel.value = prev;
     } else {
@@ -6530,10 +6599,12 @@
     // Vendor-free labels (billLabel: nickname → service address → provider+acct#,
     // + bill status) — consistent with the add-offtaker sub-account picker, never
     // the array/inverter name (Ford 2026-07-09: no vendor info in this generator).
-    const billOpts = (utilAccts || []).map(a => {
-      const sel = String(a.utility_account_id) === String(d.utility_account_id) ? "selected" : "";
-      return `<option value="${a.utility_account_id}" ${sel}>${esc(billLabel(a))}</option>`;
-    }).join("");
+    // Parent ↔ child: split into ⭐ Master (group host) vs 🏠 Individual meters,
+    // preselect the bound account, ✨-flag this offtaker's own name-matched meter.
+    const billOpts = groupedAccountOptions(utilAccts, OFFTAKERS, {
+      selectedId: d.utility_account_id,
+      offtakerName: d.customer_name,
+    });
     // Show the GMP-bill link for EVERY offtaker, INCLUDING workbook offtakers. The linked
     // utility_account_id drives the GMP-bill auto-attach (api/billing/delivery.py); it does
     // NOT change a workbook offtaker's amount (that bills from source_workbook, which takes
@@ -6563,7 +6634,7 @@
               <option value="__auto__">✨ Auto-match to this offtaker</option>
               ${billOpts}
             </select>
-            <span class="rb-fld-hint">Link this offtaker to their own GMP sub-account, or ✨ Auto-match by name. Changing it re-derives their group share automatically.</span></label>` : ""}
+            <span class="rb-fld-hint">Pick the <b>⭐ master account</b> (bills their share of the whole net-meter group) or their <b>🏠 own meter</b> (bills directly off their sub-account) — or ✨ Auto-match by name. Changing it re-derives their group share automatically.</span></label>` : ""}
           <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
           <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
