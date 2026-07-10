@@ -777,7 +777,21 @@
       MANUAL_AFTER_ADD = refreshList;
       MANUAL_OPEN = false;
       const addBtn = $("#rbCustAdd");
-      if (addBtn) addBtn.onclick = () => { BULK_OPEN = false; renderBulkImport(); MANUAL_OPEN = true; renderManual(); };
+      if (addBtn) addBtn.onclick = () => {
+        BULK_OPEN = false; renderBulkImport(); MANUAL_OPEN = true; renderManual();
+        // Jump to the freshly-opened add panel (Ford): an operator scrolled deep into a
+        // long offtaker list shouldn't have to hunt back up to the top for it. rAF so the
+        // panel is painted before we scroll; focus the first field (preventScroll so the
+        // focus doesn't fight the smooth scroll) so they can start typing right away.
+        requestAnimationFrame(() => {
+          const host = document.getElementById(MANUAL_HOST_ID);
+          if (!host) return;
+          const target = host.querySelector(".rb-add-panel") || host;
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          const first = host.querySelector("select, input, textarea");
+          if (first) { try { first.focus({ preventScroll: true }); } catch (_) { /* older browsers */ } }
+        });
+      };
       // "⬆ Bulk import" — a CSV roster (name/percent/account number) creates many
       // offtakers at once instead of one at a time. Closes the manual panel if open
       // (the two are mutually exclusive — never two add-flows stacked at once).

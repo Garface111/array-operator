@@ -1099,6 +1099,10 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
 .rb2-controls-label{font-size:14.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#0f172a)}
+/* When "＋ Add an offtaker" scrolls the add panel into view (Ford 2026-07-10), keep its
+   top clear of the sticky .rb2-controls bar above it so the "New offtaker" heading isn't
+   tucked underneath. */
+.rb-add-panel{ scroll-margin-top:70px; }
 .rb2-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rb2-exportwrap{position:relative}
 .rb2-exportpop{position:absolute;left:0;top:calc(100% + 8px);width:320px;max-width:calc(100vw - 32px);background:var(--card,#fff);
