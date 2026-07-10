@@ -6334,17 +6334,24 @@
   // regenerate. Degrades gracefully: no extension → the banner says to install it.
   const RESYNC_STALE_DAYS = 35;          // a monthly bill should have landed by now
   let _extPresent = false;
+  let _captureRefreshT = null;
   try {
     window.addEventListener("message", (e) => {
       if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
       if (e.data.type === "SO_EXTENSION_PRESENT" || e.data.type === "SO_STATUS_ACK") { _extPresent = true; return; }
-      // A utility bill just landed from a portal the operator re-synced → refresh the
-      // roster and the OPEN offtaker so the freshly-captured bill attaches and the
-      // "no bill on file" banner clears, without a manual regenerate.
+      // A utility capture just landed from a portal the operator re-synced → refresh the
+      // roster + the OPEN offtaker in place so a freshly-captured bill attaches and the
+      // "no bill on file" banner clears. DEBOUNCED, and via the SILENT refreshDraftOnOpen
+      // (not selectOfftaker(force), which shows the heavy "Drafting…" spinner) — a single
+      // VEC visit can broadcast several capture events, and stacking a forced regenerate
+      // left the card stuck spinning (Ford 2026-07-09).
       if (e.data.type === "SO_CAPTURE_LANDED" && e.data.ok) {
         try { window.dispatchEvent(new CustomEvent("ao:utility-accounts-changed")); } catch (_) {}
-        try { refreshList(); } catch (_) {}
-        try { if (ACTIVE_SUB_ID) selectOfftaker(ACTIVE_SUB_ID, true); } catch (_) {}
+        clearTimeout(_captureRefreshT);
+        _captureRefreshT = setTimeout(() => {
+          try { refreshList(); } catch (_) {}
+          try { if (ACTIVE_SUB_ID) refreshDraftOnOpen(ACTIVE_SUB_ID); } catch (_) {}
+        }, 500);
       }
     });
   } catch (_) {}
