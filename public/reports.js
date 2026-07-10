@@ -919,9 +919,11 @@
   }
   function autoRefreshNudgeHTML(missing) {
     const names = missing.map(_utilLabel).join(" and ");
-    return `<div class="rb-gmp-auto-nudge">
-      <span>⚡ Invoices update only when you open your utility portal. Save your <b>${esc(names)}</b> login once and they generate automatically every month.</span>
-      <a class="rb-gmp-inline-link" id="rbAutoRefreshLink" role="button" tabindex="0">Set up auto-refresh →</a></div>`;
+    // Compact inline pill (Ford 2026-07-10 declutter): the full explanation moved
+    // into the tooltip so the toolbar rail stays one slim line. Same #rbAutoRefreshLink
+    // id + wireAutoRefreshLink wiring — it still deep-links to Account → Auto-refresh.
+    return `<a class="rb-gmp-arpill" id="rbAutoRefreshLink" role="button" tabindex="0"
+      title="Invoices update only when you open your utility portal. Save your ${esc(names)} login once and they generate automatically every month.">⚡ Set up auto-refresh</a>`;
   }
   function wireAutoRefreshLink() {
     const a = $("#rbAutoRefreshLink");
@@ -963,20 +965,21 @@
       a.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
     };
     const autoState = await utilityAutomationState(accts);
+    // All three states render as slim inline pills now (Ford 2026-07-10) — the rail
+    // lives inside the toolbar row, so the long banners became short pills with the
+    // detail in the tooltip. Same ids (#rbGmpInlineLink / #rbAutoRefreshLink) + wiring.
     if (!accts.length) {
-      host.innerHTML = `<div class="rb-gmp-empty">
-        <span>No utility bills connected yet — offtaker invoices bill from your utility bills, so link a utility to get started.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>`;
+      host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
+        title="Offtaker invoices bill from your utility bills — link a utility to get started.">⚡ Link utility bills to start</a>`;
       wireConnectUtility();
     } else if (!withBills.length) {
-      host.innerHTML = `<div class="rb-gmp-empty">
-        <span>${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open your utility portal once more so the extension captures them.</span>
-        <a class="rb-gmp-inline-link" id="rbGmpInlineLink" role="button" tabindex="0">Link utility bills →</a></div>` +
+      host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
+        title="${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open your utility portal once more so the extension captures them.">⚡ ${fmt0(accts.length)} connected · no bills captured yet</a>` +
         (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
       wireConnectUtility();
       wireAutoRefreshLink();
     } else {
-      host.innerHTML = `<div class="rb-gmp-ok">✓ ${withBills.length} utility bill source${withBills.length === 1 ? "" : "s"} connected${autoState && autoState.auto ? " · refreshing automatically" : ""} — available to link when you add an offtaker.</div>` +
+      host.innerHTML = `<span class="rb-gmp-ok" title="These utility bill sources are available to link when you add an offtaker.">✓ ${fmt0(withBills.length)} bill source${withBills.length === 1 ? "" : "s"}${autoState && autoState.auto ? " · refreshing automatically" : ""}</span>` +
         (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
       wireAutoRefreshLink();
     }
@@ -1990,18 +1993,23 @@
     const atStake = RECON
       ? (RECON.allocation_at_stake_usd != null ? RECON.allocation_at_stake_usd : (allocN || 0) * 25)
       : null;
-    const dollars = (PIPE && PIPE.last && PIPE.last.dollars) || null;
-    const month = PIPE && PIPE.last ? _monthName(PIPE.last.period_month) : null;
     if (!nOff && !ready) { host.hidden = true; return; }
     host.hidden = false;
-    host.innerHTML = `
-      <div class="rb2-kpi"><span>Offtakers</span><b>${fmt0(nOff)}</b><small>across ${fmt0(nArr)} billed array${nArr === 1 ? "" : "s"}</small></div>
-      <div class="rb2-kpi"><span>${k2.lab}</span><b>${fmt0(k2.big)}</b><small>${k2.sub}</small></div>
-      ${allocN
-        ? `<div class="rb2-kpi flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">
-             <span>Doesn't match GMP</span><b>⚑ ${fmt0(allocN)}</b><small>≈ ${money0(atStake)} at stake</small></div>`
-        : `<div class="rb2-kpi${RECON ? "" : " rb2-kpi-checking"}" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and compare it to your entered share automatically — flagging any that differ by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%)."><span>Doesn't match GMP</span><b>${RECON ? "0" : `<span class="rb2-spin" aria-hidden="true"></span>`}</b><small>${RECON ? `within ${fmtPct(XCHECK_DEFAULT_PCT)}% — all check out` : "auditing your bills…"}</small></div>`}
-      <div class="rb2-kpi"><span>This period</span><b>${dollars != null ? money0(dollars) : "—"}</b><small>${dollars != null ? "sent · " + esc(month || "") : "no sends yet"}</small></div>`;
+    // Declutter (Ford 2026-07-10): the old 4-card strip (Offtakers / cycle / match /
+    // this-period) duplicated the send-pipeline band — so this is now ONE slim glance
+    // line. Offtaker + array counts orient you; the reconcile signal is the only fact
+    // the pipeline doesn't carry, kept clickable-to-audit with the same $25 explainer.
+    const parts = [];
+    parts.push(`<span class="rb2-gl-i"><b>${fmt0(nOff)}</b> offtaker${nOff === 1 ? "" : "s"}</span>`);
+    if (nArr) parts.push(`<span class="rb2-gl-i"><b>${fmt0(nArr)}</b> billed array${nArr === 1 ? "" : "s"}</span>`);
+    if (allocN) {
+      parts.push(`<span class="rb2-gl-flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">⚑ ${fmt0(allocN)} don't match GMP · ≈ ${money0(atStake)} at stake</span>`);
+    } else if (RECON) {
+      parts.push(`<span class="rb2-gl-ok" title="We derive GMP's actual share for each offtaker and compare it to your entered share automatically — all are within your ${fmtPct(XCHECK_DEFAULT_PCT)}% threshold."><span class="rb2-gl-check">✓</span> all bills reconcile with GMP</span>`);
+    } else {
+      parts.push(`<span class="rb2-gl-i rb2-gl-checking"><span class="rb2-spin" aria-hidden="true"></span> auditing your bills…</span>`);
+    }
+    host.innerHTML = parts.join(`<span class="rb2-gl-dot" aria-hidden="true">·</span>`);
     const flag = host.querySelector("#rb2KpiFlag");
     if (flag) {
       flag.onclick = () => openAuditTab();
@@ -2069,22 +2077,31 @@
         <div class="rb2-id">
           <h1>Offtaker invoicing</h1>
           <p id="rb2Sub">Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Nothing sends until you approve it.</b></p>
-          <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
-            <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
-            <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
+          <!-- Tabs + a slim glance-line share one row (Ford 2026-07-10 declutter). The
+               old 4-card KPI strip just restated the send-pipeline band below it, so it's
+               gone — only the ONE signal the pipeline doesn't carry (do the bills reconcile
+               against GMP?) survives, as an inline status. Same #rb2Kpis host + renderKpis
+               wiring; it renders one line now instead of four cards. -->
+          <div class="rb2-tabrow">
+            <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
+              <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
+              <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
+            </div>
+            <div class="rb2-kpis" id="rb2Kpis" hidden></div>
           </div>
         </div>
-        <div class="rb2-kpis" id="rb2Kpis" hidden></div>
       </div>
       <div class="rb2-pipe" id="rb2Pipe" hidden></div>
       <div id="rbAuditView" class="rb-au" style="display:none"></div>
       <div id="rbGenList">
       <div class="rb-listwrap rb2-listwrap">
-        <!-- Connection rail: the plumbing status lines (✓ sources connected +
-             the ⚡ auto-refresh nudge) render into this host as before. -->
-        <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
         <div class="rb2-controls">
           <span class="rb2-controls-label">Your offtakers</span>
+          <!-- Connection rail folded INTO the toolbar row (Ford 2026-07-10 declutter):
+               the ✓-sources line + ⚡ auto-refresh nudge used to stack as two full-width
+               banners above the list — now they render as one slim inline status pill
+               right of the label. Same host id + refreshGmpBillsStatus wiring. -->
+          <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
           <span class="rb2-sp"></span>
           <div class="rb-head-actions rb2-actions">
             <!-- Portfolio-level batch export, now folded into ONE Export popover
