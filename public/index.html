@@ -395,7 +395,7 @@
 <!-- Always-building feature-suggestion widget (CC 2026-06-21). Subtle fixed pill
      -> small panel -> POST /v1/feature-suggestion. -->
 <style>
-  #fsWrap{position:fixed;left:16px;bottom:16px;z-index:9000;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+  #fsWrap{position:fixed;left:16px;bottom:16px;z-index:9020;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
   #fsBtn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4);transition:color .15s,border-color .15s}
   #fsBtn:hover{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896)}
   #fsBtn .fsdot{color:var(--good,#34d896)}
@@ -450,8 +450,8 @@
 <div id="fsWrap">
   <div id="fsStatus" role="status" aria-live="polite"></div>
   <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle" aria-label="Suggest a feature">
-    <h4 id="fsTitle">We're always building.</h4>
-    <p>Our team is always listening to feedback.</p>
+    <h4 id="fsTitle">Ask, and the site changes.</h4>
+    <p>An <b>AI engineer</b> reads your idea — and your markup — and builds it. Small improvements go <b>live on this page in minutes</b>: watch the "building…" status, then refresh. Every change is safety-checked and verified before it ships, so there's <b>no fear of breaking anything</b>. Bigger ideas go to the team.</p>
     <textarea id="fsText" aria-label="Your feature suggestion" placeholder="What would make Array Operator better for you?"></textarea>
     <div id="fsMarkRow">
       <button id="fsMarkBtn" type="button" title="Freeze a screenshot of this page and circle or highlight what you mean">&#9998; Mark up the screen</button>
@@ -463,7 +463,7 @@
       <button id="fsSend" type="button">Send &rarr;</button>
     </div>
   </div>
-  <button id="fsBtn" type="button" aria-expanded="false"><span class="fsdot">&#10022;</span> Suggest a feature</button>
+  <button id="fsBtn" type="button" aria-expanded="false"><span class="fsdot">&#10022;</span> Ask AI to improve this site</button>
 </div>
 <div id="fsOverlay" role="dialog" aria-label="Mark up the screen">
   <div id="fsToolbar">
