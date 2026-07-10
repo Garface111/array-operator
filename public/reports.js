@@ -3168,14 +3168,17 @@
   }
 
   // Flat <option> list of ALL utility accounts (alphabetized by label), with
-  // `selectedId` marked selected and an optional lead option prepended.
+  // `selectedId` marked selected and an optional lead option prepended. Each option
+  // carries data-arr (the account's array_id) so the master pick can send the
+  // MASTER group-host array_id the bill-accuracy cross-check reads group-excess from.
   function accountOptionsFlat(accts, selectedId, leadHTML) {
     const selStr = selectedId != null && selectedId !== "" ? String(selectedId) : "";
     const opts = (accts || []).filter(a => a && a.utility_account_id != null)
       .slice().sort((x, y) => billLabel(x).localeCompare(billLabel(y)))
       .map(a => {
         const id = String(a.utility_account_id);
-        return `<option value="${id}"${id === selStr ? " selected" : ""}>${esc(billLabel(a))}</option>`;
+        const arr = a.array_id != null ? ` data-arr="${a.array_id}"` : "";
+        return `<option value="${id}"${arr}${id === selStr ? " selected" : ""}>${esc(billLabel(a))}</option>`;
       }).join("");
     return (leadHTML || "") + opts;
   }
@@ -7002,19 +7005,29 @@
       OF_MONEY_FIELDS.has(field), OF_RECHECK_FIELDS.has(field));
   }
 
-  // The master + sub dropdowns resolve to ONE utility_account_id: the sub-account
-  // when chosen (bill directly off their own meter, topology A), else the master
-  // (bill their share of the group). Patches like the old single select did — the
-  // backend's sub-meter invariant re-derives the group share into array_share_pct.
+  // The master + sub dropdowns resolve to the offtaker's billing binding:
+  //   • utility_account_id = the sub-account when chosen (bill directly off their
+  //     own meter, topology A), else the master (bill their share of the group).
+  //   • array_id           = the MASTER account's net-meter group array — what the
+  //     bill-accuracy cross-check reads the group-excess from. Sending BOTH keeps a
+  //     sub-meter distinct from its group host, so the GMP allocation cross-check
+  //     actually runs (otherwise the backend reads single_meter). The backend's
+  //     sub-meter invariant then re-derives the group share into array_share_pct.
   function onOfftakerUtilityPick(card, box, did, sid, masterSel, subSel) {
     const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
     if (!d) return;
     ACTIVE_DRAFT_ID = did;
     const uid = (subSel.value || masterSel.value || "").trim();
     if (uid === "") return;                      // nothing chosen → keep the current binding
+    const body = { utility_account_id: Number(uid) };
+    // The chosen master carries its group array_id (data-arr). When set, pin the
+    // offtaker to that group so the audit reads the master's group-excess bill.
+    const mOpt = masterSel.selectedOptions && masterSel.selectedOptions[0];
+    const mArr = mOpt && mOpt.dataset ? mOpt.dataset.arr : "";
+    if (masterSel.value && mArr) { body.array_id = Number(mArr); d.array_id = Number(mArr); }
     d.utility_account_id = Number(uid);
     renderDraftDoc();
-    scheduleOfftakerPatch(card, box, did, sid, { utility_account_id: Number(uid) }, true, true);
+    scheduleOfftakerPatch(card, box, did, sid, body, true, true);
   }
 
   function ofPatchBody(field, raw) {
