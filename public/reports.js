@@ -6655,7 +6655,17 @@
     // Editor prefills show the FULL 3-decimal percent (Bruce: "e.g. 24.783") —
     // the old 1-decimal rounding meant any touch of the field saved back 24.8%,
     // destroying the stored third decimal. Whole shares render as 25.000 (consistent).
-    const pct = offtakerShareFrac(d) != null ? (offtakerShareFrac(d) * 100).toFixed(3) : "";
+    // "Share of net-meter group" = array_share_pct (the group share real_math bills as
+    // share × group excess). For a SUB-metered offtaker allocation_pct is pinned to 1.0
+    // (100% of their OWN sub bill) — showing THAT read a misleading 100% (Ford: dad's
+    // "St J Pump Plant 5.67% of Timberworks" showed 100). Source array_share_pct from the
+    // subscription record (which always carries it) — the draft d may omit it, so
+    // offtakerShareFrac(d) was falling back to the pinned allocation_pct. The field still
+    // saves via allocation_pct; the backend PATCH re-routes that into array_share_pct for
+    // sub-metered subs (never re-multiplying), so the round-trip stays consistent.
+    const _subShare = (OFFTAKERS.find(x => String(x.id) === String(sid)) || {}).array_share_pct;
+    const _shareFrac = _subShare != null ? _subShare : offtakerShareFrac(d);
+    const pct = _shareFrac != null ? (_shareFrac * 100).toFixed(3) : "";
     const disc = d.discount_pct != null ? Math.round(d.discount_pct * 1000) / 10 : "";
     // Disclosure: when the operator never set a discount but one is still applied, the
     // backend auto-resolves a default (tenant default → 10%). Surface it plainly so the
