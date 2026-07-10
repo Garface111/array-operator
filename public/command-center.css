@@ -1027,6 +1027,20 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-pausechip{font:700 9.5px/1 inherit;letter-spacing:.07em;color:#92600a;
   background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);
   border-radius:999px;padding:4px 9px}
+/* Prominent delivery-mode control (Ford 2026-07-10): lifted out of the crammed header
+   into its own wide, tinted row so the Approve-to-send / Auto-send default is obvious
+   and easy to hit — big buttons, min-width so each reads as a real choice. */
+.rb2-moderow{display:flex;align-items:center;gap:14px;margin:0 0 14px;flex-wrap:wrap;
+  background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.16);
+  border-radius:12px;padding:10px 14px}
+.rb2-moderow .rb2-modelab{font:640 12.5px/1.35 inherit;color:var(--muted,#475569)}
+.rb2-moderow .rb2-modeslider{margin-left:auto;padding:4px}
+.rb2-moderow .rb2-modeslider button{font:640 14px/1 inherit;padding:11px 26px;
+  border-radius:9px;min-width:150px}
+@media(max-width:640px){
+  .rb2-moderow .rb2-modeslider{margin-left:0;width:100%}
+  .rb2-moderow .rb2-modeslider button{flex:1 1 0;min-width:0;padding:11px 10px}
+}
 .rb2-pipe-row{display:flex;align-items:stretch}
 .rb2-pcell{flex:1 1 0;min-width:160px;border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
   padding:11px 14px 10px;position:relative;transition:background .13s}

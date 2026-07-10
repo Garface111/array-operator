@@ -1762,22 +1762,20 @@
       <div class="rb2-pipe-label">
         <h2>Send pipeline</h2>
         ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : ""}
-        <small class="rb2-rules">monthly invoices fire the 1st · quarterly Jan / Apr / Jul / Oct · an invoice only generates once its utility bill settles</small>
+        <small class="rb2-rules">monthly invoices fire the 1st · an invoice only generates once its utility bill settles</small>
         <span class="rb2-sp"></span>
         <span class="rb2-draftstat" id="rb2DraftStatus" hidden></span>
         <small class="rb2-runstamp"><b>last run</b> ${esc(lastRun)} · next ${esc(_fireLabel(monthly.fires_at))}</small>
-        <div class="rb2-pipe-ctl">
-          <div class="rb2-modewrap" title="The default for every offtaker once its invoice drafts. Approve to send: it waits for your OK. Auto-send: it emails itself on schedule. Per-offtaker settings still override; real sends stay gated on demo data.">
-            <span class="rb2-modelab">When an invoice is drafted</span>
-            <div class="rb-seg rb-slider rb2-modeslider" id="rb2Mode" role="group" aria-label="Default delivery mode">
-              <button type="button" data-v="approval" class="${(p.default_delivery_mode || 'approval') === 'auto' ? '' : 'on'}">Approve to send</button>
-              <button type="button" data-v="auto" class="${(p.default_delivery_mode || 'approval') === 'auto' ? 'on' : ''}">Auto-send</button>
-            </div>
-          </div>
-          ${paused ? `<button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="true" type="button">
-            <span class="rb2-knob" aria-hidden="true"></span>Resume sending
-          </button>` : ""}
+      </div>
+      <div class="rb2-moderow" title="The default for every offtaker once its invoice drafts. Approve to send: it waits for your OK. Auto-send: it emails itself on schedule. Per-offtaker settings still override; real sends stay gated on demo data.">
+        <span class="rb2-modelab">When an invoice is drafted</span>
+        <div class="rb-seg rb-slider rb2-modeslider" id="rb2Mode" role="group" aria-label="Default delivery mode">
+          <button type="button" data-v="approval" class="${(p.default_delivery_mode || 'approval') === 'auto' ? '' : 'on'}">Approve to send</button>
+          <button type="button" data-v="auto" class="${(p.default_delivery_mode || 'approval') === 'auto' ? 'on' : ''}">Auto-send</button>
         </div>
+        ${paused ? `<button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="true" type="button">
+          <span class="rb2-knob" aria-hidden="true"></span>Resume sending
+        </button>` : ""}
       </div>
       <div class="rb2-pipe-row">
         <div class="rb2-pcell done" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive — download this month as a .zip there.">
@@ -1813,11 +1811,6 @@
           <div class="rb2-big">${fmt0(monthly.scheduled || 0)} <span>scheduled</span></div>
           <div class="rb2-chips"><span class="rb2-pc b">${fmt0(monthly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(monthly.approval || 0)} draft for approval</span></div>
           ${paused ? `<div class="rb2-pausednote">⏸ Paused — this run won't fire until you resume. Manual sends still work.</div>` : ""}
-        </div>
-        <div class="rb2-pcell later">
-          <div class="rb2-when"><b>${esc(_fireLabel(quarterly.fires_at))} · quarterly</b><small>${(quarterly.scheduled || 0) ? "" : "none scheduled"}</small></div>
-          <div class="rb2-big">${fmt0(quarterly.scheduled || 0)} <span>scheduled</span></div>
-          <div class="rb2-chips"><span class="rb2-pc b">${fmt0(quarterly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(quarterly.approval || 0)} draft for approval</span></div>
         </div>
       </div>`;
 
