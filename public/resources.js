@@ -153,20 +153,34 @@
   function loadFeed(k, feedEl, metaEl) {
     if (!feedEl) return;
     fetch("/news.json?cb=" + Date.now()).then(function (r) { return r.json(); }).then(function (data) {
-      var items = ((data && data.items) || []).filter(function (it) {
+      var all = (data && data.items) || [];
+      var items = all.filter(function (it) {
         var st = (it.state || "").toLowerCase();
         return !st || st === k || st === "region" || st === "ne" || st === "all";
       });
+      // Never show an empty feed: if this state has nothing of its own yet, fall back to
+      // the full New England set so the operator still sees what's moving next door.
+      var regionMode = false;
+      if (!items.length) { items = all.slice(); regionMode = true; }
       items.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
       if (metaEl) {
-        metaEl.innerHTML = items.length
-          ? "Last updated " + esc(fmtDate(data.updated || items[0].date)) + " · " + items.length +
-            " item" + (items.length === 1 ? "" : "s") + " for " + esc(NE[k].name)
-          : "No " + esc(NE[k].name) + " updates yet — check back soon.";
+        if (!items.length) {
+          metaEl.innerHTML = "No updates yet — check back soon.";
+        } else if (regionMode) {
+          metaEl.innerHTML = "No " + esc(NE[k].name) + "-specific headlines yet — here's what's moving across New England (updated " +
+            esc(fmtDate(data.updated || items[0].date)) + ").";
+        } else {
+          metaEl.innerHTML = "Last updated " + esc(fmtDate(data.updated || items[0].date)) + " · " + items.length +
+            " item" + (items.length === 1 ? "" : "s") + " for " + esc(NE[k].name);
+        }
       }
       feedEl.innerHTML = items.map(function (it) {
         var alert = /rule|cut|phase|deadline|case|alert/i.test((it.tag || "") + " " + (it.title || ""));
+        var stc = (it.state || "").toLowerCase();
+        var stName = NE[stc] ? NE[stc].name : (stc === "region" || stc === "ne" ? "New England" : "");
+        var stChip = regionMode && stName ? '<span class="res-stchip">' + esc(stName) + "</span>" : "";
         return '<div class="item"><div class="when">' + esc(fmtDate(it.date)) + "</div><div>" +
+          stChip +
           '<span class="tag' + (alert ? " alert" : "") + '">' + esc(it.tag || "Update") + "</span>" +
           "<h4>" + esc(it.title) + "</h4>" +
           (it.summary ? "<p>" + esc(it.summary) + "</p>" : "") +
@@ -223,7 +237,10 @@
     '.res-k{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint,#94a3b8);margin-bottom:6px}' +
     '.res-utils{display:flex;flex-wrap:wrap;gap:8px}' +
     '.res-util{font-size:12.5px;font-weight:600;color:var(--ink,#0f172a);background:rgba(15,23,42,.05);border-radius:8px;padding:5px 11px}' +
-    '.res-reg{margin:0;font-size:13.5px;color:var(--muted,#475569);line-height:1.55}';
+    '.res-reg{margin:0;font-size:13.5px;color:var(--muted,#475569);line-height:1.55}' +
+    '.res-stchip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;' +
+      'padding:2px 8px;border-radius:6px;margin:6px 8px 0 0;vertical-align:middle;' +
+      'background:rgba(15,23,42,.06);color:var(--muted,#475569)}';
 
   function injectStyles() {
     if (document.getElementById("ao-res-styles")) return;
