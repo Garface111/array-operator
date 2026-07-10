@@ -413,8 +413,8 @@
      you send a suggestion, judge-approved small improvements are built and
      shipped by an agent — this pill is how you watch your own idea go live.
      Same visual language as the trigger pill; sits quietly above the widget. */
-  #fsStatus{display:none;align-items:center;gap:8px;margin-bottom:10px;max-width:340px;border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;font-size:12.5px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4)}
-  #fsStatus.show{display:inline-flex}
+  #fsStatus{display:none;align-items:center;gap:8px;margin-bottom:10px;width:max-content;max-width:calc(100vw - 32px);border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;font-size:12.5px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4)}
+  #fsStatus.show{display:flex}
   #fsStatus .fsPulse{animation:fsPulse 1.6s ease-in-out infinite}
   @keyframes fsPulse{0%,100%{opacity:.45}50%{opacity:1}}
   #fsStatus button{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600}
