@@ -410,12 +410,36 @@
   #fsBtn:focus-visible,#fsText:focus-visible,#fsSend:focus-visible,#fsCancel:focus-visible{
     outline:2px solid var(--good,#34d896);outline-offset:2px;border-radius:9px}
   #fsText:focus-visible{outline-offset:1px}
+  /* Mark-up-the-screen (MindSpace annotate pattern, Ford 2026-07-10): freeze a
+     screenshot of the live UI, circle/highlight on it, and the composited PNG
+     rides with the suggestion so the review agent SEES the intent. */
+  #fsMarkRow{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted,#8aa89b)}
+  #fsMarkBtn{cursor:pointer;border:1px dashed var(--line,#243530);background:transparent;color:var(--muted,#8aa89b);border-radius:9px;padding:6px 10px;font-size:12px}
+  #fsMarkBtn:hover{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896)}
+  #fsMarkThumb{display:none;align-items:center;gap:7px}
+  #fsMarkThumb img{height:30px;border-radius:5px;border:1px solid var(--line,#243530);display:block}
+  #fsMarkThumb button{cursor:pointer;background:none;border:none;color:var(--muted,#8aa89b);font-size:11.5px;padding:2px;text-decoration:underline}
+  #fsOverlay{position:fixed;inset:0;z-index:10050;background:rgba(5,10,8,.92);display:none;flex-direction:column;align-items:center;justify-content:center}
+  #fsOverlay.open{display:flex}
+  #fsToolbar{display:flex;gap:6px;align-items:center;margin-bottom:10px;background:var(--card,#15201c);border:1px solid var(--line,#243530);border-radius:12px;padding:7px 10px;box-shadow:0 8px 30px -8px rgba(0,0,0,.55)}
+  #fsToolbar button{cursor:pointer;border:1px solid transparent;background:transparent;color:var(--muted,#8aa89b);border-radius:8px;padding:6px 11px;font:12.5px inherit}
+  #fsToolbar button.on{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896);background:rgba(52,216,150,.08)}
+  #fsToolbar button:hover{color:var(--ink,#e8f1ec)}
+  #fsToolbar .fsSep{width:1px;height:18px;background:var(--line,#243530)}
+  #fsToolbar #fsAttach{color:var(--good,#34d896);border-color:var(--good,#34d896);font-weight:600}
+  #fsStage{position:relative;max-width:94vw;max-height:80vh;border-radius:10px;overflow:auto;box-shadow:0 12px 50px -10px rgba(0,0,0,.7);border:1px solid var(--line,#243530)}
+  #fsStage canvas{display:block}
+  #fsInk{position:absolute;left:0;top:0;cursor:crosshair;touch-action:none}
 </style>
 <div id="fsWrap">
   <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle" aria-label="Suggest a feature">
     <h4 id="fsTitle">We're always building.</h4>
     <p>Our team is always listening to feedback.</p>
     <textarea id="fsText" aria-label="Your feature suggestion" placeholder="What would make Array Operator better for you?"></textarea>
+    <div id="fsMarkRow">
+      <button id="fsMarkBtn" type="button" title="Freeze a screenshot of this page and circle or highlight what you mean">&#9998; Mark up the screen</button>
+      <span id="fsMarkThumb"><img id="fsMarkImg" alt="Your marked-up screenshot"><button id="fsMarkDel" type="button">remove</button></span>
+    </div>
     <div id="fsMsg"></div>
     <div id="fsRow">
       <button id="fsCancel" type="button">Cancel</button>
@@ -423,6 +447,19 @@
     </div>
   </div>
   <button id="fsBtn" type="button" aria-expanded="false"><span class="fsdot">&#10022;</span> Suggest a feature</button>
+</div>
+<div id="fsOverlay" role="dialog" aria-label="Mark up the screen">
+  <div id="fsToolbar">
+    <button id="fsToolPen" type="button" class="on" title="Freehand pen">&#9998; Pen</button>
+    <button id="fsToolHi" type="button" title="Wide translucent highlighter">&#9646; Highlight</button>
+    <button id="fsToolCirc" type="button" title="Drag to circle something">&#9711; Circle</button>
+    <span class="fsSep"></span>
+    <button id="fsUndo" type="button" title="Undo last mark">&#8630; Undo</button>
+    <span class="fsSep"></span>
+    <button id="fsAttach" type="button">&#10003; Attach markup</button>
+    <button id="fsMarkCancel" type="button">&#10005; Cancel</button>
+  </div>
+  <div id="fsStage"><canvas id="fsShot"></canvas><canvas id="fsInk"></canvas></div>
 </div>
 <script>
 (function(){
@@ -452,16 +489,109 @@
       else if(!e.shiftKey && a===last){ e.preventDefault(); first.focus(); }
     }
   });
+  // ── Mark up the screen (MindSpace annotate pattern, Ford 2026-07-10) ──────
+  // Freeze a screenshot of the live page (html2canvas, lazy-loaded), let the
+  // customer draw on it (pen / highlighter / circle), composite ink over the
+  // shot, and send the PNG with the suggestion so the review agent SEES it.
+  var markBtn=document.getElementById("fsMarkBtn"), markThumb=document.getElementById("fsMarkThumb"),
+      markImg=document.getElementById("fsMarkImg"), markDel=document.getElementById("fsMarkDel"),
+      overlay=document.getElementById("fsOverlay"), stage=document.getElementById("fsStage"),
+      shotC=document.getElementById("fsShot"), inkC=document.getElementById("fsInk");
+  var MARK_B64=null, TOOL="pen", STROKES=[], CUR=null, SCL=1;
+  function setThumb(){
+    if(MARK_B64){ markImg.src="data:image/png;base64,"+MARK_B64; markThumb.style.display="inline-flex"; markBtn.textContent="✎ Re-mark the screen"; }
+    else { markThumb.style.display="none"; markBtn.textContent="✎ Mark up the screen"; }
+  }
+  markDel.onclick=function(){ MARK_B64=null; setThumb(); };
+  function loadH2C(){
+    return window.html2canvas ? Promise.resolve()
+      : new Promise(function(res,rej){ var s=document.createElement("script"); s.src="/vendor/html2canvas.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+  }
+  markBtn.onclick=function(){
+    markBtn.disabled=true; markBtn.textContent="Capturing…";
+    var wrap=document.getElementById("fsWrap");
+    loadH2C().then(function(){
+      wrap.style.visibility="hidden";               // never capture the widget itself
+      return window.html2canvas(document.body,{
+        scale:Math.min(window.devicePixelRatio||1,1.5), useCORS:true, logging:false,
+        ignoreElements:function(el){ return el&&(el.id==="fsWrap"||el.id==="fsOverlay"); }
+      });
+    }).then(function(cv){
+      wrap.style.visibility="";
+      // Fit the shot into the stage; ink canvas overlays 1:1 in CSS pixels.
+      var maxW=Math.floor(window.innerWidth*0.94), maxH=Math.floor(window.innerHeight*0.80);
+      SCL=Math.min(maxW/cv.width, maxH/cv.height, 1);
+      var w=Math.max(1,Math.floor(cv.width*SCL)), h=Math.max(1,Math.floor(cv.height*SCL));
+      shotC.width=w; shotC.height=h; inkC.width=w; inkC.height=h;
+      inkC.style.width=w+"px"; inkC.style.height=h+"px";
+      shotC.getContext("2d").drawImage(cv,0,0,w,h);
+      shotC._full=cv;                               // native-res shot for the composite
+      STROKES=[]; CUR=null; drawInk();
+      overlay.classList.add("open");
+    }).catch(function(){
+      wrap.style.visibility="";
+      msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't capture the screen here — send the words instead.";
+    }).then(function(){ markBtn.disabled=false; setThumb(); });
+  };
+  function tool(id,name){ document.getElementById(id).onclick=function(){
+    TOOL=name; ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){ document.getElementById(b).classList.toggle("on", (b===id)); }); }; }
+  tool("fsToolPen","pen"); tool("fsToolHi","hi"); tool("fsToolCirc","circ");
+  document.getElementById("fsUndo").onclick=function(){ STROKES.pop(); drawInk(); };
+  document.getElementById("fsMarkCancel").onclick=function(){ overlay.classList.remove("open"); };
+  function pos(e){ var r=inkC.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+  inkC.addEventListener("pointerdown",function(e){
+    e.preventDefault(); inkC.setPointerCapture(e.pointerId);
+    var p=pos(e);
+    CUR = TOOL==="circ" ? {t:"circ",x0:p.x,y0:p.y,x1:p.x,y1:p.y} : {t:TOOL,pts:[p]};
+  });
+  inkC.addEventListener("pointermove",function(e){
+    if(!CUR) return; var p=pos(e);
+    if(CUR.t==="circ"){ CUR.x1=p.x; CUR.y1=p.y; } else { CUR.pts.push(p); }
+    drawInk();
+  });
+  inkC.addEventListener("pointerup",function(){ if(CUR){ STROKES.push(CUR); CUR=null; drawInk(); } });
+  function paint(ctx,s,k){
+    if(s.t==="circ"){
+      ctx.strokeStyle="#ff3b30"; ctx.lineWidth=3*k; ctx.beginPath();
+      ctx.ellipse((s.x0+s.x1)/2*k,(s.y0+s.y1)/2*k,Math.abs(s.x1-s.x0)/2*k+2,Math.abs(s.y1-s.y0)/2*k+2,0,0,Math.PI*2); ctx.stroke();
+    } else {
+      ctx.strokeStyle = s.t==="hi" ? "rgba(255,235,59,.45)" : "#ff3b30";
+      ctx.lineWidth = (s.t==="hi"?14:3)*k; ctx.lineCap="round"; ctx.lineJoin="round";
+      ctx.beginPath();
+      for(var i=0;i<s.pts.length;i++){ var p=s.pts[i]; if(i===0) ctx.moveTo(p.x*k,p.y*k); else ctx.lineTo(p.x*k,p.y*k); }
+      ctx.stroke();
+    }
+  }
+  function drawInk(){
+    var ctx=inkC.getContext("2d"); ctx.clearRect(0,0,inkC.width,inkC.height);
+    STROKES.concat(CUR?[CUR]:[]).forEach(function(s){ paint(ctx,s,1); });
+  }
+  document.getElementById("fsAttach").onclick=function(){
+    var full=shotC._full; if(!full){ overlay.classList.remove("open"); return; }
+    // Composite ink over the NATIVE-resolution shot (k rescales CSS-px strokes).
+    var out=document.createElement("canvas"); out.width=full.width; out.height=full.height;
+    var ctx=out.getContext("2d"); ctx.drawImage(full,0,0);
+    var k=full.width/inkC.width;
+    STROKES.forEach(function(s){ paint(ctx,s,k); });
+    var url=out.toDataURL("image/png");
+    if(url.length>2800000) url=out.toDataURL("image/jpeg",0.85);   // stay under the 4MB cap
+    MARK_B64=url.split(",")[1];
+    overlay.classList.remove("open"); setThumb();
+    msg.style.color="var(--good,#34d896)"; msg.textContent="Markup attached — add a sentence and send.";
+  };
+  overlay.addEventListener("keydown",function(e){ if(e.key==="Escape") overlay.classList.remove("open"); });
+
   send.onclick=function(){
     var t=(txt.value||"").trim();
     if(!t){ msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Type a suggestion first."; return; }
     send.disabled=true; msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Sending...";
     var h={"Content-Type":"application/json"};
     try{ var sess=localStorage.getItem("so_session"); if(sess) h["Authorization"]="Bearer "+sess; }catch(e){}
-    fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify({text:t})})
+    var payload={text:t}; if(MARK_B64) payload.screenshot_b64=MARK_B64;
+    fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(d){
-        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — your feedback is in. We're always listening."; txt.value=""; setTimeout(function(){ open(false); }, 2200); }
+        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — your feedback is in. We're always listening."; txt.value=""; MARK_B64=null; setThumb(); setTimeout(function(){ open(false); }, 2200); }
         else { msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't send just now — try again in a moment."; }
         send.disabled=false;
       })
