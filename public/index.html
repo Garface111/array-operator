@@ -405,6 +405,18 @@
   #fsSend{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:600}
   #fsSend:hover{background:rgba(52,216,150,.08)}
   #fsMsg{font-size:12px;margin-top:8px;min-height:1em}
+  /* Suggestion lifecycle pill (self-improving product, Ford 2026-07-10): after
+     you send a suggestion, judge-approved small improvements are built and
+     shipped by an agent — this pill is how you watch your own idea go live.
+     Same visual language as the trigger pill; sits quietly above the widget. */
+  #fsStatus{display:none;align-items:center;gap:8px;margin-bottom:10px;max-width:340px;border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;font-size:12.5px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4)}
+  #fsStatus.show{display:inline-flex}
+  #fsStatus .fsPulse{animation:fsPulse 1.6s ease-in-out infinite}
+  @keyframes fsPulse{0%,100%{opacity:.45}50%{opacity:1}}
+  #fsStatus button{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600}
+  #fsStatus button:hover{background:rgba(52,216,150,.08)}
+  #fsStatus #fsStDismiss{border:none;color:var(--muted,#8aa89b);font-weight:400;padding:2px 4px}
+  #fsStatus #fsStDismiss:hover{background:none;color:var(--ink,#e8f1ec)}
   /* Keyboard focus: a clear octarine-leaning ring so tabbing through the widget is
      visible (mouse clicks stay clean via :focus-visible). */
   #fsBtn:focus-visible,#fsText:focus-visible,#fsSend:focus-visible,#fsCancel:focus-visible{
@@ -432,6 +444,7 @@
   #fsInk{position:absolute;left:0;top:0;cursor:crosshair;touch-action:none}
 </style>
 <div id="fsWrap">
+  <div id="fsStatus" role="status" aria-live="polite"></div>
   <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle" aria-label="Suggest a feature">
     <h4 id="fsTitle">We're always building.</h4>
     <p>Our team is always listening to feedback.</p>
@@ -581,6 +594,53 @@
   };
   overlay.addEventListener("keydown",function(e){ if(e.key==="Escape") overlay.classList.remove("open"); });
 
+  // ── Suggestion lifecycle pill (self-improving product, Ford 2026-07-10) ──
+  // We keep the ids of suggestions sent from this browser and quietly poll the
+  // PUBLIC status endpoint while a tab is open. Judge-approved small
+  // improvements get auto-built and shipped — the pill shows "being built…"
+  // and then "live — refresh the page" so the customer watches it happen.
+  var statusEl=document.getElementById("fsStatus");
+  var PEND_KEY="fsPending", POLL_MS=45000, PEND_TTL=7*24*3600*1000;
+  function pendGet(){ try{ var v=JSON.parse(localStorage.getItem(PEND_KEY)||"[]"); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+  function pendSet(v){ try{ localStorage.setItem(PEND_KEY, JSON.stringify(v)); }catch(e){} }
+  function pendAdd(id){ if(!id) return; var v=pendGet().filter(function(p){ return p.id!==id; }); v.push({id:id, ts:Date.now()}); pendSet(v); setTimeout(pollPending, 5000); }
+  function pendDrop(ids){ pendSet(pendGet().filter(function(p){ return ids.indexOf(p.id)<0; })); }
+  function renderStatus(states){
+    var shipped=states.filter(function(s){ return s.st==="shipped"; }),
+        building=states.some(function(s){ return s.st==="building"; });
+    if(shipped.length){
+      statusEl.innerHTML='<span>&#9989;</span><span>Your suggestion is live &mdash; refresh the page</span>'+
+        '<button id="fsReload" type="button">Refresh</button>'+
+        '<button id="fsStDismiss" type="button" aria-label="Dismiss">&#10005;</button>';
+      var ids=shipped.map(function(s){ return s.id; });
+      document.getElementById("fsReload").onclick=function(){ pendDrop(ids); location.reload(); };
+      document.getElementById("fsStDismiss").onclick=function(){ pendDrop(ids); statusEl.classList.remove("show"); pollPending(); };
+      statusEl.classList.add("show");
+    } else if(building){
+      statusEl.innerHTML='<span class="fsPulse">&#10024;</span><span>Your suggestion is being built&hellip;</span>';
+      statusEl.classList.add("show");
+    } else {
+      statusEl.classList.remove("show");
+    }
+  }
+  var _polling=false;
+  function pollPending(){
+    if(_polling) return;
+    var pend=pendGet().filter(function(p){ return Date.now()-p.ts < PEND_TTL; });
+    pendSet(pend);
+    if(!pend.length){ renderStatus([]); return; }
+    _polling=true;
+    Promise.all(pend.map(function(p){
+      return fetch("/v1/feature-suggestion/"+encodeURIComponent(p.id)+"/status")
+        .then(function(r){ if(r.status===404){ pendDrop([p.id]); return null; } return r.ok?r.json():null; })
+        .then(function(d){ return (d&&d.status)?{id:p.id, st:d.status}:null; })
+        .catch(function(){ return null; });
+    })).then(function(res){ _polling=false; renderStatus(res.filter(Boolean)); })
+      .catch(function(){ _polling=false; });
+  }
+  pollPending();
+  setInterval(pollPending, POLL_MS);
+
   send.onclick=function(){
     var t=(txt.value||"").trim();
     if(!t){ msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Type a suggestion first."; return; }
@@ -591,7 +651,7 @@
     fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(d){
-        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — your feedback is in. We're always listening."; txt.value=""; MARK_B64=null; setThumb(); setTimeout(function(){ open(false); }, 2200); }
+        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — your feedback is in. We're always listening."; txt.value=""; MARK_B64=null; setThumb(); pendAdd(d.id); setTimeout(function(){ open(false); }, 2200); }
         else { msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't send just now — try again in a moment."; }
         send.disabled=false;
       })
