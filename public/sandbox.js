@@ -104,6 +104,13 @@
    * their inverters and lands them here, and we attach to their account. */
   let EXT_PRESENT = false;
   let _vaultStatusCache = null;  // populated lazily by wireAutoLoginHints()
+  // A saved-login (auto-refresh) credential actually CHANGED: drop the cache AND tell
+  // other views so they re-evaluate live — e.g. reports.js hides its "Set up
+  // auto-refresh" nudge the moment a login is saved, without a reload (Ford 2026-07-10).
+  function _notifyVaultChanged(){
+    _vaultStatusCache = null;
+    try { window.dispatchEvent(new Event("ao:vault-changed")); } catch(e){}
+  }
   const EXT_STORE_URL = "https://chromewebstore.google.com/detail/solar-operator-sync/ocohbimolfpnkjcjhiodopjjlhclinpl";
   // Portal URLs per vendor for the one-click login.
   const PORTAL_URL = {
@@ -4682,7 +4689,7 @@
       const st = resp && resp.ok && resp.status && resp.status[vendor];
       if(st && st.hasCreds){
         clearInterval(_vaultWatch[vendor]); delete _vaultWatch[vendor];
-        _vaultStatusCache = null;
+        _notifyVaultChanged();
         wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
       } else if(ticks >= 40){   // ~2 min — stop polling quietly, the note stays
         clearInterval(_vaultWatch[vendor]); delete _vaultWatch[vendor];
@@ -4907,12 +4914,12 @@
           return;
         }
         saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
-        _vaultStatusCache = null;
+        if(r.ok) _notifyVaultChanged(); else _vaultStatusCache = null;
         setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
       if(clearBtn) clearBtn.addEventListener("click", async () => {
         await vaultOp("clear", { vendor: key });
-        _vaultStatusCache = null;
+        _notifyVaultChanged();
         wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
       });
       if(optEl) optEl.addEventListener("change", async () => {

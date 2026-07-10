@@ -887,6 +887,15 @@
     };
   } catch(e){}
 
+  // The moment a utility login is saved (auto-refresh set up), sandbox.js fires
+  // ao:vault-changed — re-render the bills-status line so the "Set up auto-refresh"
+  // nudge disappears live (Ford 2026-07-10), and the "✓ … refreshing automatically"
+  // confirmation takes its place — no reload needed.
+  if (!window.__aoVaultBannerWired) {
+    window.__aoVaultBannerWired = true;
+    window.addEventListener("ao:vault-changed", () => { try { refreshGmpBillsStatus(); } catch(e){} });
+  }
+
   // Show whether GMP utility bills are connected (and how many), with a direct
   // link to connect when none are present — answers "why is the dropdown empty?"
   // ALSO answers "will this run by itself?": bills only refresh when the utility
