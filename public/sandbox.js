@@ -3270,80 +3270,181 @@
     };
   }
 
-  // 🔔 Inverter email alerts — a small settings modal: toggle on/off, set the
-  // recipient email, the sensitivity threshold (alert under X% of peers), and a
-  // grace window. Persists to the backend (/v1/array-owners/alert-settings).
+  // ── Inverter alerts — a floating bottom-left widget (Ford 2026-07-10 redesign) ──
+  // A persistent bell FAB that opens a light, powerful control panel: recipient(s),
+  // what we watch, sensitivity + patience (presets + fine slider), a live plain-English
+  // preview, and a real "send test alert". Persists to /v1/array-owners/alert-settings;
+  // the test button hits …/alert-settings/test. Replaces the old dark centered modal.
+  const AL_API = "/v1/array-owners/alert-settings";
+  const AL_BELL = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>`;
+  const AL_SENS = [["Relaxed", 35], ["Balanced", 50], ["Sensitive", 70]];
+  const AL_PAT  = [["Fast", 2], ["Normal", 12], ["Patient", 24]];
+  let _alPanelOpen = false;
+
+  // The MONITORING-card / head "Alerts" button opens the same panel.
   function wireAlerts(host){
-    const btn = host.querySelector("#sbAlerts");
-    if(!btn) return;
-    btn.onclick = () => openAlertsModal();
+    const btn = host && host.querySelector("#sbAlerts");
+    if(btn) btn.onclick = () => openAlertsPanel();
   }
-  function openAlertsModal(){
-    document.querySelectorAll(".sb-alerts-back").forEach(n=>n.remove());
-    const back = el(`<div class="sb-alerts-back" role="dialog" aria-modal="true" aria-label="Inverter alerts">
-      <div class="sb-alerts-modal">
-        <button class="sb-alerts-x" type="button" aria-label="Close">×</button>
-        <div class="sb-alerts-title">🔔 Inverter down alerts</div>
-        <div class="sb-alerts-sub">Get an email the moment an inverter goes dark or slips below its neighbors.</div>
-        <label class="sb-alerts-toggle"><input type="checkbox" id="aaEnabled"> <span>Email me when an inverter needs attention</span></label>
-        <div class="sb-alerts-fields">
-          <label class="sb-alerts-field"><span>Send alerts to</span>
-            <input type="email" id="aaEmail" placeholder="you@example.com"></label>
-          <label class="sb-alerts-field"><span>Alert when output drops below <b id="aaThreshVal">50%</b> of its neighbors</span>
-            <input type="range" id="aaThresh" min="10" max="95" step="5" value="50"></label>
-          <label class="sb-alerts-field"><span>Wait <b id="aaGraceVal">12h</b> before alerting (ignore passing clouds)</span>
-            <input type="range" id="aaGrace" min="0" max="48" step="2" value="12"></label>
-        </div>
-        <div class="sb-alerts-note" id="aaNote"></div>
-        <div class="sb-alerts-actions">
-          <button class="sb-resetbtn" id="aaCancel" type="button">Cancel</button>
-          <button class="sb-addbtn" id="aaSave" type="button">Save</button>
-        </div>
-      </div></div>`);
-    document.body.appendChild(back);
-    const $ = id => back.querySelector(id);
-    const close = () => back.remove();
-    back.addEventListener("click", e => { if(e.target === back) close(); });
-    $("#aaCancel").onclick = close; $(".sb-alerts-x").onclick = close;
-    document.addEventListener("keydown", function esc(e){ if(e.key==="Escape"){ close(); document.removeEventListener("keydown", esc);} });
 
-    const thresh = $("#aaThresh"), grace = $("#aaGrace");
-    const syncLbls = () => { $("#aaThreshVal").textContent = thresh.value+"%"; $("#aaGraceVal").textContent = grace.value+"h"; };
-    thresh.oninput = syncLbls; grace.oninput = syncLbls;
-
-    // load current settings
+  // The persistent floating widget (bottom-left). Created once; survives re-renders.
+  function ensureAlertsWidget(){
+    if(document.getElementById("aoAlertFab")) return;
+    const fab = el(`<button type="button" id="aoAlertFab" class="ao-al-fab" aria-label="Fleet alerts" title="Fleet alerts">
+        <span class="ao-al-fab-ic" aria-hidden="true">${AL_BELL}</span>
+        <span class="ao-al-fab-txt">Alerts</span>
+        <span class="ao-al-fab-dot" id="aoAlertFabDot" aria-hidden="true" title="Off"></span>
+      </button>`);
+    document.body.appendChild(fab);
+    fab.onclick = () => _alPanelOpen ? closeAlertsPanel() : openAlertsPanel();
+    _refreshAlertDot();
+  }
+  function _setDot(on){
+    const d = document.getElementById("aoAlertFabDot");
+    if(d){ d.classList.toggle("on", !!on); d.title = on ? "On" : "Off"; }
+  }
+  function _refreshAlertDot(){
     const session = getSession();
-    if(!session){ $("#aaNote").innerHTML = `<a href="onboarding.html">Sign in</a> to set up alerts.`; }
+    if(!session || !document.getElementById("aoAlertFabDot")) return;
+    fetch(AL_API, { headers:{ Authorization:"Bearer "+session } })
+      .then(r=>r.ok?r.json():null).then(s=>{ if(s) _setDot(!!s.enabled); }).catch(()=>{});
+  }
+  function closeAlertsPanel(){
+    _alPanelOpen = false;
+    document.querySelectorAll(".ao-al-panel").forEach(n=>n.remove());
+    const fab = document.getElementById("aoAlertFab"); if(fab) fab.classList.remove("open");
+  }
+
+  function openAlertsPanel(){
+    ensureAlertsWidget();
+    if(document.querySelector(".ao-al-panel")){ closeAlertsPanel(); return; }
+    _alPanelOpen = true;
+    const fab = document.getElementById("aoAlertFab"); if(fab) fab.classList.add("open");
+    const seg = (arr, cur, unit) => arr.map(([lbl, v]) =>
+      `<button type="button" class="ao-al-seg${v===cur?" on":""}" data-seg="${v}">${lbl}<small>${v}${unit}</small></button>`).join("");
+    const panel = el(`<div class="ao-al-panel" role="dialog" aria-label="Fleet alerts">
+      <div class="ao-al-head">
+        <span class="ao-al-h-ic">${AL_BELL}</span>
+        <div class="ao-al-h-tt"><b>Fleet alerts</b><span id="aoAlStatus">Email me when an inverter needs attention</span></div>
+        <label class="ao-al-switch" title="Turn alerts on / off"><input type="checkbox" id="aoAlEnabled"><span class="ao-al-track"></span></label>
+        <button type="button" class="ao-al-x" id="aoAlX" aria-label="Close">×</button>
+      </div>
+      <div class="ao-al-body">
+        <div class="ao-al-sec">
+          <div class="ao-al-lbl">Send alerts to</div>
+          <input type="text" id="aoAlEmail" class="ao-al-input" placeholder="you@example.com" autocomplete="off" spellcheck="false">
+          <div class="ao-al-hint">Add more addresses separated by commas — everyone gets the alert.</div>
+        </div>
+        <div class="ao-al-sec">
+          <div class="ao-al-lbl">What we watch <span class="ao-al-lbl-note">every inverter, weighed against its neighbors</span></div>
+          <div class="ao-al-watch">
+            <div class="ao-al-w"><span class="ao-al-w-d dark"></span><div><b>Not producing</b><small>goes dark mid-day</small></div></div>
+            <div class="ao-al-w"><span class="ao-al-w-d low"></span><div><b>Below its neighbors</b><small>underperforming its peers</small></div></div>
+            <div class="ao-al-w"><span class="ao-al-w-d quiet"></span><div><b>Gone quiet</b><small>stopped reporting in</small></div></div>
+          </div>
+        </div>
+        <div class="ao-al-sec">
+          <div class="ao-al-lbl">Sensitivity <span class="ao-al-lbl-v">below <b id="aoAlThreshV">50%</b> of peers</span></div>
+          <div class="ao-al-seg-row" id="aoAlSensSeg">${seg(AL_SENS, 50, "%")}</div>
+          <input type="range" id="aoAlThresh" class="ao-al-range" min="10" max="95" step="5" value="50">
+        </div>
+        <div class="ao-al-sec">
+          <div class="ao-al-lbl">Patience <span class="ao-al-lbl-v">wait <b id="aoAlGraceV">12h</b> · ignore passing clouds</span></div>
+          <div class="ao-al-seg-row" id="aoAlPatSeg">${seg(AL_PAT, 12, "h")}</div>
+          <input type="range" id="aoAlGrace" class="ao-al-range" min="0" max="48" step="1" value="12">
+        </div>
+        <div class="ao-al-preview" id="aoAlPreview"></div>
+        <div class="ao-al-note" id="aoAlNote"></div>
+      </div>
+      <div class="ao-al-foot">
+        <button type="button" class="ao-al-test" id="aoAlTest">Send a test alert</button>
+        <button type="button" class="ao-al-save" id="aoAlSave">Save</button>
+      </div>
+    </div>`);
+    document.body.appendChild(panel);
+    const $ = id => panel.querySelector(id);
+    const enabled = $("#aoAlEnabled"), email = $("#aoAlEmail"),
+          thresh = $("#aoAlThresh"), grace = $("#aoAlGrace"), note = $("#aoAlNote");
+
+    const sync = () => {
+      $("#aoAlThreshV").textContent = thresh.value + "%";
+      $("#aoAlGraceV").textContent = grace.value + "h";
+      // highlight the preset the slider currently lands on (else none)
+      $("#aoAlSensSeg").querySelectorAll(".ao-al-seg").forEach(b =>
+        b.classList.toggle("on", String(b.getAttribute("data-seg")) === thresh.value));
+      $("#aoAlPatSeg").querySelectorAll(".ao-al-seg").forEach(b =>
+        b.classList.toggle("on", String(b.getAttribute("data-seg")) === grace.value));
+      const recRaw = email.value.trim();
+      const first = recRaw ? recRaw.split(",")[0].trim() : "you";
+      const extra = recRaw.split(",").filter(x=>x.trim()).length - 1;
+      const rec = extra > 0 ? `${first} +${extra} more` : (first || "you");
+      const gr = grace.value === "0" ? "right away" : `within ${grace.value}h`;
+      $("#aoAlPreview").innerHTML =
+        `We’ll email <b>${esc(rec)}</b> <b>${gr}</b> when an inverter drops below <b>${thresh.value}%</b> of its neighbors — and stays there.`;
+      panel.classList.toggle("off", !enabled.checked);
+      $("#aoAlStatus").textContent = enabled.checked ? "On — watching your fleet" : "Off — no alerts sent";
+    };
+    thresh.oninput = sync; grace.oninput = sync; email.oninput = sync;
+    enabled.onchange = sync;
+    panel.querySelectorAll("[data-seg]").forEach(b => b.onclick = () => {
+      const v = b.getAttribute("data-seg");
+      (b.closest("#aoAlSensSeg") ? thresh : grace).value = v;
+      sync();
+    });
+
+    const close = closeAlertsPanel;
+    $("#aoAlX").onclick = close;
+    const onDoc = (e) => {
+      if(panel.contains(e.target) || (fab && fab.contains(e.target))) return;
+      close(); document.removeEventListener("pointerdown", onDoc, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+    const onKey = (e) => { if(e.key==="Escape"){ close(); document.removeEventListener("keydown", onKey, true); document.removeEventListener("pointerdown", onDoc, true); } };
+    setTimeout(() => { document.addEventListener("pointerdown", onDoc, true); document.addEventListener("keydown", onKey, true); }, 0);
+
+    const session = getSession();
+    if(!session){ note.innerHTML = `<a href="onboarding.html">Sign in</a> to set up alerts.`; }
     else {
-      fetch("/v1/array-owners/alert-settings", { headers:{ "Authorization":"Bearer "+session } })
+      fetch(AL_API, { headers:{ Authorization:"Bearer "+session } })
         .then(r=>r.ok?r.json():null).then(s=>{
           if(!s) return;
-          $("#aaEnabled").checked = !!s.enabled;
-          $("#aaEmail").value = s.email || "";
+          enabled.checked = !!s.enabled;
+          email.value = s.email_is_default ? "" : (s.email || "");
+          if(s.email_is_default && s.email) email.placeholder = s.email + " (account email)";
           thresh.value = s.threshold_pct || 50;
           grace.value = s.grace_hours != null ? s.grace_hours : 12;
-          syncLbls();
+          sync();
         }).catch(()=>{});
     }
-    syncLbls();
+    sync();
 
-    $("#aaSave").onclick = () => {
-      if(!session){ $("#aaNote").innerHTML = `<a href="onboarding.html">Sign in</a> first.`; return; }
-      const body = {
-        enabled: $("#aaEnabled").checked,
-        email: $("#aaEmail").value.trim(),
-        threshold_pct: parseInt(thresh.value,10),
-        grace_hours: parseInt(grace.value,10),
-      };
-      $("#aaNote").textContent = "Saving…";
-      fetch("/v1/array-owners/alert-settings", {
-        method:"PUT", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+session },
-        body: JSON.stringify(body)
-      }).then(r=>r.json().then(j=>({ok:r.ok, j}))).then(({ok,j})=>{
-        if(!ok){ $("#aaNote").textContent = (j && j.detail) || "Couldn't save — check the email."; return; }
-        close();
-        toast(j.enabled ? `Alerts on — we'll email ${j.email} when an inverter needs you.` : "Inverter alerts turned off.", "ok");
-      }).catch(()=>{ $("#aaNote").textContent = "Network error — try again."; });
+    $("#aoAlSave").onclick = () => {
+      if(!session){ note.innerHTML = `<a href="onboarding.html">Sign in</a> first.`; return; }
+      const body = { enabled: enabled.checked, email: email.value.trim(),
+                     threshold_pct: parseInt(thresh.value,10), grace_hours: parseInt(grace.value,10) };
+      note.textContent = "Saving…";
+      fetch(AL_API, { method:"PUT",
+        headers:{ "Content-Type":"application/json", Authorization:"Bearer "+session },
+        body: JSON.stringify(body) })
+        .then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
+          if(!ok){ note.textContent = (j && j.detail) || "Couldn’t save — check the email."; return; }
+          _setDot(!!j.enabled);
+          close();
+          toast(j.enabled ? `Alerts on — we’ll email ${j.email} when an inverter needs you.` : "Fleet alerts turned off.", "ok");
+        }).catch(()=>{ note.textContent = "Network error — try again."; });
+    };
+
+    const testBtn = $("#aoAlTest");
+    testBtn.onclick = () => {
+      if(!session){ note.innerHTML = `<a href="onboarding.html">Sign in</a> first.`; return; }
+      testBtn.disabled = true; note.textContent = "Sending a test…";
+      fetch(AL_API + "/test", { method:"POST", headers:{ Authorization:"Bearer "+session } })
+        .then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
+          testBtn.disabled = false;
+          if(!ok){ note.textContent = (j && j.detail) || "Couldn’t send the test — try again."; return; }
+          note.textContent = "";
+          toast(`Test alert sent to ${(j.sent_to||[]).join(", ")} — check your inbox.`, "ok");
+        }).catch(()=>{ testBtn.disabled=false; note.textContent = "Network error — try again."; });
     };
   }
   // "Show all arrays" — visible only in TREE view when the owner has drilled into a
@@ -5594,7 +5695,7 @@
       catch(_){ location.hash = "#arrays"; }
     }
   }
-  document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); });
+  document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); ensureAlertsWidget(); });
   // expose for external callers (and post-add reloads)
   window.__sbLoad = load;
   // QA/debug hook: render a fleet-tree payload directly (used by the offline
@@ -5602,7 +5703,7 @@
   window.__sbRenderTree = render;
   // expose the alerts settings modal so it can be opened from the top-bar
   // Fleet Commander button (moved out of the sandbox head, May 2026).
-  window.__sbOpenAlerts = openAlertsModal;
+  window.__sbOpenAlerts = openAlertsPanel;
 
   // ---- shared store: re-render the fleet tree whenever the canonical fleet (or
   // the focused subset) changes — including changes made from the command center.

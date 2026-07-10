@@ -336,28 +336,93 @@
   /* weather badge beside the array name */
   .sb-wx{display:inline-block;margin-left:6px;font-size:0.95em;line-height:1;cursor:default;
     vertical-align:baseline;filter:saturate(1.05)}
-  /* ── inverter email-alert settings modal ── */
-  .sb-alerts-back{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
-    background:rgba(2,6,12,.72);backdrop-filter:blur(4px);padding:20px}
-  .sb-alerts-modal{position:relative;width:min(440px,94vw);padding:26px 28px 22px;border-radius:18px;
-    background:linear-gradient(165deg,#10161f,#0b0f17);border:1px solid var(--line);
-    box-shadow:0 30px 80px -28px rgba(0,0,0,.9);color:var(--ink)}
-  .sb-alerts-x{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--faint);
-    font-size:22px;line-height:1;cursor:pointer}
-  .sb-alerts-x:hover{color:var(--ink)}
-  .sb-alerts-title{font-size:19px;font-weight:800;letter-spacing:-.01em}
-  .sb-alerts-sub{font-size:13px;color:var(--muted);margin:6px 0 16px;line-height:1.5}
-  .sb-alerts-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;cursor:pointer;
-    padding:11px 13px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
-  .sb-alerts-toggle input{width:17px;height:17px;accent-color:var(--good);cursor:pointer}
-  .sb-alerts-fields{display:flex;flex-direction:column;gap:14px;margin-top:14px}
-  .sb-alerts-field{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--muted)}
-  .sb-alerts-field b{color:var(--good);font-weight:800}
-  .sb-alerts-field input[type=email]{padding:9px 12px;border-radius:9px;border:1px solid var(--line);
-    background:rgba(255,255,255,.04);color:var(--ink);font-size:14px}
-  .sb-alerts-field input[type=range]{width:100%;accent-color:var(--good);cursor:pointer}
-  .sb-alerts-note{font-size:12.5px;color:var(--warn);margin-top:12px;min-height:1px}
-  .sb-alerts-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  /* ── Fleet alerts — floating bottom-left widget (redesign, Ford 2026-07-10) ──
+     Own light palette (uniquely-named vars) so the panel reads light regardless of
+     the app's theme cascade — never inherits styles.css's dark base. */
+  :root{ --al-ink:#0f172a; --al-muted:#475569; --al-faint:#94a3b8; --al-line:#e6ebf2;
+    --al-blue:#2563eb; --al-card:#fff; }
+  /* stacked just above the "Suggest a feature" pill (#fsWrap, bottom:16px) so both
+     bottom-left widgets coexist without overlapping. */
+  .ao-al-fab{position:fixed;left:20px;bottom:70px;z-index:9001;display:inline-flex;align-items:center;gap:8px;
+    padding:10px 15px 10px 13px;border-radius:24px;border:1px solid var(--al-line);background:var(--al-card);
+    color:var(--al-ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 22px -8px rgba(15,23,42,.28),0 1px 2px rgba(15,23,42,.06);
+    transition:transform .14s ease,box-shadow .14s ease}
+  .ao-al-fab:hover{transform:translateY(-2px);box-shadow:0 12px 30px -10px rgba(15,23,42,.34),0 2px 4px rgba(15,23,42,.08)}
+  .ao-al-fab.open{border-color:rgba(37,99,235,.4);color:var(--al-blue)}
+  .ao-al-fab-ic{display:inline-flex;color:var(--al-blue)}
+  .ao-al-fab-dot{width:8px;height:8px;border-radius:50%;background:var(--al-faint);flex:none;
+    box-shadow:0 0 0 3px rgba(148,163,184,.16)}
+  .ao-al-fab-dot.on{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+  .ao-al-panel{position:fixed;left:20px;bottom:122px;z-index:9002;width:min(372px,calc(100vw - 40px));
+    max-height:min(78vh,720px);display:flex;flex-direction:column;border-radius:18px;overflow:hidden;
+    background:var(--al-card);border:1px solid var(--al-line);color:var(--al-ink);
+    box-shadow:0 28px 70px -22px rgba(15,23,42,.42),0 2px 6px rgba(15,23,42,.08);
+    animation:aoAlUp .16s cubic-bezier(.2,.8,.2,1)}
+  @keyframes aoAlUp{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+  .ao-al-head{display:flex;align-items:center;gap:11px;padding:15px 16px 13px;border-bottom:1px solid var(--al-line);
+    background:linear-gradient(180deg,#f7f9fc,#fff)}
+  .ao-al-h-ic{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;
+    border-radius:10px;background:rgba(37,99,235,.1);color:var(--al-blue)}
+  .ao-al-h-tt{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
+  .ao-al-h-tt b{font-size:14.5px;font-weight:800;letter-spacing:-.01em}
+  .ao-al-h-tt span{font-size:11.5px;color:var(--al-muted)}
+  .ao-al-x{background:none;border:0;color:var(--al-faint);font-size:21px;line-height:1;cursor:pointer;padding:0 2px;flex:none}
+  .ao-al-x:hover{color:var(--al-ink)}
+  /* iOS-style master switch */
+  .ao-al-switch{position:relative;display:inline-flex;flex:none;cursor:pointer}
+  .ao-al-switch input{position:absolute;opacity:0;width:0;height:0}
+  .ao-al-track{width:38px;height:22px;border-radius:20px;background:#cbd5e1;transition:background .16s ease;position:relative}
+  .ao-al-track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.28);transition:transform .16s ease}
+  .ao-al-switch input:checked + .ao-al-track{background:var(--al-blue)}
+  .ao-al-switch input:checked + .ao-al-track::after{transform:translateX(16px)}
+  .ao-al-switch input:focus-visible + .ao-al-track{box-shadow:0 0 0 3px rgba(37,99,235,.35)}
+  .ao-al-body{padding:15px 16px 4px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+  .ao-al-panel.off .ao-al-body{opacity:.5;pointer-events:none;filter:saturate(.8)}
+  .ao-al-panel.off .ao-al-sec:first-child{opacity:1;pointer-events:auto;filter:none}
+  .ao-al-sec{display:flex;flex-direction:column;gap:9px}
+  .ao-al-lbl{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--al-faint);
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .ao-al-lbl-note{font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--al-faint)}
+  .ao-al-lbl-v{margin-left:auto;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--al-muted)}
+  .ao-al-lbl-v b{color:var(--al-blue);font-weight:800}
+  .ao-al-input{padding:10px 12px;border-radius:10px;border:1px solid var(--al-line);background:#fff;color:var(--al-ink);
+    font-size:13.5px;width:100%;box-sizing:border-box}
+  .ao-al-input:focus{outline:none;border-color:rgba(37,99,235,.5);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .ao-al-hint{font-size:11px;color:var(--al-faint);line-height:1.4}
+  .ao-al-watch{display:flex;flex-direction:column;gap:8px}
+  .ao-al-w{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--al-ink)}
+  .ao-al-w div{display:flex;flex-direction:column;line-height:1.3}
+  .ao-al-w b{font-weight:650}
+  .ao-al-w small{color:var(--al-faint);font-size:11px}
+  .ao-al-w-d{width:9px;height:9px;border-radius:50%;flex:none}
+  .ao-al-w-d.dark{background:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.14)}
+  .ao-al-w-d.low{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.16)}
+  .ao-al-w-d.quiet{background:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.16)}
+  .ao-al-seg-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .ao-al-seg{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:10px;
+    border:1px solid var(--al-line);background:#f8fafc;color:var(--al-muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+    transition:background .12s ease,border-color .12s ease,color .12s ease}
+  .ao-al-seg small{font-size:10px;font-weight:600;color:var(--al-faint)}
+  .ao-al-seg:hover{border-color:#cbd5e1}
+  .ao-al-seg.on{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.4);color:var(--al-blue)}
+  .ao-al-seg.on small{color:var(--al-blue)}
+  .ao-al-range{width:100%;accent-color:var(--al-blue);cursor:pointer;margin:0}
+  .ao-al-preview{font-size:12.5px;line-height:1.5;color:var(--al-muted);background:#f4f7fb;border:1px solid var(--al-line);
+    border-radius:11px;padding:10px 12px}
+  .ao-al-preview b{color:var(--al-ink);font-weight:750}
+  .ao-al-note{font-size:12px;color:#b45309;min-height:1px}
+  .ao-al-note a{color:var(--al-blue)}
+  .ao-al-foot{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--al-line);background:#fbfcfe}
+  .ao-al-test{font:inherit;font-size:12.5px;font-weight:700;color:var(--al-blue);background:none;border:0;cursor:pointer;padding:6px 2px}
+  .ao-al-test:hover{text-decoration:underline}
+  .ao-al-test:disabled{color:var(--al-faint);cursor:default;text-decoration:none}
+  .ao-al-save{margin-left:auto;font:inherit;font-size:13px;font-weight:750;color:#fff;background:var(--al-blue);
+    border:0;border-radius:10px;padding:9px 20px;cursor:pointer;box-shadow:0 2px 6px -1px rgba(37,99,235,.4)}
+  .ao-al-save:hover{filter:brightness(1.05)}
+  .ao-al-save:active{transform:translateY(1px)}
+  @media(max-width:640px){ .ao-al-fab-txt{display:none} }
   /* grid mode: the tiles ARE the legend (color-coded), and orientation/expand-all
      are canvas-only — hide them so the toolbar stays clean. */
   #sandbox.sb-mode-grid ~ * .sb-legend,
