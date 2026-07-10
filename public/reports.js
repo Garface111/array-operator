@@ -1941,8 +1941,13 @@
       // mid-edit (a full list re-render would clobber a focused note/rate field);
       // the next poll picks it up. loadPipeline is cheap + always safe to refresh.
       loadPipeline();
-      const editing = document.activeElement && document.activeElement.closest &&
-        document.activeElement.closest("#rbList");
+      // NEVER rebuild the list out from under an open card (Ford 2026-07-10: "no shifting
+      // ground"). Defer the refresh while ANY offtaker card is expanded OR a field is
+      // focused — not just the focused-field case — so a poll can't collapse/flash the
+      // card the operator is working in. The next poll (or closing the card) picks it up.
+      const editing = ACTIVE_SUB_ID != null ||
+        (document.activeElement && document.activeElement.closest &&
+         document.activeElement.closest("#rbList"));
       if (!editing) await refreshList();
       if (st) setTimeout(() => { if (st && !_autoDraftBusy) st.hidden = true; }, 6000);
     } catch (_) { /* transient — the next poll retries */ }
@@ -5427,6 +5432,10 @@
                                 // the provider→account hierarchy so matches surface in place.
   let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
   let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
+  let SEC_OPEN = {};            // collapsible-section title -> open bool. Persists which sections
+                               // the operator has open ACROSS body re-renders (poll / recompute /
+                               // period+version change) so nothing collapses under them mid-edit —
+                               // "no shifting ground" (Ford 2026-07-10). Keyed by section title.
   let GROUP_COLLAPSED = {};     // utility-account group key -> bool; collapses every offtaker
                                 // card under one utility bill at once. DEFAULTS to collapsed
                                 // (each first-seen group key inits to true in renderAccordion).
@@ -5714,6 +5723,12 @@
     renderDraftDoc();
     renderReviewTop();
     wireCalcLinks(wrap);                 // calc dashboard now lives in the form column
+    // Remember which collapsible sections the operator has open, so the NEXT rebuild of
+    // this body (a background poll, a recompute, a period/version switch) restores them
+    // instead of collapsing everything — the "shifting ground" Ford flagged. Fresh
+    // elements each render → no duplicate listeners.
+    wrap.querySelectorAll("details[data-seckey]").forEach(dt =>
+      dt.addEventListener("toggle", () => { SEC_OPEN[dt.getAttribute("data-seckey")] = dt.open; }));
     wrap.querySelectorAll("textarea[data-draftmsg]").forEach(ta => {
       autoGrowMsg(ta);
       const did = ta.getAttribute("data-draftmsg");
@@ -6427,11 +6442,15 @@
     const sid = d.subscription_id;
     // NEPOOL client-card aesthetic (Ford 2026-07-04): each section is a colour-
     // dotted, tinted collapsible sub-card. `tone` keys the colour band.
-    const sec = (title, body, sub, open, tone) =>
-      `<details class="rb-sec" data-tone="${tone || "slate"}"${open ? " open" : ""}>
+    // `open` is the FIRST-render default; once the operator toggles a section, SEC_OPEN
+    // remembers it so a re-render restores their choice instead of snapping back.
+    const sec = (title, body, sub, open, tone) => {
+      const isOpen = (title in SEC_OPEN) ? SEC_OPEN[title] : open;
+      return `<details class="rb-sec" data-seckey="${esc(title)}" data-tone="${tone || "slate"}"${isOpen ? " open" : ""}>
         <summary class="rb-sec-h"><span class="rb-sec-caret" aria-hidden="true">▸</span><span class="rb-sec-dot" aria-hidden="true"></span><span class="rb-sec-t">${title}</span>${sub ? `<span class="rb-sec-sub">${esc(sub)}</span>` : ""}</summary>
         <div class="rb-sec-body">${body}</div>
       </details>`;
+    };
     const emailBody = `
       <div class="rb-draft-email">
         <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
@@ -6765,7 +6784,7 @@
           </div>
         </div>
 
-        <details class="rb-fadv">
+        <details class="rb-fadv" data-seckey="Advanced overrides"${SEC_OPEN["Advanced overrides"] ? " open" : ""}>
           <summary>Advanced — flag threshold, budget cap, invoice numbering, commissioning</summary>
           <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
             <label class="rep-fld"><span class="rl">Bill-accuracy threshold (%)<span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Share above — no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
