@@ -6605,60 +6605,76 @@
         <!-- Required-field marking (Bruce C5): .req mirrors ofPatchBody's actual
              semantics — name / utility account / share % refuse to save blank
              (return null); every other field persists blank, so it stays clear. -->
+        <!-- Redesign (Ford 2026-07-10): the flat 14-field grid was hard to scan.
+             Group into labeled sections (Offtaker / Billing / Invoicing), fold the
+             rarely-touched overrides into an Advanced <details>, and move the static
+             per-field descriptions into ⓘ tooltips. Native <details> keeps every field
+             in the DOM, so all wiring (data-of / .rb-of-master / .rb-of-sub /
+             .rb-of-commdate / .rb-of-ratehint) still finds them. -->
         <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
-        <div class="rb-cust-grid rb-offedit-grid">
-          <label class="rep-fld req"><span class="rl">Offtaker name</span>
-            <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
-          ${showBillPicker ? `
-          <label class="rep-fld req"><span class="rl">Master account</span>
-            <select class="rb-of-master">${msOpts.masterHTML}</select>
-            <span class="rb-fld-hint">The net-meter group host this offtaker bills a share of.</span></label>
-          <label class="rep-fld"><span class="rl">Sub-account (optional)</span>
-            <select class="rb-of-sub">${msOpts.subHTML}</select>
-            <span class="rb-fld-hint">If this offtaker meters on their own account, pick it to bill directly off their meter instead of a share of the master. Leave blank to bill their share of the master. Changing either re-derives their group share automatically.</span></label>` : ""}
-          <!-- Contact hoisted to the top (Ford 2026-07-10): the offtaker email is a
-               critical field — you can't invoice a customer without it — so it sits with
-               the identity/required fields, not buried under the billing config. Kept
-               OPTIONAL (no .req) because a "send to me only" schedule legitimately has no
-               offtaker email; .req is reserved for fields the backend refuses to save blank. -->
-          <label class="rep-fld"><span class="rl">Offtaker email</span>
-            <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com">
-            <span class="rb-fld-hint">Where the invoice is sent — needed to email the offtaker.</span></label>
-          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
-            <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
-          <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
-          <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
-            <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
-          ${rateFieldHTML(d, utilAccts)}
-          <label class="rep-fld"><span class="rl">Discount (% off the credit rate)</span>
-            <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
-            ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
-          <label class="rep-fld"><span class="rl">Bill-accuracy flag threshold (%)
-              <span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Expected share above — no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
-            <input type="number" data-of="crosscheck_threshold_pct" min="0.001" max="100" step="0.001" value="${xThresh}" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)">
-            <span class="rb-fld-hint">Flags when GMP's derived share differs from your entered share by more than this. Blank = ${fmtPct(XCHECK_DEFAULT_PCT)}%.</span></label>
-          ${editArrayId !== "" ? `
-          <label class="rep-fld"><span class="rl">Commissioning Date</span>
-            <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
-            <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
-          <label class="rep-fld"><span class="rl">Starting invoice #</span>
-            <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based">
-            <span class="rb-fld-hint">Seeds sequential invoice numbering; each send adds 1.</span></label>
-          <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
-            <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = use the calculated amount">
-            <span class="rb-fld-hint">Set a flat amount this offtaker pays — overrides the calculated total (line items still show).</span></label>
-          <label class="rep-fld"><span class="rl">Cadence</span>
-            <select data-of="cadence">
-              <option value="monthly" ${cad === "monthly" ? "selected" : ""}>Monthly</option>
-              <option value="quarterly" ${cad === "quarterly" ? "selected" : ""}>Quarterly</option>
-            </select></label>
-          <label class="rep-fld"><span class="rl">Send to</span>
-            <select data-of="send_mode">
-              <option value="to_me" ${sm === "to_me" ? "selected" : ""}>Me (operator copy)</option>
-              <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
-              <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
-            </select></label>
+
+        <div class="rb-fsec">
+          <div class="rb-fsec-h">Offtaker</div>
+          <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
+            <label class="rep-fld req"><span class="rl">Name</span>
+              <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
+            <label class="rep-fld"><span class="rl">Email<span class="rb-info" tabindex="0" title="Where the invoice is sent — needed to email the offtaker.">ⓘ</span></span>
+              <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com"></label>
+            ${showBillPicker ? `
+            <label class="rep-fld req"><span class="rl">Master account<span class="rb-info" tabindex="0" title="The net-meter group host this offtaker bills a share of.">ⓘ</span></span>
+              <select class="rb-of-master">${msOpts.masterHTML}</select></label>
+            <label class="rep-fld"><span class="rl">Sub-account<span class="rb-info" tabindex="0" title="If this offtaker meters on their own account, pick it to bill directly off their meter instead of a share of the master. Leave blank to bill their share of the master. Changing either re-derives their group share automatically.">ⓘ</span></span>
+              <select class="rb-of-sub">${msOpts.subHTML}</select></label>` : ""}
+            <label class="rep-fld rb-fgrid-full"><span class="rl">CC</span>
+              <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional — comma-separated"></label>
+          </div>
         </div>
+
+        <div class="rb-fsec">
+          <div class="rb-fsec-h">Billing</div>
+          <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
+            <label class="rep-fld req"><span class="rl">Share of net-meter group (%)<span class="rb-info" tabindex="0" title="This offtaker's percentage of the master array's net-meter group excess.">ⓘ</span></span>
+              <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
+            ${rateFieldHTML(d, utilAccts)}
+            <label class="rep-fld"><span class="rl">Discount (%)</span>
+              <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
+              ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default — auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
+          </div>
+        </div>
+
+        <div class="rb-fsec">
+          <div class="rb-fsec-h">Invoicing</div>
+          <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
+            <label class="rep-fld"><span class="rl">Cadence</span>
+              <select data-of="cadence">
+                <option value="monthly" ${cad === "monthly" ? "selected" : ""}>Monthly</option>
+                <option value="quarterly" ${cad === "quarterly" ? "selected" : ""}>Quarterly</option>
+              </select></label>
+            <label class="rep-fld"><span class="rl">Send to</span>
+              <select data-of="send_mode">
+                <option value="to_me" ${sm === "to_me" ? "selected" : ""}>Me (operator copy)</option>
+                <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
+                <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
+              </select></label>
+          </div>
+        </div>
+
+        <details class="rb-fadv">
+          <summary>Advanced — flag threshold, budget cap, invoice numbering, commissioning</summary>
+          <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
+            <label class="rep-fld"><span class="rl">Bill-accuracy threshold (%)<span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Share above — no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
+              <input type="number" data-of="crosscheck_threshold_pct" min="0.001" max="100" step="0.001" value="${xThresh}" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)"></label>
+            <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)<span class="rb-info" tabindex="0" title="Set a flat amount this offtaker pays — overrides the calculated total (line items still show).">ⓘ</span></span>
+              <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = use the calculated amount"></label>
+            <label class="rep-fld"><span class="rl">Starting invoice #<span class="rb-info" tabindex="0" title="Seeds sequential invoice numbering; each send adds 1.">ⓘ</span></span>
+              <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based"></label>
+            ${editArrayId !== "" ? `
+            <label class="rep-fld"><span class="rl">Commissioning date</span>
+              <input type="date" class="rb-of-commdate" data-commdate-arr="${editArrayId}" min="1990-01-01" max="${todayISO()}">
+              <span class="rb-fld-hint rb-of-ratehint">The array's in-service date — sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).</span></label>` : ""}
+          </div>
+        </details>
+
         <span class="rb-status rb-offedit-status"></span>
       </div>`;
   }
