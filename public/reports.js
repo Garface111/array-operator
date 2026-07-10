@@ -344,7 +344,7 @@
   // The fleet-default cross-check variance threshold (percentage points, Bruce
   // 2026-07-07). Set from the subscriptions list / list-bundle; the setup + edit
   // forms show "flags beyond X%" from it when the per-offtaker override is blank.
-  let XCHECK_DEFAULT_PCT = 0.1;
+  let XCHECK_DEFAULT_PCT = 0.05;   // fleet default (Ford 2026-07-10: 0.1 → 0.05%); backend list-bundle overrides
   // 2-decimal share/variance formatter (25.53%, not 25.5300%).
   const fmtPct = n => n == null ? "—"
     : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
