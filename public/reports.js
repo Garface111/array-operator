@@ -4755,46 +4755,49 @@
     if (!rows || !rows.length) return null;
     const acctById = {};
     (utilAccts || []).forEach(a => { if (a.utility_account_id != null) acctById[String(a.utility_account_id)] = a; });
-    // Anna-shape fleets: when (nearly) every offtaker bills off their OWN meter,
-    // the utility-account level is 1:1 with offtakers — at 800 offtakers that's
-    // 800 single-card wrapper groups burying the real structure. Group by ARRAY
-    // (the community project) instead, and sum array_share_pct so the pill
-    // answers the question that actually matters there: "is this array fully
-    // allocated?" (allocation_pct is 1.0 of each OWN bill — summing it is
-    // meaningless in this shape).
-    const bound = rows.filter(s => s.utility_account_id != null);
-    const distinctOwn = new Set(bound.map(s => String(s.utility_account_id))).size;
-    const arrayMode = bound.length > 20
-      && distinctOwn / bound.length > 0.9
-      && rows.filter(s => s.array_id != null).length / rows.length > 0.9;
+    // Group by the MASTER net-meter group (array_id), NOT the account the offtaker
+    // happens to bill from (Ford 2026-07-10). An offtaker on its OWN sub-meter (e.g.
+    // "Brooks House", a sub of the "Londonderry" master) must show UNDER its master
+    // array, labeled by that master's host account — not under its own sub-account.
+    // The group host (master) = the lowest utility_account_id on the array (mirrors
+    // the backend host rule). Topology-B offtakers bound straight to the host are
+    // unchanged: their account IS the host, so array-keying groups them identically
+    // (and array_share_pct is null for them → the sum still uses allocation_pct).
+    const hostByArray = {};
+    (utilAccts || []).forEach(a => {
+      if (a.array_id == null || a.utility_account_id == null) return;
+      const k = String(a.array_id);
+      if (!hostByArray[k] || Number(a.utility_account_id) < Number(hostByArray[k].utility_account_id))
+        hostByArray[k] = a;
+    });
     const groups = {};
     const order = [];
     rows.forEach(s => {
-      const key = (arrayMode && s.array_id != null) ? "a:" + s.array_id
+      // The net-meter GROUP key: the master array when known, else the bound account.
+      const key = s.array_id != null ? "a:" + s.array_id
         : s.utility_account_id != null ? "u:" + s.utility_account_id
-        : s.array_id != null ? "a:" + s.array_id
         : "u:none";
       if (!groups[key]) {
-        const acct = s.utility_account_id != null ? acctById[String(s.utility_account_id)] : null;
-        // provider drives the TOP grouping level (GMP / VEC / WEC …); the account
-        // label drops the provider prefix now that it sits UNDER a provider header.
+        // Label + provider come from the group's MASTER (host) account — vendor-free
+        // (utilityIdentity: nickname → service address → provider+acct#), never the
+        // sub-account or the array/inverter name.
+        const host = s.array_id != null ? hostByArray[String(s.array_id)] : null;
+        const acct = host || (s.utility_account_id != null ? acctById[String(s.utility_account_id)] : null);
         const provider = (acct && acct.provider) ? String(acct.provider).toLowerCase() : "";
         const arrName = ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name;
-        const label = (arrayMode && key.startsWith("a:") && arrName)
-          ? arrName
-          : acct
-            ? (acct.nickname || acct.account_number || String(s.utility_account_id))
-            : (s.utility_account_name || arrName || "Ungrouped");
+        const label = acct ? utilityIdentity(acct)
+          : (s.utility_account_name || arrName || "Ungrouped");
         groups[key] = { key, provider, providerLabel: provider ? provider.toUpperCase() : "Other",
-                        label, pctSum: 0, hasDraft: false, rows: [],
-                        shareMode: (arrayMode && key.startsWith("a:")) ? "array" : "meter" };
+                        label, pctSum: 0, hasDraft: false, rows: [], shareMode: "meter" };
         order.push(key);
       }
       const g = groups[key];
       g.rows.push(s);
-      g.pctSum += Number(g.shareMode === "array"
-        ? (s.array_share_pct != null ? s.array_share_pct : s.allocation_pct)
-        : s.allocation_pct) || 0;
+      // Each offtaker's share OF THE MASTER ARRAY: array_share_pct for a sub-metered
+      // offtaker (its allocation_pct is 1.0 of its own bill), else allocation_pct.
+      // A sub-metered member flips the group to the "share of the array" wording.
+      if (s.array_share_pct != null) g.shareMode = "array";
+      g.pctSum += Number(s.array_share_pct != null ? s.array_share_pct : s.allocation_pct) || 0;
       if (DRAFT_BY_SUB[String(s.id)]) g.hasDraft = true;
     });
     const list = order.map(k => groups[k]);
