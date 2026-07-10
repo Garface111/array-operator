@@ -935,24 +935,72 @@ try { window.updateTrialNudge = updateTrialNudge; } catch(e){}
 // working." Driven by FleetStore (not a fetch) so it reacts the instant a
 // Fronius/SMA/Chint array is connected, no reload needed.
 const _EXT_LIVE_VENDORS = new Set(["fronius", "sma", "chint"]);
-function _extLiveVendorsPresent(){
+// Group the fleet's extension-refreshed arrays by vendor so the note can state a
+// per-vendor "last refreshed" FACT instead of a vague warning — staleness visible
+// as data, not implied. Empty map → no such array connected → the note stays hidden.
+function _extLiveArraysByVendor(){
+  const by = {};
   try {
-    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()) return false;
+    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()) return by;
     const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
-    return arrays.some(a => _EXT_LIVE_VENDORS.has(a.vendor));
-  } catch(e){ return false; }
+    for(const a of arrays){
+      if(!_EXT_LIVE_VENDORS.has(a.vendor)) continue;
+      (by[a.vendor] = by[a.vendor] || []).push(a);
+    }
+  } catch(e){}
+  return by;
+}
+// Honest source-data freshness for one vendor's arrays. Reuses the spreadsheet's
+// canonical VendorSheet.freshness (a single source of truth for "how old is this
+// reading") on the OLDEST array in the group, so a lagging feed surfaces rather
+// than hiding behind a fresh peer. Returns "live" / "3h ago" / "" (unknown).
+function _extVendorFreshness(arrays){
+  if(!window.VendorSheet || !VendorSheet.freshness) return "";
+  let worst = null, worstAge = null;
+  for(const a of arrays){
+    const ah = (a.source_status || {}).age_hours;
+    if(ah == null) continue;
+    if(worstAge == null || ah > worstAge){ worstAge = ah; worst = a; }
+  }
+  return worst ? (VendorSheet.freshness(worst) || "") : "";
+}
+function _extJoinAnd(list){
+  if(list.length <= 1) return list[0] || "";
+  if(list.length === 2) return list[0] + " and " + list[1];
+  return list.slice(0, -1).join(", ") + " and " + list[list.length - 1];
+}
+// Calm, factual copy — no hype, no fear, no "resolved soon". Desktop states the
+// mechanism, the per-vendor freshness, and the ONE instruction that only makes
+// sense on a computer ("keep a tab open"). The mobile chip shows just the freshness
+// facts: "leave your browser open" is meaningless on a phone, so it's dropped there.
+function _extLiveNudgeCopy(by, isNarrow){
+  const keys = Object.keys(by);
+  const facts = keys.map(v => {
+    const f = _extVendorFreshness(by[v]);
+    const label = _EXT_VENDOR_LABEL[v] || v;
+    return f ? (label + " <b>" + f + "</b>") : null;
+  }).filter(Boolean).join(" · ");
+  const names = _extJoinAnd(keys.map(v => _EXT_VENDOR_LABEL[v] || v));
+  if(isNarrow){
+    return facts || (names + " refresh in-browser");
+  }
+  let s = names + " refresh through your browser extension while you're signed in.";
+  if(facts) s += " " + facts + ".";
+  s += " Keep a tab open and they stay current.";
+  return s;
 }
 function updateExtLiveNudge(){
   const bar = document.getElementById("extLiveNudge");
   if(!bar) return;
+  // localStorage guard → once dismissed, stays dismissed for this session (and
+  // beyond, matching the sibling trial/vault nudges). Checked before anything else.
   if(localStorage.getItem("ao_extlivenudge_dismiss") === "1"){ bar.hidden = true; return; }
-  if(!_extLiveVendorsPresent()){ bar.hidden = true; return; }
+  const by = _extLiveArraysByVendor();
+  if(!Object.keys(by).length){ bar.hidden = true; return; }   // only relevant when a Fronius/SMA/Chint array is present
+  const isNarrow = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+  bar.classList.toggle("is-chip", isNarrow);                  // slim, non-sticky pill on a phone (mobile.css)
   const copy = document.getElementById("extLiveNudgeCopy");
-  if(copy){
-    copy.innerHTML = "While we finish linking SMA's official API, Fronius and SMA portals can only " +
-      "refresh while Chrome is open. Please consider leaving your browser open for live data — " +
-      "<b>this will be resolved soon.</b>";
-  }
+  if(copy){ copy.innerHTML = _extLiveNudgeCopy(by, isNarrow); }
   const x = document.getElementById("extLiveNudgeX");
   if(x){
     x.onclick = function(){
@@ -965,6 +1013,13 @@ function updateExtLiveNudge(){
 try {
   window.updateExtLiveNudge = updateExtLiveNudge;
   if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(updateExtLiveNudge); }
+  // Re-render across the phone breakpoint so the chip form + desktop-only instruction
+  // follow the real layout on rotate/resize (FleetStore events don't fire on resize).
+  if(window.matchMedia){
+    const _extMq = window.matchMedia("(max-width: 600px)");
+    if(_extMq.addEventListener) _extMq.addEventListener("change", updateExtLiveNudge);
+    else if(_extMq.addListener) _extMq.addListener(updateExtLiveNudge);
+  }
 } catch(e){}
 
 // Vault-login reminder — quiet, dismissible, same shape as extLiveNudge/trialNudge.

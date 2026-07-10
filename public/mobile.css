@@ -36,6 +36,20 @@
                      border: 1px solid var(--line); border-radius: 999px;
                      background: var(--card); }
 
+  /* ── Extension-live-data note → compact, non-sticky chip ─────────────────────
+     On a phone this is CONTEXT, not a control. It must not ride the top of every
+     tab eating premium viewport, and it must never pin. So: force it out of flow
+     stickiness (position:static — belt-and-suspenders, it sits under the sticky
+     tabbar) and collapse it to a single-line pill showing just the per-vendor
+     "last refreshed" facts. app.js drops the desktop-only "keep a tab open"
+     instruction on this breakpoint (it's meaningless on a phone). */
+  #extLiveNudge { position: static; margin: 8px 0 2px; }
+  #extLiveNudge.is-chip { border-radius: 999px; }
+  #extLiveNudge.is-chip .trial-nudge-row { padding: 6px 12px; gap: 8px; flex-wrap: nowrap; }
+  #extLiveNudge.is-chip .trial-nudge-copy { flex: 1 1 auto; font-size: 11.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #extLiveNudge.is-chip .trial-nudge-x { padding: 2px 4px; font-size: 15px; }
+
   /* ── Portfolio command center ──────────────────────────────────────────── */
   #commandCenter { margin-top: 12px; }
   .cc-head h2 { font-size: 18px; }

@@ -1807,6 +1807,20 @@
         </div>
       </div>`;
 
+    // Keep the header promise HONEST against the visible auto-send counts (sim #5):
+    // the blanket "Nothing sends until you approve it" contradicts an "Auto-sending N"
+    // tile for any tenant running auto-send — the exact "who's in control" tension two
+    // personas flagged as "the worst possible combination". State the guarantee precisely:
+    // approval still LEADS (it's the trust anchor every skeptic cited — keep it bold and
+    // prominent), and auto-send is called out as the named, opt-in exception.
+    const autoInPlay = (p.default_delivery_mode === "auto")
+      || ((monthly.auto || 0) + (quarterly.auto || 0)) > 0
+      || ((inf.pending_auto || 0) > 0);
+    const subEl = document.getElementById("rb2Sub");
+    if (subEl) subEl.innerHTML = autoInPlay
+      ? `Every offtaker's solar credit invoice, generated from their settled utility bills. <b>You approve every invoice before it sends</b> — except the ones you set to Auto-send, which email on schedule.`
+      : `Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Nothing sends until you approve it.</b>`;
+
     // ── wiring ──
     const cellLast = host.querySelector("#rb2CellLast");
     if (cellLast) cellLast.onclick = () => {
@@ -2033,7 +2047,7 @@
       <div class="rb2-head">
         <div class="rb2-id">
           <h1>Offtaker invoicing</h1>
-          <p>Every offtaker's solar credit invoice, generated from their settled utility bills. Nothing sends until you approve it.</p>
+          <p id="rb2Sub">Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Nothing sends until you approve it.</b></p>
           <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
             <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
             <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
@@ -6349,11 +6363,11 @@
           <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
         </div>
         ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
+        ${sec("How this was calculated", calcDashboard(d), "kWh × rate × share = the amount", true, "amber")}
         ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "emerald")}
         ${sec("Edit email", emailBody, "the note your offtaker sees", false, "amber")}
         ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "sky")}
         ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "emerald")}
-        ${sec("How this was calculated", calcDashboard(d), "the math behind the amount", false, "amber")}
         ${bacSec}
         <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
            with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.

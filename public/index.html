@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="theme-day.css?v=20260701b"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
-<link rel="stylesheet" href="mobile.css?v=20260707a"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
+<link rel="stylesheet" href="mobile.css?v=20260710a"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
@@ -86,6 +86,9 @@
   .hero-h1{font-size:30px;line-height:1.12;font-weight:820;letter-spacing:-.02em;color:var(--ink);margin:11px 0 0}
   .hero-h1 em{font-style:normal;color:var(--gold2)}
   .hero-sub{color:var(--muted);font-size:14.5px;line-height:1.5;margin:11px 0 0;max-width:60ch}
+  /* Plain-language gloss on a term at first use (sim #8: "offtaker" meant nothing to a
+     non-technical office manager). Subtle dotted underline reads as a definition, not a link. */
+  .gloss{border-bottom:1px dotted var(--muted);font-style:italic;white-space:normal}
   .hero-ctas{display:flex;align-items:center;gap:16px;margin-top:18px;flex-wrap:wrap}
   .hero-trust{color:var(--muted);font-size:12px;line-height:1.5;margin-top:13px;opacity:.92}
   .hero-price{flex:0 0 280px;align-self:center;border:1px solid rgba(63,214,138,.28);border-radius:14px;
@@ -136,7 +139,7 @@
       <div class="hero-main">
         <span class="db-badge">FOR SOLAR ARRAY OWNERS &amp; OPERATORS</span>
         <h1 class="hero-h1">Watch every inverter. <em>Invoice every offtaker.</em></h1>
-        <p class="hero-sub">Array Operator watches every inverter for you — catching the quiet underperformer the day it slips, drafting the warranty claim when one dies — <b>and</b> turns your utility bills into per-offtaker solar-credit invoices, drafted and ready to send. One connection. Every panel. No spreadsheets.</p>
+        <p class="hero-sub">Array Operator watches every inverter for you — catching the quiet underperformer the day it slips, drafting the warranty claim when one dies — <b>and</b> turns your utility bills into a solar-credit invoice for every offtaker — <span class="gloss">the customer who receives a share of your solar credits</span> — drafted and ready to send. One connection. Every panel. No spreadsheets.</p>
         <div class="hero-ctas">
           <a class="db-cta" href="/onboarding">Start free — connect in 60 seconds →</a>
           <a class="db-signin" href="/login">Sign in</a>
@@ -169,7 +172,7 @@
     <!-- Trends restored for PowerTrack-parity multi-timeframe views (fleet kWh by
          year + seasonal YoY). Route/panel/JS were kept intact; this <a> re-enables it. -->
     <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
-    <a class="tab" id="tabReports" href="#reports" role="tab">Offtaker Invoice Generator</a>
+    <a class="tab" id="tabReports" href="#reports" role="tab" title="An offtaker is a customer who receives a share of your solar credits — this is where you invoice them.">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
@@ -331,11 +334,11 @@
      Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
-<script src="app.js?v=20260708b"></script>
+<script src="app.js?v=20260710a"></script>
 <script src="sandbox.js?v=20260709g"></script>
-<script src="vendor-sheet.js?v=20260709d"></script>
+<script src="vendor-sheet.js?v=20260710a"></script>
 <script src="command-center.js?v=12"></script>
-<script src="reports.js?v=20260709k"></script>
+<script src="reports.js?v=20260710a"></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
      Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>

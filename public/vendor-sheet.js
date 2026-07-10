@@ -681,9 +681,19 @@
     const cnt = $("#vsCount");
     if (cnt) {
       const invShown = cols.reduce((t, c) => t + (c.inverter_count || 0), 0);
+      // Reconcile "monitored" against the whole fleet on the SAME line (sim #7: an operator
+      // saw "2 monitored" here, "3 billed" on invoices, "4" in reality across tabs and
+      // couldn't tell if an array had dropped out). The canonical total is FleetStore's
+      // array count (same source Fleet Health's "arrays on file" uses); when it's larger
+      // than the monitored subset, say "N monitored of M on file" so nothing looks missing.
+      const onFile = (window.FleetStore && FleetStore.snapshot
+        && (FleetStore.snapshot().arrays || []).length) || 0;
+      const monitoredTxt = onFile > all.length
+        ? `${all.length} monitored of ${onFile} on file`
+        : `${all.length} monitored array${all.length === 1 ? "" : "s"}`;
       cnt.textContent = _query
         ? `${cols.length} of ${all.length} monitored arrays match "${_query}"`
-        : `${all.length} monitored array${all.length === 1 ? "" : "s"} · ${(data.summary || {}).inverters_total || invShown} inverters`;
+        : `${monitoredTxt} · ${(data.summary || {}).inverters_total || invShown} inverters`;
     }
     if (!cols.length) {
       body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
