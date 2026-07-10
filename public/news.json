@@ -1,9 +1,10 @@
 {
   "updated": "2026-07-10",
-  "note": "Curated Vermont solar / net-metering / regulatory updates for array operators. Refreshed by a scheduled research agent; verify against the linked source before relying on any figure.",
+  "note": "Curated New England solar / net-metering / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide); the page filters to the reader's state. Refreshed by a scheduled research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
       "date": "2026-08-01",
+      "state": "vt",
       "tag": "Deadline",
       "title": "New net-metering rates take effect August 1",
       "summary": "Under the PUC's 2026 biennial order (Case 26-0291-INV), the Category I adjustor drops about 2¢/kWh and the small-solar siting charge rises from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. Existing arrays keep their locked-in rate.",
@@ -12,6 +13,7 @@
     },
     {
       "date": "2026-06-01",
+      "state": "vt",
       "tag": "Advocacy",
       "title": "REV: 2026 net-metering cuts will further slow Vermont solar",
       "summary": "Renewable Energy Vermont's press statement notes applications for systems under 150 kW fell 24% from 2024 to 2025 and argues the PUC should have offset the loss of the federal residential solar tax credit rather than raise the siting charge. Over 1,000 public comments opposed the cuts.",
@@ -20,6 +22,7 @@
     },
     {
       "date": "2026-05-29",
+      "state": "vt",
       "tag": "Rate case",
       "title": "PUC issues 2026 biennial net-metering order — Case 26-0291-INV",
       "summary": "The Commission adopted the Department of Public Service's recommendation to cut net-metering adjustors 2¢/kWh for all new systems and raise the small-solar siting charge to 5¢/kWh. It is the seventh consecutive reduction to net-metering compensation since 2017.",
@@ -28,6 +31,7 @@
     },
     {
       "date": "2026-04-29",
+      "state": "vt",
       "tag": "Rulemaking",
       "title": "DPS urges a wholesale net-metering rulemaking instead of another formula tweak",
       "summary": "In its filing in Case 26-0291-INV, the Department of Public Service recommended the Commission waive Rule 5.128 and open a rulemaking to fully revise the net-metering program, whose compensation structure has not changed since 2017.",
@@ -36,6 +40,7 @@
     },
     {
       "date": "2026-03-05",
+      "state": "vt",
       "tag": "Rate case",
       "title": "Green Mountain Power seeks 7.5% rate increase for October 2026",
       "summary": "GMP filed for a 7.5% increase effective with bills rendered on or after Oct 1, 2026 (Case 26-0096-TF); a public hearing was held March 5, 2026 and the request remains under PUC review. A related multi-year regulation plan (Case 25-1955-PET) would run 2026–2030.",
@@ -44,6 +49,7 @@
     },
     {
       "date": "2025-11-14",
+      "state": "vt",
       "tag": "Rates",
       "title": "Vermont Electric Coop files 2.99% rate increase for 2026",
       "summary": "VEC requested a 2.99% rate increase effective Jan 1, 2026, citing higher power-supply, transmission, and labor costs. The co-op's average annual increase over the prior decade was about 2.96%.",
@@ -52,6 +58,7 @@
     },
     {
       "date": "2024-06-01",
+      "state": "vt",
       "tag": "Law",
       "title": "H.289 overhauls the RES and phases out community / offsite net metering",
       "summary": "Vermont's Renewable Energy Standard rewrite raises renewables to 100% by 2030 for large utilities and ends new offsite ('virtual') group net metering, with a mandated study of a successor program. Existing group systems continue.",
