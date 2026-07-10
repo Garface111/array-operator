@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resources — Array Operator</title>
+<meta name="description" content="The Vermont solar operator's briefing: net-metering rates, active rate cases, and the regulatory changes that move your credits — kept current.">
+<link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg">
+<style>
+  :root{ --ink:#0f172a; --muted:#475569; --faint:#94a3b8; --line:#e2e8f0; --bg:#f6f8fb;
+         --card:#fff; --good:#2563eb; --tint:#eff6ff; --tintln:#bfdbfe;
+         --amber:#b45309; --amberbg:#fff7ed; --amberln:#fed7aa;
+         --live:#059669; --livebg:#ecfdf5; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--good);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 22px 90px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;
+    font-size:13.5px}
+  .top .r{display:flex;gap:18px;align-items:center}
+  .hero{margin:6px 0 30px}
+  .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--good)}
+  h1{font-size:34px;font-weight:820;letter-spacing:-.02em;margin:.28em 0 .12em;line-height:1.1}
+  .lede{color:var(--muted);font-size:16px;max-width:64ch;margin:0}
+  h2{font-size:12px;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+    margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  section{margin:38px 0 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:12px 0}
+  h3{font-size:16px;font-weight:720;margin:0 0 6px;color:var(--ink)}
+  p{color:var(--muted);margin:.4em 0}
+  strong{color:var(--ink);font-weight:650}
+  .muted{color:var(--faint);font-size:13px}
+  /* live news */
+  .newshead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .livedot{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--live);background:var(--livebg);
+    border:1px solid #a7f3d0;border-radius:999px;padding:3px 9px}
+  .livedot i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .feed{display:flex;flex-direction:column;gap:0;margin-top:6px}
+  .item{display:grid;grid-template-columns:112px 1fr;gap:16px;padding:15px 4px;border-top:1px solid var(--line)}
+  .item:first-child{border-top:0}
+  .item .when{color:var(--faint);font-size:12.5px;white-space:nowrap;padding-top:2px}
+  .item .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    padding:2px 8px;border-radius:6px;margin-top:6px;background:var(--tint);color:var(--good);border:1px solid var(--tintln)}
+  .item .tag.alert{background:var(--amberbg);color:var(--amber);border-color:var(--amberln)}
+  .item h4{font-size:15px;font-weight:650;margin:0 0 3px;color:var(--ink);line-height:1.35}
+  .item p{margin:0;font-size:13.5px}
+  .item .src{font-size:12.5px;margin-top:5px}
+  @media(max-width:560px){ .item{grid-template-columns:1fr;gap:4px} .item .when{padding-top:0} }
+  /* rates table */
+  table{border-collapse:collapse;width:100%;margin:6px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;color:var(--ink);font-weight:650;font-size:12.5px;letter-spacing:.02em}
+  td .n{font-variant-numeric:tabular-nums;font-weight:650;color:var(--ink)}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;
+    background:var(--amberbg);color:var(--amber);border:1px solid var(--amberln)}
+  .srcs{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px}
+  .disc{background:var(--tint);border:1px solid var(--tintln);border-radius:12px;padding:12px 16px;
+    font-size:13px;color:var(--muted);margin:14px 0}
+  .foot{margin-top:52px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="/">← Array Operator</a>
+    <span class="r"><a href="/#reports">Offtaker invoicing</a><a href="/onboarding">Start free</a></span>
+  </div>
+
+  <div class="hero">
+    <span class="eyebrow">The Vermont solar operator's briefing</span>
+    <h1>Know the rules that move your credits.</h1>
+    <p class="lede">Net-metering rates, active rate cases, and the regulatory changes that decide what
+      your arrays earn — tracked in one place and kept current, so you never bill on a stale rate or
+      miss a decision that affects your offtakers.</p>
+  </div>
+
+  <section>
+    <div class="newshead">
+      <h2 style="margin-bottom:0">Latest &amp; live <span class="livedot"><i></i>updating</span></h2>
+    </div>
+    <p class="muted" id="newsMeta" style="margin:8px 0 2px">Loading the latest…</p>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <section>
+    <h2>Vermont net-metering rate — at a glance</h2>
+    <div class="card">
+      <p style="margin-top:0">Set by the Public Utility Commission's <strong>biennial update</strong> and
+        published in each utility's tariff. Array Operator always invoices from the <strong>rate on the
+        offtaker's actual settled bill</strong> — the figures below are the reference the state sets.</p>
+      <table>
+        <tr><th>What</th><th>Rate</th><th>Notes</th></tr>
+        <tr><td>Statewide <strong>blended residential</strong> rate</td>
+            <td><span class="n">$0.1839</span>/kWh</td>
+            <td>The base credit value the PUC blends from utility residential rates.</td></tr>
+        <tr><td><strong>Category I</strong> effective rate (net-metered ≤ 15 kW)</td>
+            <td><span class="n">≈ $0.1439</span>/kWh <span class="pill">↓ Aug 1, 2026</span></td>
+            <td>Blended rate minus the siting/REC adjustor, which the PUC raised 4¢ → <strong>5¢/kWh</strong>
+                for permits Aug 1, 2026 – Jul 31, 2028 (down ~2¢ from $0.1639).</td></tr>
+        <tr><td><strong>Small-system bonus</strong> (&lt; 15 kW)</td>
+            <td><span class="n">+$0.01</span>/kWh</td>
+            <td>Added for the first 10 years; <strong>+$0.03/kWh more</strong> if RECs are transferred to the utility.</td></tr>
+        <tr><td><strong>Rate lock</strong></td>
+            <td>~10 years</td>
+            <td>An array's rate is fixed for its net-metering term (from the permit/CPG date), then rolls to
+                the blended rate in effect at renewal.</td></tr>
+      </table>
+      <p class="muted">This is the <strong>7th consecutive year</strong> the PUC has cut the Category I adjustor.</p>
+    </div>
+    <div class="disc">Reference only — always confirm the current figure against the utility's filed tariff
+      or the offtaker's bill before relying on it. Array Operator's invoices already read the bill's own rate.</div>
+  </section>
+
+  <section>
+    <h2>Active rate cases &amp; regulatory status</h2>
+
+    <div class="card">
+      <h3>2026 Biennial Net-Metering Update — <span class="muted" style="font-weight:400">PUC Case 26-0291-INV</span></h3>
+      <p><strong>Order issued May 29, 2026 · effective Aug 1, 2026.</strong> The Commission's statutorily
+        required update to net-metering compensation. It raised the small-solar siting charge from 4¢ to
+        <strong>5¢/kWh</strong> (a further cut to Category I). The Department of Public Service urged the
+        Commission to instead open a <strong>broader rulemaking to reform net metering</strong> — worth
+        watching, as it could reshape compensation beyond the biennial formula.</p>
+      <p class="muted">Utilities updated their tariffs by June 15, 2026; new rates apply to permits filed on or after Aug 1, 2026.</p>
+    </div>
+
+    <div class="card" style="border-color:var(--amberln);background:var(--amberbg)">
+      <h3>Group / community ("offsite") net metering is being phased out</h3>
+      <p><strong>H.289 (enacted June 2024)</strong> overhauled Vermont's Renewable Energy Standard and
+        <strong>phased out offsite / "virtual" group net metering</strong> starting January 2025, with a
+        one-year extension for systems serving multifamily or low-income housing. A <strong>successor-program
+        analysis</strong> was mandated but no replacement is yet in place.</p>
+      <p><strong>What it means for operators:</strong> <strong>existing group-net-metering arrays keep
+        operating</strong> under their agreements — your current fleet is unaffected — but Vermont is not
+        approving new community-solar offtaker groups today. If you're planning expansion, this is the file to watch.</p>
+    </div>
+
+    <div class="card">
+      <h3>Renewable Energy Standard (RES) — the demand side of your RECs</h3>
+      <p>Under H.289, each utility's renewable requirement rises from <strong>63% (2025) to 100% by 2030</strong>
+        (2035 for GF Power and certain municipals). <strong>Tier II</strong> (distributed ≤ 5 MW) starts at 5.8%;
+        <strong>Tier III</strong> (energy transformation) rises 7.33% → <strong>12% by 2032</strong>. The update
+        also lets <strong>every provider except GMP access RECs from pre-2017 net-metering projects</strong> —
+        a shift in who can claim the environmental attributes your arrays produce.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Go to the source</h2>
+    <div class="card">
+      <div class="srcs">
+        <a href="https://puc.vermont.gov/electric/net-metering" target="_blank" rel="noopener">PUC · Net-Metering ↗</a>
+        <a href="https://puc.vermont.gov/electric/renewable-energy-standard" target="_blank" rel="noopener">PUC · Renewable Energy Standard ↗</a>
+        <a href="https://epuc.vermont.gov/" target="_blank" rel="noopener">ePUC · case filings &amp; dockets ↗</a>
+        <a href="https://publicservice.vermont.gov/renewables" target="_blank" rel="noopener">Dept. of Public Service · Renewables ↗</a>
+        <a href="https://www.revermont.org/" target="_blank" rel="noopener">Renewable Energy Vermont ↗</a>
+        <a href="https://greenmountainpower.com/rates/" target="_blank" rel="noopener">Green Mountain Power · Rates ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    Array Operator, from Dyson Swarm Technologies. Reference figures reflect the state of Vermont's programs
+    as of the "updated" date above and are compiled from public PUC/DPS filings and reporting — always verify
+    against official sources before relying on them. Questions:
+    <a href="mailto:admin@solaroperator.org">admin@solaroperator.org</a>.
+  </div>
+</div>
+
+<script>
+  // Live news feed — fetches the curated news.json that a scheduled research agent keeps
+  // fresh (so this page updates itself). Falls back to a message if it can't load.
+  (function(){
+    var feed = document.getElementById("feed");
+    var meta = document.getElementById("newsMeta");
+    function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+    function fmtDate(iso){
+      try { var d = new Date(iso + "T00:00:00");
+        return d.toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"}); }
+      catch(e){ return iso; }
+    }
+    fetch("/news.json?cb=" + Date.now()).then(function(r){ return r.json(); }).then(function(data){
+      var items = (data && data.items) || [];
+      items.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+      if(!items.length){ meta.textContent = "No updates yet — check back soon."; return; }
+      meta.innerHTML = "Last updated " + esc(fmtDate(data.updated || items[0].date)) +
+        " · " + items.length + " item" + (items.length===1?"":"s");
+      feed.innerHTML = items.map(function(it){
+        var alert = /rule|cut|phase|deadline|case|alert/i.test((it.tag||"") + " " + (it.title||""));
+        return '<div class="item">' +
+          '<div class="when">' + esc(fmtDate(it.date)) + '</div>' +
+          '<div><span class="tag' + (alert ? ' alert' : '') + '">' + esc(it.tag || "Update") + '</span>' +
+          '<h4>' + esc(it.title) + '</h4>' +
+          (it.summary ? '<p>' + esc(it.summary) + '</p>' : '') +
+          (it.url ? '<div class="src"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
+             esc(it.source || "Read more") + ' ↗</a></div>' : '') +
+          '</div></div>';
+      }).join("");
+    }).catch(function(){
+      meta.textContent = "Couldn't load the latest updates right now — see the sources below.";
+    });
+  })();
+</script>
+</body>
+</html>
