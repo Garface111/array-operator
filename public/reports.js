@@ -2036,9 +2036,9 @@
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:12.5px">
           <tr><td style="padding:5px 0;color:var(--muted)">Array total production</td>
-              <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.array_total_kwh)} kWh</td></tr>
-          <tr><td style="padding:5px 0;color:var(--muted)">Your share</td>
-              <td style="padding:5px 0;text-align:right;color:var(--ink)">${offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 + "%" : "—"}</td></tr>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(draftDisplayTriple(d).total)} kWh</td></tr>
+          <tr><td style="padding:5px 0;color:var(--muted)">Your share${draftDisplayTriple(d).fromBill ? " (from your utility bill)" : ""}</td>
+              <td style="padding:5px 0;text-align:right;color:var(--ink)">${draftDisplayTriple(d).share != null ? Math.round(draftDisplayTriple(d).share * 1000) / 10 + "%" : "—"}</td></tr>
           <tr><td style="padding:5px 0;color:var(--muted)">Your production</td>
               <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.customer_kwh)} kWh</td></tr>
           <tr><td style="padding:5px 0;color:var(--muted)">Solar-credit rate</td>
@@ -5339,6 +5339,22 @@
          : (x && x.allocation_pct != null) ? x.allocation_pct : null;
   }
 
+  // The (array total, share, billed kWh) TRIPLE a draft display shows, on ONE
+  // honest basis (Ford 2026-07-10: the offtaker's OWN bill governs the invoice;
+  // the entered share is the audit's expectation). When the own bill billed and
+  // the group pool resolved, the % is DERIVED from the bills — own-bill excess ÷
+  // the group's host pool — and the total is the GROUP pool, so total × share =
+  // billed EXACTLY. Fallback (topology B / no group data / list payloads without
+  // the meta): the stored figures + the entered share, exactly as before.
+  function draftDisplayTriple(d) {
+    if (d && d.billing_basis === "gmp_credited" && d.derived_share_pct != null
+        && d.array_group_excess_kwh != null) {
+      return { total: d.array_group_excess_kwh, share: d.derived_share_pct, fromBill: true };
+    }
+    return { total: d ? d.array_total_kwh : null,
+             share: offtakerShareFrac(d), fromBill: false };
+  }
+
   function subCard(s, arrs, utilAccts) {
     const prev = s.preview || {};
     const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -5473,7 +5489,10 @@
     let ps = "", pe = "";
     const m = String(d.period_label || "").match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
     if (m) { ps = m[1]; pe = m[2]; }
-    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
+    // Offtaker-facing {{rate}} token: the bill-DERIVED share when their own bill
+    // billed (Ford 2026-07-10 — the % comes from the bills), else the entered one.
+    const _trip = draftDisplayTriple(d);
+    const pct = _trip.share != null ? Math.round(_trip.share * 1000) / 10 : null;
     return {
       amount_due: d.amount_usd != null ? money(d.amount_usd) : "",
       kwh: d.customer_kwh != null ? fmt0(d.customer_kwh) : "",
@@ -6105,7 +6124,10 @@
   }
 
   function calcDashboard(d) {
-    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
+    // ONE honest displayed triple: pool × share = billed. When the offtaker's own
+    // bill governs, the share is DERIVED from the bills (Ford 2026-07-10).
+    const trip = draftDisplayTriple(d);
+    const pct = trip.share != null ? Math.round(trip.share * 1000) / 10 : null;
     const explicitRate = d.net_rate_per_kwh != null;
     // 1-decimal, matching the editor (step=0.1) so 12.5% shows "12.5%", not "13%",
     // and the printed "× (1−X%)" reconciles with the server-computed total.
@@ -6163,8 +6185,8 @@
         <div class="rb-calc-h">How we calculated this invoice</div>
         <div class="rb-calc-row"><span class="rb-calc-k">Latest ${offtakerProviderLabel(d) || "utility"} bill</span>
           <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(gmpBillFilename(d))}">view ↓</button>` : ""}</span></div>
-        <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(d.array_total_kwh)} kWh</span></div>
-        <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share</span>
+        <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(trip.total)} kWh</span></div>
+        <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share${trip.fromBill ? "<small>from their own utility bill</small>" : ""}</span>
           <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
         ${rateRow}
         ${totalRows}
@@ -6205,7 +6227,8 @@
     if (!d) { top.innerHTML = ""; return; }
     // A one-line "what gets sent" summary sits beside the send actions in the top bar,
     // so the operator can review-and-send without expanding anything below.
-    const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
+    const _trip = draftDisplayTriple(d);
+    const pct = _trip.share != null ? Math.round(_trip.share * 1000) / 10 : null;
     const src = d.utility_account_name || d.array_name || "";
     const summary = `<div class="rb-reviewbar-sum">Receives <b>${pct != null ? pct + "%" : "a share"}</b>${src ? " of " + esc(src) : ""}`
       + ` &middot; ${esc(d.period_label || "latest period")} &middot; <b>${money(d.amount_usd)} due</b></div>`;
@@ -6759,7 +6782,8 @@
           <div class="rb-fsec-h">Billing</div>
           <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
             <label class="rep-fld req"><span class="rl">Share of net-meter group (%)<span class="rb-info" tabindex="0" title="This offtaker's percentage of the master array's net-meter group excess.">ⓘ</span></span>
-              <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
+              <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783">
+              ${subRec.array_share_pct != null ? `<span class="rb-fld-hint">Their invoice bills <b>their own utility bill</b> — GMP's actual allocation. This share is your expected value for the <b>bill-accuracy audit</b> (and only bills directly while their sub-account has no settled bill).</span>` : ""}</label>
             ${rateFieldHTML(d, utilAccts)}
             <label class="rep-fld"><span class="rl">Discount (%)</span>
               <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
@@ -7279,8 +7303,9 @@
   function applyDraftFigures(card, d) {
     if (card) {
       const vs = card.querySelectorAll(".rb-draft-grid .rb-v");
-      const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
-      if (vs[0]) vs[0].textContent = fmt0(d.array_total_kwh) + " kWh";
+      const trip = draftDisplayTriple(d);
+      const pct = trip.share != null ? Math.round(trip.share * 1000) / 10 : null;
+      if (vs[0]) vs[0].textContent = fmt0(trip.total) + " kWh";
       if (vs[1]) vs[1].textContent = pct != null ? pct + "%" : "—";
       if (vs[2]) vs[2].textContent = fmt0(d.customer_kwh) + " kWh";
       if (vs[3]) vs[3].textContent = money(d.amount_usd);
