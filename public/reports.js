@@ -4843,11 +4843,12 @@
   // listed, then summed. A small epsilon absorbs float/rounding noise from
   // percent-entry; real over/under-allocation still shows as a warning.
   function pctSumPill(group) {
-    const pct = Math.round((group.pctSum || 0) * 1000) / 10;   // fraction -> 1-decimal percent
-    const within = Math.abs(pct - 100) <= 0.5;
-    const over = !within && pct > 100;                          // REAL over-allocation — would double-bill
-    const overBy = Math.round((pct - 100) * 10) / 10;           // how far past 100% (over case)
-    const unassigned = Math.round((100 - pct) * 10) / 10;       // how far short of 100% (under case)
+    const pctNum = (group.pctSum || 0) * 100;                   // exact percent (number — for the logic below)
+    const pct = pctNum.toFixed(2);                             // 2-decimal display string (Ford: .00, not 0)
+    const within = Math.abs(pctNum - 100) <= 0.5;
+    const over = !within && pctNum > 100;                       // REAL over-allocation — would double-bill
+    const overBy = (pctNum - 100).toFixed(2);                   // how far past 100% (over case)
+    const unassigned = (100 - pctNum).toFixed(2);               // how far short of 100% (under case)
     // ~100% = fine; >100% = a genuine double-bill risk (loud warning, guard kept);
     // <100% = calm info note that some of the meter's excess is simply unassigned.
     const cls = over ? "rb-grp-pct-warn" : "rb-grp-pct-ok";
@@ -4872,7 +4873,7 @@
       (Number(rowPct(b)) || 0) - (Number(rowPct(a)) || 0));
     const rowHtml = rows.map(s => {
       const rp = rowPct(s);
-      const p = rp != null ? Math.round(rp * 1000) / 10 : 0;
+      const p = rp != null ? (rp * 100).toFixed(2) : "0.00";
       return `<span class="rb-grp-pop-row"><span class="rb-grp-pop-who">${esc(s.customer_name || "(unnamed)")}</span><span class="rb-grp-pop-pct">${p}%</span></span>`;
     }).join("");
     const sumCls = over ? "rb-grp-pop-sum-warn" : "rb-grp-pop-sum-ok";
@@ -5261,7 +5262,7 @@
     const srcName = (s.array_share_pct != null)
       ? (_arrName || "the array")
       : (s.utility_account_name || _arrName || "the array");
-    const pctTxt = offtakerShareFrac(s) != null ? (Math.round(offtakerShareFrac(s) * 1000) / 10) + "%" : "a share";
+    const pctTxt = offtakerShareFrac(s) != null ? (offtakerShareFrac(s) * 100).toFixed(2) + "%" : "a share";
     const cadTxt = s.cadence === "quarterly" ? "Quarterly" : s.cadence === "monthly" ? "Monthly" : (s.cadence || "");
     const cc = (s.cc_emails || "").trim();
     const client = (s.client_email || "").trim();
