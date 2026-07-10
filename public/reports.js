@@ -4918,10 +4918,13 @@
     // wrapper headers (with pills computed off the filtered subset) is noise;
     // the operator asked for specific offtakers, show exactly those cards.
     const groups = q ? null : groupOfftakersByUtility(viewRows, utilAccts);
-    // Small fleets (<=5 offtakers) default EXPANDED so every card shows on load —
-    // the grouping is just an array/utility label, not a click-to-reveal wall. Larger
-    // fleets default collapsed (lazy-render perf + scannability). Ford, 2026-07-09.
-    const _smallFleet = !q && (viewRows || []).length <= 5;
+    // AUTO-EXPAND on load (Ford, 2026-07-10): a tree left collapsed at the bottom of the
+    // page makes the operator hunt + click to see their own offtakers (the ≤5 threshold
+    // missed a normal 11-offtaker fleet). Default OPEN for any normal-size fleet;
+    // AUTO_EXPAND_MAX keeps the lazy-render escape hatch so a genuinely big fleet (800-
+    // offtaker Anna shape) still paints ~2 headers, not ~800 cards.
+    const AUTO_EXPAND_MAX = 40;
+    const _smallFleet = !q && (viewRows || []).length <= AUTO_EXPAND_MAX;
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
@@ -4959,7 +4962,12 @@
         }
       }
       body = providers.map(pv => {
-        if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = !_smallFleet;   // small fleet → expanded
+        // Provider opens for a small fleet OR whenever there is a lone provider with a
+        // modest number of accounts — a single collapsed GMP header is pure indirection,
+        // and opening it only paints account-group headers (cards under still honor
+        // GROUP_COLLAPSED). Bounded by group count so an 800-offtaker fleet stays collapsed.
+        const _loneProvider = providers.length === 1 && pv.groups.length <= AUTO_EXPAND_MAX;
+        if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = !(_smallFleet || _loneProvider);   // small OR lone-modest provider → expanded
         const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
         const nAcct = pv.groups.length;
         // Array-grouped fleets (own-meter shape): the middle level is arrays,
