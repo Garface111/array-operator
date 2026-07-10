@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="theme-day.css?v=20260701b"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
+<link rel="stylesheet" href="resources.css?v=20260710a"><!-- Resources tab (in-app briefing); scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260710a"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
 <meta name="theme-color" content="#f6f8fb">
 <style>
@@ -175,8 +176,10 @@
     <a class="tab" id="tabReports" href="#reports" role="tab" title="An offtaker is a customer who receives a share of your solar credits — this is where you invoice them.">Offtaker Invoice Generator</a>
     <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Expert resource + live-news hub (Paul Bozawa's idea): net-metering rates, rate
-         cases, regulatory changes. Opens in a new tab so it never disrupts the app. -->
-    <a class="tab" id="tabResources" href="/resources.html" target="_blank" rel="noopener"
+         cases, regulatory changes. In-app view (Ford 2026-07-10) — switches like every
+         other tab instead of opening a separate page; #panelResources loads its content
+         from resources.html at runtime (still a standalone page for external/deep links). -->
+    <a class="tab" id="tabResources" href="#resources" role="tab"
        title="Vermont net-metering rates, active rate cases, and regulatory news — kept current.">Resources</a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
@@ -328,6 +331,14 @@
     <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
   </section>
 
+  <!-- ============================ TAB: RESOURCES ============================ -->
+  <!-- The Vermont operator's briefing, in-app. __aoLoadResources (inline script below)
+       injects resources.html's article here on first open and refreshes the live news
+       feed on every open. Styles are scoped to #panelResources in resources.css. -->
+  <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
+    <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
+  </section>
+
   <!-- ============================ TAB: AUDIT (removed) ============================ -->
 
 </div>
@@ -339,13 +350,74 @@
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
 <script src="app.js?v=20260710a"></script>
-<script src="sandbox.js?v=20260710a"></script>
+<script src="sandbox.js?v=20260710res"></script>
 <script src="vendor-sheet.js?v=20260710b"></script>
 <script src="command-center.js?v=12"></script>
 <script src="reports.js?v=20260710j"></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
      Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>
+<!-- Resources tab loader (Ford 2026-07-10): the Resources view now lives inside the SPA
+     instead of opening /resources.html in a new page. First open fetches that page ONCE
+     and injects its article (minus its own top nav) so the briefing has one source of
+     truth; every open refreshes the live news feed from /news.json. Called by
+     sandbox.js applyView() when #resources is active. -->
+<script>
+(function(){
+  var LOADED = false;
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function fmtDate(iso){
+    try { var d = new Date(iso + "T00:00:00");
+      return d.toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"}); }
+    catch(e){ return iso; }
+  }
+  function loadFeed(){
+    var feed = document.getElementById("feed");
+    var meta = document.getElementById("newsMeta");
+    if(!feed || !meta) return;
+    fetch("/news.json?cb=" + Date.now()).then(function(r){ return r.json(); }).then(function(data){
+      var items = (data && data.items) || [];
+      items.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+      if(!items.length){ meta.textContent = "No updates yet — check back soon."; return; }
+      meta.innerHTML = "Last updated " + esc(fmtDate(data.updated || items[0].date)) +
+        " · " + items.length + " item" + (items.length===1?"":"s");
+      feed.innerHTML = items.map(function(it){
+        var alert = /rule|cut|phase|deadline|case|alert/i.test((it.tag||"") + " " + (it.title||""));
+        return '<div class="item">' +
+          '<div class="when">' + esc(fmtDate(it.date)) + '</div>' +
+          '<div><span class="tag' + (alert ? ' alert' : '') + '">' + esc(it.tag || "Update") + '</span>' +
+          '<h4>' + esc(it.title) + '</h4>' +
+          (it.summary ? '<p>' + esc(it.summary) + '</p>' : '') +
+          (it.url ? '<div class="src"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
+             esc(it.source || "Read more") + ' ↗</a></div>' : '') +
+          '</div></div>';
+      }).join("");
+    }).catch(function(){
+      meta.textContent = "Couldn't load the latest updates right now — see the sources below.";
+    });
+  }
+  window.__aoLoadResources = function(){
+    var host = document.getElementById("rsHost");
+    if(!host) return;
+    if(LOADED){ loadFeed(); return; }
+    fetch("/resources.html?cb=" + Date.now()).then(function(r){ return r.text(); }).then(function(html){
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var wrap = doc.querySelector(".wrap");
+      if(!wrap) throw new Error("no .wrap");
+      var top = wrap.querySelector(".top"); if(top) top.remove();
+      wrap.querySelectorAll("script").forEach(function(s){ s.remove(); });
+      host.innerHTML = "";
+      host.appendChild(document.importNode(wrap, true));
+      LOADED = true;
+      loadFeed();
+    }).catch(function(){
+      host.innerHTML = '<div class="ao-res-error">Couldn’t load the briefing right now. ' +
+        '<a href="/resources.html" target="_blank" rel="noopener">Open it in a new tab ↗</a></div>';
+    });
+  };
+})();
+</script>
 <!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
      self-contained section modules (each registers on window.AnalysisSections). -->
 <script src="analysis.js?v=7"></script>

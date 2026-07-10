@@ -5472,6 +5472,7 @@
     analysis:{ panel: "panelAnalysis",tab: "tabAnalysis"},
     trends:  { panel: "panelTrends",  tab: "tabTrends"  },
     reports: { panel: "panelReports", tab: "tabReports" },
+    resources:{ panel: "panelResources", tab: "tabResources" },
   };
   function tabFromHash(){
     const h = location.hash;
@@ -5480,6 +5481,7 @@
     if(h === "#analysis") return "analysis";
     if(h === "#trends")  return "trends";
     if(h === "#reports") return "reports";
+    if(h === "#resources") return "resources";   // in-app Vermont operator briefing
     if(h === "#dashboard") return "dashboard";   // explicit deep-link → owner health home
     // Empty/legacy hash → land on the Inverter Dashboard (Spreadsheet sub-view) per Ford,
     // not Fleet Health. applyTabGating() bounces a plan that can't use it to an allowed tab.
@@ -5530,6 +5532,8 @@
       if(window.__aoLoadTrends) window.__aoLoadTrends();
     } else if(active === "reports"){
       loadReports();
+    } else if(active === "resources"){
+      if(window.__aoLoadResources) window.__aoLoadResources();
     }
     applyTabGating();   // keep tab locks fresh + bounce off a tab the plan doesn't include
     _firstApply = false;
