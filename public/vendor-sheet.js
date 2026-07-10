@@ -609,8 +609,43 @@
     setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2400);
   }
 
+  // The monitored-array columns (inverter arrays only) — the SAME set rendered in the
+  // body, factored out so "Expand all" can iterate every vendor + array (even ones a
+  // collapsed vendor hasn't rendered). Pre-query filter; renderBody narrows to matches.
+  function _monitoredCols() {
+    const data = window.FleetStore ? FleetStore.toColumns() : null;
+    return ((data && data.columns) || []).filter(c => {
+      const ds = (c && c.daily_split) || {};
+      return !!ds.has_vendor || !!(c && c.vendor)
+        || (Array.isArray(c && c.vendors) && c.vendors.length > 0)
+        || (Array.isArray(c && c.inverters) && c.inverters.length > 0);
+    });
+  }
+  // Is every vendor group + every array currently expanded? (drives the toggle's label)
+  function _allExpanded() {
+    const cols = _monitoredCols();
+    return cols.length > 0 && cols.every(c =>
+      _expanded[c.array_id] && !_vendorCollapsed[(c.vendor || "other").toLowerCase()]);
+  }
+  // Expand (or collapse) EVERY vendor group and array at once, so all inverter rows
+  // show with one click (Ford 2026-07-10). Inverter DETAIL panels are left as-is.
+  function setAllExpanded(expand) {
+    _monitoredCols().forEach(c => {
+      _vendorCollapsed[(c.vendor || "other").toLowerCase()] = !expand;
+      _expanded[c.array_id] = !!expand;
+    });
+    renderBody();
+  }
+
   function buildShell(host) {
     const heads = COLS.map(col => {
+      // The ARRAY (name) header also carries the Expand-all / Collapse-all toggle.
+      if (col.cls === "vs-c-name") {
+        const lbl = col.key
+          ? `<span class="vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`
+          : `<span>${col.label}</span>`;
+        return `<span class="${col.cls} vs-namehead">${lbl}<button type="button" class="vs-expandall" id="vsExpandAll" title="Expand every vendor and array to show all inverters">Expand all</button></span>`;
+      }
       if (!col.key) return `<span class="${col.cls}">${col.label}</span>`;
       return `<span class="${col.cls} vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`;
     }).join("");
@@ -649,6 +684,8 @@
     if (syncBtn) syncBtn.onclick = () => syncAllVendors(syncBtn);
     const closeBtn = host.querySelector("#vsCloseTabs");
     if (closeBtn) closeBtn.onclick = () => closeVendorTabs(closeBtn);
+    const expBtn = host.querySelector("#vsExpandAll");
+    if (expBtn) expBtn.onclick = () => setAllExpanded(!_allExpanded());
     host.querySelectorAll("[data-sort]").forEach(b => {
       const go = () => { setSort(b.getAttribute("data-sort")); renderBody(); };
       b.addEventListener("click", go);
@@ -671,13 +708,18 @@
     // (GMP/VEC/SmartHub with no inverters / no vendor) — they belong to the offtaker +
     // NEPOOL views, not here. (Regression fix: the GMP bill-pull began creating
     // utility-only Array rows that leaked into this grid once the source filter was lost.)
-    const all = ((data && data.columns) || []).filter(c => {
-      const ds = (c && c.daily_split) || {};
-      return !!ds.has_vendor || !!(c && c.vendor)
-        || (Array.isArray(c && c.vendors) && c.vendors.length > 0)
-        || (Array.isArray(c && c.inverters) && c.inverters.length > 0);
-    });
+    const all = _monitoredCols();
     const cols = all.filter(c => matches(c, _query));
+    // Keep the header's Expand-all / Collapse-all toggle in sync with the live state.
+    const _expBtn = document.querySelector("#vsExpandAll");
+    if (_expBtn) {
+      const allOpen = all.length > 0 && all.every(c =>
+        _expanded[c.array_id] && !_vendorCollapsed[(c.vendor || "other").toLowerCase()]);
+      _expBtn.textContent = allOpen ? "Collapse all" : "Expand all";
+      _expBtn.title = allOpen
+        ? "Collapse every vendor and array"
+        : "Expand every vendor and array to show all inverters";
+    }
     const cnt = $("#vsCount");
     if (cnt) {
       const invShown = cols.reduce((t, c) => t + (c.inverter_count || 0), 0);

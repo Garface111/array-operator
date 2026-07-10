@@ -2328,6 +2328,17 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-sortable{ cursor:pointer; user-select:none; }
 .vs-sortable:hover{ color:var(--ink,#0f172a); }
 .vs-colhead .vs-sortable.on{ color:var(--good,#2563eb); }
+/* ARRAY-header "Expand all / Collapse all" toggle (Ford 2026-07-10) — a small ghost
+   pill beside the ARRAY label; one click opens every vendor group + array so all the
+   inverter rows show at once. Header cell needs overflow:visible so the pill isn't clipped. */
+.vs-namehead{ overflow:visible; }
+.vs-expandall{ font:inherit; font-size:10px; font-weight:700; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--good,#2563eb); background:rgba(37,99,235,.08);
+  border:1px solid rgba(37,99,235,.22); border-radius:20px; padding:2px 9px; cursor:pointer;
+  white-space:nowrap; line-height:1.5; flex:none; transition:background .12s ease; }
+.vs-expandall:hover{ background:rgba(37,99,235,.14); }
+.vs-expandall:active{ transform:translateY(1px); }
+.vs-expandall:focus-visible{ outline:none; box-shadow:0 0 0 2px rgba(37,99,235,.4); }
 .vs-sc{ font-style:normal; font-size:9px; }
 
 /* ===== DASHBOARD tab — owner health home (reuses the .fc-* card + .cc-* queue) ===== */
