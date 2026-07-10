@@ -1117,9 +1117,12 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2 > .rb-au{padding:20px 40px 30px;border-radius:14px;   /* Bill audit view = its own floating card too */
   border:1px solid var(--so-cream-bd);background:var(--so-cream);
   box-shadow:var(--so-shadow-card)}
-.rb2-controls{position:sticky;top:0;z-index:22;display:flex;align-items:center;gap:12px;
-  padding:10px 0;margin-bottom:8px;background:rgba(255,255,255,.94);
-  backdrop-filter:blur(8px);border-bottom:1px solid var(--day-hover,rgba(15,23,42,.05));flex-wrap:wrap}
+/* toolbar sits on its own white squircle now (Ford 2026-07-10) — matches the
+   Invoice-archive + provider cards below it instead of floating as a bare strip.
+   Still sticky so the actions stay reachable while the list scrolls. */
+.rb2-controls{position:sticky;top:8px;z-index:22;display:flex;align-items:center;gap:12px;
+  padding:12px 16px;margin-bottom:12px;background:#fff;
+  border:1px solid var(--so-cream-bd);border-radius:12px;box-shadow:var(--so-shadow-card);flex-wrap:wrap}
 .rb2-controls-label{font-size:14.5px;font-weight:750;letter-spacing:-.01em;color:var(--ink,#0f172a)}
 /* When "＋ Add an offtaker" scrolls the add panel into view (Ford 2026-07-10), keep its
    top clear of the sticky .rb2-controls bar above it so the "New offtaker" heading isn't
