@@ -21,6 +21,15 @@
     alsoenergy: "AlsoEnergy",
   };
   const vlabel = v => BRAND[v] || (v ? v.charAt(0).toUpperCase() + v.slice(1) : "Other");
+  // Per-vendor accent hue (day-mode values, matches theme-day.css .vs-vendor-*). Drives the
+  // colored left bar + faint header/leaf tint that make each vendor's subtree a clear
+  // container — so vendor → array → inverter reads as three distinct levels (Ford 2026-07-10).
+  const VENDOR_HUE = {
+    solaredge: "#c2410c", fronius: "#4338ca", sma: "#0e7490", chint: "#be185d",
+    locus: "#0369a1", enphase: "#047857", solis: "#7c3aed", tigo: "#0f766e",
+    alsoenergy: "#9d174d",
+  };
+  const vhue = v => VENDOR_HUE[v] || "#64748b";
   // Fronius/SMA/Chint expose only ONE site-level instantaneous power; the backend
   // splits it across inverters by today's energy share — so a per-inverter "kW now"
   // is an ESTIMATE, not a measured per-device reading (data-honesty audit #5). The
@@ -786,7 +795,7 @@
       // inverter count, live now, today, or status at all, and Synced read cramped against
       // the kW total. Every column is now a real ROLLUP across the vendor's arrays, so the
       // collapsed row reads as a genuine summary, not just a label.
-      h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
+      h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}" style="--vc:${vhue(v)}">
         <div class="vs-row vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
              aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}

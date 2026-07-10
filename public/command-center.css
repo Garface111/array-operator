@@ -2174,14 +2174,23 @@ html[data-theme="day"] .rep-fld.req > select{
 /* .vs-vhead is ALSO a .vs-row (same element carries both classes) — it inherits the
    real 7-column grid so every column (inverters/live now/today/status/synced) lines up
    under its header, and rolls up a genuine summary instead of just a vendor label. */
-.vs-vhead{ padding:9px 16px 7px;
-  background:var(--card2,#f8fafc); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+/* HIERARCHY (Ford 2026-07-10): three DISTINCT visual languages so expanding the tree
+   never loses you. A per-vendor colored left bar (--vc, set inline per group) runs the
+   whole subtree as a container; the vendor row is a bold color-tinted section band, array
+   rows are plain white, inverter rows a faint tint indented deeper. */
+.vs-vgroup{ border-left:3px solid var(--vc,#cbd5e1); }
+.vs-vhead{ padding:12px 16px 10px;
+  background:color-mix(in srgb, var(--vc,#64748b) 10%, var(--card,#fff));
+  border-top:1px solid var(--line);
+  border-bottom:1px solid color-mix(in srgb, var(--vc,#64748b) 24%, var(--line)); }
+.vs-vhead .vs-vbadge{ font-size:13px; font-weight:900; letter-spacing:.04em; }
+.vs-vhead .vs-vcollapse-caret{ color:var(--vc,#64748b); }
 /* The WHOLE vendor header row collapses/expands its arrays (Ford: "click anywhere in
    the row of the vendor... not just this tiny button"). It reads as clickable; the
    portal buttons inside keep their own pointer affordance + stopPropagation. Same
    caret-rotation language as the per-array .vs-caret so the gestures read identically. */
 .vs-vhead[data-vcollapse]{ cursor:pointer; user-select:none; }
-.vs-vhead[data-vcollapse]:hover{ background:var(--day-hover,rgba(15,23,42,.05)); }
+.vs-vhead[data-vcollapse]:hover{ background:color-mix(in srgb, var(--vc,#64748b) 17%, var(--card,#fff)); }
 .vs-vcollapse-caret{ display:inline-block; width:13px; text-align:center; font-size:11px;
   color:var(--faint); transition:transform .15s ease; flex:none; }
 .vs-vhead[aria-expanded="false"] .vs-vcollapse-caret{ transform:rotate(-90deg); }
@@ -2215,7 +2224,8 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-vlag.vs-vlag-done{ color:#065f46; background:rgba(16,185,129,.16); border-color:rgba(16,185,129,.40); cursor:default; }
 .vs-vlag.vs-vlag-err{ color:#b91c1c; background:rgba(220,38,38,.12); border-color:rgba(220,38,38,.38); }
 .vs-vlag.vs-vlag-err:hover{ background:rgba(220,38,38,.20); }
-.vs-arr{ border:0; background:none; font:inherit; cursor:pointer; color:var(--ink); border-bottom:1px solid var(--line); }
+.vs-arr{ border:0; background:var(--card,#fff); font:inherit; cursor:pointer; color:var(--ink); border-bottom:1px solid var(--line); }
+.vs-arr .vs-c-name{ padding-left:16px; }
 .vs-arr:hover{ background:var(--day-hover,rgba(15,23,42,.045)); }
 .vs-arr.open{ background:rgba(37,99,235,.06); }
 .vs-caret{ display:inline-block; width:13px; color:var(--faint); transition:transform .15s ease; }
@@ -2254,9 +2264,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-pill.warn{ color:var(--gold2,#b45309); background:rgba(217,119,6,.16); }
 .vs-pill.bad{ color:#b91c1c; background:rgba(220,38,38,.15); }
 .vs-pill.muted{ color:var(--muted); background:var(--day-chip,#eef2f7); }
-.vs-inv-wrap{ background:var(--bg,#f6f8fb); border-bottom:1px solid var(--line); }
+.vs-inv-wrap{ background:color-mix(in srgb, var(--vc,#64748b) 5%, var(--bg,#f6f8fb));
+  border-bottom:1px solid var(--line); }
 .vs-inv{ padding-top:8px; padding-bottom:8px; font-size:12.5px; }
-.vs-inv .vs-c-name{ padding-left:26px; font-weight:500; color:var(--muted); }
+.vs-inv .vs-c-name{ padding-left:40px; font-weight:500; color:var(--muted); }
 .vs-inv-meta{ font-size:11px; color:var(--faint); font-weight:400; }
 /* Per-inverter row detail filling the formerly-blank Vendor / Inverters / Today cells */
 .vs-inv-sn{ font-size:11.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
