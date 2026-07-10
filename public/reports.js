@@ -2709,6 +2709,10 @@
   // customer_name + array_id + allocation_pct (percent_of_array model). The
   // customer's invoice each cycle = allocation_pct × the array's generation.
   let MANUAL_OPEN = false;
+  // When the add form is opened from a master group's "+ Add offtaker" button, the
+  // master's array_id is parked here; wireArrayFirst applies it once the net-meter
+  // group picker has populated (async), pre-selecting that master. Cleared on apply.
+  let PENDING_MASTER_ARRAY = null;
   let ARRAYS = null;   // cached [{id,name,client_name}] for the array picker
   // Where the manual-add form mounts + what to refresh after a successful add.
   // Defaults target the Offtakers subtab; back-compat with the old #rbManual mount.
@@ -2879,6 +2883,18 @@
       // overlay a type-to-filter combobox. The native <select> stays the source of
       // truth (value + onchange untouched); the combobox just mirrors the pick.
       makeSearchableSelect(s, { placeholder: "Search net meter groups…" });
+      // Pre-select the master net-meter group the operator clicked "+ Add offtaker"
+      // on (parked in PENDING_MASTER_ARRAY). Applied here — after the options exist —
+      // then a native change fires so the bill line + sub picker + rate field resolve.
+      if (PENDING_MASTER_ARRAY != null) {
+        const want = String(PENDING_MASTER_ARRAY);
+        PENDING_MASTER_ARRAY = null;
+        if (Array.from(s.options).some(o => String(o.value) === want)) {
+          s.value = want;
+          if (s.__combo) s.__combo.sync();               // mirror the pick into the combobox input
+          s.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
     });
     // Prime the utility-account cache so the first pick resolves instantly.
     resolveArrayBills(true, true);
@@ -3340,6 +3356,18 @@
       ? ` · ${a.bill_count || 0} bill${a.bill_count === 1 ? "" : "s"}${a.latest_period_label ? " · latest " + a.latest_period_label : ""}`
       : " · no bill on file yet";
     return name + bills;
+  }
+
+  // Open the add-offtaker form pre-set to a master net-meter group (from a group
+  // header's "+ Add offtaker"): park the master array_id, open the Type-it-in panel,
+  // and scroll it into view. wireArrayFirst applies the pre-pick once it populates.
+  function openAddOfftakerForMaster(arrayId) {
+    PENDING_MASTER_ARRAY = (arrayId != null && arrayId !== "") ? String(arrayId) : null;
+    ADD_MODE = "manual";
+    BULK_OPEN = false; renderBulkImport();
+    MANUAL_OPEN = true; renderManual();
+    const host = $("#" + MANUAL_HOST_ID);
+    if (host) host.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   let ADD_MODE = "manual";   // "manual" | "upload" — active tab in the add panel
@@ -5012,6 +5040,14 @@
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
       const collapsed = !!GROUP_COLLAPSED[g.key];
+      // "+ Add offtaker" on the master header → opens the add form with THIS master
+      // net-meter group pre-picked, so another offtaker onto the same master is one
+      // click (Ford 2026-07-10). Only for real array groups (the pre-pick is by array_id).
+      const grpArrayId = g.key.startsWith("a:") ? g.key.slice(2) : "";
+      const addBtn = grpArrayId
+        ? `<button type="button" class="rb-grp-add" data-grpadd="${esc(grpArrayId)}"
+             title="Add an offtaker to ${esc(g.label)}">＋ Add offtaker</button>`
+        : "";
       return `
         <div class="rb-grp rb-grp-tinted${collapsed ? " collapsed" : ""}" data-grp-tone="${grpToneIndex(g.key)}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
@@ -5019,6 +5055,7 @@
             <span class="rb-grp-caret" aria-hidden="true">▾</span>
             <span class="rb-grp-label">${esc(g.label)}</span>
             <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
+            ${addBtn}
             ${pctSumPill(g)}
           </div>
           <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
@@ -5153,6 +5190,12 @@
     // The allocation pill is an info affordance (hover shows the breakdown) — clicking
     // it should NOT also collapse the group it sits inside.
     list.querySelectorAll(".rb-grp-pctwrap").forEach(p => p.addEventListener("click", e => e.stopPropagation()));
+    // "+ Add offtaker" on a master header → open the add form pre-set to that master.
+    // stopPropagation so the click doesn't also collapse/expand the group.
+    list.querySelectorAll("[data-grpadd]").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      openAddOfftakerForMaster(b.getAttribute("data-grpadd"));
+    });
     // Per-offtaker delete (🗑 on the header). stopPropagation so the click deletes
     // instead of toggling the card open.
     list.querySelectorAll("[data-del-offtaker]").forEach(b => b.onclick = (e) => {

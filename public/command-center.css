@@ -1357,8 +1357,20 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-grp-tinted[data-grp-tone="5"]{ --grp-bg:rgba(20,184,166,.09);  --grp-bd:rgba(20,184,166,.27); --grp-ink:#0f766e; }
 .rb-grp-tinted[data-grp-tone="6"]{ --grp-bg:rgba(99,102,241,.09);  --grp-bd:rgba(99,102,241,.27); --grp-ink:#4338ca; }
 .rb-grp-tinted[data-grp-tone="7"]{ --grp-bg:rgba(217,70,239,.08);  --grp-bd:rgba(217,70,239,.24); --grp-ink:#a21caf; }
+/* "+ Add offtaker" on a master header — a quiet ghost pill that pushes to the right
+   (next to the % pill) and picks up the group's tone. One click to add another
+   offtaker onto this same master (Ford 2026-07-10). */
+.rb-grp-add{ margin-left:auto; font:inherit; font-size:11px; font-weight:650; line-height:1.4;
+  color:var(--grp-ink,var(--muted,#475569)); background:rgba(255,255,255,.55);
+  border:1px solid var(--grp-bd,rgba(100,116,139,.28)); border-radius:20px;
+  padding:3px 10px; cursor:pointer; white-space:nowrap;
+  transition:background .12s ease, box-shadow .12s ease; }
+.rb-grp-add:hover{ background:#fff; box-shadow:0 1px 5px rgba(15,23,42,.14); }
+.rb-grp-add:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--grp-bd,rgba(37,99,235,.4)); }
 .rb-grp-label{ font-size:12.5px; font-weight:750; color:var(--ink,#0f172a); letter-spacing:-.005em; }
 .rb-grp-count{ font-size:11.5px; color:var(--faint,#94a3b8); }
+/* With the add-pill consuming the auto margin, the % pill sits right after it. */
+.rb-grp-add + .rb-grp-pctwrap{ margin-left:8px; }
 .rb-grp-pctwrap{ margin-left:auto; position:relative; display:inline-flex; }
 .rb-grp-pct{ font-size:11px; font-weight:650; padding:3px 9px; border-radius:20px; cursor:default; }
 .rb-grp-pct-ok{ background:rgba(37,99,235,.10); color:var(--good,#2563eb); }
