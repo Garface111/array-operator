@@ -1621,7 +1621,7 @@
               <div><span class="rb-es-envlab">TO</span> <span id="esPrevTo"></span></div>
             </div>
             <div class="rb-es-mail-body" id="esPrevBody"></div>
-            <div class="rb-es-mail-att">📄 the offtaker's invoice PDF &nbsp;·&nbsp; 🧾 the GMP bill behind it — attached automatically, plus the figures table below the letter.</div>
+            <div class="rb-es-mail-att">📄 the offtaker's invoice PDF &nbsp;·&nbsp; 🧾 the utility bill behind it — attached automatically, plus the figures table below the letter.</div>
           </div>
         </div>
         <div class="rb-es-right">
@@ -1760,9 +1760,9 @@
               <button type="button" data-v="auto" class="${(p.default_delivery_mode || 'approval') === 'auto' ? 'on' : ''}">Auto-send</button>
             </div>
           </div>
-          <button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="${paused}" type="button">
-            <span class="rb2-knob" aria-hidden="true"></span>${paused ? "Resume sending" : "Pause sending"}
-          </button>
+          ${paused ? `<button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="true" type="button">
+            <span class="rb2-knob" aria-hidden="true"></span>Resume sending
+          </button>` : ""}
         </div>
       </div>
       <div class="rb2-pipe-row">
@@ -5994,6 +5994,15 @@
   // "How we calculated this" — a transparent breakdown above the live preview so the
   // reviewer can trace latest bill → metered generation → their share → the rate math →
   // the solar-credit value (and any fixed budget override). All from the draft's figures.
+  // The offtaker's utility provider label (GMP / VEC / WEC …), resolved from its bound
+  // utility account, for provider-accurate copy — a VEC offtaker must never read "GMP"
+  // (Ford 2026-07-10). Returns "" when unknown so callers fall back to "utility".
+  function offtakerProviderLabel(d) {
+    const acct = (INBOX_UTIL_ACCTS || []).find(a => String(a.utility_account_id) === String(d && d.utility_account_id));
+    const prov = (acct && acct.provider) || (d && d.provider) || "";
+    return prov ? String(prov).toUpperCase() : "";
+  }
+
   function calcDashboard(d) {
     const pct = offtakerShareFrac(d) != null ? Math.round(offtakerShareFrac(d) * 1000) / 10 : null;
     const explicitRate = d.net_rate_per_kwh != null;
@@ -6051,7 +6060,7 @@
     return `
       <div class="rb-calc">
         <div class="rb-calc-h">How we calculated this invoice</div>
-        <div class="rb-calc-row"><span class="rb-calc-k">Latest GMP bill</span>
+        <div class="rb-calc-row"><span class="rb-calc-k">Latest ${offtakerProviderLabel(d) || "utility"} bill</span>
           <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(gmpBillFilename(d))}">view ↓</button>` : ""}</span></div>
         <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(d.array_total_kwh)} kWh</span></div>
         <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share</span>
@@ -7238,7 +7247,7 @@
     // Only claim attachments that will actually be there (auto-attach GMP on by
     // default; AO summary opt-in) so the note never promises a file that isn't sent.
     const extras = [];
-    if (d.auto_attach_gmp !== false) extras.push("the GMP source data");
+    if (d.auto_attach_gmp !== false) extras.push(`the ${offtakerProviderLabel(d) || "utility"} bill`);
     if (d.include_summary === true) extras.push("a production summary");
     const extraLine = extras.length
       ? ` ${extras.join(" and ")} ${extras.length > 1 ? "are" : "is"} attached so you can see exactly how it was calculated.`
