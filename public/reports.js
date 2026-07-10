@@ -3362,6 +3362,11 @@
                 <span class="rb-fld-hint" id="rbmUtilHint">If this offtaker meters on their own account, pick it to bill directly off their meter. Leave blank to bill their share of the master.</span></label></label>
             <label class="rep-fld req"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
+            <!-- Contact hoisted next to name (Ford 2026-07-10): the offtaker email is
+                 critical (and required here), so it sits with the identity fields, not
+                 buried below the billing config. -->
+            <label class="rep-fld req"><span class="rl">Offtaker email</span>
+              <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
             <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
                  as one block — "get the solar credit rate right next to or below the
                  share of array". -->
@@ -3388,8 +3393,6 @@
             <label class="rep-fld"><span class="rl">Starting invoice #</span>
               <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
               <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
-            <label class="rep-fld req"><span class="rl">Client email</span>
-              <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
             <label class="rep-fld"><span class="rl">Budget bill — fixed total ($)</span>
               <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = use the calculated amount">
               <span class="rb-fld-hint">Set a flat amount this offtaker pays — overrides the calculated total (line items still show).</span></label>
@@ -6610,6 +6613,16 @@
           <label class="rep-fld"><span class="rl">Sub-account (optional)</span>
             <select class="rb-of-sub">${msOpts.subHTML}</select>
             <span class="rb-fld-hint">If this offtaker meters on their own account, pick it to bill directly off their meter instead of a share of the master. Leave blank to bill their share of the master. Changing either re-derives their group share automatically.</span></label>` : ""}
+          <!-- Contact hoisted to the top (Ford 2026-07-10): the offtaker email is a
+               critical field — you can't invoice a customer without it — so it sits with
+               the identity/required fields, not buried under the billing config. Kept
+               OPTIONAL (no .req) because a "send to me only" schedule legitimately has no
+               offtaker email; .req is reserved for fields the backend refuses to save blank. -->
+          <label class="rep-fld"><span class="rl">Offtaker email</span>
+            <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com">
+            <span class="rb-fld-hint">Where the invoice is sent — needed to email the offtaker.</span></label>
+          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
+            <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
           <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
           <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
@@ -6642,10 +6655,6 @@
               <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
               <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
             </select></label>
-          <label class="rep-fld"><span class="rl">Offtaker email</span>
-            <input type="email" data-of="client_email" value="${esc(d.client_email || "")}" placeholder="name@example.com"></label>
-          <label class="rep-fld"><span class="rl">CC (comma-separated)</span>
-            <input type="text" data-of="cc_emails" value="${esc(d.cc_emails || "")}" placeholder="optional"></label>
         </div>
         <span class="rb-status rb-offedit-status"></span>
       </div>`;
