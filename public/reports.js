@@ -3123,17 +3123,19 @@
     return host === null ? "" : String(host);
   }
 
-  // ── Parent ↔ child (master ↔ sub) account grouping ─────────────────────────
-  // GMP publishes NO net-meter group-membership table (verified against Bruce's
-  // real bills — the bill JSON has no allocation/member list, and the isPrimary
-  // flag is unset on virtually every account). So "master vs sub" can only be
-  // derived from the operator's OWN offtaker setup: an account that ≥2 offtakers
-  // bill off — or that ANY offtaker bills a FRACTIONAL (<100%) share off — is a
-  // MASTER / group host (e.g. "Chester", whose five LRHC offtakers each take
-  // 1–25% of its group excess). Every other account is an individual sub-meter an
-  // offtaker can bill directly off (topology A). We surface BOTH as a two-level
-  // <optgroup> hierarchy so the operator always sees the master account and the
-  // sub-accounts and can pick either (Ford 2026-07-10).
+  // ── Parent / child (master + sub) account picker ───────────────────────────
+  // The offtaker binds to ONE utility account, but the operator thinks of it as a
+  // parent/child pair: a MASTER account (the net-meter group host they bill a
+  // share of, topology B) and optionally the offtaker's OWN sub-account meter
+  // (bill directly off it, topology A). We present these as TWO separate
+  // dropdowns (Ford 2026-07-10). GMP publishes NO group-membership table
+  // (verified against Bruce's real bills — no allocation/member list, isPrimary
+  // unset almost everywhere), so which existing binding is a "master" vs a "sub"
+  // is derived from the operator's OWN offtaker setup: an account that ≥2
+  // offtakers bill off — or that ANY offtaker bills a FRACTIONAL (<100%) share
+  // off — is a MASTER/group host (e.g. "Chester", whose five LRHC offtakers each
+  // take 1–25%). This only decides which dropdown PRESELECTS the current binding;
+  // both dropdowns list every account so the operator can always pick either.
   function masterAccountIds(offtakers) {
     const byAcct = new Map();                       // utility_account_id -> [shares]
     for (const o of (offtakers || [])) {
@@ -3151,80 +3153,51 @@
     return masters;
   }
 
-  // Build the grouped <option>/<optgroup> HTML for an offtaker's utility-account
-  // <select>. Splits the accounts into ⭐ Master (group host) and 🏠 Individual
-  // meters, floats a name-matched own-meter to the top of the sub list (✨), and
-  // preselects `selectedId`. `leadHTML` is prepended verbatim (the placeholder /
-  // "Auto-match" rows). Falls back to one flat, alphabetized list when there isn't
-  // enough signal to split (no offtakers yet, or every account is a master).
-  function groupedAccountOptions(accts, offtakers, cfg) {
-    cfg = cfg || {};
-    const list = (accts || []).filter(a => a && a.utility_account_id != null);
-    const masters = masterAccountIds(offtakers);
-    const selStr = cfg.selectedId != null && cfg.selectedId !== "" ? String(cfg.selectedId) : "";
-    const nameMatch = cfg.offtakerName ? matchSubAccount(cfg.offtakerName, list) : null;
-    const matchedId = nameMatch ? String(nameMatch.account.utility_account_id) : "";
-    const byLabel = (x, y) => billLabel(x).localeCompare(billLabel(y));
-    const opt = (a) => {
-      const id = String(a.utility_account_id);
-      const star = (id === matchedId && id !== selStr) ? "✨ " : "";
-      return `<option value="${id}"${id === selStr ? " selected" : ""}>${star}${esc(billLabel(a))}</option>`;
-    };
-    const masterAccts = list.filter(a => masters.has(String(a.utility_account_id))).sort(byLabel);
-    const subAccts = list.filter(a => !masters.has(String(a.utility_account_id))).sort((x, y) => {
-      const xm = String(x.utility_account_id) === matchedId ? 0 : 1;   // own-meter match floats up
-      const ym = String(y.utility_account_id) === matchedId ? 0 : 1;
-      return (xm - ym) || byLabel(x, y);
-    });
-    let html = cfg.leadHTML || "";
-    if (masterAccts.length && subAccts.length) {
-      html += `<optgroup label="⭐ Master accounts — bill a share of the whole group">`
-            + masterAccts.map(opt).join("") + `</optgroup>`
-            + `<optgroup label="🏠 Individual meters — bill directly off their own account">`
-            + subAccts.map(opt).join("") + `</optgroup>`;
-    } else {
-      html += list.slice().sort(byLabel).map(opt).join("");
-    }
-    return html;
+  // Flat <option> list of ALL utility accounts (alphabetized by label), with
+  // `selectedId` marked selected and an optional lead option prepended.
+  function accountOptionsFlat(accts, selectedId, leadHTML) {
+    const selStr = selectedId != null && selectedId !== "" ? String(selectedId) : "";
+    const opts = (accts || []).filter(a => a && a.utility_account_id != null)
+      .slice().sort((x, y) => billLabel(x).localeCompare(billLabel(y)))
+      .map(a => {
+        const id = String(a.utility_account_id);
+        return `<option value="${id}"${id === selStr ? " selected" : ""}>${esc(billLabel(a))}</option>`;
+      }).join("");
+    return (leadHTML || "") + opts;
   }
 
-  // Multi-account group: render the OPTIONAL sub-account link with auto-match as
-  // its default first option. An explicit prior pick survives repaints; otherwise
-  // the live matcher (applyAutoMatch) chooses from the offtaker's name.
-  function showSubAccountPicker(wrap, usel, mine, arrId) {
+  // Master + sub <option> lists for the two-dropdown picker. Both list EVERY
+  // account; the current binding preselects the MASTER dropdown when it's a group
+  // host others share, else the SUB dropdown (an individual own meter).
+  function masterSubOptions(accts, offtakers, boundId) {
+    const masters = masterAccountIds(offtakers);
+    const bound = boundId != null && boundId !== "" ? String(boundId) : "";
+    const boundIsMaster = !!bound && masters.has(bound);
+    return {
+      masterHTML: accountOptionsFlat(accts, boundIsMaster ? bound : "",
+        `<option value="">— none —</option>`),
+      subHTML: accountOptionsFlat(accts, (bound && !boundIsMaster) ? bound : "",
+        `<option value="">— none (bill their share of the master) —</option>`),
+    };
+  }
+
+  // The OPTIONAL sub-account dropdown (second of the two account dropdowns). Lists
+  // EVERY utility account so the operator can bind this offtaker to their own meter
+  // (bill directly off it, topology A); blank keeps the master group share
+  // (topology B). Always shown once a master group with a bill is chosen. An
+  // explicit prior pick survives repaints.
+  function showSubPicker(wrap, usel) {
     if (!wrap || !usel) return;
     wrap.dataset.needPick = "";
     wrap.classList.remove("req");
     const lbl = $("#rbmUtilLabel");
-    if (lbl) lbl.textContent = "Offtaker's sub-account (optional)";
-    const prev = usel.value, userPicked = usel.dataset.userPicked === "1";
-    // Same parent↔child hierarchy as the edit panel: ⭐ master vs 🏠 own meter.
-    usel.innerHTML = groupedAccountOptions(mine, OFFTAKERS, {
-      selectedId: userPicked ? prev : "",
-      offtakerName: ($("#rbmName") ? $("#rbmName").value.trim() : ""),
-      leadHTML: `<option value="">✨ Auto-match to this offtaker</option>`,
-    });
-    if (userPicked && prev && mine.some(a => String(a.utility_account_id) === String(prev))) {
-      usel.value = prev;
-    } else {
-      applyAutoMatch(usel, mine);
-    }
-    wrap.hidden = false;
-  }
-  // Reflect the matcher's current verdict in the (unpicked) dropdown + hint. A
-  // no-op once the operator has explicitly chosen a sub-account.
-  function applyAutoMatch(usel, mine) {
-    if (!usel || usel.dataset.userPicked === "1") return;
-    const nameEl = $("#rbmName");
-    const m = matchSubAccount(nameEl ? nameEl.value.trim() : "", mine || []);
+    if (lbl) lbl.textContent = "Sub-account (optional)";
+    const prev = usel.dataset.userPicked === "1" ? usel.value : "";
+    usel.innerHTML = accountOptionsFlat(ARR_UTIL_ACCTS, prev,
+      `<option value="">— none (bill their share of the master) —</option>`);
     const hint = $("#rbmUtilHint");
-    if (m) {
-      usel.value = String(m.account.utility_account_id);
-      if (hint) hint.innerHTML = `✨ Linked to <b>${esc(billLabel(m.account))}</b> — matched by name. Change it if this offtaker meters somewhere else.`;
-    } else {
-      usel.value = "";
-      if (hint) hint.textContent = "Auto-match will bill their share of the whole group bill. Pick a sub-account only if this offtaker has their own meter.";
-    }
+    if (hint) hint.textContent = "If this offtaker meters on their own account, pick it to bill directly off their meter. Leave blank to bill their share of the master.";
+    wrap.hidden = false;
   }
 
   // Given ARR_UTIL_ACCTS + the chosen #rbmArray (Net Meter Group), render the bill state:
@@ -3281,18 +3254,17 @@
       showUtilityPicker(wrap, usel, accts, true, arrId);
       return;
     }
-    if (mine.length === 1) {
-      const a = mine[0];
-      line.className = "rb-arr-billline rb-arr-hasbill";
-      line.innerHTML = `Invoices from: <b>${esc(billLabel(a))}</b>`;
-      if (wrap) { wrap.hidden = true; usel.innerHTML =
-        `<option value="${a.utility_account_id}" selected>${esc(billLabel(a))}</option>`; }
-      return;
-    }
-    // Multiple accounts in this group → the OPTIONAL sub-account link + auto-match.
+    // A resolved master group (one or more host bills). Show the master's bill on
+    // the line and ALWAYS reveal the optional sub-account dropdown (Ford 2026-07-10:
+    // both master + sub always visible). A blank sub bills the master group share.
     line.className = "rb-arr-billline rb-arr-hasbill";
-    line.innerHTML = `This group has <b>${mine.length} utility accounts</b>. Link this offtaker to their own sub-account, or let auto-match bill their share of the whole group.`;
-    showSubAccountPicker(wrap, usel, mine, arrId);
+    if (mine.length === 1) {
+      line.innerHTML = `Invoices from: <b>${esc(billLabel(mine[0]))}</b>`;
+    } else {
+      const host = mine.slice().sort((a, b) => Number(a.utility_account_id) - Number(b.utility_account_id))[0];
+      line.innerHTML = `This group has <b>${mine.length} utility accounts</b> — its share bills from <b>${esc(billLabel(host))}</b>.`;
+    }
+    showSubPicker(wrap, usel);
   }
 
   // Fill + reveal the offtaker-bill picker. `needPick` prepends a placeholder so
@@ -3358,7 +3330,7 @@
           <button class="ao-btn ao-btn-ghost rb-cancel" id="rbmCancel" type="button">Cancel</button>
         </div>
         <p class="rb-add-sub">${ADD_MODE === "manual"
-          ? "Pick the <b>net meter group</b> your offtaker participates in — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it."
+          ? "Pick the <b>master account</b> your offtaker draws from — we resolve the utility bill it invoices from (the paper bill, never inverter data) and bill them for their share of it. If they meter on their own account, set that as the <b>sub-account</b>."
           : "Already bill in your own spreadsheet? Drop it and we'll keep invoicing in <b>that exact format</b> every cycle."}</p>
 
         <div id="rbAddManual" ${ADD_MODE === "manual" ? "" : "hidden"}>
@@ -3367,13 +3339,13 @@
                picker is visible. Everything else saves blank, so it stays clear. -->
           <p class="rb-req-legend">Marked fields are required — everything else is optional.</p>
           <div class="rb-mform-grid">
-            <label class="rep-fld req"><span class="rl">Net Meter Group</span>
-              <select id="rbmArray"><option value="">Loading net meter groups…</option></select>
-              <span class="rb-fld-hint">The utility bill (net meter group) your offtaker draws their share from.</span>
+            <label class="rep-fld req"><span class="rl">Master account</span>
+              <select id="rbmArray"><option value="">Loading master accounts…</option></select>
+              <span class="rb-fld-hint">The net-meter group host this offtaker bills a share of.</span>
               <span class="rb-arr-billline" id="rbmBillLine"></span>
-              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl" id="rbmUtilLabel">Offtaker's sub-account (optional)</span>
-                <select id="rbmUtility"><option value="">✨ Auto-match to this offtaker</option></select>
-                <span class="rb-fld-hint" id="rbmUtilHint">Link this offtaker to their own GMP sub-account, or let auto-match bill their share of the whole group.</span></label></label>
+              <label class="rep-fld rb-arr-override" id="rbmUtilityWrap" hidden><span class="rl" id="rbmUtilLabel">Sub-account (optional)</span>
+                <select id="rbmUtility"><option value="">— none (bill their share of the master) —</option></select>
+                <span class="rb-fld-hint" id="rbmUtilHint">If this offtaker meters on their own account, pick it to bill directly off their meter. Leave blank to bill their share of the master.</span></label></label>
             <label class="rep-fld req"><span class="rl">Offtaker name</span>
               <input type="text" id="rbmName" placeholder="e.g. Sunnybrook Apartments"></label>
             <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
@@ -3475,16 +3447,9 @@
         if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
       }));
       $("#rbmSave").onclick = saveManual;
-      // Live sub-account auto-match: re-run the matcher as the offtaker's name is
-      // typed (unless the operator has explicitly picked a sub-account), and record
-      // an explicit pick so typing never clobbers it.
-      const nameElAM = $("#rbmName"), utilElAM = $("#rbmUtility");
-      if (nameElAM) nameElAM.addEventListener("input", () => {
-        const wrap = $("#rbmUtilityWrap"), usel = $("#rbmUtility");
-        if (!wrap || wrap.hidden || wrap.dataset.needPick === "1" || !usel) return;
-        const arrId = $("#rbmArray") ? $("#rbmArray").value : "";
-        applyAutoMatch(usel, (ARR_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId)));
-      });
+      // Record an explicit sub-account pick (so a repaint never clobbers it) and
+      // repaint the rate field to the picked account's provider.
+      const utilElAM = $("#rbmUtility");
       if (utilElAM) utilElAM.addEventListener("change", () => {
         utilElAM.dataset.userPicked = "1"; paintRateField();
       });
@@ -3736,7 +3701,7 @@
   // Auto-match a bulk row to the offtaker's OWN sub-account by name (unless the
   // operator picked one). Refines the server's representative account to the
   // name-matched sub-account when the group has more than one; `_subMatched` drives
-  // the "✨ matched by name" badge. Single-account groups keep their one account.
+  // the "matched by name" badge. Single-account groups keep their one account.
   function bulkAutoMatchRow(row) {
     row._subMatched = false;
     if (row._subPicked) return;
@@ -3757,7 +3722,7 @@
     const opts = grp.map(a =>
       `<option value="${a.utility_account_id}"${String(a.utility_account_id) === String(row.utility_account_id) ? " selected" : ""}>${esc(billLabel(a))}</option>`).join("");
     const badge = row._subMatched
-      ? `<span class="rb-conf rb-conf-ok" title="Matched to this offtaker's own sub-account by name — change it if they meter elsewhere.">✨ matched by name</span>` : "";
+      ? `<span class="rb-conf rb-conf-ok" title="Matched to this offtaker's own sub-account by name — change it if they meter elsewhere.">matched by name</span>` : "";
     return `<div class="rb-rev-subbox">
       <select class="rb-rev-in rb-rev-subsel" data-f="utility_account_id" title="Offtaker's sub-account">${opts}</select>${badge}</div>`;
   }
@@ -6599,12 +6564,9 @@
     // Vendor-free labels (billLabel: nickname → service address → provider+acct#,
     // + bill status) — consistent with the add-offtaker sub-account picker, never
     // the array/inverter name (Ford 2026-07-09: no vendor info in this generator).
-    // Parent ↔ child: split into ⭐ Master (group host) vs 🏠 Individual meters,
-    // preselect the bound account, ✨-flag this offtaker's own name-matched meter.
-    const billOpts = groupedAccountOptions(utilAccts, OFFTAKERS, {
-      selectedId: d.utility_account_id,
-      offtakerName: d.customer_name,
-    });
+    // Two dropdowns (Ford 2026-07-10): master account (group host) + optional
+    // sub-account (own meter). The bound account preselects whichever it is.
+    const msOpts = masterSubOptions(utilAccts, OFFTAKERS, d.utility_account_id);
     // Show the GMP-bill link for EVERY offtaker, INCLUDING workbook offtakers. The linked
     // utility_account_id drives the GMP-bill auto-attach (api/billing/delivery.py); it does
     // NOT change a workbook offtaker's amount (that bills from source_workbook, which takes
@@ -6628,13 +6590,12 @@
           <label class="rep-fld req"><span class="rl">Offtaker name</span>
             <input type="text" data-of="customer_name" value="${esc(d.customer_name || "")}"></label>
           ${showBillPicker ? `
-          <label class="rep-fld req"><span class="rl">Offtaker's sub-account</span>
-            <select data-of="utility_account_id">
-              <option value="">${d.utility_account_id ? "— keep current —" : "Select a utility account…"}</option>
-              <option value="__auto__">✨ Auto-match to this offtaker</option>
-              ${billOpts}
-            </select>
-            <span class="rb-fld-hint">Pick the <b>⭐ master account</b> (bills their share of the whole net-meter group) or their <b>🏠 own meter</b> (bills directly off their sub-account) — or ✨ Auto-match by name. Changing it re-derives their group share automatically.</span></label>` : ""}
+          <label class="rep-fld req"><span class="rl">Master account</span>
+            <select class="rb-of-master">${msOpts.masterHTML}</select>
+            <span class="rb-fld-hint">The net-meter group host this offtaker bills a share of.</span></label>
+          <label class="rep-fld"><span class="rl">Sub-account (optional)</span>
+            <select class="rb-of-sub">${msOpts.subHTML}</select>
+            <span class="rb-fld-hint">If this offtaker meters on their own account, pick it to bill directly off their meter instead of a share of the master. Leave blank to bill their share of the master. Changing either re-derives their group share automatically.</span></label>` : ""}
           <!-- Money cluster (Bruce C5): share → rate → discount → cross-check, one block. -->
           <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
             <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783"></label>
@@ -6906,6 +6867,15 @@
         inp.addEventListener("input", h);
         inp.addEventListener("change", h);
       });
+      // The master + sub account dropdowns resolve together to ONE utility_account_id
+      // (sub wins when set → bill off their own meter; else the master → their share).
+      const masterSel = box.querySelector(".rb-of-master");
+      const subSel = box.querySelector(".rb-of-sub");
+      if (masterSel && subSel) {
+        const onPick = () => onOfftakerUtilityPick(card, box, did, sid, masterSel, subSel);
+        masterSel.addEventListener("change", onPick);
+        subSel.addEventListener("change", onPick);
+      }
       // The commissioning date is NOT a subscription field — it lives on the ARRAY
       // and PATCHes /arrays/{id}. Wire it specially: pre-fill from the array's
       // current setup, save the in-service DATE on change (day-accurate — it sets
@@ -6980,12 +6950,6 @@
     if (!d) return;
     const raw = inp.value;
     ACTIVE_DRAFT_ID = did;                       // preview tracks the edited draft
-    // "✨ Auto-match" chosen in the sub-account picker → resolve by name, don't
-    // persist the literal sentinel.
-    if (field === "utility_account_id" && raw === "__auto__") {
-      applyEditAutoMatch(card, box, did, sid, d, inp);
-      return;
-    }
     // Optimistic repaint for what the preview/grid can honestly show right now.
     if (field === "customer_name") {
       d.customer_name = raw;
@@ -7015,31 +6979,19 @@
       OF_MONEY_FIELDS.has(field), OF_RECHECK_FIELDS.has(field));
   }
 
-  // Edit-tab "✨ Auto-match": resolve the offtaker's OWN sub-account by matching
-  // their name against their net meter group's accounts, then PATCH the binding
-  // (the backend re-routes the group share into array_share_pct). No unique match
-  // → revert the select + say so; never bind a guess on a billing path.
-  function applyEditAutoMatch(card, box, did, sid, d, inp) {
-    const subRec = OFFTAKERS.find(x => String(x.id) === String(sid)) || {};
-    const arrId = subRec.array_id != null ? subRec.array_id : d.array_id;
-    const grp = (INBOX_UTIL_ACCTS || []).filter(a => String(a.array_id) === String(arrId));
-    const st = box && box.querySelector(".rb-offedit-status");
-    const m = matchSubAccount(d.customer_name || "", grp);
-    if (m) {
-      const uid = m.account.utility_account_id;
-      inp.value = String(uid);                   // reflect the resolved pick in the select
-      d.utility_account_id = uid;
-      renderDraftDoc();
-      scheduleOfftakerPatch(card, box, did, sid, { utility_account_id: Number(uid) }, true, true);
-      if (st) { st.className = "rb-status rb-ok"; st.textContent =
-        "✨ Linked to " + (m.account.nickname || m.account.service_address
-          || ("acct " + (m.account.account_number || "?"))) + " by name."; }
-    } else {
-      inp.value = d.utility_account_id != null ? String(d.utility_account_id) : "";  // revert
-      if (st) { st.className = "rb-status"; st.textContent = grp.length > 1
-        ? "No confident name match — pick a sub-account above."
-        : "This group has a single utility account — nothing to auto-match."; }
-    }
+  // The master + sub dropdowns resolve to ONE utility_account_id: the sub-account
+  // when chosen (bill directly off their own meter, topology A), else the master
+  // (bill their share of the group). Patches like the old single select did — the
+  // backend's sub-meter invariant re-derives the group share into array_share_pct.
+  function onOfftakerUtilityPick(card, box, did, sid, masterSel, subSel) {
+    const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+    if (!d) return;
+    ACTIVE_DRAFT_ID = did;
+    const uid = (subSel.value || masterSel.value || "").trim();
+    if (uid === "") return;                      // nothing chosen → keep the current binding
+    d.utility_account_id = Number(uid);
+    renderDraftDoc();
+    scheduleOfftakerPatch(card, box, did, sid, { utility_account_id: Number(uid) }, true, true);
   }
 
   function ofPatchBody(field, raw) {
