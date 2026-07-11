@@ -4699,9 +4699,9 @@
       if(op === "set"){
         const r = await fetch("/v1/cloud-capture/credentials", { method:"POST", headers:H, body:JSON.stringify({
           provider: extra.provider, username: extra.username, password: extra.password,
-          login_host: extra.login_host || null, enable: true }) });
+          login_host: extra.login_host || null, enable: true, consent: extra.consent === true }) });
         const d = await r.json().catch(()=>({}));
-        return { ok: r.ok, error: r.ok ? null : (d.detail || "http_"+r.status) };
+        return { ok: r.ok, error: r.ok ? null : (typeof d.detail === "string" ? d.detail : "http_"+r.status) };
       }
       if(op === "clear"){
         const r = await fetch("/v1/cloud-capture/credentials", { method:"DELETE", headers:H, body:JSON.stringify({
@@ -4968,17 +4968,28 @@
     // saveCode = the code `set` writes under (a utility's base code, or the id).
     // prefillUser = a saved login's username (shown so multiple logins are distinct).
     const credRow = (opts) => {
-      const { key, saveCode, label, ph, hasCreds, enabled, prefillUser, addLabel } = opts;
+      const { key, saveCode, label, ph, hasCreds, enabled, prefillUser, addLabel, cloudStat } = opts;
       const on = hasCreds && enabled;
       const stateTxt = hasCreds ? (enabled ? "On" : "Off") : "";
       const stateCls = on ? "on" : (hasCreds ? "off" : "");
       const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
+      // Cloud mode: an explicit status line so a saved login is unmistakable and
+      // its refresh state is visible (saved → first pull → connected, or an issue).
+      let cloudLine = "";
+      if(mode === "cloud" && hasCreds){
+        const cs = cloudStat || {};
+        if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused — re-enter your password to retry</div>`;
+        else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in — check the password</div>`;
+        else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected — refreshing automatically</div>`;
+        else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved — first refresh starting…</div>`;
+      }
       return `<div class="ar-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}">
         <div class="ar-row-top">
           ${label ? `<span class="ar-vendor">${esc(label)}</span>` : ""}
           ${hasCreds ? `<span class="ar-badge ${stateCls}">${stateTxt}</span>
           <label class="ar-switch"><input type="checkbox" class="ar-optout" ${!enabled ? "checked" : ""}><span>off</span></label>` : ""}
         </div>
+        ${cloudLine}
         <div class="ar-fields">
           <input class="ar-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph || "Portal username / email")}">
           <input class="ar-pass" type="password" autocomplete="off" placeholder="${hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
@@ -4997,7 +5008,7 @@
       const s = status[k];
       if(!s || !s.utility || !s.hasCreds) return;
       const code = s.code || k;
-      (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false });
+      (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails });
     });
     // Which utilities to show as cards: GMP (common default) + every one with a
     // saved login + anything the operator just picked from the catalog this session.
@@ -5013,6 +5024,7 @@
       const savedRows = logins.map(l => credRow({
         key: l.slot, saveCode: code, label: "", ph: "username / email",
         hasCreds: true, enabled: l.enabled, prefillUser: l.username,
+        cloudStat: { ok: l.ok, at: l.at, fails: l.fails },
       })).join("");
       const addRow = credRow({
         key: code + "::__new__", saveCode: code, label: "",
@@ -5034,7 +5046,7 @@
           // Show the saved username (Ford 2026-07-10) so a login saved in the extension
           // popup reads as clearly present here, not a blank row. Needs the extension's
           // status() to return `username` for inverters (v1.9.120+); harmless before then.
-          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "" });
+          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails } });
         }).join("")}
       </div>
       <div class="ar-group">
@@ -5087,10 +5099,18 @@
           }
           const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost, consent: true });
           passEl.value = "";
-          saveBtn.textContent = r.ok ? "✓ Saved"
-            : (r.error === "http_403" ? "Not enabled yet"
-            : r.error === "http_422" ? "Consent needed" : "Failed");
-          setTimeout(() => { wireAutoRefreshRow(); }, 800);
+          if(r.ok){
+            saveBtn.textContent = "✓ Saved";
+            saveBtn.classList.add("ar-saved-ok");
+            // Re-render so the row flips to the saved "On" state with a status line.
+            setTimeout(() => { wireAutoRefreshRow(); }, 700);
+          } else {
+            const msg = (r.error === "http_403") ? "Not enabled yet"
+              : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";
+            saveBtn.textContent = "✕ " + msg;
+            saveBtn.classList.add("ar-save-err");
+            setTimeout(() => { saveBtn.textContent = savedLabel; saveBtn.classList.remove("ar-save-err"); }, 4000);
+          }
           return;
         }
         // Always set() under the base code + username: the vault matches an existing

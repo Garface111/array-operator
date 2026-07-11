@@ -215,6 +215,12 @@
   .ar-consent a{color:var(--accent,#2563eb);text-decoration:underline}
   .ar-consent-flash{animation:arConsentFlash 1.4s ease}
   @keyframes arConsentFlash{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}30%{box-shadow:0 0 0 3px rgba(37,99,235,.35)}}
+  /* Per-login cloud status line + save button success/error states. */
+  .ar-cloud-stat{font-size:11.5px;font-weight:600;margin:2px 0 6px;display:flex;align-items:center;gap:5px}
+  .ar-cloud-stat.ok{color:#047857}
+  .ar-cloud-stat.err{color:#b45309}
+  .ar-save.ar-saved-ok{background:#047857 !important;border-color:#047857 !important;color:#fff !important}
+  .ar-save.ar-save-err{background:#b45309 !important;border-color:#b45309 !important;color:#fff !important}
   .ar-panel-stat{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 10px;border-radius:999px;color:var(--faint)}
   .ar-panel-stat.on{color:#047857;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.30)}
   .ar-panel .ar-body{margin-top:17px;cursor:default}
