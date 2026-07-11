@@ -394,10 +394,14 @@
   // `cohort` is passed, bars are scaled to the COHORT peak (shared with its neighbors)
   // and a faint dashed line traces the neighbor average each day (excluding this unit),
   // so the gap that drives the underperforming verdict is visible across all weather.
-  function sparkline(daily, cohort) {
+  function sparkline(daily, cohort, opts) {
+    opts = opts || {};
+    const cls = opts.cls || "vs-id-spark";
     const pts = (daily || []).filter(d => d && d.kwh != null).slice(-14);
-    if (pts.length < 2) return `<div class="vs-id-nospark">Not enough history yet — a sparkline needs a couple of days of capture.</div>`;
-    const W = 240, H = 40, bw = W / pts.length;
+    if (pts.length < 2) return opts.mini
+      ? `<span class="vs-inv-nospark" title="A sparkline needs a couple of days of capture">no history yet</span>`
+      : `<div class="vs-id-nospark">Not enough history yet — a sparkline needs a couple of days of capture.</div>`;
+    const W = opts.w || 240, H = opts.h || 40, bw = W / pts.length;
     const ownMax = Math.max(...pts.map(p => p.kwh), 0.001);
     const max = (cohort && cohort.peak > 0) ? cohort.peak : ownMax;   // shared scale, else self
     const bars = pts.map((p, i) => {
@@ -416,7 +420,7 @@
       }).filter(Boolean);
       if (xy.length >= 2) peerLine = `<polyline class="vs-id-peerline" fill="none" points="${xy.join(" ")}"><title>Neighbor average</title></polyline>`;
     }
-    return `<svg class="vs-id-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days, against the neighbor average">${bars}${peerLine}</svg>`;
+    return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last ${pts.length} days, against the neighbor average">${bars}${peerLine}</svg>`;
   }
   // The detail panel shown when an inverter row is clicked open.
   function invDetailHTML(iv, cohort, peers, isDaylight) {
@@ -847,16 +851,48 @@
             const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters
             invs.forEach(iv => {
               const ist = invStatus(iv, invs, c.is_daylight);
-              const meta = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null].filter(Boolean).join(" · ");
               const ikey = c.array_id + ":" + iv.inverter_id;
               const iopen = !!_invExpanded[ikey];
-              h += `<div class="vs-row vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
-                <span class="vs-c-name vs-inv-name"><span class="vs-caret vs-inv-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(iv.name || iv.sn || "Inverter")}</span>${meta ? ` <span class="vs-inv-meta">${esc(meta)}</span>` : ""}</span>
-                <span class="vs-c-vendor">${iv.sn ? `<span class="vs-inv-sn" title="Serial number">${esc(iv.sn)}</span>` : ""}</span><span class="vs-c-inv">${iv.peer_index != null ? `<span class="vs-inv-peer" title="This inverter's 14-day output vs its neighbors — 1.00× is right at the group median">${iv.peer_index.toFixed(2)}× peers</span>` : ""}</span>
-                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${isAllocatedPower(iv) ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : ""}>${isAllocatedPower(iv) ? "~" : ""}${kw(iv.current_power_w)}${pctOfMax(iv) ? ` <span class="vs-pct-rated" title="Current power as a percent of this inverter's rated nameplate (its max)">· ${pctOfMax(iv)}</span>` : ""}</span>
-                <span class="vs-c-today">${iv.produced_today_kwh != null ? `<span class="vs-inv-today">${kwh0(iv.produced_today_kwh)}</span>` : ""}</span>
-                <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
-                <span class="vs-c-fresh"></span>
+              // Name vs. model: many inverters default their name TO the model string, so
+              // showing both reads as a truncated name next to a duplicate. Show the name
+              // once; the sub-line carries only what the name doesn't already say (a distinct
+              // model, the nameplate, the serial).
+              const _nm = iv.name || iv.sn || "Inverter";
+              const _model = iv.model || "";
+              const _nameIsModel = _model && _nm.trim().toLowerCase() === _model.trim().toLowerCase();
+              const _sub = [
+                (_model && !_nameIsModel) ? esc(_model) : null,
+                iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null,
+                iv.sn ? "SN " + esc(iv.sn) : null,
+              ].filter(Boolean).join(" · ");
+              const _al = isAllocatedPower(iv);
+              const _pm = pctOfMax(iv);
+              const _live = iv.current_power_w != null
+                ? `${_al ? "~" : ""}${kw(iv.current_power_w)}${_pm ? ` <span class="vs-inv-pm">· ${_pm}</span>` : ""}`
+                : "—";
+              const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
+              const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";
+              // Inline sparkline — the 14-day output shape, always visible (Ford: graphics
+              // shouldn't be hidden behind a click). Bars carry the vendor hue; the dashed
+              // line is the neighbor average on the shared cohort scale.
+              const _spark = sparkline(iv.daily, cohortScale, { w: 132, h: 28, cls: "vs-inv-spark", mini: true });
+              const _liveTip = _al ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : "";
+              const _peerTip = iv.peer_index != null ? ` title="14-day output vs its neighbors — 1.00× is right at the group median"` : "";
+              h += `<div class="vs-inv vs-inv-click${iopen ? " open" : ""}" data-inv="${esc(ikey)}" role="button" tabindex="0" aria-expanded="${iopen}" title="Click for inverter detail">
+                <div class="vs-inv-idcol">
+                  <span class="vs-caret vs-inv-caret" aria-hidden="true">▸</span>
+                  <span class="vs-inv-idtext">
+                    <span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>
+                    ${_sub ? `<span class="vs-inv-sub">${_sub}</span>` : ""}
+                  </span>
+                </div>
+                <div class="vs-inv-spwrap">${_spark}</div>
+                <div class="vs-inv-metrics">
+                  <span class="vs-inv-metric"${_liveTip}><b class="${stale ? "vs-stale" : ""}">${_live}</b><i>live</i></span>
+                  <span class="vs-inv-metric"><b>${_today}</b><i>today</i></span>
+                  <span class="vs-inv-metric vs-inv-peermetric"${_peerTip}><b>${esc(_peer)}</b><i>vs peers</i></span>
+                </div>
+                <div class="vs-inv-statcell"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></div>
               </div>`;
               if (iopen) h += invDetailHTML(iv, cohortScale, invs, c.is_daylight);
             });

@@ -2267,16 +2267,57 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-pill.warn{ color:#92400e; background:rgba(217,119,6,.22); }
 .vs-pill.bad{ color:#991b1b; background:rgba(220,38,38,.20); }
 .vs-pill.muted{ color:var(--muted); background:var(--day-chip,#eef2f7); }
-.vs-inv-wrap{ background:color-mix(in srgb, var(--vc,#64748b) 5%, var(--bg,#f6f8fb));
-  border-bottom:1px solid var(--line); }
-.vs-inv{ padding-top:8px; padding-bottom:8px; font-size:12.5px; }
-.vs-inv .vs-c-name{ padding-left:40px; font-weight:500; color:var(--muted); }
-.vs-inv-meta{ font-size:11px; color:var(--faint); font-weight:400; }
-/* Per-inverter row detail filling the formerly-blank Vendor / Inverters / Today cells */
-.vs-inv-sn{ font-size:11.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
-.vs-inv-peer{ font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
-.vs-inv-today{ font-size:12.5px; color:var(--ink); font-variant-numeric:tabular-nums; }
+/* Expanded inverter list. The vendor color is carried ONLY by the group's left bar
+   (.vs-vgroup border-left) — NO background flood (Ford: "just hold the little line on
+   the left... don't let the color follow all the way down"). So the wrap is plain card. */
+.vs-inv-wrap{ background:var(--card,#fff); border-bottom:1px solid var(--line); }
+/* Inverter rows get their OWN layout instead of being forced into the array table's
+   7 columns (which left the Vendor + Synced cells blank and truncated the name). Four
+   zones: identity (name + a de-duplicated sub-line) · an always-on sparkline · a tight
+   live/today/peer metric cluster · the status pill. No dead columns, nothing cut off. */
+.vs-inv{ display:grid; grid-template-columns:minmax(0,1fr) 148px auto auto;
+  align-items:center; gap:16px; padding:10px 18px 10px 40px; width:100%; box-sizing:border-box;
+  text-align:left; font-size:12.5px; cursor:pointer; background:transparent;
+  border-top:1px solid color-mix(in srgb, var(--line,#e2e8f0) 55%, transparent); }
+.vs-inv:first-child{ border-top:0; }
+.vs-inv:hover{ background:rgba(37,99,235,.045); }
+.vs-inv.open{ background:rgba(37,99,235,.06); }
+.vs-inv-idcol{ display:flex; align-items:flex-start; gap:8px; min-width:0; }
+.vs-inv-caret{ width:12px; font-size:10px; color:var(--faint); flex:none; margin-top:3px;
+  transition:transform .15s ease; }
+.vs-inv.open .vs-inv-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.vs-inv-idtext{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+.vs-inv-idtext .vs-editable{ font-weight:600; color:var(--ink,#0f172a); font-size:13px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vs-inv-sub{ font-size:11px; color:var(--faint); font-weight:400; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+/* Inline sparkline — the 14-day output shape, always visible. Bars in the vendor hue. */
+.vs-inv-spwrap{ display:flex; align-items:center; }
+.vs-inv-spark{ width:132px; height:28px; display:block; }
+.vs-inv-spark rect{ fill:var(--vc,#2563eb); opacity:.8; }
+.vs-inv-spwrap .vs-id-peerline{ fill:none; stroke:var(--ink,#0f172a); stroke-width:1.1;
+  stroke-dasharray:3 2; opacity:.4; vector-effect:non-scaling-stroke; }
+.vs-inv-nospark{ font-size:10.5px; color:var(--faint); font-style:italic; }
+/* Metric cluster: right-aligned value over a small uppercase label, so live / today /
+   peer read as one tidy group instead of scattered across empty table columns. */
+.vs-inv-metrics{ display:flex; align-items:center; gap:20px; }
+.vs-inv-metric{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; min-width:50px; }
+.vs-inv-metric b{ font-weight:600; color:var(--ink,#0f172a); font-variant-numeric:tabular-nums; font-size:12.5px; white-space:nowrap; }
+.vs-inv-metric b.vs-stale{ color:var(--muted); font-weight:400; }
+.vs-inv-metric i{ font-style:normal; font-size:9px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin-top:2px; }
+.vs-inv-pm{ color:var(--muted); font-weight:400; font-size:11px; }
+.vs-inv-statcell{ display:flex; justify-content:flex-end; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
+/* Narrow: drop the sparkline, then the peer metric, before anything wraps or clips. */
+@media(max-width:860px){
+  .vs-inv{ grid-template-columns:minmax(0,1fr) auto auto; gap:12px; padding-left:32px; }
+  .vs-inv-spwrap{ display:none; }
+}
+@media(max-width:560px){
+  .vs-inv{ grid-template-columns:minmax(0,1fr) auto; }
+  .vs-inv-metrics{ gap:12px; }
+  .vs-inv-peermetric{ display:none; }
+}
 /* Stale-feed recovery banner inside an expanded array row — explains the paused
    feed and offers a one-click portal open (extension re-captures on open). */
 .vs-src-recover{ display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -2288,13 +2329,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   transition:filter .12s, transform .08s; }
 .vs-src-recover-btn:hover{ filter:brightness(1.06); }
 .vs-src-recover-btn:active{ transform:translateY(.5px); }
-/* Click an inverter row → detail panel (diagnosis, peer comparison, 14-day output + sparkline). */
-.vs-inv-click{ cursor:pointer; }
-.vs-inv-click:hover{ background:rgba(37,99,235,.05); }
-.vs-inv-caret{ width:12px; font-size:10px; }
-.vs-inv-click.open{ background:rgba(37,99,235,.05); }
-.vs-inv-click.open .vs-inv-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
-.vs-inv-detail{ background:var(--card,#fff); border-bottom:1px solid var(--line);
+/* Click an inverter row → detail panel (diagnosis, peer comparison, 14-day output + sparkline).
+   Row layout, hover/open states + caret live with the .vs-inv rules above. */
+.vs-inv-detail{ background:color-mix(in srgb, var(--good,#2563eb) 4%, var(--card,#fff)); border-bottom:1px solid var(--line);
   padding:12px 18px 14px 52px; display:flex; flex-wrap:wrap; gap:14px 28px; align-items:flex-start; }
 .vs-id-diag{ flex-basis:100%; font-size:13px; font-weight:600; color:var(--ink); }
 .vs-id-grid{ display:flex; flex-wrap:wrap; gap:14px 26px; }
