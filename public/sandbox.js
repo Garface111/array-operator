@@ -4902,6 +4902,90 @@
     });
   }
 
+  // ── The LIVE data board: "what we have + what we're doing" (Ford 2026-07-11).
+  //    One dense row per saved login, a pulsing GREEN dot when it's live, the last
+  //    refresh in tabular figures — so a curious operator can literally watch us
+  //    pulling their data. Cloud mode carries real server freshness
+  //    (_cloudAt/_cloudOk/_cloudFails); device mode has no server timestamps, so it
+  //    honestly reads "on device / refreshes on open". Octarine frames it (the vault's
+  //    signature); green/amber/red are reserved strictly for live STATE.
+  function _arLiveRank(dot){ return dot === "err" ? 0 : dot === "warn" ? 1 : dot === "live" ? 2 : 3; }
+  function buildLiveBoardHTML(status, mode, catalog){
+    const rows = [];
+    let live = 0, inv = 0, util = 0, freshest = 0;
+    Object.keys(status).forEach(k => {
+      const s = status[k]; if(!s || !s.hasCreds) return;
+      const code = s.code || k;
+      const isInv = !!s.inverter || AR_INVERTER_IDS.has(code);
+      let name;
+      if(isInv){ const v = AR_INVERTERS.find(x => x.id === code); name = v ? v.label : code.toUpperCase(); }
+      else { name = utilLabelFor(code, catalog); }
+      const enabled = s.enabled !== false;
+      const fails = s._cloudFails || 0, at = s._cloudAt || null, ok = s._cloudOk;
+      let dot, stag, stxt, tTxt;
+      if(!enabled){ dot = "off"; stag = "off"; stxt = "Paused"; tTxt = "—"; }
+      else if(mode === "cloud"){
+        if(fails >= 3){ dot = "err"; stag = "err"; stxt = "Sign-in failed"; tTxt = at ? _flAgo(at) : "—"; }
+        else if(at && ok === false){ dot = "err"; stag = "err"; stxt = "Check password"; tTxt = _flAgo(at); }
+        else if(at){ dot = "live"; stag = "live"; stxt = "Live"; tTxt = _flAgo(at); }
+        else { dot = "warn"; stag = "warn"; stxt = "Starting"; tTxt = "queued"; }
+      } else {
+        dot = "live"; stag = "live"; stxt = "On device"; tTxt = "on open";
+      }
+      if(dot === "live"){ live++; if(at){ const t = Date.parse(at); if(t && t > freshest) freshest = t; } }
+      if(isInv) inv++; else util++;
+      rows.push({ name, user: s.username || "", dot, stag, stxt, tTxt, isInv, rank: _arLiveRank(dot) });
+    });
+    const n = rows.length;
+    rows.sort((a, b) => a.rank - b.rank || (a.isInv === b.isInv ? 0 : (a.isInv ? -1 : 1)) || a.name.localeCompare(b.name));
+    const parts = [];
+    if(inv) parts.push(`<b>${inv}</b> inverter${inv === 1 ? "" : "s"}`);
+    if(util) parts.push(`<b>${util}</b> utilit${util === 1 ? "y" : "ies"}`);
+    const countHTML = n ? `<b>${n}</b> connected${parts.length ? " · " + parts.join(" · ") : ""}` : "No portals connected";
+    let freshHTML;
+    if(mode === "cloud") freshHTML = freshest ? `Updated <b>${_flAgo(new Date(freshest).toISOString())}</b>` : (n ? "First refresh queued" : "");
+    else freshHTML = n ? "Refreshes while a tab is open" : "";
+    const rowsHTML = rows.map(r =>
+      `<div class="ar-live-row">
+        <span class="ar-live-dot ${r.dot}"></span>
+        <span class="ar-live-name"><b>${esc(r.name)}</b><span class="mono">${esc(r.user || "—")}</span></span>
+        <span class="ar-live-meta"><span class="t">${esc(r.tTxt)}</span><span class="s ${r.stag}">${esc(r.stxt)}</span></span>
+      </div>`).join("");
+    return `<div class="ar-live ${n ? "" : "empty"}" id="arLiveBoard">
+      <div class="ar-live-head">
+        <span class="ar-live-badge"><span class="ar-live-dot ${live > 0 ? "live" : "off"}"></span>Live</span>
+        <span class="ar-live-count">${countHTML}</span>
+        ${freshHTML ? `<span class="ar-live-fresh">${freshHTML}</span>` : ""}
+      </div>
+      ${n ? `<div class="ar-live-rows">${rowsHTML}</div>`
+          : `<div class="ar-live-empty">Nothing connected yet — <b>add a login below</b> and it comes online here, with a live status you can watch.</div>`}
+    </div>`;
+  }
+
+  // Keep the board alive: in cloud mode (real server freshness) re-query status every
+  // 30s and repaint ONLY the board — timestamps tick, dots flip — without disturbing a
+  // half-typed credential. One interval; pauses when the panel is hidden/collapsed or a
+  // field is focused. Device mode has no server clock, so no tick (the board is static).
+  let _arLiveTick = null;
+  function _arStartLiveTick(){
+    if(_arLiveTick){ clearInterval(_arLiveTick); _arLiveTick = null; }
+    if(_arGetMode() !== "cloud") return;
+    _arLiveTick = setInterval(async () => {
+      const board = document.getElementById("arLiveBoard");
+      if(!board){ clearInterval(_arLiveTick); _arLiveTick = null; return; }
+      const body = document.getElementById("arBody");
+      if(location.hash !== "#account" || (body && body.classList.contains("ar-collapsed"))) return;
+      const ae = document.activeElement;
+      if(ae && ae.closest && ae.closest(".ar-fields")) return;
+      const cs = await cloudOp("status");
+      if(!cs || !cs.ok) return;
+      const cur = document.getElementById("arLiveBoard");
+      if(!cur) return;
+      const catalog = await loadUtilCatalog();
+      cur.outerHTML = buildLiveBoardHTML(cloudStatusToShape(cs), "cloud", catalog);
+    }, 30000);
+  }
+
   // Auto-refresh is the heart of the service, so it leads the Master Account tab as its
   // own full-width panel (Ford 2026-07-10) — not a cramped 2-column acct-row that left the
   // label column empty. Header states the value + privacy; the body lays the portals out in
@@ -5100,6 +5184,7 @@
     };
 
     listEl.innerHTML = `
+      ${buildLiveBoardHTML(status, mode, catalog)}
       ${mode === "cloud" ? _arConsentHTML() + _arCloudWarnHTML() : ""}
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
@@ -5259,6 +5344,9 @@
       searchEl.addEventListener("input", renderResults);
       renderResults();
     }
+
+    // Keep the board's freshness ticking while it's on screen (cloud mode).
+    _arStartLiveTick();
   }
 
   /* ---- Password row: view (masked + show-as-you-type) and set/change it.

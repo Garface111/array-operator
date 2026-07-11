@@ -40,6 +40,14 @@ html[data-theme="day"]{
   --warn:#d97706;          /* amber-600 — reads on light */
   --bad:#dc2626;           /* red-600 — reads on light */
 
+  /* ---- Auto-refresh vault signature (day) ---- */
+  --ao-oct:#7c3aed;        /* violet-600 — octarine, reads bold on white */
+  --ao-oct-soft:rgba(124,58,237,.09);
+  --ao-oct-line:rgba(124,58,237,.30);
+  --ao-live:#16a34a;       /* green-600 — the "working" dot (NOT the blue --good) */
+  --ao-live-glow:rgba(22,163,74,.5);
+  --ao-live-ink:#0f9d58;   /* readable green for status text on white */
+
   /* ---- lines + cards ---- */
   --line:#e2e8f0;          /* slate-200 hairline */
   --card:#ffffff;          /* white card */
