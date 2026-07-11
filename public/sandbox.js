@@ -4943,6 +4943,25 @@
         try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
       });
     }
+    // Arrived from onboarding's "skip for now" (cloud path, no logins added yet) —
+    // open, scroll to, and flash the Auto-refresh panel so they land exactly where
+    // credentials get added (Ford 2026-07-11). One-shot; strips the param after.
+    try{
+      const _sp = new URLSearchParams(location.search);
+      if(_sp.get("setup") === "autorefresh" && !window._arSetupHandled){
+        window._arSetupHandled = true;
+        const _row = document.getElementById("rowAutoRefresh");
+        const _body = document.getElementById("arBody");
+        if(_body) _body.classList.remove("ar-collapsed");   // ensure expanded
+        if(_row){
+          setTimeout(() => { _row.scrollIntoView({ behavior:"smooth", block:"start" }); }, 60);
+          _row.classList.add("ar-flash");
+          setTimeout(() => _row.classList.remove("ar-flash"), 2600);
+        }
+        _sp.delete("setup");
+        history.replaceState(null, "", location.pathname + (_sp.toString() ? "?"+_sp.toString() : "") + location.hash);
+      }
+    }catch(e){}
     const listEl = document.getElementById("arList");
     if(!listEl) return;
     // Mode: on-device (extension vault) vs hands-off cloud (server-side harvest).

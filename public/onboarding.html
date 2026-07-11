@@ -1184,7 +1184,13 @@ async function wireCloudVault(){
   }
 }
 
-function cloudFinish(){
+function cloudFinish(skipped){
+  // "Skip for now" (no logins added): don't strand them on a done screen — send
+  // them STRAIGHT to Master Account → Auto-refresh, flagged so it opens + flashes,
+  // so they actually land where credentials get added (Ford 2026-07-11). The
+  // account/trial is already live (created at the email step). Finishing WITH
+  // logins → the normal cloud done screen (arrays are already on the way).
+  if(skipped){ window.location.assign(`/?fresh=1&setup=autorefresh#account`); return; }
   state.cloudMode = true;
   go(3);
   burst();
