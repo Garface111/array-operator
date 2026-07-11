@@ -186,8 +186,10 @@
   .cv-stat{font-size:.74rem;margin:.15rem 0 .35rem;font-weight:600}
   .cv-stat.ok{color:var(--good)} .cv-stat.err{color:var(--warn)}
   .cv-fields{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-  .cv-fields input{margin-top:0;width:auto;flex:1 1 11rem}
-  .cv-actions{display:flex;gap:.4rem;flex:0 0 auto}
+  .cv-fields input{margin-top:0;width:auto;flex:1 1 11rem;min-width:0}
+  /* actions wrap to their own line so username + password get the full row width
+     (no truncated placeholders) */
+  .cv-actions{display:flex;gap:.4rem;flex:1 1 100%;margin-top:.1rem}
   .cv-actions .btn{padding:.55rem .9rem;font-size:.82rem}
   .cv-addutil{margin-top:.75rem}
   .cv-addutil-btn{background:none;border:1px dashed var(--line);color:var(--good);border-radius:10px;padding:.5rem .85rem;font:inherit;font-size:.82rem;font-weight:650;cursor:pointer}
@@ -1050,7 +1052,7 @@ async function wireCloudVault(){
       ${statLine}
       <div class="cv-fields">
         <input class="cv-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph||'Portal username / email')}">
-        <input class="cv-pass" type="password" autocomplete="off" placeholder="${hasCreds?'•••••••• (saved — type to replace)':'Portal password'}">
+        <input class="cv-pass" type="password" autocomplete="off" placeholder="${hasCreds?'saved — type to replace':'Portal password'}">
         <div class="cv-actions">
           <button class="btn btn-primary cv-save" type="button">${hasCreds?'Save':(addLabel||'Save')}</button>
           ${hasCreds ? `<button class="btn btn-ghost cv-clear" type="button">Remove</button>` : ""}
