@@ -4788,6 +4788,13 @@
       <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
     </label>`;
   }
+  function _arCloudWarnHTML(){
+    return `<div class="ar-cloud-warn">⚠ <b>Heads up:</b> because we sign in from our servers,
+      your provider (Google, or the portal itself) may send a one-time
+      &ldquo;suspicious sign-in&rdquo; security alert the first time. That&rsquo;s expected — it&rsquo;s
+      us signing in on your behalf, and it&rsquo;s safe to approve. Prefer no alerts? Use
+      <b>&ldquo;Keep it on my computer&rdquo;</b> instead.</div>`;
+  }
   function _arWireConsent(){
     const chk = document.getElementById("arConsentChk");
     if(chk && !chk._wired){
@@ -5038,7 +5045,7 @@
     };
 
     listEl.innerHTML = `
-      ${mode === "cloud" ? _arConsentHTML() : ""}
+      ${mode === "cloud" ? _arConsentHTML() + _arCloudWarnHTML() : ""}
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old." : "Live production, refreshed automatically every few minutes."}</span></div>
         ${AR_INVERTERS.map(v => {

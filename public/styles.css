@@ -221,6 +221,10 @@
   .ar-cloud-stat.err{color:#b45309}
   .ar-save.ar-saved-ok{background:#047857 !important;border-color:#047857 !important;color:#fff !important}
   .ar-save.ar-save-err{background:#b45309 !important;border-color:#b45309 !important;color:#fff !important}
+  /* Cloud-mode heads-up: automated sign-ins may trigger a provider security alert. */
+  .ar-cloud-warn{font-size:11.5px;line-height:1.5;color:var(--muted,#64748b);background:rgba(180,83,9,.06);
+    border:1px solid rgba(180,83,9,.22);border-radius:11px;padding:10px 13px;margin:0 0 14px}
+  .ar-cloud-warn b{color:#b45309}
   .ar-panel-stat{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 10px;border-radius:999px;color:var(--faint)}
   .ar-panel-stat.on{color:#047857;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.30)}
   .ar-panel .ar-body{margin-top:17px;cursor:default}
