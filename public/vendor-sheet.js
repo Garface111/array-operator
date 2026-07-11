@@ -67,34 +67,39 @@
     list.forEach(c => { cap += _arrCapW(c); p += _arrPowW(c); });
     return _frac(p, cap);
   }
-  // The shared red→amber→green scale gradient — injected once per render (referenced by
-  // every gauge via url(#vsGaugeArc); objectBoundingBox maps it across each gauge's arc).
-  const GAUGE_DEFS = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">' +
-    '<defs><linearGradient id="vsGaugeArc" x1="0" y1="0" x2="1" y2="0">' +
-    '<stop offset="0" stop-color="#ef4444"/><stop offset="0.5" stop-color="#f59e0b"/>' +
-    '<stop offset="1" stop-color="#22c55e"/></linearGradient></defs></svg>';
   function gauge(frac, opts) {
     opts = opts || {};
     if (frac == null) return `<span class="vs-gauge vs-gauge-empty" title="No nameplate on file — can't gauge output"></span>`;
     const f = Math.max(0, Math.min(1, frac));
     const pct = Math.round(f * 100);
-    const cx = 50, cy = 47, r = 39;
+    const cx = 50, cy = 46, r = 38;
     const ang = Math.PI * (1 - f);                     // 0% → π (left), 100% → 0 (right)
     const dx = Math.cos(ang), dy = -Math.sin(ang);     // needle direction (SVG y points down)
     const px = -dy, py = dx;                            // perpendicular, for the needle base
-    const len = r - 4, hb = 3;
+    const len = r - 2.5, hb = 2.7;
     const tx = cx + len * dx, ty = cy + len * dy;
     const ax = cx + hb * px, ay = cy + hb * py;
     const bx = cx - hb * px, by = cy - hb * py;
     const zc = f >= 0.66 ? "#16a34a" : f >= 0.33 ? "#d97706" : "#dc2626";
     const idle = opts.idle ? " vs-gauge-idle" : "";
     const title = (opts.label ? opts.label + " · " : "") + pct + "% of nameplate output";
+    const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
+    // The arc has pathLength 100, so the FILLED portion is just the first `f×100` units —
+    // the colored energy fills from the left (0%) up to the needle; the rest stays a faint
+    // empty track. On first paint it sweeps up from empty (fill + needle animate together).
+    const off = (100 * (1 - f)).toFixed(2);            // dash offset that reveals fraction f
+    const anim = opts.animate;
+    const ease = `dur="0.9s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.16 1 0.3 1"`;
+    const fillAnim = anim ? `<animate attributeName="stroke-dashoffset" from="100" to="${off}" ${ease}/>` : "";
+    const needleAnim = anim ? `<animateTransform attributeName="transform" type="rotate" from="${(-f * 180).toFixed(1)} ${cx} ${cy}" to="0 ${cx} ${cy}" ${ease}/>` : "";
     return `<span class="vs-gauge${idle}" title="${esc(title)}">` +
-      `<svg viewBox="0 0 100 54" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}">` +
-      `<path class="vs-gg-track" d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="url(#vsGaugeArc)" stroke-width="7" stroke-linecap="round"/>` +
-      `<polygon class="vs-gg-needle" points="${ax.toFixed(1)},${ay.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}" fill="${zc}"/>` +
-      `<circle cx="${cx}" cy="${cy}" r="4.4" fill="${zc}"/><circle cx="${cx}" cy="${cy}" r="1.8" fill="#fff"/>` +
-      `</svg></span>`;
+      `<svg viewBox="0 0 100 52" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}">` +
+      `<path class="vs-gg-track" d="${arc}" fill="none" stroke-width="7" stroke-linecap="round"/>` +
+      `<path class="vs-gg-fill" d="${arc}" fill="none" stroke="${zc}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${anim ? 100 : off}">${fillAnim}</path>` +
+      `<g class="vs-gg-nwrap">${needleAnim}` +
+        `<polygon class="vs-gg-needle" points="${ax.toFixed(1)},${ay.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}" fill="${zc}"/>` +
+        `<circle cx="${cx}" cy="${cy}" r="4" fill="${zc}"/><circle cx="${cx}" cy="${cy}" r="1.6" fill="#fff"/>` +
+      `</g></svg></span>`;
   }
   const ALLOC_TIP = v =>
     `${vlabel(v)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.`;
@@ -419,6 +424,7 @@
                                                // (Ford: "I have 56 arrays in Chint, I should be able to
                                                // click next to Chint and collapse all of them")
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
+  let _gaugeAnimated = false;                 // gauges sweep up once on first paint, then render static
   let _query = "";                            // search filter (lowercased)
 
   // Shared y-scale + per-day neighbor average for one array's inverter cohort, so the
@@ -805,7 +811,9 @@
     const byVendor = {};
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
-    let h = GAUGE_DEFS;
+    let h = "";
+    const _animGauge = !_gaugeAnimated;         // only the first paint sweeps — interactions render static
+    _gaugeAnimated = true;
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
@@ -853,7 +861,7 @@
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}
             <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
           <span class="vs-c-vendor">${lagChip}</span>
-          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet" })}</span>
+          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", animate: _animGauge })}</span>
           <span class="vs-c-inv">${nInv}</span>
           <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
           <span class="vs-c-today">${kwh0(vTodayTot)}</span>
@@ -875,7 +883,7 @@
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
-          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array") })}</span>
+          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), animate: _animGauge })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
@@ -934,7 +942,7 @@
                     ${_sub ? `<span class="vs-inv-sub">${_sub}</span>` : ""}
                   </span>
                 </div>
-                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm) })}</div>
+                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), animate: _animGauge })}</div>
                 <div class="vs-inv-spwrap">${_spark}</div>
                 <div class="vs-inv-metrics">
                   <span class="vs-inv-metric"${_liveTip}><b class="${stale ? "vs-stale" : ""}">${_live}</b><i>live</i></span>
