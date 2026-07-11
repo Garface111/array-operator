@@ -4727,12 +4727,14 @@
       const code = (c.provider || "").toLowerCase();
       const isInv = AR_INVERTER_IDS.has(code);
       const uKey = (c.username || "").toLowerCase();
-      let slot;
-      if(isInv){ slot = code; }
-      else { slot = seen[code] ? (code + "::" + uKey) : code; seen[code] = true; }
+      // Slot EVERY provider's 2nd+ login under "code::username" — inverters too
+      // (Ford 2026-07-10: link N SMA/Fronius/Chint accounts under one master).
+      // The backend already stores N per (provider, username); this stops the
+      // inverter rows collapsing onto one bare-code slot.
+      const slot = seen[code] ? (code + "::" + uKey) : code; seen[code] = true;
       shape[slot] = {
         hasCreds: true, enabled: c.enabled !== false, username: c.username || "",
-        utility: !isInv, code: code, host: c.login_host || "",
+        utility: !isInv, inverter: isInv, code: code, host: c.login_host || "",
         // extra cloud-only health, surfaced by the card as a freshness hint
         _cloudOk: c.last_harvest_ok, _cloudAt: c.last_harvest_at, _cloudFails: c.harvest_fails || 0,
       };
@@ -5017,6 +5019,18 @@
       const code = s.code || k;
       (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails });
     });
+    // Same grouping for INVERTER logins so a vendor card can list N logins (Ford
+    // 2026-07-10). Only cloud mode reports slotted inverter entries; on-device
+    // (extension) mode still returns one bare-code inverter entry (single login
+    // until the extension supports slots), so invByCode is empty there and the
+    // inverter section falls back to the single-row render below.
+    const invByCode = {};           // code -> [{ slot, username, enabled }]
+    Object.keys(status).forEach(k => {
+      const s = status[k];
+      if(!s || !s.inverter || !s.hasCreds) return;
+      const code = s.code || k;
+      (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails });
+    });
     // Which utilities to show as cards: GMP (common default) + every one with a
     // saved login + anything the operator just picked from the catalog this session.
     const shownCodes = [];
@@ -5044,17 +5058,40 @@
       </div>`;
     };
 
+    // An inverter-vendor card with N logins + an "add another" row — the same
+    // multi-login UX as utilities (Ford 2026-07-10: 10 SMA accounts under one
+    // master). Cloud mode only; each saved login is its own username-keyed row,
+    // and one login already covers all plants under that portal account.
+    const invCard = (v) => {
+      const logins = invByCode[v.id] || [];
+      const savedRows = logins.map(l => credRow({
+        key: l.slot, saveCode: v.id, label: "", ph: "username / email",
+        hasCreds: true, enabled: l.enabled, prefillUser: l.username,
+        cloudStat: { ok: l.ok, at: l.at, fails: l.fails },
+      })).join("");
+      const addRow = credRow({
+        key: v.id + "::__new__", saveCode: v.id, label: "",
+        ph: logins.length ? "another username / email" : v.ph,
+        hasCreds: false, addLabel: logins.length ? "Add login" : "Save",
+      });
+      return `<div class="ar-util" data-code="${esc(v.id)}">
+        <div class="ar-util-name">${esc(v.label)}</div>
+        ${savedRows}${addRow}
+      </div>`;
+    };
+
     listEl.innerHTML = `
       ${mode === "cloud" ? _arConsentHTML() + _arCloudWarnHTML() : ""}
       <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old." : "Live production, refreshed automatically every few minutes."}</span></div>
-        ${AR_INVERTERS.map(v => {
-          const st = status[v.id] || { hasCreds:false, enabled:true };
-          // Show the saved username (Ford 2026-07-10) so a login saved in the extension
-          // popup reads as clearly present here, not a blank row. Needs the extension's
-          // status() to return `username` for inverters (v1.9.120+); harmless before then.
-          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails } });
-        }).join("")}
+        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
+        ${mode === "cloud"
+          ? AR_INVERTERS.map(invCard).join("")
+          : AR_INVERTERS.map(v => {
+              const st = status[v.id] || { hasCreds:false, enabled:true };
+              // Device (extension) mode: single login per vendor. Show the saved
+              // username so a login saved in the extension popup reads as present.
+              return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails } });
+            }).join("")}
       </div>
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
@@ -5072,8 +5109,9 @@
     const statEl = document.getElementById("arPanelStat");
     if(statEl){
       let on = 0;
-      AR_INVERTERS.forEach(v => { const s = status[v.id]; if(s && s.hasCreds && s.enabled !== false) on++; });
-      Object.keys(status).forEach(k => { const s = status[k]; if(s && s.utility && s.hasCreds && s.enabled !== false) on++; });
+      // Count every saved + enabled login (each is a refreshing portal) — one loop
+      // now that inverters are slotted like utilities in cloud mode.
+      Object.keys(status).forEach(k => { const s = status[k]; if(s && s.hasCreds && s.enabled !== false) on++; });
       statEl.textContent = on ? `${on} portal${on === 1 ? "" : "s"} refreshing` : "";
       statEl.className = "ar-panel-stat" + (on ? " on" : "");
     }
