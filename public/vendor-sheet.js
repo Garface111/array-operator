@@ -307,10 +307,11 @@
   function syncFreshness(c) {
     const src = _ageMin(c), syn = _syncAgeMin(c);
     if (src != null && src < _liveWindowMin(c)) return "live";        // the source data itself is current
-    // Source is STALE → tell the source-data truth (matches the card), never "synced now".
+    // Source is STALE → show the SOURCE-data age, but framed as "the latest reading
+    // WE pulled" (we sync every few minutes; the age is the vendor's own publish gap,
+    // not our lag), never "synced now". e.g. "latest data 21h ago".
     if (isStale(c)) {
-      const v = vlabel(c.vendor);
-      return v + " " + _fmtAgeShort(src) + " old";                    // e.g. "SMA 21h old"
+      return "latest data " + _fmtAgeShort(src) + " ago";
     }
     if (syn != null) return syn < 1 ? "synced now" : "synced " + _fmtAgeShort(syn);  // our capture recency (updates every sync)
     if (src != null) return _fmtAgeShort(src) + " ago";              // legacy rows without a sync clock
@@ -323,13 +324,12 @@
     // matching the card) so the tooltip can't read as "all fresh" either. Our capture
     // recency follows as the secondary "we did check recently" reassurance.
     if (src != null && src >= _liveWindowMin(c)) {
-      parts.push("The " + v + " portal's own data is from " + _fmtAge(src)
-        + (c.is_daylight === false ? " — it pauses overnight while the panels aren't producing." : "."));
-      if (syn != null) parts.push("(We last checked for new data " + _fmtAge(syn) + ".)");
+      parts.push((syn != null ? "We're syncing this every few minutes — but the " : "The ")
+        + v + " portal's own data hasn't updated since " + _fmtAge(src)
+        + (c.is_daylight === false ? "; it pauses overnight while the panels aren't producing." : "."));
       return parts.join(" ");
     }
-    if (syn != null) parts.push("We last synced this array " + _fmtAge(syn) + ".");
-    if (src != null) parts.push("The " + v + " data is live.");
+    parts.push("The " + v + " data is live" + (syn != null ? " — synced " + _fmtAge(syn) : "") + ".");
     return parts.join(" ");
   }
   // Vendor-GROUP sync summary for the collapsed header row (Ford: "the vendor was
@@ -350,11 +350,12 @@
       // reads "…is 21h old", not "…is 21h ago old".
       const longAge = _fmtAge(oldestSrc).replace(/ ago$/, "");
       return {
-        text: "Source " + _fmtAgeShort(oldestSrc) + " old",
+        text: "latest data " + _fmtAgeShort(oldestSrc) + " ago",
         stale: true,
         title: (list.length > 1
-          ? n + " of these " + list.length + " arrays have stale source data — oldest is "
-          : "This array's source data is ") + longAge + " old.",
+          ? "We sync these every few minutes — but the " + n + " of " + list.length
+            + " arrays' own portals haven't published new readings; the oldest is "
+          : "We sync this every few minutes — the latest reading its portal has published is ") + longAge + " old.",
       };
     }
     const ages = list.map(_syncAgeMin).filter(a => a != null);
@@ -395,7 +396,11 @@
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
   // recapture alarms — surfaced so owners know how far behind real time a reading
   // can be. Chint recaptures every ~4 min; Fronius/SMA every ~6 min.
-  const CADENCE_MIN = { chint: 4, fronius: 6, sma: 6 };
+  // A vendor's own publish cadence — how often ITS inverters push new readings to
+  // its portal. The live window is 2x this: within it, the data is as fresh as that
+  // vendor gets, so we call it "live". Fronius/Solar.web lags most (some systems push
+  // only every ~15-18 min), so a tight window made a healthy Fronius array read stale.
+  const CADENCE_MIN = { chint: 4, fronius: 15, sma: 6 };
 
   // Each vendor's monitoring portal — clicking the vendor name opens it (via the
   // extension when present, so opening it also arms a fresh capture; else a new tab).
