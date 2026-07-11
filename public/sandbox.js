@@ -4769,6 +4769,35 @@
     }
   }
 
+  // Explicit opt-in consent gate for cloud mode: no password is stored on our
+  // servers until the owner ticks this box (mirrored by the backend, which 422s a
+  // password save without consent=true). Persisted so it stays ticked.
+  const AR_CONSENT_KEY = "ao_cc_consent";
+  function _arConsentOk(){
+    const chk = document.getElementById("arConsentChk");
+    if(chk) return chk.checked;
+    try { return localStorage.getItem(AR_CONSENT_KEY) === "1"; } catch(e){ return false; }
+  }
+  function _arConsentHTML(){
+    let saved = false; try { saved = localStorage.getItem(AR_CONSENT_KEY) === "1"; } catch(e){}
+    return `<label class="ar-consent" id="arConsent">
+      <input type="checkbox" id="arConsentChk" ${saved ? "checked" : ""}>
+      <span>I authorize EnergyAgent to securely store my portal passwords on its servers and sign in
+      on my behalf to keep my data fresh. I agree to the
+      <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and
+      <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+    </label>`;
+  }
+  function _arWireConsent(){
+    const chk = document.getElementById("arConsentChk");
+    if(chk && !chk._wired){
+      chk._wired = true;
+      chk.addEventListener("change", () => {
+        try { localStorage.setItem(AR_CONSENT_KEY, chk.checked ? "1" : "0"); } catch(e){}
+      });
+    }
+  }
+
   // Extension v1.9.109+: a page-initiated credential save waits for a one-click
   // confirm in the extension popup. Watch the vault until that vendor's creds
   // appear (the owner confirmed), then re-render so the row flips to "On" live —
@@ -4876,10 +4905,10 @@
           <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
           <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
           <div class="ar-mode" id="arMode" role="tablist" aria-label="How we keep your data fresh">
-            <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
-              <b>On this device</b><span>Free browser helper. Refreshes while a tab is open.</span></button>
             <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
-              <b>Credential Vault</b><span>Logins stored on our servers. We refresh 24/7 — no tab needed.</span></button>
+              <b>Store it with us — live data</b><span>We keep your passwords secure and refresh your data 24/7. No tab, no computer needed.</span></button>
+            <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
+              <b>Keep it on my computer</b><span>Passwords stay on your device via the browser extension. Data refreshes while a tab is open.</span></button>
           </div>
         </div>
       </div>
@@ -4997,6 +5026,7 @@
     };
 
     listEl.innerHTML = `
+      ${mode === "cloud" ? _arConsentHTML() : ""}
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old." : "Live production, refreshed automatically every few minutes."}</span></div>
         ${AR_INVERTERS.map(v => {
@@ -5029,6 +5059,7 @@
       statEl.className = "ar-panel-stat" + (on ? " on" : "");
     }
 
+    _arWireConsent();
     // ── wire credential rows (inverter + utility) ──
     listEl.querySelectorAll(".ar-row").forEach(row => {
       const key = row.dataset.key;
@@ -5047,9 +5078,18 @@
         if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
         saveBtn.textContent = "Saving…";
         if(mode === "cloud"){
-          const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost });
+          if(!_arConsentOk()){
+            saveBtn.textContent = "Check the box ↑";
+            const c = document.getElementById("arConsent");
+            if(c){ c.classList.add("ar-consent-flash"); setTimeout(()=>c.classList.remove("ar-consent-flash"), 1500); c.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+            setTimeout(()=>saveBtn.textContent=savedLabel, 1800);
+            return;
+          }
+          const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost, consent: true });
           passEl.value = "";
-          saveBtn.textContent = r.ok ? "✓ Saved" : (r.error === "http_403" ? "Not enabled yet" : "Failed");
+          saveBtn.textContent = r.ok ? "✓ Saved"
+            : (r.error === "http_403" ? "Not enabled yet"
+            : r.error === "http_422" ? "Consent needed" : "Failed");
           setTimeout(() => { wireAutoRefreshRow(); }, 800);
           return;
         }
