@@ -822,11 +822,13 @@ function forkScreen(){
 
 function chooseDevice(){
   state.connect = "device"; state.cloudMode = false;
+  renderStepper();                                                 // keep step labels in sync with the path
   if (EXT_PRESENT && !state.syncMode){ startSyncAll(); return; }   // helper already here → straight to the sync
   render();                                                        // else the "add the helper" screen
 }
 function backToFork(){
   state.connect = "fork"; state.cloudMode = false; state.gmpPath = false;
+  renderStepper();
   render();
 }
 
@@ -835,7 +837,8 @@ function backToFork(){
 // contract as the dashboard's Auto-refresh panel (POST /v1/cloud-capture/*). ──
 function chooseCloud(){
   state.connect = "cloud"; state.cloudMode = true;
-  render();   // step 1 → cloudEmailScreen
+  renderStepper();   // step-3 label flips to "Your logins" immediately
+  render();          // step 1 → cloudEmailScreen
 }
 
 function derivedNameFromEmail(email){
@@ -1222,7 +1225,11 @@ const stepper = document.getElementById("stepper");
 const main = document.getElementById("main");
 
 function renderStepper(){
-  stepper.innerHTML = STEPS.map((label,i)=>{
+  // Per-path step-3 label: the cloud path's third step is "Add your portal logins",
+  // not the extension path's "Your arrays" preview (Ford 2026-07-11 polish).
+  const labels = STEPS.slice();
+  if(state.cloudMode) labels[2] = "Your logins";
+  stepper.innerHTML = labels.map((label,i)=>{
     const cls = i===step ? "active" : i<step ? "done" : "todo";
     const seg = i<STEPS.length-1 ? `<span class="seg"></span>` : "";
     return `<li class="step"><div class="pill ${cls}"><span class="n">${i+1}</span><span class="lbl">${label}</span></div>${seg}</li>`;
