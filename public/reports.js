@@ -5075,6 +5075,21 @@
       else { n = 0; for (const c of String(key || "")) n = (n * 31 + c.charCodeAt(0)) >>> 0; }
       return ((n % GRP_TONES) + GRP_TONES) % GRP_TONES;
     };
+    // Per-utility provider colour (Ford 2026-07-11): the provider bar used to be a
+    // fixed emerald for everyone — "the VEC, that should be blue, not green. Green
+    // Mountain Power is green … we need to be prepared for all of them." Known
+    // utilities are pinned to a hue; any of the ~1,600 others gets a stable colour
+    // hashed from its code, so every utility reads apart without a hand-picked entry.
+    const PROV_HUE = { gmp: "#059669", vec: "#2563eb", wec: "#7c3aed", cvps: "#0891b2",
+                       gmcs: "#059669", bed: "#db2777", vppsa: "#d97706" };
+    const PROV_PALETTE = ["#2563eb", "#7c3aed", "#0891b2", "#db2777", "#d97706",
+                          "#0d9488", "#4f46e5", "#c026d3"];
+    const provHue = (code) => {
+      const k = String(code || "").toLowerCase();
+      if (PROV_HUE[k]) return PROV_HUE[k];
+      let n = 0; for (const c of k) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+      return PROV_PALETTE[n % PROV_PALETTE.length];
+    };
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
     const acctGroupHTML = (g) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
@@ -5087,8 +5102,13 @@
         ? `<button type="button" class="rb-grp-add" data-grpadd="${esc(grpArrayId)}"
              title="Add an offtaker to ${esc(g.label)}">＋ Add offtaker</button>`
         : "";
+      // Only tint a group that holds 2+ offtakers (Ford 2026-07-11): "when there's
+      // less than two off takers, there should be no color for the off taker. It just
+      // looks a little weird right now." A lone offtaker has nothing to be told apart
+      // from, so it renders on the plain background — no tint, no tone.
+      const tinted = g.rows.length >= 2;
       return `
-        <div class="rb-grp rb-grp-tinted${collapsed ? " collapsed" : ""}" data-grp-tone="${grpToneIndex(g.key)}">
+        <div class="rb-grp${tinted ? " rb-grp-tinted" : ""}${collapsed ? " collapsed" : ""}"${tinted ? ` data-grp-tone="${grpToneIndex(g.key)}"` : ""}>
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
                aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers ${g.shareMode === "array" ? "in this array" : "on this utility bill"}">
             <span class="rb-grp-caret" aria-hidden="true">▾</span>
@@ -5149,6 +5169,7 @@
         return `
           <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
             <div class="rb-prov-head" data-provcollapse="${esc(pv.key)}" role="button" tabindex="0"
+                 style="border-left-color:${provHue(pv.provider)}"
                  aria-expanded="${!pCollapsed}" title="${pCollapsed ? "Expand" : "Collapse"} all ${esc(pv.providerLabel)} utility accounts">
               <span class="rb-prov-caret" aria-hidden="true">▾</span>
               <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
