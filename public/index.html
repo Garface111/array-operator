@@ -397,10 +397,27 @@
       meta.textContent = "Couldn't load the latest updates right now — see the sources below.";
     });
   }
+  // New England edition (2026-07-10): the state picker / per-state reference / location-
+  // filtered news all live in the shared resources.js (window.AOResources) so this panel and
+  // the standalone page render identically. We inject resources.html's SHELL (.wrap, scripts
+  // stripped), then load resources.js and mount() into #rsHost. mount() re-renders + refreshes
+  // the feed on every open.
   window.__aoLoadResources = function(){
     var host = document.getElementById("rsHost");
     if(!host) return;
-    if(LOADED){ loadFeed(); return; }
+    function fail(){ host.innerHTML = '<div class="ao-res-error">Couldn’t load the briefing right now. ' +
+      '<a href="/resources.html" target="_blank" rel="noopener">Open it in a new tab ↗</a></div>'; }
+    function mount(){ if(window.AOResources && host.querySelector("#resApp")){ window.AOResources.mount(host); } }
+    function ensureJsThenMount(){
+      if(window.AOResources){ mount(); return; }
+      var ex = document.getElementById("aoResourcesJs");
+      if(ex){ ex.addEventListener("load", mount); return; }
+      var s = document.createElement("script");
+      s.id = "aoResourcesJs"; s.src = "/resources.js?v=20260710b";
+      s.onload = mount; s.onerror = fail;
+      document.head.appendChild(s);
+    }
+    if(LOADED){ ensureJsThenMount(); return; }
     fetch("/resources.html?cb=" + Date.now()).then(function(r){ return r.text(); }).then(function(html){
       var doc = new DOMParser().parseFromString(html, "text/html");
       var wrap = doc.querySelector(".wrap");
@@ -410,11 +427,8 @@
       host.innerHTML = "";
       host.appendChild(document.importNode(wrap, true));
       LOADED = true;
-      loadFeed();
-    }).catch(function(){
-      host.innerHTML = '<div class="ao-res-error">Couldn’t load the briefing right now. ' +
-        '<a href="/resources.html" target="_blank" rel="noopener">Open it in a new tab ↗</a></div>';
-    });
+      ensureJsThenMount();
+    }).catch(fail);
   };
 })();
 </script>
