@@ -2183,6 +2183,16 @@ html[data-theme="day"] .rep-fld.req > select{
 .vs-gg-fill{ filter:drop-shadow(0 .5px .6px rgba(15,23,42,.12)); }
 .vs-gg-needle{ stroke:var(--card,#fff); stroke-width:.4; }
 .vs-gauge-idle{ filter:grayscale(1); opacity:.42; }   /* resting (not daylight) — don't alarm */
+/* Entrance sweep: the fill rises from empty and the needle swings up from the left to its
+   value — once, when the sheet first scrolls into view (JS toggles .vs-sweep on #vsBody). */
+@keyframes vsGgFill{ from{ stroke-dashoffset:100; } }
+@keyframes vsGgNeedle{ from{ transform:rotate(var(--gg-rot,0deg)); } }
+.vs-sweep .vs-gg-fill{ animation:vsGgFill .95s cubic-bezier(.16,1,.3,1) both; }
+.vs-sweep .vs-gg-nwrap{ animation:vsGgNeedle .95s cubic-bezier(.16,1,.3,1) both;
+  transform-box:view-box; transform-origin:50px 46px; }
+@media (prefers-reduced-motion: reduce){
+  .vs-sweep .vs-gg-fill, .vs-sweep .vs-gg-nwrap{ animation:none; }
+}
 .vs-colhead{ font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
   color:var(--faint); background:var(--bg2,#eef2f7); border-bottom:1px solid var(--line);
   position:sticky; top:0; z-index:5; }

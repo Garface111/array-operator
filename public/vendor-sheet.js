@@ -86,17 +86,15 @@
     const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
     // The arc has pathLength 100, so the FILLED portion is just the first `f×100` units —
     // the colored energy fills from the left (0%) up to the needle; the rest stays a faint
-    // empty track. On first paint it sweeps up from empty (fill + needle animate together).
+    // empty track. The static offset below is the resting state; when the sheet scrolls into
+    // view a `.vs-sweep` class animates the fill up from empty (0→off) and the needle from
+    // the left (--gg-rot) to its value, so the dial "fills with energy" right as you look.
     const off = (100 * (1 - f)).toFixed(2);            // dash offset that reveals fraction f
-    const anim = opts.animate;
-    const ease = `dur="0.9s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.16 1 0.3 1"`;
-    const fillAnim = anim ? `<animate attributeName="stroke-dashoffset" from="100" to="${off}" ${ease}/>` : "";
-    const needleAnim = anim ? `<animateTransform attributeName="transform" type="rotate" from="${(-f * 180).toFixed(1)} ${cx} ${cy}" to="0 ${cx} ${cy}" ${ease}/>` : "";
     return `<span class="vs-gauge${idle}" title="${esc(title)}">` +
       `<svg viewBox="0 0 100 52" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}">` +
       `<path class="vs-gg-track" d="${arc}" fill="none" stroke-width="7" stroke-linecap="round"/>` +
-      `<path class="vs-gg-fill" d="${arc}" fill="none" stroke="${zc}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${anim ? 100 : off}">${fillAnim}</path>` +
-      `<g class="vs-gg-nwrap">${needleAnim}` +
+      `<path class="vs-gg-fill" d="${arc}" fill="none" stroke="${zc}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${off}"/>` +
+      `<g class="vs-gg-nwrap" style="--gg-rot:${(-f * 180).toFixed(1)}deg">` +
         `<polygon class="vs-gg-needle" points="${ax.toFixed(1)},${ay.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}" fill="${zc}"/>` +
         `<circle cx="${cx}" cy="${cy}" r="4" fill="${zc}"/><circle cx="${cx}" cy="${cy}" r="1.6" fill="#fff"/>` +
       `</g></svg></span>`;
@@ -424,7 +422,7 @@
                                                // (Ford: "I have 56 arrays in Chint, I should be able to
                                                // click next to Chint and collapse all of them")
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
-  let _gaugeAnimated = false;                 // gauges sweep up once on first paint, then render static
+  let _sweepArmed = false;                     // one-shot: gauges sweep up when the sheet scrolls into view
   let _query = "";                            // search filter (lowercased)
 
   // Shared y-scale + per-day neighbor average for one array's inverter cohort, so the
@@ -760,6 +758,24 @@
     });
   }
 
+  // Play the gauge fill/needle sweep ONCE, the moment the sheet first scrolls into view —
+  // not on every re-render (that would re-sweep on each expand/refresh) and not silently on
+  // load below the fold. Respects reduced-motion. #vsBody is stable across renders, so we
+  // observe it once; the `.vs-sweep` class it toggles drives the CSS keyframes on the gauges.
+  function armGaugeSweep(body) {
+    if (_sweepArmed || !body) return;
+    _sweepArmed = true;
+    try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    const play = () => {
+      body.classList.add("vs-sweep");
+      setTimeout(() => body.classList.remove("vs-sweep"), 1300);
+    };
+    if (typeof IntersectionObserver === "undefined") { play(); return; }
+    const io = new IntersectionObserver(ents => {
+      if (ents.some(e => e.isIntersecting)) { io.disconnect(); play(); }
+    }, { threshold: 0.12 });
+    io.observe(body);
+  }
   function renderBody() {
     const body = $("#vsBody");
     if (!body || !window.FleetStore) return;
@@ -812,8 +828,6 @@
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
     let h = "";
-    const _animGauge = !_gaugeAnimated;         // only the first paint sweeps — interactions render static
-    _gaugeAnimated = true;
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
@@ -861,7 +875,7 @@
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}
             <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
           <span class="vs-c-vendor">${lagChip}</span>
-          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", animate: _animGauge })}</span>
+          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet" })}</span>
           <span class="vs-c-inv">${nInv}</span>
           <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
           <span class="vs-c-today">${kwh0(vTodayTot)}</span>
@@ -883,7 +897,7 @@
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
-          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), animate: _animGauge })}</span>
+          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array") })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
@@ -942,7 +956,7 @@
                     ${_sub ? `<span class="vs-inv-sub">${_sub}</span>` : ""}
                   </span>
                 </div>
-                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), animate: _animGauge })}</div>
+                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm) })}</div>
                 <div class="vs-inv-spwrap">${_spark}</div>
                 <div class="vs-inv-metrics">
                   <span class="vs-inv-metric"${_liveTip}><b class="${stale ? "vs-stale" : ""}">${_live}</b><i>live</i></span>
@@ -960,6 +974,7 @@
       h += `</div></div>`;   // close .vs-vgroup-rows, then .vs-vgroup
     });
     body.innerHTML = h;
+    armGaugeSweep(body);
     body.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
       const id = b.getAttribute("data-arr");
       _expanded[id] = !_expanded[id];
