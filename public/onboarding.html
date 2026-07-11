@@ -144,6 +144,61 @@
     text-shadow:0 0 24px rgba(63,214,138,.3);font-variant-numeric:tabular-nums}
   .vh-sub{color:var(--muted);font-size:.78rem;margin-top:.45rem;line-height:1.5}
 
+  /* ── data-choice fork ("your data, your choice") — two first-class cards ── */
+  .fork{margin-top:1.6rem;display:grid;gap:1rem}
+  @media(min-width:640px){.fork{grid-template-columns:1fr 1fr}}
+  .forkcard{position:relative;display:flex;flex-direction:column;gap:.5rem;text-align:left;cursor:pointer;font:inherit;color:var(--ink);
+    border:1px solid var(--line);border-radius:18px;padding:1.5rem 1.4rem;background:linear-gradient(165deg,var(--card),var(--card2));transition:.15s}
+  .forkcard:hover,.forkcard:focus-visible{border-color:var(--good);box-shadow:0 0 0 1px rgba(37,99,235,.22),0 16px 34px -20px rgba(37,99,235,.55);transform:translateY(-2px);outline:none}
+  .forkcard .fic{width:2.5rem;height:2.5rem;border-radius:13px;display:grid;place-items:center;font-size:1.25rem;
+    background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.22)}
+  .forkcard .fh{font-size:1.1rem;font-weight:720;letter-spacing:-.01em}
+  .forkcard .fs{font-size:.85rem;color:var(--muted);line-height:1.5}
+  .forkcard .fs b,.forkcard .ftrade b{color:var(--ink);font-weight:650}
+  .forkcard .ftrade{margin-top:.35rem;font-size:.75rem;color:var(--faint);line-height:1.45;border-top:1px dashed var(--line);padding-top:.6rem}
+  .forkcard .fgo{margin-top:auto;padding-top:.5rem;font-size:.85rem;font-weight:700;color:var(--good)}
+  .forkcard .fbadge{position:absolute;top:-.65rem;left:1.2rem;font-size:.6rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    background:linear-gradient(180deg,var(--good2),var(--good));color:#fff;border-radius:999px;padding:.22rem .6rem;box-shadow:0 6px 16px -4px rgba(37,99,235,.5)}
+  .forkcard .fpill{align-self:flex-start;display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:700;color:var(--good);
+    background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.22);border-radius:999px;padding:.15rem .55rem}
+
+  /* ── cloud credential vault (server-side "store it with us" logins) ── */
+  .cv-consent{display:flex;gap:.55rem;align-items:flex-start;margin-top:1.4rem;font-size:.8rem;color:var(--muted);line-height:1.5;cursor:pointer}
+  .cv-consent input{width:auto;margin-top:.15rem;flex:0 0 auto;accent-color:var(--good)}
+  .cv-consent a{color:var(--good);text-decoration:underline;text-underline-offset:2px}
+  .cv-consent.flash{animation:cvflash 1.4s}
+  @keyframes cvflash{0%,100%{color:var(--muted)}30%,70%{color:var(--bad)}}
+  .cv-warn{margin-top:.9rem;border:1px solid rgba(217,119,6,.3);background:rgba(217,119,6,.08);border-radius:12px;padding:.75rem .9rem;font-size:.76rem;color:var(--gold);line-height:1.5}
+  .cv-warn b{color:var(--ink)}
+  .cv-group{margin-top:1.6rem}
+  .cv-group-h{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+  .cv-group-s{font-size:.78rem;color:var(--muted);margin-top:.15rem;line-height:1.45}
+  .cv-portal{margin-top:.65rem;border:1px solid var(--line);border-radius:14px;padding:.85rem .95rem;background:var(--card2)}
+  .cv-portal-name{font-size:.88rem;font-weight:700;color:var(--ink)}
+  .cv-row{margin-top:.6rem}
+  .cv-row:first-of-type{margin-top:.4rem}
+  .cv-row-top{display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem}
+  .cv-badge{font-size:.66rem;font-weight:800;letter-spacing:.03em;border-radius:6px;padding:.1rem .45rem}
+  .cv-badge.on{background:rgba(37,99,235,.14);color:var(--good)}
+  .cv-badge.off{background:rgba(148,163,184,.18);color:var(--faint)}
+  .cv-switch{margin-left:auto;font-size:.72rem;color:var(--muted);display:inline-flex;align-items:center;gap:.3rem;cursor:pointer}
+  .cv-switch input{accent-color:var(--good)}
+  .cv-stat{font-size:.74rem;margin:.15rem 0 .35rem;font-weight:600}
+  .cv-stat.ok{color:var(--good)} .cv-stat.err{color:var(--warn)}
+  .cv-fields{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+  .cv-fields input{margin-top:0;width:auto;flex:1 1 11rem}
+  .cv-actions{display:flex;gap:.4rem;flex:0 0 auto}
+  .cv-actions .btn{padding:.55rem .9rem;font-size:.82rem}
+  .cv-addutil{margin-top:.75rem}
+  .cv-addutil-btn{background:none;border:1px dashed var(--line);color:var(--good);border-radius:10px;padding:.5rem .85rem;font:inherit;font-size:.82rem;font-weight:650;cursor:pointer}
+  .cv-addutil-btn:hover{border-color:var(--good)}
+  .cv-picker{margin-top:.6rem}
+  .cv-picker-results{margin-top:.5rem;display:flex;flex-direction:column;gap:.3rem;max-height:15rem;overflow:auto}
+  .cv-picker-item{text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:.5rem .7rem;font:inherit;font-size:.82rem;color:var(--ink);cursor:pointer}
+  .cv-picker-item:hover{border-color:var(--good)}
+  .cv-picker-state{color:var(--faint);font-size:.72rem;margin-left:.3rem}
+  .cv-picker-hint{font-size:.78rem;color:var(--muted);padding:.3rem 0}
+
   /* ===== DAY MODE (the only mode now) — utility-blue on cool slate ===== */
   html[data-theme="day"]{
     --bg:#f6f8fb; --bg2:#eef2f7; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
@@ -199,7 +254,7 @@ let step = 0;
 // Bump when the Terms / Privacy / authorization language materially changes; the
 // version a user accepted is persisted server-side at account creation for audit.
 const CONSENT_VERSION = "2026-06-27";
-let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"", consent:false, syncingAll:false, captures:{}, syncStatus:{} };
+let state = { name:"", email:"", password:"", vendor:"solaredge", apiKey:"", fields:{}, sites:[], onboardingToken:"", sessionToken:"", consent:false, syncingAll:false, captures:{}, syncStatus:{}, connect:"fork", cloudMode:false };
 // ── "Find all my arrays" — the one-click wow ────────────────────────────────
 // After the extension is installed, one click fans it out across EVERY
 // extension-login vendor at once. Captures ACCUMULATE (deduped) across vendors
@@ -350,8 +405,12 @@ window.addEventListener("message", (e) => {
   if (e.source !== window || e.origin !== window.location.origin) return;
   const d = e.data; if (!d || typeof d !== "object") return;
   if (d.type === "SO_EXTENSION_PRESENT" || (d.type === "SO_STATUS_ACK" && d.ok)) {
-    // Auto-sync the moment the extension installs — no button, no brand picker.
-    if (!EXT_PRESENT) { EXT_PRESENT = true; if (step === 1 && !state.syncMode) startSyncAll(); }
+    const was = EXT_PRESENT; EXT_PRESENT = true;
+    // The FORK is the first thing — never yank someone out of it because the helper
+    // happens to be installed. Only auto-sync once they've CHOSEN the on-device path.
+    if (step === 1 && state.connect === "device" && !state.syncMode) startSyncAll();
+    // If they're still on the fork, refresh it so the on-device card reads "installed".
+    else if (!was && step === 1 && state.connect === "fork") render();
   }
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "solaredge") onSolarEdgeCapture(d);
   if (d.type === "SO_CAPTURE_LANDED" && d.provider === "fronius") onReadingsCapture(d, "fronius", "Fronius Solar.web");
@@ -721,6 +780,442 @@ function startGmpPath(){
   go(2);
 }
 
+// ── The fork: "your data, your choice" ──────────────────────────────────────
+// The Connect step LEADS with a choice, not a password field. Two first-class,
+// reversible paths: store logins with us (server-side, refreshed 24/7, nothing to
+// install) or keep them on-device (the existing extension flow). Neither is
+// pre-selected — the fork itself is the first thing the owner sees.
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function forkScreen(){
+  const extReady = EXT_PRESENT;
+  return `<div class="card animate">
+    <h1>Your data, your choice.</h1>
+    <p class="lede">Two ways to bring your arrays in — pick whichever you prefer. Both are free to set up, and you can switch anytime from your dashboard.</p>
+    <div class="fork">
+      <button type="button" class="forkcard" onclick="chooseCloud()">
+        <span class="fbadge">Recommended · zero effort</span>
+        <span class="fic" aria-hidden="true">☁️</span>
+        <span class="fh">Store it with us</span>
+        <span class="fs">Hand us your portal logins once and we keep your production and bills fresh <b>around the clock</b> — nothing to install, no tab to keep open.</span>
+        <span class="ftrade">Your passwords are stored <b>encrypted on our servers</b> so we can sign in for you. Remove any login anytime.</span>
+        <span class="fgo">Set up cloud refresh →</span>
+      </button>
+      <button type="button" class="forkcard" onclick="chooseDevice()">
+        ${extReady ? `<span class="fpill">✓ Helper installed</span>` : ""}
+        <span class="fic" aria-hidden="true">💻</span>
+        <span class="fh">Keep it on my computer</span>
+        <span class="fs">Add the free EnergyAgent browser helper. Your <b>passwords never leave your device</b>; your data refreshes while a Chrome tab is open.</span>
+        <span class="ftrade">Nothing is stored on our servers. Data updates only while Chrome is running.</span>
+        <span class="fgo">${extReady ? "Find my arrays →" : "Add the helper →"}</span>
+      </button>
+    </div>
+    <p class="helper" style="margin-top:1.6rem">Not ready to connect? <b>See a real sample</b> of what Array Operator produces — a working offtaker invoice and live dashboard, no install needed. <a href="/#reports" target="_blank" rel="noopener">See a sample →</a></p>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="go(0)">← Back</button>
+      <span></span>
+    </div>
+  </div>`;
+}
+
+function chooseDevice(){
+  state.connect = "device"; state.cloudMode = false;
+  if (EXT_PRESENT && !state.syncMode){ startSyncAll(); return; }   // helper already here → straight to the sync
+  render();                                                        // else the "add the helper" screen
+}
+function backToFork(){
+  state.connect = "fork"; state.cloudMode = false; state.gmpPath = false;
+  render();
+}
+
+// ── CLOUD sub-flow: create the trial (no card), then collect portal logins that
+// the server-side harvester refreshes 24/7. Reuses the same cloud-capture vault
+// contract as the dashboard's Auto-refresh panel (POST /v1/cloud-capture/*). ──
+function chooseCloud(){
+  state.connect = "cloud"; state.cloudMode = true;
+  render();   // step 1 → cloudEmailScreen
+}
+
+function derivedNameFromEmail(email){
+  return ((email||"").split("@")[0] || "Array owner").replace(/[._-]+/g," ").trim().replace(/\b\w/g,c=>c.toUpperCase()) || "Array owner";
+}
+
+function cloudEmailScreen(){
+  return `<div class="card animate">
+    <h1>Start your free trial.</h1>
+    <p class="lede">Your email starts a free 14-day trial — no card. Next you'll add your portal logins, and we'll pull your arrays in and keep them fresh automatically. This is the <b>store-it-with-us</b> path: your logins live encrypted on our servers and we refresh your data 24/7.</p>
+    <label class="fld" id="emailFld">
+      <span class="lab">Where should we send your reports?</span>
+      <span class="hint">Your email is your login. Free 14-day trial — no card needed.</span>
+      <input type="email" id="ccEmail" placeholder="you@example.com" value="${esc(state.email||'')}" oninput="state.email=this.value;cloudEmailGate()">
+    </label>
+    <label class="fld" id="ccConsentFld" style="display:flex;gap:.55rem;align-items:flex-start;margin-top:1.1rem;cursor:pointer">
+      <input type="checkbox" id="ccConsentChk" onchange="state.consent=this.checked;cloudEmailGate()" ${state.consent?"checked":""} style="width:auto;margin-top:.15rem;flex:0 0 auto;accent-color:var(--good)">
+      <span class="hint" style="margin-top:0">I agree to the <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--good);text-decoration:underline">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--good);text-decoration:underline">Privacy Policy</a>, and I authorize EnergyAgent to <b>securely store the portal logins I add on its servers (encrypted)</b> and sign in on my behalf to keep my data fresh.</span>
+    </label>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="backToFork()">← Back</button>
+      <button class="btn btn-primary btn-lg" id="ccCreateBtn" onclick="createCloudAccount()" style="opacity:.5;pointer-events:none">Create my account →</button>
+    </div>
+  </div>`;
+}
+function cloudEmailGate(){
+  const b = document.getElementById("ccCreateBtn"); if(!b) return;
+  const chk = document.getElementById("ccConsentChk");
+  const ok = emailLooksValid(state.email) && !!(chk && chk.checked);
+  b.style.opacity = ok ? "1" : ".5"; b.style.pointerEvents = ok ? "auto" : "none";
+  clearCloudMsg();
+}
+function showCloudMsg(html, tone){
+  const anchor = document.getElementById("ccConsentFld") || document.getElementById("emailFld");
+  if(!anchor) return;
+  let el = document.getElementById("cloudMsg");
+  if(!el){ el = document.createElement("div"); el.id = "cloudMsg"; el.className = "helper"; el.setAttribute("role","alert"); el.style.marginTop = ".7rem"; anchor.insertAdjacentElement("afterend", el); }
+  el.style.color = tone==="bad" ? "var(--bad)" : "var(--warn)";
+  el.innerHTML = html;
+}
+function clearCloudMsg(){ const el = document.getElementById("cloudMsg"); if(el) el.remove(); }
+
+async function createCloudAccount(){
+  if(!emailLooksValid(state.email)){ showCloudMsg(`That email doesn't look valid — please check it (no spaces, one “@”, a real domain).`, "bad"); const em=document.getElementById("ccEmail"); if(em) em.focus(); return; }
+  const chk = document.getElementById("ccConsentChk");
+  if(!chk || !chk.checked){ state.consent=false; showCloudMsg(`Please agree to the Terms & Privacy Policy and authorize secure storage to continue.`, "bad"); return; }
+  state.consent = true;
+  const btn = document.getElementById("ccCreateBtn");
+  if(btn){ btn.disabled = true; btn.textContent = "Creating your account…"; }
+  clearCloudMsg();
+  try{
+    const startRes = await fetch(`${API_BASE}/v1/onboarding/start`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ email: state.email.trim(), full_name: derivedNameFromEmail(state.email), company: null, array_count: 1, product:"array_operator", consent_version: CONSENT_VERSION })
+    });
+    const startData = await startRes.json().catch(()=>({}));
+    if(startRes.ok && startData.onboarding_token){
+      state.onboardingToken = startData.onboarding_token;
+      try{
+        const compRes = await fetch(`${API_BASE}/v1/onboarding/complete?token=${encodeURIComponent(state.onboardingToken)}`, { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" });
+        const compData = await compRes.json().catch(()=>({}));
+        if(compRes.ok && compData.session_token){ state.sessionToken = compData.session_token; try{ localStorage.setItem("so_session", compData.session_token); }catch(e){} }
+      }catch(e){ /* session is required to store cloud creds — handled below */ }
+      if(!state.sessionToken){
+        // Rare: account created but no session minted. We can't store server-side creds
+        // without the Bearer, so route them to the dashboard's Auto-refresh vault.
+        showCloudMsg(`Your account is created — we emailed <b>${esc(state.email)}</b> a sign-in link. Open it, then add your logins from <b>Master Account → Auto-refresh</b>.`, "warn");
+        if(btn){ btn.disabled=false; btn.textContent="Create my account →"; }
+        return;
+      }
+      state.cloudMode = true;
+      go(2);   // → cloud "add your portal logins" vault
+      return;
+    } else if(startRes.status === 409){
+      state.existing = true;
+      try{ await fetch(`${API_BASE}/v1/auth/request`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email: state.email.trim(), product:"array_operator" }) }); }catch(e){}
+      showCloudMsg(`You already have an Array Operator account — we emailed <b>${esc(state.email)}</b> a sign-in link. Open it, then add your logins from <b>Master Account → Auto-refresh</b>.`, "warn");
+    } else if(startRes.status === 422){
+      showCloudMsg(`That email doesn't look valid — please check it and try again.`, "bad");
+      const em=document.getElementById("ccEmail"); if(em) em.focus();
+    } else if(startRes.status === 429){
+      showCloudMsg((startData && startData.detail) || `Too many attempts — wait a moment, then try again.`, "warn");
+    } else {
+      showCloudMsg(`We couldn't reach our servers just now — nothing was saved. Try again in a moment.`, "warn");
+    }
+  }catch(e){
+    showCloudMsg(`We couldn't reach our servers just now — nothing was saved. Try again in a moment.`, "warn");
+  }
+  if(btn){ btn.disabled=false; btn.textContent="Create my account →"; }
+}
+
+// The three password-portal inverter vendors the harvester signs into (SolarEdge
+// uses an API key, not a stored password, so it stays on its own API path — not
+// offered here). Mirrors sandbox.js AR_INVERTERS.
+const CLOUD_INVERTERS = [
+  { id:"fronius", label:"Fronius (Solar.web)", ph:"Solar.web username / email" },
+  { id:"sma", label:"SMA (Sunny Portal)", ph:"Sunny Portal username / email" },
+  { id:"chint", label:"Chint / CPS", ph:"Chint username / email" },
+];
+const CLOUD_INV_IDS = new Set(CLOUD_INVERTERS.map(v=>v.id));
+let _cloudCatalog = null;
+let _cloudAddedUtils = [];      // utility codes picked this session (show an empty card to fill)
+
+// cloudApi mirrors sandbox.js cloudOp, but authed with the freshly-minted onboarding
+// session (state.sessionToken) instead of the dashboard's authHeaders().
+async function cloudApi(op, extra){
+  const tok = state.sessionToken;
+  if(!tok) return { ok:false, error:"signin" };
+  const H = { "Content-Type":"application/json", "Authorization":"Bearer "+tok };
+  try{
+    if(op==="status"){
+      const r = await fetch(`${API_BASE}/v1/cloud-capture/status`, { headers:{ "Authorization":"Bearer "+tok } });
+      if(!r.ok) return { ok:false, error:"http_"+r.status };
+      return Object.assign({ ok:true }, await r.json());
+    }
+    if(op==="set"){
+      const r = await fetch(`${API_BASE}/v1/cloud-capture/credentials`, { method:"POST", headers:H, body:JSON.stringify({
+        provider: extra.provider, username: extra.username, password: extra.password,
+        login_host: extra.login_host || null, enable: true, consent: extra.consent === true }) });
+      const d = await r.json().catch(()=>({}));
+      return { ok:r.ok, error: r.ok ? null : (typeof d.detail === "string" ? d.detail : "http_"+r.status) };
+    }
+    if(op==="clear"){
+      const r = await fetch(`${API_BASE}/v1/cloud-capture/credentials`, { method:"DELETE", headers:H, body:JSON.stringify({ provider: extra.provider, username: extra.username }) });
+      return { ok:r.ok };
+    }
+    if(op==="toggle"){
+      const r = await fetch(`${API_BASE}/v1/cloud-capture/toggle`, { method:"POST", headers:H, body:JSON.stringify({ provider: extra.provider, username: extra.username, enable: extra.enable }) });
+      return { ok:r.ok };
+    }
+  }catch(e){ return { ok:false, error:String(e) }; }
+  return { ok:false, error:"bad_op" };
+}
+
+async function loadCloudCatalog(){
+  if(_cloudCatalog) return _cloudCatalog;
+  const map = {};
+  try{
+    const r = await fetch(`${API_BASE}/v1/providers`, { credentials:"same-origin" });
+    const j = await r.json();
+    (j && j.providers || []).forEach(p => { if(p && p.code && p.scrape_status==="live"){ map[p.code] = { label: p.label||p.code, host: p.smarthub_host||"", state: p.state||"" }; } });
+  }catch(e){ /* offline — fall back to code-derived labels */ }
+  if(!map.gmp) map.gmp = { label:"Green Mountain Power" };
+  _cloudCatalog = map; return map;
+}
+function cloudUtilLabel(code, catalog){
+  const c = catalog && catalog[code];
+  if(c && c.label) return c.label + (c.host ? " (SmartHub)" : "");
+  if(code==="gmp") return "Green Mountain Power";
+  if(/^sh_/.test(code)) return code.replace(/^sh_/,"").replace(/[-_]/g," ").toUpperCase()+" (SmartHub)";
+  return code.toUpperCase();
+}
+// Adapt the cloud /status payload → the shape credRow renders from (mirrors
+// sandbox.js cloudStatusToShape). 2nd+ logins for a provider slot under code::user.
+function cloudShape(cs){
+  const shape = {}; const seen = {};
+  (cs.credentials||[]).forEach(c => {
+    const code = (c.provider||"").toLowerCase();
+    const isInv = CLOUD_INV_IDS.has(code);
+    const uKey = (c.username||"").toLowerCase();
+    const slot = seen[code] ? (code+"::"+uKey) : code; seen[code]=true;
+    shape[slot] = { hasCreds:true, enabled:c.enabled!==false, username:c.username||"", utility:!isInv, inverter:isInv, code:code, host:c.login_host||"", ok:c.last_harvest_ok, at:c.last_harvest_at, fails:c.harvest_fails||0 };
+  });
+  return shape;
+}
+
+function cloudLoginsScreen(){
+  return `<div class="card animate">
+    <h1>Add your portal logins.</h1>
+    <p class="lede">We'll sign in for you and keep your data fresh 24/7 — no tab to keep open. Add a login for each portal you use; you can add more anytime. Your passwords are <b>encrypted on our servers</b>, and you can remove any of them whenever you like.</p>
+    <label class="cv-consent" id="cvConsent">
+      <input type="checkbox" id="cvConsentChk" checked>
+      <span>I authorize EnergyAgent to securely store these portal passwords on its servers and sign in on my behalf to keep my data fresh.</span>
+    </label>
+    <div class="cv-warn">⚠ <b>Heads up:</b> because we sign in from our servers, your provider may send a one-time “new sign-in” security alert the first time. That's expected — it's us signing in for you, and it's safe to approve.</div>
+    <div id="cvList"><div class="scan"><span class="ring"></span> Loading your portals…</div></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn btn-primary btn-lg" id="cvFinishBtn" onclick="cloudFinish()" style="opacity:.5;pointer-events:none">Finish setup →</button>
+    </div>
+    <p class="helper" id="cvSkip" style="text-align:center;margin-top:1rem">Prefer to add these later? <a href="#" onclick="cloudFinish(true);return false" style="color:var(--good);font-weight:600">Skip for now — add them in your dashboard →</a></p>
+  </div>`;
+}
+
+async function wireCloudVault(){
+  const listEl = document.getElementById("cvList");
+  if(!listEl) return;
+  const cs = await cloudApi("status");
+  if(!cs || !cs.ok){
+    listEl.innerHTML = (cs && cs.error==="signin")
+      ? `<div class="helper" style="color:var(--warn)">Please sign in again to add cloud logins.</div>`
+      : `<div class="helper" style="color:var(--warn)">Couldn't load your Credential Vault — reload to retry.</div>`;
+    return;
+  }
+  const status = cloudShape(cs);
+  const catalog = await loadCloudCatalog();
+
+  // A single credential row (save/replace + optional remove), styled with the
+  // onboarding component set. Mirrors sandbox.js credRow.
+  const credRow = (opts) => {
+    const { key, saveCode, ph, hasCreds, enabled, prefillUser, addLabel, stat } = opts;
+    const on = hasCreds && enabled;
+    let statLine = "";
+    if(hasCreds){
+      const s = stat || {};
+      if((s.fails||0) >= 3) statLine = `<div class="cv-stat err">⚠ Paused — re-enter your password to retry</div>`;
+      else if(s.at && s.ok===false) statLine = `<div class="cv-stat err">⚠ Couldn't sign in — check the password</div>`;
+      else if(s.at) statLine = `<div class="cv-stat ok">✓ Connected — refreshing automatically</div>`;
+      else statLine = `<div class="cv-stat ok">✓ Saved — first refresh starting…</div>`;
+    }
+    const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
+    return `<div class="cv-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}">
+      ${hasCreds ? `<div class="cv-row-top"><span class="cv-badge ${on?'on':'off'}">${on?'On':'Off'}</span>
+        <label class="cv-switch"><input type="checkbox" class="cv-optout" ${!enabled?'checked':''}> off</label></div>` : ""}
+      ${statLine}
+      <div class="cv-fields">
+        <input class="cv-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph||'Portal username / email')}">
+        <input class="cv-pass" type="password" autocomplete="off" placeholder="${hasCreds?'•••••••• (saved — type to replace)':'Portal password'}">
+        <div class="cv-actions">
+          <button class="btn btn-primary cv-save" type="button">${hasCreds?'Save':(addLabel||'Save')}</button>
+          ${hasCreds ? `<button class="btn btn-ghost cv-clear" type="button">Remove</button>` : ""}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // Group saved logins by base code (multi-login: a code can own several slots).
+  const byCode = {};
+  Object.keys(status).forEach(k => {
+    const s = status[k]; if(!s || !s.hasCreds) return;
+    const code = s.code || k;
+    (byCode[code] = byCode[code] || []).push({ slot:k, username:s.username||"", enabled:s.enabled!==false, ok:s.ok, at:s.at, fails:s.fails, utility:s.utility });
+  });
+
+  const invCard = (v) => {
+    const logins = (byCode[v.id]||[]).filter(l => !l.utility || CLOUD_INV_IDS.has(v.id));
+    const saved = logins.map(l => credRow({ key:l.slot, saveCode:v.id, ph:"username / email", hasCreds:true, enabled:l.enabled, prefillUser:l.username, stat:{ok:l.ok,at:l.at,fails:l.fails} })).join("");
+    const add = credRow({ key:v.id+"::__new__", saveCode:v.id, ph: logins.length?"another username / email":v.ph, hasCreds:false, addLabel: logins.length?"Add login":"Save" });
+    return `<div class="cv-portal" data-code="${esc(v.id)}"><div class="cv-portal-name">${esc(v.label)}</div>${saved}${add}</div>`;
+  };
+  const utilCard = (code) => {
+    const logins = byCode[code] || [];
+    const name = cloudUtilLabel(code, catalog);
+    const saved = logins.map(l => credRow({ key:l.slot, saveCode:code, ph:"username / email", hasCreds:true, enabled:l.enabled, prefillUser:l.username, stat:{ok:l.ok,at:l.at,fails:l.fails} })).join("");
+    const add = credRow({ key:code+"::__new__", saveCode:code, ph: logins.length?"another username / email":"portal username / email", hasCreds:false, addLabel: logins.length?"Add login":"Save" });
+    return `<div class="cv-portal" data-code="${esc(code)}"><div class="cv-portal-name">${esc(name)}</div>${saved}${add}</div>`;
+  };
+
+  // Which utilities to show: GMP (common default) + any with a saved login + any
+  // the operator just picked from the catalog.
+  const shownCodes = [];
+  const pushCode = (c) => { if(c && shownCodes.indexOf(c)===-1) shownCodes.push(c); };
+  pushCode("gmp");
+  Object.keys(byCode).filter(c => byCode[c].some(l=>l.utility)).sort().forEach(pushCode);
+  (_cloudAddedUtils||[]).forEach(pushCode);
+
+  listEl.innerHTML = `
+    <div class="cv-group">
+      <div class="cv-group-h">Inverter portals</div>
+      <div class="cv-group-s">Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor.</div>
+      ${CLOUD_INVERTERS.map(invCard).join("")}
+    </div>
+    <div class="cv-group">
+      <div class="cv-group-h">Utility portals</div>
+      <div class="cv-group-s">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</div>
+      ${shownCodes.map(utilCard).join("")}
+      <div class="cv-addutil">
+        <button type="button" class="cv-addutil-btn">+ Add a utility login</button>
+        <div class="cv-picker" hidden>
+          <input type="text" class="cv-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
+          <div class="cv-picker-results"></div>
+        </div>
+      </div>
+    </div>`;
+
+  // Finish gate: enabled once at least one login is stored. Skip stays available.
+  const savedCount = Object.keys(status).length;
+  const fb = document.getElementById("cvFinishBtn");
+  if(fb){ const ok = savedCount>0; fb.style.opacity = ok?"1":".5"; fb.style.pointerEvents = ok?"auto":"none"; fb.textContent = ok ? `Finish setup → (${savedCount} connected)` : "Finish setup →"; }
+  const skip = document.getElementById("cvSkip"); if(skip) skip.style.display = savedCount>0 ? "none" : "";
+
+  const consentOk = () => { const c = document.getElementById("cvConsentChk"); return !!(c && c.checked); };
+
+  // ── wire each credential row ──
+  listEl.querySelectorAll(".cv-row").forEach(row => {
+    const key = row.dataset.key;
+    const saveCode = row.dataset.savecode;
+    const userEl = row.querySelector(".cv-user");
+    const passEl = row.querySelector(".cv-pass");
+    const saveBtn = row.querySelector(".cv-save");
+    const clearBtn = row.querySelector(".cv-clear");
+    const optEl = row.querySelector(".cv-optout");
+    const savedLabel = saveBtn.textContent;
+    const cloudHost = (catalog[saveCode] && catalog[saveCode].host) || "";
+    saveBtn.addEventListener("click", async () => {
+      const u = (userEl.value||"").trim(), p = passEl.value||"";
+      if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
+      if(!consentOk()){
+        saveBtn.textContent = "Tick the box ↑";
+        const c = document.getElementById("cvConsent");
+        if(c){ c.classList.add("flash"); setTimeout(()=>c.classList.remove("flash"),1500); c.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+        setTimeout(()=>saveBtn.textContent=savedLabel,1800);
+        return;
+      }
+      saveBtn.textContent = "Saving…";
+      const r = await cloudApi("set", { provider:saveCode, username:u, password:p, login_host:cloudHost, consent:true });
+      passEl.value = "";
+      if(r.ok){ saveBtn.textContent = "✓ Saved"; setTimeout(()=>wireCloudVault(), 700); }
+      else {
+        const msg = (r.error==="http_403") ? "Not enabled yet"
+          : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";
+        saveBtn.textContent = "✕ " + msg;
+        setTimeout(()=>saveBtn.textContent=savedLabel, 4000);
+      }
+    });
+    if(clearBtn) clearBtn.addEventListener("click", async () => { await cloudApi("clear", { provider:saveCode, username:(userEl.value||"").trim() }); wireCloudVault(); });
+    if(optEl) optEl.addEventListener("change", async () => { await cloudApi("toggle", { provider:saveCode, username:(userEl.value||"").trim(), enable: !optEl.checked }); wireCloudVault(); });
+  });
+
+  // ── wire the searchable utility picker over the whole live catalog ──
+  const addBtn = listEl.querySelector(".cv-addutil-btn");
+  const picker = listEl.querySelector(".cv-picker");
+  const searchEl = listEl.querySelector(".cv-picker-search");
+  const resultsEl = listEl.querySelector(".cv-picker-results");
+  if(addBtn && picker){ addBtn.addEventListener("click", () => { picker.hidden = !picker.hidden; if(!picker.hidden) setTimeout(()=>searchEl&&searchEl.focus(),30); }); }
+  const codes = Object.keys(catalog);
+  if(searchEl && resultsEl){
+    const renderResults = () => {
+      const q = (searchEl.value||"").trim().toLowerCase();
+      if(!q){ resultsEl.innerHTML = `<div class="cv-picker-hint">Type your utility's name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
+      const hits = codes.filter(c => { const l=(catalog[c].label||"").toLowerCase(); return l.includes(q) || c.includes(q) || (catalog[c].state||"").toLowerCase()===q; }).slice(0,25);
+      if(!hits.length){ resultsEl.innerHTML = `<div class="cv-picker-hint">No match. Not seeing your utility? It may need to be added — tell us and we'll wire it up.</div>`; return; }
+      resultsEl.innerHTML = hits.map(c => `<button type="button" class="cv-picker-item" data-code="${esc(c)}">${esc(catalog[c].label)}${catalog[c].state?` <span class="cv-picker-state">${esc(catalog[c].state)}</span>`:""}</button>`).join("");
+      resultsEl.querySelectorAll(".cv-picker-item").forEach(it => it.addEventListener("click", () => {
+        if(_cloudAddedUtils.indexOf(it.dataset.code)===-1) _cloudAddedUtils.push(it.dataset.code);
+        wireCloudVault().then(() => {
+          const card = listEl.querySelector(`.cv-portal[data-code="${CSS.escape(it.dataset.code)}"]`);
+          if(card){ card.scrollIntoView({behavior:"smooth",block:"center"}); const u = card.querySelector(".cv-row:last-child .cv-user"); if(u) u.focus(); }
+        });
+      }));
+    };
+    searchEl.addEventListener("input", renderResults);
+    renderResults();
+  }
+}
+
+function cloudFinish(){
+  state.cloudMode = true;
+  go(3);
+  burst();
+}
+
+// Cloud Done screen: the trial is live and the account already exists (created at
+// the email step). Honest about the async harvest — arrays appear in the dashboard
+// as we pull them; nothing to keep open.
+function cloudDoneScreen(){
+  return `<div class="card animate"><div class="center">
+    <div class="seal">🌿</div>
+    <div class="done-h">You're set. We've got it from here.</div>
+    <div class="done-s">Your <b>14-day free trial</b> is live — no card needed. We're signing into your portals now and pulling your production and bills.</div>
+    <div class="callout" style="margin-top:1.35rem;text-align:left">
+      <div class="t">☁️ We keep your data fresh — around the clock</div>
+      <div class="s">Nothing to install, no tab to keep open. Your arrays appear in your dashboard as we pull them in — usually within a few minutes. Live production stays under 5 minutes old; utility bills refresh daily.</div>
+      <div class="s" id="cvDoneStat" style="margin-top:.6rem"></div>
+      <div class="s" style="margin-top:.6rem">Add, remove, or switch to on-device anytime in <b>Master Account → Auto-refresh</b>.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
+      <button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
+      <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
+      <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$20 a month for each offtaker</b> you invoice (volume discounts kick in automatically for large fleets/portfolios). Never until the trial ends.</div>
+    </div>
+  </div></div>`;
+}
+// One status read on the Done screen → a quiet "N logins connected" confirmation.
+async function cloudDoneStat(){
+  const el = document.getElementById("cvDoneStat");
+  if(!el) return;
+  const cs = await cloudApi("status");
+  if(!cs || !cs.ok) return;
+  const n = (cs.credentials||[]).length;
+  if(n) el.innerHTML = `<b>${n} portal login${n===1?"":"s"} connected</b> — refreshing on our servers now.`;
+}
+
 const stepper = document.getElementById("stepper");
 const main = document.getElementById("main");
 
@@ -783,7 +1278,7 @@ function connectScreen(){
     <p class="helper" style="margin-top:1.6rem">Can't add it right now — on a work computer, or waiting on IT to approve it? You don't have to decide yet. <b>See a real sample</b> of exactly what Array Operator produces — a working offtaker invoice and live inverter dashboard, no install needed.</p>
 
     <div class="row">
-      <button class="btn btn-ghost" onclick="go(0)">← Back</button>
+      <button class="btn btn-ghost" onclick="backToFork()">← Back</button>
       <a class="btn btn-ghost" href="/#reports" target="_blank" rel="noopener">See a sample invoice →</a>
     </div>
   </div>`;
@@ -914,6 +1409,7 @@ function gmpScreen(){
 }
 
 function arraysScreen(){
+  if(state.cloudMode) return cloudLoginsScreen();
   if(state.gmpPath) return gmpScreen();
   if(state.syncMode) return arraysScreenSyncAll();
   const n = state.sites.length;
@@ -1085,6 +1581,7 @@ function countUp(el, target, ms){
 }
 
 function doneScreen(){
+  if(state.cloudMode && !state.existing) return cloudDoneScreen();
   const n = state.sites.length;
   const existing = !!state.existing;
   const created = !!state.onboardingToken && !existing;
@@ -1425,9 +1922,22 @@ function burst(){
 
 function render(){
   if(step===0) main.innerHTML = welcomeScreen();
-  else if(step===1){ state.userConnect = false; if(EXT_PRESENT && !state.syncMode){ startSyncAll(); return; } main.innerHTML = connectScreen(); }
-  else if(step===2){ main.innerHTML = arraysScreen(); if(state.gmpPath){ syncClaim(); } else if(state.syncMode){ renderSyncStatus(); appendArrayChips(); syncClaim(); } else { cascadeArrays(); } }
-  else if(step===3) main.innerHTML = doneScreen();
+  else if(step===1){
+    state.userConnect = false;
+    // The Connect step leads with the FORK. A chosen path routes to its own screen;
+    // no path auto-advances just because the helper is present.
+    if(state.connect === "cloud"){ main.innerHTML = cloudEmailScreen(); cloudEmailGate(); const em=document.getElementById("ccEmail"); if(em) em.focus(); return; }
+    if(state.connect === "device"){ if(EXT_PRESENT && !state.syncMode){ startSyncAll(); return; } main.innerHTML = connectScreen(); return; }
+    main.innerHTML = forkScreen();
+  }
+  else if(step===2){
+    main.innerHTML = arraysScreen();
+    if(state.cloudMode){ wireCloudVault(); }
+    else if(state.gmpPath){ syncClaim(); }
+    else if(state.syncMode){ renderSyncStatus(); appendArrayChips(); syncClaim(); }
+    else { cascadeArrays(); }
+  }
+  else if(step===3){ main.innerHTML = doneScreen(); if(state.cloudMode && !state.existing) cloudDoneStat(); }
 }
 
 renderStepper(); render();

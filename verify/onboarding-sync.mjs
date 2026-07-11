@@ -59,7 +59,11 @@ async function startSyncPage(browser) {
       window.postMessage({ type: "SO_CAPTURE_LANDED", ok: true, provider, sites }, location.origin);
     };
     window.__loginState = (provider, state) => window.postMessage({ type: "SO_LOGIN_STATE", provider, state }, location.origin);
-    if (typeof go === "function") go(1);                                 // Connect screen
+    if (typeof go === "function") go(1);                                 // Connect step → the fork
+    // The fork no longer auto-advances on SO_EXTENSION_PRESENT — pick the on-device
+    // path explicitly (mirrors an owner clicking "Keep it on my computer"), THEN
+    // announce the helper so it fans out the sync.
+    if (typeof chooseDevice === "function") chooseDevice();
     window.postMessage({ type: "SO_EXTENSION_PRESENT" }, location.origin); // → EXT_PRESENT + startSyncAll
   });
   // The "Your arrays" screen + its live status tiles must come up.
@@ -87,7 +91,40 @@ async function run() {
   console.log("Onboarding sync verification →", URL, "\n");
   const browser = await chromium.launch({ headless: !HEADED });
   try {
-    // ── Test 1+2: happy path + Chint sequencing ───────────────────────────────────────────
+    // ── Test 0: the FORK is the first thing, non-coercive, both paths reachable ─────────────
+    console.log("Test 0 — data-choice fork leads (cloud + on-device, neither auto-advances)");
+    try {
+      const page = await browser.newPage();
+      await page.goto(URL + (URL.includes("?") ? "&" : "?") + "verify=" + Date.now(), { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForFunction(() => typeof window.go === "function" && typeof window.chooseCloud === "function", { timeout: 15000 });
+      await page.evaluate(() => { go(1); });                                  // Connect step → fork
+      await page.waitForFunction(() => /your data, your choice/i.test((document.getElementById("main") || {}).textContent || ""), { timeout: 6000 }).catch(() => {});
+      const forkTxt = await page.evaluate(() => (document.getElementById("main") || {}).textContent || "");
+      check("Fork shows both first-class options", /store it with us/i.test(forkTxt) && /keep it on my computer/i.test(forkTxt), `main="${norm(forkTxt).slice(0, 120)}"`);
+      // Non-coercive: the fork demands nothing — no password FIELD, no email FIELD, no
+      // sync spinner. (The tradeoff copy mentions "passwords" in prose; that's honest, not a demand.)
+      const forkDemands = await page.evaluate(() => !!(document.querySelector("#main input") || document.getElementById("syncStatus")) || /finding every array/i.test((document.getElementById("main") || {}).textContent || ""));
+      check("Fork demands nothing up front (no input field / sync)", !forkDemands, "the fork rendered an input field or started a sync before a choice");
+      // Announce the helper while on the fork — it must NOT yank the owner into a sync.
+      await page.evaluate(() => window.postMessage({ type: "SO_EXTENSION_PRESENT" }, location.origin));
+      await sleep(500);
+      const stillFork = await page.evaluate(() => /your data, your choice/i.test((document.getElementById("main") || {}).textContent || "") && !document.getElementById("syncStatus"));
+      check("Helper-present does NOT auto-advance the fork", stillFork, "the fork auto-advanced when the extension announced itself");
+      mkdirSync("artifacts", { recursive: true });
+      await page.screenshot({ path: "artifacts/onboarding-fork.png", fullPage: true });
+      // Enter the cloud path → the email + consent screen (no account is created here).
+      await page.evaluate(() => chooseCloud());
+      await page.waitForFunction(() => /start your free trial/i.test((document.getElementById("main") || {}).textContent || ""), { timeout: 6000 }).catch(() => {});
+      const cloudTxt = await page.evaluate(() => (document.getElementById("main") || {}).textContent || "");
+      check("Cloud path opens the email + consent screen", /start your free trial/i.test(cloudTxt), `main="${norm(cloudTxt).slice(0, 120)}"`);
+      check("Cloud consent is honest about server-side storage", /store the portal logins i add on its servers/i.test(cloudTxt), `main="${norm(cloudTxt).slice(0, 160)}"`);
+      check("Create button gated until email + consent", await page.evaluate(() => { const b = document.getElementById("ccCreateBtn"); return b && b.style.pointerEvents === "none"; }), "create button was clickable with no email/consent");
+      await page.screenshot({ path: "artifacts/onboarding-cloud-email.png", fullPage: true });
+      console.log("       (screenshots → verify/artifacts/onboarding-fork.png, onboarding-cloud-email.png)");
+      await page.close();
+    } catch (e) { fail("Test 0 fork + cloud entry", String(e && e.message || e)); }
+
+    // ── Test 1+2: happy path + Chint sequencing (on-device path) ───────────────────────────
     console.log("Test 1 — happy path + Chint sequencing");
     try {
       const page = await startSyncPage(browser);
