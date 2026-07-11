@@ -93,7 +93,7 @@
     return `<span class="vs-gauge${idle}" title="${esc(title)}">` +
       `<svg viewBox="0 0 100 52" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}">` +
       `<path class="vs-gg-track" d="${arc}" fill="none" stroke-width="7" stroke-linecap="round"/>` +
-      `<path class="vs-gg-fill" d="${arc}" fill="none" stroke="${zc}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${off}"/>` +
+      `<path class="vs-gg-fill" d="${arc}" fill="none" stroke="${zc}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${off}" style="--gg-off:${off}"/>` +
       `<g class="vs-gg-nwrap" style="--gg-rot:${(-f * 180).toFixed(1)}deg">` +
         `<polygon class="vs-gg-needle" points="${ax.toFixed(1)},${ay.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}" fill="${zc}"/>` +
         `<circle cx="${cx}" cy="${cy}" r="4" fill="${zc}"/><circle cx="${cx}" cy="${cy}" r="1.6" fill="#fff"/>` +
