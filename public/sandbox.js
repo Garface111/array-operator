@@ -4676,6 +4676,128 @@
     const r = _vaultReq[d.reqId]; if(r){ delete _vaultReq[d.reqId]; r(d); }
   });
 
+  // ── Cloud Capture: the SERVER-SIDE alternative to the on-device extension vault.
+  // Same panel, same cred cards — but in "cloud" mode a saved login is stored
+  // (encrypted) on our servers and refreshed by a headless-browser farm 24/7, so
+  // the owner never has to keep a tab open. cloudOp mirrors vaultOp's shape so the
+  // render + row wiring are reused; only the data source + destination differ.
+  const AR_MODE_KEY = "ao_ar_mode";
+  function _arGetMode(){ try { return localStorage.getItem(AR_MODE_KEY) === "cloud" ? "cloud" : "device"; } catch(e){ return "device"; } }
+  function _arSetMode(m){ try { localStorage.setItem(AR_MODE_KEY, m === "cloud" ? "cloud" : "device"); } catch(e){} }
+  const AR_INVERTER_IDS = new Set((typeof AR_INVERTERS !== "undefined" ? AR_INVERTERS : []).map(v => v.id));
+
+  async function cloudOp(op, extra){
+    const h = authHeaders();
+    if(!h) return { ok:false, error:"signin" };
+    const H = Object.assign({ "Content-Type":"application/json" }, h);
+    try {
+      if(op === "status"){
+        const r = await fetch("/v1/cloud-capture/status", { headers:h });
+        if(!r.ok) return { ok:false, error:"http_"+r.status };
+        return Object.assign({ ok:true }, await r.json());
+      }
+      if(op === "set"){
+        const r = await fetch("/v1/cloud-capture/credentials", { method:"POST", headers:H, body:JSON.stringify({
+          provider: extra.provider, username: extra.username, password: extra.password,
+          login_host: extra.login_host || null, enable: true }) });
+        const d = await r.json().catch(()=>({}));
+        return { ok: r.ok, error: r.ok ? null : (d.detail || "http_"+r.status) };
+      }
+      if(op === "clear"){
+        const r = await fetch("/v1/cloud-capture/credentials", { method:"DELETE", headers:H, body:JSON.stringify({
+          provider: extra.provider, username: extra.username }) });
+        return { ok: r.ok };
+      }
+      if(op === "toggle"){
+        const r = await fetch("/v1/cloud-capture/toggle", { method:"POST", headers:H, body:JSON.stringify({
+          provider: extra.provider, username: extra.username, enable: extra.enable }) });
+        return { ok: r.ok };
+      }
+    } catch(e){ return { ok:false, error:String(e) }; }
+    return { ok:false, error:"bad_op" };
+  }
+
+  // Adapt the cloud /status payload onto the SAME shape the extension vault status
+  // uses, so credRow/utilByCode render identically. Utility logins key on a slot
+  // ("code" for the first, "code::username" for extra); inverters key on the id.
+  function cloudStatusToShape(cs){
+    const shape = {};
+    const seen = {};
+    (cs.credentials || []).forEach(c => {
+      const code = (c.provider || "").toLowerCase();
+      const isInv = AR_INVERTER_IDS.has(code);
+      const uKey = (c.username || "").toLowerCase();
+      let slot;
+      if(isInv){ slot = code; }
+      else { slot = seen[code] ? (code + "::" + uKey) : code; seen[code] = true; }
+      shape[slot] = {
+        hasCreds: true, enabled: c.enabled !== false, username: c.username || "",
+        utility: !isInv, code: code, host: c.login_host || "",
+        // extra cloud-only health, surfaced by the card as a freshness hint
+        _cloudOk: c.last_harvest_ok, _cloudAt: c.last_harvest_at, _cloudFails: c.harvest_fails || 0,
+      };
+    });
+    return shape;
+  }
+
+  // Paint the device/cloud segmented control: mark the active option, swap the
+  // header's privacy copy to be HONEST about where the password lives in each
+  // mode, and (once) wire the clicks to switch mode + re-render.
+  const AR_COPY = {
+    device: `Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.`,
+    cloud: `Your <b>Credential Vault</b>. Each login you add is <b>stored on our servers</b>, encrypted, so we sign in for you and refresh your data <b>around the clock — no browser tab needed</b>. Live inverter production is kept <b>under 5 minutes old</b>; utility bills refresh daily. Remove any login anytime.`,
+  };
+  function _arWireModeSwitch(){
+    const wrap = document.getElementById("arMode");
+    const sub = document.getElementById("arPanelSub");
+    if(!wrap) return;
+    const mode = _arGetMode();
+    wrap.querySelectorAll(".ar-mode-opt").forEach(b => {
+      b.classList.toggle("active", b.dataset.mode === mode);
+      b.setAttribute("aria-selected", String(b.dataset.mode === mode));
+    });
+    if(sub) sub.innerHTML = AR_COPY[mode] || AR_COPY.device;
+    if(!wrap._wired){
+      wrap._wired = true;
+      wrap.addEventListener("click", (e) => {
+        const b = e.target.closest(".ar-mode-opt"); if(!b) return;
+        if(b.dataset.mode === _arGetMode()) return;
+        _arSetMode(b.dataset.mode);
+        _vaultStatusCache = null;
+        wireAutoRefreshRow();
+      });
+    }
+  }
+
+  // Explicit opt-in consent gate for cloud mode: no password is stored on our
+  // servers until the owner ticks this box (mirrored by the backend, which 422s a
+  // password save without consent=true). Persisted so it stays ticked.
+  const AR_CONSENT_KEY = "ao_cc_consent";
+  function _arConsentOk(){
+    const chk = document.getElementById("arConsentChk");
+    if(chk) return chk.checked;
+    try { return localStorage.getItem(AR_CONSENT_KEY) === "1"; } catch(e){ return false; }
+  }
+  function _arConsentHTML(){
+    let saved = false; try { saved = localStorage.getItem(AR_CONSENT_KEY) === "1"; } catch(e){}
+    return `<label class="ar-consent" id="arConsent">
+      <input type="checkbox" id="arConsentChk" ${saved ? "checked" : ""}>
+      <span>I authorize EnergyAgent to securely store my portal passwords on its servers and sign in
+      on my behalf to keep my data fresh. I agree to the
+      <a href="/terms.html" target="_blank" rel="noopener">Terms</a> and
+      <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+    </label>`;
+  }
+  function _arWireConsent(){
+    const chk = document.getElementById("arConsentChk");
+    if(chk && !chk._wired){
+      chk._wired = true;
+      chk.addEventListener("change", () => {
+        try { localStorage.setItem(AR_CONSENT_KEY, chk.checked ? "1" : "0"); } catch(e){}
+      });
+    }
+  }
+
   // Extension v1.9.109+: a page-initiated credential save waits for a one-click
   // confirm in the extension popup. Watch the vault until that vendor's creds
   // appear (the owner confirmed), then re-render so the row flips to "On" live —
@@ -4781,11 +4903,17 @@
         <span class="ar-panel-ic" aria-hidden="true">↻</span>
         <div class="ar-panel-hd">
           <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
-          <p>Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
+          <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
+          <div class="ar-mode" id="arMode" role="tablist" aria-label="How we keep your data fresh">
+            <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
+              <b>Store it with us — live data</b><span>We keep your passwords secure and refresh your data 24/7. No tab, no computer needed.</span></button>
+            <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
+              <b>Keep it on my computer</b><span>Passwords stay on your device via the browser extension. Data refreshes while a tab is open.</span></button>
+          </div>
         </div>
       </div>
       <div class="ar-body" id="arBody">
-        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking the EnergyAgent helper…</div></div>
+        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking…</div></div>
       </div>
     </section>`;
   }
@@ -4808,16 +4936,31 @@
     }
     const listEl = document.getElementById("arList");
     if(!listEl) return;
-    if(!EXT_PRESENT){
-      listEl.innerHTML = `<div class="acct-msg">Install the free EnergyAgent helper to enable hands-free auto-refresh. <a href="onboarding.html" style="color:var(--good)">Get it →</a></div>`;
-      return;
+    // Mode: on-device (extension vault) vs hands-off cloud (server-side harvest).
+    _arWireModeSwitch();
+    const mode = _arGetMode();
+    let status = {};
+    if(mode === "cloud"){
+      const cs = await cloudOp("status");
+      if(!cs || !cs.ok){
+        listEl.innerHTML = (cs && cs.error === "signin")
+          ? `<div class="acct-msg">Sign in to set up hands-off cloud refresh.</div>`
+          : `<div class="acct-msg">Couldn't load cloud refresh status — reload to retry.</div>`;
+        return;
+      }
+      status = cloudStatusToShape(cs);
+    } else {
+      if(!EXT_PRESENT){
+        listEl.innerHTML = `<div class="acct-msg">Install the free EnergyAgent helper to enable on-device auto-refresh — or switch to <b>Hands-off cloud</b> above, which needs no helper. <a href="onboarding.html" style="color:var(--good)">Get the helper →</a></div>`;
+        return;
+      }
+      const resp = await vaultOp("status");
+      if(!resp || !resp.ok){
+        listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and reload.</div>`;
+        return;
+      }
+      status = resp.status || {};
     }
-    const resp = await vaultOp("status");
-    if(!resp || !resp.ok){
-      listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and reload.</div>`;
-      return;
-    }
-    const status = resp.status || {};
     const catalog = await loadUtilCatalog();
 
     // ── a single credential row (save/replace + optional remove) ──
@@ -4883,8 +5026,9 @@
     };
 
     listEl.innerHTML = `
+      ${mode === "cloud" ? _arConsentHTML() : ""}
       <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Live production, refreshed automatically every few minutes.</span></div>
+        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old." : "Live production, refreshed automatically every few minutes."}</span></div>
         ${AR_INVERTERS.map(v => {
           const st = status[v.id] || { hasCreds:false, enabled:true };
           // Show the saved username (Ford 2026-07-10) so a login saved in the extension
@@ -4915,6 +5059,7 @@
       statEl.className = "ar-panel-stat" + (on ? " on" : "");
     }
 
+    _arWireConsent();
     // ── wire credential rows (inverter + utility) ──
     listEl.querySelectorAll(".ar-row").forEach(row => {
       const key = row.dataset.key;
@@ -4925,10 +5070,29 @@
       const clearBtn = row.querySelector(".ar-clear");
       const optEl = row.querySelector(".ar-optout");
       const savedLabel = saveBtn.textContent;
+      // Co-op logins need their portal host so the cloud farm knows which
+      // *.smarthub.coop to open; the catalog carries it.
+      const cloudHost = (catalog[saveCode] && catalog[saveCode].host) || "";
       saveBtn.addEventListener("click", async () => {
         const u = (userEl.value||"").trim(), p = passEl.value||"";
         if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
         saveBtn.textContent = "Saving…";
+        if(mode === "cloud"){
+          if(!_arConsentOk()){
+            saveBtn.textContent = "Check the box ↑";
+            const c = document.getElementById("arConsent");
+            if(c){ c.classList.add("ar-consent-flash"); setTimeout(()=>c.classList.remove("ar-consent-flash"), 1500); c.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+            setTimeout(()=>saveBtn.textContent=savedLabel, 1800);
+            return;
+          }
+          const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost, consent: true });
+          passEl.value = "";
+          saveBtn.textContent = r.ok ? "✓ Saved"
+            : (r.error === "http_403" ? "Not enabled yet"
+            : r.error === "http_422" ? "Consent needed" : "Failed");
+          setTimeout(() => { wireAutoRefreshRow(); }, 800);
+          return;
+        }
         // Always set() under the base code + username: the vault matches an existing
         // username to overwrite its slot, or mints a new "code::username" slot for a
         // NEW login — so "add another login" and "replace password" are the same call.
@@ -4953,11 +5117,21 @@
         setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
       if(clearBtn) clearBtn.addEventListener("click", async () => {
+        if(mode === "cloud"){
+          await cloudOp("clear", { provider: saveCode, username: (userEl.value||"").trim() });
+          wireAutoRefreshRow();
+          return;
+        }
         await vaultOp("clear", { vendor: key });
         _notifyVaultChanged();
         wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{});
       });
       if(optEl) optEl.addEventListener("change", async () => {
+        if(mode === "cloud"){
+          await cloudOp("toggle", { provider: saveCode, username: (userEl.value||"").trim(), enable: !optEl.checked });
+          wireAutoRefreshRow();
+          return;
+        }
         await vaultOp("optout", { vendor: key, optedOut: optEl.checked });
         wireAutoRefreshRow();
       });
