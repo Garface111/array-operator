@@ -49,6 +49,53 @@
     return (iv && iv.nameplate_kw && iv.current_power_w != null)
       ? Math.round(iv.current_power_w / (iv.nameplate_kw * 1000) * 100) + "% of max" : null;
   }
+  // ── Output gauges ────────────────────────────────────────────────────────────
+  // A little speedometer per row: how hard is this inverter / array / vendor running
+  // RIGHT NOW as a fraction of its nameplate. Glanceable — green needle swung right =
+  // near capacity, amber straight up = middling, red swung left = barely producing.
+  function _capW(iv) { return (iv && iv.nameplate_kw) ? iv.nameplate_kw * 1000 : 0; }
+  function _arrCapW(c) { return (c.inverters || []).reduce((t, iv) => t + _capW(iv), 0); }
+  function _arrPowW(c) {
+    return c.current_power_w != null ? c.current_power_w
+      : (c.inverters || []).reduce((t, iv) => t + (iv.current_power_w || 0), 0);
+  }
+  function _frac(powW, capW) { return (capW > 0 && powW != null) ? Math.max(0, powW / capW) : null; }
+  function invFrac(iv) { return _frac(iv.current_power_w, _capW(iv)); }
+  function arrFrac(c) { return _frac(_arrPowW(c), _arrCapW(c)); }
+  function vendorFrac(list) {
+    let p = 0, cap = 0;
+    list.forEach(c => { cap += _arrCapW(c); p += _arrPowW(c); });
+    return _frac(p, cap);
+  }
+  // The shared red→amber→green scale gradient — injected once per render (referenced by
+  // every gauge via url(#vsGaugeArc); objectBoundingBox maps it across each gauge's arc).
+  const GAUGE_DEFS = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">' +
+    '<defs><linearGradient id="vsGaugeArc" x1="0" y1="0" x2="1" y2="0">' +
+    '<stop offset="0" stop-color="#ef4444"/><stop offset="0.5" stop-color="#f59e0b"/>' +
+    '<stop offset="1" stop-color="#22c55e"/></linearGradient></defs></svg>';
+  function gauge(frac, opts) {
+    opts = opts || {};
+    if (frac == null) return `<span class="vs-gauge vs-gauge-empty" title="No nameplate on file — can't gauge output"></span>`;
+    const f = Math.max(0, Math.min(1, frac));
+    const pct = Math.round(f * 100);
+    const cx = 50, cy = 47, r = 39;
+    const ang = Math.PI * (1 - f);                     // 0% → π (left), 100% → 0 (right)
+    const dx = Math.cos(ang), dy = -Math.sin(ang);     // needle direction (SVG y points down)
+    const px = -dy, py = dx;                            // perpendicular, for the needle base
+    const len = r - 4, hb = 3;
+    const tx = cx + len * dx, ty = cy + len * dy;
+    const ax = cx + hb * px, ay = cy + hb * py;
+    const bx = cx - hb * px, by = cy - hb * py;
+    const zc = f >= 0.66 ? "#16a34a" : f >= 0.33 ? "#d97706" : "#dc2626";
+    const idle = opts.idle ? " vs-gauge-idle" : "";
+    const title = (opts.label ? opts.label + " · " : "") + pct + "% of nameplate output";
+    return `<span class="vs-gauge${idle}" title="${esc(title)}">` +
+      `<svg viewBox="0 0 100 54" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}">` +
+      `<path class="vs-gg-track" d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="url(#vsGaugeArc)" stroke-width="7" stroke-linecap="round"/>` +
+      `<polygon class="vs-gg-needle" points="${ax.toFixed(1)},${ay.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}" fill="${zc}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="4.4" fill="${zc}"/><circle cx="${cx}" cy="${cy}" r="1.8" fill="#fff"/>` +
+      `</svg></span>`;
+  }
   const ALLOC_TIP = v =>
     `${vlabel(v)} reports one site-level power — we split it across inverters by today's energy share, so this per-inverter kW is an estimate.`;
   // The ARRAY-level kW is just the sum of those split per-inverter readings, so for
@@ -469,6 +516,7 @@
   const COLS = [
     { key: "name", cls: "vs-c-name", label: "Array" },
     { key: null, cls: "vs-c-vendor", label: "Vendor" },
+    { key: null, cls: "vs-c-gauge", label: "Output" },
     { key: "inv", cls: "vs-c-inv", label: "Inverters" },
     { key: "pow", cls: "vs-c-pow", label: "Live now" },
     { key: "today", cls: "vs-c-today", label: "Today" },
@@ -757,7 +805,7 @@
     const byVendor = {};
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
-    let h = "";
+    let h = GAUGE_DEFS;
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
       const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
@@ -805,6 +853,7 @@
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}
             <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
           <span class="vs-c-vendor">${lagChip}</span>
+          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet" })}</span>
           <span class="vs-c-inv">${nInv}</span>
           <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
           <span class="vs-c-today">${kwh0(vTodayTot)}</span>
@@ -826,6 +875,7 @@
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
+          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array") })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
@@ -866,10 +916,8 @@
                 iv.sn ? "SN " + esc(iv.sn) : null,
               ].filter(Boolean).join(" · ");
               const _al = isAllocatedPower(iv);
-              const _pm = pctOfMax(iv);
-              const _live = iv.current_power_w != null
-                ? `${_al ? "~" : ""}${kw(iv.current_power_w)}${_pm ? ` <span class="vs-inv-pm">· ${_pm}</span>` : ""}`
-                : "—";
+              // The "% of max" that used to ride here as text now lives in the output gauge.
+              const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "—";
               const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
               const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";
               // Inline sparkline — the 14-day output shape, always visible (Ford: graphics
@@ -886,6 +934,7 @@
                     ${_sub ? `<span class="vs-inv-sub">${_sub}</span>` : ""}
                   </span>
                 </div>
+                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm) })}</div>
                 <div class="vs-inv-spwrap">${_spark}</div>
                 <div class="vs-inv-metrics">
                   <span class="vs-inv-metric"${_liveTip}><b class="${stale ? "vs-stale" : ""}">${_live}</b><i>live</i></span>
