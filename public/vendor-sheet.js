@@ -422,7 +422,7 @@
                                                // (Ford: "I have 56 arrays in Chint, I should be able to
                                                // click next to Chint and collapse all of them")
   const _invExpanded = {};                    // "array_id:inverter_id" -> bool (click an inverter for detail)
-  let _sweepArmed = false;                     // one-shot: gauges sweep up when the sheet scrolls into view
+  let _sweepBody = null, _sweepIO = null;      // gauges sweep up when the sheet scrolls into view (per body build)
   let _query = "";                            // search filter (lowercased)
 
   // Shared y-scale + per-day neighbor average for one array's inverter cohort, so the
@@ -763,18 +763,19 @@
   // load below the fold. Respects reduced-motion. #vsBody is stable across renders, so we
   // observe it once; the `.vs-sweep` class it toggles drives the CSS keyframes on the gauges.
   function armGaugeSweep(body) {
-    if (_sweepArmed || !body) return;
-    _sweepArmed = true;
+    if (!body || body === _sweepBody) return;     // same body already handled — don't re-sweep on re-render
+    _sweepBody = body;
+    if (_sweepIO) { try { _sweepIO.disconnect(); } catch (e) {} _sweepIO = null; }
     try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
     const play = () => {
       body.classList.add("vs-sweep");
       setTimeout(() => body.classList.remove("vs-sweep"), 1300);
     };
     if (typeof IntersectionObserver === "undefined") { play(); return; }
-    const io = new IntersectionObserver(ents => {
-      if (ents.some(e => e.isIntersecting)) { io.disconnect(); play(); }
+    _sweepIO = new IntersectionObserver(ents => {
+      if (ents.some(e => e.isIntersecting)) { if (_sweepIO) _sweepIO.disconnect(); _sweepIO = null; play(); }
     }, { threshold: 0.12 });
-    io.observe(body);
+    _sweepIO.observe(body);
   }
   function renderBody() {
     const body = $("#vsBody");
