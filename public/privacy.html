@@ -34,13 +34,13 @@
   </div>
 
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: June 27, 2026 · EnergyAgent (Array Operator · NEPOOL Operator · Solar Operator)</p>
+  <p class="meta">Last updated: July 10, 2026 · EnergyAgent (Array Operator · NEPOOL Operator · Solar Operator)</p>
 
   <div class="callout">
     <ul style="margin:0">
       <li><strong>We never sell your data.</strong> It is used only to run your EnergyAgent reporting and monitoring service.</li>
       <li><strong>We only read your own utility and solar-inverter data</strong> — nothing else from your browser.</li>
-      <li><strong>We never receive your portal passwords on our servers.</strong> Optional auto-login credentials are encrypted and stored <strong>only on your device</strong>.</li>
+      <li><strong>You choose where your portal passwords live.</strong> With the browser extension they stay encrypted <strong>on your device</strong>. With opt-in <strong>Cloud Capture</strong>, they are stored <strong>encrypted on our servers</strong> so we can refresh your data for you — and you can delete them anytime.</li>
       <li><strong>You can delete everything</strong> by emailing <a href="mailto:admin@solaroperator.org">admin@solaroperator.org</a> — purged within 24 hours.</li>
     </ul>
   </div>
@@ -67,10 +67,14 @@
   <p><strong>Information you enter.</strong> Details you add to operate your account — for example
   offtaker/customer names and contact details and array configuration — so the Service can prepare
   reports and invoices for you.</p>
-  <p><strong>Optional auto-login credentials.</strong> If you choose the optional "sign in once"
-  feature, your portal username and password are encrypted and stored <strong>only on your own device</strong>
-  (in the browser extension's local storage) and are used solely to keep that portal's session fresh.
-  They are not transmitted to or stored on our servers.</p>
+  <p><strong>Optional auto-login credentials.</strong> Automated sign-in is optional and you choose how
+  it works. With the <strong>browser extension</strong>, your portal username and password are
+  encrypted and stored <strong>only on your own device</strong> (in the extension's local storage) and
+  are not transmitted to or stored on our servers. With <strong>Cloud Capture</strong> (opt-in), your
+  portal username and password are sent over an encrypted connection and stored <strong>encrypted at
+  rest on our servers</strong>, and are used solely to sign in to the portals you connected and keep
+  their data fresh. You can turn Cloud Capture off or remove a stored login at any time, which deletes
+  that credential from our servers.</p>
 
   <h2>How we use it</h2>
   <ul>
@@ -96,8 +100,9 @@
   <h2>Security</h2>
   <ul>
     <li>Data in transit is encrypted (HTTPS).</li>
-    <li>Auto-login credentials are encrypted and kept on your device, not on our servers; stored vendor
-    connection secrets are encrypted at rest.</li>
+    <li>Auto-login credentials are always encrypted at rest: with the browser extension they are kept on
+    your device (not on our servers); with opt-in Cloud Capture they are encrypted at rest on our
+    servers and used only to sign in on your behalf. Stored vendor connection secrets are encrypted at rest.</li>
     <li>After a capture, the extension clears the portal session cookies it used.</li>
     <li>Access to production data is restricted and logged.</li>
   </ul>
