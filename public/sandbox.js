@@ -4745,7 +4745,7 @@
   // mode, and (once) wire the clicks to switch mode + re-render.
   const AR_COPY = {
     device: `Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.`,
-    cloud: `Give us each portal login once and we refresh it for you <b>24/7 on our servers</b> — no browser tab required. Passwords are <b>encrypted at rest</b> and used only to sign in on your behalf. Turn any login off anytime.`,
+    cloud: `Your <b>Credential Vault</b>. Each login you add is <b>stored on our servers</b>, encrypted, so we sign in for you and refresh your data <b>around the clock — no browser tab needed</b>. Live inverter production is kept <b>under 5 minutes old</b>; utility bills refresh daily. Remove any login anytime.`,
   };
   function _arWireModeSwitch(){
     const wrap = document.getElementById("arMode");
@@ -4879,7 +4879,7 @@
             <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
               <b>On this device</b><span>Free browser helper. Refreshes while a tab is open.</span></button>
             <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
-              <b>Hands-off cloud</b><span>We refresh 24/7 on our servers — no tab needed.</span></button>
+              <b>Credential Vault</b><span>Logins stored on our servers. We refresh 24/7 — no tab needed.</span></button>
           </div>
         </div>
       </div>
@@ -4997,12 +4997,8 @@
     };
 
     listEl.innerHTML = `
-      ${mode === "cloud" ? `
       <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Handled automatically through each vendor's secure API — nothing to enter here.</span></div>
-      </div>` : `
-      <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Live production, refreshed automatically every few minutes.</span></div>
+        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old." : "Live production, refreshed automatically every few minutes."}</span></div>
         ${AR_INVERTERS.map(v => {
           const st = status[v.id] || { hasCreds:false, enabled:true };
           // Show the saved username (Ford 2026-07-10) so a login saved in the extension
@@ -5010,7 +5006,7 @@
           // status() to return `username` for inverters (v1.9.120+); harmless before then.
           return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "" });
         }).join("")}
-      </div>`}
+      </div>
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
         ${shownCodes.map(utilCard).join("")}
