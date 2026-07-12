@@ -4739,7 +4739,35 @@
   const AR_MODE_KEY = "ao_ar_mode";
   let _arWantOpen = false;   // set by __aoOpenCredentialVault → wireAutoRefreshRow opens+scrolls the panel
   function _arGetMode(){ try { return localStorage.getItem(AR_MODE_KEY) === "cloud" ? "cloud" : "device"; } catch(e){ return "device"; } }
-  function _arSetMode(m){ try { localStorage.setItem(AR_MODE_KEY, m === "cloud" ? "cloud" : "device"); } catch(e){} }
+  function _arSetMode(m){
+    const mode = m === "cloud" ? "cloud" : "device";
+    try { localStorage.setItem(AR_MODE_KEY, mode); } catch(e){}
+    // Persist server-side too, so the choice follows the owner across browsers/devices
+    // (the whole reason a cloud onboarding could read as "extension" elsewhere).
+    const h = authHeaders();
+    if(h){ try { fetch("/v1/account/capture-mode", { method:"POST",
+      headers: Object.assign({ "Content-Type":"application/json" }, h),
+      body: JSON.stringify({ mode }) }).catch(()=>{}); } catch(e){} }
+  }
+  // Reconcile the capture mode with the SERVER on account load: the server value is
+  // authoritative (survives devices); if the server has none yet but this device does,
+  // push the local choice up so it persists. Called with the fetched /v1/account.
+  function _arSyncModeFromAccount(a){
+    try {
+      const srv = a && a.capture_mode;
+      if(srv === "cloud" || srv === "device"){
+        if(localStorage.getItem(AR_MODE_KEY) !== srv) localStorage.setItem(AR_MODE_KEY, srv);
+      } else {
+        const local = localStorage.getItem(AR_MODE_KEY);
+        const h = authHeaders();
+        if((local === "cloud" || local === "device") && h){
+          fetch("/v1/account/capture-mode", { method:"POST",
+            headers: Object.assign({ "Content-Type":"application/json" }, h),
+            body: JSON.stringify({ mode: local }) }).catch(()=>{});
+        }
+      }
+    } catch(e){}
+  }
   const AR_INVERTER_IDS = new Set((typeof AR_INVERTERS !== "undefined" ? AR_INVERTERS : []).map(v => v.id));
 
   async function cloudOp(op, extra){
@@ -5978,6 +6006,10 @@
       if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
       if(!r.ok) throw new Error("account " + r.status);
       _account = await r.json();
+      // Server is authoritative for the auto-refresh mode → reconcile local + re-run the
+      // extension "keep a tab open" nudge (it reads the mode) so a cloud owner never sees it.
+      _arSyncModeFromAccount(_account);
+      try { if(window.updateExtLiveNudge) window.updateExtLiveNudge(); } catch(e){}
       if(window.aoIsCancelled && window.aoIsCancelled(_account)){
         try { window.aoShowCancelledGate(); } catch(e){}
       }

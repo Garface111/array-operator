@@ -843,6 +843,16 @@ function updateTrialNudge(session){
     .then(r => r.ok ? r.json() : null)
     .then(a => {
       if(!a){ bar.hidden = true; return; }
+      // Server is authoritative for the auto-refresh capture mode. Sync it early (this runs
+      // on load for signed-in owners, any tab) so a Cloud Capture owner's dashboard reflects
+      // their choice + never shows the "keep a tab open" nudge (Ford 2026-07-12).
+      try {
+        if((a.capture_mode === "cloud" || a.capture_mode === "device")
+           && localStorage.getItem("ao_ar_mode") !== a.capture_mode){
+          localStorage.setItem("ao_ar_mode", a.capture_mode);
+          if(window.updateExtLiveNudge) window.updateExtLiveNudge();
+        }
+      } catch(e){}
       try { if(window.aoIsCancelled && window.aoIsCancelled(a)){ bar.hidden = true; return; } } catch(e){}
       const hasCard = a.has_payment_method === true;
       const ends = a.trial_ends_at ? new Date(a.trial_ends_at) : null;
