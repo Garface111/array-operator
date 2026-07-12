@@ -920,7 +920,7 @@
       h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}" style="--vc:${vhue(v)}">
         <div class="vs-row vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
              aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
-          <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▾</span>${badge}
+          <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}
             <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
           <span class="vs-c-vendor">${lagChip}</span>
           <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet" })}</span>

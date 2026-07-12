@@ -995,6 +995,10 @@ function updateExtLiveNudge(){
   // localStorage guard → once dismissed, stays dismissed for this session (and
   // beyond, matching the sibling trial/vault nudges). Checked before anything else.
   if(localStorage.getItem("ao_extlivenudge_dismiss") === "1"){ bar.hidden = true; return; }
+  // Cloud Capture ("Store it with us") refreshes these vendors SERVER-SIDE — so the whole
+  // "keep a browser tab open" instruction is wrong for those owners. Suppress it entirely
+  // when they're on cloud mode (Ford 2026-07-12). The device/extension owners still get it.
+  try { if(localStorage.getItem("ao_ar_mode") === "cloud"){ bar.hidden = true; return; } } catch(e){}
   const by = _extLiveArraysByVendor();
   if(!Object.keys(by).length){ bar.hidden = true; return; }   // only relevant when a Fronius/SMA/Chint array is present
   const isNarrow = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
