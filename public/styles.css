@@ -481,7 +481,7 @@
   .sb-tile{position:relative;display:flex;flex-direction:column;gap:5px;text-align:left;cursor:pointer;
     padding:13px 14px 12px;border-radius:13px;border:1px solid var(--line);
     background:linear-gradient(165deg,#10161f,#0b0f17);color:var(--ink);
-    transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}
+    transition:transform var(--motion-fast) var(--ease-out),border-color .12s ease,box-shadow .12s ease}
   .sb-tile:hover{transform:translateY(-2px);box-shadow:0 12px 26px -16px rgba(0,0,0,.8)}
   /* left status rail by worst health */
   .sb-tile::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0}
@@ -526,7 +526,7 @@
     padding:10px 15px 10px 13px;border-radius:24px;border:1px solid var(--al-line);background:var(--al-card);
     color:var(--al-ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer;
     box-shadow:0 6px 22px -8px rgba(15,23,42,.28),0 1px 2px rgba(15,23,42,.06);
-    transition:transform .14s ease,box-shadow .14s ease}
+    transition:transform var(--motion-fast) var(--ease-out),box-shadow .14s ease}
   .ao-al-fab:hover{transform:translateY(-2px);box-shadow:0 12px 30px -10px rgba(15,23,42,.34),0 2px 4px rgba(15,23,42,.08)}
   .ao-al-fab.open{border-color:rgba(37,99,235,.4);color:var(--al-blue)}
   .ao-al-fab-ic{display:inline-flex;color:var(--al-blue)}
@@ -553,7 +553,7 @@
   .ao-al-switch input{position:absolute;opacity:0;width:0;height:0}
   .ao-al-track{width:38px;height:22px;border-radius:20px;background:#cbd5e1;transition:background .16s ease;position:relative}
   .ao-al-track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
-    background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.28);transition:transform .16s ease}
+    background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.28);transition:transform var(--motion-fast) var(--ease-out)}
   .ao-al-switch input:checked + .ao-al-track{background:var(--al-blue)}
   .ao-al-switch input:checked + .ao-al-track::after{transform:translateX(16px)}
   .ao-al-switch input:focus-visible + .ao-al-track{box-shadow:0 0 0 3px rgba(37,99,235,.35)}
@@ -1157,7 +1157,7 @@
   .sb-drag:active{cursor:grabbing}
   .sb-col.dragging{opacity:.55;transform:scale(.98);cursor:grabbing}
   .sb-col.dragging .sb-array{box-shadow:0 18px 44px -18px rgba(0,0,0,.8),0 0 0 1px var(--sky)}
-  .sb-canvas.dragging-active .sb-col:not(.dragging){transition:transform .18s ease}
+  .sb-canvas.dragging-active .sb-col:not(.dragging){transition:transform var(--motion-fast) var(--ease-out)}
   .sb-array[draggable="true"]{cursor:grab}
   .sb-array[draggable="true"]:active{cursor:grabbing}
 
@@ -1170,7 +1170,7 @@
   .sb-inv:active{cursor:grabbing}
   .sb-inv.inv-dragging{opacity:.45;transform:scale(.96);cursor:grabbing;
     box-shadow:0 18px 44px -18px rgba(0,0,0,.85),0 0 0 1px var(--good)}
-  .inv-dragging-active .sb-inv:not(.inv-dragging){transition:transform .16s ease}
+  .inv-dragging-active .sb-inv:not(.inv-dragging){transition:transform var(--motion-fast) var(--ease-out)}
   /* drop-target comb: clear slot indicator while an inverter hovers over it */
   .sb-teeth{min-height:42px;border-radius:12px;transition:background .15s,box-shadow .15s}
   .sb-teeth.inv-drop{background:rgba(63,214,138,.06);box-shadow:inset 0 0 0 1px rgba(63,214,138,.35)}

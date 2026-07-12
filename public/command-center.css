@@ -162,7 +162,7 @@
   display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
   width:28px; height:28px; border-radius:50%; background:rgba(63,214,138,.16);
   color:var(--good2); font-size:12px; line-height:1;
-  transition:transform .18s ease, background .14s; transform:rotate(90deg);
+  transition:transform var(--motion-fast) var(--ease-out), background .14s; transform:rotate(90deg);
 }
 .cc-collapsible.collapsed .cc-chevron{ transform:rotate(0deg); }
 .cc-collapsible:hover .cc-chevron{ background:rgba(63,214,138,.28); }
@@ -418,7 +418,7 @@ body.sb-fs-lock{ overflow:hidden; }
   padding:9px 30px 9px 11px; font:inherit; font-size:13.5px; cursor:text; }
 .nmg-combo-input:focus{ outline:none; border-color:rgba(94,194,255,.55); background:rgba(94,194,255,.05); }
 .nmg-combo-caret{ position:absolute; right:11px; top:50%; transform:translateY(-50%);
-  font-size:11px; color:var(--faint); cursor:pointer; transition:transform .12s; }
+  font-size:11px; color:var(--faint); cursor:pointer; transition:transform var(--motion-fast) var(--ease-out); }
 .nmg-combo.is-open .nmg-combo-caret{ transform:translateY(-50%) rotate(180deg); }
 .nmg-combo-list{ position:absolute; z-index:46; left:0; right:0; top:calc(100% + 4px);
   max-height:288px; overflow-y:auto; background:var(--card); border:1px solid var(--line);
@@ -744,7 +744,7 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-fadv > summary{ cursor:pointer; list-style:none; padding:12px 15px; font-size:12px;
   color:var(--faint); display:flex; align-items:center; gap:9px; user-select:none; }
 .rb-fadv > summary::-webkit-details-marker{ display:none; }
-.rb-fadv > summary::before{ content:"▸"; font-size:11px; transition:transform .15s ease; }
+.rb-fadv > summary::before{ content:"▸"; font-size:11px; transition:transform var(--motion-fast) var(--ease-out); }
 .rb-fadv[open] > summary::before{ transform:rotate(90deg); }
 .rb-fadv[open] > summary{ border-bottom:1px solid var(--line); color:var(--ink); }
 .rb-fadv .rb-cust-grid{ padding:15px; }
@@ -1357,7 +1357,7 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-prov-head:hover{ background:#fffdfa; box-shadow:0 4px 14px -3px rgba(140,78,28,.14); }
 .rb-prov.collapsed .rb-prov-head{ }
 .rb-prov-caret{ display:inline-block; width:13px; text-align:center; font-size:12px;
-  color:var(--muted,#475569); transition:transform .15s ease; flex:none; }
+  color:var(--muted,#475569); transition:transform var(--motion-fast) var(--ease-out); flex:none; }
 .rb-prov-head[aria-expanded="false"] .rb-prov-caret{ transform:rotate(-90deg); }
 .rb-prov-label{ font-size:13.5px; font-weight:800; letter-spacing:.02em; color:var(--ink,#0f172a); }
 .rb-prov-count{ font-size:11.5px; color:var(--faint,#94a3b8); }
@@ -1373,7 +1373,7 @@ html[data-theme="day"] .rep-fld.req > select{
   cursor:pointer; user-select:none; border-radius:6px 6px 0 0; }
 .rb-grp-head:hover{ background:var(--day-hover,rgba(15,23,42,.035)); }
 .rb-grp-caret{ display:inline-block; width:12px; text-align:center; font-size:11px;
-  color:var(--faint,#94a3b8); transition:transform .15s ease; flex:none; }
+  color:var(--faint,#94a3b8); transition:transform var(--motion-fast) var(--ease-out); flex:none; }
 .rb-grp-head[aria-expanded="false"] .rb-grp-caret{ transform:rotate(-90deg); }
 .rb-grp.collapsed .rb-grp-head{ border-bottom-color:transparent; margin-bottom:0; }
 /* Each master net-meter group is a subtly-tinted floating card (Ford 2026-07-10),
@@ -1450,7 +1450,7 @@ html[data-theme="day"] .rep-fld.req > select{
   box-shadow:inset 0 0 0 2px rgba(37,99,235,.35); border-radius:12px; }
 .rb-acc[data-open="true"] .rb-acc-head{ background:rgba(37,99,235,.045); border-bottom:1px solid var(--line,#e2e8f0); }
 .rb-acc-caret{ flex:0 0 auto; margin-top:2px; color:var(--faint,#94a3b8); font-size:12px; line-height:1.4;
-  transition:transform .15s ease, color .12s ease; }
+  transition:transform var(--motion-fast) var(--ease-out), color .12s ease; }
 .rb-acc[data-open="true"] .rb-acc-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
 .rb-acc-head-main{ flex:1 1 auto; min-width:0; }
 /* Delete-offtaker controls — made discoverable (Paul couldn't find delete). The row
@@ -1499,7 +1499,7 @@ html[data-theme="day"] .rep-fld.req > select{
    centered so the row never shifts as sections open/close. */
 .rb-sec-caret{ font-style:normal; color:var(--tone); font-size:17px; line-height:1; opacity:1;
   width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; flex:none;
-  transition:transform .15s ease; }
+  transition:transform var(--motion-fast) var(--ease-out); }
 .rb-sec[open] > summary .rb-sec-caret{ transform:rotate(90deg); }
 .rb-sec-dot{ width:9px; height:9px; border-radius:50%; background:var(--tone); flex:none;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
@@ -1898,7 +1898,7 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-au-collapsed{ border-top:1px solid #eef2f6; }
 .rb-au-collapsed-sum{ cursor:pointer; list-style:none; user-select:none; font-size:12px; font-weight:680; color:#0a7d4f; padding:9px 16px; display:flex; align-items:center; gap:8px; font-variant-numeric:tabular-nums; }
 .rb-au-collapsed-sum::-webkit-details-marker{ display:none; }
-.rb-au-collapsed-sum::before{ content:"\25B8"; font-size:10px; color:#90a0b0; transition:transform .15s ease; }
+.rb-au-collapsed-sum::before{ content:"\25B8"; font-size:10px; color:#90a0b0; transition:transform var(--motion-fast) var(--ease-out); }
 .rb-au-collapsed[open] > .rb-au-collapsed-sum::before{ transform:rotate(90deg); }
 .rb-au-collapsed-sum:hover{ color:#0b6b45; }
 .rb-au-offs-drawer{ padding-top:2px; }
@@ -2124,7 +2124,7 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-pick-btn-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
 .rb-pick-btn-name{ font-size:15px; font-weight:700; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .rb-pick-btn-sub{ font-size:11.5px; font-weight:500; color:var(--faint); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rb-pick-caret{ flex:0 0 auto; color:var(--faint,#8b97a8); font-size:11px; transition:transform .15s ease; }
+.rb-pick-caret{ flex:0 0 auto; color:var(--faint,#8b97a8); font-size:11px; transition:transform var(--motion-fast) var(--ease-out); }
 .rb-pick[data-open="true"] .rb-pick-caret{ transform:rotate(180deg); }
 .rb-pick-menu{ position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:60; max-height:330px;
   overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding:6px; border:1px solid var(--line);
@@ -2286,7 +2286,7 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    centered in a fixed box so they line up and read consistently — points right when
    collapsed, rotates down when open. (Ford 2026-07-12: bigger + same size + nicer.) */
 .vs-caret{ display:inline-block; width:17px; min-width:17px; text-align:center; font-size:12.5px;
-  line-height:1; color:var(--muted,#64748b); transition:transform .15s ease; flex:none; }
+  line-height:1; color:var(--muted,#64748b); transition:transform var(--motion-fast) var(--ease-out); flex:none; }
 .vs-arr.open .vs-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
 .vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Inline-editable array / inverter names (Spreadsheet view) — mirrors .sb-editable.
