@@ -1457,12 +1457,17 @@ html[data-theme="day"] .rep-fld.req > select{
   border-radius:7px; transition:background .12s ease, color .12s ease, transform .12s ease; }
 .rb-acc-head:hover .rb-acc-del{ color:var(--bad,#e5484d); }
 .rb-acc-del:hover{ background:rgba(229,72,77,.12); color:var(--bad,#e5484d); transform:scale(1.08); }
+/* Matches the site's neutral button language (.rb-btn / .vs-closetabs): a clean card-
+   background button with the --line border, quiet by default, that reveals its danger
+   (red) only on hover — same treatment as the other delete affordances. */
 .rb-offedit-del{ margin-left:auto; align-self:center; flex:none; cursor:pointer;
-  display:inline-flex; align-items:center; gap:6px; background:transparent;
-  border:1px solid rgba(229,72,77,.5); color:var(--bad,#e5484d);
-  font:600 12px/1 inherit; padding:7px 12px; border-radius:8px;
-  transition:background .12s ease, border-color .12s ease; }
-.rb-offedit-del:hover{ background:rgba(229,72,77,.12); border-color:var(--bad,#e5484d); }
+  display:inline-flex; align-items:center; gap:6px; background:var(--card,#fff);
+  border:1px solid var(--line,#e2e8f0); color:var(--muted,#64748b);
+  font:600 12.5px/1 inherit; padding:8px 13px; border-radius:9px;
+  transition:background .12s ease, border-color .12s ease, color .12s ease; }
+.rb-offedit-del:hover{ background:rgba(229,72,77,.08); border-color:rgba(229,72,77,.55);
+  color:var(--bad,#e5484d); }
+.rb-offedit-del:active{ transform:translateY(.5px); }
 /* Simplified expanded card — top review bar + collapsible <details> sections (Ford 2026-06-28).
    The send decision + summary sit up top; everything else folds away so the card opens calm. */
 .rb-reviewbar{ display:flex; justify-content:space-between; align-items:center; gap:12px;
