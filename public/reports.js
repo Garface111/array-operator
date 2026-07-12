@@ -680,8 +680,15 @@
     const overlay = document.createElement("div");
     overlay.className = "rb-tpl-lightbox";
     overlay.innerHTML = '<div class="rb-tpl-lb-inner"><div class="rb-tpl-load" style="color:#9fb0c0">Rendering…</div></div>';
+    // Discoverability toast: the full-screen preview takes over the screen and it wasn't
+    // obvious how to get out (Ford 2026-07-11). This little pill spells it out. It's
+    // pointer-events:none so it never blocks the click-anywhere-to-close, and fades on its own.
+    const hint = document.createElement("div");
+    hint.className = "rb-tpl-lb-hint";
+    hint.innerHTML = 'Press <kbd>Esc</kbd> — or click anywhere — to go back';
+    overlay.appendChild(hint);
     const close = () => { overlay.remove(); document.removeEventListener("keydown", onKey); };
-    function onKey(e) { if (e.key === "Escape") close(); }
+    function onKey(e) { if (e.key === "Escape") { e.preventDefault(); close(); } }
     overlay.onclick = close;
     document.addEventListener("keydown", onKey);
     document.body.appendChild(overlay);
