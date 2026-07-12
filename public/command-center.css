@@ -2305,7 +2305,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv{ display:grid; grid-template-columns:minmax(0,1fr) 64px 148px auto auto;
   align-items:center; gap:16px; padding:10px 18px 10px 40px; width:100%; box-sizing:border-box;
   text-align:left; font-size:12.5px; cursor:pointer; background:transparent;
-  border-top:1px solid color-mix(in srgb, var(--line,#e2e8f0) 55%, transparent); }
+  /* Full-strength hairline between every inverter (was 55%) so each row reads as its
+     own line — matches the .vs-inv-wrap/.vs-inv-detail dividers around the block. */
+  border-top:1px solid var(--line,#e2e8f0); }
 .vs-inv-gaugecell{ display:flex; align-items:center; justify-content:center; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.045); }
