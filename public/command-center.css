@@ -1082,12 +1082,16 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb2-pc.b{color:var(--good,#2563eb);background:rgba(37,99,235,.09)}
 .rb2-pc.m{color:var(--muted,#475569);background:var(--day-hover,rgba(15,23,42,.05))}
 .rb2-pc.a{color:#92600a;background:rgba(245,158,11,.12)}
-.rb2-nowmark{flex:0 0 auto;width:30px;display:flex;align-items:center;justify-content:center;position:relative}
+.rb2-nowmark{flex:0 0 auto;display:flex;align-items:center;justify-content:center;position:relative;padding:0 7px}
 .rb2-nowmark::before{content:"";position:absolute;top:-5px;bottom:-5px;left:50%;
-  border-left:2px dashed rgba(245,158,11,.5)}
-.rb2-nowmark em{font:700 8.5px/1 inherit;letter-spacing:.08em;color:#92600a;
-  background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);border-radius:999px;
-  padding:3px 6px;font-style:normal;position:relative;z-index:1}
+  border-left:2px dashed rgba(245,158,11,.45)}
+/* Clean date pill on the "now" divider: a white chip so it reads crisply over the
+   dashed line, TODAY eyebrow above the actual date (Ford 2026-07-11). */
+.rb2-now-pill{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:1px;
+  background:#fff;border:1px solid rgba(245,158,11,.42);border-radius:10px;padding:4px 9px;
+  box-shadow:0 1px 4px rgba(245,158,11,.2)}
+.rb2-now-pill em{font:800 7.5px/1.2 inherit;letter-spacing:.13em;text-transform:uppercase;color:#b45309;font-style:normal}
+.rb2-now-pill b{font:800 12px/1.05 inherit;color:#92600a;white-space:nowrap}
 .rb2-pipe.paused .rb2-pcell.sched::before,.rb2-pipe.paused .rb2-pcell.later::before{background:var(--line,#e2e8f0)}
 .rb2-pipe.paused .rb2-pcell.sched .rb2-when b,.rb2-pipe.paused .rb2-pcell.later .rb2-when b{color:var(--faint,#94a3b8)}
 .rb2-pipe.paused .rb2-pcell.sched .rb2-chips,.rb2-pipe.paused .rb2-pcell.later .rb2-chips{opacity:.5}

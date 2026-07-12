@@ -1775,6 +1775,9 @@
     const approvalTotal = (monthly.approval || 0) + (quarterly.approval || 0);
     const autoTotal = (monthly.auto || 0) + (quarterly.auto || 0);
     const days = _daysUntil(monthly.fires_at);
+    // The "now" divider between last-delivered and this-cycle shows the ACTUAL current
+    // date (Ford 2026-07-11 — a bare vertical "NOW" read as cramped/odd).
+    const todayLabel = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
     host.hidden = false;
     host.className = "rb2-pipe" + (paused ? " paused" : "");
     host.innerHTML = `
@@ -1802,7 +1805,7 @@
           <div class="rb2-big">${fmt0(last.delivered || 0)} <span>of ${fmt0(p.total_enabled || 0)}${last.dollars ? " · " + money0(last.dollars) : ""}</span></div>
           <div class="rb2-chips"><span class="rb2-pc g">✓ ${fmt0(last.delivered || 0)} sent</span></div>
         </div>
-        <div class="rb2-nowmark" aria-hidden="true"><em>NOW</em></div>
+        <div class="rb2-nowmark" aria-hidden="true"><span class="rb2-now-pill"><em>Today</em><b>${esc(todayLabel)}</b></span></div>
         <div class="rb2-pcell now">
           <div class="rb2-when"><b>This cycle</b><small>drafted from settled bills</small></div>
           ${(() => {
@@ -5234,10 +5237,27 @@
     // TOP level — provider collapse (GMP / VEC / WEC). Whole header clickable, keyboard-OK.
     // (.rb-prov-head and .rb-grp-head are siblings' children, not nested, so the two
     // collapse levels never trigger each other.)
+    // Collapsing an ancestor that holds the currently-open offtaker card must
+    // actually release it — otherwise the "keep the active card visible" force-open
+    // above (ACTIVE_SUB_ID != null) immediately re-expands this same group/provider
+    // on the render this click triggers, and the collapse click looks like it does
+    // nothing (Ford 2026-07-12: "you cannot collapse up to the GMP" while an
+    // offtaker below it is expanded). Detected via the DOM (not the `providers`
+    // structure, which is out of scope here): if the header's own container still
+    // holds the active card at click-time, this collapse is about to hide it.
+    const releaseActiveIfInside = (container) => {
+      if (ACTIVE_SUB_ID == null || !container) return;
+      if (container.querySelector(`.rb-acc[data-id="${CSS.escape(String(ACTIVE_SUB_ID))}"]`)) {
+        parkTpl();
+        ACTIVE_SUB_ID = null;
+      }
+    };
     list.querySelectorAll("[data-provcollapse]").forEach(h => {
       const go = () => {
         const k = h.getAttribute("data-provcollapse");
-        PROVIDER_COLLAPSED[k] = !PROVIDER_COLLAPSED[k];
+        const collapsing = !PROVIDER_COLLAPSED[k];
+        if (collapsing) releaseActiveIfInside(h.closest(".rb-prov"));
+        PROVIDER_COLLAPSED[k] = collapsing;
         renderAccordion(subs, arrs, utilAccts, drafts);
       };
       h.onclick = go;
@@ -5248,7 +5268,9 @@
     list.querySelectorAll("[data-grpcollapse]").forEach(h => {
       const go = () => {
         const k = h.getAttribute("data-grpcollapse");
-        GROUP_COLLAPSED[k] = !GROUP_COLLAPSED[k];
+        const collapsing = !GROUP_COLLAPSED[k];
+        if (collapsing) releaseActiveIfInside(h.closest(".rb-grp"));
+        GROUP_COLLAPSED[k] = collapsing;
         renderAccordion(subs, arrs, utilAccts, drafts);
       };
       h.onclick = go;
