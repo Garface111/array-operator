@@ -200,7 +200,15 @@
   @keyframes arFlash{0%,55%{box-shadow:0 0 0 2px var(--good,#34d896),0 0 22px -2px var(--good,#34d896)}100%{box-shadow:0 0 0 0 transparent}}
   .ar-panel-head{display:flex;gap:14px;align-items:flex-start}
   .ar-panel-ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
-    font-size:21px;color:var(--ao-oct);background:var(--ao-oct-soft);border:1px solid var(--ao-oct-line)}
+    font-size:21px;color:var(--ao-oct);background:var(--ao-oct-soft);border:1px solid var(--ao-oct-line);
+    padding:0;font-family:inherit;cursor:pointer;line-height:1;-webkit-appearance:none;appearance:none;
+    transition:background .15s ease,transform .12s ease,box-shadow .15s ease}
+  .ar-panel-ic:hover{background:var(--ao-oct-line);transform:translateY(-1px);box-shadow:0 5px 14px -5px var(--ao-oct)}
+  .ar-panel-ic:active{transform:scale(.93)}
+  .ar-panel-ic:focus-visible{outline:2px solid var(--ao-oct);outline-offset:2px}
+  /* Spins while a status pull is in flight — slow load reads as "working" (Ford 2026-07-11). */
+  .ar-panel-ic.ar-spinning{animation:ar-icspin .7s linear infinite;pointer-events:none}
+  @keyframes ar-icspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .ar-panel-hd{min-width:0}
   .ar-panel-hd h3{margin:0;font-size:19px;font-weight:820;letter-spacing:-.015em;color:var(--ink);
     display:flex;align-items:center;gap:11px;flex-wrap:wrap}

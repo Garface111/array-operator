@@ -5002,7 +5002,7 @@
   function autoRefreshRow(){
     return `<section class="ar-panel">
       <div class="ar-panel-head">
-        <span class="ar-panel-ic" aria-hidden="true">↻</span>
+        <button type="button" class="ar-panel-ic" id="arRefreshBtn" title="Refresh now" aria-label="Refresh cloud status now">↻</button>
         <div class="ar-panel-hd">
           <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
           <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
@@ -5059,6 +5059,21 @@
     if(!listEl) return;
     // Mode: on-device (extension vault) vs hands-off cloud (server-side harvest).
     _arWireModeSwitch();
+    // The header ↻ is a LIVE refresh button (Ford 2026-07-11): it spins while a
+    // status pull is in flight — so a slow load reads as "working", not "stuck" —
+    // and re-pulls on click. Wired once; the spin is driven by every load below.
+    const _arRefreshBtn = document.getElementById("arRefreshBtn");
+    if(_arRefreshBtn && !_arRefreshBtn._wired){
+      _arRefreshBtn._wired = true;
+      _arRefreshBtn.addEventListener("click", (e) => {
+        e.stopPropagation();                                        // don't collapse the panel
+        if(_arRefreshBtn.classList.contains("ar-spinning")) return; // a pull is already running
+        _vaultStatusCache = null;                                   // force a fresh pull, not the cache
+        wireAutoRefreshRow();                                       // re-fetch + re-render (spins itself)
+      });
+    }
+    const _arStopSpin = () => { if(_arRefreshBtn) setTimeout(() => _arRefreshBtn.classList.remove("ar-spinning"), 450); };
+    if(_arRefreshBtn) _arRefreshBtn.classList.add("ar-spinning");   // spin while THIS load runs
     const mode = _arGetMode();
     let status = {};
     if(mode === "cloud"){
@@ -5066,18 +5081,21 @@
       if(!cs || !cs.ok){
         listEl.innerHTML = (cs && cs.error === "signin")
           ? `<div class="acct-msg">Sign in to set up hands-off cloud refresh.</div>`
-          : `<div class="acct-msg">Couldn't load cloud refresh status — reload to retry.</div>`;
+          : `<div class="acct-msg">Couldn't load cloud refresh status — tap ↻ to retry.</div>`;
+        _arStopSpin();
         return;
       }
       status = cloudStatusToShape(cs);
     } else {
       if(!EXT_PRESENT){
         listEl.innerHTML = `<div class="acct-msg">Install the free EnergyAgent helper to enable on-device auto-refresh — or switch to <b>Hands-off cloud</b> above, which needs no helper. <a href="onboarding.html" style="color:var(--good)">Get the helper →</a></div>`;
+        _arStopSpin();
         return;
       }
       const resp = await vaultOp("status");
       if(!resp || !resp.ok){
-        listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and reload.</div>`;
+        listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and tap ↻ to retry.</div>`;
+        _arStopSpin();
         return;
       }
       status = resp.status || {};
@@ -5435,6 +5453,7 @@
 
     // Keep the board's freshness ticking while it's on screen (cloud mode).
     _arStartLiveTick();
+    _arStopSpin();   // render done → let the ↻ settle
   }
 
   /* ---- Password row: view (masked + show-as-you-type) and set/change it.
