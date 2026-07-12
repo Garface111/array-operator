@@ -8,6 +8,23 @@
      so_session localStorage routing before anything reads/writes it. Lets Ford stay
      signed into different accounts in different tabs. See session-tabscope.js. -->
 <script src="/session-tabscope.js?v=1"></script>
+<!-- bfcache sign-out guard (Ford 2026-07-12): aoSignOut() (app.js) clears so_session
+     and hard-navigates to /login instantly — but the browser's back-forward cache can
+     restore THIS page's frozen pre-logout DOM verbatim on a later Back navigation,
+     with real signed-in chrome (trial banner, vault nudges) still showing even though
+     the session is gone. Any live data fetch on that stale page (e.g. the Offtaker tab)
+     correctly re-checks auth and falls through to the anonymous demo fixture, so the
+     page reads as "half signed out" — real chrome + fake offtakers. Re-validate the
+     instant a bfcache restore happens and bounce straight to /login before anything
+     renders, closing that window entirely. -->
+<script>
+(function () {
+  window.addEventListener("pageshow", function (e) {
+    if (!e.persisted) return;
+    try { if (!localStorage.getItem("so_session")) location.replace("/login"); } catch (err) {}
+  });
+})();
+</script>
 <!-- Whole-system browser error capture — loaded first so it sees errors from
      every later script. POSTs to the shared backend /v1/client-error. -->
 <script src="error-reporter.js?v=20260709"></script>
