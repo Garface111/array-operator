@@ -1158,8 +1158,22 @@
     const sc = $("#vsScroll");
     if (!sc || (sc.closest("[hidden]"))) return;       // skip while the sheet is hidden (no layout)
     const top = sc.getBoundingClientRect().top;
-    sc.style.height = Math.max(260, window.innerHeight - top - 18) + "px";
+    const avail = window.innerHeight - top - 14;        // room from the box top to the viewport bottom
+    // Fill to the bottom of the screen so the pane is as tall as it can be. BUT when the
+    // header eats the viewport (short window / zoomed in), DON'T pin a cramped scroll box —
+    // that traps the user in a sliver with no way past it (Ford 2026-07-11). Below a usable
+    // threshold, drop the fixed height entirely so the WHOLE page scrolls naturally instead.
+    if (avail >= 340) {
+      sc.style.height = avail + "px";
+      sc.style.overflowY = "auto";
+    } else {
+      sc.style.height = "auto";
+      sc.style.overflowY = "visible";
+    }
   }
+  // Keep the pane filling the screen bottom as the page scrolls/zooms (rAF-throttled).
+  let _sizeRaf = 0;
+  function sizeScrollSoon() { if (_sizeRaf) return; _sizeRaf = requestAnimationFrame(() => { _sizeRaf = 0; sizeScroll(); }); }
 
   function render() {
     const host = $("#vendorSheet");
@@ -1218,6 +1232,7 @@
     });
     try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, window.location.origin); } catch (_) {}
     window.addEventListener("resize", sizeScroll);
+    window.addEventListener("scroll", sizeScrollSoon, { passive: true });
     showView(_view);
   }
 
