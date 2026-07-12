@@ -822,6 +822,7 @@ function forkScreen(){
 
 function chooseDevice(){
   state.connect = "device"; state.cloudMode = false;
+  try { localStorage.setItem("ao_ar_mode", "device"); } catch(e){}  // app opens in device/extension mode
   renderStepper();                                                 // keep step labels in sync with the path
   if (EXT_PRESENT && !state.syncMode){ startSyncAll(); return; }   // helper already here → straight to the sync
   render();                                                        // else the "add the helper" screen
@@ -837,6 +838,11 @@ function backToFork(){
 // contract as the dashboard's Auto-refresh panel (POST /v1/cloud-capture/*). ──
 function chooseCloud(){
   state.connect = "cloud"; state.cloudMode = true;
+  // Persist the choice as the APP's mode preference (sandbox.js reads ao_ar_mode).
+  // Without this the app defaulted to device/extension even after a cloud onboarding
+  // — the whole reason "Store it with us" appeared to fall back to the extension
+  // (Ford 2026-07-11, hit on mobile but path-wide).
+  try { localStorage.setItem("ao_ar_mode", "cloud"); } catch(e){}
   renderStepper();   // step-3 label flips to "Your logins" immediately
   render();          // step 1 → cloudEmailScreen
 }
@@ -910,6 +916,7 @@ async function createCloudAccount(){
         return;
       }
       state.cloudMode = true;
+      try { localStorage.setItem("ao_ar_mode", "cloud"); } catch(e){}   // reaffirm cloud mode at completion
       go(2);   // → cloud "add your portal logins" vault
       return;
     } else if(startRes.status === 409){
