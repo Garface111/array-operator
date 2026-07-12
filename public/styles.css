@@ -10,6 +10,37 @@
     /* Live-state signal — an explicit green (day-mode --good is BLUE, so it can't
        double as "working"). This is the colour of the pulsing dots. */
     --ao-live:#2ee68a; --ao-live-glow:rgba(46,230,138,.55); --ao-live-ink:#34d399;
+    /* ── Motion system — the hard-and-fast rules, codified (Ford 2026-07-11) ──────
+       1. DURATION: hover/caret 140ms · standard UI 200ms · reveals/panels 260ms.
+          Nothing over ~320ms for functional UI; exits a touch quicker than entrances.
+       2. EASING: never bare `ease`/`linear` for spatial motion (reads robotic).
+          Entrances DECELERATE (fast→slow → things arrive softly); exits ACCELERATE;
+          moves-within-view use the standard curve.
+       3. Animate transform + opacity (GPU-composited) — avoid width/height/top/left.
+       4. Honor prefers-reduced-motion (block below). */
+    --ease-out: cubic-bezier(.22,1,.36,1);      /* entrances — decelerate + tiny settle */
+    --ease-standard: cubic-bezier(.4,0,.2,1);   /* moves within view (Material standard) */
+    --ease-in: cubic-bezier(.4,0,1,1);          /* exits — accelerate away */
+    --motion-fast:140ms; --motion:200ms; --motion-slow:260ms;
+    /* Lets <details> and other keyword sizes animate smoothly where supported (Chromium). */
+    interpolate-size: allow-keywords;
+  }
+  /* Accessibility: honor the OS "reduce motion" preference — kill spatial jank. */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important;
+      transition-duration:.01ms !important; scroll-behavior:auto !important; }
+  }
+  /* Smooth expandable reveal for the native <details> accordions (Edit email / Invoice
+     template / Generation spreadsheet / Advanced / Invoice archive) — they used to SNAP
+     open, the main "jumpy" Ford flagged. Progressive enhancement: buttery in Chromium via
+     ::details-content + interpolate-size; unchanged (instant) where unsupported. */
+  @supports selector(::details-content){
+    .rb-sec::details-content, .rb-arch::details-content, .rb-fadv::details-content{
+      height:0; overflow:clip;
+      transition:height var(--motion-slow) var(--ease-standard),
+                 content-visibility var(--motion-slow) allow-discrete; }
+    .rb-sec[open]::details-content, .rb-arch[open]::details-content,
+    .rb-fadv[open]::details-content{ height:auto; }
   }
   *{box-sizing:border-box;margin:0;padding:0}
   /* Global keyboard-focus ring (default/night theme). theme-day.css already ships
