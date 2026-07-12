@@ -5068,23 +5068,41 @@
   // half-typed credential. One interval; pauses when the panel is hidden/collapsed or a
   // field is focused. Device mode has no server clock, so no tick (the board is static).
   let _arLiveTick = null;
+  // ADAPTIVE cadence (Ford 2026-07-12, live: "these need to load faster"): while any login
+  // is still spinning up (queued / starting — not yet live), poll every 4s so the board flips
+  // to live the moment the server captures. Once everything is live it backs off to 30s (just
+  // ticking timestamps). Fires an IMMEDIATE poll on start instead of waiting a full interval.
+  function _arStopLiveTick(){ if(_arLiveTick){ clearTimeout(_arLiveTick); _arLiveTick = null; } }
   function _arStartLiveTick(){
-    if(_arLiveTick){ clearInterval(_arLiveTick); _arLiveTick = null; }
+    _arStopLiveTick();
     if(_arGetMode() !== "cloud") return;
-    _arLiveTick = setInterval(async () => {
+    const step = async () => {
+      _arLiveTick = null;
       const board = document.getElementById("arLiveBoard");
-      if(!board){ clearInterval(_arLiveTick); _arLiveTick = null; return; }
+      if(!board) return;                                     // board gone → stop the loop
+      let delay = 30000;
       const body = document.getElementById("arBody");
-      if(location.hash !== "#account" || (body && body.classList.contains("ar-collapsed"))) return;
       const ae = document.activeElement;
-      if(ae && ae.closest && ae.closest(".ar-fields")) return;
-      const cs = await cloudOp("status");
-      if(!cs || !cs.ok) return;
-      const cur = document.getElementById("arLiveBoard");
-      if(!cur) return;
-      const catalog = await loadUtilCatalog();
-      cur.outerHTML = buildLiveBoardHTML(cloudStatusToShape(cs), "cloud", catalog);
-    }, 30000);
+      const paused = location.hash !== "#account"
+        || (body && body.classList.contains("ar-collapsed"))
+        || (ae && ae.closest && ae.closest(".ar-fields"));
+      if(!paused){
+        const cs = await cloudOp("status");
+        const cur = document.getElementById("arLiveBoard");
+        if(cur && cs && cs.ok){
+          const shape = cloudStatusToShape(cs);
+          const catalog = await loadUtilCatalog();
+          cur.outerHTML = buildLiveBoardHTML(shape, "cloud", catalog);
+          // Anything not yet live (queued/starting/warn) → keep polling fast.
+          const spinning = Object.keys(shape || {}).some(k => {
+            const s = shape[k]; return s && s.hasCreds && s._cloudOk !== true;
+          });
+          delay = spinning ? 4000 : 30000;
+        } else if(!cur){ return; }
+      } else { delay = 4000; }                               // paused → re-check soon
+      _arLiveTick = setTimeout(step, delay);
+    };
+    step();                                                  // immediate first poll
   }
 
   // Auto-refresh is the heart of the service, so it leads the Master Account tab as its
