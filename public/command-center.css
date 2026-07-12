@@ -1481,16 +1481,20 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-sec[data-tone="amber"]{ --tone:#f59e0b; --tone-bg:rgba(245,158,11,.12); --tone-bd:rgba(245,158,11,.32); --tone-ink:#92600a; }
 .rb-sec[data-tone="sky"]{ --tone:#0ea5e9; --tone-bg:rgba(14,165,233,.11); --tone-bd:rgba(14,165,233,.3); --tone-ink:#0369a1; }
 .rb-sec[data-tone="violet"]{ --tone:#8b5cf6; --tone-bg:rgba(139,92,246,.11); --tone-bd:rgba(139,92,246,.3); --tone-ink:#6d28d9; }
-.rb-sec > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px;
-  padding:10px 14px; font-size:13px; color:var(--ink,#0f172a); user-select:none; background:transparent; }
+.rb-sec > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:11px;
+  padding:13px 15px; font-size:13px; color:var(--ink,#0f172a); user-select:none; background:transparent; }
 .rb-sec > summary::-webkit-details-marker{ display:none; }
 .rb-sec > summary:hover{ background:rgba(255,255,255,.28); }
-.rb-sec-caret{ font-style:normal; color:var(--tone); font-size:11px; opacity:.85;
+/* The disclosure caret is a real, obvious toggle target (Ford 2026-07-11 — the old
+   11px arrow was too small to read as a dropdown). A fixed 20px box keeps the rotation
+   centered so the row never shifts as sections open/close. */
+.rb-sec-caret{ font-style:normal; color:var(--tone); font-size:17px; line-height:1; opacity:1;
+  width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; flex:none;
   transition:transform .15s ease; }
 .rb-sec[open] > summary .rb-sec-caret{ transform:rotate(90deg); }
-.rb-sec-dot{ width:8px; height:8px; border-radius:50%; background:var(--tone); flex:none;
+.rb-sec-dot{ width:9px; height:9px; border-radius:50%; background:var(--tone); flex:none;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
-.rb-sec-t{ font-weight:700; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--tone-ink); }
+.rb-sec-t{ font-weight:700; font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--tone-ink); }
 .rb-sec-sub{ margin-left:auto; font-size:11px; color:var(--tone-ink); opacity:.7; font-weight:600; }
 .rb-sec[open] > summary .rb-sec-sub{ display:none; }
 .rb-sec-body{ padding:4px 14px 14px; background:transparent; }
