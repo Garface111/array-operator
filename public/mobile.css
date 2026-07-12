@@ -121,15 +121,79 @@
   }
   #panelDashboard .cc-table { min-width: 620px; }   /* keep columns legible; the wrap scrolls */
 
-  /* ── Tab bar: 8 tabs were wrapping to FOUR ragged rows (108px tall, uneven
-     heights as long labels like "Offtaker Invoice Generator" broke to two lines).
-     Make it a single-row horizontal scroll strip instead — one clean 49px row,
-     uniform tabs, swipe to reach the rest. The partially-cut last tab hints the
-     scroll; scrollbar hidden to stay flat. No page-level sideways scroll. ─────── */
-  .tabbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .tabbar::-webkit-scrollbar { display: none; }
-  .tab { white-space: nowrap; flex: 0 0 auto; }
+  /* ══ BOTTOM NAV (mobile overhaul, Ford 2026-07-12) ═══════════════════════════
+     The tab bar becomes a fixed thumb-zone bar: 5 primary tabs (icon + short label,
+     injected by mobile-nav.js) + a "More" sheet for Trends/Resources. Replaces the
+     old top scroll-strip. Long desktop labels, auth chips and the theme toggle are
+     hidden on mobile; the body gets bottom padding so the fixed bar never covers
+     content. Octarine marks the active tab. ─────────────────────────────────── */
+  body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    display: flex; align-items: stretch; gap: 0; z-index: 60; margin: 0;
+    background: var(--card, #fff); border-top: 1px solid var(--line); border-radius: 0;
+    box-shadow: 0 -10px 30px -22px rgba(15, 23, 42, .5);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    overflow: visible; flex-wrap: nowrap;
+  }
+  /* only primary tabs live in the bar; everything else is hidden on mobile */
+  .tabbar > .tab:not(.tab-primary),
+  .tabbar #tabSignIn, .tabbar #tabWhoami, .tabbar #tabSignOut,
+  .tabbar .theme-toggle { display: none !important; }
+  .tab + .tab { border-left: 0; }                 /* kill desktop dividers */
+  .tab.tab-primary {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; position: relative;
+    padding: 5px 2px 2px; min-height: 46px; border: 0; background: none;
+    color: var(--faint, #94a3b8); text-decoration: none; white-space: nowrap;
+    border-radius: 12px; transition: color .16s;
+  }
+  .tab.tab-primary .tab-full { display: none; }   /* long desktop label off */
+  .tab .tab-ic { display: grid; place-items: center; height: 24px; position: relative; }
+  .tab .tab-ic svg { width: 23px; height: 23px; display: block; }
+  .tab .tab-short { font-size: 10px; font-weight: 750; letter-spacing: .01em; line-height: 1; }
+  .tab.active::after { display: none !important; }  /* neutralize desktop underline */
+  /* octarine active tab — .tabbar-scoped + !important to win AO's cascade war (the
+     day theme leans on high-specificity !important rules). Icon strokes follow via
+     currentColor; a separate indicator bar (below) is a background, so the active
+     state still reads even if some future rule steals `color`. */
+  .tabbar .tab.tab-primary.active,
+  .tabbar .tab.tab-more.on,
+  .tabbar .tab.tab-more.has-active { color: var(--ao-oct, #7c3aed) !important; }
+  .tabbar .tab.tab-primary.active .tab-ic::after {
+    content: ""; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 3px; border-radius: 0 0 3px 3px; background: var(--ao-oct, #7c3aed);
+  }
+  .tab.tab-primary:active { transform: scale(.93); }
+  #tabAccount .tab-dot { position: absolute; top: 3px; left: calc(50% + 7px); margin: 0; }
+
+  /* More sheet */
+  .mob-more-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(15, 23, 42, .3); }
+  .mob-more-backdrop[hidden] { display: none; }
+  .mob-more {
+    position: fixed; left: 8px; right: 8px; z-index: 66;
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    background: var(--card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 8px;
+    box-shadow: 0 26px 54px -20px rgba(15, 23, 42, .55);
+    animation: mobMoreUp .26s cubic-bezier(.2, .7, .2, 1.05);
+  }
+  .mob-more[hidden] { display: none; }
+  @keyframes mobMoreUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .mob-more-grip { width: 36px; height: 4px; border-radius: 999px; background: var(--line); margin: 2px auto 8px; }
+  .mob-more-item {
+    display: flex; align-items: center; gap: 13px; padding: 13px 12px; border-radius: 12px;
+    color: var(--ink); text-decoration: none; font-size: 15px; font-weight: 650;
+  }
+  .mob-more-item + .mob-more-item { border-top: 1px solid var(--line); }
+  .mob-more-item:active { background: var(--ao-oct-soft, rgba(124, 58, 237, .09)); }
+  .mob-more-ic { display: grid; place-items: center; color: var(--ao-oct, #7c3aed); }
+  .mob-more-ic svg { width: 22px; height: 22px; }
+  .mob-more-go { margin-left: auto; color: var(--faint); }
+
+  /* Floating widgets must sit ABOVE the new bottom bar, not behind it. */
+  #fsWrap { bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important; }
+  .ao-al-fab { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  .ao-al-panel { bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 
 /* Extra squeeze for the smallest phones. */
