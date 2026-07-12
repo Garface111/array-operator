@@ -1463,7 +1463,7 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-offedit-del{ margin-left:auto; align-self:center; flex:none; cursor:pointer;
   display:inline-flex; align-items:center; gap:6px; background:var(--card,#fff);
   border:1px solid var(--line,#e2e8f0); color:var(--muted,#64748b);
-  font:600 12.5px/1 inherit; padding:8px 13px; border-radius:9px;
+  font-family:inherit; font-weight:600; font-size:12.5px; line-height:1; padding:8px 13px; border-radius:9px;
   transition:background .12s ease, border-color .12s ease, color .12s ease; }
 .rb-offedit-del:hover{ background:rgba(229,72,77,.08); border-color:rgba(229,72,77,.55);
   color:var(--bad,#e5484d); }
