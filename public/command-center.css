@@ -1188,6 +1188,12 @@ body.sb-fs-lock{ overflow:hidden; }
   font:700 10.5px/1 inherit; color:#92600a; background:rgba(245,158,11,.16);
   border:1px solid rgba(245,158,11,.35); border-radius:20px; padding:2px 8px;
   vertical-align:1px; white-space:nowrap; }
+/* Same trap documented above for .nmg-combo-list / .rb-track-global: `display:
+   inline-flex` is an AUTHOR rule that always beats the UA `[hidden]{display:none}`,
+   so `updateAuditTabBadge()` setting `b.hidden = true` (n===0) never actually hid
+   it — an empty amber pill sat next to "Bill audit" with nothing flagged (Ford,
+   2026-07-11). Restore the hide. */
+.rb-au-genbadge[hidden]{ display:none !important; }
 .rb-au-sum-why{ font-size:10.5px; font-weight:500; color:var(--faint,#94a3b8); margin-left:6px; }
 
 /* ── Offtaker email studio — the MASS email customizer (full-screen overlay).
