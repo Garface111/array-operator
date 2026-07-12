@@ -190,6 +190,12 @@
   .cv-switch input{accent-color:var(--good)}
   .cv-stat{font-size:.74rem;margin:.15rem 0 .35rem;font-weight:600}
   .cv-stat.ok{color:var(--good)} .cv-stat.err{color:var(--warn)}
+  .cv-dup-hint{font-size:.74rem;line-height:1.45;font-weight:600;color:#92400e;background:rgba(180,83,9,.08);
+    border:1px solid rgba(180,83,9,.28);border-radius:9px;padding:.45rem .6rem;margin:.2rem 0 .4rem}
+  .cv-dup-hint code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;font-weight:700;
+    background:rgba(180,83,9,.12);padding:1px 5px;border-radius:4px}
+  .cv-row.cv-row-dup{outline:1px solid rgba(180,83,9,.4);outline-offset:2px;border-radius:10px}
+  .cv-user.cv-user-dup{border-color:#b45309 !important;box-shadow:0 0 0 2px rgba(180,83,9,.18)}
   .cv-fields{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
   .cv-fields input{margin-top:0;width:auto;flex:1 1 11rem;min-width:0}
   /* actions wrap to their own line so username + password get the full row width
@@ -1062,10 +1068,12 @@ async function wireCloudVault(){
       else statLine = `<div class="cv-stat ok">✓ Saved — first refresh starting…</div>`;
     }
     const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
-    return `<div class="cv-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}">
+    const origUser = hasCreds && prefillUser ? ` data-origuser="${esc((prefillUser||"").trim().toLowerCase())}"` : "";
+    return `<div class="cv-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}" data-hascreds="${hasCreds?"1":"0"}"${origUser}>
       ${hasCreds ? `<div class="cv-row-top"><span class="cv-badge ${on?'on':'off'}">${on?'On':'Off'}</span>
         <label class="cv-switch"><input type="checkbox" class="cv-optout" ${!enabled?'checked':''}> off</label></div>` : ""}
       ${statLine}
+      <div class="cv-dup-hint" hidden aria-live="polite"></div>
       <div class="cv-fields">
         <input class="cv-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph||'Portal username / email')}">
         <input class="cv-pass" type="password" autocomplete="off" placeholder="${hasCreds?'saved — type to replace':'Portal password'}">
@@ -1137,6 +1145,15 @@ async function wireCloudVault(){
   const consentOk = () => { const c = document.getElementById("cvConsentChk"); return !!(c && c.checked); };
 
   // ── wire each credential row ──
+  // Backend upserts by (provider, username_lc) — surface a live "already in vault"
+  // indicator so "Add login" with a duplicate username is not a silent overwrite.
+  const knownUsersByCode = {};
+  Object.keys(status).forEach(k => {
+    const s = status[k]; if(!s || !s.hasCreds) return;
+    const code = s.code || k;
+    const u = (s.username || "").trim(); if(!u) return;
+    (knownUsersByCode[code] = knownUsersByCode[code] || []).push({ username:u, usernameLc:u.toLowerCase() });
+  });
   listEl.querySelectorAll(".cv-row").forEach(row => {
     const key = row.dataset.key;
     const saveCode = row.dataset.savecode;
@@ -1145,8 +1162,49 @@ async function wireCloudVault(){
     const saveBtn = row.querySelector(".cv-save");
     const clearBtn = row.querySelector(".cv-clear");
     const optEl = row.querySelector(".cv-optout");
-    const savedLabel = saveBtn.textContent;
+    const dupHint = row.querySelector(".cv-dup-hint");
+    const baseLabel = saveBtn.textContent;
+    let savedLabel = baseLabel;
     const cloudHost = (catalog[saveCode] && catalog[saveCode].host) || "";
+    const origUserLc = (row.dataset.origuser || "").trim().toLowerCase();
+    const isAddRow = row.dataset.hascreds !== "1";
+    const findDup = () => {
+      const uLc = (userEl.value || "").trim().toLowerCase();
+      if(!uLc) return null;
+      const known = knownUsersByCode[saveCode] || [];
+      return known.find(k => k.usernameLc === uLc && k.usernameLc !== origUserLc) || null;
+    };
+    const paintDup = () => {
+      if(!dupHint) return false;
+      const hit = findDup();
+      if(hit){
+        row.classList.add("cv-row-dup");
+        userEl.classList.add("cv-user-dup");
+        dupHint.hidden = false;
+        dupHint.innerHTML = isAddRow
+          ? `⚠ <b>Already in your vault</b> — <code>${esc(hit.username)}</code> is saved for this portal. Saving updates that login's password (doesn't add a second copy).`
+          : `⚠ <b>Duplicate username</b> — <code>${esc(hit.username)}</code> is already saved for this portal. Saving updates that existing login instead.`;
+        if(isAddRow){
+          savedLabel = "Update existing";
+          if(saveBtn.textContent === baseLabel || saveBtn.textContent === "Add login" || saveBtn.textContent === "Save"){
+            saveBtn.textContent = savedLabel;
+          }
+        }
+        return true;
+      }
+      row.classList.remove("cv-row-dup");
+      userEl.classList.remove("cv-user-dup");
+      dupHint.hidden = true;
+      dupHint.textContent = "";
+      if(isAddRow){
+        savedLabel = baseLabel;
+        if(saveBtn.textContent === "Update existing") saveBtn.textContent = baseLabel;
+      }
+      return false;
+    };
+    userEl.addEventListener("input", paintDup);
+    userEl.addEventListener("blur", paintDup);
+    paintDup();
     saveBtn.addEventListener("click", async () => {
       const u = (userEl.value||"").trim(), p = passEl.value||"";
       if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
@@ -1157,10 +1215,12 @@ async function wireCloudVault(){
         setTimeout(()=>saveBtn.textContent=savedLabel,1800);
         return;
       }
-      saveBtn.textContent = "Saving…";
+      const isDup = !!findDup();
+      paintDup();
+      saveBtn.textContent = isDup ? "Updating…" : "Saving…";
       const r = await cloudApi("set", { provider:saveCode, username:u, password:p, login_host:cloudHost, consent:true });
       passEl.value = "";
-      if(r.ok){ saveBtn.textContent = "✓ Saved"; setTimeout(()=>wireCloudVault(), 700); }
+      if(r.ok){ saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved"; setTimeout(()=>wireCloudVault(), 700); }
       else {
         const msg = (r.error==="http_403") ? "Not enabled yet"
           : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";

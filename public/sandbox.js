@@ -5227,38 +5227,42 @@
     // saveCode = the code `set` writes under (a utility's base code, or the id).
     // prefillUser = a saved login's username (shown so multiple logins are distinct).
     const credRow = (opts) => {
-      const { key, saveCode, label, ph, hasCreds, enabled, prefillUser, addLabel, cloudStat } = opts;
-      const on = hasCreds && enabled;
-      const stateTxt = hasCreds ? (enabled ? "On" : "Off") : "";
-      const stateCls = on ? "on" : (hasCreds ? "off" : "");
-      const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
-      // Cloud mode: an explicit status line so a saved login is unmistakable and
-      // its refresh state is visible (saved → first pull → connected, or an issue).
-      let cloudLine = "";
-      if(mode === "cloud" && hasCreds){
-        const cs = cloudStat || {};
-        if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused — re-enter your password to retry</div>`;
-        else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in — check the password</div>`;
-        else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected — refreshing automatically</div>`;
-        else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved — first refresh starting…</div>`;
-      }
-      return `<div class="ar-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}">
-        <div class="ar-row-top">
-          ${label ? `<span class="ar-vendor">${esc(label)}</span>` : ""}
-          ${hasCreds ? `<span class="ar-badge ${stateCls}">${stateTxt}</span>
-          <label class="ar-switch"><input type="checkbox" class="ar-optout" ${!enabled ? "checked" : ""}><span>off</span></label>` : ""}
-        </div>
-        ${cloudLine}
-        <div class="ar-fields">
-          <input class="ar-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph || "Portal username / email")}">
-          <input class="ar-pass" type="password" autocomplete="off" placeholder="${hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
-          <div class="ar-actions">
-            <button class="acct-btn primary ar-save" type="button">${hasCreds ? "Save" : (addLabel || "Save")}</button>
-            ${hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
-          </div>
-        </div>
-      </div>`;
-    };
+          const { key, saveCode, label, ph, hasCreds, enabled, prefillUser, addLabel, cloudStat } = opts;
+          const on = hasCreds && enabled;
+          const stateTxt = hasCreds ? (enabled ? "On" : "Off") : "";
+          const stateCls = on ? "on" : (hasCreds ? "off" : "");
+          const userVal = prefillUser ? ` value="${esc(prefillUser)}"` : "";
+          // Cloud mode: an explicit status line so a saved login is unmistakable and
+          // its refresh state is visible (saved → first pull → connected, or an issue).
+          let cloudLine = "";
+          if(mode === "cloud" && hasCreds){
+            const cs = cloudStat || {};
+            if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused — re-enter your password to retry</div>`;
+            else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in — check the password</div>`;
+            else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected — refreshing automatically</div>`;
+            else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved — first refresh starting…</div>`;
+          }
+          // data-origuser = the username this row already owns (case-insensitive match
+          // skips self when checking for a duplicate against other saved logins).
+          const origUser = hasCreds && prefillUser ? ` data-origuser="${esc((prefillUser || "").trim().toLowerCase())}"` : "";
+          return `<div class="ar-row" data-key="${esc(key)}" data-savecode="${esc(saveCode)}" data-hascreds="${hasCreds ? "1" : "0"}"${origUser}>
+            <div class="ar-row-top">
+              ${label ? `<span class="ar-vendor">${esc(label)}</span>` : ""}
+              ${hasCreds ? `<span class="ar-badge ${stateCls}">${stateTxt}</span>
+              <label class="ar-switch"><input type="checkbox" class="ar-optout" ${!enabled ? "checked" : ""}><span>off</span></label>` : ""}
+            </div>
+            ${cloudLine}
+            <div class="ar-dup-hint" hidden aria-live="polite"></div>
+            <div class="ar-fields">
+              <input class="ar-user" type="text" autocomplete="off"${userVal} placeholder="${esc(ph || "Portal username / email")}">
+              <input class="ar-pass" type="password" autocomplete="off" placeholder="${hasCreds ? "•••••••• (saved — type to replace)" : "Portal password"}">
+              <div class="ar-actions">
+                <button class="acct-btn primary ar-save" type="button">${hasCreds ? "Save" : (addLabel || "Save")}</button>
+                ${hasCreds ? `<button class="acct-btn ar-clear" type="button">Remove</button>` : ""}
+              </div>
+            </div>
+          </div>`;
+        };
 
     // Group saved UTILITY logins by their base code (multi-login: a code can own
     // several "code::username" slots — the vault reports each as its own entry).
@@ -5435,47 +5439,108 @@
         }
       });
     }
-    // ── wire credential rows (inverter + utility) ──
-    listEl.querySelectorAll(".ar-row").forEach(row => {
-      const key = row.dataset.key;
-      const saveCode = row.dataset.savecode;
-      const userEl = row.querySelector(".ar-user");
-      const passEl = row.querySelector(".ar-pass");
-      const saveBtn = row.querySelector(".ar-save");
-      const clearBtn = row.querySelector(".ar-clear");
-      const optEl = row.querySelector(".ar-optout");
-      const savedLabel = saveBtn.textContent;
-      // Co-op logins need their portal host so the cloud farm knows which
-      // *.smarthub.coop to open; the catalog carries it.
-      const cloudHost = (catalog[saveCode] && catalog[saveCode].host) || "";
-      saveBtn.addEventListener("click", async () => {
-        const u = (userEl.value||"").trim(), p = passEl.value||"";
-        if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
-        saveBtn.textContent = "Saving…";
-        if(mode === "cloud"){
-          if(!_arConsentOk()){
-            saveBtn.textContent = "Check the box ↑";
-            const c = document.getElementById("arConsent");
-            if(c){ c.classList.add("ar-consent-flash"); setTimeout(()=>c.classList.remove("ar-consent-flash"), 1500); c.scrollIntoView({behavior:"smooth", block:"nearest"}); }
-            setTimeout(()=>saveBtn.textContent=savedLabel, 1800);
-            return;
-          }
-          const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost, consent: true });
-          passEl.value = "";
-          if(r.ok){
-            saveBtn.textContent = "✓ Saved";
-            saveBtn.classList.add("ar-saved-ok");
-            // Re-render so the row flips to the saved "On" state with a status line.
-            setTimeout(() => { wireAutoRefreshRow(); }, 700);
-          } else {
-            const msg = (r.error === "http_403") ? "Not enabled yet"
-              : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";
-            saveBtn.textContent = "✕ " + msg;
-            saveBtn.classList.add("ar-save-err");
-            setTimeout(() => { saveBtn.textContent = savedLabel; saveBtn.classList.remove("ar-save-err"); }, 4000);
-          }
-          return;
-        }
+    // Known usernames per provider — live duplicate detection on the add-login
+        // row (and when a saved row's username is retargeted onto another login).
+        // Backend keys PortalCredential on (tenant, provider, username_lc), so a
+        // second save with the same username silently upserts; surface that here.
+        const knownUsersByCode = {};
+        Object.keys(status).forEach(k => {
+          const s = status[k];
+          if(!s || !s.hasCreds) return;
+          const code = s.code || k;
+          const u = (s.username || "").trim();
+          if(!u) return;
+          (knownUsersByCode[code] = knownUsersByCode[code] || []).push({
+            username: u, usernameLc: u.toLowerCase(), slot: k,
+          });
+        });
+
+        // ── wire credential rows (inverter + utility) ──
+        listEl.querySelectorAll(".ar-row").forEach(row => {
+          const key = row.dataset.key;
+          const saveCode = row.dataset.savecode;
+          const userEl = row.querySelector(".ar-user");
+          const passEl = row.querySelector(".ar-pass");
+          const saveBtn = row.querySelector(".ar-save");
+          const clearBtn = row.querySelector(".ar-clear");
+          const optEl = row.querySelector(".ar-optout");
+          const dupHint = row.querySelector(".ar-dup-hint");
+          const baseLabel = saveBtn.textContent;
+          let savedLabel = baseLabel;
+          // Co-op logins need their portal host so the cloud farm knows which
+          // *.smarthub.coop to open; the catalog carries it.
+          const cloudHost = (catalog[saveCode] && catalog[saveCode].host) || "";
+          const origUserLc = (row.dataset.origuser || "").trim().toLowerCase();
+          const isAddRow = row.dataset.hascreds !== "1";
+          // True when the typed username already exists under this provider as a
+          // DIFFERENT login (self-match on a saved row is not a duplicate).
+          const findDup = () => {
+            const uLc = (userEl.value || "").trim().toLowerCase();
+            if(!uLc) return null;
+            const known = knownUsersByCode[saveCode] || [];
+            return known.find(k => k.usernameLc === uLc && k.usernameLc !== origUserLc) || null;
+          };
+          const paintDup = () => {
+            if(!dupHint) return false;
+            const hit = findDup();
+            if(hit){
+              row.classList.add("ar-row-dup");
+              userEl.classList.add("ar-user-dup");
+              dupHint.hidden = false;
+              dupHint.innerHTML = isAddRow
+                ? `⚠ <b>Already in your vault</b> — <code>${esc(hit.username)}</code> is saved for this portal. Saving updates that login’s password (doesn’t add a second copy).`
+                : `⚠ <b>Duplicate username</b> — <code>${esc(hit.username)}</code> is already saved for this portal. Saving updates that existing login instead.`;
+              if(isAddRow){
+                savedLabel = "Update existing";
+                if(saveBtn.textContent === baseLabel || saveBtn.textContent === "Add login" || saveBtn.textContent === "Save"){
+                  saveBtn.textContent = savedLabel;
+                }
+              }
+              return true;
+            }
+            row.classList.remove("ar-row-dup");
+            userEl.classList.remove("ar-user-dup");
+            dupHint.hidden = true;
+            dupHint.textContent = "";
+            if(isAddRow){
+              savedLabel = baseLabel;
+              if(saveBtn.textContent === "Update existing") saveBtn.textContent = baseLabel;
+            }
+            return false;
+          };
+          userEl.addEventListener("input", paintDup);
+          userEl.addEventListener("blur", paintDup);
+          paintDup();
+          saveBtn.addEventListener("click", async () => {
+            const u = (userEl.value||"").trim(), p = passEl.value||"";
+            if(!u || !p){ saveBtn.textContent = "Enter both"; setTimeout(()=>saveBtn.textContent=savedLabel,1500); return; }
+            const isDup = !!findDup();
+            paintDup();
+            saveBtn.textContent = isDup ? "Updating…" : "Saving…";
+            if(mode === "cloud"){
+              if(!_arConsentOk()){
+                saveBtn.textContent = "Check the box ↑";
+                const c = document.getElementById("arConsent");
+                if(c){ c.classList.add("ar-consent-flash"); setTimeout(()=>c.classList.remove("ar-consent-flash"), 1500); c.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+                setTimeout(()=>saveBtn.textContent=savedLabel, 1800);
+                return;
+              }
+              const r = await cloudOp("set", { provider: saveCode, username:u, password:p, login_host: cloudHost, consent: true });
+              passEl.value = "";
+              if(r.ok){
+                saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved";
+                saveBtn.classList.add("ar-saved-ok");
+                // Re-render so the row flips to the saved "On" state with a status line.
+                setTimeout(() => { wireAutoRefreshRow(); }, 700);
+              } else {
+                const msg = (r.error === "http_403") ? "Not enabled yet"
+                  : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";
+                saveBtn.textContent = "✕ " + msg;
+                saveBtn.classList.add("ar-save-err");
+                setTimeout(() => { saveBtn.textContent = savedLabel; saveBtn.classList.remove("ar-save-err"); }, 4000);
+              }
+              return;
+            }
         // Always set() under the base code + username: the vault matches an existing
         // username to overwrite its slot, or mints a new "code::username" slot for a
         // NEW login — so "add another login" and "replace password" are the same call.
@@ -5495,8 +5560,8 @@
           watchVaultConfirm(saveCode);
           return;
         }
-        saveBtn.textContent = r.ok ? "✓ Saved" : "Failed";
-        if(r.ok) _notifyVaultChanged(); else _vaultStatusCache = null;
+        saveBtn.textContent = r.ok ? (isDup ? "✓ Updated" : "✓ Saved") : "Failed";
+                if(r.ok) _notifyVaultChanged(); else _vaultStatusCache = null;
         setTimeout(() => { wireAutoRefreshRow(); wireAutoLoginHints().catch(()=>{}); }, 800);
       });
       if(clearBtn) clearBtn.addEventListener("click", async () => {
