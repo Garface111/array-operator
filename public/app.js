@@ -1049,6 +1049,15 @@ const _EXT_VENDOR_LABEL = { fronius: "Fronius", sma: "SMA", chint: "Chint" };
 async function updateVaultLoginNudge(){
   const bar = document.getElementById("vaultLoginNudge");
   if(!bar) return;
+  // Auth gate: __aoVaultStatus reads the extension's LOCAL vault (browser-scoped,
+  // not tied to so_session) and FleetStore.isLoaded() is true even for the
+  // anonymous demo fleet — so without this check a signed-out visitor (or a
+  // stale bfcache restore) could see a real "Save your Fronius login" prompt
+  // over demo chrome. Same phantom-signed-in class as the pageshow guard in
+  // index.html; this closes the non-bfcache half of that gap.
+  let session = null;
+  try { session = localStorage.getItem("so_session"); } catch(e){}
+  if(!session){ bar.hidden = true; return; }
   if(localStorage.getItem("ao_vaultnudge_dismiss") === "1"){ bar.hidden = true; return; }
   if(!window.__AO_EXT_PRESENT || !window.__aoVaultStatus){ bar.hidden = true; return; }
   let connected = [];
