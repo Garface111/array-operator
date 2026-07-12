@@ -357,7 +357,17 @@
         } catch(e){}
         // A meter capture (GMP/VEC/WEC) may have added new utility accounts — let
         // the offtaker editor's utility picker repopulate in place if it's open.
-        if(isMeter) notifyUtilityAccountsChanged();
+        if(isMeter){
+          notifyUtilityAccountsChanged();
+          // Ford 2026-07-12: this is the SECOND capture broadcast for GMP — the one
+          // that actually carries accounts[]/has_bill data (the first, above at
+          // "syncing your bills…", only reports the account was created and already
+          // triggers this refresh). Without it, the Offtaker Invoicing connection
+          // rail (refreshGmpBillsStatus, via reports.js's __aoRefreshGmpGate patch)
+          // stayed frozen on "connected, no bills yet" even after the real bill
+          // landed — the operator had to reload to see "✓ N bill sources connected".
+          try { if(window.__aoRefreshGmpGate) window.__aoRefreshGmpGate(); } catch(e){}
+        }
         closeAddModal();
         if(typeof toast === "function"){
           if(isMeter){
