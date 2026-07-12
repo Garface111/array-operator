@@ -185,7 +185,7 @@
   <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Health</a>
-    <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverter Dashboard</a>
+    <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverters</a>
     <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
     <!-- Trends restored for PowerTrack-parity multi-timeframe views (fleet kWh by
          year + seasonal YoY). Route/panel/JS were kept intact; this <a> re-enables it. -->
@@ -296,12 +296,12 @@
   <!-- One job: the sandbox, almost full-screen, with a single pinned COMMANDER
        card that gives whole-fleet health at a glance. No KPI strip, no triage
        table, no sub-headers — just the at-a-glance health + the canvas. -->
-  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverter Dashboard">
+  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverters">
 
     <!-- Sub-view toggle: SANDBOX (the spatial canvas) vs SPREADSHEET (every array
          as a row, grouped by vendor; expand a row to see its inverters). Both read
          the same FleetStore data; vendor-sheet.js flips between them. -->
-    <div class="vs-seg" role="group" aria-label="Inverter Dashboard view">
+    <div class="vs-seg" role="group" aria-label="Inverters view">
       <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
       <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Spreadsheet</button>
     </div>
