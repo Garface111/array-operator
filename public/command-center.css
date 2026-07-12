@@ -2335,57 +2335,59 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    (.vs-vgroup border-left) — NO background flood (Ford: "just hold the little line on
    the left... don't let the color follow all the way down"). So the wrap is plain card. */
 .vs-inv-wrap{ background:var(--card,#fff); border-bottom:1px solid var(--line); }
-/* Inverter rows get their OWN layout instead of being forced into the array table's
-   7 columns (which left the Vendor + Synced cells blank and truncated the name). Four
-   zones: identity (name + a de-duplicated sub-line) · an always-on sparkline · a tight
-   live/today/peer metric cluster · the status pill. No dead columns, nothing cut off. */
-.vs-inv{ display:grid; grid-template-columns:minmax(0,1fr) 64px 148px auto auto;
-  align-items:center; gap:16px; padding:10px 18px 10px 40px; width:100%; box-sizing:border-box;
-  text-align:left; font-size:12.5px; cursor:pointer; background:transparent;
-  /* Full-strength hairline between every inverter (was 55%) so each row reads as its
-     own line — matches the .vs-inv-wrap/.vs-inv-detail dividers around the block. */
-  border-top:1px solid var(--line,#e2e8f0); }
-.vs-inv-gaugecell{ display:flex; align-items:center; justify-content:center; }
+/* Inverter rows now share the SAME 8-column grid as the vendor/array rows above them
+   (they're .vs-row too), so the gauge + every column line up in one straight vertical
+   column — no more jagged, per-tier layouts (Ford 2026-07-12 realignment). The row only
+   adds nesting cues: a deeper name indent + a hairline. The 14-day chart moved to the
+   full-screen Details view, so nothing here breaks the grid. */
+.vs-inv{ cursor:default; border-top:1px solid var(--line,#e2e8f0); }
 .vs-inv:first-child{ border-top:0; }
-.vs-inv:hover{ background:rgba(37,99,235,.045); }
-.vs-inv.open{ background:rgba(37,99,235,.06); }
-.vs-inv-idcol{ display:flex; align-items:flex-start; gap:8px; min-width:0; }
-/* Inverter caret inherits the shared .vs-caret size; only nudge it to align with the
-   two-line name block above it. */
-.vs-inv-caret{ margin-top:2px; }
-.vs-inv.open .vs-inv-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
-.vs-inv-idtext{ display:flex; flex-direction:column; gap:1px; min-width:0; }
-.vs-inv-idtext .vs-editable{ font-weight:600; color:var(--ink,#0f172a); font-size:13px;
+.vs-inv:hover{ background:rgba(37,99,235,.04); }
+.vs-inv-name{ padding-left:40px; align-items:baseline; }
+.vs-inv-name .vs-editable{ font-weight:600; color:var(--ink,#0f172a);
+  flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vs-inv-sub{ font-size:11px; color:var(--faint); font-weight:400; flex:0 1 auto;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vs-inv-sub{ font-size:11px; color:var(--faint); font-weight:400; white-space:nowrap;
-  overflow:hidden; text-overflow:ellipsis; }
-/* Inline sparkline — the 14-day output shape, always visible. Bars in the vendor hue. */
-.vs-inv-spwrap{ display:flex; align-items:center; }
-.vs-inv-spark{ width:132px; height:28px; display:block; }
-.vs-inv-spark rect{ fill:var(--vc,#2563eb); opacity:.8; }
-.vs-inv-spwrap .vs-id-peerline{ fill:none; stroke:var(--ink,#0f172a); stroke-width:1.1;
-  stroke-dasharray:3 2; opacity:.4; vector-effect:non-scaling-stroke; }
+.vs-inv-peercol{ font-variant-numeric:tabular-nums; color:var(--muted); }
 .vs-inv-nospark{ font-size:10.5px; color:var(--faint); font-style:italic; }
-/* Metric cluster: right-aligned value over a small uppercase label, so live / today /
-   peer read as one tidy group instead of scattered across empty table columns. */
-.vs-inv-metrics{ display:flex; align-items:center; gap:20px; }
-.vs-inv-metric{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; min-width:50px; }
-.vs-inv-metric b{ font-weight:600; color:var(--ink,#0f172a); font-variant-numeric:tabular-nums; font-size:12.5px; white-space:nowrap; }
-.vs-inv-metric b.vs-stale{ color:var(--muted); font-weight:400; }
-.vs-inv-metric i{ font-style:normal; font-size:9px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin-top:2px; }
-.vs-inv-pm{ color:var(--muted); font-weight:400; font-size:11px; }
-.vs-inv-statcell{ display:flex; justify-content:flex-end; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
-/* Narrow: drop the sparkline, then the peer metric, before anything wraps or clips. */
-@media(max-width:860px){
-  .vs-inv{ grid-template-columns:minmax(0,1fr) 64px auto auto; gap:12px; padding-left:32px; }
-  .vs-inv-spwrap{ display:none; }
-}
-@media(max-width:560px){
-  .vs-inv{ grid-template-columns:minmax(0,1fr) 64px auto; }
-  .vs-inv-metrics{ gap:12px; }
-  .vs-inv-peermetric{ display:none; }
-}
+/* "Details →" opens the full-screen 14-day chart (sits in the Synced column, right-aligned). */
+.vs-inv-details{ font:inherit; font-size:12px; font-weight:600; cursor:pointer; color:var(--good,#2563eb);
+  background:transparent; border:1px solid transparent; border-radius:7px; padding:4px 8px; white-space:nowrap;
+  transition:background .12s, border-color .12s; }
+.vs-inv-details:hover{ background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.4); }
+@media(max-width:640px){ .vs-inv-name{ padding-left:26px; } }
+
+/* ── Full-screen inverter detail: the interactive 14-day chart (Ford + Martin 2026-07-12) ── */
+.vs-dc-ov{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
+  background:rgba(15,23,42,.55); backdrop-filter:blur(2px); padding:24px; }
+.vs-dc-modal{ position:relative; width:min(880px,96vw); max-height:92vh; overflow:auto; background:var(--card,#fff);
+  border:1px solid var(--line,#e2e8f0); border-radius:16px; box-shadow:0 30px 80px -24px rgba(15,23,42,.5);
+  padding:22px 24px 26px; }
+.vs-dc-x{ position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:8px; border:1px solid var(--line);
+  background:var(--card); color:var(--muted); font-size:14px; cursor:pointer; line-height:1; transition:color .12s, border-color .12s; }
+.vs-dc-x:hover{ color:var(--bad,#e5484d); border-color:rgba(229,72,77,.5); }
+.vs-dc-head{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 40px 2px 0; }
+.vs-dc-head h3{ margin:0; font-size:19px; font-weight:760; letter-spacing:-.01em; color:var(--ink,#0f172a); }
+.vs-dc-sub{ font-size:13px; color:var(--faint); }
+.vs-dc-diag{ margin:12px 0 2px; font-size:13px; line-height:1.5; color:var(--muted);
+  background:var(--bg2,#f1f5f9); border:1px solid var(--line); border-radius:10px; padding:10px 13px; }
+.vs-dc-diag.warn{ color:var(--gold2,#b45309); background:rgba(217,119,6,.08); border-color:rgba(217,119,6,.3); font-weight:600; }
+.vs-dc-stats{ display:flex; flex-wrap:wrap; gap:14px 30px; margin:15px 0 6px; }
+.vs-dc-stat{ display:flex; flex-direction:column; gap:2px; }
+.vs-dc-k{ font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); }
+.vs-dc-v{ font-size:15px; font-weight:650; color:var(--ink,#0f172a); font-variant-numeric:tabular-nums; }
+.vs-dc-chartwrap{ margin-top:16px; border-top:1px solid var(--line); padding-top:14px; }
+.vs-dc-chart-h{ font-size:11.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin-bottom:10px; }
+.vs-dc-legend{ font-weight:500; text-transform:none; letter-spacing:0; }
+.vs-dc-svg{ width:100%; height:auto; display:block; }
+.vs-dc-svg .vs-dc-bar{ fill:var(--good,#2563eb); opacity:.85; transition:opacity .1s ease; }
+.vs-dc-svg .vs-dc-bar:hover{ opacity:1; }
+.vs-dc-svg .vs-dc-empty{ fill:var(--line,#e6e9ef); opacity:1; }
+.vs-dc-svg .vs-dc-grid{ stroke:var(--line,#e6e9ef); stroke-width:1; }
+.vs-dc-svg .vs-dc-ylab, .vs-dc-svg .vs-dc-xlab{ fill:var(--faint,#94a3b8); font-size:11px; }
+.vs-dc-svg .vs-dc-peer{ fill:none; stroke:var(--ink,#0f172a); stroke-width:1.5; stroke-dasharray:4 3; opacity:.5; vector-effect:non-scaling-stroke; }
+.vs-dc-nohist{ color:var(--faint); font-size:13px; padding:24px 0; text-align:center; }
 /* Stale-feed recovery banner inside an expanded array row — explains the paused
    feed and offers a one-click portal open (extension re-captures on open). */
 .vs-src-recover{ display:flex; align-items:center; gap:12px; flex-wrap:wrap;
