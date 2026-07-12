@@ -308,6 +308,12 @@
   .ar-panel .ar-addutil{grid-column:1/-1}
   .ar-panel .ar-row{background:rgba(15,23,42,.018)}
   .ar-panel .ar-util{grid-column:auto}
+  /* SolarEdge connects via an API key (a list of connected keys + "add another"),
+     not a username/password login like the other inverter cards — cramming it into
+     the same fixed-width grid cell reads as a mismatched 4th tile. Give it its own
+     full-width row instead, right under the Fronius/SMA/Chint row (Ford 2026-07-12:
+     "it should be grouped with the other vendor portals... get its own row"). */
+  .ar-panel .ar-util[data-code="solaredge"]{grid-column:1/-1}
   @media(max-width:640px){ .ar-panel{padding:15px 15px 16px} .ar-panel .ar-group{grid-template-columns:1fr} }
   /* grouped credential sections: Inverter portals / Utility portals */
   .ar-group{display:flex;flex-direction:column;gap:9px}
