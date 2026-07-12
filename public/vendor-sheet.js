@@ -561,6 +561,31 @@
     if (_sort.key === key) _sort.dir = _sort.dir === "asc" ? "desc" : "asc";
     else _sort = { key, dir: key === "name" ? "asc" : "desc" };   // numbers default biggest-first
   }
+  // Sort an array's INVERTER rows by the active column, so a header click reorders the
+  // rows the operator is actually looking at (Ford 2026-07-11 — before this the sort only
+  // reordered the array-level rows, so with a single array clicking a header "did nothing").
+  // Only columns that vary per inverter reorder them; Synced is array-level (uniform across
+  // an array's inverters) and Inverters is a count, so those leave the captured order.
+  const _INV_SORT_KEYS = { pow: 1, today: 1, status: 1, name: 1 };
+  const _INV_STATUS_RANK = { bad: 3, warn: 2, muted: 1, ok: 0 };
+  function invSortVal(iv, key, cohort, isDaylight) {
+    switch (key) {
+      case "pow": return iv.current_power_w == null ? -1 : iv.current_power_w;
+      case "today": return iv.produced_today_kwh == null ? -1 : iv.produced_today_kwh;
+      case "status": return _INV_STATUS_RANK[invStatus(iv, cohort, isDaylight).cls] || 0;
+      default: return (iv.name || iv.sn || "").toLowerCase();   // name
+    }
+  }
+  function sortInvs(invs, isDaylight) {
+    if (!_INV_SORT_KEYS[_sort.key] || (invs || []).length < 2) return invs;
+    const m = _sort.dir === "desc" ? -1 : 1;
+    return invs.slice().sort((a, b) => {
+      const va = invSortVal(a, _sort.key, invs, isDaylight), vb = invSortVal(b, _sort.key, invs, isDaylight);
+      if (va < vb) return -1 * m;
+      if (va > vb) return 1 * m;
+      return String(a.name || a.sn || "").localeCompare(String(b.name || b.sn || ""));   // stable tiebreak
+    });
+  }
   function invMatch(c, q) {
     return (c.inverters || []).some(iv =>
       ((iv.name || "") + " " + (iv.model || "") + " " + (iv.sn || "")).toLowerCase().includes(q));
@@ -975,8 +1000,8 @@
           if (!invs.length) {
             h += `<div class="vs-inv-empty">No inverters captured for this array yet.</div>`;
           } else {
-            const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters
-            invs.forEach(iv => {
+            const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters (order-independent)
+            sortInvs(invs, c.is_daylight).forEach(iv => {
               const ist = invStatus(iv, invs, c.is_daylight);
               const ikey = c.array_id + ":" + iv.inverter_id;
               const iopen = !!_invExpanded[ikey];
