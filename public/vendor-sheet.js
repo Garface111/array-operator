@@ -520,6 +520,11 @@
   let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "spreadsheet"; } catch (e) { return "spreadsheet"; } })();
 
   let _extPresent = false;        // EnergyAgent extension detected on this page (routes "Open to sync" through it)
+  // Cloud Capture mode (server-side harvest) vs device mode (extension). Shares the
+  // Auto-refresh panel's single preference (sandbox.js AR_MODE_KEY). In cloud mode the
+  // server refreshes 24/7, so the extension-only affordances (per-vendor "Open to sync",
+  // tab-opening "Sync all", "Close tabs") change or disappear (Ford 2026-07-11).
+  function _cloudMode(){ try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } }
 
   // The sortable columns (Vendor is the grouping, not sortable).
   const COLS = [
@@ -575,6 +580,25 @@
   // foreground "open its portal to finish" (which used to pull the operator to the Chint
   // tab). openChint() is kept only as the fallback for older extensions that can't.
   let _syncing = false;
+  // Cloud-mode "Refresh from cloud": ask the server to capture every enabled login
+  // NOW, then re-pull the fleet so the freshest readings render. No tabs, no
+  // extension — the server-side counterpart of Sync-all (Ford 2026-07-11).
+  let _cloudRefreshing = false;
+  async function cloudRefreshAll(btn) {
+    if (_cloudRefreshing) return;
+    _cloudRefreshing = true;
+    const orig = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.classList.add("vs-syncing"); btn.innerHTML = "↻ Refreshing…"; }
+    let queued = 0, ok = false;
+    try {
+      if (window.__aoCloudRefresh) { const r = await window.__aoCloudRefresh(); ok = !!(r && r.ok); queued = (r && r.queued) || 0; }
+      // Re-pull the fleet so the view reflects the server's latest. The forced capture
+      // lands within ~90s; the live FleetStore beat then paints it without another click.
+      if (window.FleetStore && FleetStore.load) { try { await FleetStore.load(); } catch (_) {} }
+    } catch (_) { ok = false; }
+    if (btn) btn.innerHTML = ok ? (queued ? `✓ Refreshing ${queued} vendor${queued === 1 ? "" : "s"}…` : "✓ Up to date") : "Couldn't refresh — try again";
+    setTimeout(() => { if (btn) { btn.disabled = false; btn.classList.remove("vs-syncing"); btn.innerHTML = orig; } _cloudRefreshing = false; }, 2400);
+  }
   function recaptureVendorViaBridge(vendor, timeoutMs = 120000) {
     return new Promise((resolve) => {
       const reqId = "vs-sync-" + vendor + "-" + Date.now();
@@ -719,17 +743,25 @@
       if (!col.key) return `<span class="${col.cls}">${col.label}</span>`;
       return `<span class="${col.cls} vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`;
     }).join("");
+    const _cloud = _cloudMode();
+    const _hint = _cloud
+      ? `Your vendor data refreshes automatically on our servers — no portal to open, no browser tab needed. Live production stays under 5 minutes old; utility bills refresh daily.`
+      : `To refresh a vendor, open its portal — click its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.`;
+    const _syncLabel = _cloud ? "↻ Refresh from cloud" : "↻ Sync all vendors";
+    const _syncTitle = _cloud
+      ? "Tells our servers to pull fresh readings from every vendor now, then updates this view — no tabs opened."
+      : "Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.";
     host.innerHTML = `
       <div class="vs-topbar">
         <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
-          <div class="vs-hint">To refresh a vendor, open its portal — click its <strong>↗ Open to sync</strong> button and sign in. The EnergyAgent extension captures the latest readings automatically.</div></div>
+          <div class="vs-hint">${_hint}</div></div>
         <div class="vs-actions">
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
           <div class="vs-actions-right">
             <button type="button" class="vs-syncall" id="vsSyncAll"
-              title="Opens each vendor's portal in the background, captures the latest readings, and closes it — one click to refresh every vendor.">↻ Sync all vendors</button>
-            <button type="button" class="vs-closetabs" id="vsCloseTabs"
-              title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>
+              title="${_syncTitle}">${_syncLabel}</button>
+            ${_cloud ? "" : `<button type="button" class="vs-closetabs" id="vsCloseTabs"
+              title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>`}
           </div>
         </div>
         <div class="vs-searchrow"><input type="search" class="vs-search" id="vsSearch"
@@ -744,14 +776,22 @@
     const s = host.querySelector("#vsSearch");
     s.value = _query;
     s.addEventListener("input", () => { _query = s.value.trim().toLowerCase(); renderBody(); });
-    // "+ Add vendor" → the SAME add-array modal the Sandbox view uses (one flow).
+    // "+ Add vendor" → cloud mode adds a SERVER-SIDE login (Credential Vault); device
+    // mode opens the SAME add-array modal the Sandbox view uses (one flow) (Ford 2026-07-11).
     const add = host.querySelector("#vsAddVendor");
     if (add) add.onclick = () => {
+      if (_cloudMode()) {
+        if (window.__aoOpenCredentialVault) window.__aoOpenCredentialVault();
+        else location.hash = "#account";
+        return;
+      }
       if (window.__aoAddArray) window.__aoAddArray();
       else location.hash = "#arrays";   // defensive: sandbox owns the modal
     };
+    // "Sync all" → cloud mode forces a fresh server-side capture + re-pulls; device
+    // mode opens each vendor's portal through the extension.
     const syncBtn = host.querySelector("#vsSyncAll");
-    if (syncBtn) syncBtn.onclick = () => syncAllVendors(syncBtn);
+    if (syncBtn) syncBtn.onclick = () => _cloudMode() ? cloudRefreshAll(syncBtn) : syncAllVendors(syncBtn);
     const closeBtn = host.querySelector("#vsCloseTabs");
     if (closeBtn) closeBtn.onclick = () => closeVendorTabs(closeBtn);
     const expBtn = host.querySelector("#vsExpandAll");
@@ -844,7 +884,9 @@
       const _portal = VENDOR_PORTAL[v];
       // Only the extension-scraped vendors (Chint/Fronius/SMA) sync by opening the portal;
       // SolarEdge is pulled server-side via API, so it needs no "open to sync" prompt.
-      const lagChip = (_portal && CADENCE_MIN[v])
+      // Cloud mode: the server signs in and refreshes on its own, so there's no
+      // "Open to sync" portal chip — it would only confuse (Ford 2026-07-11).
+      const lagChip = (!_cloudMode() && _portal && CADENCE_MIN[v])
         ? `<button type="button" class="vs-vlag" data-vportal="${esc(v)}" title="Opens your ${esc(vlabel(v))} portal in a new tab. Sign in there and your latest readings sync here automatically — the EnergyAgent extension captures them.">↗ Open ${esc(vlabel(v))} to sync</button>`
         : "";
       // The vendor NAME opens that vendor's portal in a plain NEW TAB (data-vopen) — a normal
@@ -916,7 +958,14 @@
           // path back to fresh data right where the owner notices it — open the
           // vendor portal (extension re-captures on open). Reuses the existing
           // [data-vportal] click delegation, so no extra handler is wired.
-          if (syncStale(c) && _portal) {
+          if (syncStale(c) && _cloudMode()) {
+            // Cloud mode: our servers own the refresh, so the fix isn't "open a portal"
+            // — it's re-entering the password if the saved one stopped working.
+            h += `<div class="vs-src-recover">
+              <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep retrying. If it persists, re-enter the password in your Credential Vault.</span>
+              <button type="button" class="vs-src-recover-btn" id="vsRecoverVault-${esc(v)}" onclick="window.__aoOpenCredentialVault && window.__aoOpenCredentialVault()">Open Credential Vault</button>
+            </div>`;
+          } else if (syncStale(c) && _portal) {
             h += `<div class="vs-src-recover">
               <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — auto-sync may need a hand. Open the portal to capture the latest.</span>
               <button type="button" class="vs-src-recover-btn" data-vportal="${esc(v)}">↗ Open ${esc(vlabel(v))} to sync</button>

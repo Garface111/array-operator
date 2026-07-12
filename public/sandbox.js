@@ -4691,6 +4691,7 @@
   // the owner never has to keep a tab open. cloudOp mirrors vaultOp's shape so the
   // render + row wiring are reused; only the data source + destination differ.
   const AR_MODE_KEY = "ao_ar_mode";
+  let _arWantOpen = false;   // set by __aoOpenCredentialVault → wireAutoRefreshRow opens+scrolls the panel
   function _arGetMode(){ try { return localStorage.getItem(AR_MODE_KEY) === "cloud" ? "cloud" : "device"; } catch(e){ return "device"; } }
   function _arSetMode(m){ try { localStorage.setItem(AR_MODE_KEY, m === "cloud" ? "cloud" : "device"); } catch(e){} }
   const AR_INVERTER_IDS = new Set((typeof AR_INVERTERS !== "undefined" ? AR_INVERTERS : []).map(v => v.id));
@@ -4722,9 +4723,26 @@
           provider: extra.provider, username: extra.username, enable: extra.enable }) });
         return { ok: r.ok };
       }
+      if(op === "refresh"){
+        const r = await fetch("/v1/cloud-capture/refresh", { method:"POST", headers:H });
+        const d = await r.json().catch(()=>({}));
+        return { ok: r.ok, queued: d.queued || 0 };
+      }
     } catch(e){ return { ok:false, error:String(e) }; }
     return { ok:false, error:"bad_op" };
   }
+  // Cloud "Sync all" for the vendor spreadsheet (vendor-sheet.js lives in another
+  // module, so expose the op as a global). Forces a fresh server-side capture NOW.
+  window.__aoCloudRefresh = () => cloudOp("refresh");
+  // "+ Add vendor" in cloud mode → the Credential Vault is where a server-side login
+  // is added, so jump straight there (Master Account → Auto-refresh, cloud mode,
+  // expanded + scrolled). Reuses the panel's own open/scroll/flash via _arWantOpen.
+  window.__aoOpenCredentialVault = function(){
+    _arSetMode("cloud");
+    _arWantOpen = true;
+    if(location.hash !== "#account"){ location.hash = "#account"; }
+    else { try { wireAutoRefreshRow(); } catch(e){} }
+  };
 
   // Adapt the cloud /status payload onto the SAME shape the extension vault status
   // uses, so credRow/utilByCode render identically. Utility logins key on a slot
@@ -5041,8 +5059,14 @@
     // credentials get added (Ford 2026-07-11). One-shot; strips the param after.
     try{
       const _sp = new URLSearchParams(location.search);
-      if(_sp.get("setup") === "autorefresh" && !window._arSetupHandled){
-        window._arSetupHandled = true;
+      // Open + scroll + flash the panel when arriving from onboarding's "skip for
+      // now" (?setup=autorefresh) OR from the spreadsheet's "+ Add vendor" in cloud
+      // mode (_arWantOpen, set by __aoOpenCredentialVault) — both land the operator
+      // exactly where a login gets added.
+      const _fromParam = _sp.get("setup") === "autorefresh" && !window._arSetupHandled;
+      if(_fromParam || _arWantOpen){
+        if(_fromParam) window._arSetupHandled = true;
+        _arWantOpen = false;
         const _row = document.getElementById("rowAutoRefresh");
         const _body = document.getElementById("arBody");
         if(_body) _body.classList.remove("ar-collapsed");   // ensure expanded
@@ -5051,8 +5075,10 @@
           _row.classList.add("ar-flash");
           setTimeout(() => _row.classList.remove("ar-flash"), 2600);
         }
-        _sp.delete("setup");
-        history.replaceState(null, "", location.pathname + (_sp.toString() ? "?"+_sp.toString() : "") + location.hash);
+        if(_fromParam){
+          _sp.delete("setup");
+          history.replaceState(null, "", location.pathname + (_sp.toString() ? "?"+_sp.toString() : "") + location.hash);
+        }
       }
     }catch(e){}
     const listEl = document.getElementById("arList");
