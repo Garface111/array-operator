@@ -98,6 +98,7 @@ function render(data){
 let _ovl = null;        // shared overlay node
 let _escHandler = null;
 let _lastFocus = null;
+let _modalOnClose = null;   // fires once whenever the modal closes, however it closes
 
 function ensureOverlay(){
   if(_ovl) return _ovl;
@@ -118,9 +119,14 @@ function closeModal(){
   _ovl.innerHTML = "";
   if(_escHandler){ document.removeEventListener("keydown", _escHandler); _escHandler=null; }
   if(_lastFocus && _lastFocus.focus){ try{ _lastFocus.focus(); }catch(e){} }
+  // Fires exactly once per open→close cycle, however the modal closed (×, backdrop,
+  // Esc, or a caller's own close() call) — AODialog below uses this as its single
+  // resolve path so a dismissed dialog behaves like a cancelled native confirm/prompt.
+  if(_modalOnClose){ const cb = _modalOnClose; _modalOnClose = null; cb(); }
 }
 
-function openModal({title, bodyHTML, footHTML, onMount}){
+function openModal({title, bodyHTML, footHTML, onMount, onClose}){
+  _modalOnClose = onClose || null;
   _lastFocus = document.activeElement;
   const ovl = ensureOverlay();
   ovl.innerHTML =
@@ -152,6 +158,76 @@ function openModal({title, bodyHTML, footHTML, onMount}){
   if(firstFocus) try{ firstFocus.focus(); }catch(e){}
   return { close: closeModal, root };
 }
+
+/* ===========================================================================
+ * AODialog — confirm/alert/prompt, styled as our own card (never the unstylable
+ * native Chrome dialogs). Built on openModal(), so it automatically matches the
+ * app's skin (day theme + the dark defaults) with zero extra CSS wiring.
+ *
+ *   const ok  = await AODialog.confirm("This can't be undone.", {title:"Delete X?", danger:true});
+ *   const val = await AODialog.prompt("Leave blank to clear.", current, {title:"Set a note"});
+ *   await AODialog.alert("Couldn't save — try again.", {title:"Network error"});
+ *
+ * Splitting a native dialog's one-line message into a short TITLE (the decision)
+ * + a body (the consequence) is the point, not just a skin — read clearer than a
+ * wall of text. Esc / backdrop click / Cancel all resolve exactly like a native
+ * dialog's cancel path: false for confirm, null for prompt, undefined for alert.
+ * ==========================================================================*/
+function _aodEsc(s){
+  return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+let _aodSeq = 0;
+function _aodOpen({ kind, title, message, confirmLabel, cancelLabel, danger, value, placeholder }){
+  return new Promise(resolve => {
+    const id = "aod" + (++_aodSeq);
+    const isPrompt = kind === "prompt", isAlert = kind === "alert";
+    const msgHTML = _aodEsc(message).replace(/\n/g, "<br>");
+    const fieldHTML = isPrompt
+      ? `<div class="ao-field" style="margin-top:12px;">
+           <input class="ao-input ao-dialog-input" id="${id}" type="text" value="${_aodEsc(value||"")}"
+             placeholder="${_aodEsc(placeholder||"")}"
+             style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:9px;font-size:14px;">
+         </div>`
+      : "";
+    const footHTML = isAlert
+      ? `<button type="button" class="ao-btn ao-btn-primary" data-act="ok"
+           style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||"OK")}</button>`
+      : `<button type="button" class="ao-btn ao-btn-ghost" data-act="cancel"
+           style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:9px;background:#fff;cursor:pointer;font-weight:650;">${_aodEsc(cancelLabel||"Cancel")}</button>
+         <button type="button" class="ao-btn ao-btn-primary${danger?" ao-btn-danger":""}" data-act="confirm"
+           style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||(isPrompt?"Save":"Confirm"))}</button>`;
+
+    let settled = false;
+    const fallback = isAlert ? undefined : (isPrompt ? null : false);
+    const settle = v => { if(settled) return; settled = true; resolve(v); };
+
+    openModal({
+      title: title || "",
+      bodyHTML: `<p class="ao-dialog-msg" style="margin:0;font-size:14px;line-height:1.55;">${msgHTML}</p>${fieldHTML}`,
+      footHTML,
+      onClose: () => settle(fallback),
+      onMount(root, close){
+        const input = root.querySelector(".ao-dialog-input");
+        const cancelBtn = root.querySelector('[data-act="cancel"]');
+        const okBtn = root.querySelector('[data-act="confirm"]') || root.querySelector('[data-act="ok"]');
+        if(input){
+          setTimeout(() => { try{ input.focus(); input.select(); }catch(e){} }, 30);
+          input.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); okBtn && okBtn.click(); } });
+        }
+        if(cancelBtn) cancelBtn.onclick = () => { settle(fallback); close(); };
+        if(okBtn) okBtn.onclick = () => {
+          const v = isPrompt ? (input ? input.value : "") : (isAlert ? undefined : true);
+          settle(v); close();
+        };
+      }
+    });
+  });
+}
+window.AODialog = {
+  confirm(message, opts){ return _aodOpen(Object.assign({ kind:"confirm", message }, opts||{})); },
+  alert(message, opts){ return _aodOpen(Object.assign({ kind:"alert", message }, opts||{})); },
+  prompt(message, value, opts){ return _aodOpen(Object.assign({ kind:"prompt", message, value }, opts||{})); },
+};
 
 const esc = s => String(s==null?"":s)
   .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")

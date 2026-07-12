@@ -114,6 +114,13 @@ html[data-theme="day"] .rb-save{
 html[data-theme="day"] .cc-btn.primary:hover,
 html[data-theme="day"] .cl-btn.primary:hover{background:linear-gradient(180deg,#2563eb,#1d4ed8) !important}
 
+/* ── destructive confirm (AODialog danger:true) — red, not the go-forward blue ── */
+html[data-theme="day"] .ao-btn-danger{
+  background:linear-gradient(180deg,#ef4444,#dc2626) !important;
+  color:#ffffff !important;
+  box-shadow:0 4px 14px -4px rgba(220,38,38,.45) !important;
+}
+
 /* ── small accent tags keep dark text on the lighter blue ─────────────────── */
 html[data-theme="day"] .act h3 .tag,
 html[data-theme="day"] .pc-free{color:#0b2f6b !important}

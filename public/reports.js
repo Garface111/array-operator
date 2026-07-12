@@ -1861,13 +1861,17 @@
     // to Approve-to-send is always safe + instant.
     const modeSeg = host.querySelector("#rb2Mode");
     if (modeSeg) modeSeg.querySelectorAll("button[data-v]").forEach(b => {
-      b.onclick = () => {
+      b.onclick = async () => {
         const want = b.getAttribute("data-v");
         const cur = (PIPE && PIPE.default_delivery_mode) || "approval";
         if (want === cur) return;
         if (want === "auto") {
           const n = (PIPE && PIPE.mode_split && PIPE.mode_split.approval) || 0;
-          if (!confirm(`Switch ${fmt0(n)} offtaker${n === 1 ? "" : "s"} to Auto-send? Their invoices will email automatically on schedule — from settled bills, no review. Per-offtaker settings still override, and real sends stay gated on demo data.`)) return;
+          const ok = await AODialog.confirm(
+            "Their invoices will email automatically on schedule — from settled bills, no review. Per-offtaker settings still override, and real sends stay gated on demo data.",
+            { title: `Switch ${fmt0(n)} offtaker${n === 1 ? "" : "s"} to Auto-send?` }
+          );
+          if (!ok) return;
         }
         setDeliveryModeAll(want);
       };
@@ -2586,7 +2590,8 @@
       } catch (e) {}
     };
     if (del) del.onclick = async () => {
-      if (!confirm("Remove this offtaker’s invoice template? Their invoices go back to the standard format.")) return;
+      const ok = await AODialog.confirm("Their invoices go back to the standard format.", { title: "Remove this offtaker’s invoice template?" });
+      if (!ok) return;
       const base = tplApi();
       try { if (base) await fetch(base, { method: "DELETE", headers: authHeaders() }); } catch (e) {}
       if (htmlBox) { htmlBox.value = ""; htmlBox.dataset.dirty = ""; }
@@ -5363,14 +5368,15 @@
       const n = card.querySelector(".rb-acc-name");
       if (n && n.childNodes[0]) name = (n.childNodes[0].textContent || name).trim() || name;
     }
-    if (!confirm(`Delete ${name} and their invoice schedule? This can't be undone.`)) return;
+    const ok = await AODialog.confirm("This can't be undone.", { title: `Delete ${name} and their invoice schedule?`, danger: true, confirmLabel: "Delete" });
+    if (!ok) return;
     try {
       const r = await fetch(API + "/subscriptions/" + id, { method: "DELETE", headers: authHeaders() });
-      if (!r.ok) { alert("Couldn't delete the offtaker (HTTP " + r.status + ")."); return; }
+      if (!r.ok) { await AODialog.alert("HTTP " + r.status + ".", { title: "Couldn't delete the offtaker" }); return; }
       if (String(ACTIVE_SUB_ID) === String(id)) ACTIVE_SUB_ID = null;
       await refreshList();
     } catch (e) {
-      alert("Network error — the offtaker wasn't deleted. Try again.");
+      await AODialog.alert("The offtaker wasn't deleted. Try again.", { title: "Network error" });
     }
   }
 
@@ -7592,14 +7598,16 @@
       return;
     }
     if (act === "dismiss") {
-      if (!confirm("Dismiss this drafted report without sending?")) return;
+      const ok = await AODialog.confirm("It's removed from your inbox without emailing the offtaker.", { title: "Dismiss this drafted report?" });
+      if (!ok) return;
       setSt("rb-status rb-busy", "Dismissing…");
       await fetch(API + "/drafts/" + id + "/dismiss", { method: "POST", headers: authHeaders() });
       await refreshInbox();
       return;
     }
     if (act === "approve") {
-      if (!confirm("Approve and send this report to the offtaker now?")) return;
+      const ok = await AODialog.confirm("This sends the invoice email to the offtaker right now.", { title: "Approve and send this report?", confirmLabel: "Send now" });
+      if (!ok) return;
       setSt("rb-status rb-busy", "Sending…");
       try {
         const r = await fetch(API + "/drafts/" + id + "/approve", { method: "POST", headers: authHeaders() });

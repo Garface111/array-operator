@@ -143,6 +143,11 @@
     box-shadow:0 4px 16px rgba(63,214,138,.28)!important;
   }
   .ao-btn-primary:hover{filter:brightness(1.06)}
+  /* Destructive confirm (AODialog danger:true) — red, distinct from the normal
+     go-forward primary, so "Delete" never reads like a routine confirm. */
+  .ao-btn-danger{background:linear-gradient(180deg,#ff8a8a,var(--bad))!important;color:#2a0808!important;
+    box-shadow:0 4px 16px rgba(255,107,107,.28)!important}
+  .ao-btn-danger:hover{filter:brightness(1.06)}
   .ao-sites,.ao-site{background:rgba(255,255,255,.03)!important;border:1px solid var(--line)!important;border-radius:10px!important}
   .ao-causes{color:var(--muted)!important}
 

@@ -829,12 +829,12 @@
     // The FleetStore mutation re-renders the orchestrator, so no manual repaint.
     if (ctx.signedIn && ctx.live && ctx.live.setArrayPortfolio) {
       container.querySelectorAll(".ansg-assign").forEach(function (btn) {
-        btn.addEventListener("click", function (e) {
+        btn.addEventListener("click", async function (e) {
           e.stopPropagation();   // don't bubble into a group-header collapse
           var aid = btn.getAttribute("data-assign");
           var current = "";
           for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { current = rows[i].portfolio || ""; break; } }
-          var next = window.prompt("Portfolio for this site (leave blank to clear):", current);
+          var next = await AODialog.prompt("Leave blank to clear.", current, { title: "Portfolio for this site" });
           if (next == null) return;                 // cancelled
           next = String(next).trim();
           if (next === current) return;             // no change
@@ -847,12 +847,12 @@
     // mutator. Blank clears. FleetStore mutation re-renders the orchestrator.
     if (ctx.signedIn && ctx.live && ctx.live.setArrayReminder) {
       container.querySelectorAll("[data-reminder]").forEach(function (el) {
-        el.addEventListener("click", function (e) {
+        el.addEventListener("click", async function (e) {
           e.stopPropagation();   // don't bubble into a group-header collapse
           var aid = el.getAttribute("data-reminder");
           var current = "";
           for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { current = rows[i].reminder || ""; break; } }
-          var next = window.prompt("O&M note for this site (leave blank to clear):", current);
+          var next = await AODialog.prompt("Leave blank to clear.", current, { title: "O&M note for this site" });
           if (next == null) return;                 // cancelled
           next = String(next).trim();
           if (next === current) return;             // no change
@@ -866,12 +866,15 @@
     // row starts modeling. Defaults the prompt to the site's own name.
     if (ctx.signedIn && ctx.setLocation) {
       container.querySelectorAll("[data-setloc]").forEach(function (btn) {
-        btn.addEventListener("click", function (e) {
+        btn.addEventListener("click", async function (e) {
           e.stopPropagation();
           var aid = btn.getAttribute("data-setloc");
           var name = "";
           for (var i = 0; i < rows.length; i++) { if (rows[i].aid === aid) { name = rows[i].name || ""; break; } }
-          var place = window.prompt("Where is “" + name + "”?\nEnter a town or address so the weather model can run — e.g. “Londonderry, VT”:", name);
+          var place = await AODialog.prompt(
+            "Enter a town or address so the weather model can run — e.g. “Londonderry, VT”.",
+            name, { title: "Where is “" + name + "”?" }
+          );
           if (place == null) return;                  // cancelled
           place = String(place).trim();
           if (!place) return;
@@ -879,7 +882,7 @@
           btn.textContent = "locating…"; btn.disabled = true;
           ctx.setLocation(aid, { place: place }).catch(function (err) {
             btn.textContent = prev; btn.disabled = false;
-            try { alert(err && err.message ? err.message : "Couldn't find that location — try a nearby town or a full address."); } catch (_) { }
+            AODialog.alert(err && err.message ? err.message : "Try a nearby town or a full address.", { title: "Couldn't find that location" });
           });
           // success path: the orchestrator reloads the forecast and re-renders.
         });

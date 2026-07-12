@@ -451,7 +451,7 @@
           stageFile(t.files && t.files[0]);
         }
       });
-      container.addEventListener("click", function (e) {
+      container.addEventListener("click", async function (e) {
         var el = e.target && e.target.closest ? e.target.closest("[data-role],[data-dl],[data-del]") : null;
         if (!el || !container.contains(el)) return;
         var role = el.getAttribute("data-role");
@@ -466,7 +466,8 @@
           doDownload(el.getAttribute("data-dl"), el.getAttribute("data-fn"));
         } else if (el.hasAttribute("data-del")) {
           var name = el.getAttribute("data-fn") || "this file";
-          if (window.confirm("Delete " + name + "? This can’t be undone.")) doDelete(el.getAttribute("data-del"));
+          var ok = await AODialog.confirm("This can’t be undone.", { title: "Delete " + name + "?", danger: true, confirmLabel: "Delete" });
+          if (ok) doDelete(el.getAttribute("data-del"));
         }
       });
       container._anfilesBound = true;
