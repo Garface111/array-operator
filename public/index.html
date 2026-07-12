@@ -608,7 +608,7 @@
   markDel.onclick=function(){ MARK_B64=null; setThumb(); };
   function loadH2C(){
     return window.html2canvas ? Promise.resolve()
-      : new Promise(function(res,rej){ var s=document.createElement("script"); s.src="/vendor/html2canvas.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+      : new Promise(function(res,rej){ var s=document.createElement("script"); s.src="/vendor/html2canvas.min.js?v=pro158"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
   }
   markBtn.onclick=function(){
     markBtn.disabled=true; markBtn.textContent="Capturing…";
