@@ -438,7 +438,13 @@
         _syncState[d.provider] = { phase:"failed", msg:_friendlySyncFail(d.reason, BRAND[d.provider]||d.provider) };
         try { repaintFresh(d.provider); } catch(_){}
       }
-      const note = _ov && _ov.querySelector("#sbNote");
+      // Ford 2026-07-12: a background/other-tab SMA capture attempt (auto-refresh,
+      // not anything the operator did in THIS modal) was landing its failure inside
+      // the "Link utility bills" modal — which offers no SMA option at all, so "SMA
+      // didn't connect" made no sense there. Only show the note if the failed
+      // provider is actually offered by the currently-open modal.
+      const irrelevant = _ovUtilityOnly && _INVERTER_VENDORS.includes(d.provider);
+      const note = !irrelevant && _ov && _ov.querySelector("#sbNote");
       if(note){
         note.className = "sb-note err";
         note.textContent = `${BRAND[d.provider]||d.provider} didn't connect: ${d.reason||"unknown error"}. Make sure you're signed in on the portal tab, then click again.`;
@@ -4027,6 +4033,13 @@
   let _ov = null, _escH = null;
   let renderAddModalBody = null;   // assigned when the Add-array modal opens; the
                                    // extension-present listener calls it to re-render.
+  // Which mode the currently-open modal is in — "Add an array" offers inverter
+  // AND utility vendors; the offtaker "Link utility bills" modal (utilityOnly)
+  // offers ONLY utilities and never shows an inverter vendor as an option. The
+  // module-level SO_CAPTURE_FAILED listener below needs this to avoid writing an
+  // unrelated vendor's error into whatever modal happens to be open (see below).
+  let _ovUtilityOnly = false;
+  const _INVERTER_VENDORS = ["solaredge","fronius","sma","chint"];
   function ensureOv(){
     if(_ov) return _ov;
     _ov = document.createElement("div");
@@ -4044,6 +4057,7 @@
   function openAddArrayModal(opts){
     const ov = ensureOv();
     const utilityOnly = !!(opts && opts.utilityOnly);   // offtaker "Link utility bills" → utilities only
+    _ovUtilityOnly = utilityOnly;
     const _modalTitle = utilityOnly ? "Link utility bills" : "Add an array";
     let vendor = "solaredge";
     let manual = false;                // false = one-click login view; true = paste-keys view
