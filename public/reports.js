@@ -278,13 +278,13 @@
       if (unverifiedSubs) {
         return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill. No discrepancies found; ${unverifiedSubs} can't be fully verified until measured generation data lands.">✓ No billing discrepancies · ${unverifiedSubs} awaiting data</span>`;
       }
-      return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill — everything reconciles.">✓ Utility bills reconcile</span>`;
+      return `<span class="rb-bac-clean" title="We cross-check each offtaker's measured production and GMP's allocation against the utility bill. Everything reconciles.">✓ Utility bills reconcile</span>`;
     }
     const dTxt = atStake > 0 ? ` · ≈ ${money0(atStake)} at stake` : "";
-    const label = `⚑ ${n} bill${n === 1 ? "" : "s"} to review — doesn't match GMP${dTxt}`;
+    const label = `⚑ ${n} bill${n === 1 ? "" : "s"} to review · doesn't match GMP${dTxt}`;
     const tip = allocN
-      ? `The utility bill doesn't match our numbers for ${n} offtaker${n === 1 ? "" : "s"}: ${allocN} GMP allocation error${allocN === 1 ? "" : "s"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""}. GMP credits $25 per billing error they made — that's ${money0(atStake)} across these catches. Click to open the Bill audit.`
-      : `Measured production differs from the GMP bill for ${arrN} offtaker${arrN === 1 ? "" : "s"} — a possible billing error. Click to open the Bill audit.`;
+      ? `The utility bill doesn't match our numbers for ${n} offtaker${n === 1 ? "" : "s"}: ${allocN} GMP allocation error${allocN === 1 ? "" : "s"}${arrN ? " + " + arrN + " production difference" + (arrN === 1 ? "" : "s") : ""}. GMP credits $25 per billing error they made, totaling ${money0(atStake)} across these catches. Click to open the Bill audit.`
+      : `Measured production differs from the GMP bill for ${arrN} offtaker${arrN === 1 ? "" : "s"}, a possible billing error. Click to open the Bill audit.`;
     return `<span class="rb-bac-chip" id="rbBacChip" role="button" tabindex="0" title="${esc(tip)}">${label}</span>`;
   }
   // Flip the generator to the Bill-audit tab (the flagged chip's destination —
@@ -977,11 +977,11 @@
     // detail in the tooltip. Same ids (#rbGmpInlineLink / #rbAutoRefreshLink) + wiring.
     if (!accts.length) {
       host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
-        title="Offtaker invoices bill from your utility bills — link a utility to get started.">⚡ Link utility bills to start</a>`;
+        title="Offtaker invoices bill from your utility bills. Link one to get started.">⚡ Link utility bills to start</a>`;
       wireConnectUtility();
     } else if (!withBills.length) {
       host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
-        title="${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills have landed yet — open your utility portal once more so the extension captures them.">⚡ ${fmt0(accts.length)} connected · no bills captured yet</a>` +
+        title="${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills yet. Open your utility portal again so the extension captures them.">⚡ ${fmt0(accts.length)} connected · no bills captured yet</a>` +
         (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
       wireConnectUtility();
       wireAutoRefreshLink();
@@ -1228,7 +1228,7 @@
           <span class="rb-arch-t">Invoice archive</span>
           <span class="rb-arch-sub">monthly directory</span></summary>
         <div class="rb-arch-body">
-          <p class="rb-arch-empty">No invoices archived yet — they appear here once GMP bills with billable excess land.</p>
+          <p class="rb-arch-empty">No invoices archived yet. They'll appear once a GMP bill has billable excess.</p>
         </div></details>`;
       wireArchiveToggle();
       return;
@@ -1361,8 +1361,8 @@
     if (list) {
       const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
       const headLine = pending
-        ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send — nothing sends until you approve.`
-        : `Click an offtaker to review &amp; send their invoice — nothing sends until you approve.`;
+        ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Nothing sends until you approve.`
+        : `Click an offtaker to review &amp; send their invoice. Nothing sends until you approve.`;
       list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
         OFFTAKERS.map(s => subCard(s, demoArrays, demoUtil)).join("");
       wireAccordionHeaders(list);
@@ -1800,7 +1800,7 @@
         </button>` : ""}
       </div>
       <div class="rb2-pipe-row">
-        <div class="rb2-pcell done" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive — download this month as a .zip there.">
+        <div class="rb2-pcell done" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive. Download this month as a .zip there.">
           <div class="rb2-when"><b>${esc(_monthName(last.period_month))} · delivered</b><small>ran ${esc(lastRun)}</small></div>
           <div class="rb2-big">${fmt0(last.delivered || 0)} <span>of ${fmt0(p.total_enabled || 0)}${last.dollars ? " · " + money0(last.dollars) : ""}</span></div>
           <div class="rb2-chips"><span class="rb2-pc g">✓ ${fmt0(last.delivered || 0)} sent</span></div>
@@ -1832,7 +1832,7 @@
           <div class="rb2-when"><b>${esc(_fireLabel(monthly.fires_at))} · next run</b><small>${paused ? "paused" : (days != null ? "fires in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</small></div>
           <div class="rb2-big">${fmt0(monthly.scheduled || 0)} <span>scheduled</span></div>
           <div class="rb2-chips"><span class="rb2-pc b">${fmt0(monthly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(monthly.approval || 0)} draft for approval</span></div>
-          ${paused ? `<div class="rb2-pausednote">⏸ Paused — this run won't fire until you resume. Manual sends still work.</div>` : ""}
+          ${paused ? `<div class="rb2-pausednote">⏸ Paused. This run won't fire until you resume. Manual sends still work.</div>` : ""}
         </div>
       </div>`;
 
@@ -1847,7 +1847,7 @@
       || ((inf.pending_auto || 0) > 0);
     const subEl = document.getElementById("rb2Sub");
     if (subEl) subEl.innerHTML = autoInPlay
-      ? `Every offtaker's solar credit invoice, generated from their settled utility bills. <b>You approve every invoice before it sends</b> — except the ones you set to Auto-send, which email on schedule.`
+      ? `Every offtaker's solar credit invoice, generated from their settled utility bills. <b>You approve every invoice before it sends,</b> except the ones you set to Auto-send, which email on schedule.`
       : `Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Nothing sends until you approve it.</b>`;
 
     // ── wiring ──
@@ -2013,9 +2013,9 @@
     parts.push(`<span class="rb2-gl-i"><b>${fmt0(nOff)}</b> offtaker${nOff === 1 ? "" : "s"}</span>`);
     if (nArr) parts.push(`<span class="rb2-gl-i"><b>${fmt0(nArr)}</b> billed array${nArr === 1 ? "" : "s"}</span>`);
     if (allocN) {
-      parts.push(`<span class="rb2-gl-flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error — ${money0(atStake)} across these catches. Opens the Bill audit.">⚑ ${fmt0(allocN)} don't match GMP · ≈ ${money0(atStake)} at stake</span>`);
+      parts.push(`<span class="rb2-gl-flag" role="button" tabindex="0" id="rb2KpiFlag" title="We derive GMP's actual share for each offtaker (credited ÷ the array's group excess) and flag it when it differs from your entered share by more than your threshold (default ${fmtPct(XCHECK_DEFAULT_PCT)}%). GMP credits $25 per billing error, totaling ${money0(atStake)} across these catches. Opens the Bill audit.">⚑ ${fmt0(allocN)} don't match GMP · ≈ ${money0(atStake)} at stake</span>`);
     } else if (RECON) {
-      parts.push(`<span class="rb2-gl-ok" title="We derive GMP's actual share for each offtaker and compare it to your entered share automatically — all are within your ${fmtPct(XCHECK_DEFAULT_PCT)}% threshold."><span class="rb2-gl-check">✓</span> all bills reconcile with GMP</span>`);
+      parts.push(`<span class="rb2-gl-ok" title="We derive GMP's actual share for each offtaker and compare it to your entered share automatically. All are within your ${fmtPct(XCHECK_DEFAULT_PCT)}% threshold."><span class="rb2-gl-check">✓</span> all bills reconcile with GMP</span>`);
     } else {
       parts.push(`<span class="rb2-gl-i rb2-gl-checking"><span class="rb2-spin" aria-hidden="true"></span> auditing your bills…</span>`);
     }
@@ -2121,7 +2121,7 @@
               <button class="ao-btn rb-btn" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false">⬇ Export</button>
               <div class="rb2-exportpop" id="rb2ExportPop" hidden>
                 <div class="rb2-exportpop-h">Export invoices to accounting</div>
-                <p class="rb2-exportpop-p">Pick your accounting system, the invoice date, and the billing cycle — the batch drafts every offtaker's invoice and downloads a file that imports directly.</p>
+                <p class="rb2-exportpop-p">Pick your accounting system, the invoice date, and the billing cycle. The batch drafts every offtaker's invoice and downloads a file that imports directly.</p>
                 <div class="rb-export rb2-export" id="rbExportBox" hidden>
                   <label class="rb-exf" for="rbExportFmt">Accounting system
                     <select class="rb-export-sel" id="rbExportFmt"
@@ -2143,24 +2143,24 @@
                   </label>
                   <label class="rb-exf" for="rbExportMemo">Memo <span class="rb-exf-opt">(optional)</span>
                     <input class="rb-export-memo" id="rbExportMemo" type="text" inputmode="text"
-                           placeholder="Solar credit — {month}" maxlength="120" autocomplete="off"
-                           title="The description on each invoice line (QuickBooks ItemDescription / Xero Description / IIF memo). Leave blank to use “Solar credit — {month}”.">
+                           placeholder="Solar credit ({month})" maxlength="120" autocomplete="off"
+                           title="The description on each invoice line (QuickBooks ItemDescription / Xero Description / IIF memo). Leave blank to use “Solar credit ({month})”.">
                   </label>
                   <label class="rb-exf" for="rbExportAcct" id="rbExportAcctWrap">Income account <span class="rb-exf-opt">(optional)</span>
                     <input class="rb-export-acct" id="rbExportAcct" type="text" inputmode="text"
                            placeholder="e.g. 200 or Solar Credit Income" maxlength="60" autocomplete="off"
-                           title="The account these solar invoices post to — Xero's AccountCode and QuickBooks Desktop's income account. QuickBooks Online ignores it (it uses the “Solar Credit” product/service). Remembered for next time.">
+                           title="The account these solar invoices post to: Xero's AccountCode and QuickBooks Desktop's income account. QuickBooks Online ignores it (it uses the “Solar Credit” product/service). Remembered for next time.">
                   </label>
-                  <p class="rb-export-note" id="rbExportIifNote" hidden>QuickBooks Desktop 2019+ restricts IIF transaction imports by default — you may need File → Utilities → Import to enable it.</p>
+                  <p class="rb-export-note" id="rbExportIifNote" hidden>QuickBooks Desktop 2019+ restricts IIF transaction imports by default. You may need File → Utilities → Import to enable it.</p>
                   <button class="ao-btn ao-btn-primary rb-btn rb-export-go" id="rbExportGo" type="button"
                           title="Draft every offtaker's invoice for the chosen cycle and download the import file.">⬇ Download export</button>
                   <span class="rb-export-stat" id="rbExportStat" aria-live="polite"></span>
                 </div>
               </div>
             </div>
-            <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with — greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
-            <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against — GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
-            <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster — name, percent share, and (ideally) account number.">⬆ Bulk import</button>
+            <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with: greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
+            <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
+            <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster: name, percent share, and (ideally) account number.">⬆ Bulk import</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
@@ -2181,7 +2181,7 @@
       <div class="rb-tpl rep-card" id="rbTpl">
         <div class="rb-tpl-main">
           <h3>This offtaker’s invoice template</h3>
-          <p>Upload an invoice and <b>this offtaker’s</b> invoices reproduce that exact format — PDF, Word, HTML, an image, or an Excel workbook (we'll find the invoice sheet inside it). Leave it on Default to use the standard format.</p>
+          <p>Upload an invoice and <b>this offtaker’s</b> invoices reproduce that exact format: PDF, Word, HTML, an image, or an Excel workbook (we'll find the invoice sheet inside it). Leave it on Default to use the standard format.</p>
         </div>
         <div class="rb-tpl-ctl">
           <input type="file" id="rbTplFile" accept=".pdf,.html,.htm,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls,.xlsm" hidden>
@@ -4951,11 +4951,11 @@
       label = `✓ 100% allocated`;
       hint = "";
     } else if (over) {
-      label = `⚠ ${pct}% allocated — over-allocated (would double-bill the meter's excess)`;
+      label = `⚠ ${pct}% allocated · would double-bill the meter's excess`;
       hint = `These shares add to ${overBy}% more than 100%, so part of the meter's excess would be billed to two offtakers at once. Lower a share so the total is 100%.`;
     } else {
       label = `ⓘ ${pct}% allocated`;
-      hint = `${unassigned}% of this meter's excess is unassigned — fine if that's intended, or add/raise a share to reach 100%.`;
+      hint = `${unassigned}% of this meter's excess is unassigned. That's fine if intended, or add/raise a share to reach 100%.`;
     }
     // Breakdown rows — each offtaker's share, biggest first so the math reads
     // top-down. Array-grouped fleets (own-meter shape) show array_share_pct —
@@ -4978,7 +4978,7 @@
     return `<span class="rb-grp-pctwrap">
       <span class="rb-grp-pct ${cls}" tabindex="0" aria-describedby="">${label}</span>
       <span class="rb-grp-pct-pop" role="tooltip">
-        <span class="rb-grp-pop-title">How this adds up — ${rows.length} offtaker${rows.length === 1 ? "" : "s"} ${where}</span>
+        <span class="rb-grp-pop-title">How this adds up · ${rows.length} offtaker${rows.length === 1 ? "" : "s"} ${where}</span>
         ${rowHtml}
         <span class="rb-grp-pop-row rb-grp-pop-sum ${sumCls}"><span class="rb-grp-pop-who">Total allocated</span><span class="rb-grp-pop-pct">${pct}%</span></span>
         ${hint ? `<span class="rb-grp-pop-note">${esc(hint)}</span>` : ""}
@@ -5002,14 +5002,14 @@
     _indexInbox(drafts || [], subs || []);
     // OFFTAKERS is reused as the canonical ordered offtaker list (drafts float to top).
     if (!OFFTAKERS.length) {
-      list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet — click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
+      list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet. Click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
       return;
     }
     // Header copy: "N reports ready to review & send — nothing sends until you approve."
     const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
     const headLine = pending
-      ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send — nothing sends until you approve.`
-      : `Click an offtaker to review &amp; send their invoice — nothing sends until you approve.`;
+      ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Nothing sends until you approve.`
+      : `Click an offtaker to review &amp; send their invoice. Nothing sends until you approve.`;
     // Keep the currently-open card open across refreshes, but do NOT auto-open one on a
     // fresh load — every offtaker starts collapsed until the operator clicks one (Ford).
     const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
@@ -5450,7 +5450,7 @@
       ? "auto-sent to " + esc(recips)
       : "drafted for your approval, then sent to " + esc(recips);
     const sentence = "<b>" + esc(s.customer_name) + "</b> receives <b>" + pctTxt + "</b> of <b>"
-      + esc(srcName) + "</b>'s generation. <b>" + cadTxt + "</b> " + esc(fmts) + " &mdash; " + deliveryTxt + ".";
+      + esc(srcName) + "</b>'s generation. <b>" + cadTxt + "</b> " + esc(fmts) + ", " + deliveryTxt + ".";
     // Whether a draft is queued for this offtaker (Ready) drives the header pill.
     const draft = DRAFT_BY_SUB[String(s.id)];
     const readyPill = draft
