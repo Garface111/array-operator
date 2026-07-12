@@ -5348,14 +5348,19 @@
       try { return (window.FleetStore && FleetStore.snapshot().arrays || []).filter(a => a.vendor === "solaredge").length; }
       catch (e) { return 0; }
     })();
+    // The connected keys list (.ar-se-keys) is filled async by loadSolarEdgeKeys()
+    // below; "+ Add another key" reveals the key input (.ar-se-add) — matching how
+    // the other vendor cards reveal an "add login" field (Ford 2026-07-10).
     const solarEdgeCardHTML = () => `<div class="ar-util" data-code="solaredge">
       <div class="ar-util-name">SolarEdge</div>
       <div class="ar-cloud-stat" style="color:var(--faint)">Connects with your SolarEdge monitoring API key, not a saved login. Works the same in either mode above.</div>
-      ${seCount ? `<div class="ar-cloud-stat ok">✓ ${seCount} array${seCount === 1 ? "" : "s"} connected</div>` : ""}
-      <div class="ar-fields">
+      <div class="ar-se-keys" aria-live="polite"></div>
+      <button type="button" class="acct-btn ar-se-addbtn" hidden>+ Add another key</button>
+      <div class="ar-fields ar-se-add" hidden>
         <input class="ar-se-key" type="text" autocomplete="off" placeholder="SolarEdge API key">
         <div class="ar-actions">
-          <button class="acct-btn primary ar-se-save" type="button">${seCount ? "Add another key" : "Connect"}</button>
+          <button class="acct-btn primary ar-se-save" type="button">Connect</button>
+          <button class="acct-btn ar-se-cancel" type="button" hidden>Cancel</button>
         </div>
       </div>
       <div class="ar-se-stat ar-cloud-stat" aria-live="polite"></div>
@@ -5439,6 +5444,44 @@
         }
       });
     }
+    // Show the SolarEdge key(s) already connected (masked, with a reveal toggle), and
+    // make "+ Add another key" reveal the key input — like the other cards' add-login.
+    (async function loadSolarEdgeKeys(){
+      const keysEl = listEl.querySelector(".ar-se-keys");
+      const addBtn = listEl.querySelector(".ar-se-addbtn");
+      const addWrap = listEl.querySelector(".ar-se-add");
+      const cancel = addWrap && addWrap.querySelector(".ar-se-cancel");
+      if (!keysEl || !addBtn || !addWrap) return;
+      let keys = [];
+      try {
+        const r = await fetch("/v1/array-owners/solaredge/keys", { headers: authHeaders() });
+        if (r.ok) { const d = await r.json().catch(()=>({})); keys = d.keys || []; }
+      } catch(e) {}
+      if (keys.length) {
+        keysEl.innerHTML = keys.map(k => `<div class="ar-se-krow">
+            <span class="ar-se-kdot">✓</span>
+            <code class="ar-se-kval" data-full="${esc(k.key)}" data-masked="${esc(k.masked)}">${esc(k.masked)}</code>
+            <button type="button" class="ar-se-reveal" title="Show / hide the full key">show</button>
+            <span class="ar-se-karr" title="${esc(k.arrays.join(', '))}">${k.array_count} array${k.array_count===1?"":"s"}</span>
+          </div>`).join("");
+        addBtn.hidden = false; addWrap.hidden = true;
+        if (cancel) cancel.hidden = false;
+        keysEl.querySelectorAll(".ar-se-reveal").forEach(btn => btn.onclick = () => {
+          const code = btn.parentElement.querySelector(".ar-se-kval");
+          const masked = code.textContent === code.dataset.masked;
+          code.textContent = masked ? code.dataset.full : code.dataset.masked;
+          btn.textContent = masked ? "hide" : "show";
+        });
+      } else {
+        keysEl.innerHTML = "";
+        addBtn.hidden = true; addWrap.hidden = false;
+        if (cancel) cancel.hidden = true;
+      }
+      addBtn.onclick = () => { addBtn.hidden = true; addWrap.hidden = false;
+        const inp = addWrap.querySelector(".ar-se-key"); if (inp) inp.focus(); };
+      if (cancel) cancel.onclick = () => { addWrap.hidden = true; addBtn.hidden = false;
+        const inp = addWrap.querySelector(".ar-se-key"); if (inp) inp.value = ""; };
+    })();
     // Known usernames per provider — live duplicate detection on the add-login
         // row (and when a saved row's username is retargeted onto another login).
         // Backend keys PortalCredential on (tenant, provider, username_lc), so a

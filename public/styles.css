@@ -272,6 +272,18 @@
     .ar-cloud-stat{font-size:11.5px;font-weight:600;margin:2px 0 6px;display:flex;align-items:center;gap:5px}
     .ar-cloud-stat.ok{color:#047857}
     .ar-cloud-stat.err{color:#b45309}
+    /* SolarEdge connected-keys list — see which monitoring key(s) are linked, reveal to copy (Ford 2026-07-10) */
+    .ar-se-keys{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
+    .ar-se-krow{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 9px;border-radius:9px;
+      background:rgba(4,120,87,.06);border:1px solid rgba(4,120,87,.2)}
+    .ar-se-kdot{color:#047857;font-weight:800;flex:none}
+    .ar-se-kval{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink);
+      background:rgba(0,0,0,.05);padding:2px 7px;border-radius:6px;letter-spacing:.02em;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:200px}
+    .ar-se-reveal{background:none;border:0;color:#2563eb;font:inherit;font-size:11px;font-weight:700;
+      cursor:pointer;padding:0;flex:none;text-decoration:underline}
+    .ar-se-karr{margin-left:auto;font-size:11px;color:var(--faint);font-weight:600;flex:none}
+    .ar-se-addbtn{align-self:flex-start;margin-bottom:2px}
     .ar-save.ar-saved-ok{background:#047857 !important;border-color:#047857 !important;color:#fff !important}
     .ar-save.ar-save-err{background:#b45309 !important;border-color:#b45309 !important;color:#fff !important}
     /* Duplicate username indicator on Credential Vault add/edit rows. */
