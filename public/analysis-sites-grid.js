@@ -475,6 +475,21 @@
     if (r.expected == null) return '<td class="ansg-num ansg-faint">—</td>';
     return '<td class="ansg-num ansg-val">' + ctx.esc(ctx.fmt.kwh(r.expected)) + '</td>';
   }
+  // Plain-English "why isn't this modeled yet, and how long until it is" — shown as
+  // a hover popup on the "not modeled yet" cell (Ford 2026-07-10). Reason-aware. There
+  // is no hard min-day CONSTANT in the model; it cites the real 10-day comparison
+  // window + a typical (not guaranteed) 3–4 days of production before the read is solid.
+  function nomodelTip(r, ctx) {
+    var reason = ctx.forecastSkipped && ctx.forecastSkipped[r.aid];
+    if (reason === "no_nameplate")
+      return "Add this site's capacity (nameplate kW) so the weather model can compute its expected output.";
+    if (reason === "irradiance_unavailable")
+      return "Weather data for this location isn't available yet — this usually resolves within a day.";
+    // Has a location, but no measured daily production has accumulated yet.
+    return "Weather-adjusted performance compares this site's measured production against the real sunlight that fell on it, over the last 10 days. "
+      + "It needs a location on file plus a few days of measured daily production — usually 3–4 full days after it starts producing. "
+      + "This site is producing now but hasn't logged full days yet, so it'll model automatically once that data loads.";
+  }
   function cellRatio(r, ctx) {
     // HONESTY: no forecast row → never a bar, never a 0%
     if (!r.hasForecast || r.ratio == null) {
@@ -485,7 +500,7 @@
       if (reason === "no_location" && ctx.signedIn && ctx.setLocation) {
         return '<td class="ansg-ave"><button type="button" class="ansg-setloc" data-setloc="' + ctx.esc(r.aid) + '" title="No location on file — add a town or address so the weather model can run">＋ set location</button></td>';
       }
-      return '<td class="ansg-ave"><span class="ansg-nomodel">not modeled yet</span></td>';
+      return '<td class="ansg-ave"><span class="ansg-nomodel" title="' + ctx.esc(nomodelTip(r, ctx)) + '" tabindex="0">not modeled yet</span></td>';
     }
     var bucket = ratioBucket(r.ratio);
     var fillCls = bucket === "good" ? "" : bucket === "neutral" ? " neutral" : " bad";

@@ -113,7 +113,8 @@
     var unitHtml = parts.unit ? '<span class="ansum-unit">' + esc(parts.unit) + "</span>" : "";
     var subHtml = sub ? '<div class="ansum-sub' + (opts.subTone ? " " + opts.subTone : "") + '">' + sub + "</div>" : "";
     var railCls = (tone === "warn" || tone === "bad" || tone === "muted") ? " " + tone : "";
-    return '<div class="ansum-card' + railCls + '">' +
+    var titleAttr = opts.title ? ' title="' + esc(opts.title) + '" tabindex="0"' : "";
+    return '<div class="ansum-card' + railCls + '"' + titleAttr + '>' +
       '<div class="ansum-lbl">' + esc(label) + "</div>" +
       '<div class="ansum-val' + (tone ? " " + tone : "") + '">' + esc(parts.v) + unitHtml + "</div>" +
       subHtml + "</div>";
@@ -254,7 +255,9 @@
       if (modeled != null) perfSub += (perfSub ? " · " : "") + modeled + (modeled === 1 ? " array modeled" : " arrays modeled");
       html += card("Weather-adj. performance", fmt.pct(perfRatio), perfSub || "vs expected", { tone: pTone });
     } else {
-      html += card("Weather-adj. performance", "—", "not modeled yet", { tone: "muted" });
+      html += card("Weather-adj. performance", "—", "not modeled yet", { tone: "muted",
+        title: "Compares each site's measured production against the real sunlight that fell on it, over the last 10 days. "
+          + "It needs a location on file plus a few days of measured daily production — usually 3–4 full days after a site starts producing — then it fills in automatically." });
     }
 
     // 7. Active alarms (measured)
