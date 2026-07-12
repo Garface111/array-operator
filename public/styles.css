@@ -1203,7 +1203,7 @@
   .sb-detail-host{position:absolute;right:24px;bottom:24px;width:min(330px,42%);z-index:7}
   .sb-detail-card{position:relative;padding:14px 15px 13px;border-radius:14px;border:1px solid var(--line);
     background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -20px rgba(0,0,0,.85);
-    animation:dcin .32s ease}
+    animation:dcin .32s var(--ease-out)}
   @keyframes dcin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
   /* ── Click-to-zoom: the detail becomes a large CENTERED, PINNED modal ── */
@@ -1457,7 +1457,7 @@
   .sb-card-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;min-width:150px;
     display:flex;flex-direction:column;gap:2px;padding:6px;border-radius:12px;border:1px solid var(--line);
     background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -20px rgba(0,0,0,.85);
-    animation:dcin .18s ease}
+    animation:dcin .18s var(--ease-out)}
   .sb-card-menu button{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
     color:var(--ink);font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:8px}
   .sb-card-menu button:hover{background:rgba(255,255,255,.06);color:var(--good)}
@@ -1466,7 +1466,7 @@
   /* right-click array context menu (lives on <body>, fixed to the cursor) */
   .sb-ctxmenu{position:fixed;z-index:200;min-width:140px;padding:5px;border-radius:11px;
     border:1px solid var(--line);background:linear-gradient(165deg,var(--card2),var(--card));
-    box-shadow:0 18px 44px -20px rgba(0,0,0,.85);animation:dcin .15s ease}
+    box-shadow:0 18px 44px -20px rgba(0,0,0,.85);animation:dcin .15s var(--ease-out)}
   .sb-ctxmenu button{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
     font-size:12.5px;font-weight:600;padding:8px 11px;border-radius:7px;color:var(--bad)}
   .sb-ctxmenu button:hover{background:rgba(255,107,107,.13)}
@@ -1474,7 +1474,7 @@
   /* the cards themselves (shared chrome for free + fixed) */
   .sb-card{position:absolute;width:210px;border-radius:13px;border:1px solid var(--line);
     background:linear-gradient(165deg,var(--card2),var(--card));box-shadow:0 18px 44px -22px rgba(0,0,0,.85);
-    z-index:5;touch-action:none;animation:dcin .26s ease}
+    z-index:5;touch-action:none;animation:dcin .26s var(--ease-out)}
   .sb-card.dragging{opacity:.92;box-shadow:0 26px 60px -20px rgba(0,0,0,.9);cursor:grabbing}
   .sb-card-bar{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 9px;border-bottom:1px solid var(--line);
     cursor:grab;touch-action:none;border-radius:13px 13px 0 0;background:rgba(255,255,255,.02)}
