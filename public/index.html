@@ -615,8 +615,17 @@
     var wrap=document.getElementById("fsWrap");
     loadH2C().then(function(){
       wrap.style.visibility="hidden";               // never capture the widget itself
+      // Capture ONLY what's on screen right now (the current viewport), not the whole
+      // unfolded scroll height — cropping to [scroll, viewport] keeps the markup canvas
+      // to what the customer is actually looking at (Ford 2026-07-11). Also far lighter,
+      // so tall pages stop failing capture.
+      var sx=Math.floor(window.scrollX||window.pageXOffset||0);
+      var sy=Math.floor(window.scrollY||window.pageYOffset||0);
+      var vw=Math.max(1,window.innerWidth||document.documentElement.clientWidth);
+      var vh=Math.max(1,window.innerHeight||document.documentElement.clientHeight);
       return window.html2canvas(document.body,{
         scale:Math.min(window.devicePixelRatio||1,1.5), useCORS:true, logging:false,
+        x:sx, y:sy, width:vw, height:vh,             // crop the render to the visible viewport
         ignoreElements:function(el){ return el&&(el.id==="fsWrap"||el.id==="fsOverlay"); }
       });
     }).then(function(cv){
