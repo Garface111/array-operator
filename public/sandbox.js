@@ -4126,14 +4126,24 @@
           const el = document.getElementById("sbUtilCount");
           if(el) el.textContent = provCountLabel();
         });
-        const _lede = utilityOnly
+        // Cloud Capture owners don't use the browser helper at all — their utility logins
+        // live in the SERVER-SIDE vault in Master Account. So "Link utility bills" must send
+        // them there, not push the 1-click extension. (Ford 2026-07-12.)
+        const _isCloud = (() => { try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } })();
+        const cloudUtil = utilityOnly && _isCloud;
+        const _lede = cloudUtil
+          ? `You're on <b>Cloud Capture</b> — we sign in and refresh your utility bills around the clock on our servers, no browser helper needed. Add your utility login in <b>Master Account</b> and we pull the bills in automatically.`
+          : utilityOnly
           ? (EXT_PRESENT
               ? `Connect the utility whose bills you invoice your offtakers against — we pull the bills in automatically. Pick yours below (any of <span id="sbUtilCount">hundreds of</span> supported utilities).`
               : "Connect the utility whose bills you invoice your offtakers against. Add the free helper, then pick your utility and we pull the bills in automatically.")
           : (EXT_PRESENT
               ? "Connect the easy way — log into the monitoring site you already use, and your inverters come in on their own. No keys to find."
               : "Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.");
-        const extBlock = EXT_PRESENT
+        const extBlock = cloudUtil
+          ? `<p class="sb-modal-lede">${_lede}</p>
+             <button type="button" class="sb-mbtn primary" id="sbCloudLink">Add a utility login in Master Account →</button>`
+          : EXT_PRESENT
           ? `<p class="sb-modal-lede">${_lede}</p>
              ${loginSections}`
           : `<p class="sb-modal-lede">${_lede}</p>
@@ -4143,6 +4153,18 @@
         body.innerHTML = extBlock + (utilityOnly ? "" :
           `<div class="sb-or"><span>or</span></div>
            <button type="button" class="sb-mbtn ghost sb-manual-toggle" id="sbManualToggle">Enter keys manually instead</button>`);
+        // Cloud path → close, jump to Master Account's vault, open the utility-login picker.
+        const _cloudLink = body.querySelector("#sbCloudLink");
+        if(_cloudLink) _cloudLink.onclick = () => {
+          closeAddModal();
+          location.hash = "#account";
+          setTimeout(() => {
+            const row = document.getElementById("rowAutoRefresh");
+            if(row) row.scrollIntoView({ behavior:"smooth", block:"center" });
+            const ab = document.querySelector(".ar-addutil-btn");
+            if(ab) ab.click();
+          }, 260);
+        };
         foot.innerHTML = `<button class="sb-mbtn ghost" type="button" id="sbCancel">Close</button>`;
 
         body.querySelectorAll("[data-login]").forEach(b => {
