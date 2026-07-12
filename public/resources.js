@@ -154,31 +154,39 @@
     if (!feedEl) return;
     fetch("/news.json?cb=" + Date.now()).then(function (r) { return r.json(); }).then(function (data) {
       var all = (data && data.items) || [];
+      // STRICTLY the operator's OWN state + genuinely New-England-wide items (ISO-NE,
+      // federal, region tags). Other states' state-specific headlines never appear here:
+      // a New Hampshire operator sees New Hampshire (and region-wide) news, not Vermont's
+      // (Ford 2026-07-11). NO all-states fallback — an honest empty beats a misleading
+      // dump of another state's rate cases under your state's briefing.
       var items = all.filter(function (it) {
         var st = (it.state || "").toLowerCase();
         return !st || st === k || st === "region" || st === "ne" || st === "all";
       });
-      // Never show an empty feed: if this state has nothing of its own yet, fall back to
-      // the full New England set so the operator still sees what's moving next door.
-      var regionMode = false;
-      if (!items.length) { items = all.slice(); regionMode = true; }
       items.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+      var stateName = (NE[k] && NE[k].name) || "your state";
       if (metaEl) {
         if (!items.length) {
-          metaEl.innerHTML = "No updates yet — check back soon.";
-        } else if (regionMode) {
-          metaEl.innerHTML = "No " + esc(NE[k].name) + "-specific headlines yet — here's what's moving across New England (updated " +
-            esc(fmtDate(data.updated || items[0].date)) + ").";
+          metaEl.innerHTML = "We're tracking " + esc(stateName) + "'s utility-commission dockets and rate cases — no " +
+            esc(stateName) + " headlines yet. Nothing here means nothing has changed for your " + esc(stateName) + " arrays.";
         } else {
           metaEl.innerHTML = "Last updated " + esc(fmtDate(data.updated || items[0].date)) + " · " + items.length +
-            " item" + (items.length === 1 ? "" : "s") + " for " + esc(NE[k].name);
+            " update" + (items.length === 1 ? "" : "s") + " for " + esc(stateName);
         }
+      }
+      if (!items.length) {
+        feedEl.innerHTML = '<div class="disc">Nothing to report for ' + esc(stateName) +
+          ' right now. We watch the public commission dockets and reporting regularly and will surface any ' +
+          esc(stateName) + ' rate case, net-metering change, or filing deadline here the moment it moves.</div>';
+        return;
       }
       feedEl.innerHTML = items.map(function (it) {
         var alert = /rule|cut|phase|deadline|case|alert/i.test((it.tag || "") + " " + (it.title || ""));
         var stc = (it.state || "").toLowerCase();
-        var stName = NE[stc] ? NE[stc].name : (stc === "region" || stc === "ne" ? "New England" : "");
-        var stChip = regionMode && stName ? '<span class="res-stchip">' + esc(stName) + "</span>" : "";
+        // Only region-wide items get a chip (to read as New-England-wide context, not
+        // your state) — the operator's own-state items need no chip.
+        var isRegional = (stc === "region" || stc === "ne" || stc === "all");
+        var stChip = isRegional ? '<span class="res-stchip">New England</span>' : "";
         return '<div class="item"><div class="when">' + esc(fmtDate(it.date)) + "</div><div>" +
           stChip +
           '<span class="tag' + (alert ? " alert" : "") + '">' + esc(it.tag || "Update") + "</span>" +
