@@ -4838,8 +4838,15 @@
       shape[slot] = {
         hasCreds: true, enabled: c.enabled !== false, username: c.username || "",
         utility: !isInv, inverter: isInv, code: code, host: c.login_host || "",
-        // extra cloud-only health, surfaced by the card as a freshness hint
+        // extra cloud-only health, surfaced by the card as a freshness hint.
+        // _cloudStatus is the RAW harvest outcome (ok|login_failed|scrape_failed|…)
+        // — needed so the status line can tell "wrong password" (login_failed, the
+        // only real credential issue) apart from a post-login data-pull hiccup
+        // (scrape_failed etc.) that a bare ok/not-ok boolean can't distinguish
+        // (Ford 2026-07-12: Chint kept saying "check the password" on a correct
+        // password because of exactly this — see solar-operator cloud_capture.py).
         _cloudOk: c.last_harvest_ok, _cloudAt: c.last_harvest_at, _cloudFails: c.harvest_fails || 0,
+        _cloudStatus: c.last_harvest_status || null,
       };
     });
     return shape;
@@ -5024,12 +5031,17 @@
       if(isInv){ const v = AR_INVERTERS.find(x => x.id === code); name = v ? v.label : code.toUpperCase(); }
       else { name = utilLabelFor(code, catalog); }
       const enabled = s.enabled !== false;
-      const fails = s._cloudFails || 0, at = s._cloudAt || null, ok = s._cloudOk;
+      const fails = s._cloudFails || 0, at = s._cloudAt || null, ok = s._cloudOk, hStatus = s._cloudStatus;
       let dot, stag, stxt, tTxt;
       if(!enabled){ dot = "off"; stag = "off"; stxt = "Paused"; tTxt = "—"; }
       else if(mode === "cloud"){
+        // Only a REAL login_failed is a credential problem — a bare ok===false also
+        // covers scrape_failed (signed in fine, the data pull hit a transient snag,
+        // doesn't count toward `fails`) and shouldn't blame the password. See the
+        // matching fix in credRow's cloudLine (Ford 2026-07-12, Chint).
         if(fails >= 3){ dot = "err"; stag = "err"; stxt = "Sign-in failed"; tTxt = at ? _flAgo(at) : "—"; }
-        else if(at && ok === false){ dot = "err"; stag = "err"; stxt = "Check password"; tTxt = _flAgo(at); }
+        else if(at && ok === false && hStatus === "login_failed"){ dot = "err"; stag = "err"; stxt = "Check password"; tTxt = _flAgo(at); }
+        else if(at && ok === false){ dot = "warn"; stag = "warn"; stxt = "Retrying"; tTxt = _flAgo(at); }
         else if(at){ dot = "live"; stag = "live"; stxt = "Live"; tTxt = _flAgo(at); }
         else { dot = "warn"; stag = "warn"; stxt = "Starting"; tTxt = "queued"; }
       } else {
@@ -5238,7 +5250,8 @@
           if(mode === "cloud" && hasCreds){
             const cs = cloudStat || {};
             if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused — re-enter your password to retry</div>`;
-            else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in — check the password</div>`;
+            else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in — check the password</div>`;
+            else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine — the last data pull hit a snag, retrying automatically</div>`;
             else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected — refreshing automatically</div>`;
             else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved — first refresh starting…</div>`;
           }
@@ -5271,7 +5284,7 @@
       const s = status[k];
       if(!s || !s.utility || !s.hasCreds) return;
       const code = s.code || k;
-      (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails });
+      (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus });
     });
     // Same grouping for INVERTER logins so a vendor card can list N logins (Ford
     // 2026-07-10). Only cloud mode reports slotted inverter entries; on-device
@@ -5283,7 +5296,7 @@
       const s = status[k];
       if(!s || !s.inverter || !s.hasCreds) return;
       const code = s.code || k;
-      (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails });
+      (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus });
     });
     // Which utilities to show as cards: GMP (common default) + every one with a
     // saved login + anything the operator just picked from the catalog this session.
@@ -5299,7 +5312,7 @@
       const savedRows = logins.map(l => credRow({
         key: l.slot, saveCode: code, label: "", ph: "username / email",
         hasCreds: true, enabled: l.enabled, prefillUser: l.username,
-        cloudStat: { ok: l.ok, at: l.at, fails: l.fails },
+        cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status },
       })).join("");
       const addRow = credRow({
         key: code + "::__new__", saveCode: code, label: "",
@@ -5321,7 +5334,7 @@
       const savedRows = logins.map(l => credRow({
         key: l.slot, saveCode: v.id, label: "", ph: "username / email",
         hasCreds: true, enabled: l.enabled, prefillUser: l.username,
-        cloudStat: { ok: l.ok, at: l.at, fails: l.fails },
+        cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status },
       })).join("");
       const addRow = credRow({
         key: v.id + "::__new__", saveCode: v.id, label: "",
@@ -5377,7 +5390,7 @@
               const st = status[v.id] || { hasCreds:false, enabled:true };
               // Device (extension) mode: single login per vendor. Show the saved
               // username so a login saved in the extension popup reads as present.
-              return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails } });
+              return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
             }).join("")}
         ${solarEdgeCardHTML()}
       </div>
