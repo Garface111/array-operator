@@ -506,8 +506,14 @@
   //    can hover, plus the stats + live diagnosis. Replaces the cramped inline panel; the
   //    rows themselves stay aligned to the table grid.
   function _dayLabel(dateStr) {
-    try { const d = new Date(dateStr + "T00:00:00"); return (d.getMonth() + 1) + "/" + d.getDate(); }
-    catch (e) { return ""; }
+    if (dateStr == null) return "";
+    const s = String(dateStr);
+    // Relative "d-N" (N days ago — the sample/demo shape) → resolve to a calendar date.
+    const m = s.match(/^d-?(\d+)$/);
+    let d;
+    if (m) { d = new Date(); d.setDate(d.getDate() - parseInt(m[1], 10)); }
+    else { d = new Date(s.length <= 10 ? s + "T00:00:00" : s); if (isNaN(d.getTime())) d = new Date(s); }
+    return isNaN(d.getTime()) ? "" : (d.getMonth() + 1) + "/" + d.getDate();
   }
   function _kwhShort(v) { if (v == null) return ""; return v >= 1000 ? (v / 1000).toFixed(1) + "k" : String(Math.round(v)); }
   function _peerAvgFor(cohort, p) {
