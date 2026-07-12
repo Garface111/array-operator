@@ -184,7 +184,7 @@
 
   <!-- THREE-TAB APP BAR — mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
-    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Health</a>
+    <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Triage</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverters</a>
     <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
     <!-- Trends restored for PowerTrack-parity multi-timeframe views (fleet kWh by
@@ -273,10 +273,10 @@
        fleet-healthy %, $ recoverable, and the COMBINED "needs attention" list (every
        flagged inverter across the fleet, worst-first). Reuses command-center.js: it
        fills #fleetCommander (the health card) + #ccQueue (the attention queue). -->
-  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Health">
+  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Triage">
     <div class="dash-wrap">
       <div class="dash-head">
-        <h2>Fleet health</h2>
+        <h2>Fleet triage</h2>
         <div class="dash-prod" id="dashProd"></div>
       </div>
       <section id="fleetCommander"></section>
