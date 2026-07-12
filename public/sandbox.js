@@ -2978,12 +2978,13 @@
     menu.style.left = x + "px";
     menu.style.top = y + "px";
     menu.addEventListener("click", ev => ev.stopPropagation());
-    menu.querySelector(".sb-ctxmenu-del").onclick = () => {
-      if(confirm(`Delete array "${name}"? You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.`)){
+    menu.querySelector(".sb-ctxmenu-del").onclick = async () => {
+      closeArrayCtxMenu();   // don't leave the tiny menu floating behind the dialog
+      const ok = await AODialog.confirm("You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.", { title: `Delete array "${name}"?`, danger: true, confirmLabel: "Delete" });
+      if(ok){
         FleetStore.deleteArray(id);
         toast(`Deleted "${name}" — press ↶ Undo (Ctrl/Cmd+Z) to bring it back.`, "ok");
       }
-      closeArrayCtxMenu();
     };
     document.body.appendChild(menu);
     // keep the menu inside the viewport if it would overflow the right/bottom edge
@@ -3025,12 +3026,13 @@
       }
       closeArrayCtxMenu();
     };
-    menu.querySelector(".sb-ctxmenu-del").onclick = () => {
-      if(confirm(`Delete inverter "${name}"? You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.`)){
+    menu.querySelector(".sb-ctxmenu-del").onclick = async () => {
+      closeArrayCtxMenu();   // don't leave the tiny menu floating behind the dialog
+      const ok = await AODialog.confirm("You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.", { title: `Delete inverter "${name}"?`, danger: true, confirmLabel: "Delete" });
+      if(ok){
         FleetStore.deleteInverter(id);
         toast(`Deleted "${name}" — press ↶ Undo (Ctrl/Cmd+Z) to bring it back.`, "ok");
       }
-      closeArrayCtxMenu();
     };
     document.body.appendChild(menu);
     // keep the menu inside the viewport if it would overflow the right/bottom edge
@@ -3824,8 +3826,8 @@
   function wireNewArrayButton(host){
     const btn = host.querySelector("#sbNewArray");
     if(!btn) return;
-    btn.onclick = () => {
-      let name = window.prompt("Name your new array (then drag inverters into it):", "");
+    btn.onclick = async () => {
+      let name = await AODialog.prompt("Then drag inverters into it.", "", { title: "Name your new array", placeholder: "e.g. Rutland Community" });
       if(name == null) return;                 // cancelled
       name = name.trim();
       if(!name){ toast("Enter a name for the new array.", "err"); return; }
@@ -5328,6 +5330,33 @@
       </div>`;
     };
 
+    // SolarEdge is deliberately absent from AR_INVERTERS: it connects with its
+    // OWN monitoring API key, not a portal username/password, so it never had a
+    // vault entry — and so it never had ANY row in this panel at all (Ford
+    // 2026-07-12: "no option to put in your SolarEdge login" — there truly wasn't
+    // one). It's mode-independent (the key lives with SolarEdge's own servers,
+    // not our extension vault or cloud-capture harvester), so it renders the
+    // SAME regardless of the Device/Cloud toggle above. Reuses the existing
+    // connect-account endpoint (same one "Add an array" already calls) — this
+    // is just giving it a visible home next to the other portals instead of only
+    // being reachable through a different modal.
+    const seCount = (() => {
+      try { return (window.FleetStore && FleetStore.snapshot().arrays || []).filter(a => a.vendor === "solaredge").length; }
+      catch (e) { return 0; }
+    })();
+    const solarEdgeCardHTML = () => `<div class="ar-util" data-code="solaredge">
+      <div class="ar-util-name">SolarEdge</div>
+      <div class="ar-cloud-stat" style="color:var(--faint)">Connects with your SolarEdge monitoring API key, not a saved login. Works the same in either mode above.</div>
+      ${seCount ? `<div class="ar-cloud-stat ok">✓ ${seCount} array${seCount === 1 ? "" : "s"} connected</div>` : ""}
+      <div class="ar-fields">
+        <input class="ar-se-key" type="text" autocomplete="off" placeholder="SolarEdge API key">
+        <div class="ar-actions">
+          <button class="acct-btn primary ar-se-save" type="button">${seCount ? "Add another key" : "Connect"}</button>
+        </div>
+      </div>
+      <div class="ar-se-stat ar-cloud-stat" aria-live="polite"></div>
+    </div>`;
+
     listEl.innerHTML = `
       ${buildLiveBoardHTML(status, mode, catalog)}
       ${mode === "cloud" ? _arConsentHTML() + _arCloudWarnHTML() : ""}
@@ -5341,6 +5370,7 @@
               // username so a login saved in the extension popup reads as present.
               return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails } });
             }).join("")}
+        ${solarEdgeCardHTML()}
       </div>
       <div class="ar-group">
         <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
@@ -5367,6 +5397,44 @@
     }
 
     _arWireConsent();
+    // ── SolarEdge: connect with an API key, straight to the same endpoint
+    // "Add an array" uses (/v1/array-owners/solaredge/connect-account). No vault,
+    // no on/off toggle, no username — it's not a saved-login credential, it's a
+    // direct key-based connection that discovers + attaches every site on the
+    // account (matching existing arrays, creating new ones for the rest).
+    const seSave = listEl.querySelector(".ar-se-save");
+    if (seSave) {
+      const seKeyEl = listEl.querySelector(".ar-se-key");
+      const seStat = listEl.querySelector(".ar-se-stat");
+      const seLabel = seSave.textContent;
+      seSave.addEventListener("click", async () => {
+        const key = (seKeyEl.value || "").trim();
+        if (!key) { seSave.textContent = "Paste a key"; setTimeout(() => seSave.textContent = seLabel, 1500); return; }
+        seSave.disabled = true; seSave.textContent = "Connecting…";
+        if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat"; seStat.textContent = ""; }
+        try {
+          const r = await fetch("/v1/array-owners/solaredge/connect-account", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ api_key: key }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.ok) {
+            seKeyEl.value = "";
+            if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat ok"; seStat.textContent = d.message || "Connected."; }
+            try { if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch(); } catch (e) {}
+            setTimeout(() => { wireAutoRefreshRow(); }, 900);
+          } else {
+            const msg = (d && d.detail) ? d.detail : ("Couldn't connect (HTTP " + r.status + ").");
+            if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat err"; seStat.textContent = msg; }
+            seSave.disabled = false; seSave.textContent = seLabel;
+          }
+        } catch (e) {
+          if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat err"; seStat.textContent = "Network error. Try again."; }
+          seSave.disabled = false; seSave.textContent = seLabel;
+        }
+      });
+    }
     // ── wire credential rows (inverter + utility) ──
     listEl.querySelectorAll(".ar-row").forEach(row => {
       const key = row.dataset.key;
