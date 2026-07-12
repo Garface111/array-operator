@@ -120,6 +120,16 @@
     overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch;
   }
   #panelDashboard .cc-table { min-width: 620px; }   /* keep columns legible; the wrap scrolls */
+
+  /* ── Tab bar: 8 tabs were wrapping to FOUR ragged rows (108px tall, uneven
+     heights as long labels like "Offtaker Invoice Generator" broke to two lines).
+     Make it a single-row horizontal scroll strip instead — one clean 49px row,
+     uniform tabs, swipe to reach the rest. The partially-cut last tab hints the
+     scroll; scrollbar hidden to stay flat. No page-level sideways scroll. ─────── */
+  .tabbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabbar::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; flex: 0 0 auto; }
 }
 
 /* Extra squeeze for the smallest phones. */
