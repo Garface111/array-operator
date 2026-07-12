@@ -4660,6 +4660,15 @@
     return code.toUpperCase();
   }
   const _arAddedUtils = new Set();          // utility codes the operator picked this session (show an empty card to fill)
+  // Utilities the operator asked us to ADD (not in the catalog yet). Queued locally so
+  // they can fire off a bunch fast, then submitted as one batch to /v1/utility-requests
+  // → an agent researches + wires each one in. Persisted so a reload doesn't lose them.
+  let _arUtilReqQueue = (() => {
+    try { return JSON.parse(localStorage.getItem("ao_util_req_queue") || "[]"); } catch (e) { return []; }
+  })();
+  function _saveUtilReqQueue() {
+    try { localStorage.setItem("ao_util_req_queue", JSON.stringify(_arUtilReqQueue)); } catch (e) {}
+  }
   let _vaultReq = {};                       // reqId → resolver, for bridge acks
   function vaultOp(op, extra){
     return new Promise((resolve) => {
@@ -5205,6 +5214,7 @@
           <div class="ar-picker" hidden>
             <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
             <div class="ar-picker-results"></div>
+            <div class="ar-req-queue" hidden></div>
           </div>
         </div>
       </div>`;
@@ -5311,22 +5321,90 @@
     const picker = listEl.querySelector(".ar-picker");
     const searchEl = listEl.querySelector(".ar-picker-search");
     const resultsEl = listEl.querySelector(".ar-picker-results");
+    const queueEl = listEl.querySelector(".ar-req-queue");
     if(addBtn && picker){
       addBtn.addEventListener("click", () => {
         picker.hidden = !picker.hidden;
-        if(!picker.hidden) setTimeout(() => searchEl && searchEl.focus(), 30);
+        if(!picker.hidden){ setTimeout(() => searchEl && searchEl.focus(), 30); renderReqQueue(); }
       });
     }
     const codes = Object.keys(catalog);
+
+    // Queue a "please add this utility" request. Fast path: type a name that isn't in
+    // the catalog → one click (or Enter) drops it into a local queue as a chip; keep
+    // going. "Send" fires the whole batch to /v1/utility-requests → an agent wires each in.
+    function _queueUtilReq(name){
+      const n = (name || "").trim();
+      if(!n) return;
+      const key = n.toLowerCase();
+      if(_arUtilReqQueue.some(r => (r.name || "").toLowerCase() === key)) { renderReqQueue(); return; }
+      _arUtilReqQueue.push({ name: n.slice(0, 120) });
+      _saveUtilReqQueue();
+      searchEl.value = ""; renderResults(); searchEl.focus();
+      renderReqQueue();
+    }
+    function renderReqQueue(){
+      if(!queueEl) return;
+      const q = _arUtilReqQueue;
+      if(!q.length){ queueEl.hidden = true; queueEl.innerHTML = ""; return; }
+      queueEl.hidden = false;
+      queueEl.innerHTML =
+        `<div class="ar-req-head">${q.length} utilit${q.length === 1 ? "y" : "ies"} to add — an agent wires each one in</div>` +
+        `<div class="ar-req-chips">` +
+        q.map((r, i) => `<span class="ar-req-chip">${esc(r.name)}<button type="button" class="ar-req-x" data-i="${i}" title="Remove" aria-label="Remove">×</button></span>`).join("") +
+        `</div>` +
+        `<div class="ar-req-actions"><button type="button" class="ar-req-send">Send ${q.length} request${q.length === 1 ? "" : "s"} →</button></div>`;
+      queueEl.querySelectorAll(".ar-req-x").forEach(x => x.addEventListener("click", () => {
+        _arUtilReqQueue.splice(+x.dataset.i, 1); _saveUtilReqQueue(); renderReqQueue();
+      }));
+      const sendBtn = queueEl.querySelector(".ar-req-send");
+      if(sendBtn) sendBtn.addEventListener("click", () => _sendUtilReqs(sendBtn));
+    }
+    async function _sendUtilReqs(btn){
+      if(!_arUtilReqQueue.length) return;
+      btn.disabled = true; btn.textContent = "Sending…";
+      const payload = { requests: _arUtilReqQueue.map(r => ({ name: r.name })) };
+      const s = (() => { try { return localStorage.getItem("so_session") || ""; } catch(e){ return ""; } })();
+      try{
+        const r = await fetch("/v1/utility-requests", {
+          method: "POST",
+          headers: Object.assign({ "Content-Type":"application/json" }, s ? { Authorization: "Bearer " + s } : {}),
+          body: JSON.stringify(payload),
+        });
+        const d = await r.json().catch(() => ({}));
+        if(!r.ok || d.ok === false) throw new Error("bad response");
+        const n = d.count || _arUtilReqQueue.length;
+        _arUtilReqQueue = []; _saveUtilReqQueue();
+        queueEl.hidden = false;
+        queueEl.innerHTML = `<div class="ar-req-done">✓ On it — an agent is wiring up ${n} utilit${n === 1 ? "y" : "ies"}. We’ll email you as each goes live; connect it here the moment it does.</div>`;
+      }catch(e){
+        btn.disabled = false; btn.textContent = `Send ${_arUtilReqQueue.length} request${_arUtilReqQueue.length === 1 ? "" : "s"} →`;
+        let err = queueEl.querySelector(".ar-req-err");
+        if(!err){ err = document.createElement("div"); err.className = "ar-req-err"; queueEl.appendChild(err); }
+        err.textContent = "Couldn’t send just now — your list is saved, try Send again.";
+      }
+    }
+
     if(searchEl && resultsEl){
       const renderResults = () => {
-        const q = (searchEl.value || "").trim().toLowerCase();
-        if(!q){ resultsEl.innerHTML = `<div class="ar-picker-hint">Type your utility’s name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
+        const q = (searchEl.value || "").trim();
+        const ql = q.toLowerCase();
+        if(!ql){ resultsEl.innerHTML = `<div class="ar-picker-hint">Type your utility’s name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
         const hits = codes.filter(c => {
           const l = (catalog[c].label || "").toLowerCase();
-          return l.includes(q) || c.includes(q) || (catalog[c].state || "").toLowerCase() === q;
+          return l.includes(ql) || c.includes(ql) || (catalog[c].state || "").toLowerCase() === ql;
         }).slice(0, 25);
-        if(!hits.length){ resultsEl.innerHTML = `<div class="ar-picker-hint">No match. Not seeing your utility? It may need to be added — tell us and we’ll wire it up.</div>`; return; }
+        if(!hits.length){
+          // Not in the catalog — offer to REQUEST it (this is the whole point). One click
+          // or Enter queues it; they can keep adding more without leaving the box.
+          resultsEl.innerHTML =
+            `<div class="ar-req-empty">Not in the list yet.` +
+            `<button type="button" class="ar-req-add">+ Request “${esc(q)}”</button>` +
+            `<span class="ar-req-tip">or press Enter — add as many as you need, then Send</span></div>`;
+          const add = resultsEl.querySelector(".ar-req-add");
+          if(add) add.addEventListener("click", () => _queueUtilReq(q));
+          return;
+        }
         resultsEl.innerHTML = hits.map(c =>
           `<button type="button" class="ar-picker-item" data-code="${esc(c)}">${esc(catalog[c].label)}${catalog[c].state ? ` <span class="ar-picker-state">${esc(catalog[c].state)}</span>` : ""}</button>`
         ).join("");
@@ -5341,8 +5419,18 @@
           });
         });
       };
+      // Enter with no catalog match = queue the request (fast bulk entry).
+      searchEl.addEventListener("keydown", (e) => {
+        if(e.key !== "Enter") return;
+        const q = (searchEl.value || "").trim();
+        if(!q) return;
+        const ql = q.toLowerCase();
+        const anyHit = codes.some(c => (catalog[c].label || "").toLowerCase().includes(ql) || c.includes(ql) || (catalog[c].state || "").toLowerCase() === ql);
+        if(!anyHit){ e.preventDefault(); _queueUtilReq(q); }
+      });
       searchEl.addEventListener("input", renderResults);
       renderResults();
+      renderReqQueue();
     }
 
     // Keep the board's freshness ticking while it's on screen (cloud mode).
