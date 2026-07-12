@@ -344,14 +344,14 @@ const VENDORS = [
       {name:"pv_system_id", label:"PV System ID (optional — leave blank to see every system)"},
     ] },
   { code:"sma", label:"SMA", meta:"Sunny Portal", available:true, discover:false,
-    note:"One-click SMA API linking is coming — our SMA developer-app registration is in progress. Today you can connect instantly by signing into Sunny Portal (the EnergyAgent helper reads your inverters), or paste API credentials if SMA has issued them to you.",
+    note:"One-click SMA API linking is coming — our SMA developer-app registration is in progress. Today you can connect instantly by signing into Sunny Portal (the EnergyAgent Chrome extension reads your inverters), or paste API credentials if SMA has issued them to you.",
     fields:[
       {name:"client_id", label:"Client ID"},
       {name:"client_secret", label:"Client Secret", secret:true},
       {name:"system_id", label:"Plant / System ID"},
     ] },
   { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:true, discover:false, loginOnly:true,
-    note:"New — sign into the Chint Connect monitoring portal you already use and the EnergyAgent helper reads your inverters automatically (no key to paste). Chint/CPS support is in final verification against live accounts." },
+    note:"New — sign into the Chint Connect monitoring portal you already use and the EnergyAgent Chrome extension reads your inverters automatically (no key to paste). Chint/CPS support is in final verification against live accounts." },
 ];
 function vendorByCode(c){ return VENDORS.find(v=>v.code===c) || VENDORS[0]; }
 
@@ -387,7 +387,7 @@ function extSend(type, extra){
 }
 function extInstallClicked(){
   const w = document.getElementById("extWatch");
-  if (w) w.innerHTML = "Waiting for the helper… once it's added, come back to this tab and your arrays appear automatically — no refresh needed.";
+  if (w) w.innerHTML = "Waiting for the Chrome extension… once it's added, come back to this tab and your arrays appear automatically — no refresh needed.";
   // A freshly-installed Chrome extension often lands SWITCHED OFF (Chrome disables a new/low-
   // reputation extension until the owner enables it). If nothing's announced after a beat, show
   // a calm, factual nudge so they aren't stranded at a grey toggle. Auto-resolves: render()
@@ -804,12 +804,12 @@ function forkScreen(){
         <span class="fgo">Set up cloud refresh →</span>
       </button>
       <button type="button" class="forkcard" onclick="chooseDevice()">
-        ${extReady ? `<span class="fpill">✓ Helper installed</span>` : ""}
+        ${extReady ? `<span class="fpill">✓ Chrome extension installed</span>` : ""}
         <span class="fic" aria-hidden="true">💻</span>
         <span class="fh">Keep it on my computer</span>
-        <span class="fs">Add the free EnergyAgent browser helper. Your <b>passwords never leave your device</b>; your data refreshes while a Chrome tab is open.</span>
+        <span class="fs">Add the free EnergyAgent Chrome extension. Your <b>passwords never leave your device</b>; your data refreshes while a browser tab is open.</span>
         <span class="ftrade">Nothing is stored on our servers. Data updates only while Chrome is running.</span>
-        <span class="fgo">${extReady ? "Find my arrays →" : "Add the helper →"}</span>
+        <span class="fgo">${extReady ? "Find my arrays →" : "Add the extension →"}</span>
       </button>
     </div>
     <p class="helper" style="margin-top:1.6rem">Not ready to connect? <b>See a real sample</b> of what Array Operator produces — a working offtaker invoice and live dashboard, no install needed. <a href="/#reports" target="_blank" rel="noopener">See a sample →</a></p>
@@ -1278,11 +1278,11 @@ function connectScreen(){
   // installed we auto-sync every platform. No brand picker, no keys, no clutter.
   return `<div class="card animate">
     <h1>Add the extension. We'll find every array.</h1>
-    <p class="lede">Array Operator reads your arrays straight from the inverter logins you already use. Add the free EnergyAgent helper once — then sit back while we pull in every array across every platform, automatically.</p>
+    <p class="lede">Array Operator reads your arrays straight from the inverter logins you already use. Add the free EnergyAgent Chrome extension once — then sit back while we pull in every array across every platform, automatically.</p>
 
     <div class="callout" style="margin-top:1.5rem">
       <div class="t">⚡ Add the EnergyAgent extension</div>
-      <div class="s">The free Chrome helper that reads your arrays from the inverter portals you already use — no API keys to hunt down, nothing to paste.</div>
+      <div class="s">The free Chrome extension that reads your arrays from the inverter portals you already use — no API keys to hunt down, nothing to paste.</div>
       <div class="s" style="margin-top:.6rem">Browser extensions are normal operating flow these days — and this one runs <b>entirely on your device</b>. It has the access it needs to read your portals, and your logins are stored locally on your computer; they never leave it or reach our servers.</div>
       <a class="btn btn-primary btn-lg" style="margin-top:1.1rem" href="${EXT_STORE_URL}" target="_blank" rel="noopener" onclick="extInstallClicked()">Add to Chrome — free →</a>
       <div class="s" id="extWatch" style="margin-top:.8rem">The moment it's installed we'll start finding your arrays — no need to refresh.</div>
