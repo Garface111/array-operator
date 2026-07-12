@@ -67,6 +67,17 @@
     list.forEach(c => { cap += _arrCapW(c); p += _arrPowW(c); });
     return _frac(p, cap);
   }
+  // Status → gauge color. A raw "% of nameplate" threshold used to pick this instead
+  // (green >=66%, amber >=33%, red below) — but nameplate output swings normally all
+  // day (time of day, cloud cover, a smaller string) and has nothing to do with actual
+  // health. That painted a perfectly healthy "OK" inverter amber for hours at a time,
+  // the SAME color the real peer-verified "Low vs peers" warning uses right next to it
+  // in the status column — a false alarm dressed as a data bug (Ford 2026-07-12: two
+  // "OK" inverters at 60% and 66% of nameplate got orange vs green for no health reason
+  // anyone could see). The gauge still shows the true output fraction via needle
+  // position + fill, but its COLOR now matches the row's own verdict (ok/warn/bad/
+  // muted) — the same classification already driving the status pill beside it.
+  const GAUGE_STATUS_COLOR = { ok: "#16a34a", warn: "#d97706", bad: "#dc2626", muted: "#94a3b8" };
   function gauge(frac, opts) {
     opts = opts || {};
     if (frac == null) return `<span class="vs-gauge vs-gauge-empty" title="No nameplate on file — can't gauge output"></span>`;
@@ -80,9 +91,10 @@
     const tx = cx + len * dx, ty = cy + len * dy;
     const ax = cx + hb * px, ay = cy + hb * py;
     const bx = cx - hb * px, by = cy - hb * py;
-    const zc = f >= 0.66 ? "#16a34a" : f >= 0.33 ? "#d97706" : "#dc2626";
+    const zc = GAUGE_STATUS_COLOR[opts.statusCls] || "#2563eb";
     const idle = opts.idle ? " vs-gauge-idle" : "";
-    const title = (opts.label ? opts.label + " · " : "") + pct + "% of nameplate output";
+    const title = (opts.label ? opts.label + " · " : "") + pct + "% of nameplate output"
+      + (opts.statusLabel ? " · " + opts.statusLabel : "");
     const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
     // The arc has pathLength 100, so the FILLED portion is just the first `f×100` units —
     // the colored energy fills from the left (0%) up to the needle; the rest stays a faint
@@ -948,7 +960,7 @@
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}
             <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
           <span class="vs-c-vendor">${lagChip}</span>
-          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet" })}</span>
+          <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", statusCls: vStatus.cls, statusLabel: vStatus.label })}</span>
           <span class="vs-c-inv">${nInv}</span>
           <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
           <span class="vs-c-today">${kwh0(vTodayTot)}</span>
@@ -970,7 +982,7 @@
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
           <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
-          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array") })}</span>
+          <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
@@ -1036,7 +1048,7 @@
                     ${_sub ? `<span class="vs-inv-sub">${_sub}</span>` : ""}
                   </span>
                 </div>
-                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm) })}</div>
+                <div class="vs-inv-gaugecell">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</div>
                 <div class="vs-inv-spwrap">${_spark}</div>
                 <div class="vs-inv-metrics">
                   <span class="vs-inv-metric"${_liveTip}><b class="${stale ? "vs-stale" : ""}">${_live}</b><i>live</i></span>
