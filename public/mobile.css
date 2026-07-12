@@ -6,6 +6,16 @@
    tap targets ≥42px, the fleet-tree toolbar wraps instead of clipping, and the
    fleet tree itself stays a pan-to-explore canvas (touch-action:none already).
    ========================================================================== */
+
+/* mobile-nav.js injects an icon + short label into every tab and a "More" control for
+   the phone bottom nav — those are MOBILE-ONLY. Hide them at ALL widths by default so
+   desktop keeps its normal text tabs. (Bug 2026-07-12: desktop rendered icon + long
+   label + short label together → "Fleet HealthFleet". The @media block below re-shows
+   them on phones with !important + higher specificity.) */
+.tabbar .tab-ic,
+.tabbar .tab-short,
+.tabbar .tab-more { display: none !important; }
+
 @media (max-width: 600px) {
   /* Tighter page gutters — 28px each side eats half a phone. */
   .wrap { padding: 0 12px; }
@@ -149,9 +159,10 @@
     border-radius: 12px; transition: color .16s;
   }
   .tab.tab-primary .tab-full { display: none; }   /* long desktop label off */
-  .tab .tab-ic { display: grid; place-items: center; height: 24px; position: relative; }
+  .tabbar .tab.tab-primary .tab-ic { display: grid !important; place-items: center; height: 24px; position: relative; }
   .tab .tab-ic svg { width: 23px; height: 23px; display: block; }
-  .tab .tab-short { font-size: 10px; font-weight: 750; letter-spacing: .01em; line-height: 1; }
+  .tabbar .tab.tab-primary .tab-short { display: block !important; font-size: 10px; font-weight: 750; letter-spacing: .01em; line-height: 1; }
+  .tabbar .tab.tab-more { display: flex !important; }   /* the More control is a primary tab on phones */
   .tab.active::after { display: none !important; }  /* neutralize desktop underline */
   /* octarine active tab — .tabbar-scoped + !important to win AO's cascade war (the
      day theme leans on high-specificity !important rules). Icon strokes follow via
