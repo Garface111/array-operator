@@ -1022,10 +1022,11 @@ function cloudLoginsScreen(){
     </label>
     <div class="cv-warn">⚠ <b>Heads up:</b> because we sign in from our servers, your provider may send a one-time “new sign-in” security alert the first time. That's expected — it's us signing in for you, and it's safe to approve.</div>
     <div id="cvList"><div class="scan"><span class="ring"></span> Loading your portals…</div></div>
-    <div class="row" style="justify-content:flex-end">
+    <div class="row" id="cvActions" style="justify-content:flex-end;align-items:center;gap:.6rem;flex-wrap:wrap">
+      <button class="btn btn-ghost" id="cvSkipBtn" style="margin-right:auto" onclick="cloudFinish(true);return false">Skip for now →</button>
       <button class="btn btn-primary btn-lg" id="cvFinishBtn" onclick="cloudFinish()" style="opacity:.5;pointer-events:none">Finish setup →</button>
     </div>
-    <p class="helper" id="cvSkip" style="text-align:center;margin-top:1rem">Prefer to add these later? <a href="#" onclick="cloudFinish(true);return false" style="color:var(--good);font-weight:600">Skip for now — add them in your dashboard →</a></p>
+    <p class="helper" id="cvSkipNote" style="text-align:center;margin-top:.9rem">No rush — you can add these anytime from <b>Master Account → Auto-refresh</b>.</p>
   </div>`;
 }
 
@@ -1124,7 +1125,9 @@ async function wireCloudVault(){
   const savedCount = Object.keys(status).length;
   const fb = document.getElementById("cvFinishBtn");
   if(fb){ const ok = savedCount>0; fb.style.opacity = ok?"1":".5"; fb.style.pointerEvents = ok?"auto":"none"; fb.textContent = ok ? `Finish setup → (${savedCount} connected)` : "Finish setup →"; }
-  const skip = document.getElementById("cvSkip"); if(skip) skip.style.display = savedCount>0 ? "none" : "";
+  // Once at least one login is stored, Finish is the action — retire the skip affordances.
+  const skipBtn = document.getElementById("cvSkipBtn"); if(skipBtn) skipBtn.style.display = savedCount>0 ? "none" : "";
+  const skipNote = document.getElementById("cvSkipNote"); if(skipNote) skipNote.style.display = savedCount>0 ? "none" : "";
 
   const consentOk = () => { const c = document.getElementById("cvConsentChk"); return !!(c && c.checked); };
 
