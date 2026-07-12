@@ -5005,7 +5005,7 @@
       list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet. Click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
       return;
     }
-    // Header copy: "N reports ready to review & send — nothing sends until you approve."
+    // Header copy: "N reports ready to review & send. Nothing sends until you approve."
     const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
     const headLine = pending
       ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Nothing sends until you approve.`
