@@ -600,8 +600,7 @@
       stat("Rated", iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null),
     ].join("");
   }
-  // The FOCUS region: the selected inverter's header + live diagnosis + stats + big chart.
-  // Re-rendered in place when the operator picks a different card from the comparison deck.
+  // The inverter detail body: its header + live diagnosis + stats + the 14-day chart.
   function focusHTML(iv, cohort, peers, isDaylight) {
     const _lv = (iv.status === "ok" || iv.status == null) && peers && window.FleetStore && FleetStore.liveVerdict
       ? FleetStore.liveVerdict(iv, peers, isDaylight) : null;
@@ -620,64 +619,19 @@
         ${invChartHTML(iv, cohort)}
       </div>`;
   }
-  // Build + open the full-screen detail overlay for one inverter. Below the focused unit's
-  // own 14-day chart sits a COMPARISON DECK (Ford 2026-07-13): every inverter in the array
-  // rendered as an off-axis, isometric stack of cohort-scaled mini-charts — fanned best-to-
-  // weakest so the spread reads at a glance, and each card clickable to pull it into focus
-  // above. One sheet answers both "how is this one doing" and "how does it stack up".
+  // Build + open the full-screen detail overlay for one inverter: its header + live
+  // diagnosis + stats + the 14-day daily-output chart (with the neighbor-average line).
+  // The per-inverter "Compare the array" card deck was REMOVED (Ford 2026-07-13 — it
+  // didn't land); the neighbor comparison still lives in the "vs. neighbors" stat and the
+  // dashed average line on the chart.
   function openInvDetail(iv, cohort, peers, isDaylight) {
-    const list = (peers && peers.length) ? peers.slice() : [iv];
-    // Rank strongest→weakest so the fan's shape itself encodes the ranking (front card = best).
-    const rankVal = a => a.peer_index != null ? a.peer_index
-      : (a.window_kwh != null ? a.window_kwh / 1e7 : -1);
-    const ranked = list.slice().sort((a, b) => rankVal(b) - rankVal(a));
-    const multi = ranked.length > 1;
-    let selId = iv.inverter_id;
-    const findIv = id => ranked.find(x => String(x.inverter_id) === String(id)) || iv;
-
     const ov = document.createElement("div");
     ov.className = "vs-dc-ov";
     ov.innerHTML =
-      `<div class="vs-dc-modal${multi ? " vs-dc-hasdeck" : ""}" role="dialog" aria-modal="true" aria-label="Inverter detail">
+      `<div class="vs-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
         <button type="button" class="vs-dc-x" aria-label="Close">✕</button>
         <div class="vs-dc-focus" id="vsDcFocus">${focusHTML(iv, cohort, peers, isDaylight)}</div>
-        ${multi ? `<div class="vs-cmp-wrap">
-          <div class="vs-cmp-h">Compare the array <span class="vs-cmp-sub">— ${ranked.length} inverters, strongest to weakest · click one to inspect</span></div>
-          <div class="vs-cmp-stage" id="vsCmpStage" style="--n:${ranked.length}"></div>
-        </div>` : ""}
       </div>`;
-    const focusEl = ov.querySelector("#vsDcFocus");
-    const stage = ov.querySelector("#vsCmpStage");
-
-    function deckCard(x, i) {
-      const st = invStatus(x, peers, isDaylight);
-      const peer = x.peer_index != null ? x.peer_index.toFixed(2) + "×" : "—";
-      const spk = sparkline(x.daily, cohort, { cls: "vs-cmp-sparksvg", w: 300, h: 58 });
-      const on = String(x.inverter_id) === String(selId);
-      return `<button type="button" class="vs-cmp-card st-${st.cls}${on ? " on" : ""}" data-cmp="${esc(String(x.inverter_id))}" style="--i:${i}" aria-pressed="${on}" title="${esc(x.name || x.sn || "Inverter")} — ${esc(st.label)}${x.peer_index != null ? " · " + peer : ""}">
-        <span class="vs-cmp-top"><span class="vs-cmp-name">${esc(x.name || x.sn || "Inverter")}</span><span class="vs-cmp-peer">${esc(peer)}</span></span>
-        <span class="vs-cmp-spark">${spk}</span>
-        <span class="vs-cmp-foot"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
-      </button>`;
-    }
-    function selectCard(id) {
-      selId = id;
-      const sel = findIv(id);
-      focusEl.innerHTML = focusHTML(sel, cohort, peers, isDaylight);
-      if (stage) stage.querySelectorAll(".vs-cmp-card").forEach(c => {
-        const isOn = String(c.getAttribute("data-cmp")) === String(id);
-        c.classList.toggle("on", isOn); c.setAttribute("aria-pressed", String(isOn));
-      });
-      try { focusEl.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
-    }
-    if (stage) {
-      stage.innerHTML = ranked.map(deckCard).join("");
-      stage.querySelectorAll("[data-cmp]").forEach(btn => btn.onclick = (e) => {
-        e.stopPropagation();
-        selectCard(btn.getAttribute("data-cmp"));
-      });
-    }
-
     const close = () => { ov.remove(); document.removeEventListener("keydown", onKey); };
     const onKey = e => { if (e.key === "Escape") close(); };
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
