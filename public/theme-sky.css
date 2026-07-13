@@ -152,7 +152,13 @@ html.sky body{
 }
 html.sky body::before{
   content:"";
-  position:fixed; inset:0; z-index:-1;
+  position:fixed;
+  left:0; right:0; top:0;
+  /* Taller than the viewport so the mountain-parallax transform has room to
+     pan without revealing the solid --sky-mid fallback at the edges
+     (Ford 2026-07-13: "on top of the mountain… physically move around it"). */
+  height:130vh;
+  z-index:-1;
   pointer-events:none;
   background-image:
     url("img/sky/world-2560.jpg"),
@@ -166,6 +172,12 @@ html.sky body::before{
   background-size:cover, auto, auto;
   background-position:center 70%, center, center;
   background-repeat:no-repeat;
+  /* scroll-driven pan — set by the sky-parallax script on html { --sky-py } */
+  transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
+  will-change:transform;
+}
+@media (prefers-reduced-motion: reduce){
+  html.sky body::before{transform:none;will-change:auto}
 }
 /* smaller desktop windows stream the lighter plate */
 @media (max-width:1600px){

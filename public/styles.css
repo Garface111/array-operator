@@ -231,8 +231,18 @@
      whole thing packs snugly with no dead left column. */
   .ar-panel{background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;
     padding:18px 20px 20px;margin:0 0 22px}
+  /* Multi-card vault stack (Ford 2026-07-13): head + live + consent + portal
+     groups as separate cards so sky/gaps show between them. */
+  .ar-stack{display:flex;flex-direction:column;gap:14px;margin:0 0 22px}
+  .ar-stack > .ar-panel,
+  .ar-stack .ar-card{margin:0}
+  .ar-card{background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;
+    padding:16px 18px}
+  .ar-list{display:flex;flex-direction:column;gap:14px}
+  .ar-stack .ar-list{gap:14px}
   /* One-shot "you're here — add your logins" cue when arriving from onboarding skip. */
-  #rowAutoRefresh.ar-flash .ar-panel{animation:arFlash 2.6s ease-out 1}
+  #rowAutoRefresh.ar-flash .ar-panel,
+  #rowAutoRefresh.ar-flash .ar-card-head{animation:arFlash 2.6s ease-out 1}
   @keyframes arFlash{0%,55%{box-shadow:0 0 0 2px var(--good,#34d896),0 0 22px -2px var(--good,#34d896)}100%{box-shadow:0 0 0 0 transparent}}
   .ar-panel-head{display:flex;gap:14px;align-items:flex-start}
   .ar-panel-ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
@@ -301,20 +311,37 @@
   .ar-panel-stat.on{color:#047857;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.30)}
   .ar-panel .ar-body{margin-top:17px;cursor:default}
   .ar-panel .ar-list{margin-top:0;display:flex;flex-direction:column;gap:20px}
-  /* Each group: head spans the row, portal cards flow into a 2-up responsive grid. */
-  .ar-panel .ar-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px;align-items:start}
-  .ar-panel .ar-group + .ar-group{margin-top:0}
-  .ar-panel .ar-group-head{grid-column:1/-1;margin-bottom:0}
-  .ar-panel .ar-addutil{grid-column:1/-1}
+  /* Each group: head spans the row, portal cards flow into a 2-up responsive grid.
+     Works inside the old single .ar-panel OR the multi-card .ar-stack/.ar-card layout. */
+  .ar-panel .ar-group,
+  .ar-card .ar-group,
+  .ar-stack .ar-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px;align-items:start}
+  .ar-panel .ar-group + .ar-group,
+  .ar-card .ar-group + .ar-group{margin-top:0}
+  .ar-panel .ar-group-head,
+  .ar-card .ar-group-head,
+  .ar-stack .ar-group-head{grid-column:1/-1;margin-bottom:0}
+  .ar-panel .ar-addutil,
+  .ar-card .ar-addutil,
+  .ar-stack .ar-addutil{grid-column:1/-1}
   .ar-panel .ar-row{background:rgba(15,23,42,.018)}
-  .ar-panel .ar-util{grid-column:auto}
+  .ar-panel .ar-util,
+  .ar-card .ar-util{grid-column:auto}
   /* SolarEdge connects via an API key (a list of connected keys + "add another"),
      not a username/password login like the other inverter cards — cramming it into
      the same fixed-width grid cell reads as a mismatched 4th tile. Give it its own
      full-width row instead, right under the Fronius/SMA/Chint row (Ford 2026-07-12:
      "it should be grouped with the other vendor portals... get its own row"). */
-  .ar-panel .ar-util[data-code="solaredge"]{grid-column:1/-1}
-  @media(max-width:640px){ .ar-panel{padding:15px 15px 16px} .ar-panel .ar-group{grid-template-columns:1fr} }
+  .ar-panel .ar-util[data-code="solaredge"],
+  .ar-card .ar-util[data-code="solaredge"],
+  .ar-stack .ar-util[data-code="solaredge"]{grid-column:1/-1}
+  @media(max-width:640px){
+    .ar-panel{padding:15px 15px 16px}
+    .ar-card{padding:14px 14px}
+    .ar-panel .ar-group,
+    .ar-card .ar-group,
+    .ar-stack .ar-group{grid-template-columns:1fr}
+  }
   /* grouped credential sections: Inverter portals / Utility portals */
   .ar-group{display:flex;flex-direction:column;gap:9px}
   .ar-group + .ar-group{margin-top:8px}

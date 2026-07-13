@@ -57,10 +57,17 @@ html.sky #panelAnalysis{
    viewportfuls of the sheet AND its children failing to rasterize (flat sky,
    orphan rows). Over the smooth fixed gradient, translucent white + the
    white edge + the sheet shadow read as the same glass without the blur.
-   The per-view blur budget stays spent on the tab bar + modals only. ─────── */
+   The per-view blur budget stays spent on the tab bar + modals only.
+
+   WIDTH (Ford 2026-07-13): cancel analysis.css's viewport breakout
+   (margin-inline: calc(50% - 50vw + 32px)) so the NOC sheet is exactly the
+   same content width as the top tab bar — both live inside .wrap
+   (max-width:min(1440px,94vw) + 28px pad). ─────────────────────────────── */
 html.sky #panelAnalysis .an-wrap{
-  margin-block:14px 46px;         /* margin-INLINE stays analysis.css's
-                                     full-bleed breakout calc — untouched */
+  max-width: none;
+  width: 100%;
+  margin-inline: 0 !important;   /* kill the full-bleed breakout */
+  margin-block:14px 46px;
   padding:34px 42px 54px;
   background:rgba(255,255,255,.6);
   border:1px solid var(--sky-glass-edge);

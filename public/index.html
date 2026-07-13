@@ -53,7 +53,7 @@ document.documentElement.setAttribute("data-theme","day");
 })();
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
-<link rel="stylesheet" href="styles.css?v=20260712serow">
+<link rel="stylesheet" href="styles.css?v=20260713sky">
 <link rel="stylesheet" href="command-center.css?v=20260712rd2">
 <link rel="stylesheet" href="theme-day.css?v=20260712dlg"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
@@ -74,8 +74,34 @@ document.documentElement.setAttribute("data-theme","day");
    ["img/sky/world-m-828.webp","(max-width:600px) and (max-resolution:2.09dppx)"],
    ["img/sky/world-m-1284.webp","(max-width:600px) and (min-resolution:2.1dppx)"]
   ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
-  ["theme-sky.css?v=20260712sky4","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky2","theme-sky-analysis.css?v=20260712sky1","theme-sky-trends.css?v=20260712sky2","theme-sky-resources.css?v=20260712sky1","theme-sky-mobile.css?v=20260712sky3"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+  ["theme-sky.css?v=20260712sky5","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky3","theme-sky-analysis.css?v=20260712sky2","theme-sky-trends.css?v=20260712sky2","theme-sky-resources.css?v=20260712sky1","theme-sky-mobile.css?v=20260712sky4"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
+<!-- Mountain parallax: as you scroll, the world plate pans slightly so the UI
+     feels like glass floating over a real landscape you're moving through.
+     Only when Sky is on; honors prefers-reduced-motion. -->
+<script>if (window.__AO_SKY__){(function(){
+  try{ if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
+  var root = document.documentElement;
+  var ticking = false;
+  var maxShift = 360;
+  // Gentle factor — enough to feel the crest, not enough to make UI lag.
+  var factor = (window.innerWidth && window.innerWidth <= 600) ? 0.10 : 0.16;
+  function paint(){
+    ticking = false;
+    var y = window.scrollY || window.pageYOffset || 0;
+    var shift = y * factor;
+    if (shift > maxShift) shift = maxShift;
+    if (shift < 0) shift = 0;
+    root.style.setProperty("--sky-py", shift.toFixed(1) + "px");
+  }
+  function onScroll(){ if (!ticking){ ticking = true; requestAnimationFrame(paint); } }
+  window.addEventListener("scroll", onScroll, { passive:true });
+  window.addEventListener("resize", function(){
+    factor = (window.innerWidth && window.innerWidth <= 600) ? 0.10 : 0.16;
+    paint();
+  }, { passive:true });
+  paint();
+})();}</script>
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
@@ -405,7 +431,7 @@ document.documentElement.setAttribute("data-theme","day");
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
 <script src="app.js?v=20260712dlg"></script>
-<script src="sandbox.js?v=20260712serow2"></script>
+<script src="sandbox.js?v=20260713vault"></script>
 <script src="vendor-sheet.js?v=20260712rd3"></script>
 <script src="command-center.js?v=12"></script>
 <script src="reports.js?v=20260712dlg"></script>

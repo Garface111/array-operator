@@ -140,36 +140,51 @@ html.sky #cancelYes:hover{filter:brightness(1.05)}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    5 · THE CREDENTIAL VAULT (.ar-*) — the trust surface.
-   The most solid, calm glass in the app: near-opaque white card, sky hairlines,
-   NO backdrop-filter anywhere inside (repeated cred cards — perf guardrail).
-   Octarine signature COOLED for the sky: #7c3aed → #6350E0, re-pointed as a
-   scoped token so every var(--ao-oct*) consumer inside follows. Green/amber/red
-   stay strictly LIVE-state. The pulse keeps pulsing.
-   ═══════════════════════════════════════════════════════════════════════════ */
-html.sky .ar-panel{
-  /* cooled octarine, vault-scoped (inherits to every .ar-* child) */
+   Multi-card stack (Ford 2026-07-13): separate glass cards with sky gaps
+   between them so the mountain bleeds through. Head stays the calmest /
+   most solid (passwords); body cards go more liquid. Octarine signature
+   COOLED for the sky: #7c3aed → #6350E0, re-pointed as a scoped token.
+   Green/amber/red stay strictly LIVE-state. ═══════════════════════════════ */
+html.sky .ar-stack{
   --ao-oct:#6350E0;
   --ao-oct-soft:rgba(99,80,224,.09);
   --ao-oct-line:rgba(99,80,224,.30);
-  /* liquid pass: softened one touch (.92→.87) but deliberately kept the most
-     solid surface in the app — this is the trust surface holding passwords */
-  background:rgba(255,255,255,.87) !important;
-  border:1px solid rgba(255,255,255,.95) !important;
+  gap:16px;
+  background:transparent;
+  margin:2px 0 22px;
+}
+/* Head card — still the most solid (the trust surface framing the mode choice) */
+html.sky .ar-stack .ar-card-head,
+html.sky .ar-panel{
+  --ao-oct:#6350E0;
+  --ao-oct-soft:rgba(99,80,224,.09);
+  --ao-oct-line:rgba(99,80,224,.30);
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
-  margin:2px 0 18px;
 }
+/* Body cards — more liquid so the sky is visible between and through them */
+html.sky .ar-stack .ar-card{
+  background:rgba(255,255,255,.58) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .ar-stack .ar-card-live{background:rgba(255,255,255,.52) !important}
+html.sky .ar-stack .ar-card-consent{background:rgba(255,255,255,.55) !important}
+html.sky .ar-stack .ar-card-group{background:rgba(255,255,255,.58) !important}
 html.sky .ar-panel-hd h3{color:var(--ink)}
 html.sky .ar-panel-hd p{color:var(--muted)}
 html.sky .ar-panel-hd p b{color:var(--ink)}
 /* device/cloud mode segmented control: glass options, octarine active */
 html.sky .ar-mode-opt{
-  background:rgba(255,255,255,.7);
+  background:rgba(255,255,255,.55);
   border:1px solid var(--line);
   border-radius:13px;
   box-shadow:0 1px 4px rgba(20,60,120,.05);
 }
-html.sky .ar-mode-opt:hover{border-color:var(--ao-oct-line);background:#ffffff}
+html.sky .ar-mode-opt:hover{border-color:var(--ao-oct-line);background:rgba(255,255,255,.82)}
 html.sky .ar-mode-opt.active{
   border-color:var(--ao-oct);
   background:var(--ao-oct-soft);
@@ -184,6 +199,7 @@ html.sky .ar-consent{
   border:1px solid rgba(33,150,243,.25);
   border-radius:12px;
   color:var(--muted);
+  margin:0 0 10px;
 }
 html.sky .ar-consent input{accent-color:var(--sky-primary)}
 html.sky .ar-consent a{color:var(--sky-primary-deep)}
@@ -193,23 +209,25 @@ html.sky .ar-cloud-warn{
   border-color:rgba(217,119,6,.28);
   border-radius:12px;
   color:var(--muted);
+  margin:0;
 }
 /* group heads: octarine dash follows the cooled token automatically */
 html.sky .ar-group-title{color:var(--ink)}
 html.sky .ar-group-sub{color:var(--faint)}
 /* portal cards (repeated — SOLID tier, zero blur) */
 html.sky .ar-util{
-  background:linear-gradient(180deg,#ffffff,#F7FAFF);
-  border:1px solid var(--line);
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.85);
   border-radius:14px;
 }
 html.sky .ar-util-name{color:var(--ink)}
 html.sky .ar-row{
-  background:rgba(255,255,255,.75);
+  background:rgba(255,255,255,.55);
   border:1px solid var(--line);
   border-radius:13px;
 }
-html.sky .ar-panel .ar-row{background:rgba(255,255,255,.75)}
+html.sky .ar-panel .ar-row,
+html.sky .ar-stack .ar-row{background:rgba(255,255,255,.55)}
 html.sky .ar-util .ar-row{background:rgba(20,60,120,.035);border-color:rgba(20,60,120,.08)}
 html.sky .ar-vendor{color:var(--ink)}
 /* credential fields: crisp white, octarine focus (signature-on-interaction) */
@@ -248,7 +266,7 @@ html.sky .ar-pending-note{
 html.sky .ar-pending-note b{color:var(--ao-oct)}
 /* utility picker: quiet blue well; octarine interaction hovers (was emerald) */
 html.sky .ar-picker{
-  background:#F2F7FE;
+  background:rgba(242,247,254,.75);
   border:1px solid rgba(20,60,120,.14);
   border-radius:14px;
 }

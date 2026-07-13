@@ -5122,22 +5122,25 @@
     step();                                                  // immediate first poll
   }
 
-  // Auto-refresh is the heart of the service, so it leads the Master Account tab as its
-  // own full-width panel (Ford 2026-07-10) — not a cramped 2-column acct-row that left the
-  // label column empty. Header states the value + privacy; the body lays the portals out in
-  // a responsive grid so there's no dead space.
+  // Auto-refresh is the heart of the service, so it leads the Master Account tab.
+  // Stack of separate glass cards (Ford 2026-07-13): head / live / consent /
+  // inverter group / utility group — gaps between them let the sky bleed through
+  // instead of one monolithic vault slab. #rowAutoRefresh wraps the stack for
+  // scroll/flash targets; #arBody holds the body cards (collapse target).
   function autoRefreshRow(){
-    return `<section class="ar-panel">
-      <div class="ar-panel-head">
-        <button type="button" class="ar-panel-ic" id="arRefreshBtn" title="Refresh now" aria-label="Refresh cloud status now">↻</button>
-        <div class="ar-panel-hd">
-          <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
-          <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
-          <div class="ar-mode" id="arMode" role="tablist" aria-label="How we keep your data fresh">
-            <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
-              <b>Store it with us — live data</b><span>We keep your passwords secure and refresh your data 24/7. No tab, no computer needed.</span></button>
-            <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
-              <b>Keep it on my computer</b><span>Passwords stay on your device via the browser extension. Data refreshes while a tab is open.</span></button>
+    return `<section class="ar-stack" id="rowAutoRefresh">
+      <div class="ar-panel ar-card ar-card-head">
+        <div class="ar-panel-head">
+          <button type="button" class="ar-panel-ic" id="arRefreshBtn" title="Refresh now" aria-label="Refresh cloud status now">↻</button>
+          <div class="ar-panel-hd">
+            <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
+            <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
+            <div class="ar-mode" id="arMode" role="tablist" aria-label="How we keep your data fresh">
+              <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
+                <b>Store it with us — live data</b><span>We keep your passwords secure and refresh your data 24/7. No tab, no computer needed.</span></button>
+              <button type="button" class="ar-mode-opt" data-mode="device" role="tab">
+                <b>Keep it on my computer</b><span>Passwords stay on your device via the browser extension. Data refreshes while a tab is open.</span></button>
+            </div>
           </div>
         </div>
       </div>
@@ -5408,29 +5411,33 @@
     </div>`;
 
     listEl.innerHTML = `
-      ${buildLiveBoardHTML(status, mode, catalog)}
-      ${mode === "cloud" ? _arConsentHTML() + _arCloudWarnHTML() : ""}
-      <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
-        ${mode === "cloud"
-          ? AR_INVERTERS.map(invCard).join("")
-          : AR_INVERTERS.map(v => {
-              const st = status[v.id] || { hasCreds:false, enabled:true };
-              // Device (extension) mode: single login per vendor. Show the saved
-              // username so a login saved in the extension popup reads as present.
-              return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
-            }).join("")}
-        ${solarEdgeCardHTML()}
+      <div class="ar-card ar-card-live">${buildLiveBoardHTML(status, mode, catalog)}</div>
+      ${mode === "cloud" ? `<div class="ar-card ar-card-consent">${_arConsentHTML()}${_arCloudWarnHTML()}</div>` : ""}
+      <div class="ar-card ar-card-group">
+        <div class="ar-group">
+          <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
+          ${mode === "cloud"
+            ? AR_INVERTERS.map(invCard).join("")
+            : AR_INVERTERS.map(v => {
+                const st = status[v.id] || { hasCreds:false, enabled:true };
+                // Device (extension) mode: single login per vendor. Show the saved
+                // username so a login saved in the extension popup reads as present.
+                return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
+              }).join("")}
+          ${solarEdgeCardHTML()}
+        </div>
       </div>
-      <div class="ar-group">
-        <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
-        ${shownCodes.map(utilCard).join("")}
-        <div class="ar-addutil">
-          <button type="button" class="acct-btn ar-addutil-btn">+ Add a utility login</button>
-          <div class="ar-picker" hidden>
-            <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
-            <div class="ar-picker-results"></div>
-            <div class="ar-req-queue" hidden></div>
+      <div class="ar-card ar-card-group">
+        <div class="ar-group">
+          <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily — powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
+          ${shownCodes.map(utilCard).join("")}
+          <div class="ar-addutil">
+            <button type="button" class="acct-btn ar-addutil-btn">+ Add a utility login</button>
+            <div class="ar-picker" hidden>
+              <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
+              <div class="ar-picker-results"></div>
+              <div class="ar-req-queue" hidden></div>
+            </div>
           </div>
         </div>
       </div>`;

@@ -50,7 +50,10 @@
   }
   html.sky body::before{
     content:"";
-    position:fixed; inset:0; z-index:-1;
+    position:fixed;
+    left:0; right:0; top:0;
+    height:130vh; /* room for mountain-parallax pan (see theme-sky.css) */
+    z-index:-1;
     pointer-events:none;
     background-image:
       url("img/sky/world-m-1284.jpg"),
@@ -64,6 +67,8 @@
     background-size:cover, auto, auto;
     background-position:center bottom, center, center;
     background-repeat:no-repeat;
+    transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
+    will-change:transform;
   }
 
   /* ── 2 · THE DOCK — the fixed bottom nav becomes a floating glass pill.
