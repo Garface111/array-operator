@@ -1,0 +1,206 @@
+{
+  "updated": "2026-07-13",
+  "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
+  "states": {
+    "vt": {
+      "name": "Vermont",
+      "comp": "Blended residential ≈ $0.1839/kWh; Category I (≤15 kW) effective ≈ $0.1439/kWh after the Aug 1, 2026 siting charge rose 4¢ → 5¢.",
+      "how": "Rates are set by the PUC's biennial update; an array's rate locks ~10 years from its permit, then rolls to the blended rate. Small systems add +$0.01/kWh, or +$0.03/kWh if RECs go to the utility.",
+      "note": "Group / offsite (community) net metering is being phased out under H.289 — existing arrays keep running.",
+      "utils": ["Green Mountain Power", "Vermont Electric Cooperative"],
+      "reg": "PUC Case 26-0291-INV — 2026 biennial update, order May 29, 2026 (the 7th consecutive Category I cut).",
+      "sources": [
+        { "l": "Vermont PUC · Net-Metering", "u": "https://puc.vermont.gov/electric/net-metering" },
+        { "l": "ePUC · case filings", "u": "https://epuc.vermont.gov/" },
+        { "l": "Dept. of Public Service", "u": "https://publicservice.vermont.gov/renewables" },
+        { "l": "Renewable Energy Vermont", "u": "https://www.revermont.org/" }
+      ],
+      "rec": {
+        "program": "Vermont RES + NEPOOL-GIS Class I (out-of-state sale)",
+        "price_display": "≈ $30–40 / MWh (Class I broker range)",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "Net-metered systems that transfer RECs to the utility earn a +$0.03/kWh adjustor; systems that keep RECs can sell Class I certificates into NEPOOL (or have a verifier/aggregator do it).",
+        "how": "Vermont's Renewable Energy Standard (rewritten by H.289) drives utility demand for RECs. Small net-metered arrays often leave the certificate with the utility for the rate adjustor; larger or offsite systems may retain and sell them. Tracking is via NEPOOL-GIS with an Independent Verifier.",
+        "acp_or_cap": "State RES compliance; Class I ACP set by the demanding state's program (MA/CT often set the regional ceiling).",
+        "sources": [
+          { "l": "VT DPS · Renewables", "u": "https://publicservice.vermont.gov/renewables" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    },
+    "nh": {
+      "name": "New Hampshire",
+      "comp": "NEM 2.0 credits exports at ≈ 85% of retail (100% of supply + transmission + 25% of distribution). Eversource retail ≈ $0.25/kWh.",
+      "how": "The NEM 2.0 credit formula is locked through Jan 1, 2041 (Docket DE 16-576) — unusually long-term stability for the region.",
+      "note": "",
+      "utils": ["Eversource", "Liberty Utilities", "New Hampshire Electric Cooperative", "Unitil"],
+      "reg": "NH PUC affirmed the Eversource rate case (monthly customer charge ≈ $14 → $19.81, ROE 9.5%) but threw out automatic annual increases; a 2026 docket will examine alternative regulation.",
+      "sources": [
+        { "l": "NH PUC", "u": "https://www.puc.nh.gov/" },
+        { "l": "NH Dept. of Energy", "u": "https://www.energy.nh.gov/" },
+        { "l": "Office of the Consumer Advocate", "u": "https://www.oca.nh.gov/" }
+      ],
+      "rec": {
+        "program": "NH RPS Class I / Class II (solar) + NEPOOL-GIS",
+        "price_display": "≈ $30–40 / MWh (Class I); Class II solar often trades near Class I",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "Owners typically register with NEPOOL-GIS and use an Independent Monitor (often the utility for net-metered systems) to report production so RECs can be minted and sold.",
+        "how": "New Hampshire's RPS requires Class I (new renewables) and a Class II solar carve-out. Solar arrays that register and report can sell certificates; net-metering credits and REC sales are separate revenue streams.",
+        "acp_or_cap": "NH RPS ACP rates are published annually by the Dept. of Energy / PUC.",
+        "sources": [
+          { "l": "NH Dept. of Energy · RPS", "u": "https://www.energy.nh.gov/renewable-energy/renewable-portfolio-standard" },
+          { "l": "Eversource · NH RECs", "u": "https://www.eversource.com/residential/about/doing-business-with-us/interconnections/new-hampshire/renewable-energy-certificates" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    },
+    "me": {
+      "name": "Maine",
+      "comp": "Net Energy Billing (NEB) — 1:1 retail-rate credits for rooftop solar. CMP ≈ $0.27/kWh, Versant ≈ $0.32/kWh; credits roll monthly and true up annually.",
+      "how": "Rooftop NEB is protected; LD 1777 reformed only community-solar NEB (slowing its cost growth), with a successor program to be designed in 2026.",
+      "note": "",
+      "utils": ["Central Maine Power (CMP)", "Versant Power"],
+      "reg": "Maine PUC (MPUC). LD 1792 reversed a 2025 cost-allocation increase; tariff rates are set through 2046 (Dockets 2019-00197, 2022-00185).",
+      "sources": [
+        { "l": "Maine PUC · Net Energy Billing", "u": "https://www.maine.gov/mpuc/regulated-utilities/electricity/neb" },
+        { "l": "Maine PUC", "u": "https://www.maine.gov/mpuc/" }
+      ],
+      "rec": {
+        "program": "Maine RPS Class I + NEPOOL-GIS",
+        "price_display": "≈ $30–40 / MWh (Class I broker range)",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "NEB credits are the primary owner revenue; RECs for qualifying generation can still be registered and sold if not claimed by the program counterparty — check the project's tariff / PPA.",
+        "how": "Maine participates in NEPOOL-GIS. Class I RECs from eligible renewable facilities can supply Maine or other New England RPS markets when dual-qualified. Community NEB reforms (LD 1777) do not erase existing certificate eligibility.",
+        "acp_or_cap": "Maine RPS ACP published by the PUC / Legislature schedule.",
+        "sources": [
+          { "l": "Maine PUC", "u": "https://www.maine.gov/mpuc/" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    },
+    "ma": {
+      "name": "Massachusetts",
+      "comp": "1:1 retail-rate net metering for residential ≤ 25 kW (Class I) — credits ≈ $0.2836/kWh (Eversource), ≈ $0.32/kWh (National Grid).",
+      "how": "On top of net metering, SMART 3.0 (PY2026) pays a flat $0.03/kWh incentive (residential ≤ 25 kW; $0.06/kWh low-income).",
+      "note": "",
+      "utils": ["Eversource", "National Grid", "Unitil"],
+      "reg": "MA Dept. of Public Utilities (DPU); the SMART incentive is administered by DOER.",
+      "sources": [
+        { "l": "MA DPU", "u": "https://www.mass.gov/orgs/department-of-public-utilities" },
+        { "l": "SMART Program (DOER)", "u": "https://www.mass.gov/info-details/solar-massachusetts-renewable-target-smart-program" }
+      ],
+      "rec": {
+        "program": "MA RPS Class I (+ legacy SREC I/II for remaining terms); SMART systems typically transfer RECs to the utility/program",
+        "price_display": "Class I ≈ $30–40 / MWh; legacy SRECs much higher while terms last",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "SMART-enrolled systems usually assign RECs to the utility as a condition of the incentive. Legacy SREC I/II systems still mint SRECs until their term ends (or Q4 2027, whichever first), then roll to Class I. Independent systems can sell Class I via NEPOOL-GIS.",
+        "how": "Massachusetts is the regional demand anchor for Class I RECs. Minimum standard steps to 27% in 2026 (incl. solar carve-outs). ACP is the ceiling; DOER publishes it each year (Jan 31). 1 REC = 1 MWh; minting is quarterly with ~1-quarter lag via NEPOOL-GIS + Independent Verifier.",
+        "acp_or_cap": "MA Class I ACP set annually by DOER (CPI-adjusted). Caps the market — suppliers may pay ACP instead of buying RECs.",
+        "sources": [
+          { "l": "MassCEC / Class I RECs", "u": "https://www.masscec.com/production-tracking-system-pts/renewable-energy-certificates" },
+          { "l": "Xpansiv · MA Class I market", "u": "https://www.ms.xpansiv.com/markets/rps/class-1/massachusetts" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    },
+    "ct": {
+      "name": "Connecticut",
+      "comp": "No net metering — the RRES Netting Tariff (PURA). Pick Netting (retail-rate credits, 20 yr) or Buy-All (fixed ≈ $0.3289/kWh for 2026 enrollments, 20 yr). Plus a +$0.0402/kWh Solar Energy Adjustment in 2026.",
+      "how": "Whichever option you choose at enrollment is locked for 20 years; Eversource and United Illuminating administer it identically.",
+      "note": "",
+      "utils": ["Eversource", "United Illuminating (UI)"],
+      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022.",
+      "sources": [
+        { "l": "CT PURA", "u": "https://portal.ct.gov/pura" },
+        { "l": "Office of Consumer Counsel", "u": "https://portal.ct.gov/occ" }
+      ],
+      "rec": {
+        "program": "CT RPS Class I + NEPOOL-GIS (often dual-qualified with MA)",
+        "price_display": "≈ $30–40 / MWh (Class I; often co-moves with MA)",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "RRES / Buy-All program terms usually assign renewable attributes to the utility or program. Standalone / merchant systems that keep attributes can sell Class I RECs regionally.",
+        "how": "Connecticut Class I prices tend to move with Massachusetts; both can supply dual-qualified NEPOOL contracts. Tracking is NEPOOL-GIS.",
+        "acp_or_cap": "CT Class I ACP published under the state's RPS schedule.",
+        "sources": [
+          { "l": "CT PURA", "u": "https://portal.ct.gov/pura" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    },
+    "ri": {
+      "name": "Rhode Island",
+      "comp": "Net metering ≈ 80% of retail (≈ $0.232/kWh) for new systems, 125% annual cap, protected through 2039. The separate REG program pays ≈ $0.2723/kWh for 15 years.",
+      "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
+      "note": "The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
+      "utils": ["Rhode Island Energy"],
+      "reg": "RI PUC + Office of Energy Resources (OER).",
+      "sources": [
+        { "l": "RI PUC", "u": "https://ripuc.ri.gov/" },
+        { "l": "Office of Energy Resources", "u": "https://energy.ri.gov/renewable-energy/net-metering" }
+      ],
+      "rec": {
+        "program": "RI RES Class I + NEPOOL-GIS; REG often transfers RECs to the utility",
+        "price_display": "≈ $30–40 / MWh (Class I broker range)",
+        "price_usd_per_mwh_low": 30,
+        "price_usd_per_mwh_high": 40,
+        "owner_path": "REG program participants typically transfer RECs as part of the fixed-price offtake. Net-metered systems that retain attributes can register and sell Class I certificates.",
+        "how": "Rhode Island's Renewable Energy Standard creates Class I demand. RECs are tracked in NEPOOL-GIS and may dual-qualify for other New England markets.",
+        "acp_or_cap": "RI RES ACP rates set under state statute / OER schedule.",
+        "sources": [
+          { "l": "RI OER", "u": "https://energy.ri.gov/" },
+          { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" }
+        ]
+      }
+    }
+  },
+  "rec_market": {
+    "headline": "New England REC market",
+    "as_of": "2026-07",
+    "summary": "Renewable Energy Certificates (RECs) are the tradable proof that 1 MWh of renewable electricity was generated. Across New England they are issued and tracked in NEPOOL-GIS, typically one quarter after generation. Class I RECs (new renewables, post-1997 facilities) are the main commodity solar operators care about; MA and CT demand often set the regional price. SRECs are a legacy Massachusetts solar carve-out that still pays higher while individual terms last, then rolls to Class I.",
+    "class_i": {
+      "label": "NEPOOL Class I (region)",
+      "price_display": "≈ $30–40 / MWh",
+      "price_usd_per_mwh_low": 30,
+      "price_usd_per_mwh_high": 40,
+      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The Alternative Compliance Payment (ACP) in the demanding state is the hard ceiling. Prices have historically swung from single digits to $50+/MWh.",
+      "registry": "NEPOOL-GIS",
+      "mint_lag": "Issued quarterly, roughly one quarter after generation (e.g. Q1 generation mints mid-year).",
+      "eligible_states": ["ma", "ct", "ri", "nh", "me", "vt"]
+    },
+    "products": [
+      {
+        "code": "class_i",
+        "name": "Class I REC",
+        "price_display": "≈ $30–40 / MWh",
+        "note": "Primary New England renewable commodity. Solar, wind, eligible hydro, etc.",
+        "states": ["ma", "ct", "ri", "nh", "me", "vt"]
+      },
+      {
+        "code": "ma_srec",
+        "name": "MA SREC I / II (legacy)",
+        "price_display": "Much higher than Class I while term lasts",
+        "note": "Closed solar carve-outs. Systems roll to Class I after 10-year/40-quarter term or end of Q4 2027 (whichever first).",
+        "states": ["ma"]
+      },
+      {
+        "code": "smart_attr",
+        "name": "SMART attributes (MA)",
+        "price_display": "Usually assigned to utility (not owner-sold)",
+        "note": "SMART incentive typically requires transferring RECs/attributes — the $/kWh incentive is the compensation path, not open-market REC sales.",
+        "states": ["ma"]
+      }
+    ],
+    "operator_tip": "If your arrays already report into NEPOOL-GIS (or a verifier does it for you), check whether YOU still own the certificates. Many net-metering / SMART / REG programs transfer RECs to the utility. Certificates you still own are real money — typically tens of dollars per MWh of generation.",
+    "sources": [
+      { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" },
+      { "l": "Xpansiv · MA Class I", "u": "https://www.ms.xpansiv.com/markets/rps/class-1/massachusetts" },
+      { "l": "MassCEC · RECs", "u": "https://www.masscec.com/production-tracking-system-pts/renewable-energy-certificates" },
+      { "l": "SEA · Class I overview", "u": "https://www.seadvantage.com/blog-post/dont-be-rec-less/" }
+    ]
+  }
+}

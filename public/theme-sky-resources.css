@@ -271,13 +271,36 @@ html.sky #panelResources .srcs a:hover{
   box-shadow:0 6px 18px -6px rgba(20,60,120,.3);
 }
 
+/* ── 7b · REC MARKET — price hero + product chips ride the sky glass ─────── */
+html.sky #panelResources .res-rec-price-block{
+  background:linear-gradient(165deg,rgba(16,185,129,.14),rgba(33,150,243,.08));
+  border:1px solid rgba(16,185,129,.28);
+  box-shadow:0 4px 16px -8px rgba(16,185,129,.35);
+}
+html.sky #panelResources .res-rec-price-lab{color:#0d8a5b}
+html.sky #panelResources .res-rec-price{color:var(--ink)}
+html.sky #panelResources .res-rec-prod{
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 2px 10px rgba(20,60,120,.06);
+}
+html.sky #panelResources .res-rec-prod-price{color:#0d8a5b}
+html.sky #panelResources .res-daily-pill{
+  background:rgba(16,185,129,.12);
+  color:#0d8a5b;
+  border-color:rgba(16,185,129,.28);
+}
+html.sky #panelResources .res-rec-asof{color:#46658C}
+
 /* ── 8 · SQUIRCLE — extend the foundation's progressive enhancement to this
       pass's card vocabulary (Chrome 139+; harmless no-op elsewhere) ───────── */
 @supports (corner-shape: squircle){
   html.sky #panelResources .item,
   html.sky #panelResources .card,
   html.sky #panelResources .disc,
-  html.sky #panelResources .res-comp{corner-shape:squircle}
+  html.sky #panelResources .res-comp,
+  html.sky #panelResources .res-rec-price-block,
+  html.sky #panelResources .res-rec-prod{corner-shape:squircle}
 }
 
 /* ── 9 · ≤600px — MINIMAL: the mobile fragment (loads after) sheets #rsHost
