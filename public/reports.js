@@ -7682,9 +7682,8 @@
             extra = " · pay link attached";
             // Refresh payment chips so this offtaker shows "Pay link open".
             try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
-          } else if (res.payment_id == null && res.fee_cents == null) {
-            // No pay link — often Connect not ready; soft nudge once.
-            extra = "";
+          } else if (res.pay_skip_reason) {
+            extra = " · no pay link (" + String(res.pay_skip_reason).slice(0, 80) + ")";
           }
           setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + extra + ".");
           setTimeout(refreshInbox, 900);
