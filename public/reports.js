@@ -2108,6 +2108,38 @@
       <div class="rb2-pipe" id="rb2Pipe" hidden></div>
       <div id="rbAuditView" class="rb-au" style="display:none"></div>
       <div id="rbGenList">
+      <!-- Master solar credit rate — Tenant.default_net_rate_per_kwh (+ discount).
+           Every offtaker without a per-offtaker override bills at credit × (1 − discount).
+           Wired by wireGlobalRate() → GET/PUT /v1/array-operator/billing/global-rate. -->
+      <div class="rb-globalrate rep-card" id="rbGlobalRate">
+        <div class="rb-gr-main">
+          <h3>Master solar credit rate</h3>
+          <p>Default rate for <b>all offtakers</b>. Each offtaker's invoice uses this credit
+             rate (minus your discount) unless you've set a custom rate on that offtaker.
+             Leave blank to use the Vermont tariff default.</p>
+        </div>
+        <div class="rb-gr-ctl">
+          <label class="rb-gr-field">
+            <span class="rb-gr-lbl">Solar credit rate</span>
+            <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
+              <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="0.184"
+                     inputmode="decimal" autocomplete="off"
+                     title="Master $/kWh solar credit rate applied to offtakers without their own override">
+              <span class="rb-gr-unit">/kWh</span></span>
+          </label>
+          <label class="rb-gr-field">
+            <span class="rb-gr-lbl">Discount</span>
+            <span class="rb-gr-inwrap">
+              <input type="number" id="rbGrDisc" min="0" max="99" step="1" placeholder="10"
+                     inputmode="numeric" autocomplete="off"
+                     title="Percent off the credit rate offtakers pay (their solar savings). Blank = 10% default.">
+              <span class="rb-gr-unit">% off</span></span>
+          </label>
+          <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save rate</button>
+          <span class="rb-status" id="rbGrStatus"></span>
+        </div>
+        <div class="rb-gr-eff" id="rbGrEff"></div>
+      </div>
       <div class="rb-listwrap rb2-listwrap">
         <div class="rb2-controls">
           <span class="rb2-controls-label">Your offtakers</span>
@@ -2703,7 +2735,31 @@
         });
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
-          st.className = "rb-status rb-ok"; st.textContent = "Saved.";
+          st.className = "rb-status rb-ok";
+          st.textContent = "Saved — offtakers without a custom rate now use this.";
+          // Refresh effective preview from the server response.
+          if (data.default_net_rate_per_kwh != null) {
+            net.value = data.default_net_rate_per_kwh;
+            effNet = Number(data.default_net_rate_per_kwh);
+          } else if (data.default_net_rate_per_kwh === null) {
+            net.value = "";
+          }
+          if (data.default_discount_pct != null) {
+            disc.value = Math.round(Number(data.default_discount_pct) * 100);
+            effDisc = Number(data.default_discount_pct);
+          } else if (data.default_discount_pct === null) {
+            disc.value = "";
+          }
+          // Re-fetch effective defaults (handles null → VT fallback).
+          try {
+            const gr = await fetch(API + "/global-rate", { headers: authHeaders() });
+            const gd = await gr.json().catch(() => ({}));
+            if (gr.ok) {
+              if (gd.effective_net_rate_per_kwh != null) effNet = gd.effective_net_rate_per_kwh;
+              if (gd.effective_discount_pct != null) effDisc = gd.effective_discount_pct;
+            }
+          } catch (_) {}
+          renderEff();
           await refreshList();   // re-price rows that use the defaults
         } else {
           st.className = "rb-status rb-err";

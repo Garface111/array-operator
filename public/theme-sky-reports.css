@@ -139,6 +139,34 @@ html.sky .rb2-controls{background:rgba(255,255,255,.92);
 html.sky .rb2-controls-label{letter-spacing:-.01em}
 html.sky .rb-add-panel{scroll-margin-top:76px}
 
+/* Master solar credit rate — sits above the offtaker list; solid glass card. */
+html.sky .rb-globalrate{
+  background:rgba(255,255,255,.88);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:18px;
+  box-shadow:var(--sky-shadow-card);
+  padding:18px 22px;
+  margin:0 0 14px;
+}
+html.sky .rb-globalrate .rb-gr-main h3{color:var(--ink);font-weight:750}
+html.sky .rb-globalrate .rb-gr-main p{color:var(--muted)}
+html.sky .rb-globalrate .rb-gr-main p b{color:var(--ink)}
+html.sky .rb-gr-ctl input{
+  background:rgba(255,255,255,.95);
+  border:1px solid rgba(20,60,120,.16);
+  color:var(--ink);
+  border-radius:10px;
+  padding:8px 10px;
+}
+html.sky .rb-gr-ctl input:focus{
+  border-color:rgba(33,150,243,.55);
+  box-shadow:0 0 0 3px rgba(33,150,243,.14);
+  outline:none;
+}
+html.sky .rb-gr-lbl{color:var(--muted)}
+html.sky .rb-gr-eff{color:var(--muted)}
+html.sky .rb-gr-eff b{color:var(--sky-primary)}
+
 /* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────
    White glass bars; the per-provider hue spine is applied inline by reports.js
    (PROV_HUE) and passes through untouched. */
