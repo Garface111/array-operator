@@ -451,22 +451,61 @@
   // count (arrStatus already resolves inverter-level dark/low/fault down to a per-array
   // label like "2 dark now") rather than re-deriving inverter state a second way, so this
   // can never drift from what expanding the row actually shows.
+  // Collapsed vendor-row STATUS: surface the actual issue(s) so the operator can
+  // read them WITHOUT expanding (Ford 2026-07-13: "1 issue" hid that it was a
+  // Vendor issue; the specific label belongs on the group row).
+  //   • one type  → that label ("Vendor issue", "2 dark now", "Stopped", …)
+  //   • multi type → compact join ("Vendor issue · Dark now")
+  //   • all clear → "All clear"
   function vendorStatusSummary(list) {
-    let worstCls = "ok", total = 0;
+    let worstCls = "ok";
+    const issues = [];
     list.forEach(c => {
       const st = arrStatus(c);
       if (st.cls === "ok" || st.cls === "muted") return;   // "muted" = Asleep overnight — not an issue
       if (st.cls === "bad") worstCls = "bad";
       else if (worstCls !== "bad") worstCls = "warn";
-      // Read the REAL flagged-inverter count off the status object (arrStatus now
-      // carries it) rather than scraping a leading digit from the display string —
-      // a critical headline like "An inverter stopped earning" has no digit but may
-      // represent several dead inverters (alert.count), which the scrape undercounted.
-      total += st.count > 0 ? st.count : 1;
+      issues.push(st);
     });
-    return total === 0
-      ? { label: "All clear", cls: "ok" }
-      : { label: total + (total === 1 ? " issue" : " issues"), cls: worstCls };
+    if (!issues.length) return { label: "All clear", cls: "ok" };
+
+    // Tally by display label (already human-readable from arrStatus).
+    const byLabel = {};
+    const tips = [];
+    issues.forEach(st => {
+      const lab = (st.label || "Issue").trim();
+      byLabel[lab] = (byLabel[lab] || 0) + 1;
+      if (st.tip) tips.push(st.tip);
+    });
+    const keys = Object.keys(byLabel);
+    let label;
+    if (keys.length === 1) {
+      // Single issue type across the vendor — show it by name, not "N issues".
+      // Multi-array same type: "Vendor issue" stays singular (same problem);
+      // labels that already carry a count ("2 dark now") keep as-is.
+      const lab = keys[0];
+      const n = byLabel[lab];
+      if (n > 1 && !/^\d+\s/.test(lab) && !/^\d+\s*×/i.test(lab)) {
+        // e.g. two arrays both "Vendor issue" → "2 × Vendor issue"
+        label = n + " × " + lab;
+      } else {
+        label = lab;
+      }
+    } else {
+      // Mixed issues: list each type so nothing is buried behind a count.
+      label = keys.map(k => {
+        const n = byLabel[k];
+        if (n > 1 && !/^\d+\s/.test(k)) return n + " × " + k;
+        return k;
+      }).join(" · ");
+    }
+    // Cap length so a messy mixed fleet still fits the pill.
+    if (label.length > 42) label = label.slice(0, 40).replace(/\s+\S*$/, "") + "…";
+    return {
+      label,
+      cls: worstCls,
+      tip: tips[0] || ("Issues on " + issues.length + " array" + (issues.length === 1 ? "" : "s")),
+    };
   }
 
   // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
@@ -1243,7 +1282,7 @@
           <span class="vs-c-inv">${nInv}</span>
           <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
           <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
-          <span class="vs-c-status"><span class="vs-pill ${vStatus.cls}">${esc(vStatus.label)}</span></span>
+          <span class="vs-c-status"><span class="vs-pill ${vStatus.cls}"${vStatus.tip ? ` title="${esc(vStatus.tip)}"` : ""}>${esc(vStatus.label)}</span></span>
           <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
         </div>${vnote}
         <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
