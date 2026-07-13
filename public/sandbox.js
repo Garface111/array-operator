@@ -5028,13 +5028,16 @@
       const code = s.code || k;
       const isInv = !!s.inverter || AR_INVERTER_IDS.has(code);
       let name;
-      if(isInv){ const v = AR_INVERTERS.find(x => x.id === code); name = v ? v.label : code.toUpperCase(); }
+      if(isInv){ const v = AR_INVERTERS.find(x => x.id === code); name = v ? v.label : (code === "solaredge" ? "SolarEdge" : code.toUpperCase()); }
       else { name = utilLabelFor(code, catalog); }
       const enabled = s.enabled !== false;
       const fails = s._cloudFails || 0, at = s._cloudAt || null, ok = s._cloudOk, hStatus = s._cloudStatus;
       let dot, stag, stxt, tTxt;
       if(!enabled){ dot = "off"; stag = "off"; stxt = "Paused"; tTxt = "—"; }
-      else if(mode === "cloud"){
+      // SolarEdge always uses the freshness branch below regardless of the
+      // Device/Cloud toggle — its data syncs server-side via SolarEdge's OWN
+      // API unconditionally, it was never "on this device" to begin with.
+      else if(mode === "cloud" || code === "solaredge"){
         // Only a REAL login_failed is a credential problem — a bare ok===false also
         // covers scrape_failed (signed in fine, the data pull hit a transient snag,
         // doesn't count toward `fails`) and shouldn't blame the password. See the
@@ -5233,6 +5236,31 @@
       status = resp.status || {};
     }
     const catalog = await loadUtilCatalog();
+
+    // SolarEdge has no vault entry (it's an API key, not a login) so it never
+    // flowed into `status` — meaning it never showed up in the LIVE data board
+    // above, even though it's a real connected data source (Ford 2026-07-12:
+    // "add its status up here"). Fetch its own freshness (last_synced_at, from
+    // DailyGeneration's daily solaredge pull — see solar-operator array_owners.py)
+    // and splice it into `status` under the SAME shape every other row uses, so
+    // buildLiveBoardHTML renders it for free. Silently skipped if nothing's
+    // connected yet (mirrors every other row's hasCreds gate) or the fetch fails.
+    try{
+      const seR = await fetch("/v1/array-owners/solaredge/keys", { headers: authHeaders() });
+      if(seR.ok){
+        const seD = await seR.json().catch(() => ({}));
+        const seKeys = seD.keys || [];
+        if(seKeys.length){
+          const seArrays = new Set(); seKeys.forEach(k => (k.arrays || []).forEach(a => seArrays.add(a)));
+          status.solaredge = {
+            hasCreds: true, enabled: true, code: "solaredge", inverter: true, utility: false,
+            username: `${seKeys.length} key${seKeys.length === 1 ? "" : "s"} · ${seArrays.size} array${seArrays.size === 1 ? "" : "s"}`,
+            _cloudOk: !!seD.last_synced_at, _cloudAt: seD.last_synced_at || null, _cloudFails: 0,
+            _cloudStatus: seD.last_synced_at ? "ok" : null,
+          };
+        }
+      }
+    }catch(e){}
 
     // ── a single credential row (save/replace + optional remove) ──
     // key = the vault key clear/optout act on (an inverter id, or a utility slot).
