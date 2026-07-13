@@ -5218,13 +5218,16 @@
     };
     const viewRows = q ? scopeRows.filter(matchesQuery) : scopeRows;
     const showSearch = OFFTAKERS.length >= 1;
+    // Full-width hero search — hard to miss (Ford 2026-07-13: "bigger and harder to miss").
     const searchHTML = showSearch ? `
-      <div class="rb-osearch">
+      <div class="rb-osearch rb-osearch-lg">
         <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
-        <input id="rbOSearch" type="search" placeholder="Search offtakers — name, email, account…"
+        <input id="rbOSearch" type="search" placeholder="Search offtakers by name, email, or account number…"
                value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
                aria-label="Search offtakers">
-        ${q ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>` : ""}
+        ${q
+          ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>`
+          : `<span class="rb-osearch-hint">${OFFTAKERS.length} offtaker${OFFTAKERS.length === 1 ? "" : "s"}</span>`}
       </div>` : "";
     // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
     // utility account → offtaker. Both upper levels collapse on a whole-header click and
@@ -5365,8 +5368,11 @@
       // but stay honest rather than render a blank list).
       body = `<div class="empty" style="padding:18px 0;color:var(--faint)">No ${OFFTAKER_FILTER === "gmp" ? "GMP" : "non-GMP"} offtakers.</div>`;
     }
+    // Search on its own full-width row first, then filter chips underneath —
+    // the search is the primary lookup tool and shouldn't share a cramped row.
     const toolsHTML = (filterStripHTML || searchHTML)
-      ? `<div class="rb-listtools">${filterStripHTML}${searchHTML}</div>` : "";
+      ? `<div class="rb-listtools${searchHTML ? " rb-listtools-searchfirst" : ""}">${searchHTML}${filterStripHTML}</div>`
+      : "";
     list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
       `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + toolsHTML + body;
     wireBacChip($("#rbBacSummary"));
