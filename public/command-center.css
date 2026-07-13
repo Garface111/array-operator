@@ -2722,3 +2722,58 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   color:#fff; background:#047857; padding:8px 14px; border-radius:8px;
 }
 .rb-pay-banner-cta:hover{ filter:brightness(1.06); }
+
+/* V2 hand-holding online-pay setup card (Master Account) */
+.acct-pay-setup{ display:block; padding:0; border:0; background:transparent; }
+.acct-pay-setup .r-k, .acct-pay-setup .r-a{ display:none; }
+.ao-pay-card{ width:100%; }
+.ao-pay-card-load{ padding:18px 16px; color:var(--faint,#64748b); font-size:13.5px; }
+.ao-pay-inner{
+  border-radius:14px; padding:16px 18px 14px;
+  border:1px solid rgba(5,150,105,.22);
+  background:linear-gradient(165deg, rgba(5,150,105,.10), rgba(255,255,255,.55));
+  box-shadow:0 1px 0 rgba(255,255,255,.6) inset;
+}
+.ao-pay-inner.is-ready{
+  border-color:rgba(5,150,105,.35);
+  background:linear-gradient(165deg, rgba(5,150,105,.16), rgba(255,255,255,.6));
+}
+.ao-pay-inner.is-almost{
+  border-color:rgba(217,119,6,.3);
+  background:linear-gradient(165deg, rgba(251,191,36,.14), rgba(255,255,255,.55));
+}
+.ao-pay-inner.is-err{
+  border-color:rgba(185,28,28,.25);
+  background:linear-gradient(165deg, rgba(254,226,226,.5), rgba(255,255,255,.55));
+}
+.ao-pay-head{ display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
+.ao-pay-badge{
+  flex:0 0 auto; font-size:10px; font-weight:800; letter-spacing:.06em;
+  padding:4px 8px; border-radius:999px; background:#047857; color:#fff;
+}
+.ao-pay-inner.is-off .ao-pay-badge{ background:#64748b; }
+.ao-pay-inner.is-almost .ao-pay-badge{ background:#d97706; }
+.ao-pay-inner.is-err .ao-pay-badge{ background:#b91c1c; }
+.ao-pay-k{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--faint,#64748b); }
+.ao-pay-title{ font-size:16px; font-weight:800; color:var(--ink,#0f172a); line-height:1.25; margin-top:2px; }
+.ao-pay-body{ font-size:13.5px; line-height:1.45; color:var(--ink,#0f172a); opacity:.9; margin:0 0 12px; }
+.ao-pay-body b{ color:#047857; }
+.ao-pay-steps{
+  list-style:none; margin:0 0 14px; padding:0; display:grid; gap:8px;
+}
+.ao-pay-steps li{ display:flex; gap:10px; align-items:flex-start; }
+.ao-pay-step-n{
+  flex:0 0 22px; height:22px; border-radius:50%;
+  background:#047857; color:#fff; font-size:11px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+}
+.ao-pay-inner.is-almost .ao-pay-step-n{ background:#d97706; }
+.ao-pay-step-t{ display:flex; flex-direction:column; gap:1px; font-size:13px; }
+.ao-pay-step-t b{ color:var(--ink,#0f172a); }
+.ao-pay-step-t small{ color:var(--faint,#64748b); font-size:12px; }
+.ao-pay-foot{
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+}
+.ao-pay-cta{ min-width:200px; }
+.ao-pay-fee{ font-size:12px; color:var(--faint,#64748b); }
+.ao-pay-inner .acct-msg{ margin-top:10px; }

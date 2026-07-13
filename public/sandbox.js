@@ -4613,14 +4613,13 @@
         `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
         null,
         `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
-      // V2 offtaker pay-links: Connect Express so invoice emails get a Pay button
-      // and the platform scrapes a tiny application fee off each offtaker payment.
-      rowStatic("Collect offtaker payments",
-        `<span id="connectState">—</span>` +
-        `<span class="r-sub" id="connectSub">When enabled, every offtaker invoice includes a secure pay link. Money lands in your bank; we keep a small fee.</span>` +
-        `<div class="acct-msg" id="connectMsg"></div>`,
-        null,
-        `<button class="acct-btn primary" id="connectManage" type="button">Enable online pay</button>`) +
+      // V2 offtaker pay-links — full-width hand-holding card (not a thin row).
+      // Owner does ONE click; Stripe collects bank/card; we attach pay links forever.
+      `<div class="acct-row acct-pay-setup" id="aoPaySetup">
+        <div class="ao-pay-card" id="aoPayCard">
+          <div class="ao-pay-card-load">Checking online payments…</div>
+        </div>
+      </div>` +
       `<div class="acct-row acct-files-row">
         <div class="r-k">Your files <span class="rb-files-count" id="acctFilesCount"></span></div>
         <div class="r-v"><div class="rb-files-body" id="acctFilesBody"><div class="rb-files-empty">Loading…</div></div></div>
@@ -4635,18 +4634,53 @@
     wireCancelRow();
     loadAcctFiles();
     renderConnectPayouts(authHeaders());
-    // Stripe Connect return / refresh from Account Link.
+  }
+
+  /** Hand-holding online-pay setup for offtaker invoices.
+   * Owner path: one big button → Stripe secure form (bank/card) → back here → done.
+   * We create the Connect account, mint Account Links, attach pay URLs to invoices. */
+  async function renderConnectPayouts(h){
+    const card = document.getElementById("aoPayCard");
+    if(!card) return;
+    const feeFallback = "0.5%";
+
+    function paint(html){ card.innerHTML = html; }
+
+    // Demo (signed-out)
+    if(!h && window.AO_DEMO){
+      paint(_payCardHTML({
+        state: "ready",
+        feeTxt: feeFallback,
+        title: "Online payments on (demo)",
+        body: "In a real account, every offtaker invoice would include a Pay button. We keep " + feeFallback + "; the rest lands in your bank.",
+        cta: null,
+      }));
+      return;
+    }
+    if(!h){
+      paint(_payCardHTML({
+        state: "off",
+        feeTxt: feeFallback,
+        title: "Get paid online",
+        body: "Sign in to turn on pay links for your offtaker invoices.",
+        cta: null,
+      }));
+      return;
+    }
+
+    paint(`<div class="ao-pay-card-load">Checking online payments…</div>`);
+    let st = null;
+    try {
+      const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h });
+      if(r.ok) st = await r.json();
+    } catch(e){ st = null; }
+
+    // Returning from Stripe Account Link — poll until ready or give a soft nudge.
+    let justReturned = false;
     try {
       const q = new URLSearchParams(location.search || "");
       if(q.get("connect") === "return" || q.get("connect") === "refresh"){
-        const msg = document.getElementById("connectMsg");
-        if(msg){
-          msg.className = "acct-msg";
-          msg.textContent = q.get("connect") === "return"
-            ? "Checking Stripe onboarding…"
-            : "Resuming Stripe onboarding…";
-        }
-        // Scrub the query so a refresh doesn't re-flash the toast.
+        justReturned = true;
         try {
           const u = new URL(location.href);
           u.searchParams.delete("connect");
@@ -4654,73 +4688,149 @@
         } catch(_){}
       }
     } catch(_){}
-  }
 
-  async function renderConnectPayouts(h){
-    const stateEl = document.getElementById("connectState");
-    const subEl = document.getElementById("connectSub");
-    const btn = document.getElementById("connectManage");
-    const msg = document.getElementById("connectMsg");
-    if(!stateEl || !btn) return;
-    // Demo (signed-out): show the ready state with sample copy, no network.
-    if(!h && window.AO_DEMO){
-      stateEl.textContent = "Online payments on (demo)";
-      if(subEl) subEl.textContent = "Demo only — offtaker invoices would include a pay button. 0.5% platform fee on each payment.";
-      btn.textContent = "Demo — sign in to enable";
-      btn.disabled = true;
-      return;
-    }
-    if(!h){
-      stateEl.textContent = "Sign in to enable";
-      btn.disabled = true;
-      return;
-    }
-    btn.disabled = true;
-    stateEl.textContent = "Checking…";
-    let st = null;
-    try {
-      const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h });
-      if(r.ok) st = await r.json();
-    } catch(e){ st = null; }
-    btn.disabled = false;
     if(!st || !st.ok){
-      stateEl.textContent = "Couldn't load status";
-      if(subEl) subEl.textContent = "Refresh the page, or try again in a moment.";
-      btn.textContent = "Retry";
-      btn.onclick = () => renderConnectPayouts(authHeaders());
+      paint(_payCardHTML({
+        state: "err",
+        feeTxt: feeFallback,
+        title: "Couldn't check payment setup",
+        body: "Refresh the page, or try again in a moment.",
+        cta: { label: "Try again", action: "retry" },
+      }));
+      _wirePayCard();
       return;
     }
+
     const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 50) / 100));
     const feeTxt = (Math.round(feePct * 100) / 100) + "%";
+
     if(st.ready || st.charges_enabled){
-      stateEl.innerHTML = `<b style="color:var(--good,#047857)">Online payments on</b>`;
-      if(subEl) subEl.textContent =
-        `Offtaker invoices include a secure pay link. Money goes to your bank; we keep ${feeTxt} per payment.`;
-      btn.textContent = "Update payouts";
-      btn.onclick = () => startConnectOnboarding(false);
-    } else if(st.connected || st.account_id){
-      stateEl.textContent = "Finish bank setup";
-      if(subEl) subEl.textContent =
-        `Almost there — complete Stripe onboarding so offtaker invoices can include a pay button (${feeTxt} fee).`;
-      btn.textContent = "Continue setup";
-      btn.onclick = () => startConnectOnboarding(true);
-    } else {
-      stateEl.textContent = "Off — offtakers pay you outside the app";
-      if(subEl) subEl.textContent =
-        `Turn on online pay and every invoice email gets a Pay button. We keep ${feeTxt}; the rest lands in your bank.`;
-      btn.textContent = "Enable online pay";
-      btn.onclick = () => startConnectOnboarding(true);
+      paint(_payCardHTML({
+        state: "ready",
+        feeTxt,
+        title: "You're set — offtakers can pay online",
+        body: "Every invoice email we send now includes a secure <b>Pay</b> button. Money goes to your bank. We keep " + feeTxt + " per payment — that's it.",
+        steps: null,
+        cta: { label: "Update bank details", action: "update", secondary: true },
+      }));
+      _wirePayCard();
+      return;
     }
-    if(msg && !msg.textContent) msg.textContent = "";
+
+    if(st.connected || st.account_id){
+      // Mid-flow: they started but didn't finish Stripe's form.
+      paint(_payCardHTML({
+        state: justReturned ? "almost" : "almost",
+        feeTxt,
+        title: justReturned ? "Almost done — finish bank details" : "Continue bank setup",
+        body: justReturned
+          ? "Stripe still needs a couple of details. One more click — enter your bank info, then you're done. We handle the rest."
+          : "You're halfway there. Finish entering your bank details on Stripe's secure page. We never see your bank login.",
+        steps: [
+          { n: "1", t: "Click below", d: "Opens Stripe's secure form" },
+          { n: "2", t: "Enter bank info", d: "Routing + account (or debit card)" },
+          { n: "3", t: "We do the rest", d: "Pay buttons appear on every invoice" },
+        ],
+        cta: { label: "Continue — enter bank info", action: "start" },
+      }));
+      _wirePayCard();
+      // Soft auto-poll a few times if they just returned (webhook lag).
+      if(justReturned) _pollConnectReady(8);
+      return;
+    }
+
+    // Fresh: never started.
+    paint(_payCardHTML({
+      state: "off",
+      feeTxt,
+      title: "Get paid online — one setup",
+      body: "Offtakers click <b>Pay</b> on their invoice. You get the money in your bank. We keep " + feeTxt + ". Takes about two minutes.",
+      steps: [
+        { n: "1", t: "Click the button", d: "We open Stripe securely" },
+        { n: "2", t: "Enter bank or debit card", d: "You type it once — we never store it" },
+        { n: "3", t: "Done forever", d: "Every future invoice gets a Pay button automatically" },
+      ],
+      cta: { label: "Set up payouts — takes ~2 min", action: "start" },
+    }));
+    _wirePayCard();
+  }
+
+  function _payCardHTML({ state, feeTxt, title, body, steps, cta }){
+    const stateCls = state === "ready" ? "is-ready"
+      : state === "almost" ? "is-almost"
+      : state === "err" ? "is-err" : "is-off";
+    const badge = state === "ready" ? "ON"
+      : state === "almost" ? "ALMOST"
+      : state === "err" ? "RETRY" : "OFF";
+    const stepsHtml = (steps && steps.length)
+      ? `<ol class="ao-pay-steps">${steps.map(s =>
+          `<li><span class="ao-pay-step-n">${s.n}</span><span class="ao-pay-step-t"><b>${s.t}</b><small>${s.d}</small></span></li>`
+        ).join("")}</ol>`
+      : "";
+    const ctaHtml = cta
+      ? `<button type="button" class="acct-btn ${cta.secondary ? "" : "primary"} ao-pay-cta" data-pay-action="${cta.action}">${esc(cta.label)}</button>`
+      : "";
+    return `
+      <div class="ao-pay-inner ${stateCls}">
+        <div class="ao-pay-head">
+          <span class="ao-pay-badge">${badge}</span>
+          <div class="ao-pay-titles">
+            <div class="ao-pay-k">Collect offtaker payments</div>
+            <div class="ao-pay-title">${title}</div>
+          </div>
+        </div>
+        <div class="ao-pay-body">${body}</div>
+        ${stepsHtml}
+        <div class="ao-pay-foot">
+          ${ctaHtml}
+          <span class="ao-pay-fee" title="Platform fee on each offtaker card payment">Fee ${esc(feeTxt || "0.5%")} · powered by Stripe</span>
+        </div>
+        <div class="acct-msg" id="connectMsg"></div>
+      </div>`;
+  }
+
+  function _wirePayCard(){
+    const card = document.getElementById("aoPayCard");
+    if(!card) return;
+    card.querySelectorAll("[data-pay-action]").forEach(btn => {
+      btn.onclick = () => {
+        const act = btn.getAttribute("data-pay-action");
+        if(act === "retry") renderConnectPayouts(authHeaders());
+        else startConnectOnboarding(act !== "update");
+      };
+    });
+  }
+
+  let _connectPollTimer = null;
+  function _pollConnectReady(maxTries){
+    if(_connectPollTimer) clearInterval(_connectPollTimer);
+    let n = 0;
+    _connectPollTimer = setInterval(async () => {
+      n++;
+      try {
+        const h = authHeaders();
+        if(!h){ clearInterval(_connectPollTimer); return; }
+        const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h });
+        if(r.ok){
+          const st = await r.json();
+          if(st.ready || st.charges_enabled){
+            clearInterval(_connectPollTimer);
+            renderConnectPayouts(h);
+            return;
+          }
+        }
+      } catch(_){}
+      if(n >= (maxTries || 8)) clearInterval(_connectPollTimer);
+    }, 2500);
   }
 
   async function startConnectOnboarding(primary){
     const h = authHeaders();
     const msg = document.getElementById("connectMsg");
-    const btn = document.getElementById("connectManage");
+    const btn = document.querySelector(".ao-pay-cta") || document.getElementById("connectManage");
     if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
-    if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening secure Stripe setup…"; }
-    if(btn) btn.disabled = true;
+    if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening Stripe’s secure bank form…"; }
+    if(btn){ btn.disabled = true; btn.textContent = "Opening Stripe…"; }
     try {
       const r = await fetch("/v1/array-operator/billing/payments/connect", {
         method: "POST",
@@ -4728,16 +4838,29 @@
         body: "{}",
       });
       const d = await r.json().catch(() => ({}));
-      if(r.ok && d.url){ window.location = d.url; return; }
-      if(msg){
-        msg.className = "acct-msg err";
-        msg.textContent = (d && d.detail) || (d && d.error)
-          || "Couldn't start payout setup — please try again shortly.";
+      // FastAPI HTTPException wraps structured detail.
+      const detail = (d && typeof d.detail === "object") ? d.detail : d;
+      if(r.ok && d.already_ready){
+        if(msg){ msg.className = "acct-msg"; msg.textContent = "Already set up — you're good."; }
+        renderConnectPayouts(h);
+        return;
+      }
+      if(r.ok && d.url){
+        if(msg){ msg.className = "acct-msg"; msg.textContent = "Redirecting to Stripe — enter your bank, then you'll land back here."; }
+        window.location = d.url;
+        return;
+      }
+      const errMsg = (detail && detail.error) || (typeof d.detail === "string" ? d.detail : null)
+        || d.error || "Couldn't open bank setup — please try again shortly.";
+      if(msg){ msg.className = "acct-msg err"; msg.textContent = errMsg; }
+      if(btn){
+        btn.disabled = false;
+        btn.textContent = (detail && detail.retryable) ? "Try again" : "Set up payouts — takes ~2 min";
       }
     } catch(e){
       if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't reach Stripe — check your connection."; }
+      if(btn){ btn.disabled = false; btn.textContent = "Try again"; }
     }
-    if(btn) btn.disabled = false;
   }
 
   /* ---- Danger zone: cancel the account.
