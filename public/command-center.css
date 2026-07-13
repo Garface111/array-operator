@@ -933,33 +933,58 @@ body.sb-fs-lock{ overflow:hidden; }
   background:var(--day-hover,rgba(15,23,42,.05)); border-radius:20px; padding:1px 7px; min-width:16px; text-align:center; }
 .rb-ofilter-chip.on .rb-ofilter-n{ color:var(--good,#2563eb); background:rgba(37,99,235,.14); }
 
-/* Find-an-offtaker search — full-width, large, primary lookup over the list
+/* Find-an-offtaker search — labeled hero panel, sticky, hard to miss
    (Ford 2026-07-13: bigger + harder to miss). Filter chips sit below it. */
 .rb-listtools{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 14px; }
 .rb-listtools-searchfirst{ flex-direction:column; align-items:stretch; gap:12px; }
 .rb-listtools .rb-ofilter{ margin:0; align-self:flex-start; }
-.rb-listtools .rb-osearch{ margin:0; width:100%; max-width:none; }
-.rb-osearch{ display:flex; align-items:center; gap:12px; flex:1 1 auto; width:100%;
+.rb-listtools .rb-osearch,
+.rb-listtools .rb-osearch-panel{ margin:0; width:100%; max-width:none; }
+
+/* Sticky labeled panel so the find control stays parked above the offtaker list. */
+.rb-osearch-panel{
+  position:sticky; top:8px; z-index:6;
+  width:100%; box-sizing:border-box;
+  padding:14px 16px 16px;
+  background:linear-gradient(165deg, rgba(37,99,235,.10), rgba(37,99,235,.04));
+  border:2px solid rgba(37,99,235,.38);
+  border-radius:18px;
+  box-shadow:0 8px 28px rgba(37,99,235,.12), 0 2px 8px rgba(15,23,42,.06);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+.rb-osearch-labelrow{
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 14px;
+  margin:0 0 10px; padding:0 2px;
+}
+.rb-osearch-label{
+  font:800 15px/1.15 inherit; letter-spacing:.02em; text-transform:uppercase;
+  color:#1d4ed8;
+}
+.rb-osearch-sub{
+  font:550 13.5px/1.25 inherit; color:#475569;
+}
+.rb-osearch{ display:flex; align-items:center; gap:14px; flex:1 1 auto; width:100%;
   max-width:none; min-width:0; box-sizing:border-box;
-  background:#fff; border:2px solid rgba(37,99,235,.28); border-radius:14px;
-  padding:14px 18px;
-  box-shadow:0 2px 10px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.9); }
-.rb-osearch-lg{ min-height:52px; }
-.rb-osearch:focus-within{ border-color:rgba(37,99,235,.7);
-  box-shadow:0 0 0 4px rgba(37,99,235,.14), 0 4px 14px rgba(37,99,235,.12); }
-.rb-osearch-ico{ color:#2563eb; font-size:22px; flex:none; line-height:1;
-  font-weight:700; opacity:.9; }
+  background:#fff; border:2.5px solid rgba(37,99,235,.42); border-radius:14px;
+  padding:16px 20px;
+  box-shadow:0 2px 12px rgba(15,23,42,.07), inset 0 1px 0 rgba(255,255,255,.95); }
+.rb-osearch-lg{ min-height:64px; }
+.rb-osearch:focus-within{ border-color:#2563eb;
+  box-shadow:0 0 0 5px rgba(37,99,235,.18), 0 6px 18px rgba(37,99,235,.16); }
+.rb-osearch-ico{ color:#2563eb; font-size:28px; flex:none; line-height:1;
+  font-weight:700; opacity:.95; width:1.1em; text-align:center; }
 .rb-osearch input{ border:0; outline:0; background:transparent; flex:1; min-width:0;
-  font:650 16px/1.35 inherit; color:var(--ink,#0f172a); letter-spacing:-.01em; }
-.rb-osearch input::placeholder{ color:#7a8a98; font-weight:550; }
-.rb-osearch-hint{ font-size:12.5px; font-weight:700; color:#5a6b7b;
-  background:rgba(15,23,42,.05); border:1px solid rgba(15,23,42,.08);
-  border-radius:999px; padding:5px 12px; white-space:nowrap; flex:none;
+  font:700 18px/1.35 inherit; color:var(--ink,#0f172a); letter-spacing:-.015em; }
+.rb-osearch input::placeholder{ color:#8a9aab; font-weight:550; }
+.rb-osearch-hint{ font-size:13.5px; font-weight:750; color:#334155;
+  background:rgba(37,99,235,.08); border:1px solid rgba(37,99,235,.18);
+  border-radius:999px; padding:7px 14px; white-space:nowrap; flex:none;
   font-variant-numeric:tabular-nums; }
 /* Search match count — emerald pill, prominent while scanning. */
-.rb-osearch-n{ font-size:13px; font-weight:780; color:#047857;
-  background:rgba(16,185,129,.16); border:1px solid rgba(16,185,129,.32);
-  border-radius:999px; padding:5px 12px; white-space:nowrap; flex:none;
+.rb-osearch-n{ font-size:14px; font-weight:800; color:#047857;
+  background:rgba(16,185,129,.18); border:1px solid rgba(16,185,129,.36);
+  border-radius:999px; padding:7px 14px; white-space:nowrap; flex:none;
   font-variant-numeric:tabular-nums; }
 
 /* Reconciliation-in-progress: a small spinner + faint pulse so a slow bill audit

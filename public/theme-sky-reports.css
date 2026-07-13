@@ -336,21 +336,28 @@ html.sky .rb-slider button.on, html.sky .rb-ofilter-chip.on{
   background:var(--sky-primary) !important;color:#fff !important;
   box-shadow:0 3px 10px -3px rgba(33,150,243,.55)}
 html.sky .rb-ofilter-chip.on .rb-ofilter-n{background:rgba(255,255,255,.25);color:#fff}
-/* find-an-offtaker search — large full-width glass field (hard to miss) */
+/* find-an-offtaker — labeled sticky hero panel (hard to miss) */
+html.sky .rb-osearch-panel{
+  background:linear-gradient(165deg, rgba(33,150,243,.12), rgba(33,150,243,.05));
+  border:2px solid rgba(33,150,243,.42);
+  border-radius:18px;
+  box-shadow:0 10px 30px rgba(33,150,243,.14), 0 2px 8px rgba(20,60,120,.06)}
+html.sky .rb-osearch-label{color:var(--sky-primary,#2196F3)}
+html.sky .rb-osearch-sub{color:#4a5f75}
 html.sky .rb-osearch{
-  background:rgba(255,255,255,.92);
-  border:2px solid rgba(33,150,243,.35);
+  background:rgba(255,255,255,.96);
+  border:2.5px solid rgba(33,150,243,.45);
   border-radius:16px;
-  padding:15px 20px;
+  padding:16px 20px;
   box-shadow:0 4px 16px rgba(20,60,120,.08), inset 0 1px 0 rgba(255,255,255,.95)}
 html.sky .rb-osearch:focus-within{
-  border-color:rgba(33,150,243,.75);
-  box-shadow:0 0 0 4px rgba(33,150,243,.16), 0 6px 18px rgba(33,150,243,.14)}
-html.sky .rb-osearch-ico{color:var(--sky-primary,#2196F3);font-size:22px}
-html.sky .rb-osearch input{font-size:16.5px;font-weight:650;color:var(--ink)}
+  border-color:rgba(33,150,243,.9);
+  box-shadow:0 0 0 5px rgba(33,150,243,.18), 0 8px 22px rgba(33,150,243,.16)}
+html.sky .rb-osearch-ico{color:var(--sky-primary,#2196F3);font-size:28px}
+html.sky .rb-osearch input{font-size:18px;font-weight:700;color:var(--ink)}
 html.sky .rb-osearch input::placeholder{color:#6b7c8f;font-weight:550}
-html.sky .rb-osearch-hint{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.18);
-  color:#3d5a80}
+html.sky .rb-osearch-hint{background:rgba(33,150,243,.10);border-color:rgba(33,150,243,.22);
+  color:#2f4f6f;font-size:13.5px}
 /* upload dropzone: hover goes primary (control affordance, not a status) */
 html.sky .rb-drop{background:rgba(255,255,255,.55) !important;
   border-color:rgba(20,60,120,.22) !important;border-radius:16px}

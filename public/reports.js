@@ -5218,16 +5218,24 @@
     };
     const viewRows = q ? scopeRows.filter(matchesQuery) : scopeRows;
     const showSearch = OFFTAKERS.length >= 1;
-    // Full-width hero search — hard to miss (Ford 2026-07-13: "bigger and harder to miss").
+    // Hero find-panel — labeled, oversized, sticky (Ford 2026-07-13: "bigger and
+    // harder to miss" — the plain field still read as chrome; make it the landing
+    // control for the offtaker list).
     const searchHTML = showSearch ? `
-      <div class="rb-osearch rb-osearch-lg">
-        <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
-        <input id="rbOSearch" type="search" placeholder="Search offtakers by name, email, or account number…"
-               value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
-               aria-label="Search offtakers">
-        ${q
-          ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>`
-          : `<span class="rb-osearch-hint">${OFFTAKERS.length} offtaker${OFFTAKERS.length === 1 ? "" : "s"}</span>`}
+      <div class="rb-osearch-panel" role="search">
+        <div class="rb-osearch-labelrow">
+          <span class="rb-osearch-label">Find offtaker</span>
+          <span class="rb-osearch-sub">Type a name, email, or utility account #</span>
+        </div>
+        <div class="rb-osearch rb-osearch-lg">
+          <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
+          <input id="rbOSearch" type="search" placeholder="e.g. Anna Smith · anna@… · 123456…"
+                 value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
+                 aria-label="Find offtaker by name, email, or account number">
+          ${q
+            ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>`
+            : `<span class="rb-osearch-hint">${OFFTAKERS.length} offtaker${OFFTAKERS.length === 1 ? "" : "s"}</span>`}
+        </div>
       </div>` : "";
     // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
     // utility account → offtaker. Both upper levels collapse on a whole-header click and
