@@ -68,16 +68,16 @@ document.documentElement.setAttribute("data-theme","day");
      with the first paint. Media lists MIRROR the tier queries in
      theme-sky.css §2 + theme-sky-mobile.css §1/§6b EXACTLY — keep them in
      sync or a viewport double-fetches. Flag off → none of this runs. */
-  [["img/sky/world-m-1664.webp","(min-width:601px) and (max-width:1600px) and (max-resolution:1.49dppx)"],
-   ["img/sky/world-m-2496.webp","(min-width:1601px) and (max-width:1799px) and (max-resolution:1.49dppx)"],
-   ["img/sky/world-m-3328.webp","(min-width:601px) and (min-resolution:1.5dppx) and (max-resolution:1.99dppx), (min-width:1800px) and (max-resolution:1.99dppx)"],
-   ["img/sky/world-m-3328.webp","(min-width:601px) and (min-resolution:2dppx)"],
-   ["img/sky/world-m-828.webp","(max-width:600px) and (max-resolution:1.5dppx)"],
-   ["img/sky/world-m-1284.webp","(max-width:600px) and (min-resolution:1.51dppx) and (max-resolution:2.49dppx)"],
-   ["img/sky/world-m-2496.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
-   ["img/sky/world-m-3328.webp","(max-width:600px) and (min-resolution:3dppx)"]
+  [["img/sky/world-zo-1600.webp","(min-width:601px) and (max-width:1600px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-zo-2560.webp","(min-width:1601px) and (max-width:1799px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-zo-2560.webp","(min-width:601px) and (min-resolution:1.5dppx) and (max-resolution:1.99dppx), (min-width:1800px) and (max-resolution:1.99dppx)"],
+   ["img/sky/world-zo-2560.webp","(min-width:601px) and (min-resolution:2dppx)"],
+   ["img/sky/world-zo-1080.webp","(max-width:600px) and (max-resolution:1.5dppx)"],
+   ["img/sky/world-zo-1600.webp","(max-width:600px) and (min-resolution:1.51dppx) and (max-resolution:2.49dppx)"],
+   ["img/sky/world-zo-2560.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
+   ["img/sky/world-zo-2560.webp","(max-width:600px) and (min-resolution:3dppx)"]
   ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
-  ["theme-sky.css?v=20260713low1","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260713glass1","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713glass1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260713low1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+  ["theme-sky.css?v=20260713zo1","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260713glass1","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713glass1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260713zo1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
 <!-- THE DESCENT — you arrive high in the plate's sky (background-position
      center top) and the world drifts down at 0.1× the scroll speed, clamped

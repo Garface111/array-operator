@@ -58,12 +58,12 @@
     /* Default phone plate: 1284 (≈3x logical width of ~390–430 CSS px) —
        rebuilt 2026-07-13 from the 6K portrait master at high quality. */
     background-image:
-      url("img/sky/world-m-1284.jpg"),
+      url("img/sky/world-zo-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-m-1284.webp") type("image/webp"),
-                url("img/sky/world-m-1284.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo-1600.webp") type("image/webp"),
+                url("img/sky/world-zo-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-size:cover, auto, auto;
@@ -279,12 +279,12 @@
 @media (max-width:600px) and (max-resolution:1.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-m-1284.jpg"),
+      url("img/sky/world-zo-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-m-828.webp") type("image/webp"),
-                url("img/sky/world-m-1284.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo-1080.webp") type("image/webp"),
+                url("img/sky/world-zo-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -292,12 +292,12 @@
 @media (max-width:600px) and (min-resolution:2.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-m-2496.jpg"),
+      url("img/sky/world-zo-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-m-2496.webp") type("image/webp"),
-                url("img/sky/world-m-2496.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo-2560.webp") type("image/webp"),
+                url("img/sky/world-zo-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -305,12 +305,12 @@
 @media (max-width:600px) and (min-resolution:3dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-m-2496.jpg"),
+      url("img/sky/world-zo-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-m-3328.webp") type("image/webp"),
-                url("img/sky/world-m-2496.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo-2560.webp") type("image/webp"),
+                url("img/sky/world-zo-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
