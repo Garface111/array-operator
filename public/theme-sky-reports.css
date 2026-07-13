@@ -49,6 +49,18 @@ html.sky .rb2{
   --card2:#F4F9FF;                               /* inner tints → azure white */
   --day-hover:rgba(33,150,243,.07);              /* warm ochre hover → sky */
   gap:16px;
+  /* SAFE ZONE (Ford 2026-07-13: "give it the feel of the Analysis page — once you're on
+     it you're safe from the background; the photo is a little overwhelming"). Mirror the
+     Analysis model: ONE calm content sheet wrapping the whole Invoices tab (this .rb2),
+     with near-solid cards on top (the .rb2-* bands below). The wrap fills the gaps BETWEEN
+     the bands with soft white instead of the vivid mountain photo, so the eye rests on a
+     continuous plane — exactly why #panelAnalysis .an-wrap reads as calm. */
+  background:rgba(255,255,255,.66);
+  padding:16px 18px 26px;
+  border:1px solid var(--sky-glass-edge);
+  border-radius:var(--sky-r-sheet);
+  box-shadow:var(--sky-shadow-sheet);
+  margin:4px 0 40px;
 }
 
 /* ── 2 · TOP-LEVEL BANDS = GLASS SHEETS (content tier, blur allowed) ───────
@@ -58,12 +70,16 @@ html.sky .rb2-head,
 html.sky .rb2-pipe,
 html.sky .rb2-listwrap,
 html.sky .rb2 > .rb-au{
-  background:var(--sky-glass-content);
+  /* near-solid frosted cards sitting ON the .rb2 safe-zone sheet (the Analysis .an-card
+     move: ~.86 white so content reads on an opaque plane, not through the photo). Card
+     shadow, not sheet shadow — they're cards on a sheet now, and the sheet already lifts
+     the whole zone. Blur kept so the thin edge that peeks past .86 stays frosted glass. */
+  background:rgba(255,255,255,.86);
   -webkit-backdrop-filter:var(--sky-sheet-blur);
   backdrop-filter:var(--sky-sheet-blur);
   border:1px solid var(--sky-glass-edge);
-  border-radius:26px;
-  box-shadow:var(--sky-shadow-sheet);
+  border-radius:22px;
+  box-shadow:var(--sky-shadow-card);
 }
 /* generous air — the decluttering is spacing, not fewer facts */
 html.sky .rb2-head{padding:26px 32px 22px}
