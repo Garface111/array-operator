@@ -85,7 +85,12 @@
     if (!_forecast) { var cached = readForecastCache(); if (cached) _forecast = cached; }
     if (_forecastInFlight) return;
     _forecastInFlight = true;
-    fetch("/v1/array-owners/forecast-fleet?window_days=10", { headers: { Authorization: "Bearer " + s } })
+    var win = 10;
+    try {
+      var n = Number(sessionStorage.getItem("ao_forecast_window_days"));
+      if (n >= 3 && n <= 30) win = n;
+    } catch (e) { }
+    fetch("/v1/array-owners/forecast-fleet?window_days=" + win, { headers: { Authorization: "Bearer " + s } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { _forecast = d || _forecast || null; if (d) writeForecastCache(d); _forecastTried = true; _forecastInFlight = false; scheduleRender(); })
       .catch(function () { _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
@@ -125,6 +130,63 @@
         throw new Error(msg || ("Couldn't save the target (" + r.status + ")"));
       });
     }).then(function (d) { reloadForecast(); return d; });
+  };
+
+  // Save tilt / azimuth / performance ratio for ONE array (or clear with nulls).
+  window.__aoSetArrayGeometry = function (arrayId, opts) {
+    var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to edit model inputs"));
+    opts = opts || {};
+    var body = {
+      tilt_deg: opts.tilt_deg == null || opts.tilt_deg === "" ? null : Number(opts.tilt_deg),
+      azimuth_deg: opts.azimuth_deg == null || opts.azimuth_deg === "" ? null : Number(opts.azimuth_deg),
+    };
+    if (opts.clear_performance_ratio) body.clear_performance_ratio = true;
+    else if (opts.performance_ratio != null && opts.performance_ratio !== "")
+      body.performance_ratio = Number(opts.performance_ratio);
+    return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/geometry", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
+        var msg = e && e.detail;
+        if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
+        throw new Error(msg || ("Couldn't save geometry (" + r.status + ")"));
+      });
+    }).then(function (d) { reloadForecast(); return d; });
+  };
+
+  // Bulk-apply model params across the fleet (only assumed values by default).
+  window.__aoSetFleetForecastParams = function (opts) {
+    var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to edit model inputs"));
+    opts = opts || {};
+    return fetch("/v1/array-owners/forecast-params", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+      body: JSON.stringify(opts)
+    }).then(function (r) {
+      return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
+        var msg = e && e.detail;
+        if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
+        throw new Error(msg || ("Couldn't save model params (" + r.status + ")"));
+      });
+    }).then(function (d) { reloadForecast(); return d; });
+  };
+
+  // Change the Analysis forecast window (7/10/14/30 days) and refetch.
+  window.__aoSetForecastWindow = function (days) {
+    var n = Number(days);
+    if (!(n >= 3 && n <= 30)) n = 10;
+    try { sessionStorage.setItem("ao_forecast_window_days", String(n)); } catch (e) { }
+    _forecast = null; _simForecast = null; _forecastTried = false; _forecastInFlight = false;
+    clearForecastCache();
+    // loadForecast reads the window from sessionStorage
+    loadForecast();
+  };
+  window.__aoGetForecastWindow = function () {
+    try {
+      var n = Number(sessionStorage.getItem("ao_forecast_window_days"));
+      if (n >= 3 && n <= 30) return n;
+    } catch (e) { }
+    return 10;
   };
 
   // ---- weather: Open-Meteo weathercode → a compact sky descriptor -------------

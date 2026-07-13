@@ -98,6 +98,34 @@ html.sky #panelAnalysis .an-asof{
   box-shadow:0 2px 10px rgba(20,60,120,.07);
 }
 html.sky #panelAnalysis .an-livedot{box-shadow:0 0 0 3px rgba(30,144,232,.16)}
+
+/* ── Production vs expected LEAD hero (order 1) — calm glass flagship ─────── */
+html.sky #panelAnalysis .anfc-lead.an-card{
+  background:linear-gradient(165deg,rgba(255,255,255,.94),rgba(247,251,255,.9)) !important;
+  border:1px solid rgba(255,255,255,.95) !important;
+  border-radius:22px !important;
+  box-shadow:0 18px 48px -28px rgba(20,60,120,.28),0 1px 0 rgba(255,255,255,.9) inset !important;
+  overflow:hidden;
+}
+html.sky #panelAnalysis .anfc-model{
+  background:linear-gradient(165deg,rgba(255,255,255,.98),rgba(237,245,253,.92)) !important;
+  border-color:rgba(20,60,120,.08) !important;
+}
+html.sky #panelAnalysis .anfc-btn{
+  background:linear-gradient(180deg,#42a5f5,#2196F3) !important;
+  box-shadow:0 8px 20px -10px rgba(33,150,243,.6) !important;
+}
+html.sky #panelAnalysis .anfc-pct{color:var(--ink)}
+html.sky #panelAnalysis .anfc-kicker{color:#1565C0}
+html.sky #panelAnalysis .anfc-kicker i{background:#2196F3;box-shadow:0 0 0 3px rgba(33,150,243,.18)}
+html.sky #panelAnalysis .anfc-fill:not(.warn):not(.soft){
+  background:linear-gradient(90deg,#64b5f6,#2196F3) !important;
+}
+html.sky #panelAnalysis .anfc-track{background:rgba(20,60,120,.06)}
+html.sky #panelAnalysis .anfc-spot{
+  background:rgba(33,150,243,.06);
+  border-color:rgba(33,150,243,.16);
+}
 /* state re-declare: base rule above outranks the module's `.an-livedot.demo` */
 html.sky #panelAnalysis .an-livedot.demo{box-shadow:0 0 0 3px rgba(217,119,6,.14)}
 

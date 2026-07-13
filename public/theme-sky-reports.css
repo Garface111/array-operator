@@ -139,14 +139,20 @@ html.sky .rb2-controls{background:rgba(255,255,255,.92);
 html.sky .rb2-controls-label{letter-spacing:-.01em}
 html.sky .rb-add-panel{scroll-margin-top:76px}
 
-/* Master solar credit rate — sits above the offtaker list; solid glass card. */
-html.sky .rb-globalrate{
+/* Master solar credit rate — sits above the offtaker list; solid glass card.
+   Full width of the .rb2 base sheet (same span as .rb2-pipe / .rb2-listwrap).
+   .rep-card's global max-width:700px would leave it half-empty on wide screens. */
+html.sky .rb-globalrate,
+html.sky .rb2 .rep-card.rb-globalrate{
   background:rgba(255,255,255,.88);
   border:1px solid var(--sky-glass-edge);
   border-radius:18px;
   box-shadow:var(--sky-shadow-card);
-  padding:18px 22px;
-  margin:0 0 14px;
+  padding:18px 24px;
+  margin:0 0 0;            /* .rb2 gap owns the spacing between bands */
+  max-width:none;
+  width:100%;
+  box-sizing:border-box;
 }
 html.sky .rb-globalrate .rb-gr-main h3{color:var(--ink);font-weight:750}
 html.sky .rb-globalrate .rb-gr-main p{color:var(--muted)}
@@ -166,6 +172,7 @@ html.sky .rb-gr-ctl input:focus{
 html.sky .rb-gr-lbl{color:var(--muted)}
 html.sky .rb-gr-eff{color:var(--muted)}
 html.sky .rb-gr-eff b{color:var(--sky-primary)}
+html.sky .rb-gr-src{color:var(--sky-primary);font-weight:600;font-size:11.5px}
 
 /* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────
    White glass bars; the per-provider hue spine is applied inline by reports.js

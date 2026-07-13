@@ -1,235 +1,648 @@
 /* ============================================================================
  * Array Operator — Analysis tab · Production vs Expected  (analysis-forecast.js)
  *
- * The weather-adjusted "Production vs expected" card — RELOCATED here from Fleet
- * Health (was command-center.js #fleetTarget). Fleet Health now leads with the
- * "which inverters need a crew" queue; the whole-fleet weather-adjusted view is
- * an analysis concern, so it lives in the Analysis tab.
+ * Lead hero of the Analysis tab (order 1). Weather-adjusted fleet production vs
+ * the real sunlight on each site — big calm % verdict, then a simple model
+ * system: EVERY array listed with its own address / tilt / facing / losses.
+ * When setup is complete the editor collapses to a one-line summary.
  *
- * Renders from the shared ctx.forecast (the orchestrator's ONE
- * /v1/array-owners/forecast-fleet fetch — same payload the old card fetched), so
- * behavior is preserved: the headline % of weather-expected output, the actual-vs-
- * expected kWh, the clearest-recent-day spotlight, and the expandable
- * "How we calculated this" panel that names every model input.
- *
- * Window: 10 days (Ford). Honest by construction: Actual = measured production
- * from the arrays' inverter telemetry over the last 10 days; Expected = the real
- * irradiance (sunlight) that fell on each array's location over the same 10 days.
- * No forecast (demo / not-yet-loaded / no addresses) → an honest empty state; we
- * never fabricate an expected value.
+ * Data: shared ctx.forecast from /v1/array-owners/forecast-fleet. Never fabricates.
  * ========================================================================== */
 (function () {
   "use strict";
 
   window.AnalysisSections = window.AnalysisSections || [];
 
-  var _open = false;   // is the "How we calculated this" detail expanded? (module-level → survives re-render)
+  var _howOpen = false;     // "how the number is built" drawer
+  var _modelOpen = null;    // null = auto (open when needs setup); true/false force
+  var _dirty = false;       // unsaved edits in the model list
 
-  // Confidence → plain words (matches the rest of the fleet's "say why" voice).
   var CONF_LABEL = {
     high: "high confidence", medium: "moderate confidence",
     low: "limited data so far", none: "not enough measured days yet"
   };
 
+  var AZ_OPTIONS = [
+    { v: 0, lab: "South" },
+    { v: -45, lab: "Southeast" },
+    { v: 45, lab: "Southwest" },
+    { v: -90, lab: "East" },
+    { v: 90, lab: "West" },
+    { v: 180, lab: "North" }
+  ];
+
   function num(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
   function windowDays(fc, ctx) {
+    if (typeof window.__aoGetForecastWindow === "function") {
+      var w = window.__aoGetForecastWindow();
+      if (w >= 3 && w <= 30) return w;
+    }
     return (fc && fc.window && fc.window.days) || (ctx && ctx.windowDays) || 10;
   }
 
-  // ---- one-time scoped CSS ----------------------------------------------------
+  /** Strip geocode annotations so we never re-submit "Londonderry, VT (from site name)". */
+  function cleanAddress(addr) {
+    if (addr == null || addr === "") return "";
+    return String(addr)
+      .replace(/\s*\(from\s+[^)]*\)\s*/gi, "")
+      .replace(/\s*\(geocoded[^)]*\)\s*/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function azLabel(az) {
+    var n = Number(az);
+    for (var i = 0; i < AZ_OPTIONS.length; i++) {
+      if (AZ_OPTIONS[i].v === n) return AZ_OPTIONS[i].lab;
+    }
+    return (isFinite(n) ? n + "°" : "South");
+  }
+
+  /** Build the unified list of arrays that can have model variables. */
+  function modelableArrays(f) {
+    var out = [];
+    var seen = {};
+    (f.rows || []).forEach(function (r) {
+      seen[r.array_id] = true;
+      out.push({
+        array_id: r.array_id,
+        array_name: r.array_name || ("Array " + r.array_id),
+        nameplate_kw: r.nameplate_kw,
+        address: cleanAddress(r.address),
+        raw_address: r.address || "",
+        has_location: !!(r.latitude != null && r.longitude != null) || !!(r.address || r.geocode_source),
+        tilt_deg: r.tilt_deg,
+        azimuth_deg: r.azimuth_deg != null ? r.azimuth_deg : 0,
+        performance_ratio: r.performance_ratio != null ? r.performance_ratio : 0.84,
+        tilt_assumed: !!r.tilt_assumed,
+        azimuth_assumed: r.azimuth_assumed != null ? !!r.azimuth_assumed : true,
+        pr_assumed: r.performance_ratio_assumed != null ? !!r.performance_ratio_assumed : true,
+        needs_location: false,
+        ratio_pct: r.ratio_pct,
+        modeled: true
+      });
+    });
+    (f.skipped || []).forEach(function (s) {
+      if (seen[s.array_id]) return;
+      // Only surfaces where the operator can still fix the model with inputs.
+      if (s.reason !== "no_location" && s.reason !== "irradiance_unavailable") return;
+      seen[s.array_id] = true;
+      out.push({
+        array_id: s.array_id,
+        array_name: s.array_name || ("Array " + s.array_id),
+        nameplate_kw: s.nameplate_kw,
+        address: cleanAddress(s.address),
+        raw_address: s.address || "",
+        has_location: false,
+        tilt_deg: s.tilt_deg != null ? s.tilt_deg : "",
+        azimuth_deg: s.azimuth_deg != null ? s.azimuth_deg : 0,
+        performance_ratio: s.performance_ratio != null ? s.performance_ratio : 0.84,
+        tilt_assumed: true,
+        azimuth_assumed: true,
+        pr_assumed: true,
+        needs_location: s.reason === "no_location",
+        ratio_pct: null,
+        modeled: false
+      });
+    });
+    out.sort(function (a, b) {
+      return String(a.array_name).localeCompare(String(b.array_name));
+    });
+    return out;
+  }
+
+  function needsSetup(arrays) {
+    return arrays.some(function (a) { return a.needs_location || !a.has_location; });
+  }
+
+  function isModelOpen(arrays) {
+    if (_modelOpen === true) return true;
+    if (_modelOpen === false) return false;
+    // Auto: open while any site still needs a location; otherwise stay collapsed.
+    return needsSetup(arrays);
+  }
+
+  // ---- one-time scoped CSS --------------------------------------------------
   function injectCss() {
     if (document.getElementById("anfc-css")) return;
     var s = document.createElement("style");
     s.id = "anfc-css";
     s.textContent = [
-      ".anfc-body{padding:18px 18px 20px;}",
+      /* ── hero shell ── */
+      ".anfc-hero{padding:28px 28px 26px;}",
+      ".anfc-kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:var(--good);margin:0 0 10px;}",
+      ".anfc-kicker i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(37,99,235,.18);}",
+      ".anfc-title{font-size:22px;font-weight:760;letter-spacing:-.025em;color:var(--ink);margin:0 0 4px;line-height:1.2;}",
+      ".anfc-lede{font-size:13.5px;color:var(--muted);line-height:1.5;margin:0 0 22px;max-width:52ch;}",
+      ".anfc-lede b{color:var(--ink);font-weight:650;}",
 
-      /* headline row: big % + made/expected numbers */
-      ".anfc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;}",
-      ".anfc-pct{font-size:46px;font-weight:800;letter-spacing:-.02em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;}",
-      ".anfc-pct span{font-size:20px;font-weight:700;color:var(--muted);margin-left:4px;}",
-      ".anfc-pct small{display:block;font-size:12px;font-weight:600;color:var(--faint);letter-spacing:.02em;margin-top:5px;}",
-      ".anfc-nums{text-align:right;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.5;}",
-      ".anfc-nums b{color:var(--ink);font-weight:720;}",
-      ".anfc-badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--good);background:rgba(37,99,235,.09);border:1px solid rgba(37,99,235,.28);border-radius:999px;padding:2px 8px;margin-left:9px;vertical-align:middle;}",
+      /* ── verdict strip ── */
+      ".anfc-verdict-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:28px;align-items:end;}",
+      "@media (max-width:720px){.anfc-verdict-row{grid-template-columns:1fr;gap:18px;}}",
+      ".anfc-pct{font-size:64px;font-weight:800;letter-spacing:-.035em;line-height:.92;color:var(--ink);font-variant-numeric:tabular-nums;}",
+      ".anfc-pct span{font-size:28px;font-weight:700;color:var(--muted);margin-left:2px;}",
+      ".anfc-pct-lab{display:block;font-size:13px;font-weight:600;color:var(--faint);letter-spacing:.01em;margin-top:8px;}",
+      ".anfc-nums{text-align:right;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.55;padding-bottom:6px;}",
+      "@media (max-width:720px){.anfc-nums{text-align:left;}}",
+      ".anfc-nums b{display:block;font-size:20px;font-weight:750;color:var(--ink);letter-spacing:-.02em;}",
+      ".anfc-nums .anfc-num-sub{font-size:13px;color:var(--faint);}",
 
-      /* the progress track (100% = weather-expected) */
-      ".anfc-track{position:relative;height:12px;border-radius:8px;background:var(--bg2);overflow:hidden;margin:16px 0 6px;}",
-      ".anfc-fill{height:100%;border-radius:8px;background:var(--good);transition:width .5s ease;}",
-      ".anfc-fill.warn{background:var(--bad);} .anfc-fill.soft{background:var(--warn);}",
-      ".anfc-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.35;}",
-
-      ".anfc-verdict{font-size:13.5px;font-weight:640;color:var(--muted);margin-top:4px;}",
+      /* progress */
+      ".anfc-track{position:relative;height:10px;border-radius:999px;background:rgba(14,20,32,.06);overflow:hidden;margin:18px 0 10px;}",
+      ".anfc-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--good2,#60a5fa),var(--good));transition:width .55s cubic-bezier(.2,.8,.2,1);}",
+      ".anfc-fill.warn{background:linear-gradient(90deg,#fca5a5,var(--bad));}",
+      ".anfc-fill.soft{background:linear-gradient(90deg,#fcd34d,var(--warn));}",
+      ".anfc-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.28;border-radius:1px;}",
+      ".anfc-verdict{font-size:14px;font-weight:650;color:var(--muted);margin:0;}",
       ".anfc-verdict.warn{color:var(--bad);} .anfc-verdict.ok{color:var(--good);}",
 
-      /* window + actuals explainer (Ford: clearer window + how actuals are collected) */
-      ".anfc-explain{margin-top:15px;border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:13px 15px;}",
-      ".anfc-explain-win{font-size:12px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:var(--good);margin-bottom:9px;}",
-      ".anfc-explain-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;}",
-      ".anfc-ex{min-width:0;}",
-      ".anfc-ex .k{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);margin-bottom:3px;}",
-      ".anfc-ex .v{font-size:12.5px;color:var(--muted);line-height:1.5;}",
-      ".anfc-ex .v b{color:var(--ink);font-weight:660;}",
-      "@media (max-width:620px){.anfc-explain-grid{grid-template-columns:1fr;}}",
-
-      /* clearest-recent-day spotlight */
-      ".anfc-spot{margin-top:13px;font-size:12.5px;color:var(--muted);line-height:1.55;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.16);border-radius:10px;padding:10px 12px;}",
+      /* spotlight chip */
+      ".anfc-spot{margin-top:16px;font-size:13px;color:var(--muted);line-height:1.5;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.14);border-radius:12px;padding:11px 14px;}",
       ".anfc-spot b{color:var(--ink);} .anfc-spot .good{color:var(--good);} .anfc-spot .bad{color:var(--bad);}",
-      ".anfc-spot-ic{margin-right:5px;}",
 
-      /* "How we calculated this" toggle + panel */
-      ".anfc-note{font-size:12.5px;color:var(--muted);margin-top:13px;line-height:1.55;}",
-      ".anfc-note b{color:var(--ink);}",
-      ".anfc-toggle{margin-left:6px;border:0;background:none;color:var(--good);font:inherit;font-size:12.5px;font-weight:660;cursor:pointer;padding:0;text-decoration:underline;}",
-      ".anfc-how{margin-top:13px;border-top:1px solid var(--line);padding-top:13px;}",
-      ".anfc-how-eq{font-size:12px;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-variant-numeric:tabular-nums;}",
-      ".anfc-how-dl{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;margin:12px 0 0;font-size:12.5px;}",
-      ".anfc-how-dl dt{font-weight:700;color:var(--faint);text-transform:uppercase;font-size:11px;letter-spacing:.03em;padding-top:2px;}",
+      ".anfc-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}",
+      ".anfc-chip{font-size:11.5px;font-weight:650;color:var(--muted);background:rgba(14,20,32,.04);border:1px solid rgba(14,20,32,.06);border-radius:999px;padding:5px 11px;}",
+      ".anfc-chip b{color:var(--ink);font-weight:720;}",
+
+      /* ── model panel ── */
+      ".anfc-model{margin-top:22px;border-radius:16px;background:linear-gradient(165deg,rgba(255,255,255,.92),rgba(247,251,255,.88));border:1px solid rgba(14,20,32,.07);box-shadow:0 8px 28px -18px rgba(20,60,120,.22);overflow:hidden;}",
+      ".anfc-model-sum{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 18px;cursor:pointer;user-select:none;}",
+      ".anfc-model-sum:hover{background:rgba(37,99,235,.03);}",
+      ".anfc-model-sum-l{display:flex;flex-direction:column;gap:3px;min-width:0;}",
+      ".anfc-model-h{font-size:12px;font-weight:780;letter-spacing:.06em;text-transform:uppercase;color:var(--good);margin:0;}",
+      ".anfc-model-sub{font-size:12.5px;color:var(--muted);margin:0;line-height:1.4;}",
+      ".anfc-model-sub b{color:var(--ink);font-weight:650;}",
+      ".anfc-model-sum-r{display:flex;align-items:center;gap:10px;flex-shrink:0;}",
+      ".anfc-pill{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:999px;background:rgba(14,20,32,.05);color:var(--muted);}",
+      ".anfc-pill.warn{background:rgba(217,119,6,.1);color:var(--warn,#b45309);}",
+      ".anfc-pill.ok{background:rgba(37,99,235,.08);color:var(--good);}",
+      ".anfc-chev{font-size:12px;color:var(--faint);transition:transform .15s;}",
+      ".anfc-model.is-open .anfc-chev{transform:rotate(180deg);}",
+
+      ".anfc-model-body{padding:0 18px 16px;border-top:1px solid rgba(14,20,32,.06);}",
+      ".anfc-model-intro{font-size:12.5px;color:var(--muted);margin:12px 0 12px;line-height:1.45;}",
+      ".anfc-model-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px;}",
+      ".anfc-fld{display:flex;flex-direction:column;gap:5px;min-width:0;}",
+      ".anfc-fld label{font-size:10.5px;font-weight:720;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);}",
+      ".anfc-fld input,.anfc-fld select,.anfc-row input,.anfc-row select{box-sizing:border-box;font:inherit;font-size:13px;font-weight:600;padding:9px 11px;border-radius:10px;border:1px solid rgba(14,20,32,.1);background:rgba(255,255,255,.95);color:var(--ink);transition:border-color .12s,box-shadow .12s;}",
+      ".anfc-fld input:focus,.anfc-fld select:focus,.anfc-row input:focus,.anfc-row select:focus{outline:none;border-color:rgba(37,99,235,.5);box-shadow:0 0 0 3px rgba(37,99,235,.12);}",
+      ".anfc-fld-win{width:160px;}",
+
+      /* per-array table */
+      ".anfc-list{display:flex;flex-direction:column;gap:0;border:1px solid rgba(14,20,32,.07);border-radius:12px;overflow:hidden;background:#fff;}",
+      ".anfc-list-head,.anfc-row{display:grid;grid-template-columns:minmax(120px,1.3fr) minmax(140px,1.6fr) 72px 110px 72px;gap:10px;align-items:center;padding:10px 12px;}",
+      "@media (max-width:820px){.anfc-list-head{display:none;}.anfc-row{grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-bottom:1px solid rgba(14,20,32,.06);}.anfc-row .anfc-site{grid-column:1/-1;}.anfc-row .anfc-addr{grid-column:1/-1;}}",
+      ".anfc-list-head{background:rgba(14,20,32,.03);font-size:10px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid rgba(14,20,32,.06);}",
+      ".anfc-row{border-bottom:1px solid rgba(14,20,32,.05);}",
+      ".anfc-row:last-child{border-bottom:0;}",
+      ".anfc-row.needs{background:rgba(217,119,6,.04);}",
+      ".anfc-row input,.anfc-row select{width:100%;}",
+      ".anfc-site{min-width:0;}",
+      ".anfc-site-name{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".anfc-site-meta{font-size:11px;color:var(--faint);margin-top:2px;}",
+      ".anfc-site-meta .need{color:var(--warn,#b45309);font-weight:700;}",
+      ".anfc-site-meta .ok{color:var(--good);}",
+      ".anfc-assumed{font-size:10px;font-weight:700;color:var(--faint);letter-spacing:.02em;}",
+
+      ".anfc-edit-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;}",
+      ".anfc-btn{font:inherit;font-size:13px;font-weight:740;padding:10px 18px;border-radius:11px;border:0;cursor:pointer;background:linear-gradient(180deg,var(--good2,#60a5fa),var(--good));color:#fff;box-shadow:0 6px 16px -8px rgba(37,99,235,.55);}",
+      ".anfc-btn:hover{filter:brightness(1.04);}",
+      ".anfc-btn:disabled{opacity:.55;cursor:default;filter:none;}",
+      ".anfc-btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(14,20,32,.1);box-shadow:none;}",
+      ".anfc-btn-ghost:hover{color:var(--ink);border-color:rgba(14,20,32,.18);}",
+      ".anfc-edit-stat{font-size:12.5px;color:var(--muted);}",
+      ".anfc-edit-stat.ok{color:var(--good);font-weight:650;} .anfc-edit-stat.err{color:var(--bad);font-weight:650;}",
+
+      /* quiet details */
+      ".anfc-details{margin-top:16px;}",
+      ".anfc-toggle{border:0;background:none;color:var(--good);font:inherit;font-size:13px;font-weight:680;cursor:pointer;padding:0;}",
+      ".anfc-toggle:hover{text-decoration:underline;}",
+      ".anfc-how{margin-top:12px;padding-top:14px;border-top:1px solid rgba(14,20,32,.07);}",
+      ".anfc-how-eq{font-size:12.5px;color:var(--ink);background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.12);border-radius:10px;padding:11px 14px;font-variant-numeric:tabular-nums;letter-spacing:.01em;}",
+      ".anfc-how-dl{display:grid;grid-template-columns:auto 1fr;gap:9px 18px;margin:14px 0 0;font-size:13px;}",
+      ".anfc-how-dl dt{font-weight:720;color:var(--faint);text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;padding-top:3px;}",
       ".anfc-how-dl dd{margin:0;color:var(--muted);line-height:1.5;}",
       ".anfc-how-dl dd b{color:var(--ink);} .anfc-how-dl dd em{color:var(--faint);font-style:italic;}",
-      ".anfc-how-foot{font-size:12px;color:var(--faint);margin-top:12px;line-height:1.55;}",
+      ".anfc-how-foot{font-size:12px;color:var(--faint);margin-top:14px;line-height:1.55;}",
       ".anfc-how-foot b{color:var(--muted);}",
 
-      /* honest empty state (no forecast) */
-      ".anfc-empty{display:flex;gap:13px;align-items:flex-start;padding:4px 0;}",
-      ".anfc-empty-ic{flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--faint);}",
-      ".anfc-empty-tx b{display:block;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:3px;}",
-      ".anfc-empty-tx span{font-size:12.5px;color:var(--muted);line-height:1.5;}"
+      /* empty */
+      ".anfc-empty{display:flex;gap:14px;align-items:flex-start;padding:8px 0;}",
+      ".anfc-empty-ic{flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--faint);}",
+      ".anfc-empty-tx b{display:block;font-size:15px;font-weight:720;color:var(--ink);margin-bottom:4px;letter-spacing:-.01em;}",
+      ".anfc-empty-tx span{font-size:13px;color:var(--muted);line-height:1.5;}"
     ].join("");
     document.head.appendChild(s);
   }
 
-  // The transparent "How we calculated this" panel — every model input, named.
-  // Ported verbatim from command-center.js forecastHowHTML (window copy = 10 days).
-  function howHTML(f, ctx) {
+  function summaryLine(arrays) {
+    var n = arrays.length;
+    var needLoc = arrays.filter(function (a) { return a.needs_location || !a.has_location; }).length;
+    var assumed = arrays.filter(function (a) { return a.tilt_assumed || a.azimuth_assumed || a.pr_assumed; }).length;
+    if (needLoc) {
+      return "<b>" + needLoc + "</b> site" + (needLoc === 1 ? "" : "s") + " need an address · " + n + " total";
+    }
+    if (assumed === n && n > 0) {
+      return "<b>" + n + "</b> site" + (n === 1 ? "" : "s") + " · using default tilt / facing / losses";
+    }
+    if (assumed > 0) {
+      return "<b>" + n + "</b> site" + (n === 1 ? "" : "s") + " · " + assumed + " still on defaults";
+    }
+    return "<b>" + n + "</b> site" + (n === 1 ? "" : "s") + " configured";
+  }
+
+  function modelHTML(f, ctx) {
+    var esc = ctx.esc;
+    var arrays = modelableArrays(f);
+    var open = isModelOpen(arrays);
+    var need = needsSetup(arrays);
+    var curWin = windowDays(f, ctx);
+    var winOpts = [7, 10, 14, 21, 30].map(function (d) {
+      return '<option value="' + d + '"' + (Number(curWin) === d ? " selected" : "") + ">Last " + d + " days</option>";
+    }).join("");
+
+    var pill = need
+      ? '<span class="anfc-pill warn">needs address</span>'
+      : '<span class="anfc-pill ok">' + arrays.length + " sites</span>";
+
+    var sum =
+      '<div class="anfc-model-sum" data-anfc-sum role="button" tabindex="0" aria-expanded="' + open + '">' +
+      '<div class="anfc-model-sum-l">' +
+      '<div class="anfc-model-h">Model</div>' +
+      '<p class="anfc-model-sub">' + summaryLine(arrays) + "</p>" +
+      "</div>" +
+      '<div class="anfc-model-sum-r">' + pill +
+      '<span class="anfc-chev" aria-hidden="true">▾</span>' +
+      "</div></div>";
+
+    if (!open) {
+      return '<div class="anfc-model" id="anfcEdit">' + sum + "</div>";
+    }
+
+    var head =
+      '<div class="anfc-list-head">' +
+      "<div>Array</div><div>Address</div><div>Tilt °</div><div>Facing</div><div>PR %</div>" +
+      "</div>";
+
+    var rows = arrays.map(function (a) {
+      var prPct = Math.round((a.performance_ratio != null ? a.performance_ratio : 0.84) * 100);
+      var tiltVal = a.tilt_deg != null && a.tilt_deg !== "" ? a.tilt_deg : "";
+      var azOpts = AZ_OPTIONS.map(function (o) {
+        return '<option value="' + o.v + '"' + (Number(a.azimuth_deg) === o.v ? " selected" : "") + ">" + o.lab + "</option>";
+      }).join("");
+      var meta = a.needs_location || !a.has_location
+        ? '<span class="need">add address to model weather</span>'
+        : (a.nameplate_kw != null
+          ? (a.nameplate_kw + " kW") +
+            (a.tilt_assumed || a.azimuth_assumed || a.pr_assumed
+              ? ' · <span class="assumed">defaults</span>'
+              : (a.ratio_pct != null ? " · " + a.ratio_pct + "% of expected" : ""))
+          : "");
+      return '<div class="anfc-row' + (a.needs_location || !a.has_location ? " needs" : "") + '" data-aid="' + esc(String(a.array_id)) + '" data-orig-addr="' + esc(a.address) + '">' +
+        '<div class="anfc-site"><div class="anfc-site-name" title="' + esc(a.array_name) + '">' + esc(a.array_name) + "</div>" +
+        '<div class="anfc-site-meta">' + meta + "</div></div>" +
+        '<div class="anfc-addr"><input type="text" data-f="addr" placeholder="Town, state or street" value="' + esc(a.address) + '" autocomplete="street-address"></div>' +
+        '<div><input type="number" data-f="tilt" min="0" max="90" step="0.5" value="' + esc(String(tiltVal)) + '" placeholder="lat" title="Panel tilt in degrees from horizontal"></div>' +
+        '<div><select data-f="az">' + azOpts + "</select></div>" +
+        '<div><input type="number" data-f="pr" min="50" max="100" step="1" value="' + prPct + '" title="Performance ratio — losses from DC nameplate to AC"></div>' +
+        "</div>";
+    }).join("");
+
+    if (!rows) {
+      rows = '<div style="padding:16px;font-size:13px;color:var(--muted)">No arrays with inverter data yet — connect a vendor portal first.</div>';
+    }
+
+    var body =
+      '<div class="anfc-model-body">' +
+      '<p class="anfc-model-intro">Set each array’s angle, facing, losses, and site address. Address is only re-geocoded when you change it.</p>' +
+      '<div class="anfc-model-tools">' +
+      '<div class="anfc-fld anfc-fld-win"><label for="anfcWin">Comparison window</label>' +
+      '<select id="anfcWin">' + winOpts + "</select></div>" +
+      "</div>" +
+      '<div class="anfc-list">' + head + rows + "</div>" +
+      '<div class="anfc-edit-actions">' +
+      '<button type="button" class="anfc-btn" id="anfcApply">Save &amp; recalculate</button>' +
+      '<button type="button" class="anfc-btn anfc-btn-ghost" id="anfcDone">Done</button>' +
+      '<span class="anfc-edit-stat" id="anfcStat"></span>' +
+      "</div></div>";
+
+    return '<div class="anfc-model is-open" id="anfcEdit">' + sum + body + "</div>";
+  }
+
+  function detailsHTML(f, ctx) {
     var esc = ctx.esc;
     var i = f.inputs || {};
     var loc = i.location || {}, g = i.geometry || {}, ir = i.irradiance || {};
     var srcName = ({ census: "street address (rooftop)", nominatim: "street address (OpenStreetMap)",
-      "open-meteo": "town centroid (approximate)", manual: "operator-set" })[loc.geocode_source] || loc.geocode_source || "—";
+      "open-meteo": "town centroid", manual: "operator-set" })[loc.geocode_source] || loc.geocode_source || "—";
+    var prAssumed = i.performance_ratio_assumed;
+    if (prAssumed == null && i.performance_ratio != null)
+      prAssumed = Math.abs(Number(i.performance_ratio) - 0.84) < 1e-9;
     var tiltTxt = g.tilt_deg != null
-      ? (g.tilt_deg + "° tilt" + (g.tilt_assumed ? " <em>(assumed = your latitude — the usual fixed-tilt optimum)</em>" : " (you set this)"))
+      ? (g.tilt_deg + "° tilt" + (g.tilt_assumed ? " <em>(assumed ≈ latitude)</em>" : " <em>(you set)</em>"))
       : "—";
     var azTxt = g.azimuth_deg != null
-      ? ("facing " + esc(g.azimuth_label || "south") + (g.azimuth_assumed ? " <em>(assumed south)</em>" : " (you set this)"))
+      ? ("facing " + esc(g.azimuth_label || "south") + (g.azimuth_assumed ? " <em>(assumed)</em>" : " <em>(you set)</em>"))
       : "—";
     var win = windowDays(f, ctx);
+    var prPct = i.performance_ratio != null ? Math.round(i.performance_ratio * 100) : 84;
+    var addrShow = cleanAddress(loc.address) || "—";
     var rows = [
-      ["Where", esc(loc.address || "—") + " — " + esc(srcName) + " → " + (loc.lat != null ? (loc.lat + ", " + loc.lng) : "—")],
-      ["Sunlight", esc(ir.source || "Open-Meteo") + " for " + esc(ir.window_start || "") + "–" + esc(ir.window_end || "") + ". Best day this window: <b>" + (ir.best_day_poa_kwh_m2 != null ? ir.best_day_poa_kwh_m2 : "—") + " kWh/m²</b> of plane-of-array sun (vs " + (ir.stc_reference_kwh_m2 || 1) + " kWh/m² at lab \"standard\" conditions)."],
+      ["Where", esc(addrShow) + " · " + esc(srcName) + (loc.lat != null ? " → " + loc.lat + ", " + loc.lng : "")],
+      ["Sunlight", esc(ir.source || "Open-Meteo") + " · " + esc(ir.window_start || "") + "–" + esc(ir.window_end || "") +
+        ". Best day: <b>" + (ir.best_day_poa_kwh_m2 != null ? ir.best_day_poa_kwh_m2 : "—") + " kWh/m²</b> POA. <em>Real weather — not editable.</em>"],
       ["Panel angle", tiltTxt + ", " + azTxt],
-      ["Capacity", "<b>" + (i.nameplate_kw != null ? i.nameplate_kw : "—") + " kW</b> nameplate (sum of this fleet's inverters)"],
-      ["Losses", "Performance ratio <b>" + (i.performance_ratio != null ? Math.round(i.performance_ratio * 100) + "%" : "—") + "</b> — the standard derate from panel nameplate to delivered AC power (inverter efficiency, wiring, heat, soiling, mismatch)."],
-      ["Measured", "Actual = real metered/inverter kWh only. We <b>exclude</b> monthly utility-bill estimates so a bill can't masquerade as one big day. " + (i.measured_days != null ? i.measured_days : "0") + " measured day(s) in the " + win + "-day window."]
+      ["Capacity", "<b>" + (i.nameplate_kw != null ? i.nameplate_kw : "—") + " kW</b> nameplate from inverters"],
+      ["Losses", "PR <b>" + prPct + "%</b>" + (prAssumed ? " <em>(default)</em>" : " <em>(custom)</em>") +
+        " — inverter, wiring, heat, soiling, mismatch"],
+      ["Measured", "Inverter/metered kWh only (utility-bill estimates excluded). " +
+        (i.measured_days != null ? i.measured_days : "0") + " day(s) in the " + win + "-day window."]
     ];
-    var dl = rows.map(function (kv) { return "<dt>" + esc(kv[0]) + "</dt><dd>" + kv[1] + "</dd>"; }).join("");
+    var dl = rows.map(function (kv) {
+      return "<dt>" + esc(kv[0]) + "</dt><dd>" + kv[1] + "</dd>";
+    }).join("");
     return '<div class="anfc-how">' +
-      '<div class="anfc-how-eq">expected kWh  =  nameplate kW  ×  (sunlight ÷ standard 1 kW/m²)  ×  performance ratio</div>' +
-      '<dl class="anfc-how-dl">' + dl + '</dl>' +
-      '<div class="anfc-how-foot">This is a <b>weather-adjusted expected value</b>, not a guarantee — a cloudy stretch runs under, a clear one over. It uses the real sun that fell on your location, so it catches a whole-fleet dip (soiling, snow, smoke, aging) that per-neighbor checks miss. ' +
-      (f.arrays_skipped ? (f.arrays_skipped + " array(s) not yet modeled (no address or capacity on file).") : "") + '</div>' +
-      '</div>';
+      '<div class="anfc-how-eq">expected kWh  =  nameplate kW  ×  (sunlight ÷ 1 kW/m² STC)  ×  performance ratio</div>' +
+      '<dl class="anfc-how-dl">' + dl + "</dl>" +
+      '<div class="anfc-how-foot">A weather-adjusted expected — cloudy stretches run under, clear ones over. Real sun on each site catches whole-fleet dips (soiling, snow, smoke) that peer checks miss. ' +
+      (f.arrays_skipped ? (f.arrays_skipped + " array(s) not yet modeled.") : "") +
+      "</div></div>";
   }
 
-  // The clearer window + actuals explanation Ford asked for — explicit + honest.
-  function explainHTML(f, ctx) {
-    var win = windowDays(f, ctx);
-    var modeled = num(f.arrays_modeled);
-    var actualsSrc = (f.simulated
-      ? "simulated demo telemetry"
-      : "the arrays' inverter telemetry (real metered production; monthly utility-bill estimates are excluded)");
-    return '<div class="anfc-explain">' +
-      '<div class="anfc-explain-win">Window · last ' + win + ' days</div>' +
-      '<div class="anfc-explain-grid">' +
-      '<div class="anfc-ex"><div class="k">Actuals — measured</div><div class="v">Real production summed from <b>' + actualsSrc + '</b> over the last <b>' + win + ' days</b>' + (modeled != null ? ', across <b>' + modeled + ' modeled array' + (modeled === 1 ? '' : 's') + '</b>' : '') + '.</div></div>' +
-      '<div class="anfc-ex"><div class="k">Expected — weather-adjusted</div><div class="v">The <b>real irradiance (sunlight)</b> that actually fell on each array\'s location over the <b>same ' + win + ' days</b>, converted to expected AC kWh (not a seasonal average).</div></div>' +
-      '</div></div>';
+  function readRow(el) {
+    var addrEl = el.querySelector('[data-f="addr"]');
+    var tiltEl = el.querySelector('[data-f="tilt"]');
+    var azEl = el.querySelector('[data-f="az"]');
+    var prEl = el.querySelector('[data-f="pr"]');
+    var addr = cleanAddress(addrEl ? addrEl.value : "");
+    var orig = cleanAddress(el.getAttribute("data-orig-addr") || "");
+    var tiltRaw = tiltEl && tiltEl.value.trim() !== "" ? Number(tiltEl.value) : null;
+    var az = azEl ? Number(azEl.value) : 0;
+    var prPct = prEl ? Number(prEl.value) : 84;
+    return {
+      array_id: Number(el.getAttribute("data-aid")),
+      address: addr,
+      address_changed: addr !== "" && addr.toLowerCase() !== orig.toLowerCase(),
+      needs_address: !orig && !addr,
+      had_address: !!orig,
+      tilt_deg: tiltRaw,
+      azimuth_deg: az,
+      pr_pct: prPct,
+      performance_ratio: Math.round(prPct) / 100
+    };
   }
 
-  // honest empty state — the card has no meaning without the weather model
+  function wireModel(container, f, ctx) {
+    var root = container.querySelector("#anfcEdit");
+    if (!root) return;
+
+    var sum = root.querySelector("[data-anfc-sum]");
+    if (sum) {
+      var toggle = function (e) {
+        if (e && e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+        if (e && e.type === "keydown") e.preventDefault();
+        // Don't collapse while dirty without saving — just flip state.
+        _modelOpen = !isModelOpen(modelableArrays(f));
+        render(container, ctx);
+      };
+      sum.addEventListener("click", toggle);
+      sum.addEventListener("keydown", toggle);
+    }
+
+    var stat = root.querySelector("#anfcStat");
+    function setStat(msg, cls) {
+      if (!stat) return;
+      stat.className = "anfc-edit-stat" + (cls ? " " + cls : "");
+      stat.textContent = msg || "";
+    }
+
+    // Mark dirty on any field change so Done can warn.
+    root.querySelectorAll(".anfc-row input, .anfc-row select").forEach(function (inp) {
+      inp.addEventListener("input", function () { _dirty = true; });
+      inp.addEventListener("change", function () { _dirty = true; });
+    });
+
+    var done = root.querySelector("#anfcDone");
+    if (done) done.addEventListener("click", function () {
+      if (_dirty) {
+        setStat("Save first, or your edits won’t apply.", "err");
+        return;
+      }
+      _modelOpen = false;
+      render(container, ctx);
+    });
+
+    var apply = root.querySelector("#anfcApply");
+    if (!apply) return;
+
+    apply.addEventListener("click", function () {
+      var rows = [].slice.call(root.querySelectorAll(".anfc-row[data-aid]"));
+      if (!rows.length) { setStat("No arrays to save.", "err"); return; }
+
+      var parsed = rows.map(readRow);
+      for (var i = 0; i < parsed.length; i++) {
+        var p = parsed[i];
+        if (p.tilt_deg != null && (isNaN(p.tilt_deg) || p.tilt_deg < 0 || p.tilt_deg > 90)) {
+          setStat("Tilt must be 0–90°.", "err"); return;
+        }
+        if (isNaN(p.pr_pct) || p.pr_pct < 50 || p.pr_pct > 100) {
+          setStat("PR must be 50–100%.", "err"); return;
+        }
+        if (p.needs_address || (!p.had_address && !p.address && p.address_changed === false)) {
+          // Allow geometry-only save when already located; require address only when never set.
+        }
+      }
+
+      var winEl = root.querySelector("#anfcWin");
+      var win = winEl ? Number(winEl.value) : 10;
+      if (typeof window.__aoSetForecastWindow === "function" &&
+          typeof window.__aoGetForecastWindow === "function" &&
+          win !== window.__aoGetForecastWindow()) {
+        window.__aoSetForecastWindow(win);
+      }
+
+      setStat("Saving…");
+      apply.disabled = true;
+
+      // Sequential saves: location first (if changed), then geometry+PR per array.
+      var chain = Promise.resolve({ nLoc: 0, nGeo: 0, errors: [] });
+      parsed.forEach(function (p) {
+        chain = chain.then(function (acc) {
+          var step = Promise.resolve();
+          if (p.address_changed) {
+            if (!window.__aoSetArrayLocation) {
+              acc.errors.push("Location edit unavailable");
+              return acc;
+            }
+            step = step.then(function () {
+              return window.__aoSetArrayLocation(p.array_id, { place: p.address })
+                .then(function () { acc.nLoc++; })
+                .catch(function (e) {
+                  acc.errors.push((e && e.message) || ("Address failed for array " + p.array_id));
+                });
+            });
+          } else if (!p.had_address && p.address) {
+            // New address on a previously empty field.
+            if (window.__aoSetArrayLocation) {
+              step = step.then(function () {
+                return window.__aoSetArrayLocation(p.array_id, { place: p.address })
+                  .then(function () { acc.nLoc++; })
+                  .catch(function (e) {
+                    acc.errors.push((e && e.message) || ("Address failed for array " + p.array_id));
+                  });
+              });
+            }
+          }
+          return step.then(function () {
+            if (!window.__aoSetArrayGeometry) {
+              acc.errors.push("Geometry edit unavailable");
+              return acc;
+            }
+            return window.__aoSetArrayGeometry(p.array_id, {
+              tilt_deg: p.tilt_deg,
+              azimuth_deg: p.azimuth_deg,
+              performance_ratio: p.performance_ratio
+            }).then(function () {
+              acc.nGeo++;
+              return acc;
+            }).catch(function (e) {
+              acc.errors.push((e && e.message) || ("Couldn't save array " + p.array_id));
+              return acc;
+            });
+          });
+        });
+      });
+
+      chain.then(function (acc) {
+        apply.disabled = false;
+        if (acc.errors.length) {
+          setStat(acc.errors[0] + (acc.errors.length > 1 ? " (+" + (acc.errors.length - 1) + " more)" : ""), "err");
+          _dirty = true;
+          return;
+        }
+        _dirty = false;
+        var parts = [];
+        if (acc.nGeo) parts.push(acc.nGeo + " array" + (acc.nGeo === 1 ? "" : "s"));
+        if (acc.nLoc) parts.push(acc.nLoc + " address" + (acc.nLoc === 1 ? "" : "es"));
+        setStat("Saved " + (parts.join(" · ") || "changes") + " · recalculating…", "ok");
+        // Collapse once everything that needs an address has one.
+        var stillNeed = parsed.some(function (p) {
+          return !p.had_address && !p.address && !p.address_changed;
+        });
+        // Prefer collapse after a clean save when no sites still lack an address.
+        if (!stillNeed && !needsSetup(modelableArrays(f).map(function (a) {
+          // Re-check from form state: if every row has an address now, collapse.
+          return a;
+        }))) {
+          /* fall through */
+        }
+        // After a successful save of a fully-addressed fleet, collapse the panel.
+        var allHaveAddr = parsed.every(function (p) {
+          return p.had_address || p.address || p.address_changed;
+        });
+        if (allHaveAddr) {
+          _modelOpen = false;
+        }
+        // Forecast reload is triggered by the save helpers; a re-render follows.
+      }).catch(function (e) {
+        setStat((e && e.message) || "Couldn't save.", "err");
+        apply.disabled = false;
+      });
+    });
+  }
+
   function emptyHTML(ctx) {
     var esc = ctx.esc;
     return '<div class="anfc-empty">' +
       '<div class="anfc-empty-ic">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>' +
       '</div><div class="anfc-empty-tx">' +
-      '<b>Production vs expected needs your weather-modeled data</b>' +
-      '<span>' + (ctx.simulated
-        ? 'The live demo fleet has no weather model. Sign in with real arrays (with a service address on file) to compare measured production against the real sunlight on each site.'
-        : 'Available once production has loaded for a few days and your arrays have a location on file — we compare measured output against the weather-expected output for each site over the last 10 days.') +
-      '</span></div></div>';
+      "<b>Waiting on weather-modeled data</b>" +
+      "<span>" + (ctx.simulated
+        ? "Sign in with real arrays (and a service address) to compare measured production to the sunlight on each site."
+        : "Once a few days of production land and arrays have locations, we compare measured output to weather-expected output.") +
+      "</span></div></div>";
   }
 
-  // ---- render (idempotent) ----------------------------------------------------
   function render(container, ctx) {
     injectCss();
     var esc = ctx.esc;
     var f = ctx.forecast;
-
     var body;
+
     if (!f || !f.available || num(f.ratio_pct) == null) {
-      // No usable forecast → honest empty state (never a fabricated expected value).
-      body = emptyHTML(ctx);
+      // Still show the model editor when we have skipped no_location arrays —
+      // that's exactly when the operator needs to fill addresses.
+      var arraysEmpty = f ? modelableArrays(f) : [];
+      if (arraysEmpty.length && ctx.signedIn !== false) {
+        body =
+          '<div class="anfc-kicker"><i></i>Weather-adjusted</div>' +
+          '<h2 class="anfc-title">Production vs expected</h2>' +
+          '<p class="anfc-lede">Add each site’s address and angles below so we can compare measured production to the real sunlight on the roof.</p>' +
+          modelHTML(f || { rows: [], skipped: arraysEmpty }, ctx);
+      } else {
+        body = emptyHTML(ctx);
+      }
     } else {
       var pct = num(f.ratio_pct);
       var fill = Math.max(0, Math.min(pct, 120));
       var tone = pct < 82 ? "warn" : (pct >= 92 ? "ok" : "soft");
       var verdict = pct < 82
-        ? ((100 - pct) + "% under the sunlight-expected output")
-        : (pct >= 100 ? "at or above what the actual weather should yield" : "tracking near the sunlight-expected output");
+        ? ((100 - pct) + "% under what the sunlight should yield")
+        : (pct >= 100 ? "at or above what the weather should yield" : "tracking near weather-expected output");
       var spot = f.sunny_spotlight;
       var spotLine = (spot && num(spot.ratio_pct) != null)
-        ? '<div class="anfc-spot"><span class="anfc-spot-ic">☀</span> Clearest recent day (' + esc(spot.day) + ', ' + spot.poa_kwh_m2 + ' kWh/m² sun): <b>' + esc(spot.array_name) + '</b> made <b>' + Math.round(spot.actual_kwh).toLocaleString() + ' kWh</b> vs ' + Math.round(spot.expected_kwh).toLocaleString() + ' expected — <b class="' + (spot.ratio_pct >= 92 ? 'good' : spot.ratio_pct < 82 ? 'bad' : '') + '">' + spot.ratio_pct + '%</b>.</div>'
+        ? '<div class="anfc-spot">☀ Clearest day (' + esc(spot.day) + ", " + spot.poa_kwh_m2 + " kWh/m²): <b>" +
+          esc(spot.array_name) + "</b> made <b>" + Math.round(spot.actual_kwh).toLocaleString() +
+          " kWh</b> vs " + Math.round(spot.expected_kwh).toLocaleString() + ' expected — <b class="' +
+          (spot.ratio_pct >= 92 ? "good" : spot.ratio_pct < 82 ? "bad" : "") + '">' + spot.ratio_pct + "%</b></div>"
         : "";
-      var conf = esc(CONF_LABEL[f.confidence] || f.confidence || "");
+      var conf = CONF_LABEL[f.confidence] || f.confidence || "";
       var modeled = num(f.arrays_modeled);
-      // honesty footnote: arrays whose "expected" is an operator-entered kWh/kW
-      // target (set in the kWh/kW health card above), not the weather model.
+      var win = windowDays(f, ctx);
       var ratioBased = num(f.arrays_ratio_based);
-      var ratioNote = (ratioBased > 0)
-        ? ' ' + ratioBased + ' array' + (ratioBased === 1 ? ' uses' : 's use') + ' your entered kWh/kW target as its expected.'
-        : '';
+
+      var chips = '<div class="anfc-meta">' +
+        '<span class="anfc-chip"><b>' + win + "d</b> window</span>" +
+        (modeled != null ? '<span class="anfc-chip"><b>' + modeled + "</b> sites modeled</span>" : "") +
+        (conf ? '<span class="anfc-chip">' + esc(conf) + "</span>" : "") +
+        (ratioBased > 0 ? '<span class="anfc-chip"><b>' + ratioBased + "</b> on your kWh/kW target</span>" : "") +
+        "</div>";
 
       body =
-        '<div class="anfc-head">' +
-        '  <div class="anfc-pct">' + pct + '<span>%</span><small>of weather-expected</small></div>' +
-        '  <div class="anfc-nums"><b>' + Math.round(f.actual_kwh).toLocaleString() + ' kWh</b> made<br>' + Math.round(f.expected_kwh).toLocaleString() + ' kWh expected</div>' +
-        '</div>' +
-        '<div class="anfc-track" role="img" aria-label="Fleet made ' + pct + '% of its weather-expected output">' +
-        // fill is clamped 0-120 (a fleet CAN beat weather-expected); the track is a
-        // 0-100% CSS width, so fill/tick must share the same /120 normalization or
-        // exactly-100% overshoots its own "100%" tick — a fleet dead on target reads
-        // as visibly over-performing. Matches the sibling Sites-grid bar's math.
+        '<div class="anfc-kicker"><i></i>Weather-adjusted</div>' +
+        '<h2 class="anfc-title">Production vs expected</h2>' +
+        '<p class="anfc-lede">What your fleet made against the <b>real sunlight</b> that fell on each site — not a seasonal average.</p>' +
+        '<div class="anfc-verdict-row">' +
+        '  <div><div class="anfc-pct">' + pct + '<span>%</span><span class="anfc-pct-lab">of weather-expected</span></div></div>' +
+        '  <div class="anfc-nums"><b>' + Math.round(f.actual_kwh).toLocaleString() + " kWh</b> made" +
+        '    <span class="anfc-num-sub">' + Math.round(f.expected_kwh).toLocaleString() + " kWh expected</span></div>" +
+        "</div>" +
+        '<div class="anfc-track" role="img" aria-label="Fleet made ' + pct + '% of weather-expected">' +
         '  <div class="anfc-fill ' + tone + '" style="width:' + (fill / 1.2).toFixed(1) + '%"></div>' +
-        '  <span class="anfc-mark" style="left:' + (100 / 1.2).toFixed(1) + '%" title="100% = the actual weather\'s expected output"></span>' +
-        '</div>' +
-        '<div class="anfc-verdict ' + tone + '">' + (pct < 82 ? "⚠ " : "") + esc(verdict) + '</div>' +
-        explainHTML(f, ctx) +
+        '  <span class="anfc-mark" style="left:' + (100 / 1.2).toFixed(1) + '%" title="100% = weather-expected"></span>' +
+        "</div>" +
+        '<p class="anfc-verdict ' + tone + '">' + (pct < 82 ? "⚠ " : "") + esc(verdict) + "</p>" +
         spotLine +
-        '<div class="anfc-note">Expected = the <b>real sunlight</b> that fell on your arrays\' locations, not a seasonal average — ' + conf + (modeled != null ? ' (' + modeled + ' array' + (modeled === 1 ? '' : 's') + ' modeled)' : '') + '.' + esc(ratioNote) +
-        '<button type="button" class="anfc-toggle" data-anfc-toggle aria-expanded="' + _open + '">' + (_open ? "Hide" : "How we calculated this") + '</button></div>' +
-        (_open ? howHTML(f, ctx) : "");
+        chips +
+        modelHTML(f, ctx) +
+        '<div class="anfc-details">' +
+        '<button type="button" class="anfc-toggle" data-anfc-toggle aria-expanded="' + _howOpen + '">' +
+        (_howOpen ? "Hide how the number is built" : "How the number is built") + "</button>" +
+        (_howOpen ? detailsHTML(f, ctx) : "") +
+        "</div>";
     }
 
-    var simNote = (f && f.simulated)
-      ? '<div class="an-card-sub">Demo fleet — a simulated weather model so the card is demoable.</div>'
-      : '<div class="an-card-sub">Measured production vs the real sunlight on each site, last ' + windowDays(f, ctx) + ' days</div>';
-
     container.innerHTML =
-      '<div class="an-card">' +
-      '  <div class="an-card-head">' +
-      '    <div><h3>Production vs expected <span class="anfc-badge">weather-adjusted</span></h3>' + simNote + '</div>' +
-      '  </div>' +
-      '  <div class="anfc-body">' + body + '</div>' +
-      '</div>';
+      '<div class="an-card anfc-lead">' +
+      '  <div class="anfc-hero">' + body + "</div>" +
+      "</div>";
 
-    // Wire the "How we calculated this" toggle (re-render preserves _open).
     var t = container.querySelector("[data-anfc-toggle]");
-    if (t) t.addEventListener("click", function () { _open = !_open; render(container, ctx); });
+    if (t) t.addEventListener("click", function () { _howOpen = !_howOpen; render(container, ctx); });
+    wireModel(container, f || { rows: [], skipped: [] }, ctx);
   }
 
-  // order 8 → SECOND, right under the kWh/kW health ranking (order 5) and above
-  // the Portfolio KPI strip (10). Bruce's Analysis order: kWh/kW ratio first
-  // (with flags inline), THEN actual-vs-expected as the second layer.
-  window.AnalysisSections.push({ id: "forecast", title: "Production vs expected", order: 8, render: render });
+  // First on the Analysis tab — the fleet weather verdict + model controls.
+  window.AnalysisSections.push({ id: "forecast", title: "Production vs expected", order: 1, render: render });
 })();

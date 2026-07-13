@@ -2109,22 +2109,25 @@
       <div id="rbAuditView" class="rb-au" style="display:none"></div>
       <div id="rbGenList">
       <!-- Master solar credit rate — Tenant.default_net_rate_per_kwh (+ discount).
-           Every offtaker without a per-offtaker override bills at credit × (1 − discount).
+           SET  → fleet override for every offtaker without a per-offtaker rate.
+           BLANK → each offtaker uses the EXCESS credit rate from THEIR own bound
+           utility sub-account bill (custom per offtaker).
            Wired by wireGlobalRate() → GET/PUT /v1/array-operator/billing/global-rate. -->
       <div class="rb-globalrate rep-card" id="rbGlobalRate">
         <div class="rb-gr-main">
           <h3>Master solar credit rate</h3>
-          <p>Default rate for <b>all offtakers</b>. Each offtaker's invoice uses this credit
-             rate (minus your discount) unless you've set a custom rate on that offtaker.
-             Leave blank to use the Vermont tariff default.</p>
+          <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
+             the solar credit rate on <b>their own utility sub-account bill</b>
+             (custom per offtaker). Fill this in to force one rate for everyone
+             who doesn't have a per-offtaker override.</p>
         </div>
         <div class="rb-gr-ctl">
           <label class="rb-gr-field">
             <span class="rb-gr-lbl">Solar credit rate</span>
             <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
-              <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="0.184"
+              <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="per bill"
                      inputmode="decimal" autocomplete="off"
-                     title="Master $/kWh solar credit rate applied to offtakers without their own override">
+                     title="Optional master $/kWh. Blank = each offtaker uses the credit rate from their own utility bill.">
               <span class="rb-gr-unit">/kWh</span></span>
           </label>
           <label class="rb-gr-field">
@@ -2668,6 +2671,9 @@
   }
 
   // ---- global default billing (net rate + discount) --------------------------
+  // Master rate SET  → fleet override for offtakers without a per-offtaker rate.
+  // Master rate BLANK → each offtaker uses the EXCESS credit rate on THEIR own
+  // bound utility sub-account bill (custom per offtaker). Never a fleet median.
   async function wireGlobalRate() {
     const net = $("#rbGrNet");
     const disc = $("#rbGrDisc");
@@ -2676,27 +2682,40 @@
     const eff = $("#rbGrEff");
     if (!net || !disc || !save) return;
 
-    let effNet = 0.18398, effDisc = 0.10;   // built-in fallbacks for the preview
+    let effDisc = 0.10, effSrc = "per_offtaker_bill", effNote = "";
     function renderEff() {
-      const n = net.value.trim() === "" ? effNet : Number(net.value);
       const d = disc.value.trim() === "" ? effDisc * 100 : Number(disc.value);
+      const raw = net.value.trim();
       if (eff) {
+        if (raw === "") {
+          // Blank master → per-offtaker bill rates (no single $/kWh to preview).
+          const discBit = isNaN(d) ? "10" : d.toFixed(0);
+          eff.innerHTML =
+            `Master rate is <b>blank</b> — each offtaker is priced from the solar credit ` +
+            `rate on <b>their own utility sub-account bill</b> (custom per offtaker), ` +
+            `then minus your ${discBit}% discount. ` +
+            `Fill the box only if you want one rate for everyone.`;
+          return;
+        }
+        const n = Number(raw);
         if (isNaN(n) || isNaN(d)) { eff.textContent = ""; return; }
         const rate = n * (1 - d / 100);
-        eff.innerHTML = `Offtakers pay <b>$${rate.toFixed(4)}/kWh</b> ` +
-          `(credit $${n.toFixed(4)} − ${d.toFixed(0)}% off). ` +
-          `Blank = your defaults ($${effNet.toFixed(3)} credit, ${(effDisc*100).toFixed(0)}% off).`;
+        eff.innerHTML =
+          `Master rate is set — offtakers without a custom rate pay ` +
+          `<b>$${rate.toFixed(4)}/kWh</b> (credit $${n.toFixed(5)} − ${d.toFixed(0)}% off). ` +
+          `Clear the box to go back to each offtaker's own utility-bill rate.`;
       }
     }
-    // Load current globals (+ the effective defaults the backend would apply).
     try {
       const r = await fetch(API + "/global-rate", { headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
       if (r.ok) {
-        if (data.effective_net_rate_per_kwh != null) effNet = data.effective_net_rate_per_kwh;
         if (data.effective_discount_pct != null) effDisc = data.effective_discount_pct;
+        if (data.effective_net_rate_source) effSrc = data.effective_net_rate_source;
+        if (data.effective_net_rate_note) effNote = data.effective_net_rate_note;
+        // Only show a number when the operator has SAVED a master override.
         if (data.default_net_rate_per_kwh != null) net.value = data.default_net_rate_per_kwh;
-        else if (data.default_billing_rate_per_kwh != null) net.value = data.default_billing_rate_per_kwh;
+        else net.value = "";
         if (data.default_discount_pct != null) disc.value = Math.round(data.default_discount_pct * 100);
       }
     } catch (e) { /* leave blank */ }
@@ -2706,7 +2725,7 @@
 
     save.onclick = async () => {
       const body = {};
-      // net rate: blank clears (→ VT default)
+      // net rate: blank clears (→ per-offtaker utility bill rates)
       const rawNet = net.value.trim();
       if (rawNet === "") body.default_net_rate_per_kwh = null;
       else {
@@ -2736,12 +2755,12 @@
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
           st.className = "rb-status rb-ok";
-          st.textContent = "Saved — offtakers without a custom rate now use this.";
-          // Refresh effective preview from the server response.
+          st.textContent = rawNet === ""
+            ? "Cleared — each offtaker uses the rate from their own utility bill."
+            : "Saved — offtakers without a custom rate now use this master rate.";
           if (data.default_net_rate_per_kwh != null) {
             net.value = data.default_net_rate_per_kwh;
-            effNet = Number(data.default_net_rate_per_kwh);
-          } else if (data.default_net_rate_per_kwh === null) {
+          } else {
             net.value = "";
           }
           if (data.default_discount_pct != null) {
@@ -2750,17 +2769,17 @@
           } else if (data.default_discount_pct === null) {
             disc.value = "";
           }
-          // Re-fetch effective defaults (handles null → VT fallback).
           try {
             const gr = await fetch(API + "/global-rate", { headers: authHeaders() });
             const gd = await gr.json().catch(() => ({}));
             if (gr.ok) {
-              if (gd.effective_net_rate_per_kwh != null) effNet = gd.effective_net_rate_per_kwh;
               if (gd.effective_discount_pct != null) effDisc = gd.effective_discount_pct;
+              if (gd.effective_net_rate_source) effSrc = gd.effective_net_rate_source;
+              if (gd.effective_net_rate_note) effNote = gd.effective_net_rate_note;
             }
           } catch (_) {}
           renderEff();
-          await refreshList();   // re-price rows that use the defaults
+          await refreshList();
         } else {
           st.className = "rb-status rb-err";
           st.textContent = apiErr(data, "Couldn't save.");
@@ -3840,17 +3859,19 @@
 
   // OUR importable fields, in display order. `req` = required (Continue is gated on
   // all three being mapped). Order/labels are the operator-facing column meanings.
+  // Utility-agnostic field labels (GMP / VEC / WEC / SmartHub / any co-op export).
+  // array_name is soft-required: backend accepts account-# identity instead.
   const BULK_FIELDS = [
-    { key: "array_name",             label: "Array",              req: true  },
-    { key: "master_account_number",  label: "Master account #",   req: false },
-    { key: "offtaker_account_name",  label: "Offtaker GMP name",  req: false },
-    { key: "offtaker_name",          label: "Offtaker name",      req: true  },
-    { key: "allocation_pct",         label: "Share %",            req: true  },
-    { key: "email",                  label: "Email",              req: false },
-    { key: "discount_pct",           label: "Discount %",         req: false },
-    { key: "account_number",         label: "Offtaker account #", req: false },
-    { key: "budget",                 label: "Budget monthly ($)", req: false },
-    { key: "net_rate",               label: "Rate ($/kWh)",       req: false },
+    { key: "array_name",             label: "Array",                    req: true  },
+    { key: "master_account_number",  label: "Master utility account #", req: false },
+    { key: "offtaker_account_name",  label: "Offtaker utility name",    req: false },
+    { key: "offtaker_name",          label: "Offtaker name",            req: true  },
+    { key: "allocation_pct",         label: "Share %",                  req: true  },
+    { key: "email",                  label: "Email",                    req: false },
+    { key: "discount_pct",           label: "Discount %",               req: false },
+    { key: "account_number",         label: "Offtaker account #",       req: false },
+    { key: "budget",                 label: "Budget monthly ($)",       req: false },
+    { key: "net_rate",               label: "Rate ($/kWh)",             req: false },
   ];
 
   // 0 → "A", 1 → "B", … 26 → "AA" — spreadsheet-style column letters for friendliness.
@@ -3952,19 +3973,20 @@
             <h3>Bulk import offtakers</h3>
             <button class="ao-btn ao-btn-ghost rb-cancel" id="rbBulkCancel" type="button">Cancel</button>
           </div>
-          <p class="rb-add-sub">One row per offtaker — <b>Array</b>, <b>Offtaker</b>, <b>Share %</b>,
-            plus <b>Email</b>/<b>Discount</b> if you have them. We'll match each row to an array and
-            let you review + correct every match before creating anything.</p>
+          <p class="rb-add-sub">Drop <b>any</b> utility roster or your own spreadsheet — GMP, VEC,
+            WEC, SmartHub co-op, Excel, Google Sheets. We detect columns, match each offtaker to an
+            array, and create <b>new</b> offtakers after you review. One row needs an offtaker name,
+            a share %, and either an array name or a utility account #.</p>
           <div class="rb-upload" id="rbBulkDrop">
             <label class="rb-drop" id="rbBulkDropZone">
               <input type="file" id="rbBulkFile" accept=".csv,.xlsx" hidden>
               <span class="rb-drop-ico">⬆</span>
               <span class="rb-drop-main">Choose a spreadsheet or drop it here</span>
-              <span class="rb-drop-sub">.xlsx or .csv — exported from Excel or Google Sheets</span>
+              <span class="rb-drop-sub">.xlsx or .csv — any utility export or operator roster</span>
             </label>
-            <p class="rb-sample-hint">Not sure of the layout?
+            <p class="rb-sample-hint">Want a blank starter?
               <a href="#" class="rb-sample-link" id="rbBulkTemplate">Download the template</a>
-              — fill it in and drop it back here.</p>
+              — or just drop the file you already have; column names don't need to match.</p>
             <div class="rb-status" id="rbBulkStatus"></div>
           </div>
         </div>`;
@@ -4008,6 +4030,16 @@
     const a = bulkArrayById(row.array_id);
     const noBill = a && (a.utility_account_id == null || a.has_bill === false);
     if (noBill) return `<span class="rb-conf rb-conf-warn" title="This array has no connected utility bill yet.">no bill yet</span>`;
+    const flags = row.flags || [];
+    if (flags.includes("offtaker_account_not_connected")) {
+      const pending = row.pending_offtaker_account_number
+        ? ` Account # ${row.pending_offtaker_account_number} isn't connected yet — offtaker will bill from the host until that meter is linked.`
+        : " Offtaker account # isn't connected yet — offtaker will bill from the host until that meter is linked.";
+      return `<span class="rb-conf rb-conf-warn" title="${esc(pending.trim())}">account pending</span>`;
+    }
+    if (flags.includes("master_account_not_connected")) {
+      return `<span class="rb-conf rb-conf-warn" title="Master utility account # isn't connected yet — pick the array manually.">master pending</span>`;
+    }
     const c = row._confirmed ? "high" : (row.confidence || "none");
     if (c === "exact" || c === "high") return `<span class="rb-conf rb-conf-ok" title="Confident match.">✓</span>`;
     if (c === "medium") return `<button type="button" class="rb-conf rb-conf-warn rb-conf-confirm" title="Low-confidence match — click to confirm this is the right array, or pick a different one.">check this ✓</button>`;
@@ -4043,8 +4075,14 @@
   function colFieldBadge(field) {
     const idx = COLUMN_MAP[field.key];
     if (idx == null) {
-      return field.req
-        ? `<span class="rb-col-badge rb-conf rb-conf-bad" title="Required — pick the column that holds this.">needed</span>`
+      // array_name is soft-required when an account # column stands in for it.
+      const softOk = field.key === "array_name" && (
+        COLUMN_MAP.master_account_number != null || COLUMN_MAP.account_number != null);
+      if (field.req && !softOk) {
+        return `<span class="rb-col-badge rb-conf rb-conf-bad" title="Required — pick the column that holds this.">needed</span>`;
+      }
+      return softOk
+        ? `<span class="rb-col-badge rb-col-skip" title="Optional when a utility account # is mapped — we'll resolve the array from the account.">via account #</span>`
         : `<span class="rb-col-badge rb-col-skip" title="Not in your sheet — that's fine.">not mapped</span>`;
     }
     // Only trust the detected confidence while the operator keeps the detected column;
@@ -4065,8 +4103,14 @@
   }
 
   // Required fields still without a column → the reasons Continue stays disabled.
+  // array_name is soft: account # columns can stand in for array identity (utility
+  // exports that only list member account numbers, no array name).
   function unmappedRequired() {
-    return BULK_FIELDS.filter(f => f.req && COLUMN_MAP[f.key] == null);
+    const missing = BULK_FIELDS.filter(f => f.req && COLUMN_MAP[f.key] == null);
+    const hasArrayIdentity = COLUMN_MAP.array_name != null
+      || COLUMN_MAP.master_account_number != null
+      || COLUMN_MAP.account_number != null;
+    return missing.filter(f => f.key !== "array_name" || !hasArrayIdentity);
   }
 
   function renderColumnMapping() {
@@ -4392,6 +4436,8 @@
         offtaker_account_name: r.offtaker_account_name || "",
         confidence: r.confidence || "none",
         errors: r.errors || [],
+        flags: r.flags || [],
+        pending_offtaker_account_number: r.pending_offtaker_account_number || null,
         _confirmed: (r.confidence === "exact" || r.confidence === "high"),
         // An exact offtaker-account-number bind is authoritative — treat it as an
         // explicit pick so name auto-match never second-guesses it.

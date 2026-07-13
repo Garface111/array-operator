@@ -464,13 +464,16 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-autosend-note b{ color:var(--ink); }
 
 /* ---- global default rate bar (master solar credit rate for all offtakers) ---- */
+/* Full width of the Invoices base sheet — NOT the global .rep-card 700px cap
+   (that left the card half-empty next to the full-width pipeline + offtaker list). */
 .rb-globalrate{ display:flex; align-items:flex-start; justify-content:space-between;
   gap:18px; flex-wrap:wrap; margin:0 0 14px; padding:18px 20px;
   border-radius:16px; border:1px solid var(--line);
-  background:linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); }
-.rb-globalrate .rb-gr-main{ flex:1 1 240px; min-width:0; }
+  background:linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  max-width:none; width:100%; box-sizing:border-box; }
+.rb-globalrate .rb-gr-main{ flex:1 1 280px; min-width:0; }
 .rb-globalrate .rb-gr-main h3{ font-size:15.5px; margin:0 0 .25em; font-weight:750; letter-spacing:-.01em; }
-.rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:56ch; margin:0; }
+.rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:72ch; margin:0; }
 .rb-globalrate .rb-gr-main p b{ color:var(--ink); font-weight:650; }
 /* invoice-template upload card — operator's own format */
 .rb-tpl{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }

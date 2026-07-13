@@ -685,8 +685,10 @@
   let _extPresent = false;        // EnergyAgent extension detected on this page (routes "Open to sync" through it)
   // Cloud Capture mode (server-side harvest) vs device mode (extension). Shares the
   // Auto-refresh panel's single preference (sandbox.js AR_MODE_KEY). In cloud mode the
-  // server refreshes 24/7, so the extension-only affordances (per-vendor "Open to sync",
-  // tab-opening "Sync all", "Close tabs") change or disappear (Ford 2026-07-11).
+  // server refreshes 24/7, so extension-only refresh affordances (per-vendor "Open to
+  // sync", tab-opening "Sync all") swap to cloud variants — but "Close all vendor tabs"
+  // ALWAYS stays visible: owners still open portals by hand (or leave tabs from a prior
+  // device-mode sync) and need a one-click cleanup (Ford 2026-07-13).
   function _cloudMode(){ try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } }
   // Cloud harvest health, pulled from the Auto-refresh vault via sandbox.js's
   // __aoCloudStatus. Per provider we track:
@@ -1065,10 +1067,10 @@
         <div class="vs-actions">
           <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
           <div class="vs-actions-right">
+            <button type="button" class="vs-closetabs" id="vsCloseTabs"
+              title="Closes every open vendor portal tab (SolarEdge, Fronius, SMA, Chint, utility portals, etc.).">✕ Close all vendor tabs</button>
             <button type="button" class="vs-syncall" id="vsSyncAll"
               title="${_syncTitle}">${_syncLabel}</button>
-            ${_cloud ? "" : `<button type="button" class="vs-closetabs" id="vsCloseTabs"
-              title="Closes every open vendor portal tab.">✕ Close all vendor tabs</button>`}
           </div>
         </div>
         <div class="vs-searchrow"><input type="search" class="vs-search" id="vsSearch"
