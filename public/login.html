@@ -4,105 +4,111 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in · Array Operator</title>
+<meta name="theme-color" content="#56B4F0">
 <!-- Per-tab auth session shim — MUST be the very first script so it patches the
      so_session localStorage routing before anything reads/writes it. See session-tabscope.js. -->
 <script src="/session-tabscope.js?v=1"></script>
-<!-- Day/night theme: set the attribute BEFORE first paint so there's no flash. -->
-<script>(function(){try{if(localStorage.getItem("ao_theme")!=="night")document.documentElement.setAttribute("data-theme","day");}catch(e){document.documentElement.setAttribute("data-theme","day");}})();</script>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
+  /* ── Array Operator sign-in — the SKY world (2026-07-13). Matches the app's
+     theme-sky.css: the alpine-solar photo IS the background, the sign-in card
+     is frosted liquid glass floating in front of it, Plus Jakarta Sans, the
+     sky-blue palette. (Night mode retired — the app is day/sky only.) ── */
+  @font-face{
+    font-family:"Plus Jakarta Sans";
+    src:url("/fonts/PlusJakartaSans-latin.woff2") format("woff2");
+    font-weight:200 800; font-style:normal; font-display:swap;
+  }
   :root{
-    --bg:#0a0e14; --bg2:#0e131c; --ink:#eaf0f7; --muted:#8b97a8; --faint:#6b7686;
-    --good:#3fd68a; --good2:#7ff0bb; --warn:#ffb454; --bad:#ff6b6b;
-    --line:rgba(255,255,255,.08); --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.018);
+    --sky-top:#1E90E8; --sky-mid:#56B4F0; --sky-horizon:#BEE3FA;
+    --primary:#2196F3; --primary-deep:#1976D2;
+    --ink:#0E1420; --muted:#4C596B; --faint:#6B7789;
+    --good:#2196F3; --bad:#dc2626;
+    --glass:rgba(255,255,255,.62);
+    --glass-edge:rgba(255,255,255,.6);
+    --line:rgba(20,60,120,.14);
   }
   *{box-sizing:border-box} html,body{height:100%}
+  html{scrollbar-width:none} html::-webkit-scrollbar{display:none}
   body{
-    margin:0; background:radial-gradient(1200px 700px at 75% -10%, #16202e 0%, var(--bg) 55%);
-    background-attachment:fixed; color:var(--ink); min-height:100%;
-    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+    margin:0; min-height:100%; color:var(--ink);
+    font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
     -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+    background:var(--sky-mid);
+  }
+  /* the sky world — fixed photo plate + instant-paint gradient underlay */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image:
+      url("/img/sky/world-zo-2560.jpg"),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("/img/sky/world-zo-2560.webp") type("image/webp"),
+                url("/img/sky/world-zo-2560.jpg") type("image/jpeg")),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-size:cover, auto;
+    background-position:center 50%, center;
+    background-repeat:no-repeat;
+  }
+  @media (max-width:1600px){
+    body::before{
+      background-image:
+        url("/img/sky/world-zo-2560.jpg"),
+        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+      background-image:
+        image-set(url("/img/sky/world-zo-1600.webp") type("image/webp"),
+                  url("/img/sky/world-zo-2560.jpg") type("image/jpeg")),
+        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    }
   }
   a{color:inherit}
   .top{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;font-size:16px;
-       padding:1.5rem 1.75rem}
+       padding:1.5rem 1.75rem;color:#fff;text-shadow:0 1px 3px rgba(8,44,90,.4)}
   .logo{height:2rem;width:2rem;border-radius:999px;flex:none;
-        background:radial-gradient(circle at 35% 30%,var(--good2),var(--good) 55%,#1f7d54 100%);
-        box-shadow:0 0 0 4px rgba(63,214,138,.1),0 6px 18px rgba(63,214,138,.35)}
-  .top small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-top:-2px}
+        background:radial-gradient(circle at 35% 30%,#8FD0F6,var(--primary) 55%,var(--primary-deep) 100%);
+        box-shadow:0 0 0 4px rgba(33,150,243,.16),0 6px 18px rgba(15,50,110,.35)}
+  .top small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.85);letter-spacing:.04em;margin-top:-2px;text-shadow:0 1px 2px rgba(8,44,90,.4)}
   main{flex:1;display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4rem}
-  .card{width:100%;max-width:25rem;background:linear-gradient(165deg,var(--card),var(--card2));
-        border:1px solid var(--line);border-radius:22px;padding:2rem;
-        box-shadow:0 24px 60px rgba(0,0,0,.5)}
-  h1{margin:0;font-size:1.5rem;line-height:1.22;font-weight:720;letter-spacing:-.02em;padding-bottom:.14em;
-     background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  /* the sign-in card — frosted liquid glass, the app's signature material */
+  .card{width:100%;max-width:25rem;
+        background:var(--glass);
+        -webkit-backdrop-filter:blur(18px) saturate(1.7); backdrop-filter:blur(18px) saturate(1.7);
+        border:1px solid var(--glass-edge);border-radius:26px;padding:2rem;
+        box-shadow:0 24px 60px -16px rgba(15,50,110,.35), 0 2px 10px rgba(20,60,120,.10)}
+  @supports (corner-shape: squircle){ .card{corner-shape:squircle} }
+  h1{margin:0;font-size:1.6rem;line-height:1.18;font-weight:780;letter-spacing:-.025em;color:var(--ink)}
   .sub{margin-top:.5rem;font-size:.9rem;color:var(--muted)}
-  .tabs{display:flex;gap:.35rem;background:rgba(0,0,0,.3);border:1px solid var(--line);
-        border-radius:12px;padding:.3rem;margin:1.5rem 0 .5rem}
+  .tabs{display:flex;gap:.35rem;background:rgba(20,60,120,.07);border:1px solid var(--line);
+        border-radius:999px;padding:.3rem;margin:1.5rem 0 .5rem}
   .tab{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:650;font-size:.85rem;
-       padding:.5rem;border-radius:9px;cursor:pointer;transition:.15s}
-  .tab.on{background:rgba(63,214,138,.14);color:var(--good2);box-shadow:inset 0 0 0 1px rgba(63,214,138,.3)}
+       padding:.55rem;border-radius:999px;cursor:pointer;transition:.15s}
+  .tab.on{background:var(--primary);color:#fff;box-shadow:0 4px 14px -4px rgba(33,150,243,.6)}
   label.fld{display:block;margin-top:1.25rem}
   label.fld .lab{font-size:.85rem;font-weight:700;color:var(--ink)}
-  input{width:100%;margin-top:.5rem;padding:.7rem .85rem;background:rgba(0,0,0,.35);
-    border:1px solid var(--line);border-radius:10px;font:inherit;color:var(--ink);transition:.15s}
+  input{width:100%;margin-top:.5rem;padding:.72rem .9rem;background:#fff;
+    border:1px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);transition:.15s}
   input::placeholder{color:var(--faint)}
-  input:focus{outline:none;border-color:var(--good);box-shadow:0 0 0 3px rgba(63,214,138,.15)}
-  .btn{display:inline-flex;width:100%;align-items:center;justify-content:center;gap:.5rem;border-radius:11px;
-       padding:.8rem 1.5rem;font-size:.95rem;font-weight:700;border:0;cursor:pointer;transition:.15s;margin-top:1.4rem}
-  .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn-primary{background:linear-gradient(180deg,var(--good2),var(--good));color:#06140d;box-shadow:0 4px 16px rgba(63,214,138,.28)}
-  .btn-primary:hover:not(:disabled){filter:brightness(1.06)}
-  .msg{margin-top:1rem;font-size:.82rem;line-height:1.5;border-radius:10px;padding:.7rem .85rem;display:none}
+  input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(33,150,243,.18)}
+  .btn{display:inline-flex;width:100%;align-items:center;justify-content:center;gap:.5rem;border-radius:12px;
+       padding:.82rem 1.5rem;font-size:.95rem;font-weight:700;border:0;cursor:pointer;transition:.15s;margin-top:1.4rem}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 18px -6px rgba(33,150,243,.6)}
+  .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 24px -8px rgba(33,150,243,.7)}
+  .msg{margin-top:1rem;font-size:.82rem;line-height:1.5;border-radius:12px;padding:.7rem .9rem;display:none}
   .msg.show{display:block}
-  .msg.err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);color:#ffb1b1}
-  .msg.ok{background:rgba(63,214,138,.1);border:1px solid rgba(63,214,138,.3);color:var(--good2)}
+  .msg.err{background:rgba(220,38,38,.09);border:1px solid rgba(220,38,38,.28);color:#b42318}
+  .msg.ok{background:rgba(33,150,243,.09);border:1px solid rgba(33,150,243,.3);color:var(--primary-deep)}
   .foot{margin-top:1.5rem;font-size:.82rem;color:var(--muted);text-align:center}
-  .foot a{color:var(--good);font-weight:650;text-decoration:underline;text-underline-offset:2px}
-  .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(6,20,13,.25);border-top-color:#06140d;animation:spin .7s linear infinite;display:inline-block}
+  .foot a{color:var(--primary-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+  .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
   @keyframes spin{to{transform:rotate(360deg)}}
   .hide{display:none!important}
-
-  /* Day/night toggle control (header, top-right) */
-  .theme-toggle{margin-left:auto;cursor:pointer;border:1px solid var(--line);background:var(--card);
-    color:var(--muted);width:34px;height:34px;border-radius:10px;display:inline-grid;place-items:center;
-    font-size:15px;line-height:1;transition:color .15s,border-color .15s,background .15s}
-  .theme-toggle:hover{color:var(--good);border-color:var(--good)}
-  .theme-toggle .tt-ico{line-height:1;pointer-events:none}
-
-  /* ===== DAY MODE (default) — utility-blue on cool slate ===== */
-  html[data-theme="day"]{
-    --bg:#f6f8fb; --bg2:#eef2f7; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
-    --good:#2563eb; --good2:#0ea5e9; --warn:#d97706; --bad:#dc2626;
-    --line:#e2e8f0; --card:#ffffff; --card2:#f8fafc;
-    color-scheme:light;
-  }
-  html[data-theme="day"] body{
-    background:radial-gradient(1200px 700px at 75% -10%, #eef3fb 0%, #f6f8fb 55%);
-  }
-  html[data-theme="day"] h1{
-    background:linear-gradient(180deg,#0f172a,#475569);-webkit-background-clip:text;background-clip:text;color:transparent;
-  }
-  html[data-theme="day"] .logo{background:radial-gradient(circle at 35% 30%,#60a5fa,#2563eb 55%,#1d4ed8 100%);box-shadow:0 0 0 4px rgba(37,99,235,.1),0 6px 18px rgba(37,99,235,.32);}
-  html[data-theme="day"] .tabs{background:#eef2f7;}
-  html[data-theme="day"] .tab.on{background:#ffffff;color:#1d4ed8;box-shadow:inset 0 0 0 1px rgba(37,99,235,.35);}
-  html[data-theme="day"] input{background:#ffffff;color:var(--ink);}
-  html[data-theme="day"] input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
-  html[data-theme="day"] .btn-primary{background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;box-shadow:0 4px 14px -4px rgba(29,78,216,.45);}
-  html[data-theme="day"] .card{box-shadow:0 10px 30px -12px rgba(15,23,42,.16);}
-  html[data-theme="day"] .msg.err{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.3);color:#b42318;}
-  html[data-theme="day"] .msg.ok{background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.3);color:#1d4ed8;}
-  html[data-theme="day"] .ring{border-color:rgba(255,255,255,.55);border-top-color:#fff;}
 </style>
 </head>
 <body>
   <div class="top">
     <span class="logo" aria-hidden="true"></span>
     <span>Array Operator<small>by EnergyAgent</small></span>
-    <button class="theme-toggle" id="themeToggle" type="button"
-            title="Toggle day / night" aria-label="Toggle day or night theme">
-      <span class="tt-ico" aria-hidden="true">☾</span>
-    </button>
   </div>
   <main>
     <div class="card">
@@ -136,23 +142,6 @@
     </div>
   </main>
 
-<script>
-// Day/night toggle — persists in localStorage (ao_theme), shared with the dashboard.
-(function(){
-  var btn = document.getElementById("themeToggle");
-  function read(){ try { return localStorage.getItem("ao_theme") !== "night"; } catch(e){ return true; } }
-  function apply(day){
-    document.documentElement.setAttribute("data-theme", day ? "day" : "night");
-    if (btn){ var i = btn.querySelector(".tt-ico"); if (i) i.textContent = day ? "☀" : "☾"; }
-  }
-  var day = read(); apply(day);
-  if (btn) btn.addEventListener("click", function(){
-    day = !day;
-    try { localStorage.setItem("ao_theme", day ? "day" : "night"); } catch(e){}
-    apply(day);
-  });
-})();
-</script>
 <script>
 // Same-origin on arrayoperator.com (/v1/* proxies to Railway via _redirects).
 // On a local static preview, hit the Railway backend directly (CORS allows it).
