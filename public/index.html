@@ -664,6 +664,53 @@ document.documentElement.setAttribute("data-theme","day");
 
   @keyframes fsPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
 
+
+  /* ── Print Screen / snip grab panel ── */
+  #fsGrab{
+    display:none; position:fixed; inset:0; z-index:10040;
+    background:rgba(8,20,40,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    align-items:center; justify-content:center; padding:20px;
+  }
+  #fsGrab.open{display:flex}
+  #fsGrabCard{
+    width:min(440px,100%); background:rgba(255,255,255,.97); border-radius:20px;
+    border:1px solid rgba(255,255,255,.85); padding:22px 22px 18px;
+    box-shadow:0 24px 70px -18px rgba(15,50,110,.4);
+    font:13.5px/1.45 "Plus Jakarta Sans",system-ui,sans-serif; color:#0E1420;
+  }
+  #fsGrabCard h4{margin:0 0 6px; font-size:17px; font-weight:780; letter-spacing:-.02em}
+  #fsGrabCard .fsLead{margin:0 0 14px; color:#4C596B; font-size:13px}
+  #fsGrabSteps{margin:0 0 14px; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px}
+  #fsGrabSteps li{
+    display:grid; grid-template-columns:28px 1fr; gap:10px; align-items:start;
+    padding:10px 12px; border-radius:12px; background:rgba(33,150,243,.06);
+    border:1px solid rgba(33,150,243,.12);
+  }
+  #fsGrabSteps .n{
+    width:28px; height:28px; border-radius:50%; background:#2196F3; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;
+  }
+  #fsGrabSteps b{display:block; font-size:13px; font-weight:750}
+  #fsGrabSteps span{display:block; font-size:12px; color:#6B7789; margin-top:2px}
+  #fsPasteZone{
+    display:block; width:100%; box-sizing:border-box; min-height:88px; margin:0 0 12px;
+    border:2px dashed rgba(33,150,243,.4); border-radius:14px; background:rgba(33,150,243,.04);
+    color:#1565C0; font:650 13.5px/1.4 inherit; cursor:pointer; text-align:center; padding:22px 12px;
+  }
+  #fsPasteZone:focus{outline:2px solid #2196F3; outline-offset:2px; border-color:#2196F3; background:rgba(33,150,243,.08)}
+  #fsPasteZone kbd{
+    display:inline-block; padding:2px 7px; border-radius:6px; font:700 12px ui-monospace,monospace;
+    background:#fff; border:1px solid rgba(20,60,120,.18); color:#0E1420; margin:0 2px;
+  }
+  #fsGrabStatus{font-size:12.5px; color:#4C596B; min-height:1.2em; margin:0 0 12px; text-align:center}
+  #fsGrabActions{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap}
+  #fsGrabActions button{
+    cursor:pointer; border-radius:11px; padding:9px 14px; font:700 13px inherit; border:1px solid transparent;
+  }
+  #fsGrabFreeze{background:#2196F3; color:#fff; border-color:#2196F3}
+  #fsGrabFreeze:hover{background:#1976D2}
+  #fsGrabCancel{background:transparent; color:#6B7789; border-color:rgba(20,60,120,.14); font-weight:600}
+
   /* ── Full-screen mark overlay ── */
   #fsOverlay{
     position:fixed;inset:0;z-index:10050;background:rgba(8,20,40,.72);
@@ -723,10 +770,32 @@ document.documentElement.setAttribute("data-theme","day");
       </div>
     </div>
   </div>
-  <button id="fsBtn" type="button" aria-expanded="false" title="Circle a spot on the page and tell us what you wish was there">
+  <button id="fsBtn" type="button" aria-expanded="false" title="Screenshot like Print Screen, then circle what should change">
     <span class="fsdot">✦</span> Wish this was better
   </button>
 </div>
+
+<div id="fsGrab" role="dialog" aria-modal="true" aria-labelledby="fsGrabTitle">
+  <div id="fsGrabCard">
+    <h4 id="fsGrabTitle">Screenshot this page</h4>
+    <p class="fsLead">Same quality as Print Screen on your PC — crisp glass, real sky, no grey mush.</p>
+    <ol id="fsGrabSteps">
+      <li><span class="n">1</span><div><b>Snip the page</b><span>Press <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (or <kbd>PrtScn</kbd>) and capture this window</span></div></li>
+      <li><span class="n">2</span><div><b>Paste it here</b><span>Click the box below and press <kbd>Ctrl</kbd>+<kbd>V</kbd></span></div></li>
+      <li><span class="n">3</span><div><b>Circle the spot</b><span>Mark exactly what should change, then describe it</span></div></li>
+    </ol>
+    <button type="button" id="fsPasteZone" tabindex="0">
+      Click here, then paste screenshot<br>
+      <span style="font-weight:600;opacity:.85;font-size:12.5px">Ctrl+V · uses your real Print Screen pixels</span>
+    </button>
+    <p id="fsGrabStatus">Waiting for a screenshot on the clipboard…</p>
+    <div id="fsGrabActions">
+      <button type="button" id="fsGrabCancel">Cancel</button>
+      <button type="button" id="fsGrabFreeze" title="Browser freeze of this tab (pick This tab)">Freeze this tab instead</button>
+    </div>
+  </div>
+</div>
+
 <div id="fsOverlay" role="dialog" aria-label="Circle the spot on the screen">
   <div id="fsToolbar">
     <span class="fsTip">Circle the spot that should change</span>
@@ -790,44 +859,107 @@ document.documentElement.setAttribute("data-theme","day");
   }
 
   // ── Capture + mark (THE entry path) ──
-  // TRUST-CRITICAL: the freeze must be pixel-identical to what the user sees.
-  // html2canvas CANNOT paint backdrop-filter glass or body::before plates — every
-  // reconstruction was grey, soft, or flat (Ford 2026-07-13, three failed passes).
-  // New approach: one-frame capture of THIS TAB via getDisplayMedia
-  // (preferCurrentTab). The browser paints the real compositor output — mountain,
-  // frost, crisp type. Stream is stopped immediately after one frame.
-  // If the user denies share, fall through to text-only (never a fake mushy shot).
+  // TRUST-CRITICAL: the freeze must match a real PC Print Screen / Snip
+  // (crisp glass, alpine plate, no grey mush). html2canvas cannot do that.
+  // getDisplayMedia is close but needs a "share tab" dialog.
+  // Best match to "Print Screen from the PC":
+  //   1) PRIMARY — paste the OS clipboard image (Win+Shift+S / PrtScn / Snipping
+  //      Tool all land on the clipboard — same pixels as the latest screenshot).
+  //   2) SECONDARY — freeze this tab via getDisplayMedia(preferCurrentTab).
+  // Never reconstruct the page with html2canvas.
+
+  function openMarkWithCanvas(cv){
+    if(!cv || !cv.width) throw new Error("empty canvas");
+    var maxW = Math.floor(window.innerWidth * 0.94);
+    var maxH = Math.floor(window.innerHeight * 0.78);
+    SCL = Math.min(maxW / cv.width, maxH / cv.height, 1);
+    var w = Math.max(1, Math.floor(cv.width * SCL));
+    var h = Math.max(1, Math.floor(cv.height * SCL));
+    shotC.width = w; shotC.height = h;
+    inkC.width = w; inkC.height = h;
+    inkC.style.width = w + "px"; inkC.style.height = h + "px";
+    var sctx = shotC.getContext("2d");
+    sctx.imageSmoothingEnabled = (SCL < 0.99);
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(cv, 0, 0, w, h);
+    shotC._full = cv;
+    STROKES = []; CUR = null; drawInk();
+    TOOL = "circ";
+    ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){
+      document.getElementById(b).classList.toggle("on", b === "fsToolCirc");
+    });
+    try{
+      var tipEl = document.querySelector("#fsToolbar .fsTip");
+      if(tipEl) tipEl.textContent = "Circle the spot that should change";
+    }catch(e){}
+    overlay.classList.add("open");
+  }
+
+  // Decode a clipboard image Blob/File → full-res canvas (true Print Screen pixels).
+  function canvasFromBlob(blob){
+    return new Promise(function(resolve, reject){
+      if(!blob || !String(blob.type||"").match(/^image\//)){
+        reject(new Error("not an image")); return;
+      }
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var cv = document.createElement("canvas");
+          cv.width = img.naturalWidth || img.width;
+          cv.height = img.naturalHeight || img.height;
+          if(cv.width < 8 || cv.height < 8){ reject(new Error("tiny")); return; }
+          cv.getContext("2d").drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          resolve(cv);
+        }catch(e){ URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("decode")); };
+      img.src = url;
+    });
+  }
+
+  function canvasFromClipboardEvent(e){
+    var items = (e.clipboardData && e.clipboardData.items) ? e.clipboardData.items : [];
+    for(var i = 0; i < items.length; i++){
+      if(items[i].type && items[i].type.indexOf("image/") === 0){
+        var file = items[i].getAsFile();
+        if(file) return canvasFromBlob(file);
+      }
+    }
+    // Clipboard API async path (some Chromium builds)
+    if(navigator.clipboard && navigator.clipboard.read){
+      return navigator.clipboard.read().then(function(items){
+        for(var j = 0; j < items.length; j++){
+          var types = items[j].types || [];
+          for(var k = 0; k < types.length; k++){
+            if(String(types[k]).indexOf("image/") === 0){
+              return items[j].getType(types[k]).then(canvasFromBlob);
+            }
+          }
+        }
+        throw new Error("no image on clipboard");
+      });
+    }
+    return Promise.reject(new Error("no image on clipboard"));
+  }
+
+  // Optional: freeze this tab (real compositor) — same quality as Print Screen
+  // when the user picks This Tab.
   function captureTabFrame(){
     if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
       return Promise.reject(new Error("no getDisplayMedia"));
     }
-    // Hide our chrome so it doesn't appear in the freeze.
     var wrap = document.getElementById("fsWrap");
     var prevVis = wrap ? wrap.style.visibility : "";
     if(wrap) wrap.style.visibility = "hidden";
-    // Brief toast so the permission dialog isn't a surprise.
-    var tip = document.createElement("div");
-    tip.id = "fsShareTip";
-    tip.setAttribute("role","status");
-    tip.style.cssText = [
-      "position:fixed","left:50%","top:18px","transform:translateX(-50%)","z-index:10060",
-      "max-width:min(440px,92vw)","padding:12px 16px","border-radius:14px",
-      "background:rgba(255,255,255,.96)","color:#0E1420","font:600 13.5px/1.4 Plus Jakarta Sans,system-ui,sans-serif",
-      "box-shadow:0 12px 40px -12px rgba(15,50,110,.35)","border:1px solid rgba(33,150,243,.25)",
-      "text-align:center","pointer-events:none"
-    ].join(";");
-    tip.textContent = "Pick “This tab” once — we take a single freeze, then stop sharing.";
-    document.body.appendChild(tip);
 
     var opts = {
       video: {
         displaySurface: "browser",
-        frameRate: { ideal: 5, max: 15 },
-        width: { ideal: window.innerWidth * (window.devicePixelRatio || 1) },
-        height: { ideal: window.innerHeight * (window.devicePixelRatio || 1) }
+        frameRate: { ideal: 15, max: 30 }
       },
       audio: false,
-      // Chromium: prefer THIS tab so the dialog defaults correctly.
       preferCurrentTab: true,
       selfBrowserSurface: "include",
       surfaceSwitching: "exclude",
@@ -835,117 +967,132 @@ document.documentElement.setAttribute("data-theme","day");
     };
 
     return navigator.mediaDevices.getDisplayMedia(opts).then(function(stream){
-      if(tip.parentNode) tip.parentNode.removeChild(tip);
       var track = stream.getVideoTracks()[0];
       if(!track){ stream.getTracks().forEach(function(t){ t.stop(); }); throw new Error("no video track"); }
-
       var video = document.createElement("video");
-      video.playsInline = true;
-      video.muted = true;
-      video.srcObject = stream;
-
+      video.playsInline = true; video.muted = true; video.srcObject = stream;
       function stopAll(){
         try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
         try{ video.srcObject = null; }catch(e){}
       }
-
       return video.play().then(function(){
-        // Wait until we have real dimensions + at least one painted frame.
         return new Promise(function(resolve, reject){
           var tries = 0;
-          function ready(){
+          (function ready(){
             if(video.videoWidth > 2 && video.videoHeight > 2){
-              // One more frame for compositor settling after our chrome hid.
-              if(video.requestVideoFrameCallback){
-                video.requestVideoFrameCallback(function(){ resolve(); });
-              } else {
-                setTimeout(resolve, 80);
-              }
+              if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(function(){ resolve(); });
+              else setTimeout(resolve, 100);
               return;
             }
-            if(++tries > 60){ reject(new Error("video never ready")); return; }
-            setTimeout(ready, 32);
-          }
-          ready();
+            if(++tries > 80) reject(new Error("video never ready"));
+            else setTimeout(ready, 32);
+          })();
         });
       }).then(function(){
-        var vw = video.videoWidth, vh = video.videoHeight;
         var cv = document.createElement("canvas");
-        cv.width = vw;
-        cv.height = vh;
-        var ctx = cv.getContext("2d");
-        ctx.drawImage(video, 0, 0, vw, vh);
+        cv.width = video.videoWidth; cv.height = video.videoHeight;
+        cv.getContext("2d").drawImage(video, 0, 0);
         stopAll();
         if(wrap) wrap.style.visibility = prevVis;
-        // Sanity: blank/black frame is useless
-        try{
-          var sample = ctx.getImageData((vw/2)|0, (vh/2)|0, 1, 1).data;
-          var sum = sample[0]+sample[1]+sample[2];
-          if(sum < 8) throw new Error("blank frame");
-        }catch(e){
-          if(String(e.message||e).indexOf("blank")>=0) throw e;
-          // getImageData can taint on some browsers — ignore
-        }
         return cv;
       }, function(err){
-        stopAll();
-        if(wrap) wrap.style.visibility = prevVis;
-        throw err;
+        stopAll(); if(wrap) wrap.style.visibility = prevVis; throw err;
       });
     }, function(err){
-      if(tip.parentNode) tip.parentNode.removeChild(tip);
-      if(wrap) wrap.style.visibility = prevVis;
-      throw err;
+      if(wrap) wrap.style.visibility = prevVis; throw err;
     });
   }
 
-  function startMark(fromSkip){
+  // Snipping-tool style grab panel: paste Print Screen OR freeze this tab.
+  var grabOpen = false;
+  function closeGrab(){
+    grabOpen = false;
+    var g = document.getElementById("fsGrab");
+    if(g) g.classList.remove("open");
+    document.removeEventListener("paste", onGrabPaste, true);
+    document.removeEventListener("keydown", onGrabKey, true);
+  }
+  function onGrabPaste(e){
+    if(!grabOpen) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var status = document.getElementById("fsGrabStatus");
+    if(status) status.textContent = "Reading your screenshot…";
+    canvasFromClipboardEvent(e).then(function(cv){
+      closeGrab();
+      openMarkWithCanvas(cv);
+    }).catch(function(){
+      if(status){
+        status.style.color = "#b45309";
+        status.textContent = "No image on the clipboard yet — press Win+Shift+S (or PrtScn), snip the page, then Ctrl+V here.";
+      }
+    });
+  }
+  function onGrabKey(e){
+    if(!grabOpen) return;
+    if(e.key === "Escape"){ e.preventDefault(); closeGrab(); }
+  }
+  function openGrab(){
     openPanel(false);
-    btn.disabled = true;
-    var prevLabel = btn.innerHTML;
-    btn.innerHTML = '<span class="fsdot">✦</span> Freezing…';
-
-    captureTabFrame().then(function(cv){
-      // Fit the freeze into the mark stage (display size); keep full-res on _full.
-      var maxW = Math.floor(window.innerWidth * 0.94);
-      var maxH = Math.floor(window.innerHeight * 0.78);
-      SCL = Math.min(maxW / cv.width, maxH / cv.height, 1);
-      var w = Math.max(1, Math.floor(cv.width * SCL));
-      var h = Math.max(1, Math.floor(cv.height * SCL));
-      shotC.width = w; shotC.height = h;
-      inkC.width = w; inkC.height = h;
-      inkC.style.width = w + "px"; inkC.style.height = h + "px";
-      // Draw crisply — imageSmoothing for downscale only.
-      var sctx = shotC.getContext("2d");
-      sctx.imageSmoothingEnabled = true;
-      sctx.imageSmoothingQuality = "high";
-      sctx.drawImage(cv, 0, 0, w, h);
-      shotC._full = cv;
-      STROKES = []; CUR = null; drawInk();
-      TOOL = "circ";
-      ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){
-        document.getElementById(b).classList.toggle("on", b === "fsToolCirc");
-      });
-      // Update tip in toolbar
-      try{
-        var tipEl = document.querySelector("#fsToolbar .fsTip");
-        if(tipEl) tipEl.textContent = "Circle the spot that should change";
-      }catch(e){}
-      overlay.classList.add("open");
-    }).catch(function(err){
-      // User denied share, or browser lacks the API — never ship a grey mush shot.
-      openPanel(true);
-      var denied = err && (err.name === "NotAllowedError" || err.name === "AbortError");
-      msg.style.color = "#b45309";
-      msg.textContent = denied
-        ? "Tab share cancelled — describe what you want in a sentence (or try again and pick This tab)."
-        : "Couldn't freeze this tab pixel-perfectly here — describe the change in a sentence instead.";
-      try{ console.warn("fs tab capture failed", err); }catch(e){}
-    }).then(function(){
-      btn.disabled = false;
-      btn.innerHTML = prevLabel;
-    });
+    var g = document.getElementById("fsGrab");
+    if(!g) return;
+    grabOpen = true;
+    g.classList.add("open");
+    var status = document.getElementById("fsGrabStatus");
+    if(status){
+      status.style.color = "#4C596B";
+      status.textContent = "Waiting for a screenshot on the clipboard…";
+    }
+    document.addEventListener("paste", onGrabPaste, true);
+    document.addEventListener("keydown", onGrabKey, true);
+    // Focus the paste zone so Ctrl+V works immediately.
+    setTimeout(function(){
+      var z = document.getElementById("fsPasteZone");
+      if(z) try{ z.focus(); }catch(e){}
+    }, 40);
   }
+
+  function startMark(){
+    // Primary path: OS Print Screen / Snipping Tool → paste (matches PC screenshots).
+    openGrab();
+  }
+
+
+  // Grab panel actions
+  (function(){
+    var cancel = document.getElementById("fsGrabCancel");
+    var freeze = document.getElementById("fsGrabFreeze");
+    var zone = document.getElementById("fsPasteZone");
+    if(cancel) cancel.onclick = function(){ closeGrab(); };
+    if(zone){
+      zone.onclick = function(){ try{ zone.focus(); }catch(e){} };
+      zone.onkeydown = function(e){
+        // Allow Ctrl+V; ignore others except Escape (handled globally)
+        if(e.key === "Escape"){ closeGrab(); }
+      };
+    }
+    if(freeze) freeze.onclick = function(){
+      var status = document.getElementById("fsGrabStatus");
+      if(status){ status.style.color = "#4C596B"; status.textContent = "Pick “This tab” in the browser prompt…"; }
+      closeGrab();
+      btn.disabled = true;
+      var prev = btn.innerHTML;
+      btn.innerHTML = '<span class="fsdot">✦</span> Freezing…';
+      captureTabFrame().then(function(cv){
+        openMarkWithCanvas(cv);
+      }).catch(function(err){
+        openGrab();
+        var st = document.getElementById("fsGrabStatus");
+        var denied = err && (err.name === "NotAllowedError" || err.name === "AbortError");
+        if(st){
+          st.style.color = "#b45309";
+          st.textContent = denied
+            ? "Tab freeze cancelled — use Win+Shift+S then Ctrl+V instead (best quality)."
+            : "Couldn't freeze the tab — use Win+Shift+S then Ctrl+V (Print Screen quality).";
+        }
+      }).then(function(){ btn.disabled = false; btn.innerHTML = prev; });
+    };
+  })();
 
   // Primary CTA: go straight into mark mode (the "right here" moment).
   btn.onclick=function(){
