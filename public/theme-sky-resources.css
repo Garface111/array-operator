@@ -30,76 +30,68 @@
    pulse = updating · action blue = links/selected state. Material only.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · PANEL GROUND — no sheet; the column breathes a little wider so the
-      card grid gets room (reading measure still capped by the cards) ──────── */
+/* ── 1 · THE VIEW SHEET — Resources now lives in ONE frosted glass sheet, the
+      same as Fleet Triage (.dash-wrap) and Inverters (#sheetWrap) (Ford
+      2026-07-13: "make Resources look like the other tabs — it clashes").
+      #rsHost > .wrap is the injected container of hero + feed + foot. Desktop
+      only: the mobile fragment already sheets #rsHost white on phones. ────── */
 @media (min-width:601px){
-  html.sky #panelResources .wrap{max-width:1000px;padding:8px 6px 88px}
+  html.sky #panelResources #rsHost .wrap{
+    max-width:1160px;
+    margin:14px auto 46px;
+    padding:34px 42px 44px;
+    background:var(--sky-glass-content);
+    -webkit-backdrop-filter:var(--sky-sheet-blur);
+    backdrop-filter:var(--sky-sheet-blur);
+    border:1px solid var(--sky-glass-edge);
+    border-radius:var(--sky-r-sheet);
+    box-shadow:var(--sky-shadow-sheet);
+  }
 }
 
-/* ── 2 · HERO — floats white in the sky, the landing hero's exact grammar
-      (veil ≤.18 behind the text block, crisping shadow + wide glow). Desktop
-      only: on a phone the mobile fragment sheets #rsHost white and the stock
-      ink hero is already right. ─────────────────────────────────────────── */
+/* ── 2 · HERO — now sits INSIDE the sheet, so it's dark ink like Fleet
+      Triage's "Fleet triage" head (was white-on-world for the old no-sheet
+      layout). Desktop only; mobile's stock ink hero on the #rsHost sheet is
+      already right. ─────────────────────────────────────────────────────── */
 @media (min-width:601px){
-  html.sky #panelResources .hero{position:relative;z-index:0;margin:22px 0 30px}
-  html.sky #panelResources .hero::before{
-    content:""; position:absolute; z-index:-1; pointer-events:none;
-    inset:-38px -44px -30px -48px;
-    background:radial-gradient(76% 82% at 32% 42%,
-      rgba(9,44,88,.16) 0%, rgba(9,44,88,.10) 52%, rgba(9,44,88,0) 82%);
-  }
-  /* deep-sky tint, not translucent white — signed-out the panel enters over
-     the plate's sunlit grass band, where white-on-white washes out (the same
-     calibration the landing's ghost pill + the mobile pass ratified) */
+  html.sky #panelResources .hero{position:relative;z-index:0;margin:0 0 24px}
+  html.sky #panelResources .hero::before{display:none}   /* no dark veil — text is on the sheet */
   html.sky #panelResources .eyebrow{
     display:inline-flex; align-items:center;
-    background:rgba(11,42,82,.26);
-    border:1px solid rgba(255,255,255,.55);
+    background:rgba(33,150,243,.10);
+    border:1px solid rgba(33,150,243,.22);
     border-radius:var(--sky-r-pill);
     padding:6px 13px;
-    color:#ffffff; font-weight:700; letter-spacing:.14em;
-    text-shadow:0 1px 2px rgba(8,44,90,.45);
+    color:var(--sky-primary-deep); font-weight:700; letter-spacing:.14em;
+    text-shadow:none;
   }
   /* counter theme-day's gradient-clip (html[data-theme=day] .hero h1 —
-     !important text-fill transparent) exactly like the landing .hero-h1 */
+     !important text-fill transparent); dark ink on the sheet */
   html.sky #panelResources .hero h1{
     background:none !important;
     -webkit-background-clip:border-box !important; background-clip:border-box !important;
-    color:#ffffff !important;
-    -webkit-text-fill-color:#ffffff;
-    font-size:40px; font-weight:750; letter-spacing:-.025em; line-height:1.08;
+    color:var(--ink) !important;
+    -webkit-text-fill-color:var(--ink);
+    font-size:38px; font-weight:780; letter-spacing:-.025em; line-height:1.08;
     margin:.4em 0 .2em;
-    text-shadow:0 1px 3px rgba(8,44,90,.28), 0 2px 30px rgba(8,44,90,.52);
+    text-shadow:none;
     text-wrap:balance;
   }
-  html.sky #panelResources .lede{
-    color:rgba(255,255,255,.93);
-    text-shadow:0 1px 3px rgba(8,44,90,.4), 0 2px 18px rgba(8,44,90,.42);
-  }
-  /* every line that sits RAW on the world goes white + shadowed */
-  html.sky #panelResources .res-picker-lab{
-    color:rgba(255,255,255,.92);
-    text-shadow:0 1px 3px rgba(8,44,90,.5);
-  }
-  html.sky #panelResources .muted{
-    color:rgba(255,255,255,.93);
-    text-shadow:0 1px 3px rgba(8,44,90,.5);
-  }
+  html.sky #panelResources .lede{color:var(--muted);text-shadow:none}
+  html.sky #panelResources .res-picker-lab{color:var(--muted);text-shadow:none}
+  html.sky #panelResources .muted{color:var(--muted);text-shadow:none}
   html.sky #panelResources .foot{
-    color:rgba(255,255,255,.88);
-    border-top:1px solid rgba(255,255,255,.38);
-    text-shadow:0 1px 3px rgba(8,44,90,.5);
+    color:var(--muted);
+    border-top:1px solid rgba(20,60,120,.12);
+    text-shadow:none;
   }
   html.sky #panelResources .foot a{
-    color:#ffffff; font-weight:650;
-    text-decoration:underline; text-decoration-color:rgba(255,255,255,.55);
+    color:var(--sky-primary-deep); font-weight:650;
+    text-decoration:underline; text-decoration-color:rgba(33,150,243,.4);
   }
   html.sky #panelResources .ao-res-loading,
-  html.sky #panelResources .ao-res-error{
-    color:rgba(255,255,255,.93);
-    text-shadow:0 1px 3px rgba(8,44,90,.5);
-  }
-  html.sky #panelResources .ao-res-error a{color:#ffffff;font-weight:650}
+  html.sky #panelResources .ao-res-error{color:var(--muted);text-shadow:none}
+  html.sky #panelResources .ao-res-error a{color:var(--sky-primary-deep);font-weight:650}
 }
 
 /* ── 3 · STATE PICKER — glass pills, active = solid action blue (the tab
