@@ -143,14 +143,18 @@ html.sky{
 html.sky{
   background:var(--sky-mid) !important;
   /* analysis.css reserves html{scrollbar-gutter:stable both-edges} for the
-     stock skin's symmetric centering — but Chromium never paints page
-     content (incl. this fixed world layer) into the gutter band, so with
-     classic scrollbars the plate showed two ~15px flat --sky-mid strips at
-     the viewport edges. The world must run edge to edge: retire the gutters
-     under the flag (classic-scrollbar setups get a normal right scrollbar;
-     overlay-scrollbar platforms were already full-bleed). */
+     stock skin's symmetric centering — retire it so the world runs edge to
+     edge (no reserved gutter band). */
   scrollbar-gutter:auto;
+  /* Ford 2026-07-13: hide the MAIN page scrollbar for the clean immersive
+     world (wheel / trackpad / keyboard scroll all keep working). Scoped to
+     the html element only — `scrollbar-width` isn't inherited and the
+     ::-webkit-scrollbar pseudo matches only this element, so inner scroll
+     areas (tables, the vendor sheet) keep their own scrollbars. */
+  scrollbar-width:none;         /* Firefox */
+  -ms-overflow-style:none;      /* legacy Edge/IE */
 }
+html.sky::-webkit-scrollbar{ width:0; height:0; display:none; } /* Chrome/Safari/Edge */
 html.sky body{
   background:none !important;
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
