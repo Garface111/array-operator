@@ -28,8 +28,26 @@
 <!-- Whole-system browser error capture — loaded first so it sees errors from
      every later script. POSTs to the shared backend /v1/client-error. -->
 <script src="error-reporter.js?v=20260709"></script>
-<!-- Day mode only (the night toggle was removed) — set before first paint, no flash. -->
-<script>document.documentElement.setAttribute("data-theme","day");</script>
+<!-- Day mode only (the night toggle was removed) — set before first paint, no flash.
+     SKY DEMO FLAG (Ford's flag-gated "Sky" redesign, 2026-07-12): ?sky=1 turns it on
+     (persisted in localStorage ao_sky), ?sky=0 turns it off. When on, <html> gets
+     class "sky" here (pre-paint) and a second inline script AFTER the mobile.css
+     link document.writes theme-sky.css so it loads LAST and wins the cascade.
+     Flag off = no class, no stylesheet, zero change for real customers. -->
+<script>
+document.documentElement.setAttribute("data-theme","day");
+(function(){
+  try{
+    var q = location.search || "";
+    if (/[?&]sky=0(&|$)/.test(q)) localStorage.removeItem("ao_sky");
+    else if (/[?&]sky=1(&|$)/.test(q)) localStorage.setItem("ao_sky","1");
+    if (localStorage.getItem("ao_sky") === "1"){
+      document.documentElement.classList.add("sky");
+      window.__AO_SKY__ = true;
+    }
+  }catch(e){}
+})();
+</script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260712serow">
 <link rel="stylesheet" href="command-center.css?v=20260712rd2">
@@ -38,6 +56,10 @@
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260710a"><!-- Resources tab (in-app briefing); scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260712mob4"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
+<!-- SKY DEMO THEME — only when the ao_sky flag is on (see the pre-paint script above).
+     document.write keeps it parser-blocking (no FOUC) and positions it AFTER
+     mobile.css so it is the final word in the cascade. -->
+<script>if (window.__AO_SKY__) document.write('<link rel="stylesheet" href="theme-sky.css?v=20260712sky1">');</script>
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */

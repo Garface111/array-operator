@@ -1,0 +1,521 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARRAY OPERATOR — "SKY" THEME · flag-gated demo layer          (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   The whole app lives IN the sky: a fixed sky-blue gradient is the world,
+   and every surface is frosted glass floating on it. Design language from
+   the ao-sky-redesign-brief (Scribblit reference + Ford's glass-squircle
+   refinement): Plus Jakarta Sans, glass-squircle sheets, pastel accents,
+   alpine-solar hero photography.
+
+   GATE — this file is loaded ONLY when the Sky flag is on:
+     · ?sky=1 in the URL (persists via localStorage ao_sky='1')
+     · ?sky=0 clears the flag
+   The inline pre-paint script in index.html adds class "sky" to <html> and
+   document.writes this <link> AFTER mobile.css, so it is the LAST sheet in
+   the cascade and wins every specificity war by source order. Every rule in
+   here is scoped under html.sky — with the flag off this file never loads
+   and NOTHING changes for real customers.
+
+   MATERIAL TIERS (keep these straight when extending per-tab):
+     · chrome glass  — rgba(255,255,255,.55) + blur(24px) saturate(1.5)
+                       ONLY the tab bar + modal sheets. The most transparent.
+     · content glass — rgba(255,255,255,.78) + blur(16px)
+                       top-level sheets (one per view: #sbWrap, .dash-wrap,
+                       .acct-list, the hero pricing card). Data stays crisp.
+     · card solid    — rgba(255,255,255,.80-.88), NO backdrop-filter.
+                       Every card INSIDE a sheet (.sb-inv, .fcg-tile, .cc-kpi,
+                       .rb-card…). They sit on blurred glass already; adding
+                       per-card blur would melt the 100-array canvas GPU.
+   PERF GUARDRAIL: backdrop-filter ONLY on .tabbar, modals, and top-level
+   sheets. NEVER on .sb-inv / per-inverter cards. (brief §perf)
+
+   PRESERVED SEMANTICS (do not re-map while extending): amber=warn / red=hard
+   error / --ao-live green=working / octarine=machine-computed, the four-state
+   chips, '~'/est. honesty markers. This layer restyles material, not meaning.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 0 · Plus Jakarta Sans — self-hosted VARIABLE font (wght 200–800).
+      One file covers 400/500/600/700 AND the house's intermediate weights
+      (640, 750, 820…) exactly. CSP font-src is 'self' — no external URL. ── */
+@font-face{
+  font-family:"Plus Jakarta Sans";
+  src:url("fonts/PlusJakartaSans-latin.woff2") format("woff2");
+  font-weight:200 800; font-style:normal; font-display:swap;
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family:"Plus Jakarta Sans";
+  src:url("fonts/PlusJakartaSans-latin-ext.woff2") format("woff2");
+  font-weight:200 800; font-style:normal; font-display:swap;
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* ── 1 · DESIGN TOKENS ─────────────────────────────────────────────────────── */
+html.sky{
+  /* the sky itself */
+  --sky-top:#1E90E8;
+  --sky-mid:#56B4F0;
+  --sky-horizon:#BEE3FA;
+
+  /* brand + accents (brief palette) */
+  --sky-primary:#2196F3;        /* solid action blue */
+  --sky-primary-deep:#1976D2;
+  --sky-pastel-blue:#D9E7FB;
+  --sky-pastel-green:#D3F2CE;
+  --sky-green:#4CAF50;          /* saturated green accent (icons/badges) */
+
+  /* radius scale (brief) */
+  --sky-r-pill:999px;
+  --sky-r-btn:12px;
+  --sky-r-card:22px;
+  --sky-r-sheet:32px;
+
+  /* glass material tiers */
+  --sky-glass-chrome:rgba(255,255,255,.55);
+  --sky-glass-content:rgba(255,255,255,.78);
+  --sky-glass-solid:rgba(255,255,255,.88);
+  --sky-glass-edge:rgba(255,255,255,.5);     /* the 1px inner border */
+
+  /* soft blue-tinted shadows */
+  --sky-shadow-card:0 8px 30px rgba(20,60,120,.08);
+  --sky-shadow-sheet:0 18px 50px -12px rgba(20,60,120,.16);
+  --sky-shadow-float:0 24px 70px -18px rgba(15,50,110,.28);
+
+  /* ── re-point the app's core tokens (everything var()-driven follows) ── */
+  --bg:#EAF4FD;                 /* light azure stand-in where --bg paints a fill */
+  --bg2:#DFEDFB;
+  --ink:#0E1420;
+  --muted:#5A6572;
+  --faint:#7C8798;
+  --line:rgba(20,60,120,.12);   /* hairlines get the blue tint */
+  --card:#ffffff;               /* stays SOLID — glass is applied per-surface,
+                                   so popovers/menus without blur stay legible */
+  --card2:#F4F9FF;
+  --good:#2196F3;               /* brand primary + healthy (day's blue-is-good) */
+  --good2:#1E90E8;
+  --green-deep:#1565C0;
+  --day-chip:#E3F0FC;
+  --day-tile:#E3F0FC;
+  --day-track:rgba(20,60,120,.10);
+  --day-hover:rgba(33,150,243,.08);
+  --day-surf:rgba(255,255,255,.6);
+  --dash-shadow:var(--sky-shadow-card);
+  /* --warn/--bad/--gold/--ao-oct/--ao-live untouched: ratified status language */
+}
+
+/* ── 2 · THE SKY WORLD — the page IS the sky ───────────────────────────────
+   Fixed full-viewport vertical gradient + a soft white horizon glow low in
+   the frame (sun through haze). Everything floats over this; panels stay
+   transparent so the world shows through. Beats theme-day's !important. ── */
+html.sky{background:var(--sky-mid) !important}
+html.sky body{
+  background:
+    radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%) !important;
+  background-attachment:fixed !important;
+  font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+html.sky button, html.sky input, html.sky select, html.sky textarea{font-family:inherit}
+html.sky h1, html.sky h2, html.sky h3{letter-spacing:-.015em}
+/* native popups stay light */
+html.sky select, html.sky option, html.sky optgroup,
+html.sky input, html.sky textarea{color-scheme:light}
+html.sky select option, html.sky select optgroup{background:#ffffff;color:var(--ink)}
+html.sky :focus-visible{outline:2px solid var(--sky-primary);outline-offset:2px}
+html.sky ::selection{background:rgba(33,150,243,.22)}
+
+/* ── 3 · CHROME — the tab bar becomes a floating glass pill bar ────────────
+   Desktop only; ≤600px keeps the mobile-overhaul bottom nav's geometry and
+   just adopts the glass material. ─────────────────────────────────────── */
+@media (min-width:601px){
+  html.sky .tabbar{
+    margin:20px 0 14px; padding:6px; gap:4px;
+    background:var(--sky-glass-chrome);
+    -webkit-backdrop-filter:blur(24px) saturate(1.5);
+    backdrop-filter:blur(24px) saturate(1.5);
+    border:1px solid var(--sky-glass-edge); border-bottom:1px solid var(--sky-glass-edge);
+    border-radius:var(--sky-r-pill);
+    box-shadow:var(--sky-shadow-card);
+  }
+  html.sky .tab{
+    border-radius:var(--sky-r-pill); padding:10px 16px;
+    color:#33415A; font-weight:600;
+  }
+  html.sky .tab + .tab{border-left:0}
+  html.sky .tab::after{display:none}                /* no underline indicator */
+  html.sky .tab:hover{background:rgba(255,255,255,.6) !important;color:var(--ink) !important}
+  html.sky .tab.active{
+    background:var(--sky-primary) !important; color:#ffffff !important;
+    box-shadow:0 4px 14px -4px rgba(33,150,243,.6);
+  }
+  html.sky .tab.active:hover{background:var(--sky-primary) !important;color:#ffffff !important}
+  html.sky .tab-dot{background:#ffe082;box-shadow:0 0 0 3px rgba(255,224,130,.25)}
+  html.sky .tab.tab-whoami{
+    background:rgba(255,255,255,.7) !important;
+    border-color:var(--sky-glass-edge);
+  }
+  html.sky .tab.tab-whoami:hover{background:rgba(255,255,255,.9) !important}
+}
+@media (max-width:600px){
+  /* the fixed bottom bar: same geometry, sky glass material */
+  html.sky .tabbar{
+    background:var(--sky-glass-chrome) !important;
+    -webkit-backdrop-filter:blur(24px) saturate(1.5);
+    backdrop-filter:blur(24px) saturate(1.5);
+    border-top:1px solid rgba(255,255,255,.65);
+    box-shadow:0 -10px 30px -22px rgba(15,50,110,.5);
+  }
+  html.sky .mob-more{
+    background:var(--sky-glass-content) !important;
+    -webkit-backdrop-filter:blur(24px) saturate(1.5);
+    backdrop-filter:blur(24px) saturate(1.5);
+    border-color:var(--sky-glass-edge) !important;
+  }
+}
+
+/* ── 4 · TOP-LEVEL GLASS SHEETS (content tier, blur allowed — one per view) ── */
+html.sky #sbWrap,
+html.sky #panelDashboard .dash-wrap,
+html.sky .acct-list{
+  background:var(--sky-glass-content) !important;
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--sky-glass-edge) !important;
+  border-radius:var(--sky-r-sheet) !important;
+  box-shadow:var(--sky-shadow-sheet) !important;
+}
+html.sky #panelDashboard .dash-wrap{padding:30px 30px 60px !important;margin-top:14px !important}
+html.sky .acct-list{overflow:hidden}
+
+/* the pannable fleet board inside the #sbWrap sheet: let the sky glow through
+   a whisper of white; re-tint theme-day's dot grid to deep sky blue */
+html.sky .sb-viewport{
+  background-color:rgba(255,255,255,.22) !important;
+  background-image:
+    radial-gradient(58% 55% at 84% -8%, rgba(255,255,255,.4), rgba(255,255,255,0) 70%),
+    radial-gradient(rgba(21,101,192,.15) 1.1px, transparent 1.3px) !important;
+  background-size:auto, 24px 24px !important;
+  background-position:0 0, 0 0 !important;
+  background-attachment:local, local !important;
+  border-radius:var(--sky-r-card);
+}
+
+/* ── 5 · CORE MATERIAL — card families become glass (solid tier, NO blur) ──
+   These all sit on a blurred sheet or directly on the sky; a translucent
+   white fill + 1px white inner edge + soft blue shadow reads as glass
+   without paying backdrop-filter per card. ─────────────────────────────── */
+html.sky .sb-array,
+html.sky .sb-array--card,
+html.sky .sb-vend,
+html.sky .fcg-tile,
+html.sky .cc-kpi,
+html.sky .cl-kpi,
+html.sky .cl-card,
+html.sky .cl-policy,
+html.sky .ft-card,
+html.sky .cc-collapsible,
+html.sky .rb-card,
+html.sky .rb-acc{
+  background:rgba(255,255,255,.8) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .cc-tablewrap{
+  background:rgba(255,255,255,.7) !important;
+  border-radius:var(--sky-r-card) !important;
+}
+/* per-inverter cards in the 100-array canvas: SOLID fallback, never blurred */
+html.sky .sb-inv{
+  background:rgba(255,255,255,.88) !important;
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:14px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .sb-inv:hover,
+html.sky .sb-array--card:hover{box-shadow:0 12px 28px -12px rgba(20,60,120,.28) !important}
+/* frosted floating clusters over the fleet board */
+html.sky .sb-head-btns,
+html.sky .sb-legend{
+  background:rgba(255,255,255,.72) !important;
+  border-color:var(--sky-glass-edge) !important;
+  border-radius:var(--sky-r-pill);
+}
+
+/* modals + toasts + detail cards: chrome-tier frosted sheets (blur allowed) */
+html.sky .ao-modal,
+html.sky .sb-modal,
+html.sky .cl-modal,
+html.sky .sb-detail-card,
+html.sky .sb-toast{
+  background:rgba(255,255,255,.82) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--sky-glass-edge) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+html.sky .sb-card-menu{
+  background:#ffffff !important;                 /* opaque — menus must be legible */
+  border:1px solid var(--line) !important;
+  border-radius:16px !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+/* scrims: deep-sky dim instead of slate */
+html.sky .ao-overlay,
+html.sky .sb-ov,
+html.sky .cl-modal-back{background:rgba(13,44,86,.38) !important}
+html.sky .ao-modal-foot,
+html.sky .sb-modal-foot{background:rgba(233,243,253,.65) !important}
+
+/* ── 6 · BUTTONS ───────────────────────────────────────────────────────────
+   primary = solid action blue, white text, rounded-12, hover lift
+   secondary/ghost = white/70 glass pill                                  ── */
+html.sky .btn-primary-lg,
+html.sky .acct-btn.primary,
+html.sky .sb-addbtn,
+html.sky .sb-mbtn.primary,
+html.sky .ao-btn-primary,
+html.sky .cc-btn.primary,
+html.sky .cl-btn.primary,
+html.sky .cl-segbtn.on,
+html.sky .rb-save{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%) , var(--sky-primary) !important;
+  color:#ffffff !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 18px -6px rgba(33,150,243,.55) !important;
+  transition:transform .14s var(--ease-out,ease-out), box-shadow .14s, filter .14s;
+}
+html.sky .btn-primary-lg:hover,
+html.sky .acct-btn.primary:hover,
+html.sky .sb-addbtn:hover,
+html.sky .sb-mbtn.primary:hover,
+html.sky .ao-btn-primary:hover,
+html.sky .cc-btn.primary:hover,
+html.sky .cl-btn.primary:hover,
+html.sky .rb-save:hover{
+  background:linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,0) 42%) , var(--sky-primary) !important;
+  transform:translateY(-1px);
+  box-shadow:0 9px 24px -7px rgba(33,150,243,.65) !important;
+}
+html.sky .acct-btn,
+html.sky .acct-pw-eye,
+html.sky .sb-togglebtn,
+html.sky .sb-resetbtn,
+html.sky .sb-cardbtn,
+html.sky .sb-mbtn.ghost,
+html.sky .ao-btn-ghost,
+html.sky .ao-btn:not(.ao-btn-primary):not(.ao-btn-danger),
+html.sky .rb-btn:not(.ao-btn-primary),
+html.sky .rb-cancel,
+html.sky .cl-btn.ghost,
+html.sky .cc-btn.ghost{
+  background:rgba(255,255,255,.7) !important;
+  color:var(--ink) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.07) !important;
+}
+html.sky .acct-btn:hover,
+html.sky .sb-cardbtn:hover,
+html.sky .rb-btn:not(.ao-btn-primary):hover,
+html.sky .cc-btn.ghost:hover{
+  background:rgba(255,255,255,.92) !important;
+  border-color:rgba(33,150,243,.45) !important;
+  color:var(--sky-primary-deep) !important;
+}
+/* danger stays red (AODialog danger:true) — only the shape modernizes */
+html.sky .ao-btn-danger{border-radius:var(--sky-r-btn) !important}
+
+/* ── 7 · INPUTS — crisp white glass fields, primary-blue focus ────────────── */
+html.sky .acct-edit .r-v input,
+html.sky .acct-pw-edit input,
+html.sky .rep-fld select,
+html.sky .rep-fld input,
+html.sky .sb-fld input,
+html.sky .sb-data-pick,
+html.sky .ao-input,
+html.sky .ao-textarea,
+html.sky .cc-search input,
+html.sky .cl-fld input,
+html.sky .cl-fld textarea,
+html.sky .cl-grace input{
+  background:rgba(255,255,255,.85) !important;
+  color:var(--ink) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+}
+html.sky .ao-input:focus,
+html.sky .ao-textarea:focus,
+html.sky .cc-search input:focus,
+html.sky .sb-fld input:focus{
+  border-color:var(--sky-primary) !important;
+  box-shadow:0 0 0 3px rgba(33,150,243,.18) !important;
+}
+
+/* ── 8 · THE LANDING HERO (signed-out #demoBanner) ─────────────────────────
+   The reference composition: one rounded-32 glass-edged container holding
+   the sky gradient + the alpine-solar hero photo anchored at the bottom,
+   white headline over the deep sky, glass pricing card floating right,
+   the "LIVE DEMO BELOW" strip re-cut as a rotated white sticker pill.
+   Copy and links are untouched — composition + material only. ─────────── */
+html.sky .demo-banner{
+  margin:22px 0 10px;
+  border-radius:var(--sky-r-sheet);
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:var(--sky-shadow-float);
+  position:relative;
+  isolation:isolate;
+  /* layers, top→bottom: deep-sky veil for headline legibility · hero photo
+     bottom-anchored (webp with jpg fallback) · the sky gradient behind it */
+  background-image:
+    linear-gradient(180deg, rgba(12,62,124,.44) 0%, rgba(12,62,124,.20) 34%, rgba(12,62,124,0) 58%),
+    url("img/sky/hero.jpg"),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-horizon) 100%);
+  background-image:
+    linear-gradient(180deg, rgba(12,62,124,.44) 0%, rgba(12,62,124,.20) 34%, rgba(12,62,124,0) 58%),
+    image-set(url("img/sky/hero.webp") type("image/webp"), url("img/sky/hero.jpg") type("image/jpeg")),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-horizon) 100%);
+  background-repeat:no-repeat;
+  background-position:center top, center bottom, center;
+  background-size:100% 100%, cover, cover;
+}
+html.sky .hero{padding:54px 54px 132px;gap:34px}
+html.sky .hero .db-badge{
+  background:rgba(255,255,255,.26);
+  border:1px solid rgba(255,255,255,.5);
+  color:#ffffff;
+  font-weight:700; letter-spacing:.14em;
+  padding:6px 13px;
+}
+/* headline: pure white, larger, tight tracking — must out-rank theme-day's
+   gradient-clip rule (html[data-theme=day] .hero h1) */
+html.sky .hero .hero-h1{
+  background:none !important;
+  -webkit-background-clip:border-box !important; background-clip:border-box !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff;
+  font-weight:700; letter-spacing:-.025em;
+  text-shadow:0 2px 26px rgba(8,44,90,.45);
+  text-wrap:balance;
+}
+@media (min-width:761px){ html.sky .hero .hero-h1{font-size:46px;line-height:1.06} }
+@media (max-width:760px){ html.sky .hero .hero-h1{font-size:30px} }
+html.sky .hero .hero-h1 em{color:#E5F6E0}          /* pastel-green lift on the payoff */
+html.sky .hero .hero-sub{
+  color:rgba(255,255,255,.88);
+  text-shadow:0 1px 16px rgba(8,44,90,.4);
+  font-size:15px; max-width:56ch;
+}
+html.sky .hero .hero-sub b{color:#ffffff}
+html.sky .hero .gloss{border-bottom-color:rgba(255,255,255,.55)}
+/* CTAs: solid action blue + translucent white pill */
+html.sky .hero .db-cta{
+  background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 45%), var(--sky-primary);
+  color:#ffffff;
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:var(--sky-r-btn);
+  box-shadow:0 10px 28px -8px rgba(10,50,110,.55);
+}
+html.sky .hero .db-cta:hover{
+  filter:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.3), rgba(255,255,255,0) 45%), var(--sky-primary);
+  box-shadow:0 14px 34px -9px rgba(10,50,110,.65);
+}
+html.sky .hero .db-signin{
+  background:rgba(255,255,255,.22);
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:var(--sky-r-pill);
+  color:#ffffff; padding:11px 22px; font-weight:600;
+  transition:background .14s;
+}
+html.sky .hero .db-signin:hover{background:rgba(255,255,255,.34);color:#ffffff}
+html.sky .hero .hero-trust{color:rgba(255,255,255,.78);text-shadow:0 1px 12px rgba(8,44,90,.4)}
+/* the pricing aside: a floating content-glass card over the scene */
+html.sky .hero .hero-price{
+  background:var(--sky-glass-content);
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.7);
+  border-radius:var(--sky-r-card);
+  box-shadow:var(--sky-shadow-sheet);
+  padding:22px;
+}
+html.sky .hero .hp-k{color:#46658C}
+html.sky .hero .hp-num{color:var(--sky-primary-deep)}
+html.sky .hero .hp-unit{color:var(--muted)}
+html.sky .hero .hp-eg{color:var(--ink)}
+html.sky .hero .hp-eg-sub{color:var(--muted)}
+html.sky .hero .hp-list li{color:#3D4A5C}
+html.sky .hero .hp-list li::before{color:var(--sky-green)}
+/* demo strip: a white glass band; the badge becomes the rotated sticker */
+html.sky .db-demostrip{
+  background:rgba(255,255,255,.6);
+  border-top:1px solid rgba(255,255,255,.55);
+  padding:13px 28px;
+}
+html.sky .db-demostrip .db-badge.sm{
+  background:#ffffff;
+  border:0;
+  color:#1B6ACB;
+  transform:rotate(-2deg);
+  box-shadow:0 4px 14px rgba(20,60,120,.18);
+  padding:6px 11px;
+  font-size:10px;
+}
+html.sky .db-demostrip .db-copy{color:#33415A}
+html.sky .db-demostrip .db-copy b{color:var(--ink)}
+html.sky .db-demostrip .db-signin{color:#33415A;font-weight:650}
+html.sky .db-demostrip .db-signin:hover{color:var(--sky-primary-deep)}
+@media (max-width:760px){
+  html.sky .hero{padding:34px 22px 96px}
+  html.sky .demo-banner{border-radius:24px}
+}
+
+/* ── 9 · NUDGE / GATE BARS float as glass too (material only, states keep
+      their amber/green/neutral semantics) ─────────────────────────────── */
+html.sky .trial-nudge{
+  background:rgba(255,255,255,.72);
+  border-color:var(--sky-glass-edge);
+  border-radius:16px;
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .gmp-gate{border-radius:18px;box-shadow:var(--sky-shadow-card)}
+
+/* ── 10 · SQUIRCLE — progressive enhancement (Chrome 139+; harmless no-op
+      elsewhere). Continuous-curvature corners on the glass vocabulary. ── */
+@supports (corner-shape: squircle){
+  html.sky .demo-banner,
+  html.sky .tabbar,
+  html.sky .tab,
+  html.sky #sbWrap,
+  html.sky #panelDashboard .dash-wrap,
+  html.sky .acct-list,
+  html.sky .sb-array,
+  html.sky .sb-array--card,
+  html.sky .sb-inv,
+  html.sky .sb-vend,
+  html.sky .fcg-tile,
+  html.sky .cc-kpi,
+  html.sky .ft-card,
+  html.sky .rb-card,
+  html.sky .rb-acc,
+  html.sky .ao-modal,
+  html.sky .sb-modal,
+  html.sky .sb-detail-card,
+  html.sky .hero-price,
+  html.sky .db-cta,
+  html.sky .ao-btn-primary,
+  html.sky .sb-addbtn{
+    corner-shape:squircle;
+  }
+}
+
+/* ── 11 · SMALL WORLD-COHESION TOUCHES ────────────────────────────────────── */
+/* empty-state text sits right on the sky in some views — keep it readable */
+html.sky .empty{color:#28466E}
+/* keyboard-focus ring on glass */
+html.sky .ao-modal-close:focus-visible,
+html.sky .sb-modal-x:focus-visible{outline-color:var(--sky-primary)}
