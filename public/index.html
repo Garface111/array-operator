@@ -230,18 +230,18 @@ document.documentElement.setAttribute("data-theme","day");
   <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
     <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Triage</a>
     <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverters</a>
+    <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13) — see #panelAnalysis's
+         segmented control. No top-level Trends tab; #trends deep-links route here. -->
     <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
-    <!-- Trends restored for PowerTrack-parity multi-timeframe views (fleet kWh by
-         year + seasonal YoY). Route/panel/JS were kept intact; this <a> re-enables it. -->
-    <a class="tab" id="tabTrends" href="#trends" role="tab">Trends</a>
     <a class="tab" id="tabReports" href="#reports" role="tab" title="Offtaker Invoice Generator — an offtaker is a customer who receives a share of your solar credits; this is where you invoice them.">Invoices</a>
-    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Expert resource + live-news hub (Paul Bozawa's idea): net-metering rates, rate
          cases, regulatory changes. In-app view (Ford 2026-07-10) — switches like every
          other tab instead of opening a separate page; #panelResources loads its content
          from resources.html at runtime (still a standalone page for external/deep links). -->
     <a class="tab" id="tabResources" href="#resources" role="tab"
        title="Vermont net-metering rates, active rate cases, and regulatory news — kept current.">Resources</a>
+    <!-- Master Account moved to the right of Resources (Ford 2026-07-13). -->
+    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
     <!-- Signed-in identity chip — which account am I in. Top-right, next to the
@@ -371,17 +371,29 @@ document.documentElement.setAttribute("data-theme","day");
        from self-contained section modules (analysis-*.js) that register on
        window.AnalysisSections; analysis.js (window.__aoLoadAnalysis) builds the
        shared ctx (FleetStore + /v1/array-owners/forecast-fleet) and renders them. -->
+  <!-- Analysis has two sub-views (Ford 2026-07-13): the fleet NOC + Trends. The
+       segmented control (reuses the Inverters .vs-seg styling) switches between the
+       two PANELS below — kept SEPARATE so analysis's #panelAnalysis .an-* styling
+       never bleeds onto trends' .an-* (a known collision, see the frontend map).
+       sandbox.js routes #analysis→this panel, #trends→panelTrends, both under the
+       Analysis top tab. -->
   <section class="panel" id="panelAnalysis" role="tabpanel" aria-label="Analysis">
+    <div class="vs-seg an-sub-seg" role="group" aria-label="Analysis view" style="margin:14px auto 6px">
+      <button class="vs-seg-btn on" type="button" data-ansub="analysis" aria-pressed="true">Fleet analysis</button>
+      <button class="vs-seg-btn" type="button" data-ansub="trends" aria-pressed="false">Trends</button>
+    </div>
     <div id="analysisRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading analysis…</div></div>
   </section>
 
-  <!-- ============================ TAB: TRENDS ============================ -->
-  <!-- Portfolio-wide multi-year production trends (Paul Bozuwa's "macro-level
-       tab for multi-year trend lines"): total fleet kWh by year + seasonal
-       year-over-year across EVERY array, with a per-array drill-down below.
-       Rendered by trends.js (window.__aoLoadTrends) into #trendsRoot from
-       GET /v1/array-owners/fleet-trends. -->
+  <!-- ===================== ANALYSIS SUB-VIEW: TRENDS ===================== -->
+  <!-- Paul's portfolio-wide multi-year trend lines. Rendered by trends.js
+       (window.__aoLoadTrends) into #trendsRoot. Reached via the Analysis tab's
+       "Trends" segmented button (or a #trends deep-link). -->
   <section class="panel" id="panelTrends" role="tabpanel" aria-label="Trends">
+    <div class="vs-seg an-sub-seg" role="group" aria-label="Analysis view" style="margin:14px auto 6px">
+      <button class="vs-seg-btn" type="button" data-ansub="analysis" aria-pressed="false">Fleet analysis</button>
+      <button class="vs-seg-btn on" type="button" data-ansub="trends" aria-pressed="true">Trends</button>
+    </div>
     <div id="trendsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div></div>
   </section>
 
@@ -411,13 +423,13 @@ document.documentElement.setAttribute("data-theme","day");
      there's no session (gated inside those files). -->
 <script src="demo-data.js"></script>
 <script src="app.js?v=20260712dlg"></script>
-<script src="sandbox.js?v=20260713vault"></script>
+<script src="sandbox.js?v=20260713trends"></script>
 <script src="vendor-sheet.js?v=20260713vend"></script>
 <script src="command-center.js?v=12"></script>
 <script src="reports.js?v=20260713zebra"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
      phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=1" defer></script>
+<script src="mobile-nav.js?v=20260713trends" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
      Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>

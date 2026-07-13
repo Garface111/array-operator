@@ -6292,7 +6292,8 @@
     account: { panel: "panelAccount", tab: "tabAccount" },
     arrays:  { panel: "panelArrays",  tab: "tabArrays"  },
     analysis:{ panel: "panelAnalysis",tab: "tabAnalysis"},
-    trends:  { panel: "panelTrends",  tab: "tabTrends"  },
+    /* Trends is a SUB-VIEW of Analysis now (Ford 2026-07-13) — panelTrends is
+       toggled manually inside the analysis branch of applyView, not via this map. */
     reports: { panel: "panelReports", tab: "tabReports" },
     resources:{ panel: "panelResources", tab: "tabResources" },
   };
@@ -6301,7 +6302,7 @@
     if(h === "#account") return "account";
     if(h === "#arrays" || h === "#sandbox") return "arrays";
     if(h === "#analysis") return "analysis";
-    if(h === "#trends")  return "trends";
+    if(h === "#trends")  return "analysis";   // Trends is a sub-view of Analysis now
     if(h === "#reports") return "reports";
     if(h === "#resources") return "resources";   // in-app Vermont operator briefing
     if(h === "#dashboard") return "dashboard";   // explicit deep-link → owner health home
@@ -6323,6 +6324,33 @@
   }
   try { window.__aoUpdateAccountDot = updateAccountDot; } catch(_){}
 
+  /* Analysis ⇄ Trends sub-view (Ford 2026-07-13). #analysis shows the fleet NOC,
+     #trends shows Paul's multi-year trends — both under the Analysis top tab, via
+     the .an-sub-seg segmented control duplicated in each panel. */
+  function subFromHash(){ return location.hash === "#trends" ? "trends" : "analysis"; }
+  function applyAnalysisSub(){
+    const trendsSub = subFromHash() === "trends";
+    const pA = document.getElementById("panelAnalysis");
+    const pT = document.getElementById("panelTrends");
+    if(pA) pA.classList.toggle("active", !trendsSub);
+    if(pT) pT.classList.toggle("active",  trendsSub);
+    document.querySelectorAll(".an-sub-seg [data-ansub]").forEach(b => {
+      const on = (b.getAttribute("data-ansub") === "trends") === trendsSub;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if(trendsSub){ if(window.__aoLoadTrends) window.__aoLoadTrends(); }
+    else { if(window.__aoLoadAnalysis) window.__aoLoadAnalysis(); }
+  }
+  // The segmented buttons just set the hash; hashchange → applyView → applyAnalysisSub.
+  document.addEventListener("click", function(e){
+    const b = e.target && e.target.closest ? e.target.closest(".an-sub-seg [data-ansub]") : null;
+    if(!b) return;
+    const target = b.getAttribute("data-ansub") === "trends" ? "#trends" : "#analysis";
+    if(location.hash === target) applyAnalysisSub();     // same hash → still (re)apply
+    else location.hash = target;
+  });
+
   let _firstApply = true;
   function applyView(){
     const active = tabFromHash();
@@ -6333,6 +6361,11 @@
       if(panel) panel.classList.toggle("active", name === active);
       if(tab)   tab.classList.toggle("active",   name === active);
     });
+    // Trends panel isn't in TABS (it's an Analysis sub-view); hide it on other tabs.
+    if(active !== "analysis"){
+      const _pT = document.getElementById("panelTrends");
+      if(_pT) _pT.classList.remove("active");
+    }
 
     if(active === "dashboard"){
       // Owner health home — command-center.js fills #fleetCommander + #ccQueue + the
@@ -6349,9 +6382,7 @@
       try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
       updateAccountDot();
     } else if(active === "analysis"){
-      if(window.__aoLoadAnalysis) window.__aoLoadAnalysis();
-    } else if(active === "trends"){
-      if(window.__aoLoadTrends) window.__aoLoadTrends();
+      applyAnalysisSub();      // shows the Fleet-analysis OR Trends sub-view + loads it
     } else if(active === "reports"){
       loadReports();
     } else if(active === "resources"){
@@ -6367,7 +6398,7 @@
    * locked tab is greyed; clicking it offers an upgrade. Managed in Master Account.
    * ========================================================================== */
   let _entitlement = null;   // { plan, plan_chosen, vendor_data, invoicing } | null
-  const TAB_FEATURE = { dashboard: "vendor_data", arrays: "vendor_data", analysis: "vendor_data", trends: "vendor_data", reports: "invoicing" };
+  const TAB_FEATURE = { dashboard: "vendor_data", arrays: "vendor_data", analysis: "vendor_data", reports: "invoicing" };
   const PLAN_LABEL  = { monitoring: "Live vendor data", invoicing: "Offtaker invoices", both: "Both" };
   const FEAT_LABEL  = { vendor_data: "Live vendor data", invoicing: "Offtaker invoices" };
 

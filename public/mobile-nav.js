@@ -39,7 +39,7 @@
       { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
       { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },
       { id: "tabAccount", short: "Account", ic: "account", primary: true },
-      { id: "tabTrends", short: "Trends", ic: "trends", primary: false },
+      /* Trends is now a sub-view of Analysis (reached via the in-panel toggle). */
       { id: "tabResources", short: "Resources", ic: "resources", primary: false }
     ];
 
