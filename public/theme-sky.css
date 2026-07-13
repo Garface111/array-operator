@@ -160,6 +160,9 @@ html.sky body::before{
   height:130vh;
   z-index:-1;
   pointer-events:none;
+  /* Default plate: 2560 — rebuilt 2026-07-13 from the 6K master at high quality
+     (prior 3840.webp was a soft over-compressed upscale @ ~0.5MB; new tiers
+     preserve real edge detail and serve density-matched sizes). */
   background-image:
     url("img/sky/world-2560.jpg"),
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
@@ -179,8 +182,8 @@ html.sky body::before{
 @media (prefers-reduced-motion: reduce){
   html.sky body::before{transform:none;will-change:auto}
 }
-/* smaller desktop windows stream the lighter plate */
-@media (max-width:1600px){
+/* small 1x desktops — lightest plate */
+@media (max-width:1600px) and (max-resolution:1.49dppx){
   html.sky body::before{
     background-image:
       url("img/sky/world-2560.jpg"),
@@ -193,17 +196,44 @@ html.sky body::before{
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
 }
-/* big or high-density displays get the 4K plate (declared after the 1600
-   tier so a retina laptop in a ≤1600 window still gets the sharp plate) */
-@media (min-width:2200px), (min-resolution:1.5dppx){
+/* 4K plate — retina laptops / ≥2200 CSS px windows (later rules win) */
+@media (min-width:1800px), (min-resolution:1.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-2560.jpg"),
+      url("img/sky/world-3840.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
       image-set(url("img/sky/world-3840.webp") type("image/webp"),
-                url("img/sky/world-2560.jpg") type("image/jpeg")),
+                url("img/sky/world-3840.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
+}
+/* 5K plate — 2x retina desktops (~2880–5120 physical px) */
+@media (min-resolution:2dppx), (min-width:2400px) and (min-resolution:1.5dppx){
+  html.sky body::before{
+    background-image:
+      url("img/sky/world-3840.jpg"),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-5120.webp") type("image/webp"),
+                url("img/sky/world-3840.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
+}
+/* 6K plate — full master for 2.5x+ / 5K–6K displays */
+@media (min-resolution:2.5dppx), (min-width:2800px) and (min-resolution:2dppx){
+  html.sky body::before{
+    background-image:
+      url("img/sky/world-3840.jpg"),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-6144.webp") type("image/webp"),
+                url("img/sky/world-3840.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
