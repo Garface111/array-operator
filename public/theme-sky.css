@@ -178,7 +178,9 @@ html.sky body::before{
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   background-size:cover, auto, auto;
-  background-position:center top, center, center;
+  /* Ford 2026-07-13: start ~50% lower than the plate top so you arrive looking
+     at the mountains/valley, not pure sky; the descent still pans from here. */
+  background-position:center 50%, center, center;
   background-repeat:no-repeat;
   /* scroll-driven pan — set by the sky-parallax script on html { --sky-py } */
   transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);

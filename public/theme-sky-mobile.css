@@ -67,9 +67,9 @@
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-size:cover, auto, auto;
-    /* ARRIVE HIGH (Ford): frame the portrait plate's sky first; the descent
-       driver reveals the ridge panels at the plate foot as you scroll. */
-    background-position:center top, center, center;
+    /* Ford 2026-07-13: start ~50% lower so you arrive on the mountains/valley,
+       not pure sky; the descent driver still reveals the panels as you scroll. */
+    background-position:center 50%, center, center;
     background-repeat:no-repeat;
     transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
     will-change:transform;
