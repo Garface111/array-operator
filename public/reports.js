@@ -2172,6 +2172,8 @@
         <div id="rbArchiveHost" hidden></div>
         <div id="rbCustManual"></div>
         <div id="rbBulkHost"></div>
+        <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
+        <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
         <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
       </div>
       <!-- ONE wired invoice-template box, PER-OFFTAKER: it folds into whichever
@@ -4831,6 +4833,40 @@
       });
       PAY_BY_SUB = map;
     } catch (e) { /* leave prior map */ }
+    // Refresh the Connect nudge in parallel with payment chips.
+    try { await refreshPayBanner(); } catch (e) { /* ignore */ }
+  }
+
+  async function refreshPayBanner() {
+    const el = document.getElementById("rbPayBanner");
+    if (!el) return;
+    if (!authHeaders()) { el.hidden = true; el.innerHTML = ""; return; }
+    let st = null;
+    try {
+      const r = await fetch(API + "/payments/connect", { headers: authHeaders() });
+      if (r.ok) st = await r.json();
+    } catch (e) { st = null; }
+    if (!st || !st.ok) { el.hidden = true; return; }
+    const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 50) / 100));
+    const feeTxt = (Math.round(feePct * 100) / 100) + "%";
+    if (st.ready || st.charges_enabled) {
+      // Quiet success: don't clutter the Reports tab once they're set up.
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    if (st.connected || st.account_id) {
+      el.innerHTML =
+        `<span class="rb-pay-banner-ic" aria-hidden="true">💳</span>` +
+        `<span class="rb-pay-banner-tx"><b>Finish online payments setup</b> — complete your bank details so offtaker invoices can include a pay button (${feeTxt} fee).</span>` +
+        `<a class="rb-pay-banner-cta" href="#account">Continue setup →</a>`;
+    } else {
+      el.innerHTML =
+        `<span class="rb-pay-banner-ic" aria-hidden="true">💳</span>` +
+        `<span class="rb-pay-banner-tx"><b>Collect payments online</b> — offtaker invoices can include a secure pay link. We keep ${feeTxt}; the rest lands in your bank.</span>` +
+        `<a class="rb-pay-banner-cta" href="#account">Enable online pay →</a>`;
+    }
   }
 
   // Group offtakers by the utility account they share (Ford, 2026-06-30: "when you

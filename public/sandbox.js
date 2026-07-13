@@ -4649,7 +4649,7 @@
     // Demo (signed-out): show the ready state with sample copy, no network.
     if(!h && window.AO_DEMO){
       stateEl.textContent = "Online payments on (demo)";
-      if(subEl) subEl.textContent = "Demo only — offtaker invoices would include a pay button. 1.5% platform fee on each payment.";
+      if(subEl) subEl.textContent = "Demo only — offtaker invoices would include a pay button. 0.5% platform fee on each payment.";
       btn.textContent = "Demo — sign in to enable";
       btn.disabled = true;
       return;
@@ -4674,7 +4674,7 @@
       btn.onclick = () => renderConnectPayouts(authHeaders());
       return;
     }
-    const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 150) / 100));
+    const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 50) / 100));
     const feeTxt = (Math.round(feePct * 100) / 100) + "%";
     if(st.ready || st.charges_enabled){
       stateEl.innerHTML = `<b style="color:var(--good,#047857)">Online payments on</b>`;

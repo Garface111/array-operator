@@ -2703,3 +2703,22 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 }
 
 
+
+/* V2 offtaker pay-links — Connect nudge on Reports */
+.rb-pay-banner{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin:0 0 14px; padding:12px 14px;
+  border-radius:10px;
+  background:linear-gradient(165deg, rgba(5,150,105,.10), rgba(5,150,105,.03));
+  border:1px solid rgba(5,150,105,.22);
+  color:var(--ink,#0f172a); font-size:13.5px; line-height:1.4;
+}
+.rb-pay-banner[hidden]{ display:none !important; }
+.rb-pay-banner-ic{ font-size:18px; flex:0 0 auto; }
+.rb-pay-banner-tx{ flex:1 1 200px; min-width:0; }
+.rb-pay-banner-tx b{ color:#047857; }
+.rb-pay-banner-cta{
+  flex:0 0 auto; font-weight:700; font-size:13px; text-decoration:none;
+  color:#fff; background:#047857; padding:8px 14px; border-radius:8px;
+}
+.rb-pay-banner-cta:hover{ filter:brightness(1.06); }
