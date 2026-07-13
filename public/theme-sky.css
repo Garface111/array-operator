@@ -21,13 +21,18 @@
 
    MATERIAL TIERS (keep these straight when extending per-tab):
      · chrome glass  — rgba(255,255,255,.60) + blur(24px) saturate(1.5)
-                       ONLY the tab bar + modal sheets. The most transparent.
-     · content glass — rgba(255,255,255,.83) + blur(16px)
+                       The tab bar + modal sheets. FORD'S REFERENCE MATERIAL
+                       (2026-07-12 liquid pass: "I love the way the top bar
+                       looks — everything should get that feeling").
+     · content glass — rgba(255,255,255,.64) + blur(16px) saturate(1.65)
                        top-level sheets (one per view: #sbWrap, .dash-wrap,
-                       .acct-list, the hero pricing card). Data stays crisp.
-     · card solid    — rgba(255,255,255,.80-.88), NO backdrop-filter.
+                       .acct-list, the hero pricing card). The sky bleeds
+                       through; ink compensates (darker muted/faint + firmer
+                       hairlines in the tokens below).
+     · card solid    — rgba(255,255,255,.68-.78), NO backdrop-filter.
                        Every card INSIDE a sheet (.sb-inv, .fcg-tile, .cc-kpi,
-                       .rb-card…). They sit on blurred glass already; adding
+                       .rb-card…). They sit on blurred glass already, so
+                       transparency alone reads as liquid glass; adding
                        per-card blur would melt the 100-array canvas GPU.
    PERF GUARDRAIL: backdrop-filter ONLY on .tabbar, modals, and top-level
    sheets. NEVER on .sb-inv / per-inverter cards. (brief §perf)
@@ -73,13 +78,16 @@ html.sky{
   --sky-r-card:22px;
   --sky-r-sheet:32px;
 
-  /* glass material tiers — alphas calibrated 2026-07-12 for the PHOTO world:
-     the plate's lower-right panels/greens are busier than the old gradient,
-     so chrome +.05 (the tab bar rides right over the panel field) and
-     content +.05 (data sheets stay milk-white over the grass). */
+  /* glass material tiers — LIQUID recalibration 2026-07-12 (Ford: "a little
+     more see-through on the main cards so the blue is leaking through — it
+     should look a lot like the top bar"). Chrome is untouched: it IS the
+     reference. Content/solid drop toward it (.83→.64 / .88→.74) and every
+     sheet that already blurs gains saturate — transparency-over-blurred-glass
+     is what makes the no-blur card tier read liquid. Ink compensates below
+     (muted/faint darkened one step, hairlines .12→.17) so data stays crisp. */
   --sky-glass-chrome:rgba(255,255,255,.60);
-  --sky-glass-content:rgba(255,255,255,.83);
-  --sky-glass-solid:rgba(255,255,255,.88);
+  --sky-glass-content:rgba(255,255,255,.64);
+  --sky-glass-solid:rgba(255,255,255,.74);
   --sky-glass-edge:rgba(255,255,255,.5);     /* the 1px inner border */
 
   /* soft blue-tinted shadows */
@@ -91,9 +99,11 @@ html.sky{
   --bg:#EAF4FD;                 /* light azure stand-in where --bg paints a fill */
   --bg2:#DFEDFB;
   --ink:#0E1420;
-  --muted:#5A6572;
-  --faint:#7C8798;
-  --line:rgba(20,60,120,.12);   /* hairlines get the blue tint */
+  --muted:#4C596B;              /* one step darker than the .83-era #5A6572 —
+                                   compensates the liquid tier's lower alpha */
+  --faint:#6B7789;              /* ditto (#7C8798 pre-liquid) */
+  --line:rgba(20,60,120,.17);   /* hairlines firmer (.12 pre-liquid) so table
+                                   rules survive the see-through surfaces */
   --card:#ffffff;               /* stays SOLID — glass is applied per-surface,
                                    so popovers/menus without blur stay legible */
   --card2:#F4F9FF;
@@ -253,8 +263,8 @@ html.sky #panelDashboard .dash-wrap,
 html.sky #sheetWrap,
 html.sky .acct-list{
   background:var(--sky-glass-content) !important;
-  -webkit-backdrop-filter:blur(16px);
-  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px) saturate(1.65);
+  backdrop-filter:blur(16px) saturate(1.65);
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-sheet) !important;
   box-shadow:var(--sky-shadow-sheet) !important;
@@ -266,7 +276,7 @@ html.sky .acct-list{overflow:hidden}
 /* the pannable fleet board inside the #sbWrap sheet: let the sky glow through
    a whisper of white; re-tint theme-day's dot grid to deep sky blue */
 html.sky .sb-viewport{
-  background-color:rgba(255,255,255,.22) !important;
+  background-color:rgba(255,255,255,.15) !important;
   background-image:
     radial-gradient(58% 55% at 84% -8%, rgba(255,255,255,.4), rgba(255,255,255,0) 70%),
     radial-gradient(rgba(21,101,192,.15) 1.1px, transparent 1.3px) !important;
@@ -292,18 +302,19 @@ html.sky .ft-card,
 html.sky .cc-collapsible,
 html.sky .rb-card,
 html.sky .rb-acc{
-  background:rgba(255,255,255,.8) !important;
+  background:rgba(255,255,255,.68) !important;
   border:1px solid rgba(255,255,255,.85) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
 }
 html.sky .cc-tablewrap{
-  background:rgba(255,255,255,.7) !important;
+  background:rgba(255,255,255,.6) !important;
   border-radius:var(--sky-r-card) !important;
 }
-/* per-inverter cards in the 100-array canvas: SOLID fallback, never blurred */
+/* per-inverter cards in the 100-array canvas: SOLID fallback, never blurred.
+   Densest data card in the app — it keeps the highest card alpha (.78). */
 html.sky .sb-inv{
-  background:rgba(255,255,255,.88) !important;
+  background:rgba(255,255,255,.78) !important;
   -webkit-backdrop-filter:none !important;
   backdrop-filter:none !important;
   border:1px solid rgba(255,255,255,.9) !important;
@@ -315,7 +326,7 @@ html.sky .sb-array--card:hover{box-shadow:0 12px 28px -12px rgba(20,60,120,.28) 
 /* frosted floating clusters over the fleet board */
 html.sky .sb-head-btns,
 html.sky .sb-legend{
-  background:rgba(255,255,255,.72) !important;
+  background:rgba(255,255,255,.6) !important;
   border-color:var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-pill);
 }
@@ -326,9 +337,9 @@ html.sky .sb-modal,
 html.sky .cl-modal,
 html.sky .sb-detail-card,
 html.sky .sb-toast{
-  background:rgba(255,255,255,.82) !important;
-  -webkit-backdrop-filter:blur(24px) saturate(1.5);
-  backdrop-filter:blur(24px) saturate(1.5);
+  background:rgba(255,255,255,.72) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.65);
+  backdrop-filter:blur(24px) saturate(1.65);
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-float) !important;
@@ -344,7 +355,7 @@ html.sky .ao-overlay,
 html.sky .sb-ov,
 html.sky .cl-modal-back{background:rgba(13,44,86,.38) !important}
 html.sky .ao-modal-foot,
-html.sky .sb-modal-foot{background:rgba(233,243,253,.65) !important}
+html.sky .sb-modal-foot{background:rgba(233,243,253,.5) !important}
 
 /* ── 6 · BUTTONS ───────────────────────────────────────────────────────────
    primary = solid action blue, white text, rounded-12, hover lift
@@ -565,7 +576,7 @@ html.sky .db-demostrip .db-signin:hover{color:var(--sky-primary-deep)}
 /* ── 9 · NUDGE / GATE BARS float as glass too (material only, states keep
       their amber/green/neutral semantics) ─────────────────────────────── */
 html.sky .trial-nudge{
-  background:rgba(255,255,255,.72);
+  background:rgba(255,255,255,.64);
   border-color:var(--sky-glass-edge);
   border-radius:16px;
   box-shadow:var(--sky-shadow-card);

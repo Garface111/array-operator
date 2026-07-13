@@ -49,7 +49,7 @@ html.sky #acctPlanVal{color:var(--sky-primary-deep)}
 html.sky .ao-modal-ov{background:rgba(13,44,86,.38) !important}
 /* plan cards: solid-tier glass ON the frosted modal (no per-card blur) */
 html.sky .ao-plan-card{
-  background:rgba(255,255,255,.72) !important;
+  background:rgba(255,255,255,.62) !important;
   border:1.5px solid rgba(255,255,255,.95) !important;
   border-radius:16px !important;
   box-shadow:var(--sky-shadow-card) !important;
@@ -151,7 +151,9 @@ html.sky .ar-panel{
   --ao-oct:#6350E0;
   --ao-oct-soft:rgba(99,80,224,.09);
   --ao-oct-line:rgba(99,80,224,.30);
-  background:rgba(255,255,255,.92) !important;
+  /* liquid pass: softened one touch (.92→.87) but deliberately kept the most
+     solid surface in the app — this is the trust surface holding passwords */
+  background:rgba(255,255,255,.87) !important;
   border:1px solid rgba(255,255,255,.95) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
@@ -353,9 +355,9 @@ html.sky .ao-al-fab{
 html.sky .ao-al-fab:hover{box-shadow:0 12px 30px -10px rgba(20,60,120,.3)}
 html.sky .ao-al-fab.open{border-color:rgba(33,150,243,.45)}
 html.sky .ao-al-panel{
-  background:rgba(255,255,255,.86);
-  -webkit-backdrop-filter:blur(24px) saturate(1.5);
-  backdrop-filter:blur(24px) saturate(1.5);
+  background:rgba(255,255,255,.78);
+  -webkit-backdrop-filter:blur(24px) saturate(1.6);
+  backdrop-filter:blur(24px) saturate(1.6);
   border:1px solid var(--sky-glass-edge);
   border-radius:20px;
   box-shadow:var(--sky-shadow-float);
@@ -514,7 +516,7 @@ html.sky .gmp-gate.almost .gmp-gate-cta{box-shadow:0 6px 18px -8px rgba(33,150,2
 html.sky .gmp-gate-cta{border-radius:11px !important}
 /* trial/ext-live/vault nudges: one quiet glass card, tier rails re-asserted */
 html.sky .trial-nudge{
-  background:rgba(255,255,255,.78) !important;
+  background:rgba(255,255,255,.66) !important;
   border-color:rgba(255,255,255,.85) !important;
   border-radius:16px !important;
   box-shadow:var(--sky-shadow-card) !important;

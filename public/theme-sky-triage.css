@@ -34,6 +34,22 @@
    meant "accent", never "live state") to sky blue — it never touches meaning.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ═══ 0 · LIQUID DEEP-DIP (2026-07-12, Ford's direct call-out) ═════════════
+   "Fleet Triage needs it, same with the vendor data — the blue should be
+   leaking through, like the top bar." These two views' TOP-LEVEL SHEETS dip
+   below the global content tier toward the tab bar's own material (.60):
+   lower alpha + a touch more blur/saturation on the blurs they ALREADY own
+   (no new blur — this deepens the existing sheet filters only). Every card
+   on top is transparency-without-blur, which over these frosted sheets is
+   exactly the liquid read. ═══════════════════════════════════════════════ */
+html.sky #panelDashboard .dash-wrap,
+html.sky #sbWrap,
+html.sky #sheetWrap{
+  background:rgba(255,255,255,.56) !important;
+  -webkit-backdrop-filter:blur(18px) saturate(1.7);
+  backdrop-filter:blur(18px) saturate(1.7);
+}
+
 /* ═══ 1 · FLEET TRIAGE TAB (#panelDashboard) ═══════════════════════════════ */
 
 /* — header: gradient-clipped title re-graded into the sky ink ramp — */
@@ -44,13 +60,13 @@ html.sky #panelDashboard .dash-head h2{
 }
 /* production stat-pills become floating glass pills */
 html.sky #panelDashboard .dash-prod .dp{
-  background:rgba(255,255,255,.72) !important;
+  background:rgba(255,255,255,.55) !important;
   border:1px solid rgba(255,255,255,.9) !important;
   border-radius:var(--sky-r-pill) !important;
   box-shadow:0 2px 12px rgba(20,60,120,.08) !important;
 }
 html.sky #panelDashboard .dash-prod .dp-skel{
-  background:rgba(255,255,255,.72) !important;
+  background:rgba(255,255,255,.55) !important;
   border:1px solid rgba(255,255,255,.9) !important;
   border-radius:var(--sky-r-pill) !important;
 }
@@ -59,9 +75,11 @@ html.sky #panelDashboard .dash-prod .dp-skel-bar{
   background-size:280% 100% !important;
 }
 
-/* — KPI tile grid: solid-tier glass (beats DIVINE DASHBOARD's opaque white) — */
+/* — KPI tile grid: LIQUID tier (Ford's call-out) — .55 white on the frosted
+     sheet lets the landscape visibly leak through; big KPI numerals carry the
+     contrast, the darker token muted/faint carries the small labels. — */
 html.sky #panelDashboard .fcg-tile{
-  background:rgba(255,255,255,.8) !important;
+  background:rgba(255,255,255,.55) !important;
   border:1px solid rgba(255,255,255,.85) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card), inset 0 1px 0 rgba(255,255,255,.95) !important;
@@ -71,7 +89,7 @@ html.sky #panelDashboard .fcg-tile{
    extra class, out-specifying these base rules — semantics preserved). */
 html.sky #panelDashboard .fcg-tile--health{
   border-color:rgba(255,255,255,.85) !important;
-  background:linear-gradient(135deg,rgba(33,150,243,.12),rgba(86,180,240,.04) 55%,transparent) rgba(255,255,255,.8) !important;
+  background:linear-gradient(135deg,rgba(33,150,243,.12),rgba(86,180,240,.04) 55%,transparent) rgba(255,255,255,.55) !important;
 }
 html.sky #panelDashboard .fcg-tile--health .fcg-v b{
   background:linear-gradient(160deg,#1876D3,#43ABF3) !important;
@@ -103,7 +121,7 @@ html.sky #panelDashboard .cc-search input{
   box-shadow:none !important;
 }
 html.sky #panelDashboard .cc-chips{
-  background:rgba(255,255,255,.6) !important;
+  background:rgba(255,255,255,.5) !important;
   border:1px solid rgba(255,255,255,.9) !important;
   border-radius:var(--sky-r-pill) !important;
   padding:4px !important;
@@ -120,31 +138,32 @@ html.sky .cc-sel{
   border-radius:var(--sky-r-btn) !important;
 }
 
-/* — the queue table: one crisp near-white sheet, airy rows, blue-tinted
-     hairlines (the sky world's rgba-ink hairline, per the brief) — */
+/* — the queue table: LIQUID sheet (Ford's call-out) — .58 white over the
+     frosted dash sheet; row hairlines firm up (.10/.09 vs the old .08/.07)
+     so the grid survives the transparency. — */
 html.sky #panelDashboard .cc-tablewrap{
-  background:rgba(255,255,255,.82) !important;
+  background:rgba(255,255,255,.58) !important;
   border:1px solid rgba(255,255,255,.85) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
 }
 html.sky #panelDashboard .cc-table thead th{
-  background:rgba(233,243,253,.75) !important;
-  border-bottom:1px solid rgba(14,20,32,.08) !important;
+  background:rgba(233,243,253,.6) !important;
+  border-bottom:1px solid rgba(14,20,32,.1) !important;
 }
-html.sky #panelDashboard .cc-table td{ border-bottom:1px solid rgba(14,20,32,.07) !important; }
+html.sky #panelDashboard .cc-table td{ border-bottom:1px solid rgba(14,20,32,.09) !important; }
 html.sky #panelDashboard .cc-table tbody tr.row:hover{ background:rgba(33,150,243,.05) !important; }
 html.sky #panelDashboard .cc-table tbody tr.row.sel{ background:rgba(33,150,243,.08) !important; }
 /* the same vocabulary on the Arrays-tab command center (no #panelDashboard) */
 html.sky .cc-tablewrap{
-  background:rgba(255,255,255,.82) !important;
+  background:rgba(255,255,255,.58) !important;
   border:1px solid rgba(255,255,255,.85) !important;
 }
 html.sky .cc-table thead th{
-  background:rgba(233,243,253,.75) !important;
-  border-bottom:1px solid rgba(14,20,32,.08) !important;
+  background:rgba(233,243,253,.6) !important;
+  border-bottom:1px solid rgba(14,20,32,.1) !important;
 }
-html.sky .cc-table tbody tr.row{ border-bottom:1px solid rgba(14,20,32,.07) !important; }
+html.sky .cc-table tbody tr.row{ border-bottom:1px solid rgba(14,20,32,.09) !important; }
 html.sky .cc-table tbody tr.row:hover{ background:rgba(33,150,243,.05) !important; }
 html.sky .cc-table tbody tr.row.sel{ background:rgba(33,150,243,.08) !important; }
 html.sky .cc-search input{
@@ -153,7 +172,7 @@ html.sky .cc-search input{
   border-radius:var(--sky-r-btn) !important;
 }
 html.sky .cc-chips{
-  background:rgba(255,255,255,.6) !important;
+  background:rgba(255,255,255,.5) !important;
   border:1px solid rgba(255,255,255,.9) !important;
   border-radius:var(--sky-r-pill) !important;
 }
@@ -166,9 +185,9 @@ html.sky .cc-chip.on .n{ color:rgba(255,255,255,.85) !important; }
 
 /* — expand drawer: azure inner sheet; evidence tiles as small glass cards;
      the recommendation box loses its emerald-era tint (accent → sky) — */
-html.sky .cc-drawer .inner{ background:rgba(233,243,253,.6) !important; }
+html.sky .cc-drawer .inner{ background:rgba(233,243,253,.45) !important; }
 html.sky .cc-evidence .e{
-  background:rgba(255,255,255,.75) !important;
+  background:rgba(255,255,255,.6) !important;
   border:1px solid rgba(255,255,255,.9) !important;
   border-radius:12px;
   box-shadow:0 1px 6px rgba(20,60,120,.06);
@@ -200,10 +219,14 @@ html.sky .ft-track{ background:rgba(20,60,120,.10); }
 /* ═══ 2 · SPREADSHEET SUB-VIEW (#sheetWrap / #vendorSheet) ═════════════════ */
 
 /* the Sandbox|Spreadsheet segmented toggle floats directly on the sky:
-   a glass pill track, sky-primary active segment (mirrors the tab bar) */
+   the tab bar's OWN material, verbatim (chrome glass + blur24/sat1.5) — it is
+   a singular control over the raw plate, exactly the .tabbar situation, so
+   the one extra backdrop-filter is chrome-tier by definition, not a card. */
 html.sky .vs-seg{
-  background:rgba(255,255,255,.72) !important;
-  border:1px solid rgba(255,255,255,.9) !important;
+  background:var(--sky-glass-chrome) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-pill) !important;
   padding:4px !important;
   box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
@@ -217,30 +240,50 @@ html.sky .vs-seg-btn:not(.on){ background:transparent !important; color:#33415A 
 html.sky .vs-seg-btn:not(.on):hover,
 html.sky .vs-seg-btn:not(.on):focus-visible{ background:rgba(255,255,255,.75) !important; color:var(--ink) !important; opacity:1; }
 
-/* the table container: near-white sheet on the blurred #sheetWrap glass —
-   data stays crisp, rows go transparent so the sheet reads as ONE material */
+/* the table container: LIQUID sheet on the frosted #sheetWrap glass (Ford's
+   call-out) — .58 white lets the valley leak through the rows; hairlines
+   firmed a step so the grid holds. */
 html.sky #sheetWrap{ --gg-track:rgba(20,60,120,.14); }
 html.sky .vs-scroll{
-  background:rgba(255,255,255,.82) !important;
+  background:rgba(255,255,255,.58) !important;
   border:1px solid rgba(255,255,255,.85) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
 }
+/* DEAD-SPACE FIX (Ford 2026-07-12: "the card expands all the way down even
+   though I only have four vendors"): vendor-sheet.js sizeScroll() pins an
+   INLINE height on #vsScroll that always fills the viewport bottom — with a
+   short fleet that's a wall of empty white. Author !important beats inline
+   style: hug the content instead (height:auto), and keep the internal-scroll
+   contract via a viewport cap so a 100-array fleet still scrolls INSIDE the
+   sheet with its sticky column header; the 340px floor mirrors the stock
+   "never trap the user in a sliver" threshold (short/zoomed windows get a
+   usable pane and the page itself scrolls the rest of the way). */
+html.sky .vs-scroll{
+  height:auto !important;
+  max-height:max(340px, calc(100vh - 310px));
+  overflow-y:auto !important;
+}
 /* generous row height (brief: tables breathe) + ink hairlines */
 html.sky .vs-row{ padding:13px 16px; }
 html.sky .vs-colhead{
-  background:#F0F7FE !important;             /* sticky → must be opaque */
-  border-bottom:1px solid rgba(14,20,32,.09) !important;
+  background:rgba(240,247,254,.92) !important; /* sticky → stays near-opaque so
+                                                  rows never ghost through it */
+  border-bottom:1px solid rgba(14,20,32,.1) !important;
 }
-html.sky .vs-arr{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.07); }
+html.sky .vs-arr{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.09); }
 html.sky .vs-arr:hover{ background:rgba(33,150,243,.05) !important; }
 html.sky .vs-arr.open{ background:rgba(33,150,243,.08) !important; }
-html.sky .vs-inv-wrap{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.07); }
-html.sky .vs-inv{ border-top:1px solid rgba(14,20,32,.06) !important; }
+html.sky .vs-inv-wrap{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.09); }
+html.sky .vs-inv{ border-top:1px solid rgba(14,20,32,.08) !important; }
 html.sky .vs-inv:hover{ background:rgba(33,150,243,.04) !important; }
 /* vendor band + group spine keep their per-vendor hue (--vc, semantic);
-   only the mixing base follows the glass (color-mix against white reads fine) */
-html.sky .vs-vnote{ background:rgba(233,243,253,.65) !important; }
+   the mixing base goes translucent so the band is a tinted glass stripe
+   (~.44 effective alpha) instead of an opaque slab on the liquid sheet */
+html.sky .vs-vhead{
+  background:color-mix(in srgb, var(--vc,#64748b) 14%, rgba(255,255,255,.35)) !important;
+}
+html.sky .vs-vnote{ background:rgba(233,243,253,.5) !important; }
 
 /* freshness / lag chips: sky-blue pill (was hardcoded 2563eb-era blue) */
 html.sky .vs-vlag{
@@ -296,9 +339,9 @@ html.sky .vs-inv-detail{ background:rgba(33,150,243,.05) !important; }
    modal sheet (singular → blur budget OK) */
 html.sky .vs-dc-ov{ background:rgba(13,44,86,.38) !important; }
 html.sky .vs-dc-modal{
-  background:rgba(255,255,255,.86) !important;
-  -webkit-backdrop-filter:blur(24px) saturate(1.5);
-  backdrop-filter:blur(24px) saturate(1.5);
+  background:rgba(255,255,255,.74) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.65);
+  backdrop-filter:blur(24px) saturate(1.65);
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-float) !important;
@@ -316,7 +359,7 @@ html.sky .vs-dc-diag{ background:rgba(233,243,253,.7); border-color:rgba(20,60,1
      status rail, dot, and flag colors ride the re-pointed tokens (healthy
      blue / watch amber / critical red) — geometry + material only here. — */
 html.sky .sb-tile{
-  background:rgba(255,255,255,.8) !important;
+  background:rgba(255,255,255,.62) !important;
   border:1px solid rgba(255,255,255,.85) !important;
   border-radius:16px !important;
   box-shadow:var(--sky-shadow-card) !important;

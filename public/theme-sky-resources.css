@@ -1,0 +1,320 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY · RESOURCES DEEP PASS — the briefing becomes glass cards   (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   Surfaces owned by this file (loaded after theme-sky.css, before -mobile):
+     · #panelResources — the in-app expert hub (#rsHost hosts resources.html's
+       .wrap: hero → state picker → live news feed → per-state reference →
+       sources → foot; resources.js renders the picker/feed/reference)
+
+   THE MOVE (Ford: "resources needs more of a card style"): the panel gets NO
+   sheet on desktop — the hero floats white in the plate's own sky exactly
+   like the landing hero, and every piece of content becomes a floating glass
+   card: the news feed turns from a bordered list into a responsive CARD GRID
+   (pure CSS grid on .feed — markup untouched), the newest headline leads the
+   grid full-width, section headers become floating eyebrow pills, the
+   per-state reference is a wider/opaquer reading card, and the sources are
+   frameless pill chips floating straight in the world.
+
+   MATERIAL: news cards ride the sky DIRECTLY (no blurred sheet beneath) at
+   .68 white — the sky genuinely leaks through; the reading card goes .78 for
+   prose comfort. NO backdrop-filter anywhere in here (repeated cards — the
+   foundation's perf guardrail); translucency + white edge + blue shadow read
+   as glass on their own over the composited world plate.
+
+   ≤600px: theme-sky-mobile.css (loads AFTER this) sheets #rsHost near-solid
+   white — so the white-on-sky treatments here are DESKTOP-SCOPED (≥601px)
+   and the mobile rules below only re-hairline the cards for the white ground.
+
+   Every rule scoped html.sky. Tokens from theme-sky.css — nothing new
+   invented. PRESERVED SEMANTICS: amber tag/note = attention · live-green
+   pulse = updating · action blue = links/selected state. Material only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · PANEL GROUND — no sheet; the column breathes a little wider so the
+      card grid gets room (reading measure still capped by the cards) ──────── */
+@media (min-width:601px){
+  html.sky #panelResources .wrap{max-width:1000px;padding:8px 6px 88px}
+}
+
+/* ── 2 · HERO — floats white in the sky, the landing hero's exact grammar
+      (veil ≤.18 behind the text block, crisping shadow + wide glow). Desktop
+      only: on a phone the mobile fragment sheets #rsHost white and the stock
+      ink hero is already right. ─────────────────────────────────────────── */
+@media (min-width:601px){
+  html.sky #panelResources .hero{position:relative;z-index:0;margin:22px 0 30px}
+  html.sky #panelResources .hero::before{
+    content:""; position:absolute; z-index:-1; pointer-events:none;
+    inset:-38px -44px -30px -48px;
+    background:radial-gradient(76% 82% at 32% 42%,
+      rgba(9,44,88,.16) 0%, rgba(9,44,88,.10) 52%, rgba(9,44,88,0) 82%);
+  }
+  /* deep-sky tint, not translucent white — signed-out the panel enters over
+     the plate's sunlit grass band, where white-on-white washes out (the same
+     calibration the landing's ghost pill + the mobile pass ratified) */
+  html.sky #panelResources .eyebrow{
+    display:inline-flex; align-items:center;
+    background:rgba(11,42,82,.26);
+    border:1px solid rgba(255,255,255,.55);
+    border-radius:var(--sky-r-pill);
+    padding:6px 13px;
+    color:#ffffff; font-weight:700; letter-spacing:.14em;
+    text-shadow:0 1px 2px rgba(8,44,90,.45);
+  }
+  /* counter theme-day's gradient-clip (html[data-theme=day] .hero h1 —
+     !important text-fill transparent) exactly like the landing .hero-h1 */
+  html.sky #panelResources .hero h1{
+    background:none !important;
+    -webkit-background-clip:border-box !important; background-clip:border-box !important;
+    color:#ffffff !important;
+    -webkit-text-fill-color:#ffffff;
+    font-size:40px; font-weight:750; letter-spacing:-.025em; line-height:1.08;
+    margin:.4em 0 .2em;
+    text-shadow:0 1px 3px rgba(8,44,90,.28), 0 2px 30px rgba(8,44,90,.52);
+    text-wrap:balance;
+  }
+  html.sky #panelResources .lede{
+    color:rgba(255,255,255,.93);
+    text-shadow:0 1px 3px rgba(8,44,90,.4), 0 2px 18px rgba(8,44,90,.42);
+  }
+  /* every line that sits RAW on the world goes white + shadowed */
+  html.sky #panelResources .res-picker-lab{
+    color:rgba(255,255,255,.92);
+    text-shadow:0 1px 3px rgba(8,44,90,.5);
+  }
+  html.sky #panelResources .muted{
+    color:rgba(255,255,255,.93);
+    text-shadow:0 1px 3px rgba(8,44,90,.5);
+  }
+  html.sky #panelResources .foot{
+    color:rgba(255,255,255,.88);
+    border-top:1px solid rgba(255,255,255,.38);
+    text-shadow:0 1px 3px rgba(8,44,90,.5);
+  }
+  html.sky #panelResources .foot a{
+    color:#ffffff; font-weight:650;
+    text-decoration:underline; text-decoration-color:rgba(255,255,255,.55);
+  }
+  html.sky #panelResources .ao-res-loading,
+  html.sky #panelResources .ao-res-error{
+    color:rgba(255,255,255,.93);
+    text-shadow:0 1px 3px rgba(8,44,90,.5);
+  }
+  html.sky #panelResources .ao-res-error a{color:#ffffff;font-weight:650}
+}
+
+/* ── 3 · STATE PICKER — glass pills, active = solid action blue (the tab
+      bar's own grammar). Material works on both grounds (world + sheet). ── */
+html.sky #panelResources .res-picker{gap:8px;margin:0 0 26px}
+html.sky #panelResources .res-state{
+  background:rgba(255,255,255,.66);
+  border:1px solid rgba(255,255,255,.85);
+  color:#33415A; font-weight:650;
+  padding:8px 15px;
+  box-shadow:0 2px 10px rgba(20,60,120,.08);
+  transition:background .14s, color .14s, border-color .14s, box-shadow .14s, transform .14s;
+}
+html.sky #panelResources .res-state:hover{
+  background:rgba(255,255,255,.94);
+  border-color:rgba(33,150,243,.45);
+  color:var(--sky-primary-deep);
+  transform:translateY(-1px);
+}
+html.sky #panelResources .res-state.on,
+html.sky #panelResources .res-state.on:hover{
+  background:var(--sky-primary);
+  border-color:rgba(255,255,255,.35);
+  color:#ffffff;
+  transform:none;
+  box-shadow:0 4px 14px -4px rgba(33,150,243,.6);
+}
+
+/* ── 4 · SECTION HEADERS — the hairline rows become floating eyebrow pills ── */
+html.sky #panelResources h2{
+  display:inline-flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.68);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:var(--sky-r-pill);
+  padding:7px 15px;
+  color:#33415A;
+  letter-spacing:.1em;
+  box-shadow:0 2px 10px rgba(20,60,120,.08);
+  margin:0 0 16px;
+}
+html.sky #panelResources h2::after{display:none}   /* retire the hairline */
+/* the live pulse keeps its green (live = updating), softened onto glass */
+html.sky #panelResources .livedot{
+  background:rgba(236,253,245,.95);
+  border-color:rgba(52,199,123,.45);
+}
+
+/* ── 5 · THE NEWS FEED — list → responsive glass CARD GRID (markup untouched:
+      .feed goes grid, each .item becomes a floating card, the newest headline
+      leads full-width). Cards sit RAW on the world: .68 white, sky leaking
+      through, NO blur (repeated cards — perf guardrail). ─────────────────── */
+html.sky #panelResources .feed{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(min(340px,100%), 1fr));
+  gap:16px;
+  margin-top:16px;
+}
+/* empty-state notice spans the whole grid, never one orphan track */
+html.sky #panelResources .feed > .disc{grid-column:1/-1}
+html.sky #panelResources .item{
+  display:flex; flex-direction:column; gap:10px;
+  background:rgba(255,255,255,.68);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:var(--sky-r-card);
+  padding:18px 20px 17px;
+  box-shadow:var(--sky-shadow-card);
+  transition:transform .16s ease-out, box-shadow .16s ease-out, background .16s;
+}
+/* gentle dolly lift — the card comes toward you, the world stays put */
+html.sky #panelResources .item:hover{
+  transform:translateY(-2px);
+  background:rgba(255,255,255,.8);
+  box-shadow:0 14px 34px -12px rgba(20,60,120,.3);
+}
+/* newest item = the lead card (feed renders newest-first); also re-asserts
+   the border the stock :first-child{border-top:0} separator rule strips */
+html.sky #panelResources .item:first-child{
+  grid-column:1 / -1;
+  border-top:1px solid rgba(255,255,255,.85);
+  padding:20px 24px 18px;
+}
+html.sky #panelResources .item:first-child h4{font-size:17.5px}
+/* date = a quiet pill riding the top of the card */
+html.sky #panelResources .item .when{
+  align-self:flex-start;
+  background:rgba(20,60,120,.07);
+  border-radius:var(--sky-r-pill);
+  padding:3px 10px 2px;
+  font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:#46658C;
+}
+/* tag chips → quiet pills; amber = attention stays amber */
+html.sky #panelResources .item .tag{
+  margin-top:0;
+  border-radius:var(--sky-r-pill);
+  background:rgba(33,150,243,.1);
+  border-color:rgba(33,150,243,.25);
+  color:#1B6ACB;
+}
+html.sky #panelResources .item .tag.alert{
+  background:rgba(255,247,237,.92);
+  border-color:rgba(217,119,6,.3);
+  color:#b45309;
+}
+html.sky #panelResources .res-stchip{
+  margin:0 8px 0 0;
+  border-radius:var(--sky-r-pill);
+  background:rgba(20,60,120,.08);
+  color:#46658C;
+}
+html.sky #panelResources .item h4{
+  margin:9px 0 5px;
+  font-size:15.5px; font-weight:700; letter-spacing:-.01em;
+}
+html.sky #panelResources .item .src{margin-top:7px}
+html.sky #panelResources .item .src a{color:var(--sky-primary-deep);font-weight:650}
+
+/* ── 6 · READING CARDS — the per-state reference + disclaimer get the wider,
+      opaquer prose tier (.78) so long lines stay comfortable ─────────────── */
+html.sky #panelResources .card{
+  background:rgba(255,255,255,.78);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:var(--sky-r-card);
+  padding:22px 24px;
+  margin:14px 0;
+  box-shadow:var(--sky-shadow-card);
+}
+/* the headline rate figure: the card's blue moment (blue-is-good) */
+html.sky #panelResources .res-comp{
+  background:rgba(33,150,243,.08);
+  border:1px solid rgba(33,150,243,.2);
+  border-radius:14px;
+  color:var(--ink);
+}
+html.sky #panelResources .res-note{
+  background:rgba(255,247,237,.88);
+  border-color:rgba(217,119,6,.28);
+  border-radius:12px;
+}
+html.sky #panelResources .res-k{color:#46658C;letter-spacing:.08em}
+html.sky #panelResources .res-util{
+  background:rgba(20,60,120,.07);
+  border-radius:var(--sky-r-pill);
+  padding:5px 12px;
+}
+html.sky #panelResources .disc{
+  background:rgba(227,240,252,.82);
+  border:1px solid rgba(255,255,255,.8);
+  border-radius:14px;
+  color:#3D5170;
+  box-shadow:var(--sky-shadow-card);
+}
+
+/* ── 7 · GO TO THE SOURCE — the wrapping card dissolves (progressive: without
+      :has it stays a glass card) and each authority becomes a floating pill
+      chip in the world ───────────────────────────────────────────────────── */
+html.sky #panelResources .card:has(> .srcs){
+  background:none; border:0; box-shadow:none;
+  padding:2px 0; margin:10px 0;
+}
+html.sky #panelResources .srcs{gap:10px 12px}
+html.sky #panelResources .srcs a{
+  display:inline-flex; align-items:center;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:var(--sky-r-pill);
+  padding:9px 16px;
+  color:var(--sky-primary-deep); font-weight:650; font-size:13px;
+  box-shadow:0 2px 10px rgba(20,60,120,.08);
+  transition:background .14s, border-color .14s, transform .14s, box-shadow .14s;
+}
+html.sky #panelResources .srcs a:hover{
+  text-decoration:none;
+  background:#ffffff;
+  border-color:rgba(33,150,243,.45);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px -6px rgba(20,60,120,.3);
+}
+
+/* ── 8 · SQUIRCLE — extend the foundation's progressive enhancement to this
+      pass's card vocabulary (Chrome 139+; harmless no-op elsewhere) ───────── */
+@supports (corner-shape: squircle){
+  html.sky #panelResources .item,
+  html.sky #panelResources .card,
+  html.sky #panelResources .disc,
+  html.sky #panelResources .res-comp{corner-shape:squircle}
+}
+
+/* ── 9 · ≤600px — MINIMAL: the mobile fragment (loads after) sheets #rsHost
+      near-solid white, so the stock ink hero stands; just give the glass
+      vocabulary honest hairlines for the white ground. Grid collapses to one
+      column by itself (minmax(min(340px,100%),1fr)). ─────────────────────── */
+@media (max-width:600px){
+  html.sky #panelResources h2{
+    background:rgba(33,150,243,.07);
+    border-color:rgba(33,150,243,.2);
+    color:#1B6ACB;
+  }
+  html.sky #panelResources .item{
+    background:rgba(255,255,255,.92);
+    border-color:rgba(20,60,120,.1);
+  }
+  html.sky #panelResources .item:first-child{border-top-color:rgba(20,60,120,.1);padding:18px 20px 17px}
+  html.sky #panelResources .card{background:#ffffff;border-color:rgba(20,60,120,.1);padding:18px 18px}
+  html.sky #panelResources .srcs a{border-color:rgba(20,60,120,.14);background:#ffffff}
+  html.sky #panelResources .res-state{border-color:rgba(20,60,120,.14);background:#ffffff}
+  html.sky #panelResources .res-state.on{border-color:transparent;background:var(--sky-primary)}
+}
+
+/* ── 10 · REDUCED MOTION — the dolly lifts sit still ─────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  html.sky #panelResources .item,
+  html.sky #panelResources .res-state,
+  html.sky #panelResources .srcs a{transition:none}
+  html.sky #panelResources .item:hover,
+  html.sky #panelResources .res-state:hover,
+  html.sky #panelResources .srcs a:hover{transform:none}
+}

@@ -24,8 +24,8 @@
 /* ── 1 · THE VIEW SHEET — #trendsRoot floats as one glass sheet on the sky ── */
 html.sky #trendsRoot{
   background:var(--sky-glass-content);
-  -webkit-backdrop-filter:blur(16px);
-  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px) saturate(1.65);
+  backdrop-filter:blur(16px) saturate(1.65);
   border:1px solid var(--sky-glass-edge);
   border-radius:var(--sky-r-sheet);
   box-shadow:var(--sky-shadow-sheet);
@@ -36,9 +36,11 @@ html.sky #trendsRoot{
   html.sky #trendsRoot{padding:14px 12px 22px;border-radius:24px}
 }
 
-/* ── 2 · STAT BAND — four floating glass tiles ─────────────────────────────── */
+/* ── 2 · STAT BAND — four floating glass tiles (liquid pass: .8→.66, one
+      notch gentler than the triage KPI dip — Ford: "Trends could increase
+      the see-throughness") ─────────────────────────────────────────────── */
 html.sky .tr-stat{
-  background:rgba(255,255,255,.8);
+  background:rgba(255,255,255,.66);
   border:1px solid rgba(255,255,255,.85);
   border-radius:var(--sky-r-card);
   box-shadow:var(--sky-shadow-card);
@@ -53,7 +55,7 @@ html.sky .tr-chartblock,
 html.sky #trendsRoot .an-wrap,
 html.sky .rp-card,
 html.sky .tr-adv-btn{
-  background:rgba(255,255,255,.86);
+  background:rgba(255,255,255,.72);
   border:1px solid rgba(255,255,255,.9);
   box-shadow:var(--sky-shadow-card);
 }
@@ -165,12 +167,12 @@ html.sky .tr-adv-btn{border-radius:18px}
 html.sky .tr-adv-btn:hover{border-color:rgba(33,150,243,.45)}
 html.sky .tr-adv-btn.open{
   border-color:rgba(33,150,243,.4);
-  background:linear-gradient(170deg,rgba(33,150,243,.07),rgba(255,255,255,.86));
+  background:linear-gradient(170deg,rgba(33,150,243,.07),rgba(255,255,255,.72));
 }
 
 /* ── 8 · BY-ARRAY TABLE ────────────────────────────────────────────────────── */
 html.sky .tr-tablewrap{
-  background:rgba(255,255,255,.8);
+  background:rgba(255,255,255,.66);
   border:1px solid rgba(255,255,255,.85);
   border-radius:var(--sky-r-card);
   box-shadow:var(--sky-shadow-card);
