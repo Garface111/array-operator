@@ -159,13 +159,17 @@ html.sky body{
   background:none !important;
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
 }
-html.sky{--sky-travel:62vh}
+/* --sky-base = the arrival "camera drop" (Ford 2026-07-13): the world starts
+   shifted UP by this much so you land already looking at the solar panels at
+   the foot of the plate, not the sky/valley. --sky-travel = the extra descent
+   pan below that. The layer is tall enough for BOTH; the index.html driver
+   subtracts --sky-base so scroll pan stays within --sky-travel. */
+html.sky{--sky-travel:48vh; --sky-base:32vh}
 html.sky body::before{
   content:"";
   position:fixed;
   left:0; right:0; top:0;
-  /* Taller than the viewport by --sky-travel: the descent's pan room. */
-  height:calc(100vh + var(--sky-travel,62vh));
+  height:calc(100vh + var(--sky-base,32vh) + var(--sky-travel,48vh));
   z-index:-1;
   pointer-events:none;
   /* PORTRAIT plate — the SAME sharp plate as mobile (Ford 2026-07-13: "use the
@@ -186,8 +190,9 @@ html.sky body::before{
      at the mountains/valley, not pure sky; the descent still pans from here. */
   background-position:center 50%, center, center;
   background-repeat:no-repeat;
-  /* scroll-driven pan — set by the sky-parallax script on html { --sky-py } */
-  transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
+  /* start dropped by --sky-base (arrive on the panels), then the scroll-driven
+     --sky-py pans further down. */
+  transform:translate3d(0, calc(-1 * (var(--sky-base,32vh) + var(--sky-py,0px))), 0);
   will-change:transform;
 }
 @media (prefers-reduced-motion: reduce){

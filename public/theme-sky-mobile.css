@@ -52,7 +52,8 @@
     content:"";
     position:fixed;
     left:0; right:0; top:0;
-    height:130vh; /* room for mountain-parallax pan (see theme-sky.css) */
+    /* 100vh + camera-drop base + 30vh phone pan (see theme-sky.css --sky-base) */
+    height:calc(100vh + var(--sky-base,32vh) + 30vh);
     z-index:-1;
     pointer-events:none;
     /* Default phone plate: 1284 (≈3x logical width of ~390–430 CSS px) —
@@ -71,7 +72,8 @@
        not pure sky; the descent driver still reveals the panels as you scroll. */
     background-position:center 50%, center, center;
     background-repeat:no-repeat;
-    transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
+    /* camera-drop base (arrive on the panels) + scroll pan */
+    transform:translate3d(0, calc(-1 * (var(--sky-base,32vh) + var(--sky-py,0px))), 0);
     will-change:transform;
   }
   /* reduced-motion phones: static framing must still SHOW the panels — the
