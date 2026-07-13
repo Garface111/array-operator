@@ -1,11 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ARRAY OPERATOR — "SKY" THEME · flag-gated demo layer          (2026-07-12)
    ─────────────────────────────────────────────────────────────────────────────
-   The whole app lives IN the sky: a fixed sky-blue gradient is the world,
-   and every surface is frosted glass floating on it. Design language from
-   the ao-sky-redesign-brief (Scribblit reference + Ford's glass-squircle
-   refinement): Plus Jakarta Sans, glass-squircle sheets, pastel accents,
-   alpine-solar hero photography.
+   The whole app lives IN the world: the alpine-solar photograph is the
+   full-viewport background of the entire site (drone POV at the crest —
+   panels below-right, misty valley ahead, vast sky above; the sky-blue
+   gradient is the plate's own sky, kept as the instant-paint fallback),
+   and every surface is frosted glass floating in front of it. Design
+   language from the ao-sky-redesign-brief (Scribblit reference + Ford's
+   glass-squircle refinement + the 2026-07-12 "the photo IS the world"
+   sharpening): Plus Jakarta Sans, glass-squircle sheets, pastel accents.
 
    GATE — this file is loaded ONLY when the Sky flag is on:
      · ?sky=1 in the URL (persists via localStorage ao_sky='1')
@@ -17,9 +20,9 @@
    and NOTHING changes for real customers.
 
    MATERIAL TIERS (keep these straight when extending per-tab):
-     · chrome glass  — rgba(255,255,255,.55) + blur(24px) saturate(1.5)
+     · chrome glass  — rgba(255,255,255,.60) + blur(24px) saturate(1.5)
                        ONLY the tab bar + modal sheets. The most transparent.
-     · content glass — rgba(255,255,255,.78) + blur(16px)
+     · content glass — rgba(255,255,255,.83) + blur(16px)
                        top-level sheets (one per view: #sbWrap, .dash-wrap,
                        .acct-list, the hero pricing card). Data stays crisp.
      · card solid    — rgba(255,255,255,.80-.88), NO backdrop-filter.
@@ -70,9 +73,12 @@ html.sky{
   --sky-r-card:22px;
   --sky-r-sheet:32px;
 
-  /* glass material tiers */
-  --sky-glass-chrome:rgba(255,255,255,.55);
-  --sky-glass-content:rgba(255,255,255,.78);
+  /* glass material tiers — alphas calibrated 2026-07-12 for the PHOTO world:
+     the plate's lower-right panels/greens are busier than the old gradient,
+     so chrome +.05 (the tab bar rides right over the panel field) and
+     content +.05 (data sheets stay milk-white over the grass). */
+  --sky-glass-chrome:rgba(255,255,255,.60);
+  --sky-glass-content:rgba(255,255,255,.83);
   --sky-glass-solid:rgba(255,255,255,.88);
   --sky-glass-edge:rgba(255,255,255,.5);     /* the 1px inner border */
 
@@ -103,17 +109,85 @@ html.sky{
   /* --warn/--bad/--gold/--ao-oct/--ao-live untouched: ratified status language */
 }
 
-/* ── 2 · THE SKY WORLD — the page IS the sky ───────────────────────────────
-   Fixed full-viewport vertical gradient + a soft white horizon glow low in
-   the frame (sun through haze). Everything floats over this; panels stay
-   transparent so the world shows through. Beats theme-day's !important. ── */
-html.sky{background:var(--sky-mid) !important}
+/* ── 2 · THE SKY WORLD — the photograph IS the page ────────────────────────
+   Drone POV at the crest of the mountain: solar panels on the slope below-
+   right, misty valley dead ahead, vast sky above — the whole site floats in
+   front of this one plate. The photo rides a position:fixed body::before
+   (NOT background-attachment:fixed — iOS ignores that and Android repaints
+   the raster every scroll frame; the fixed layer composites once — the
+   approach the mobile pass proved). The sky gradient rides UNDER the photo
+   as extra background layers of the SAME element: zero network, it paints
+   instantly while the plate streams in, and stays the color fallback.
+   body's own background must be NONE — an in-flow body background paints
+   ABOVE a negative-z fixed ::before (CSS 2.1 App. E paint order), so any
+   body fill would hide the world.
+   Plate tiers (mirrored by the flag-gated preloads in index.html — keep in
+   sync): ≤1600px viewports stream world-1600 · default world-2560 ·
+   ≥2200px or ≥1.5dppx world-3840. JPG for no-webp/image-set browsers.
+   background-position "center 70%": 16:9/16:10 windows fit the plate with
+   no vertical crop; ultrawides shed the surplus 70/30 off the top sky
+   (which owns half the frame) so the panels + valley never leave view.
+   ≤600px is re-plated portrait by theme-sky-mobile.css (loads after).   ── */
+html.sky{
+  background:var(--sky-mid) !important;
+  /* analysis.css reserves html{scrollbar-gutter:stable both-edges} for the
+     stock skin's symmetric centering — but Chromium never paints page
+     content (incl. this fixed world layer) into the gutter band, so with
+     classic scrollbars the plate showed two ~15px flat --sky-mid strips at
+     the viewport edges. The world must run edge to edge: retire the gutters
+     under the flag (classic-scrollbar setups get a normal right scrollbar;
+     overlay-scrollbar platforms were already full-bleed). */
+  scrollbar-gutter:auto;
+}
 html.sky body{
-  background:
-    radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%) !important;
-  background-attachment:fixed !important;
+  background:none !important;
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+html.sky body::before{
+  content:"";
+  position:fixed; inset:0; z-index:-1;
+  pointer-events:none;
+  background-image:
+    url("img/sky/world-2560.jpg"),
+    radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  background-image:
+    image-set(url("img/sky/world-2560.webp") type("image/webp"),
+              url("img/sky/world-2560.jpg") type("image/jpeg")),
+    radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  background-size:cover, auto, auto;
+  background-position:center 70%, center, center;
+  background-repeat:no-repeat;
+}
+/* smaller desktop windows stream the lighter plate */
+@media (max-width:1600px){
+  html.sky body::before{
+    background-image:
+      url("img/sky/world-2560.jpg"),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-1600.webp") type("image/webp"),
+                url("img/sky/world-2560.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
+}
+/* big or high-density displays get the 4K plate (declared after the 1600
+   tier so a retina laptop in a ≤1600 window still gets the sharp plate) */
+@media (min-width:2200px), (min-resolution:1.5dppx){
+  html.sky body::before{
+    background-image:
+      url("img/sky/world-2560.jpg"),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-3840.webp") type("image/webp"),
+                url("img/sky/world-2560.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
 }
 html.sky button, html.sky input, html.sky select, html.sky textarea{font-family:inherit}
 html.sky h1, html.sky h2, html.sky h3{letter-spacing:-.015em}
@@ -357,36 +431,34 @@ html.sky .sb-fld input:focus{
   box-shadow:0 0 0 3px rgba(33,150,243,.18) !important;
 }
 
-/* ── 8 · THE LANDING HERO (signed-out #demoBanner) ─────────────────────────
-   The reference composition: one rounded-32 glass-edged container holding
-   the sky gradient + the alpine-solar hero photo anchored at the bottom,
-   white headline over the deep sky, glass pricing card floating right,
-   the "LIVE DEMO BELOW" strip re-cut as a rotated white sticker pill.
+/* ── 8 · THE LANDING HERO — the frame is DISSOLVED (2026-07-12 rework) ─────
+   No banner box, no photo-in-a-frame: the full-viewport world plate (§2) IS
+   the hero image. The badge pill, white H1, sub, CTAs, trust line and the
+   glass pricing card float directly in the plate's upper sky; a soft radial
+   veil rides behind the TEXT BLOCK ONLY (≤.18 alpha — where the near-
+   horizon sky runs pale the white H1 needs a whisper of depth, never a
+   re-frame). The LIVE-DEMO strip stays, re-cut as a frameless glass band.
+   hero.webp/hero.jpg stay in the repo — no longer painted by any rule.
    Copy and links are untouched — composition + material only. ─────────── */
 html.sky .demo-banner{
-  margin:22px 0 10px;
-  border-radius:var(--sky-r-sheet);
-  border:1px solid rgba(255,255,255,.55) !important;
-  box-shadow:var(--sky-shadow-float) !important;
-  position:relative;
-  isolation:isolate;
-  /* layers, top→bottom: deep-sky veil for headline legibility · hero photo
-     bottom-anchored (webp with jpg fallback) · the sky gradient behind it.
-     !important throughout: theme-day paints .demo-banner white with a
-     background SHORTHAND !important, which resets these longhands. */
-  background-image:
-    linear-gradient(180deg, rgba(12,62,124,.44) 0%, rgba(12,62,124,.20) 34%, rgba(12,62,124,0) 58%),
-    url("img/sky/hero.jpg"),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-horizon) 100%) !important;
-  background-image:
-    linear-gradient(180deg, rgba(12,62,124,.44) 0%, rgba(12,62,124,.20) 34%, rgba(12,62,124,0) 58%),
-    image-set(url("img/sky/hero.webp") type("image/webp"), url("img/sky/hero.jpg") type("image/jpeg")),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-horizon) 100%) !important;
-  background-repeat:no-repeat !important;
-  background-position:center top, center bottom, center !important;
-  background-size:100% 100%, cover, cover !important;
+  margin:26px 0 12px;
+  background:none !important;         /* beats theme-day's white shorthand */
+  border:0 !important;
+  border-radius:0;
+  box-shadow:none !important;
+  overflow:visible;                   /* index.html clips — let the veil +
+                                         rotated sticker breathe (body is
+                                         overflow-x:hidden, no scroll risk) */
 }
-html.sky .hero{padding:54px 54px 132px;gap:34px}
+html.sky .hero{padding:46px 44px 40px;gap:40px}
+/* the legibility veil — behind the text block, not the container */
+html.sky .hero .hero-main{position:relative;z-index:0}
+html.sky .hero .hero-main::before{
+  content:""; position:absolute; z-index:-1; pointer-events:none;
+  inset:-52px -48px -44px -64px;
+  background:radial-gradient(78% 74% at 42% 44%,
+    rgba(9,44,88,.17) 0%, rgba(9,44,88,.11) 52%, rgba(9,44,88,0) 82%);
+}
 html.sky .hero .db-badge{
   background:rgba(255,255,255,.26) !important;
   border:1px solid rgba(255,255,255,.5) !important;
@@ -402,15 +474,17 @@ html.sky .hero .hero-h1{
   color:#ffffff !important;
   -webkit-text-fill-color:#ffffff;
   font-weight:700; letter-spacing:-.025em;
-  text-shadow:0 2px 26px rgba(8,44,90,.45);
+  /* tight crisping shadow + wide glow — carries the white through the pale
+     sun-flare sky at big widths without any veil heavier than .18 */
+  text-shadow:0 1px 3px rgba(8,44,90,.28), 0 2px 30px rgba(8,44,90,.52);
   text-wrap:balance;
 }
 @media (min-width:761px){ html.sky .hero .hero-h1{font-size:46px;line-height:1.06} }
 @media (max-width:760px){ html.sky .hero .hero-h1{font-size:30px} }
 html.sky .hero .hero-h1 em{color:#E5F6E0 !important}   /* pastel-green lift on the payoff */
 html.sky .hero .hero-sub{
-  color:rgba(255,255,255,.88);
-  text-shadow:0 1px 16px rgba(8,44,90,.4);
+  color:rgba(255,255,255,.92);
+  text-shadow:0 1px 3px rgba(8,44,90,.4), 0 2px 18px rgba(8,44,90,.42);
   font-size:15px; max-width:56ch;
 }
 html.sky .hero .hero-sub b{color:#ffffff}
@@ -429,14 +503,18 @@ html.sky .hero .db-cta:hover{
   box-shadow:0 14px 34px -9px rgba(10,50,110,.65) !important;
 }
 html.sky .hero .db-signin{
-  background:rgba(255,255,255,.22);
-  border:1px solid rgba(255,255,255,.55);
+  background:rgba(11,42,82,.24);      /* deep-sky tint — translucent white
+     washed out against the plate's bright sun-flare band (mirrors the
+     mobile pass's cloud-band fix) */
+  border:1px solid rgba(255,255,255,.6);
   border-radius:var(--sky-r-pill);
   color:#ffffff; padding:11px 22px; font-weight:600;
   transition:background .14s;
 }
-html.sky .hero .db-signin:hover{background:rgba(255,255,255,.34);color:#ffffff}
-html.sky .hero .hero-trust{color:rgba(255,255,255,.78);text-shadow:0 1px 12px rgba(8,44,90,.4)}
+html.sky .hero .db-signin:hover{background:rgba(11,42,82,.36);color:#ffffff}
+/* the trust line crosses the plate's bright horizon haze at wide viewports —
+   near-solid white + a tight shadow keep the ✓s honest (calibration R1) */
+html.sky .hero .hero-trust{color:rgba(255,255,255,.95);text-shadow:0 1px 3px rgba(8,44,90,.55), 0 2px 16px rgba(8,44,90,.5)}
 /* the pricing aside: a floating content-glass card over the scene */
 html.sky .hero .hero-price{
   background:var(--sky-glass-content) !important;
@@ -454,11 +532,17 @@ html.sky .hero .hp-eg{color:var(--ink)}
 html.sky .hero .hp-eg-sub{color:var(--muted)}
 html.sky .hero .hp-list li{color:#3D4A5C}
 html.sky .hero .hp-list li::before{color:var(--sky-green)}
-/* demo strip: a white glass band; the badge becomes the rotated sticker */
+/* demo strip: a frameless glass band floating in the world (no banner edge
+   to hang from any more); the badge stays the rotated sticker */
 html.sky .db-demostrip{
-  background:rgba(255,255,255,.6) !important;
-  border-top:1px solid rgba(255,255,255,.55) !important;
-  padding:13px 28px;
+  background:rgba(255,255,255,.5) !important;
+  -webkit-backdrop-filter:blur(12px) saturate(1.4);
+  backdrop-filter:blur(12px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.6) !important;
+  border-top:1px solid rgba(255,255,255,.6) !important;  /* theme-day resets border-top-color */
+  border-radius:var(--sky-r-pill);
+  box-shadow:var(--sky-shadow-card);
+  padding:13px 26px;
 }
 html.sky .db-demostrip .db-badge.sm{
   background:#ffffff !important;
@@ -474,8 +558,8 @@ html.sky .db-demostrip .db-copy b{color:var(--ink)}
 html.sky .db-demostrip .db-signin{color:#33415A;font-weight:650}
 html.sky .db-demostrip .db-signin:hover{color:var(--sky-primary-deep)}
 @media (max-width:760px){
-  html.sky .hero{padding:34px 22px 96px}
-  html.sky .demo-banner{border-radius:24px}
+  html.sky .hero{padding:32px 20px 26px}
+  html.sky .hero .hero-main::before{inset:-30px -16px -24px -18px}
 }
 
 /* ── 9 · NUDGE / GATE BARS float as glass too (material only, states keep
@@ -491,7 +575,6 @@ html.sky .gmp-gate{border-radius:18px;box-shadow:var(--sky-shadow-card)}
 /* ── 10 · SQUIRCLE — progressive enhancement (Chrome 139+; harmless no-op
       elsewhere). Continuous-curvature corners on the glass vocabulary. ── */
 @supports (corner-shape: squircle){
-  html.sky .demo-banner,
   html.sky .tabbar,
   html.sky .tab,
   html.sky #sbWrap,

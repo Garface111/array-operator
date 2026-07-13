@@ -19,8 +19,9 @@
      · tables keep their overflow-x scroll (restated at ≥ the specificity of
        mobile.css's .cc-tablewrap !important war, so a sibling fragment can't
        accidentally re-clip them)
-     · the sky gradient itself moves off background-attachment:fixed (iOS
-       ignores it / Android repaints per scroll) onto a fixed ::before layer
+     · the WORLD itself: the fixed ::before layer re-plates the desktop 16:9
+       drone photograph with the portrait world-m-* plate (huge sky, panels
+       low on the ridge crest), gradient underlayers for instant paint
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width:600px){
@@ -32,12 +33,16 @@
     --sky-r-card:18px;
   }
 
-  /* ── 1 · THE SKY, scroll-safe — desktop paints the gradient on body with
-        background-attachment:fixed; iOS Safari ignores fixed-on-body and
-        Android repaints the huge gradient every scroll frame. On a phone the
-        world moves to a composited position:fixed ::before layer instead
-        (painted once, zero scroll cost). body goes transparent so the layer
-        shows through; the html.sky solid --sky-mid stays as the backstop. ── */
+  /* ── 1 · THE WORLD, portrait plate — desktop's fixed ::before carries the
+        16:9 drone plate; a phone re-plates it PORTRAIT (world-m-*: panels on
+        the ridge crest low in frame, huge sky) on the same composited
+        position:fixed layer (painted once, zero scroll cost — iOS ignores
+        background-attachment:fixed and Android repaints it per frame). The
+        sky gradient rides UNDER the photo as extra layers of the same
+        element: instant first paint + color fallback while the plate
+        streams. body stays transparent; solid --sky-mid is the backstop.
+        Plate tiers (mirror the index.html preloads): default world-m-828,
+        ≥2.1dppx world-m-1284 (top-level block after this one). ─────────── */
   html.sky body{
     background:none !important;
     padding-bottom:calc(78px + env(safe-area-inset-bottom,0px)); /* dock clearance:
@@ -47,9 +52,18 @@
     content:"";
     position:fixed; inset:0; z-index:-1;
     pointer-events:none;
-    background:
+    background-image:
+      url("img/sky/world-m-1284.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-m-828.webp") type("image/webp"),
+                url("img/sky/world-m-1284.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-size:cover, auto, auto;
+    background-position:center bottom, center, center;
+    background-repeat:no-repeat;
   }
 
   /* ── 2 · THE DOCK — the fixed bottom nav becomes a floating glass pill.
@@ -162,11 +176,15 @@
     margin-top:10px;
   }
 
-  /* ── 4 · HERO — the stacked composition ──────────────────────────────────
+  /* ── 4 · HERO — the stacked composition, floating in the world ───────────
         headline step-down · full-width CTA pair · pricing card = full-width
-        glass sheet riding the photo band · sticker pill on its own line ── */
-  html.sky .demo-banner{margin:12px 0 8px; border-radius:22px}
-  html.sky .hero{padding:28px 18px 112px; gap:16px}
+        glass sheet over the world · sticker pill on its own line. The frame
+        is gone (base §8): no radius/box to keep, just rhythm. ───────────── */
+  html.sky .demo-banner{margin:14px 0 8px}
+  html.sky .hero{padding:24px 16px 22px; gap:16px}
+  /* the legibility veil hugs tighter on a phone (body clips overflow-x,
+     but keep it visually inside the slim gutter) */
+  html.sky .hero .hero-main::before{inset:-22px -12px -18px -14px}
   html.sky .hero .db-badge{font-size:9.5px; letter-spacing:.12em; padding:5px 11px}
   html.sky .hero .hero-h1{font-size:27px; line-height:1.1}
   html.sky .hero .hero-sub{font-size:13.5px}
@@ -198,6 +216,7 @@
   html.sky .db-demostrip{
     flex-direction:column; align-items:flex-start; gap:9px;
     padding:14px 18px 16px;
+    border-radius:20px;      /* the base pill radius reads odd on a stacked column */
   }
   html.sky .db-demostrip .db-badge.sm{transform:rotate(-3deg); margin-left:2px}
 
@@ -233,6 +252,23 @@
   }
 }
 
+/* ── 6b · DENSE PHONES (≥2.1dppx — 3x iPhones, 2.6x Pixels) stream the 1284
+      portrait plate. Top-level so it declares AFTER (and beats) the base
+      ::before above and the desktop tiers in theme-sky.css. ─────────────── */
+@media (max-width:600px) and (min-resolution:2.1dppx){
+  html.sky body::before{
+    background-image:
+      url("img/sky/world-m-1284.jpg"),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+    background-image:
+      image-set(url("img/sky/world-m-1284.webp") type("image/webp"),
+                url("img/sky/world-m-1284.jpg") type("image/jpeg")),
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
+}
+
 /* ── 7 · THE SMALLEST PHONES (mirrors mobile.css's 380px tier) ────────────── */
 @media (max-width:380px){
   html.sky .wrap{padding:0 6px}
@@ -245,7 +281,7 @@
   html.sky #fsWrap{bottom:calc(76px + env(safe-area-inset-bottom,0px)) !important}
   html.sky .ao-al-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px)) !important}
   html.sky .ao-al-panel{bottom:calc(132px + env(safe-area-inset-bottom,0px)) !important}
-  html.sky .hero{padding:24px 14px 96px}
+  html.sky .hero{padding:20px 12px 18px}
   html.sky .hero .hero-h1{font-size:24px}
   html.sky .hero .hp-num{font-size:29px}
 }

@@ -59,7 +59,19 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- SKY DEMO THEME — only when the ao_sky flag is on (see the pre-paint script above).
      document.write keeps it parser-blocking (no FOUC) and positions it AFTER
      mobile.css so it is the final word in the cascade. -->
-<script>if (window.__AO_SKY__) ["theme-sky.css?v=20260712sky2","theme-sky-triage.css?v=20260712sky1","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky1","theme-sky-analysis.css?v=20260712sky1","theme-sky-trends.css?v=20260712sky1","theme-sky-mobile.css?v=20260712sky1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });</script>
+<script>if (window.__AO_SKY__){
+  /* Preload the world plate (the full-viewport photo background) so it lands
+     with the first paint. Media lists MIRROR the tier queries in
+     theme-sky.css §2 + theme-sky-mobile.css §1/§6b EXACTLY — keep them in
+     sync or a viewport double-fetches. Flag off → none of this runs. */
+  [["img/sky/world-1600.webp","(min-width:601px) and (max-width:1600px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-2560.webp","(min-width:1601px) and (max-width:2199px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-3840.webp","(min-width:601px) and (min-resolution:1.5dppx), (min-width:2200px)"],
+   ["img/sky/world-m-828.webp","(max-width:600px) and (max-resolution:2.09dppx)"],
+   ["img/sky/world-m-1284.webp","(max-width:600px) and (min-resolution:2.1dppx)"]
+  ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
+  ["theme-sky.css?v=20260712sky3","theme-sky-triage.css?v=20260712sky1","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky1","theme-sky-analysis.css?v=20260712sky1","theme-sky-trends.css?v=20260712sky1","theme-sky-mobile.css?v=20260712sky3"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+}</script>
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
