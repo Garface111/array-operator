@@ -770,15 +770,15 @@ document.documentElement.setAttribute("data-theme","day");
       </div>
     </div>
   </div>
-  <button id="fsBtn" type="button" aria-expanded="false" title="Screenshot like Print Screen, then circle what should change">
+  <button id="fsBtn" type="button" aria-expanded="false" title="Freeze this tab, then circle what should change">
     <span class="fsdot">✦</span> Wish this was better
   </button>
 </div>
 
 <div id="fsGrab" role="dialog" aria-modal="true" aria-labelledby="fsGrabTitle">
   <div id="fsGrabCard">
-    <h4 id="fsGrabTitle">Screenshot this page</h4>
-    <p class="fsLead">Same quality as Print Screen on your PC — crisp glass, real sky, no grey mush.</p>
+    <h4 id="fsGrabTitle">Paste a screenshot instead</h4>
+    <p class="fsLead">Optional backup — use your PC’s Print Screen / Snipping Tool if tab freeze wasn’t available.</p>
     <ol id="fsGrabSteps">
       <li><span class="n">1</span><div><b>Snip the page</b><span>Press <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (or <kbd>PrtScn</kbd>) and capture this window</span></div></li>
       <li><span class="n">2</span><div><b>Paste it here</b><span>Click the box below and press <kbd>Ctrl</kbd>+<kbd>V</kbd></span></div></li>
@@ -786,12 +786,12 @@ document.documentElement.setAttribute("data-theme","day");
     </ol>
     <button type="button" id="fsPasteZone" tabindex="0">
       Click here, then paste screenshot<br>
-      <span style="font-weight:600;opacity:.85;font-size:12.5px">Ctrl+V · uses your real Print Screen pixels</span>
+      <span style="font-weight:600;opacity:.85;font-size:12.5px">Ctrl+V · real Print Screen pixels</span>
     </button>
     <p id="fsGrabStatus">Waiting for a screenshot on the clipboard…</p>
     <div id="fsGrabActions">
       <button type="button" id="fsGrabCancel">Cancel</button>
-      <button type="button" id="fsGrabFreeze" title="Browser freeze of this tab (pick This tab)">Freeze this tab instead</button>
+      <button type="button" id="fsGrabFreeze" title="Browser freeze of this tab (pick This tab)">Freeze this tab</button>
     </div>
   </div>
 </div>
@@ -1052,13 +1052,53 @@ document.documentElement.setAttribute("data-theme","day");
     }, 40);
   }
 
-  function startMark(){
-    // Primary path: OS Print Screen / Snipping Tool → paste (matches PC screenshots).
-    openGrab();
+  function freezeThisTab(){
+    openPanel(false);
+    closeGrab();
+    btn.disabled = true;
+    var prev = btn.innerHTML;
+    btn.innerHTML = '<span class="fsdot">✦</span> Freezing…';
+    // Tiny toast so the browser share prompt isn’t a surprise.
+    var tip = document.createElement("div");
+    tip.id = "fsShareTip";
+    tip.setAttribute("role","status");
+    tip.style.cssText = [
+      "position:fixed","left:50%","top:18px","transform:translateX(-50%)","z-index:10060",
+      "max-width:min(440px,92vw)","padding:12px 16px","border-radius:14px",
+      "background:rgba(255,255,255,.96)","color:#0E1420",
+      "font:600 13.5px/1.4 Plus Jakarta Sans,system-ui,sans-serif",
+      "box-shadow:0 12px 40px -12px rgba(15,50,110,.35)","border:1px solid rgba(33,150,243,.25)",
+      "text-align:center","pointer-events:none"
+    ].join(";");
+    tip.textContent = "Pick “This tab” — one freeze, then sharing stops.";
+    document.body.appendChild(tip);
+    return captureTabFrame().then(function(cv){
+      if(tip.parentNode) tip.parentNode.removeChild(tip);
+      openMarkWithCanvas(cv);
+    }).catch(function(err){
+      if(tip.parentNode) tip.parentNode.removeChild(tip);
+      // Fall back to paste / Print Screen path.
+      openGrab();
+      var st = document.getElementById("fsGrabStatus");
+      var denied = err && (err.name === "NotAllowedError" || err.name === "AbortError");
+      if(st){
+        st.style.color = "#b45309";
+        st.textContent = denied
+          ? "Tab freeze cancelled — paste a Print Screen below (Win+Shift+S, then Ctrl+V)."
+          : "Couldn't freeze the tab — paste a Print Screen below (Win+Shift+S, then Ctrl+V).";
+      }
+    }).then(function(){
+      btn.disabled = false;
+      btn.innerHTML = prev;
+    });
   }
 
+  function startMark(){
+    // Default: freeze this tab (pixel-perfect compositor capture).
+    freezeThisTab();
+  }
 
-  // Grab panel actions
+  // Grab panel actions (paste backup + retry freeze)
   (function(){
     var cancel = document.getElementById("fsGrabCancel");
     var freeze = document.getElementById("fsGrabFreeze");
@@ -1067,37 +1107,15 @@ document.documentElement.setAttribute("data-theme","day");
     if(zone){
       zone.onclick = function(){ try{ zone.focus(); }catch(e){} };
       zone.onkeydown = function(e){
-        // Allow Ctrl+V; ignore others except Escape (handled globally)
         if(e.key === "Escape"){ closeGrab(); }
       };
     }
-    if(freeze) freeze.onclick = function(){
-      var status = document.getElementById("fsGrabStatus");
-      if(status){ status.style.color = "#4C596B"; status.textContent = "Pick “This tab” in the browser prompt…"; }
-      closeGrab();
-      btn.disabled = true;
-      var prev = btn.innerHTML;
-      btn.innerHTML = '<span class="fsdot">✦</span> Freezing…';
-      captureTabFrame().then(function(cv){
-        openMarkWithCanvas(cv);
-      }).catch(function(err){
-        openGrab();
-        var st = document.getElementById("fsGrabStatus");
-        var denied = err && (err.name === "NotAllowedError" || err.name === "AbortError");
-        if(st){
-          st.style.color = "#b45309";
-          st.textContent = denied
-            ? "Tab freeze cancelled — use Win+Shift+S then Ctrl+V instead (best quality)."
-            : "Couldn't freeze the tab — use Win+Shift+S then Ctrl+V (Print Screen quality).";
-        }
-      }).then(function(){ btn.disabled = false; btn.innerHTML = prev; });
-    };
+    if(freeze) freeze.onclick = function(){ freezeThisTab(); };
   })();
 
-  // Primary CTA: go straight into mark mode (the "right here" moment).
+  // Primary CTA: freeze this tab immediately.
   btn.onclick=function(){
     if(journey.classList.contains("open") && ACTIVE_ID){
-      // If a build is running, re-open the journey rather than starting another.
       return;
     }
     startMark();
