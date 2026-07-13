@@ -5198,26 +5198,32 @@
     const scopeRows = showFilter && OFFTAKER_FILTER !== "all"
       ? OFFTAKERS.filter(s => offtakerProviderBucket(s, bucketCounts.acctById) === OFFTAKER_FILTER)
       : OFFTAKERS;
-    // ── find-an-offtaker search (Anna-scale) ──────────────────────────────────
-    // Big fleets need a lookup tool, not a scroll: match name / email / utility-
-    // account number or nickname. The query lives beside the GMP-vs-other chips
-    // in one tools row over the ONE list (integrate-in-place, no separate page).
-    const acctByIdFull = new Map((utilAccts || []).map(a => [String(a.id), a]));
+    // ── find-an-offtaker search ──────────────────────────────────────────────
+    // Always available (Ford 2026-07-13: even a 3-offtaker fleet wants lookup
+    // next to the All/GMP/Other strip — was gated to >12 and never appeared).
+    // Match name / email / utility account # or nickname / array name.
+    const acctByIdFull = new Map((utilAccts || []).map(a => {
+      const id = a.utility_account_id != null ? a.utility_account_id : a.id;
+      return [String(id), a];
+    }));
+    const arrNameById = new Map((arrs || ACC_ARRS || []).map(a => [String(a.id), a.name || ""]));
     const q = (OFFTAKER_QUERY || "").trim().toLowerCase();
     const matchesQuery = (s) => {
       if (!q) return true;
       const a = s.utility_account_id != null ? acctByIdFull.get(String(s.utility_account_id)) : null;
-      return [s.customer_name, s.client_email, a && a.account_number, a && a.nickname]
+      const arrName = s.array_id != null ? arrNameById.get(String(s.array_id)) : "";
+      return [s.customer_name, s.client_email, a && a.account_number, a && a.nickname,
+              a && a.provider, arrName, s.utility_account_name]
         .some(v => v && String(v).toLowerCase().includes(q));
     };
     const viewRows = q ? scopeRows.filter(matchesQuery) : scopeRows;
-    const showSearch = OFFTAKERS.length > 12;
+    const showSearch = OFFTAKERS.length >= 1;
     const searchHTML = showSearch ? `
       <div class="rb-osearch">
         <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
-        <input id="rbOSearch" type="search" placeholder="Find an offtaker — name, email, or account…"
+        <input id="rbOSearch" type="search" placeholder="Search offtakers — name, email, account…"
                value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
-               aria-label="Find an offtaker">
+               aria-label="Search offtakers">
         ${q ? `<span class="rb-osearch-n">${viewRows.length} of ${scopeRows.length}</span>` : ""}
       </div>` : "";
     // Above 5 offtakers, build the three-level hierarchy (Ford): utility (provider) →
