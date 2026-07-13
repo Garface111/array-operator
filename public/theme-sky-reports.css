@@ -133,10 +133,11 @@ html.sky .rb-prov-head{background:rgba(255,255,255,.8);
 html.sky .rb-prov-head:hover{background:rgba(255,255,255,.95);
   box-shadow:0 10px 26px -12px rgba(20,60,120,.24)}
 
-/* ── 7 · NET-METER GROUPS — the 8-tone var model, re-tinted to sky pastels ──
-   Same mechanism (data-grp-tone=array_id%8 → --grp-bg/bd/ink), same stable
-   hue per array; each tint now sits on a translucent white veil so groups
-   read as tinted glass instead of flat color washes. */
+/* ── 7 · NET-METER GROUPS — 2-TONE ZEBRA on translucent glass ──────────────
+   Was an 8-hue-per-array rainbow; now a subtle alternating band keyed off row
+   position (data-grp-tone = index % 2), matching the base theme (Ford 2026-07-12:
+   "remove the different colors … two or three colors in a consistent pattern").
+   Two tones alternate on the white glass veil; labels use ONE readable ink. */
 html.sky .rb-grp-tinted{
   background-color:rgba(255,255,255,.55);
   background-image:linear-gradient(0deg,var(--grp-bg),var(--grp-bg));
@@ -146,14 +147,8 @@ html.sky .rb-grp-tinted{
   padding:8px 14px 10px;
 }
 html.sky .rb-grp-tinted .rb-grp-head:hover{background:rgba(255,255,255,.5)}
-html.sky .rb-grp-tinted[data-grp-tone="0"]{ --grp-bg:rgba(76,175,80,.12);   --grp-bd:rgba(76,175,80,.30);   --grp-ink:#2e7d32; }
-html.sky .rb-grp-tinted[data-grp-tone="1"]{ --grp-bg:rgba(33,150,243,.11);  --grp-bd:rgba(33,150,243,.30);  --grp-ink:#1565C0; }
-html.sky .rb-grp-tinted[data-grp-tone="2"]{ --grp-bg:rgba(245,158,11,.11);  --grp-bd:rgba(245,158,11,.30);  --grp-ink:#92600a; }
-html.sky .rb-grp-tinted[data-grp-tone="3"]{ --grp-bg:rgba(139,92,246,.11);  --grp-bd:rgba(139,92,246,.28);  --grp-ink:#6d28d9; }
-html.sky .rb-grp-tinted[data-grp-tone="4"]{ --grp-bg:rgba(244,63,94,.09);   --grp-bd:rgba(244,63,94,.24);   --grp-ink:#be123c; }
-html.sky .rb-grp-tinted[data-grp-tone="5"]{ --grp-bg:rgba(20,184,166,.11);  --grp-bd:rgba(20,184,166,.28);  --grp-ink:#0f766e; }
-html.sky .rb-grp-tinted[data-grp-tone="6"]{ --grp-bg:rgba(99,102,241,.11);  --grp-bd:rgba(99,102,241,.28);  --grp-ink:#4338ca; }
-html.sky .rb-grp-tinted[data-grp-tone="7"]{ --grp-bg:rgba(217,70,239,.09);  --grp-bd:rgba(217,70,239,.24);  --grp-ink:#a21caf; }
+html.sky .rb-grp-tinted[data-grp-tone="0"]{ --grp-bg:rgba(33,150,243,.09);  --grp-bd:rgba(33,150,243,.28); --grp-ink:#1e293b; }
+html.sky .rb-grp-tinted[data-grp-tone="1"]{ --grp-bg:rgba(148,163,184,.10); --grp-bd:rgba(100,116,139,.30); --grp-ink:#1e293b; }
 html.sky .rb-grp-add{background:rgba(255,255,255,.7)}
 html.sky .rb-grp-add:hover{background:#fff}
 

@@ -5079,17 +5079,13 @@
     // offtaker Anna shape) still paints ~2 headers, not ~800 cards.
     const AUTO_EXPAND_MAX = 40;
     const _smallFleet = !q && (viewRows || []).length <= AUTO_EXPAND_MAX;
-    // Each master net-meter group gets a stable, distinct background tint (Ford
-    // 2026-07-10) so masters read apart at a glance — the colour is keyed off the
-    // array_id (mod the palette) so a group keeps its colour across renders.
-    const GRP_TONES = 8;
-    const grpToneIndex = (key) => {
-      const m = /^a:(\d+)/.exec(key || "");
-      let n;
-      if (m) { n = parseInt(m[1], 10); }
-      else { n = 0; for (const c of String(key || "")) n = (n * 31 + c.charCodeAt(0)) >>> 0; }
-      return ((n % GRP_TONES) + GRP_TONES) % GRP_TONES;
-    };
+    // Master net-meter groups get a subtle ALTERNATING background band — a 2-tone
+    // zebra keyed off ROW POSITION, not the array id (Ford 2026-07-12: "remove the
+    // different colors … use two or three colors in a consistent pattern, don't
+    // switch between colors without reason"). The old per-array hashed rainbow
+    // assigned 8 hues meaninglessly; position-parity banding separates adjacent
+    // groups for the same at-a-glance scan with a consistent, reasoned pattern.
+    // (Tone is computed at render from each group's index — see acctGroupHTML.)
     // Per-utility provider colour (Ford 2026-07-11): the provider bar used to be a
     // fixed emerald for everyone — "the VEC, that should be blue, not green. Green
     // Mountain Power is green … we need to be prepared for all of them." Known
@@ -5106,7 +5102,7 @@
       return PROV_PALETTE[n % PROV_PALETTE.length];
     };
     // MIDDLE level — one utility-account group (its header + the offtaker cards under it).
-    const acctGroupHTML = (g) => {
+    const acctGroupHTML = (g, _i) => {
       if (GROUP_COLLAPSED[g.key] === undefined) GROUP_COLLAPSED[g.key] = !_smallFleet;   // small fleet → expanded
       const collapsed = !!GROUP_COLLAPSED[g.key];
       // "+ Add offtaker" on the master header → opens the add form with THIS master
@@ -5123,7 +5119,7 @@
       // from, so it renders on the plain background — no tint, no tone.
       const tinted = g.rows.length >= 2;
       return `
-        <div class="rb-grp${tinted ? " rb-grp-tinted" : ""}${collapsed ? " collapsed" : ""}"${tinted ? ` data-grp-tone="${grpToneIndex(g.key)}"` : ""}>
+        <div class="rb-grp${tinted ? " rb-grp-tinted" : ""}${collapsed ? " collapsed" : ""}"${tinted ? ` data-grp-tone="${_i % 2}"` : ""}>
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
                aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers ${g.shareMode === "array" ? "in this array" : "on this utility bill"}">
             <span class="rb-grp-caret" aria-hidden="true">▾</span>
