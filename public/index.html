@@ -790,6 +790,14 @@ document.documentElement.setAttribute("data-theme","day");
   }
 
   // ── Capture + mark (THE entry path) ──
+  // TRUST-CRITICAL: the mark-up shot MUST look like the real page. html2canvas
+  // cannot paint our Sky world correctly on its own because:
+  //   1. the alpine plate lives on body::before (position:fixed; z-index:-1)
+  //   2. glass uses backdrop-filter (unsupported → solid white cards)
+  // Bare html2canvas left a flat blue gradient (Ford 2026-07-13 screenshot —
+  // "breaks trust"). Fix: resolve the live plate URL, paint cover+gradient
+  // ourselves, capture the UI with a transparent background + no
+  // backdrop-filter in the clone, then composite UI over the plate.
   function loadH2C(){
     return window.html2canvas ? Promise.resolve()
       : new Promise(function(res,rej){
@@ -797,6 +805,126 @@ document.documentElement.setAttribute("data-theme","day");
           s.src="/vendor/html2canvas.min.js?v=pro158";
           s.onload=res; s.onerror=rej; document.head.appendChild(s);
         });
+  }
+  function resolveSkyPlateUrl(){
+    // Prefer the same plate the browser is actually painting on body::before.
+    try{
+      var bg = (getComputedStyle(document.body, "::before").backgroundImage || "");
+      var re = /url\(\s*(['"]?)([^"')]+)\1\s*\)/g, m, first=null;
+      while((m = re.exec(bg))){
+        var u = m[2];
+        if(/\/img\/sky\//.test(u) || /\.(webp|jpe?g|png)(\?|$)/i.test(u)){
+          first = u; break;
+        }
+        if(!first) first = u;
+      }
+      if(first){
+        // Resolve relative URLs against the page.
+        try{ return new URL(first, location.href).href; }catch(e){ return first; }
+      }
+    }catch(e){}
+    // Fallback matching theme-sky.css plate tiers.
+    var dpr = window.devicePixelRatio || 1, w = window.innerWidth || 1200;
+    var file = (w <= 600)
+      ? (dpr >= 2.5 ? "world-zo6-2560" : dpr > 1.5 ? "world-zo6-1600" : "world-zo6-1080")
+      : (dpr >= 2 || w >= 2400) ? "world-zo6-2560"
+      : (dpr >= 1.5 || w >= 1800) ? "world-zo6-2560"
+      : (w <= 1600) ? "world-zo6-1600" : "world-zo6-2560";
+    return new URL("img/sky/"+file+".webp", location.href).href;
+  }
+  function loadImg(url){
+    return new Promise(function(res, rej){
+      var img = new Image();
+      // Same-origin plate — CORS not required, but set it so a future CDN still works.
+      try{ img.crossOrigin = "anonymous"; }catch(e){}
+      img.onload = function(){ res(img); };
+      img.onerror = function(){
+        // webp may 404 on older cache → jpg twin
+        if(/\.webp(\?|$)/i.test(url)){
+          loadImg(url.replace(/\.webp/i, ".jpg")).then(res, rej);
+        } else rej(new Error("sky plate load failed"));
+      };
+      img.src = url;
+    });
+  }
+  // CSS background-size:cover + background-position:center 52% (theme-sky).
+  function drawCover(ctx, img, w, h, posY){
+    posY = (posY == null) ? 0.52 : posY;
+    var ir = img.naturalWidth / img.naturalHeight, cr = w / h;
+    var dw, dh;
+    if(ir > cr){ dh = h; dw = h * ir; } else { dw = w; dh = w / ir; }
+    var dx = (w - dw) / 2;
+    var dy = (h * posY) - (dh * posY);
+    ctx.drawImage(img, dx, dy, dw, dh);
+  }
+  function paintSkyWorld(ctx, w, h, img){
+    // Gradient under the photo — same tokens as --sky-top/mid/horizon.
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "#1E90E8");
+    g.addColorStop(0.48, "#56B4F0");
+    g.addColorStop(1, "#BEE3FA");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    if(img && img.naturalWidth){
+      drawCover(ctx, img, w, h, 0.52);
+      // Soft fog at the foot of the plate (matches the radial in theme-sky).
+      var rg = ctx.createRadialGradient(w/2, h*1.04, 0, w/2, h*1.04, Math.max(w,h)*0.55);
+      rg.addColorStop(0, "rgba(255,255,255,0.45)");
+      rg.addColorStop(0.55, "rgba(255,255,255,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+  function captureViewportFaithful(){
+    var sx = Math.floor(window.scrollX || window.pageXOffset || 0);
+    var sy = Math.floor(window.scrollY || window.pageYOffset || 0);
+    var vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
+    var vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
+    var scale = Math.min(window.devicePixelRatio || 1, 1.5);
+    var plateUrl = resolveSkyPlateUrl();
+    return Promise.all([
+      loadH2C(),
+      loadImg(plateUrl).catch(function(){ return null; })
+    ]).then(function(pair){
+      var skyImg = pair[1];
+      return window.html2canvas(document.body, {
+        // Transparent so our plate shows through glass/rgba layers.
+        backgroundColor: null,
+        scale: scale,
+        useCORS: true,
+        logging: false,
+        x: sx, y: sy, width: vw, height: vh,
+        ignoreElements: function(el){
+          return el && (el.id === "fsWrap" || el.id === "fsOverlay" || el.id === "fsSkyPlateProxy");
+        },
+        onclone: function(doc){
+          // html2canvas cannot render backdrop-filter OR fixed body::before.
+          // Drop both in the clone so paint is honest translucent UI over our
+          // later plate composite (instead of opaque white cards on empty blue).
+          try{
+            var st = doc.createElement("style");
+            st.textContent = [
+              "html, body { background: transparent !important; }",
+              "html.sky body::before, html.sky body::after { content: none !important; display: none !important; background: none !important; }",
+              "* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }",
+              // Nudge the glass tokens a touch more translucent so the plate
+              // reads through the way the live frosted UI does with blur.
+              "html.sky { --sky-glass-chrome: rgba(255,255,255,.55); --sky-glass-content: rgba(255,255,255,.50); --sky-glass-solid: rgba(255,255,255,.70); }"
+            ].join("\n");
+            doc.head.appendChild(st);
+          }catch(e){}
+        }
+      }).then(function(uiCv){
+        // Composite: sky plate (cover) → UI layer. Same pixel size as the capture.
+        var out = document.createElement("canvas");
+        out.width = uiCv.width;
+        out.height = uiCv.height;
+        var ctx = out.getContext("2d");
+        paintSkyWorld(ctx, out.width, out.height, skyImg);
+        ctx.drawImage(uiCv, 0, 0);
+        return out;
+      });
+    });
   }
 
   function startMark(fromSkip){
@@ -806,17 +934,12 @@ document.documentElement.setAttribute("data-theme","day");
     btn.disabled=true;
     var prevLabel=btn.innerHTML;
     btn.innerHTML='<span class="fsdot">✦</span> Capturing…';
-    loadH2C().then(function(){
-      wrap.style.visibility="hidden";
-      var sx=Math.floor(window.scrollX||window.pageXOffset||0);
-      var sy=Math.floor(window.scrollY||window.pageYOffset||0);
-      var vw=Math.max(1,window.innerWidth||document.documentElement.clientWidth);
-      var vh=Math.max(1,window.innerHeight||document.documentElement.clientHeight);
-      return window.html2canvas(document.body,{
-        scale:Math.min(window.devicePixelRatio||1,1.5), useCORS:true, logging:false,
-        x:sx, y:sy, width:vw, height:vh,
-        ignoreElements:function(el){ return el&&(el.id==="fsWrap"||el.id==="fsOverlay"); }
-      });
+    wrap.style.visibility="hidden";
+    // Yield a frame so the hide paints before capture (avoids a ghost of the pill).
+    Promise.resolve().then(function(){
+      return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+    }).then(function(){
+      return captureViewportFaithful();
     }).then(function(cv){
       wrap.style.visibility="";
       var maxW=Math.floor(window.innerWidth*0.94), maxH=Math.floor(window.innerHeight*0.78);
@@ -833,12 +956,13 @@ document.documentElement.setAttribute("data-theme","day");
         document.getElementById(b).classList.toggle("on", b==="fsToolCirc");
       });
       overlay.classList.add("open");
-    }).catch(function(){
+    }).catch(function(err){
       wrap.style.visibility="";
       // Capture failed — fall through to text-only compose.
       openPanel(true);
       msg.style.color="#b45309";
       msg.textContent="Couldn't freeze the screen here — describe what you want instead.";
+      try{ console.warn("fs capture failed", err); }catch(e){}
     }).then(function(){
       btn.disabled=false;
       btn.innerHTML=prevLabel;
