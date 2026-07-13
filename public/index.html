@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Array Operator — your array, working for you</title>
+<!-- Offtaker pay-link return (LEGACY): old Stripe success_url was /?paid=1#reports
+     which dumped offtakers into the owner SPA. Bounce them to the public thank-you
+     page BEFORE any session shim or app scripts run — never into a dashboard. -->
+<script>
+(function () {
+  try {
+    var q = location.search || "";
+    var m = q.match(/[?&]paid=([^&]*)/);
+    if (!m) return;
+    var v = decodeURIComponent(m[1] || "").toLowerCase();
+    var cancel = (v === "0" || v === "false" || v === "cancel" || v === "cancelled");
+    location.replace(cancel ? "/paid?status=cancel" : "/paid?status=ok");
+  } catch (e) {}
+})();
+</script>
 <!-- Per-tab auth session shim — MUST be the very first script so it patches the
      so_session localStorage routing before anything reads/writes it. Lets Ford stay
      signed into different accounts in different tabs. See session-tabscope.js. -->
