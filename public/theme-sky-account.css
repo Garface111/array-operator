@@ -268,11 +268,12 @@ html.sky .ar-pending-note{
   color:var(--muted);
 }
 html.sky .ar-pending-note b{color:var(--ao-oct)}
-/* utility picker: quiet blue well; octarine interaction hovers (was emerald) */
-html.sky .ar-picker{
-  background:rgba(242,247,254,.75);
+/* utility picker combobox: solid shell + always-on results list */
+html.sky .ar-picker-shell{
+  background:rgba(255,255,255,.88);
   border:1px solid rgba(20,60,120,.14);
-  border-radius:14px;
+  border-radius:16px;
+  box-shadow:0 12px 36px -18px rgba(20,60,120,.35);
 }
 html.sky .ar-picker-search{
   background:#ffffff;color:var(--ink);
@@ -282,13 +283,34 @@ html.sky .ar-picker-search:focus{
   border-color:var(--ao-oct) !important;
   box-shadow:0 0 0 3px var(--ao-oct-soft);
 }
+html.sky .ar-picker-results{
+  background:#ffffff;
+  border:1px solid rgba(20,60,120,.12);
+  min-height:140px;
+}
 html.sky .ar-picker-item{color:var(--ink)}
-html.sky .ar-picker-item:hover{
+html.sky .ar-picker-item:hover,
+html.sky .ar-picker-item-on{
   border-color:rgba(99,80,224,.40);
   background:rgba(99,80,224,.07);
 }
+html.sky .ar-picker-item-picked{
+  border-color:rgba(99,80,224,.55);
+  background:rgba(99,80,224,.12);
+}
 html.sky .ar-picker-state,
 html.sky .ar-picker-hint{color:var(--faint)}
+html.sky .ar-picker-request{
+  border-color:rgba(99,80,224,.35);
+  background:rgba(99,80,224,.06);
+}
+html.sky .ar-picker-request:hover,
+html.sky .ar-picker-request.ar-picker-item-on{
+  border-color:rgba(99,80,224,.5);
+  background:rgba(99,80,224,.11);
+}
+html.sky .ar-picker-req-ico{background:linear-gradient(180deg,#6F5CE8,#5847D2)}
+html.sky .ar-picker-queued-check{background:var(--good)}
 /* "+ Add a utility login": a dashed glass card, not a pill (theme-sky's blanket
    .acct-btn pill radius reads wrong on a 52px full-width card button) */
 html.sky .ar-addutil-btn{
@@ -304,19 +326,16 @@ html.sky .ar-addutil-btn:hover{
   color:var(--ao-oct) !important;
   background:var(--ao-oct-soft) !important;
 }
-/* request-a-utility queue: octarine chips/CTAs follow the cooled token via
-   their var(--ao-oct,…) fallbacks; just round the corners into the system */
-html.sky .ar-req-add{border-radius:10px}
-/* the send CTA's stock gradient mixes toward BLACK at the bottom — too heavy
-   on the light panel; keep it pure cooled octarine */
 html.sky .ar-req-send{
   border-radius:11px;
   background:linear-gradient(180deg,#6F5CE8,#5847D2);
   box-shadow:0 5px 16px -6px rgba(99,80,224,.55);
 }
-html.sky .ar-req-queue{border-top:1px dashed var(--line)}
+html.sky .ar-req-queue{
+  border:1px solid rgba(99,80,224,.22);
+  background:rgba(99,80,224,.05);
+}
 html.sky .ar-req-head{color:var(--faint)}
-html.sky .ar-req-tip{color:var(--faint)}
 /* SolarEdge key rows: green = connected/working (LIVE semantics, kept) */
 html.sky .ar-se-krow{
   background:rgba(15,157,88,.07);

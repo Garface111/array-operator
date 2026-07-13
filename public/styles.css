@@ -387,25 +387,42 @@
   .ar-util .ar-row{border-color:rgba(255,255,255,.08);background:transparent;padding:9px 10px}
   .ar-addutil{margin-top:2px}
   .ar-addutil-btn{width:100%;border-style:dashed;color:var(--muted);font-weight:600}
-  .ar-picker{margin-top:8px;border:1px solid var(--line);border-radius:11px;padding:9px;background:var(--bg)}
-  .ar-picker-search{width:100%;box-sizing:border-box;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);
-    border-radius:9px;background:var(--bg);color:var(--ink)}
+  .ar-picker{margin-top:8px}
+  .ar-picker-shell{border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--bg);
+    box-shadow:0 10px 32px -16px rgba(20,40,80,.28)}
+  .ar-picker-search{width:100%;box-sizing:border-box;font-size:14px;padding:11px 13px;border:1px solid var(--line);
+    border-radius:10px;background:var(--card,#fff);color:var(--ink)}
   .ar-picker-search:focus{outline:none;border-color:var(--good)}
-  .ar-picker-results{margin-top:7px;max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
-  .ar-picker-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid transparent;
-    background:transparent;color:var(--ink);font-size:13px;padding:7px 9px;border-radius:8px;cursor:pointer}
-  .ar-picker-item:hover{border-color:rgba(63,214,138,.5);background:rgba(63,214,138,.08)}
-  .ar-picker-state{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--faint)}
-  .ar-picker-hint{font-size:11.5px;color:var(--faint);padding:6px 4px;line-height:1.5}
-  /* Request-a-utility: when the search finds nothing, offer to queue it for the agent.
-     Fast bulk entry — chips accrue, one Send fires the batch. */
-  .ar-req-empty{font-size:12px;color:var(--muted);padding:7px 4px 3px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;line-height:1.4}
-  .ar-req-add{font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;border:1px solid var(--ao-oct,#7c5cff);
-    color:#fff;background:var(--ao-oct,#7c5cff);border-radius:8px;padding:6px 12px;white-space:nowrap;
-    transition:filter .12s,transform .04s;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-  .ar-req-add:hover{filter:brightness(1.08)} .ar-req-add:active{transform:translateY(1px)}
-  .ar-req-tip{font-size:11px;color:var(--faint)}
-  .ar-req-queue{margin-top:9px;border-top:1px dashed var(--line);padding-top:10px}
+  /* Stable results list — never collapses into a strip or vanishes */
+  .ar-picker-results{margin-top:8px;min-height:120px;max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;
+    border:1px solid var(--line);border-radius:11px;background:var(--card,#fff);padding:4px}
+  .ar-picker-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid transparent;
+    background:transparent;color:var(--ink);font:inherit;font-size:13.5px;padding:10px 12px;border-radius:9px;cursor:pointer;
+    transition:background .1s,border-color .1s}
+  .ar-picker-item:hover,.ar-picker-item-on{border-color:rgba(63,214,138,.45);background:rgba(63,214,138,.09)}
+  .ar-picker-item-picked{border-color:rgba(63,214,138,.7);background:rgba(63,214,138,.16)}
+  .ar-picker-item-name{font-weight:650;color:var(--ink)}
+  .ar-picker-item-body{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+  .ar-picker-state{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--faint);flex-shrink:0}
+  .ar-picker-hint{font-size:11.5px;color:var(--faint);padding:8px 12px 4px;line-height:1.45}
+  /* Request row = same list item chrome as a catalog hit (not a floating pill strip) */
+  .ar-picker-request{border-style:dashed;border-color:color-mix(in srgb,var(--ao-oct,#7c5cff) 35%,transparent);
+    background:color-mix(in srgb,var(--ao-oct,#7c5cff) 6%,transparent);margin-top:2px}
+  .ar-picker-request:hover,.ar-picker-request.ar-picker-item-on{
+    border-color:color-mix(in srgb,var(--ao-oct,#7c5cff) 55%,transparent);
+    background:color-mix(in srgb,var(--ao-oct,#7c5cff) 12%,transparent)}
+  .ar-picker-request-primary{border-style:solid;border-color:color-mix(in srgb,var(--ao-oct,#7c5cff) 50%,transparent);
+    background:color-mix(in srgb,var(--ao-oct,#7c5cff) 10%,transparent)}
+  .ar-picker-req-ico{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:16px;font-weight:700;color:#fff;background:var(--ao-oct,#7c5cff)}
+  .ar-picker-req-sub{font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.35}
+  .ar-picker-queued{display:flex;align-items:center;gap:10px;padding:14px 14px;font-size:13.5px;color:var(--ink);line-height:1.45}
+  .ar-picker-queued b{font-weight:750}
+  .ar-picker-queued-check{flex:0 0 auto;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:800;color:#fff;background:var(--good,#15926b)}
+  /* Request queue lives under the search field so chips stay visible */
+  .ar-req-queue{margin:8px 0 0;border:1px solid color-mix(in srgb,var(--ao-oct,#7c5cff) 28%,var(--line));
+    border-radius:11px;padding:10px 12px;background:color-mix(in srgb,var(--ao-oct,#7c5cff) 6%,var(--card,#fff))}
   .ar-req-queue[hidden]{display:none}
   .ar-req-head{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
   .ar-req-chips{display:flex;flex-wrap:wrap;gap:7px}
@@ -422,6 +439,8 @@
   .ar-req-done{font-size:12.5px;color:var(--good,#15926b);background:color-mix(in srgb,var(--good,#15926b) 10%,var(--card,#fff));
     border:1px solid color-mix(in srgb,var(--good,#15926b) 30%,transparent);border-radius:10px;padding:10px 13px;line-height:1.5}
   .ar-req-err{font-size:12px;color:var(--bad,#e5484d);margin-top:8px}
+  /* legacy no-match strip — kept harmless if any stale markup appears */
+  .ar-req-empty{display:none}
   /* octarine focus + green "working" badge — signature colour on interaction, green on state */
   .ar-fields input:focus{border-color:var(--ao-oct) !important;box-shadow:0 0 0 3px var(--ao-oct-soft)}
   .ar-picker-search:focus{border-color:var(--ao-oct) !important;box-shadow:0 0 0 3px var(--ao-oct-soft)}

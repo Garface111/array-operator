@@ -5858,9 +5858,11 @@
           <div class="ar-addutil">
             <button type="button" class="acct-btn ar-addutil-btn">+ Add a utility login</button>
             <div class="ar-picker" hidden>
-              <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…">
-              <div class="ar-picker-results"></div>
-              <div class="ar-req-queue" hidden></div>
+              <div class="ar-picker-shell">
+                <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility — GMP, a co-op, a city…" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arPickerList">
+                <div class="ar-req-queue" hidden></div>
+                <div class="ar-picker-results" id="arPickerList" role="listbox"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -6144,31 +6146,54 @@
     });
 
     // ── wire the "add a utility login" searchable picker over the whole catalog ──
+    // Combobox UX (Ford 2026-07-13): the results panel ALWAYS stays a real list —
+    // never swaps into a vanishing strip. No-match → a pickable "Request …" row
+    // in the same style as catalog hits; keyboard ↑↓/Enter works; queueing shows
+    // a clear ✓ flash so it feels like the action landed.
     const addBtn = listEl.querySelector(".ar-addutil-btn");
     const picker = listEl.querySelector(".ar-picker");
     const searchEl = listEl.querySelector(".ar-picker-search");
     const resultsEl = listEl.querySelector(".ar-picker-results");
     const queueEl = listEl.querySelector(".ar-req-queue");
+    const codes = Object.keys(catalog);
+    let _pickIdx = -1;          // keyboard highlight index into current .ar-picker-item nodes
+    let _flashTimer = null;
+
     if(addBtn && picker){
       addBtn.addEventListener("click", () => {
         picker.hidden = !picker.hidden;
-        if(!picker.hidden){ setTimeout(() => searchEl && searchEl.focus(), 30); renderReqQueue(); }
+        if(!picker.hidden){
+          setTimeout(() => searchEl && searchEl.focus(), 30);
+          renderReqQueue();
+          renderResults();
+        }
       });
     }
-    const codes = Object.keys(catalog);
 
-    // Queue a "please add this utility" request. Fast path: type a name that isn't in
-    // the catalog → one click (or Enter) drops it into a local queue as a chip; keep
-    // going. "Send" fires the whole batch to /v1/utility-requests → an agent wires each in.
+    // Queue a "please add this utility" request. One click / Enter → chip; Send batch.
     function _queueUtilReq(name){
       const n = (name || "").trim();
-      if(!n) return;
+      if(!n || !resultsEl) return;
       const key = n.toLowerCase();
-      if(_arUtilReqQueue.some(r => (r.name || "").toLowerCase() === key)) { renderReqQueue(); return; }
-      _arUtilReqQueue.push({ name: n.slice(0, 120) });
-      _saveUtilReqQueue();
-      searchEl.value = ""; renderResults(); searchEl.focus();
+      const already = _arUtilReqQueue.some(r => (r.name || "").toLowerCase() === key);
+      if(!already){
+        _arUtilReqQueue.push({ name: n.slice(0, 120) });
+        _saveUtilReqQueue();
+      }
+      // Visible confirmation INSIDE the list (old UX cleared the field with no flash
+      // — felt like the dropdown ate the action).
+      if(_flashTimer) clearTimeout(_flashTimer);
+      resultsEl.innerHTML =
+        `<div class="ar-picker-queued" role="status">` +
+        `<span class="ar-picker-queued-check">✓</span>` +
+        (already
+          ? `<span><b>${esc(n)}</b> is already on your request list</span>`
+          : `<span>Queued <b>${esc(n)}</b> — keep typing to add more, then Send</span>`) +
+        `</div>`;
+      searchEl.value = "";
       renderReqQueue();
+      searchEl.focus();
+      _flashTimer = setTimeout(() => { renderResults(); }, 1100);
     }
     function renderReqQueue(){
       if(!queueEl) return;
@@ -6176,16 +6201,17 @@
       if(!q.length){ queueEl.hidden = true; queueEl.innerHTML = ""; return; }
       queueEl.hidden = false;
       queueEl.innerHTML =
-        `<div class="ar-req-head">${q.length} utilit${q.length === 1 ? "y" : "ies"} to add — an agent wires each one in</div>` +
+        `<div class="ar-req-head">${q.length} utilit${q.length === 1 ? "y" : "ies"} to request</div>` +
         `<div class="ar-req-chips">` +
         q.map((r, i) => `<span class="ar-req-chip">${esc(r.name)}<button type="button" class="ar-req-x" data-i="${i}" title="Remove" aria-label="Remove">×</button></span>`).join("") +
         `</div>` +
         `<div class="ar-req-actions"><button type="button" class="ar-req-send">Send ${q.length} request${q.length === 1 ? "" : "s"} →</button></div>`;
-      queueEl.querySelectorAll(".ar-req-x").forEach(x => x.addEventListener("click", () => {
+      queueEl.querySelectorAll(".ar-req-x").forEach(x => x.addEventListener("click", (e) => {
+        e.stopPropagation();
         _arUtilReqQueue.splice(+x.dataset.i, 1); _saveUtilReqQueue(); renderReqQueue();
       }));
       const sendBtn = queueEl.querySelector(".ar-req-send");
-      if(sendBtn) sendBtn.addEventListener("click", () => _sendUtilReqs(sendBtn));
+      if(sendBtn) sendBtn.addEventListener("click", (e) => { e.stopPropagation(); _sendUtilReqs(sendBtn); });
     }
     async function _sendUtilReqs(btn){
       if(!_arUtilReqQueue.length) return;
@@ -6212,50 +6238,136 @@
       }
     }
 
-    if(searchEl && resultsEl){
-      const renderResults = () => {
-        const q = (searchEl.value || "").trim();
-        const ql = q.toLowerCase();
-        if(!ql){ resultsEl.innerHTML = `<div class="ar-picker-hint">Type your utility’s name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
-        const hits = codes.filter(c => {
-          const l = (catalog[c].label || "").toLowerCase();
-          return l.includes(ql) || c.includes(ql) || (catalog[c].state || "").toLowerCase() === ql;
-        }).slice(0, 25);
-        if(!hits.length){
-          // Not in the catalog — offer to REQUEST it (this is the whole point). One click
-          // or Enter queues it; they can keep adding more without leaving the box.
-          resultsEl.innerHTML =
-            `<div class="ar-req-empty">Not in the list yet.` +
-            `<button type="button" class="ar-req-add">+ Request “${esc(q)}”</button>` +
-            `<span class="ar-req-tip">or press Enter — add as many as you need, then Send</span></div>`;
-          const add = resultsEl.querySelector(".ar-req-add");
-          if(add) add.addEventListener("click", () => _queueUtilReq(q));
-          return;
-        }
-        resultsEl.innerHTML = hits.map(c =>
-          `<button type="button" class="ar-picker-item" data-code="${esc(c)}">${esc(catalog[c].label)}${catalog[c].state ? ` <span class="ar-picker-state">${esc(catalog[c].state)}</span>` : ""}</button>`
-        ).join("");
-        resultsEl.querySelectorAll(".ar-picker-item").forEach(it => {
-          it.addEventListener("click", () => {
-            _arAddedUtils.add(it.dataset.code);
-            _vaultStatusCache = null;
-            wireAutoRefreshRow().then(() => {
-              const card = listEl.querySelector(`.ar-util[data-code="${CSS.escape(it.dataset.code)}"]`);
-              if(card){ card.scrollIntoView({ behavior:"smooth", block:"center" }); const u = card.querySelector(".ar-row:last-child .ar-user"); if(u) u.focus(); }
-            });
+    function _matchCodes(ql){
+      if(!ql) return [];
+      return codes.filter(c => {
+        const l = (catalog[c].label || "").toLowerCase();
+        return l.includes(ql) || c.includes(ql) || (catalog[c].state || "").toLowerCase() === ql;
+      }).slice(0, 25);
+    }
+    function _popularCodes(){
+      const pref = ["gmp", "vec", "wec", "cmp", "eversource", "nationalgrid", "unitil"];
+      const out = [];
+      pref.forEach(c => { if(catalog[c] && !out.includes(c)) out.push(c); });
+      // Fill with a few more alphabetically so the empty state never looks blank.
+      codes.slice().sort((a,b) => (catalog[a].label||a).localeCompare(catalog[b].label||b))
+        .forEach(c => { if(out.length < 12 && !out.includes(c)) out.push(c); });
+      return out;
+    }
+    function _itemHTML(c){
+      return `<button type="button" class="ar-picker-item" role="option" data-code="${esc(c)}">` +
+        `<span class="ar-picker-item-name">${esc(catalog[c].label)}</span>` +
+        (catalog[c].state ? `<span class="ar-picker-state">${esc(catalog[c].state)}</span>` : "") +
+        `</button>`;
+    }
+    function _requestRowHTML(q, primary){
+      // Same shape as a catalog hit so the list never "disappears" into a strip.
+      return `<button type="button" class="ar-picker-item ar-picker-request${primary ? " ar-picker-request-primary" : ""}" role="option" data-req="1" data-name="${esc(q)}">` +
+        `<span class="ar-picker-req-ico" aria-hidden="true">＋</span>` +
+        `<span class="ar-picker-item-body">` +
+        `<span class="ar-picker-item-name">Request “${esc(q)}”</span>` +
+        `<span class="ar-picker-req-sub">${primary ? "Not in our list yet — we’ll wire it up for you" : "Can’t find it? Ask us to add this utility"}</span>` +
+        `</span></button>`;
+    }
+    function _wireResultClicks(){
+      resultsEl.querySelectorAll(".ar-picker-item[data-code]").forEach(it => {
+        it.addEventListener("click", () => {
+          _arAddedUtils.add(it.dataset.code);
+          _vaultStatusCache = null;
+          // Brief “selected” feel before the card lands.
+          it.classList.add("ar-picker-item-picked");
+          wireAutoRefreshRow().then(() => {
+            const card = listEl.querySelector(`.ar-util[data-code="${CSS.escape(it.dataset.code)}"]`);
+            if(card){
+              card.scrollIntoView({ behavior:"smooth", block:"center" });
+              const u = card.querySelector(".ar-row:last-child .ar-user");
+              if(u) u.focus();
+            }
           });
         });
-      };
-      // Enter with no catalog match = queue the request (fast bulk entry).
-      searchEl.addEventListener("keydown", (e) => {
-        if(e.key !== "Enter") return;
-        const q = (searchEl.value || "").trim();
-        if(!q) return;
-        const ql = q.toLowerCase();
-        const anyHit = codes.some(c => (catalog[c].label || "").toLowerCase().includes(ql) || c.includes(ql) || (catalog[c].state || "").toLowerCase() === ql);
-        if(!anyHit){ e.preventDefault(); _queueUtilReq(q); }
       });
+      resultsEl.querySelectorAll(".ar-picker-item[data-req]").forEach(it => {
+        it.addEventListener("click", () => _queueUtilReq(it.dataset.name || searchEl.value));
+      });
+    }
+    function _setHighlight(idx){
+      const items = resultsEl.querySelectorAll(".ar-picker-item");
+      if(!items.length){ _pickIdx = -1; return; }
+      _pickIdx = Math.max(0, Math.min(idx, items.length - 1));
+      items.forEach((el, i) => {
+        el.classList.toggle("ar-picker-item-on", i === _pickIdx);
+        if(i === _pickIdx) el.setAttribute("aria-selected", "true");
+        else el.removeAttribute("aria-selected");
+      });
+      const on = items[_pickIdx];
+      if(on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+    }
+    function _activateHighlight(){
+      const items = resultsEl.querySelectorAll(".ar-picker-item");
+      if(!items.length) return false;
+      const el = items[_pickIdx >= 0 ? _pickIdx : 0];
+      if(!el) return false;
+      el.click();
+      return true;
+    }
+
+    function renderResults(){
+      if(!searchEl || !resultsEl) return;
+      const q = (searchEl.value || "").trim();
+      const ql = q.toLowerCase();
+      _pickIdx = -1;
+
+      if(!ql){
+        // Open state: always show a real list (popular + hint) so the control
+        // never looks broken/empty when first expanded.
+        const pop = _popularCodes();
+        resultsEl.innerHTML =
+          `<div class="ar-picker-hint">Popular utilities — or type a name, co-op, city, or state</div>` +
+          pop.map(_itemHTML).join("");
+        _wireResultClicks();
+        return;
+      }
+
+      const hits = _matchCodes(ql);
+      let html = "";
+      if(!hits.length){
+        html += `<div class="ar-picker-hint">No match for “${esc(q)}”</div>`;
+        html += _requestRowHTML(q, true);
+      } else {
+        html += hits.map(_itemHTML).join("");
+        // Always offer request as a stable last row — never a mode-swap.
+        html += _requestRowHTML(q, false);
+      }
+      resultsEl.innerHTML = html;
+      _wireResultClicks();
+      // Highlight first actionable row so Enter works immediately.
+      _setHighlight(hits.length ? 0 : 0);
+    }
+
+    if(searchEl && resultsEl){
       searchEl.addEventListener("input", renderResults);
+      searchEl.addEventListener("keydown", (e) => {
+        const items = resultsEl.querySelectorAll(".ar-picker-item");
+        if(e.key === "ArrowDown"){
+          e.preventDefault();
+          if(!items.length) return;
+          _setHighlight(_pickIdx < 0 ? 0 : _pickIdx + 1);
+        } else if(e.key === "ArrowUp"){
+          e.preventDefault();
+          if(!items.length) return;
+          _setHighlight(_pickIdx < 0 ? items.length - 1 : _pickIdx - 1);
+        } else if(e.key === "Enter"){
+          e.preventDefault();
+          if(_activateHighlight()) return;
+          // Fallback: queue free-text if nothing highlighted.
+          const q = (searchEl.value || "").trim();
+          if(q) _queueUtilReq(q);
+        } else if(e.key === "Escape"){
+          e.preventDefault();
+          searchEl.value = "";
+          renderResults();
+        }
+      });
       renderResults();
       renderReqQueue();
     }
