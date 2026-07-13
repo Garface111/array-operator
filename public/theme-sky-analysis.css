@@ -66,9 +66,10 @@ html.sky #panelAnalysis{
 html.sky #panelAnalysis .an-wrap{
   max-width: none;
   width: 100%;
-  margin-inline: 0 !important;   /* kill the full-bleed breakout */
+  margin-inline: 0 !important;   /* kill the full-bleed breakout — match tab bar */
   margin-block:14px 46px;
-  padding:34px 42px 54px;
+  /* Tighter pad so Sites table can show Capacity without clipping (was 42px). */
+  padding:28px 16px 52px;
   /* matches the #sheetWrap alpha (Ford: "make all backgrounds look like this one"),
      but NO backdrop-filter: this sheet runs tens of thousands of px tall and
      blur blows Chromium's composited-layer limit (viewportfuls fail to paint).
@@ -179,6 +180,11 @@ html.sky #panelAnalysis .ansg-search input:focus{
 html.sky #panelAnalysis .ansg-dot.ok i{box-shadow:0 0 0 3px rgba(33,150,243,.16)}
 html.sky #panelAnalysis .ansg-livedot{box-shadow:0 0 0 2px rgba(30,144,232,.2)}
 html.sky #panelAnalysis .ansg-table tbody tr:hover{background:rgba(33,150,243,.055)}
+/* Sticky Capacity column — solid sky card bg so it doesn't go translucent */
+html.sky #panelAnalysis .ansg-table thead th.ansg-cap,
+html.sky #panelAnalysis .ansg-table tfoot td.ansg-cap{background:rgba(255,255,255,.96)}
+html.sky #panelAnalysis .ansg-table tbody td.ansg-cap{background:rgba(255,255,255,.94)}
+html.sky #panelAnalysis .ansg-table tbody tr:hover td.ansg-cap{background:rgba(244,249,255,.98)}
 
 /* ── 10 · ALARMS (.analm-*) — rollup chips go glass; severity rings intact ── */
 html.sky #panelAnalysis .analm-chip{

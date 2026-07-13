@@ -17,8 +17,10 @@
    text comfortable air against the card edges on all four sides. */
 #panelAnalysis .an-wrap {
   max-width: none;
-  margin-inline: calc(50% - 50vw + 32px);
-  padding: 32px 40px 64px;
+  /* Slightly tighter gutters so wide tables (Sites) can use more of the viewport
+     without clipping the last columns (Capacity). */
+  margin-inline: calc(50% - 50vw + 20px);
+  padding: 28px 22px 56px;
 }
 @media (max-width: 900px) {
   /* Small screens: .wrap already hugs the viewport — no breakout needed. */

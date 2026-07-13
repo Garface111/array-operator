@@ -37,64 +37,84 @@
 
   // ---- one-time scoped stylesheet --------------------------------------------
   function injectCSS() {
-    if (document.getElementById("ansg-css")) return;
+    // Bump id when layout CSS changes so hard-refresh isn't required to clear
+    // a stale injected sheet from a prior page load.
+    var prev = document.getElementById("ansg-css") || document.getElementById("ansg-css-v1");
+    if (prev && prev.id === "ansg-css-v2") return;
+    if (prev) prev.remove();
     var s = document.createElement("style");
-    s.id = "ansg-css";
+    s.id = "ansg-css-v2";
     s.textContent = [
-      ".ansg-wrap{overflow-x:auto}",
+      // Fit the full column set in the card — no forced min-width that clips CAPACITY
+      // and leaves a dead horizontal scrollbar (Ford 2026-07-13 analysis screenshot).
+      ".ansg-wrap{overflow-x:auto;width:100%;max-width:100%;-webkit-overflow-scrolling:touch}",
       // toolbar (search + count) above the table
-      ".ansg-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 4px 0 2px}",
+      ".ansg-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 2px}",
       ".ansg-search{position:relative;flex:0 0 auto}",
-      ".ansg-search input{appearance:none;background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:inherit;font-size:12.5px;padding:7px 11px 7px 28px;width:200px;outline:none;transition:border-color .12s,box-shadow .12s}",
+      ".ansg-search input{appearance:none;background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:inherit;font-size:12.5px;padding:7px 11px 7px 28px;width:180px;outline:none;transition:border-color .12s,box-shadow .12s}",
       ".ansg-search input:focus{border-color:var(--good2);box-shadow:0 0 0 3px rgba(14,165,233,.14)}",
       ".ansg-search input::placeholder{color:var(--faint)}",
       ".ansg-search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--faint);pointer-events:none}",
       ".ansg-count{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}",
-      // table
-      ".ansg-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;min-width:1000px}",
-      ".ansg-table th,.ansg-table td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}",
-      ".ansg-table thead th{position:sticky;top:0;z-index:1;background:var(--card2);color:var(--muted);font-size:10.5px;font-weight:740;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;user-select:none;border-bottom:1px solid var(--line)}",
+      // table — fixed layout eats dead space so every column (incl. Capacity) fits
+      ".ansg-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px;table-layout:fixed;min-width:0}",
+      ".ansg-table th,.ansg-table td{padding:8px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line);overflow:hidden;text-overflow:ellipsis}",
+      ".ansg-table thead th{position:sticky;top:0;z-index:1;background:var(--card2);color:var(--muted);font-size:10px;font-weight:740;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;user-select:none;border-bottom:1px solid var(--line)}",
       ".ansg-table thead th.ansg-sortable:hover{color:var(--ink)}",
       ".ansg-table thead th.ansg-num,.ansg-table td.ansg-num{text-align:right}",
       ".ansg-table thead th.ansg-on{color:var(--ink)}",
-      ".ansg-arrow{display:inline-block;width:0;opacity:0;margin-left:4px;font-size:9px;transition:opacity .1s}",
+      ".ansg-arrow{display:inline-block;width:0;opacity:0;margin-left:3px;font-size:9px;transition:opacity .1s}",
       ".ansg-table thead th.ansg-on .ansg-arrow{opacity:.9;width:auto}",
       ".ansg-table tbody tr{transition:background .1s}",
       ".ansg-table tbody tr:hover{background:var(--bg2)}",
       ".ansg-table tbody tr:last-child td{border-bottom:0}",
+      // col widths (table-layout:fixed) — Site + Actual-vs-Expected take flex room
+      ".ansg-table col.ansg-c-dot{width:34px}",
+      ".ansg-table col.ansg-c-site{width:22%}",
+      ".ansg-table col.ansg-c-trend{width:68px}",
+      ".ansg-table col.ansg-c-now{width:11%}",
+      ".ansg-table col.ansg-c-wx{width:36px}",
+      ".ansg-table col.ansg-c-exp{width:9%}",
+      ".ansg-table col.ansg-c-ave{width:17%}",
+      ".ansg-table col.ansg-c-win{width:9%}",
+      ".ansg-table col.ansg-c-cap{width:8%}",
+      // pin Capacity so it never disappears under a residual scroll
+      ".ansg-table thead th.ansg-cap,.ansg-table tbody td.ansg-cap,.ansg-table tfoot td.ansg-cap{position:sticky;right:0;z-index:2;background:var(--card2);box-shadow:-6px 0 10px -8px rgba(15,23,42,.18)}",
+      ".ansg-table tbody td.ansg-cap{background:var(--card);z-index:1}",
+      ".ansg-table tbody tr:hover td.ansg-cap{background:var(--bg2)}",
       // status dot + count badge
-      ".ansg-dotcell{width:1%;padding-right:4px}",
-      ".ansg-dot{display:inline-flex;align-items:center;gap:6px}",
-      ".ansg-dot i{width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px rgba(100,116,139,.12)}",
+      ".ansg-dotcell{width:34px;padding-right:2px;padding-left:6px}",
+      ".ansg-dot{display:inline-flex;align-items:center;gap:5px}",
+      ".ansg-dot i{width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px rgba(100,116,139,.12);flex:none}",
       ".ansg-dot.ok i{background:var(--good);box-shadow:0 0 0 3px rgba(37,99,235,.14)}",
       ".ansg-dot.warn i{background:var(--warn);box-shadow:0 0 0 3px rgba(217,119,6,.16)}",
       ".ansg-dot.critical i{background:var(--bad);box-shadow:0 0 0 3px rgba(220,38,38,.16)}",
       ".ansg-badge{font-size:10px;font-weight:760;color:var(--bad);background:rgba(220,38,38,.12);border-radius:7px;padding:1px 5px;line-height:1.5}",
       ".ansg-dot.warn .ansg-badge{color:var(--warn);background:rgba(217,119,6,.12)}",
-      // name cell
-      ".ansg-name{font-weight:680;color:var(--ink);max-width:230px;overflow:hidden;text-overflow:ellipsis}",
-      ".ansg-name-row{display:flex;align-items:center;gap:7px}",
-      ".ansg-vtag{font-size:9.5px;font-weight:720;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;flex:0 0 auto}",
-      ".ansg-region{display:block;color:var(--faint);font-size:11px;font-weight:500;margin-top:1px;max-width:230px;overflow:hidden;text-overflow:ellipsis}",
+      // name cell — share width with vendor chip; ellipsis instead of table overflow
+      ".ansg-name{font-weight:680;color:var(--ink);min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
+      ".ansg-name-row{display:flex;align-items:center;gap:6px;min-width:0}",
+      ".ansg-vtag{font-size:9px;font-weight:720;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 4px;flex:0 0 auto}",
+      ".ansg-region{display:block;color:var(--faint);font-size:10.5px;font-weight:500;margin-top:1px;overflow:hidden;text-overflow:ellipsis}",
       // sparkline
-      ".ansg-spark{display:block}",
+      ".ansg-spark{display:block;max-width:64px;height:auto}",
       ".ansg-spark-none{color:var(--faint)}",
       // measured value cells
       ".ansg-val{color:var(--ink);font-weight:560}",
       ".ansg-muted{color:var(--muted)}",
       ".ansg-faint{color:var(--faint)}",
-      ".ansg-now{display:inline-flex;align-items:center;gap:6px}",
+      ".ansg-now{display:inline-flex;align-items:center;gap:5px;max-width:100%}",
       ".ansg-now b{color:var(--good2);font-weight:680}",
-      ".ansg-livedot{width:6px;height:6px;border-radius:50%;background:var(--good2);box-shadow:0 0 0 2px rgba(14,165,233,.18)}",
-      // hero: actual-vs-expected bar
-      ".ansg-ave{min-width:180px}",
-      ".ansg-bar-row{display:flex;align-items:center;gap:9px}",
-      ".ansg-track{position:relative;flex:1 1 auto;height:16px;min-width:96px;background:var(--bg2);border-radius:5px;overflow:hidden}",
+      ".ansg-livedot{width:6px;height:6px;border-radius:50%;background:var(--good2);box-shadow:0 0 0 2px rgba(14,165,233,.18);flex:none}",
+      // hero: actual-vs-expected bar — flexible, not a rigid 180px floor
+      ".ansg-ave{min-width:0}",
+      ".ansg-bar-row{display:flex;align-items:center;gap:7px;min-width:0}",
+      ".ansg-track{position:relative;flex:1 1 auto;height:14px;min-width:48px;background:var(--bg2);border-radius:5px;overflow:hidden}",
       ".ansg-fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good);transition:width .35s cubic-bezier(.22,.61,.36,1)}",
       ".ansg-fill.neutral{background:var(--muted)}",
       ".ansg-fill.bad{background:var(--bad)}",
       ".ansg-tick{position:absolute;top:-1px;bottom:-1px;width:1px;background:var(--faint);opacity:.5}", // 100% reference
-      ".ansg-pct{flex:0 0 auto;width:42px;text-align:right;font-weight:700;color:var(--ink)}",
+      ".ansg-pct{flex:0 0 auto;width:38px;text-align:right;font-weight:700;color:var(--ink);font-size:12px}",
       ".ansg-pct.over{color:var(--good)}",
       ".ansg-pct.bad{color:var(--bad)}",
       ".ansg-pct.neutral{color:var(--muted)}",
@@ -155,11 +175,13 @@
       ".ansg-remadd.ansg-inline:hover{border-color:var(--good2);color:var(--good2);border-style:solid}",
       // density: compact tightens padding + font on the table wrapper
       ".ansg-wrap.ansg-compact .ansg-table{font-size:11.5px}",
-      ".ansg-wrap.ansg-compact .ansg-table th,.ansg-wrap.ansg-compact .ansg-table td{padding:5px 9px}",
+      ".ansg-wrap.ansg-compact .ansg-table th,.ansg-wrap.ansg-compact .ansg-table td{padding:5px 6px}",
       ".ansg-wrap.ansg-compact .ansg-table thead th{font-size:9.5px}",
       ".ansg-wrap.ansg-compact .ansg-grouphead td{padding-top:5px;padding-bottom:5px}",
       ".ansg-wrap.ansg-compact .ansg-subhead td{padding-top:4px;padding-bottom:4px}",
       ".ansg-wrap.ansg-compact .ansg-table tfoot td{padding-top:7px;padding-bottom:7px}",
+      // very narrow viewports: still fit, slightly denser
+      "@media(max-width:900px){.ansg-table{font-size:11.5px}.ansg-table th,.ansg-table td{padding:6px 5px}.ansg-table col.ansg-c-site{width:20%}.ansg-table col.ansg-c-ave{width:16%}}",
       // secondary "then by" selector in the toolbar
       ".ansg-thenby{display:flex;align-items:center;gap:7px}",
       ".ansg-thenby > span{color:var(--faint);font-size:10.5px;font-weight:740;letter-spacing:.06em;text-transform:uppercase}",
@@ -521,8 +543,8 @@
     return '<td class="ansg-num ansg-val">' + ctx.esc(ctx.fmt.kwh(r.win)) + '</td>';
   }
   function cellCap(r, ctx) {
-    if (r.cap == null) return '<td class="ansg-num ansg-faint">—</td>';
-    return '<td class="ansg-num ansg-val">' + ctx.esc(ctx.fmt.kw(r.cap)) + '</td>';
+    if (r.cap == null) return '<td class="ansg-num ansg-val ansg-cap ansg-faint">—</td>';
+    return '<td class="ansg-num ansg-val ansg-cap">' + ctx.esc(ctx.fmt.kw(r.cap)) + '</td>';
   }
 
   // ---- main render ------------------------------------------------------------
@@ -603,12 +625,25 @@
 
     // ---- header cells with sort affordance ------------------------------------
     var headHtml = COLS.map(function (c) {
-      if (!c.sortable) return '<th class="' + (c.num ? "ansg-num " : "") + '">' + ctx.esc(c.label) + '</th>';
+      var extra = (c.key === "cap" ? "ansg-cap " : "") + (c.cls ? c.cls + " " : "");
+      if (!c.sortable) return '<th class="' + extra + (c.num ? "ansg-num " : "") + '">' + ctx.esc(c.label) + '</th>';
       var on = sortKey === c.key;
       var arrow = on ? (sortDir === "asc" ? "▲" : "▼") : "";
-      return '<th class="ansg-sortable ' + (c.num ? "ansg-num " : "") + (c.cls ? c.cls + " " : "") + (on ? "ansg-on" : "") +
+      return '<th class="ansg-sortable ' + extra + (c.num ? "ansg-num " : "") + (on ? "ansg-on" : "") +
         '" data-sort="' + c.key + '">' + ctx.esc(c.label) + '<span class="ansg-arrow">' + arrow + '</span></th>';
     }).join("");
+    var colgroupHtml =
+      '<colgroup>' +
+      '<col class="ansg-c-dot">' +
+      '<col class="ansg-c-site">' +
+      '<col class="ansg-c-trend">' +
+      '<col class="ansg-c-now">' +
+      '<col class="ansg-c-wx">' +
+      '<col class="ansg-c-exp">' +
+      '<col class="ansg-c-ave">' +
+      '<col class="ansg-c-win">' +
+      '<col class="ansg-c-cap">' +
+      '</colgroup>';
 
     // ---- body -----------------------------------------------------------------
     function siteRow(r) {
@@ -721,7 +756,7 @@
           ? '<span class="ansg-pct ' + (fleetPct > 115 ? "over" : ratioBucket(fleetPct) === "bad" ? "bad" : ratioBucket(fleetPct) === "neutral" ? "neutral" : "") + '">' + fleetPct + '%</span> <span class="ansg-faint" style="font-weight:600">fleet</span>'
           : '<span class="ansg-nomodel">—</span>') + '</td>' +
         '<td class="ansg-num">' + (hasWin ? ctx.esc(ctx.fmt.kwh(totWin)) : "—") + '</td>' +
-        '<td class="ansg-num">' + (hasCap ? ctx.esc(ctx.fmt.kw(totCap)) : "—") + '</td>' +
+        '<td class="ansg-num ansg-cap">' + (hasCap ? ctx.esc(ctx.fmt.kw(totCap)) : "—") + '</td>' +
         '</tr></tfoot>';
     }
 
@@ -732,7 +767,7 @@
       '    <h3>Sites</h3>' +
       '    <span class="an-card-sub">' + ctx.esc(subline) + '</span>' +
       '  </div>' +
-      '  <div style="padding:12px 14px 4px">' +
+      '  <div style="padding:10px 10px 2px">' +
       '    <div class="ansg-bar">' +
       '      <div class="ansg-search">' +
       '        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
@@ -748,6 +783,7 @@
       '  </div>' +
       '  <div class="ansg-wrap' + (density === "compact" ? " ansg-compact" : "") + '">' +
       '    <table class="ansg-table">' +
+      colgroupHtml +
       '      <thead><tr>' + headHtml + '</tr></thead>' +
       '      <tbody>' + bodyHtml + '</tbody>' +
       footHtml +
