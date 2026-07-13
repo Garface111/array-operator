@@ -370,6 +370,11 @@ html.sky .rb-track, html.sky .rb-vecbill{
   border-radius:16px}
 html.sky .rb-track-sub, html.sky .rb-vecbill{border-left:3px solid var(--sky-primary)}
 html.sky .rb-track-chip{border-color:rgba(20,60,120,.14)}
+html.sky .rb-track-chip-money b{color:var(--sky-primary,#2196F3)}
+html.sky .rb-track-pays-scroll{border-color:rgba(20,60,120,.12);background:rgba(255,255,255,.92)}
+html.sky .rb-track-paytable th{background:rgba(217,231,251,.55);color:#3d5a80}
+html.sky .rb-track-payst-paid{background:rgba(33,150,243,.12);color:#1565c0}
+html.sky .rb-track-payempty{border-color:rgba(20,60,120,.18);background:rgba(244,249,255,.7)}
 /* informational resync banner: same blue meaning, sky family */
 html.sky .rb-resync{background:rgba(33,150,243,.08);
   border-color:rgba(33,150,243,.3);border-radius:12px}

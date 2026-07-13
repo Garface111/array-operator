@@ -824,6 +824,35 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-track-stat.rb-err{ color:#dc2626; }
 .rb-track-warn{ font-size:11px; color:#9a6a00; background:#fff8e8;
   border:1px solid #f1e2bd; border-radius:8px; padding:6px 9px; }
+/* Invoice collection roll-up on the offtaker generation spreadsheet card */
+.rb-track-collect{ display:flex; flex-wrap:wrap; gap:6px; }
+.rb-track-chip-money b{ color:#1565c0; }
+.rb-track-chip-paid b{ color:#0a7d4f; }
+.rb-track-chip-open b{ color:#b45309; }
+.rb-track-pays{ display:flex; flex-direction:column; gap:6px; }
+.rb-track-pays-h{ font-size:11px; font-weight:740; letter-spacing:.04em;
+  text-transform:uppercase; color:#5a6b7b; }
+.rb-track-pays-scroll{ overflow-x:auto; border:1px solid #e2e9ef; border-radius:9px;
+  background:#fff; }
+.rb-track-paytable{ width:100%; border-collapse:collapse; font-size:12px;
+  font-variant-numeric:tabular-nums; }
+.rb-track-paytable th{ text-align:left; font-size:10.5px; font-weight:720;
+  letter-spacing:.03em; text-transform:uppercase; color:#7a8a98;
+  padding:7px 9px; border-bottom:1px solid #e8eef4; background:#f7fafc; white-space:nowrap; }
+.rb-track-paytable td{ padding:7px 9px; border-bottom:1px solid #f0f4f8; color:#2a3947;
+  white-space:nowrap; }
+.rb-track-paytable tr:last-child td{ border-bottom:0; }
+.rb-track-paytable td.rb-num{ text-align:right; font-weight:680; color:#16202b; }
+.rb-track-paytable td.rb-muted{ color:#9aa7b3; font-size:11px; }
+.rb-track-payst{ display:inline-block; font-size:10.5px; font-weight:720;
+  letter-spacing:.02em; padding:2px 7px; border-radius:999px; }
+.rb-track-payst-paid{ background:rgba(10,125,79,.12); color:#0a7d4f; }
+.rb-track-payst-open{ background:rgba(180,83,9,.12); color:#b45309; }
+.rb-track-payst-other{ background:rgba(90,107,123,.12); color:#5a6b7b; }
+.rb-track-payempty{ font-size:12px; color:#7a8a98; line-height:1.45;
+  padding:8px 10px; background:rgba(255,255,255,.65); border:1px dashed #d5dee8;
+  border-radius:8px; }
+.rb-track-paymore{ font-size:11px; color:#7a8a98; padding:0 2px; }
 /* Each offtaker's OWN sheet, nested inside its accordion card. A blue left accent
    marks it as nested; the operator-wide MASTER sheet sits at the top of the page. */
 .rb-track-sub{ margin-top:12px; border-left:3px solid #2563eb;

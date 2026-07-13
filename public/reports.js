@@ -6975,7 +6975,9 @@
   // TRACKER_BASE stays as the tenant-level fallback used by loadTrackerInto.)
   const TRACKER_BASE = "/v1/array-operator/tracker";   // tenant-level fallback (no /billing, no sid)
   const FIELD_LABEL = { period: "Period", generation: "Generation kWh",
-    consumption: "Consumption", rate: "Credit rate", amount: "Amount $" };
+    consumption: "Consumption", rate: "Credit rate", amount: "Amount $",
+    status: "Status", paid_date: "Paid date", collected: "Collected $",
+    fee: "Platform fee $", invoice_number: "Invoice #" };
 
   function relTime(iso) {
     try {
@@ -6986,6 +6988,23 @@
       if (s < 86400) return Math.round(s / 3600) + "h ago";
       return Math.round(s / 86400) + "d ago";
     } catch (e) { return ""; }
+  }
+
+  function moneyFmt(n) {
+    if (n == null || n === "" || Number.isNaN(Number(n))) return "—";
+    const v = Number(n);
+    return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, {
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
+  }
+
+  function paidDateShort(iso) {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    } catch (e) { return String(iso).slice(0, 10); }
   }
 
   // Generic tracker loader. The box carries its OWN endpoint + scope on data-
@@ -7007,12 +7026,74 @@
     } catch (e) { box.hidden = true; }                    // network — leave hidden
   }
 
-  function trackerMapTable(t) {
+  function trackerCollectionSummary(t) {
+    const paid = t.payments_paid || 0;
+    const open = t.payments_open || 0;
+    const collected = t.collected_usd;
+    const pays = Array.isArray(t.payments) ? t.payments : [];
+    if (!pays.length && !paid && !open && !(collected > 0)) return "";
+    const chips = [];
+    if (collected != null) {
+      chips.push(`<span class="rb-track-chip rb-track-chip-money"><b>${esc(moneyFmt(collected))}</b> collected</span>`);
+    }
+    if (paid) chips.push(`<span class="rb-track-chip rb-track-chip-paid"><b>${paid}</b> paid</span>`);
+    if (open) chips.push(`<span class="rb-track-chip rb-track-chip-open"><b>${open}</b> awaiting</span>`);
+    return `<div class="rb-track-collect">${chips.join("")}</div>`;
+  }
+
+  function trackerPaymentsTable(t) {
+    const pays = Array.isArray(t.payments) ? t.payments : [];
+    if (!pays.length) {
+      return `<div class="rb-track-payempty">No invoices collected yet — when offtakers pay online, each period lands here with paid date and amount collected.</div>`;
+    }
+    // Newest first already from API; show up to 12, rest via download.
+    const rows = pays.slice(0, 12).map(p => {
+      const st = (p.status || "").toLowerCase();
+      const stCls = st === "paid" ? "paid" : (st === "open" ? "open" : "other");
+      const label = p.status_label || p.status || "—";
+      const coll = st === "paid" ? moneyFmt(p.collected_usd) : "—";
+      const amt = moneyFmt(p.amount_usd);
+      return `<tr class="rb-track-payrow" data-status="${esc(stCls)}">
+        <td>${esc(p.period_label || p.period_key || "—")}</td>
+        <td><span class="rb-track-payst rb-track-payst-${esc(stCls)}">${esc(label)}</span></td>
+        <td class="rb-num">${esc(amt)}</td>
+        <td>${esc(st === "paid" ? paidDateShort(p.paid_at) : "—")}</td>
+        <td class="rb-num">${esc(coll)}</td>
+        <td class="rb-muted">${esc(p.invoice_number || "—")}</td>
+      </tr>`;
+    }).join("");
+    const more = pays.length > 12
+      ? `<div class="rb-track-paymore">+${pays.length - 12} more in the downloaded spreadsheet</div>`
+      : "";
+    return `
+      <div class="rb-track-pays">
+        <div class="rb-track-pays-h">Invoice collection</div>
+        <div class="rb-track-pays-scroll">
+          <table class="rb-track-paytable">
+            <thead><tr>
+              <th>Period</th><th>Status</th><th>Invoice $</th><th>Paid</th><th>Collected $</th><th>#</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${more}
+      </div>`;
+  }
+
+  function trackerMapTable(t, scope) {
     if (!t.has_sheet) return "";
     const heads = t.headers || [];
     const cols = t.columns || {};
     let chips;
-    if (t.auto) {
+    if (t.auto && scope === "offtaker") {
+      // Default invoice ledger: period + generation + invoice/collection columns.
+      const nInv = t.data_rows || (Array.isArray(t.payments) ? t.payments.length : 0);
+      chips = `<span class="rb-track-chip"><b>Invoice ledger</b></span>`
+            + `<span class="rb-track-chip"><b>${nInv}</b> invoice${nInv === 1 ? "" : "s"}</span>`;
+      if (t.collected_usd != null) {
+        chips += `<span class="rb-track-chip rb-track-chip-money"><b>${esc(moneyFmt(t.collected_usd))}</b> collected</span>`;
+      }
+    } else if (t.auto) {
       // The auto-built master sheet's columns ARE the arrays (+ Period/Total), not
       // detected logical fields — summarize its shape instead of a field map.
       const nArr = Math.max(0, (heads.length || 0) - 2);   // minus Period + Total
@@ -7035,19 +7116,25 @@
   }
 
   // Scope-aware copy. A box is either the MASTER (operator-wide) sheet at the top
-  // or one OFFTAKER's own sheet inside its accordion. The master is auto-built
-  // from the operator's arrays unless they upload their own layout to override it.
+  // or one OFFTAKER's own sheet inside its accordion. Offtaker default = invoice
+  // ledger with generation + paid/collected columns; upload overrides layout.
   function trackerCopy(box, t) {
     const scope = box.dataset.trackerScope || "global";
     const name = (box.dataset.trackerName || "").trim();
     const has = !!t.has_sheet;
     if (scope === "offtaker") {
       const who = name || "this offtaker";
+      if (t.auto || !has) {
+        return {
+          title: name ? `${name}’s generation & invoices` : "Generation & invoices",
+          hint: has
+            ? `Default ledger for ${who}: generation, invoice $, paid date, and money collected. Download anytime — or upload your own sheet layout.`
+            : `We keep a ledger of ${who}’s invoices and collections. Upload a custom sheet if you already track generation yourself.`,
+        };
+      }
       return {
         title: name ? `${name}’s generation spreadsheet` : "This offtaker’s generation spreadsheet",
-        hint: has
-          ? `We add a new row to ${who}’s sheet each month as their GMP bills land.`
-          : `Upload ${name ? name + "’s" : "this offtaker’s"} own tracking sheet — we’ll match its format and add a row each month as their GMP bills land.`,
+        hint: `Your uploaded sheet for ${who} — we add a row each month as bills land. Remove to restore the default invoice ledger.`,
       };
     }
     // master / operator-wide
@@ -7064,22 +7151,30 @@
   }
 
   function renderTracker(box, t) {
+    const scope = box.dataset.trackerScope || "global";
     const has = !!t.has_sheet;
     const isAuto = !!t.auto;
-    const canRemove = has && !isAuto;                 // the auto master sheet has nothing to remove
+    const canRemove = has && !isAuto;                 // the auto ledger has nothing to remove
     const upLabel = !has ? "Upload spreadsheet" : (isAuto ? "Upload your own" : "Replace");
     const upTitle = isAuto ? "Upload your own sheet to override the auto-built one"
                            : (has ? "Replace the tracked sheet" : "Upload a spreadsheet");
-    const dlLabel = isAuto ? "Download spreadsheet ↓" : "Download latest spreadsheet ↓";
+    const dlLabel = isAuto
+      ? (scope === "offtaker" ? "Download invoice ledger ↓" : "Download spreadsheet ↓")
+      : "Download latest spreadsheet ↓";
+    // Always offer download for offtaker auto ledger (API builds it on demand).
+    const showDl = has || (scope === "offtaker");
     const { title, hint } = trackerCopy(box, t);
+    const showPays = scope === "offtaker";
     box.innerHTML = `
       <div class="rb-track-h">
         <span class="rl">${esc(title)}</span>
         <span class="rb-track-hint">${esc(hint)}</span>
       </div>
-      ${trackerMapTable(t)}
+      ${trackerMapTable(t, scope)}
+      ${showPays ? trackerCollectionSummary(t) : ""}
+      ${showPays ? trackerPaymentsTable(t) : ""}
       <div class="rb-track-actions">
-        ${has ? `<button type="button" class="rb-track-dl" data-tdl="1">${dlLabel}</button>` : ""}
+        ${showDl ? `<button type="button" class="rb-track-dl" data-tdl="1">${dlLabel}</button>` : ""}
         <label class="rb-track-up" title="${esc(upTitle)}">
           ${upLabel}
           <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-tup="1" hidden>
