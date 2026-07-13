@@ -77,7 +77,7 @@ document.documentElement.setAttribute("data-theme","day");
    ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
    ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:3dppx)"]
   ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
-  ["theme-sky.css?v=20260713whoami","theme-sky-triage.css?v=20260713invgraph","theme-sky-reports.css?v=20260713mrate","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713glass1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260713whoami"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+  ["theme-sky.css?v=20260713whoami","theme-sky-triage.css?v=20260713invgraph","theme-sky-reports.css?v=20260713mrate","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713anfc1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260713whoami"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
 <!-- (The scroll-parallax "descent" was removed 2026-07-13 — Ford: it magnified +
      softened the plate. The world is now a simple fixed cover background at
@@ -513,7 +513,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="analysis.js?v=8"></script>
 <script src="analysis-health.js?v=1"></script>
 <script src="analysis-fleet-summary.js?v=3"></script>
-<script src="analysis-forecast.js?v=4"></script>
+<script src="analysis-forecast.js?v=5"></script>
 <script src="analysis-sites-grid.js?v=20260712dlg"></script>
 <script src="analysis-performance.js?v=1"></script>
 <script src="analysis-alarms.js?v=2"></script>
@@ -790,266 +790,160 @@ document.documentElement.setAttribute("data-theme","day");
   }
 
   // ── Capture + mark (THE entry path) ──
-  // TRUST-CRITICAL: the freeze must look like the live page.
-  // html2canvas cannot paint body::before (fixed alpine plate) or backdrop-filter
-  // glass. v1 left a flat blue void; v2 tried translucent glass + manual composite
-  // but the plate often never loaded and glass-over-blue looked greyer (worse).
-  // v3: fetch the plate as pixels → paint cover into a data-URL <img> injected as
-  // a real fixed element → html2canvas captures that <img> behind the UI. Cards
-  // stay solid (readable); the world shows around them like the live page.
-  function loadH2C(){
-    return window.html2canvas ? Promise.resolve()
-      : new Promise(function(res,rej){
-          var s=document.createElement("script");
-          s.src="/vendor/html2canvas.min.js?v=pro158";
-          s.onload=res; s.onerror=rej; document.head.appendChild(s);
-        });
-  }
-  function resolveSkyPlateUrl(){
-    try{
-      var bg = (getComputedStyle(document.body, "::before").backgroundImage || "");
-      var re = /url\(\s*(['"]?)([^"')]+)\1\s*\)/g, m, first=null;
-      while((m = re.exec(bg))){
-        var u = m[2];
-        if(/\/img\/sky\//.test(u) || /\.(webp|jpe?g|png)(\?|$)/i.test(u)){
-          first = u; break;
-        }
-        if(!first) first = u;
+  // TRUST-CRITICAL: the freeze must be pixel-identical to what the user sees.
+  // html2canvas CANNOT paint backdrop-filter glass or body::before plates — every
+  // reconstruction was grey, soft, or flat (Ford 2026-07-13, three failed passes).
+  // New approach: one-frame capture of THIS TAB via getDisplayMedia
+  // (preferCurrentTab). The browser paints the real compositor output — mountain,
+  // frost, crisp type. Stream is stopped immediately after one frame.
+  // If the user denies share, fall through to text-only (never a fake mushy shot).
+  function captureTabFrame(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+      return Promise.reject(new Error("no getDisplayMedia"));
+    }
+    // Hide our chrome so it doesn't appear in the freeze.
+    var wrap = document.getElementById("fsWrap");
+    var prevVis = wrap ? wrap.style.visibility : "";
+    if(wrap) wrap.style.visibility = "hidden";
+    // Brief toast so the permission dialog isn't a surprise.
+    var tip = document.createElement("div");
+    tip.id = "fsShareTip";
+    tip.setAttribute("role","status");
+    tip.style.cssText = [
+      "position:fixed","left:50%","top:18px","transform:translateX(-50%)","z-index:10060",
+      "max-width:min(440px,92vw)","padding:12px 16px","border-radius:14px",
+      "background:rgba(255,255,255,.96)","color:#0E1420","font:600 13.5px/1.4 Plus Jakarta Sans,system-ui,sans-serif",
+      "box-shadow:0 12px 40px -12px rgba(15,50,110,.35)","border:1px solid rgba(33,150,243,.25)",
+      "text-align:center","pointer-events:none"
+    ].join(";");
+    tip.textContent = "Pick “This tab” once — we take a single freeze, then stop sharing.";
+    document.body.appendChild(tip);
+
+    var opts = {
+      video: {
+        displaySurface: "browser",
+        frameRate: { ideal: 5, max: 15 },
+        width: { ideal: window.innerWidth * (window.devicePixelRatio || 1) },
+        height: { ideal: window.innerHeight * (window.devicePixelRatio || 1) }
+      },
+      audio: false,
+      // Chromium: prefer THIS tab so the dialog defaults correctly.
+      preferCurrentTab: true,
+      selfBrowserSurface: "include",
+      surfaceSwitching: "exclude",
+      systemAudio: "exclude"
+    };
+
+    return navigator.mediaDevices.getDisplayMedia(opts).then(function(stream){
+      if(tip.parentNode) tip.parentNode.removeChild(tip);
+      var track = stream.getVideoTracks()[0];
+      if(!track){ stream.getTracks().forEach(function(t){ t.stop(); }); throw new Error("no video track"); }
+
+      var video = document.createElement("video");
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = stream;
+
+      function stopAll(){
+        try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+        try{ video.srcObject = null; }catch(e){}
       }
-      if(first){
-        try{ return new URL(first, location.href).href; }catch(e){ return first; }
-      }
-    }catch(e){}
-    var dpr = window.devicePixelRatio || 1, w = window.innerWidth || 1200;
-    var file = (w <= 600)
-      ? (dpr >= 2.5 ? "world-zo6-2560" : dpr > 1.5 ? "world-zo6-1600" : "world-zo6-1080")
-      : (dpr >= 2 || w >= 2400) ? "world-zo6-2560"
-      : (dpr >= 1.5 || w >= 1800) ? "world-zo6-2560"
-      : (w <= 1600) ? "world-zo6-1600" : "world-zo6-2560";
-    return new URL("img/sky/"+file+".webp", location.href).href;
-  }
-  // CSS background-size:cover + background-position:center 52% (theme-sky).
-  function drawCover(ctx, img, w, h, posY){
-    posY = (posY == null) ? 0.52 : posY;
-    var ir = img.naturalWidth / img.naturalHeight, cr = w / h;
-    var dw, dh;
-    if(ir > cr){ dh = h; dw = h * ir; } else { dw = w; dh = w / ir; }
-    var dx = (w - dw) / 2;
-    var dy = (h * posY) - (dh * posY);
-    ctx.drawImage(img, dx, dy, dw, dh);
-  }
-  function paintSkyWorld(ctx, w, h, img){
-    var g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#1E90E8");
-    g.addColorStop(0.48, "#56B4F0");
-    g.addColorStop(1, "#BEE3FA");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-    if(img && img.naturalWidth){
-      drawCover(ctx, img, w, h, 0.52);
-    }
-  }
-  // Fetch plate as blob → Image. Tries several candidates so a single 404 can't
-  // leave us with the flat gradient. Same-origin; no CORS drama.
-  function loadPlateImage(){
-    var urls = [], seen = {};
-    function add(u){ if(u && !seen[u]){ seen[u]=1; urls.push(u); } }
-    try{ add(resolveSkyPlateUrl()); }catch(e){}
-    var base = location.origin.replace(/\/$/,"") + "/img/sky/";
-    ["world-zo6-2560.webp","world-zo6-2560.jpg","world-zo6-1600.webp","world-zo6-1600.jpg","world-zo6-2048.webp"].forEach(function(f){ add(base+f); });
-    function tryOne(i){
-      if(i >= urls.length) return Promise.reject(new Error("no sky plate loaded"));
-      return fetch(urls[i], { credentials:"same-origin", cache:"force-cache" })
-        .then(function(r){ if(!r.ok) throw new Error("http "+r.status); return r.blob(); })
-        .then(function(blob){
-          if(!blob || blob.size < 1000) throw new Error("tiny blob");
-          return new Promise(function(res, rej){
-            var img = new Image();
-            var obj = URL.createObjectURL(blob);
-            img.onload = function(){ URL.revokeObjectURL(obj); if(img.naturalWidth<16) rej(new Error("bad dim")); else res(img); };
-            img.onerror = function(){ URL.revokeObjectURL(obj); rej(new Error("decode")); };
-            img.src = obj;
-          });
-        })
-        .catch(function(){ return tryOne(i+1); });
-    }
-    return tryOne(0);
-  }
-  // Punch only the flat sky FILLS html2canvas paints (exact theme stops), then
-  // lay the real alpine plate underneath. Leaves buttons (#2196F3) and content
-  // alone — those are a different blue. This is the reliability net when the
-  // injected <img> isn't painted into the capture (common with fixed+crop).
-  function compositePlateUnderUi(uiCv, skyImg){
-    var w = uiCv.width, h = uiCv.height;
-    var out = document.createElement("canvas");
-    out.width = w; out.height = h;
-    var ctx = out.getContext("2d");
-    paintSkyWorld(ctx, w, h, skyImg);
 
-    var ui = document.createElement("canvas");
-    ui.width = w; ui.height = h;
-    var ux = ui.getContext("2d");
-    ux.drawImage(uiCv, 0, 0);
-    var id = ux.getImageData(0, 0, w, h);
-    var d = id.data;
-    function near(a, b, tol){ return Math.abs(a - b) <= tol; }
-    // Theme sky stops only (NOT brand primary #2196F3 = 33,150,243).
-    for(var i = 0; i < d.length; i += 4){
-      var r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-      if(a < 8) continue;
-      // --sky-mid #56B4F0 (html2canvas backgroundColor fill)
-      if(near(r,86,14) && near(g,180,14) && near(b,240,14)){ d[i+3] = 0; continue; }
-      // --sky-top #1E90E8
-      if(near(r,30,14) && near(g,144,14) && near(b,232,14)){ d[i+3] = 0; continue; }
-      // --sky-horizon #BEE3FA
-      if(near(r,190,16) && near(g,227,16) && near(b,250,16)){ d[i+3] = 0; continue; }
-      // html.sky --bg #EAF4FD (light azure page fill, if it leaks in)
-      if(near(r,234,12) && near(g,244,12) && near(b,253,12)){ d[i+3] = 0; continue; }
-    }
-    ux.putImageData(id, 0, 0);
-    ctx.drawImage(ui, 0, 0);
-    return out;
-  }
-  function captureViewportFaithful(){
-    var sx = Math.floor(window.scrollX || window.pageXOffset || 0);
-    var sy = Math.floor(window.scrollY || window.pageYOffset || 0);
-    var vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
-    var vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
-    var scale = Math.min(window.devicePixelRatio || 1, 1.5);
-    var raised = [];
-    var proxy = null;
-    function cleanup(){
-      try{ document.documentElement.classList.remove("fs-capturing"); }catch(e){}
-      if(proxy && proxy.parentNode) proxy.parentNode.removeChild(proxy);
-      proxy = null;
-      raised.forEach(function(r){
-        try{
-          if(r.posReset) r.el.style.position = r.pos;
-          r.el.style.zIndex = r.z;
-        }catch(e){}
-      });
-      raised = [];
-    }
-    return loadH2C().then(function(){ return loadPlateImage(); }).then(function(skyImg){
-      // Bake cover plate → data-URL <img> so html2canvas has a real element to paint
-      // (it never paints body::before). Even if this is missed, compositePlateUnderUi
-      // still forces the plate under any flat sky fill.
-      var plate = document.createElement("canvas");
-      plate.width = Math.max(1, Math.round(vw * scale));
-      plate.height = Math.max(1, Math.round(vh * scale));
-      paintSkyWorld(plate.getContext("2d"), plate.width, plate.height, skyImg);
-
-      proxy = document.createElement("img");
-      proxy.id = "fsSkyPlateProxy";
-      proxy.alt = "";
-      proxy.src = plate.toDataURL("image/jpeg", 0.92);
-      proxy.style.cssText = [
-        "position:fixed","left:0","top:0",
-        "width:"+vw+"px","height:"+vh+"px",
-        "object-fit:fill","object-position:center",
-        "z-index:0","pointer-events:none",
-        "margin:0","padding:0","border:0","display:block",
-        "opacity:1","visibility:visible"
-      ].join(";");
-      document.body.insertBefore(proxy, document.body.firstChild);
-
-      Array.prototype.forEach.call(document.body.children, function(ch){
-        if(!ch || ch === proxy || ch.id === "fsWrap" || ch.id === "fsOverlay") return;
-        var cs = window.getComputedStyle(ch);
-        var entry = { el: ch, z: ch.style.zIndex, pos: ch.style.position, posReset: false };
-        if(cs.position === "static"){
-          ch.style.position = "relative";
-          entry.posReset = true;
-        }
-        var z = parseInt(cs.zIndex, 10);
-        if(isNaN(z) || z < 1) ch.style.zIndex = "1";
-        raised.push(entry);
-      });
-      document.documentElement.classList.add("fs-capturing");
-
-      return window.html2canvas(document.body, {
-        // Solid sky-mid — we deliberately punch this exact fill out later and
-        // replace it with the real plate (avoids the grey-glass-over-blue mess).
-        backgroundColor: "#56B4F0",
-        scale: scale,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        x: sx, y: sy, width: vw, height: vh,
-        ignoreElements: function(el){
-          return el && (el.id === "fsWrap" || el.id === "fsOverlay");
-        },
-        onclone: function(doc){
-          try{
-            var st = doc.createElement("style");
-            st.textContent = [
-              "html.sky body::before, html.sky body::after, html.fs-capturing body::before{",
-              "  content:none!important;display:none!important;background:none!important;}",
-              // Keep cards solid/readable — do NOT force translucent glass.
-              "*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}",
-              "html.sky, html.fs-capturing{background:#56B4F0!important;}",
-              "html.sky body, html.fs-capturing body{background:transparent!important;}",
-              "#fsSkyPlateProxy{display:block!important;visibility:visible!important;",
-              "  opacity:1!important;z-index:0!important;position:fixed!important;}"
-            ].join("\n");
-            doc.head.appendChild(st);
-            var p = doc.getElementById("fsSkyPlateProxy");
-            if(p){
-              p.style.setProperty("display","block","important");
-              p.style.setProperty("visibility","visible","important");
-              p.style.setProperty("opacity","1","important");
-              p.style.setProperty("z-index","0","important");
+      return video.play().then(function(){
+        // Wait until we have real dimensions + at least one painted frame.
+        return new Promise(function(resolve, reject){
+          var tries = 0;
+          function ready(){
+            if(video.videoWidth > 2 && video.videoHeight > 2){
+              // One more frame for compositor settling after our chrome hid.
+              if(video.requestVideoFrameCallback){
+                video.requestVideoFrameCallback(function(){ resolve(); });
+              } else {
+                setTimeout(resolve, 80);
+              }
+              return;
             }
-          }catch(e){}
+            if(++tries > 60){ reject(new Error("video never ready")); return; }
+            setTimeout(ready, 32);
+          }
+          ready();
+        });
+      }).then(function(){
+        var vw = video.videoWidth, vh = video.videoHeight;
+        var cv = document.createElement("canvas");
+        cv.width = vw;
+        cv.height = vh;
+        var ctx = cv.getContext("2d");
+        ctx.drawImage(video, 0, 0, vw, vh);
+        stopAll();
+        if(wrap) wrap.style.visibility = prevVis;
+        // Sanity: blank/black frame is useless
+        try{
+          var sample = ctx.getImageData((vw/2)|0, (vh/2)|0, 1, 1).data;
+          var sum = sample[0]+sample[1]+sample[2];
+          if(sum < 8) throw new Error("blank frame");
+        }catch(e){
+          if(String(e.message||e).indexOf("blank")>=0) throw e;
+          // getImageData can taint on some browsers — ignore
         }
-      }).then(function(cv){
-        cleanup();
-        // ALWAYS underlay the real plate: punch flat sky fills → mountain shows
-        // around the white cards. This is what makes the freeze match the live page.
-        return compositePlateUnderUi(cv, skyImg);
-      }, function(err){ cleanup(); throw err; });
+        return cv;
+      }, function(err){
+        stopAll();
+        if(wrap) wrap.style.visibility = prevVis;
+        throw err;
+      });
+    }, function(err){
+      if(tip.parentNode) tip.parentNode.removeChild(tip);
+      if(wrap) wrap.style.visibility = prevVis;
+      throw err;
     });
   }
 
   function startMark(fromSkip){
-    // Hide UI chrome while capturing so the shot is clean.
-    var wrap=document.getElementById("fsWrap");
     openPanel(false);
-    btn.disabled=true;
-    var prevLabel=btn.innerHTML;
-    btn.innerHTML='<span class="fsdot">✦</span> Capturing…';
-    wrap.style.visibility="hidden";
-    // Yield a frame so the hide paints before capture (avoids a ghost of the pill).
-    Promise.resolve().then(function(){
-      return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
-    }).then(function(){
-      return captureViewportFaithful();
-    }).then(function(cv){
-      wrap.style.visibility="";
-      var maxW=Math.floor(window.innerWidth*0.94), maxH=Math.floor(window.innerHeight*0.78);
-      SCL=Math.min(maxW/cv.width, maxH/cv.height, 1);
-      var w=Math.max(1,Math.floor(cv.width*SCL)), h=Math.max(1,Math.floor(cv.height*SCL));
-      shotC.width=w; shotC.height=h; inkC.width=w; inkC.height=h;
-      inkC.style.width=w+"px"; inkC.style.height=h+"px";
-      shotC.getContext("2d").drawImage(cv,0,0,w,h);
-      shotC._full=cv;
-      STROKES=[]; CUR=null; drawInk();
-      // Default tool = circle (Ford: circle the location)
-      TOOL="circ";
+    btn.disabled = true;
+    var prevLabel = btn.innerHTML;
+    btn.innerHTML = '<span class="fsdot">✦</span> Freezing…';
+
+    captureTabFrame().then(function(cv){
+      // Fit the freeze into the mark stage (display size); keep full-res on _full.
+      var maxW = Math.floor(window.innerWidth * 0.94);
+      var maxH = Math.floor(window.innerHeight * 0.78);
+      SCL = Math.min(maxW / cv.width, maxH / cv.height, 1);
+      var w = Math.max(1, Math.floor(cv.width * SCL));
+      var h = Math.max(1, Math.floor(cv.height * SCL));
+      shotC.width = w; shotC.height = h;
+      inkC.width = w; inkC.height = h;
+      inkC.style.width = w + "px"; inkC.style.height = h + "px";
+      // Draw crisply — imageSmoothing for downscale only.
+      var sctx = shotC.getContext("2d");
+      sctx.imageSmoothingEnabled = true;
+      sctx.imageSmoothingQuality = "high";
+      sctx.drawImage(cv, 0, 0, w, h);
+      shotC._full = cv;
+      STROKES = []; CUR = null; drawInk();
+      TOOL = "circ";
       ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){
-        document.getElementById(b).classList.toggle("on", b==="fsToolCirc");
+        document.getElementById(b).classList.toggle("on", b === "fsToolCirc");
       });
+      // Update tip in toolbar
+      try{
+        var tipEl = document.querySelector("#fsToolbar .fsTip");
+        if(tipEl) tipEl.textContent = "Circle the spot that should change";
+      }catch(e){}
       overlay.classList.add("open");
     }).catch(function(err){
-      wrap.style.visibility="";
-      // Capture failed — fall through to text-only compose.
+      // User denied share, or browser lacks the API — never ship a grey mush shot.
       openPanel(true);
-      msg.style.color="#b45309";
-      msg.textContent="Couldn't freeze the screen here — describe what you want instead.";
-      try{ console.warn("fs capture failed", err); }catch(e){}
+      var denied = err && (err.name === "NotAllowedError" || err.name === "AbortError");
+      msg.style.color = "#b45309";
+      msg.textContent = denied
+        ? "Tab share cancelled — describe what you want in a sentence (or try again and pick This tab)."
+        : "Couldn't freeze this tab pixel-perfectly here — describe the change in a sentence instead.";
+      try{ console.warn("fs tab capture failed", err); }catch(e){}
     }).then(function(){
-      btn.disabled=false;
-      btn.innerHTML=prevLabel;
+      btn.disabled = false;
+      btn.innerHTML = prevLabel;
     });
   }
 
