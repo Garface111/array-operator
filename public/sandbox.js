@@ -3361,6 +3361,16 @@
           <div class="ao-al-hint">Add more addresses separated by commas — everyone gets the alert.</div>
         </div>
         <div class="ao-al-sec">
+          <label class="ao-al-check" title="Fewer emails — fold inverter alerts into your daily fleet digest">
+            <input type="checkbox" id="aoAlViaDigest">
+            <span class="ao-al-check-box" aria-hidden="true"></span>
+            <span class="ao-al-check-tt">
+              <b>Attach to my morning digest</b>
+              <small>Fewer emails — include inverter alerts in your daily fleet digest instead of sending them separately.</small>
+            </span>
+          </label>
+        </div>
+        <div class="ao-al-sec">
           <div class="ao-al-lbl">What we watch <span class="ao-al-lbl-note">every inverter, weighed against its neighbors</span></div>
           <div class="ao-al-watch">
             <div class="ao-al-w"><span class="ao-al-w-d dark"></span><div><b>Not producing</b><small>goes dark mid-day</small></div></div>
@@ -3389,6 +3399,7 @@
     document.body.appendChild(panel);
     const $ = id => panel.querySelector(id);
     const enabled = $("#aoAlEnabled"), email = $("#aoAlEmail"),
+          viaDigest = $("#aoAlViaDigest"),
           thresh = $("#aoAlThresh"), grace = $("#aoAlGrace"), note = $("#aoAlNote");
 
     const sync = () => {
@@ -3404,13 +3415,20 @@
       const extra = recRaw.split(",").filter(x=>x.trim()).length - 1;
       const rec = extra > 0 ? `${first} +${extra} more` : (first || "you");
       const gr = grace.value === "0" ? "right away" : `within ${grace.value}h`;
-      $("#aoAlPreview").innerHTML =
-        `We’ll email <b>${esc(rec)}</b> <b>${gr}</b> when an inverter drops below <b>${thresh.value}%</b> of its neighbors — and stays there.`;
+      if(viaDigest.checked){
+        $("#aoAlPreview").innerHTML =
+          `We’ll include inverter issues for <b>${esc(rec)}</b> in your <b>morning fleet digest</b> when an inverter drops below <b>${thresh.value}%</b> of its neighbors — no separate alert emails.`;
+      } else {
+        $("#aoAlPreview").innerHTML =
+          `We’ll email <b>${esc(rec)}</b> <b>${gr}</b> when an inverter drops below <b>${thresh.value}%</b> of its neighbors — and stays there.`;
+      }
       panel.classList.toggle("off", !enabled.checked);
-      $("#aoAlStatus").textContent = enabled.checked ? "On — watching your fleet" : "Off — no alerts sent";
+      $("#aoAlStatus").textContent = !enabled.checked
+        ? "Off — no alerts sent"
+        : (viaDigest.checked ? "On — via morning digest" : "On — watching your fleet");
     };
     thresh.oninput = sync; grace.oninput = sync; email.oninput = sync;
-    enabled.onchange = sync;
+    enabled.onchange = sync; viaDigest.onchange = sync;
     panel.querySelectorAll("[data-seg]").forEach(b => b.onclick = () => {
       const v = b.getAttribute("data-seg");
       (b.closest("#aoAlSensSeg") ? thresh : grace).value = v;
@@ -3438,6 +3456,7 @@
           if(s.email_is_default && s.email) email.placeholder = s.email + " (account email)";
           thresh.value = s.threshold_pct || 50;
           grace.value = s.grace_hours != null ? s.grace_hours : 12;
+          viaDigest.checked = !!s.via_digest;
           sync();
         }).catch(()=>{});
     }
@@ -3446,7 +3465,8 @@
     $("#aoAlSave").onclick = () => {
       if(!session){ note.innerHTML = `<a href="onboarding.html">Sign in</a> first.`; return; }
       const body = { enabled: enabled.checked, email: email.value.trim(),
-                     threshold_pct: parseInt(thresh.value,10), grace_hours: parseInt(grace.value,10) };
+                     threshold_pct: parseInt(thresh.value,10), grace_hours: parseInt(grace.value,10),
+                     via_digest: viaDigest.checked };
       note.textContent = "Saving…";
       fetch(AL_API, { method:"PUT",
         headers:{ "Content-Type":"application/json", Authorization:"Bearer "+session },
@@ -3455,7 +3475,13 @@
           if(!ok){ note.textContent = (j && j.detail) || "Couldn’t save — check the email."; return; }
           _setDot(!!j.enabled);
           close();
-          toast(j.enabled ? `Alerts on — we’ll email ${j.email} when an inverter needs you.` : "Fleet alerts turned off.", "ok");
+          let msg = "Fleet alerts turned off.";
+          if(j.enabled){
+            msg = j.via_digest
+              ? "Alerts on — inverter issues go in your morning digest (no separate emails)."
+              : `Alerts on — we’ll email ${j.email} when an inverter needs you.`;
+          }
+          toast(msg, "ok");
         }).catch(()=>{ note.textContent = "Network error — try again."; });
     };
 

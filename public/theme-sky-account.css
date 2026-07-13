@@ -413,6 +413,21 @@ html.sky .ao-al-preview{
   border-color:var(--al-line);
   border-radius:12px;
 }
+html.sky .ao-al-check{
+  background:rgba(255,255,255,.72);
+  border-color:var(--al-line);
+  border-radius:13px;
+}
+html.sky .ao-al-check:hover{background:rgba(255,255,255,.88);border-color:rgba(33,150,243,.3)}
+html.sky .ao-al-check:has(input:checked){
+  background:rgba(33,150,243,.1);
+  border-color:rgba(33,150,243,.4);
+}
+html.sky .ao-al-check-box{background:rgba(255,255,255,.9);border-color:rgba(20,60,120,.28)}
+html.sky .ao-al-check input:checked + .ao-al-check-box{
+  background:var(--sky-primary);border-color:var(--sky-primary);
+  box-shadow:0 0 0 3px rgba(33,150,243,.16);
+}
 html.sky .ao-al-track{background:rgba(20,60,120,.20)}
 html.sky .ao-al-save{
   background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary);
