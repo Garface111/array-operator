@@ -2999,6 +2999,15 @@
       // overlay a type-to-filter combobox. The native <select> stays the source of
       // truth (value + onchange untouched); the combobox just mirrors the pick.
       makeSearchableSelect(s, { placeholder: "Search net meter groups…" });
+      // Suggestion #15: "search for utility bills inside these dropdowns." The sub-
+      // account picker beside the master lists the same utility bills, so give it the
+      // same type-to-filter combobox (its CSS is already covered by .rb-mform-grid).
+      // keepEmpty keeps the "— none —" option pickable: here a blank value is a real
+      // choice (bill the master group's share), not just a placeholder.
+      const usub = $("#rbmUtility");
+      if (usub) makeSearchableSelect(usub, { placeholder: "Search utility accounts…",
+        keepEmpty: true, noMatch: "No utility account matches that.",
+        emptyText: "No utility accounts linked yet." });
       // Pre-select the master net-meter group the operator clicked "+ Add offtaker"
       // on (parked in PENDING_MASTER_ARRAY). Applied here — after the options exist —
       // then a native change fires so the bill line + sub picker + rate field resolve.
@@ -3045,13 +3054,13 @@
 
     let open = false, active = -1, items = [];
 
-    const selectedLabel = () => { const o = sel.options[sel.selectedIndex]; return (o && o.value) ? o.textContent : ""; };
+    const selectedLabel = () => { const o = sel.options[sel.selectedIndex]; return (o && (o.value || opt.keepEmpty)) ? o.textContent : ""; };
     const syncInputToSelection = () => { input.value = selectedLabel(); };
 
     const build = (q) => {
       const needle = String(q || "").trim().toLowerCase();
       list.innerHTML = ""; items = [];
-      const opts = Array.from(sel.options).filter(o => o.value !== "");   // skip the "Choose…" placeholder
+      const opts = Array.from(sel.options).filter(o => opt.keepEmpty || o.value !== "");   // skip the "Choose…" placeholder (keepEmpty keeps a blank-value option that's a real choice)
       for (const o of opts) {
         const label = o.textContent;
         if (needle && !label.toLowerCase().includes(needle)) continue;
@@ -3068,7 +3077,9 @@
       if (!items.length) {
         const none = document.createElement("div");
         none.className = "nmg-combo-none";
-        none.textContent = opts.length ? "No net meter group matches that." : "No net meter groups yet.";
+        none.textContent = opts.length
+          ? (opt.noMatch || "No net meter group matches that.")
+          : (opt.emptyText || "No net meter groups yet.");
         list.appendChild(none);
       }
       active = -1;
@@ -3375,6 +3386,7 @@
       `<option value="">— none (bill their share of the master) —</option>`);
     const hint = $("#rbmUtilHint");
     if (hint) hint.textContent = "If this offtaker meters on their own account, pick it to bill directly off their meter. Leave blank to bill their share of the master.";
+    if (usel.__combo) usel.__combo.sync();   // mirror the (re)populated selection into the search box
     wrap.hidden = false;
   }
 
@@ -3468,6 +3480,7 @@
       hint.textContent = gname +
         " has multiple participants. Your selection here should be the utility account from this dropdown list.";
     }
+    if (usel.__combo) usel.__combo.sync();   // mirror the (re)populated selection into the search box
     wrap.hidden = false;
   }
 
