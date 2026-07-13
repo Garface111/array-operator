@@ -630,6 +630,26 @@ document.documentElement.setAttribute("data-theme","day");
   #fsJActions #fsReload:hover{background:#1976D2}
   #fsJActions #fsJDismiss{border:none;color:#6B7789;font-weight:500}
 
+  /* Mini pill when journey is hidden — sits above Wish this was better so the
+     build isn't gone forever (Ford 2026-07-13). */
+  #fsMini{
+    display:none;align-items:center;gap:8px;cursor:pointer;
+    border:1px solid rgba(33,150,243,.3);background:rgba(255,255,255,.92);
+    color:#0E1420;border-radius:999px;padding:8px 14px;font-weight:650;font-size:12.5px;
+    box-shadow:0 8px 28px -10px rgba(20,60,120,.28);
+    backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+    max-width:100%;
+  }
+  #fsMini.show{display:inline-flex}
+  #fsMini:hover{border-color:#2196F3;box-shadow:0 12px 32px -10px rgba(33,150,243,.35)}
+  #fsMini .fsMiniDot{
+    width:8px;height:8px;border-radius:50%;background:#2196F3;flex-shrink:0;
+    animation:fsPulse 1.4s ease-in-out infinite;
+  }
+  #fsMini.live .fsMiniDot{background:#10b981;animation:none}
+  #fsMini.fail .fsMiniDot{background:#dc2626;animation:none}
+  #fsMini span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
   /* ── Compose panel (after markup) ── */
   #fsPanel{
     display:none;width:100%;box-sizing:border-box;
@@ -754,6 +774,9 @@ document.documentElement.setAttribute("data-theme","day");
 </style>
 <div id="fsWrap">
   <div id="fsJourney" role="status" aria-live="polite" aria-atomic="true"></div>
+  <button type="button" id="fsMini" class="" aria-label="Reopen build progress" title="Show build progress">
+    <i class="fsMiniDot" aria-hidden="true"></i><span id="fsMiniLabel">Building your wish…</span>
+  </button>
   <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle">
     <h4 id="fsTitle">What should be here?</h4>
     <p class="fsLead">You marked the spot. One short sentence is enough — an AI engineer builds small improvements and ships them live on this page.</p>
@@ -817,6 +840,8 @@ document.documentElement.setAttribute("data-theme","day");
   var btn=document.getElementById("fsBtn"),
       panel=document.getElementById("fsPanel"),
       journey=document.getElementById("fsJourney"),
+      mini=document.getElementById("fsMini"),
+      miniLabel=document.getElementById("fsMiniLabel"),
       txt=document.getElementById("fsText"),
       send=document.getElementById("fsSend"),
       cancel=document.getElementById("fsCancel"),
@@ -828,6 +853,8 @@ document.documentElement.setAttribute("data-theme","day");
   // ── State ──
   var MARK_B64=null, TOOL="circ", STROKES=[], CUR=null, SCL=1;
   var ACTIVE_ID=null, ACTIVE_SINCE=0, POLL_T=null;
+  // Journey card can be collapsed to #fsMini without killing the watch.
+  var JOURNEY_COLLAPSED=false, LAST_ST="new", LAST_FAILED=false;
 
   var markThumb=document.getElementById("fsMarkThumb"),
       markImg=document.getElementById("fsMarkImg"),
@@ -857,6 +884,34 @@ document.documentElement.setAttribute("data-theme","day");
   function openJourney(o){
     journey.classList.toggle("open", !!o);
   }
+  function showMini(show){
+    if(!mini) return;
+    mini.classList.toggle("show", !!show);
+    if(!show){
+      mini.classList.remove("live","fail");
+      return;
+    }
+    mini.classList.toggle("live", LAST_ST==="shipped");
+    mini.classList.toggle("fail", !!LAST_FAILED);
+    if(miniLabel){
+      miniLabel.textContent = LAST_ST==="shipped" ? "Your wish is live — open"
+        : LAST_FAILED ? "Build finished — open"
+        : LAST_ST==="building" ? "Building… tap to follow"
+        : "Wish in progress — tap to follow";
+    }
+  }
+  function collapseJourney(){
+    // Hide the big card, keep a pill above Wish this was better. Poll continues.
+    JOURNEY_COLLAPSED = true;
+    openJourney(false);
+    showMini(true);
+  }
+  function expandJourney(){
+    JOURNEY_COLLAPSED = false;
+    showMini(false);
+    renderJourney(LAST_ST, { failed: LAST_FAILED });
+  }
+  if(mini) mini.onclick = function(){ expandJourney(); };
 
   // ── Capture + mark (THE entry path) ──
   // TRUST-CRITICAL: the freeze must match a real PC Print Screen / Snip
@@ -1256,19 +1311,35 @@ document.documentElement.setAttribute("data-theme","day");
 
   function renderJourney(st, opts){
     opts = opts || {};
+    LAST_ST = st || "new";
+    LAST_FAILED = !!opts.failed;
     var elapsed = ACTIVE_SINCE ? Math.floor((Date.now()-ACTIVE_SINCE)/1000) : 0;
-    var stepIdx = mapStatusToStep(st || "new", elapsed);
-    var failed = !!opts.failed;
-    var html = '<h4>'+(st==="shipped"?"It's live.": failed ? "Couldn't auto-ship this one." : "Building your wish…")+'</h4>';
+    var stepIdx = mapStatusToStep(LAST_ST, elapsed);
+    var failed = LAST_FAILED;
+
+    // If the user hid the card, keep polling but only refresh the mini pill —
+    // unless something terminal happened (live / failed), then re-expand so
+    // they notice.
+    if(JOURNEY_COLLAPSED && !opts.forceExpand){
+      if(LAST_ST==="shipped" || failed){
+        JOURNEY_COLLAPSED = false;
+        showMini(false);
+      } else {
+        showMini(true);
+        return;
+      }
+    }
+
+    var html = '<h4>'+(LAST_ST==="shipped"?"It's live.": failed ? "Couldn't auto-ship this one." : "Building your wish…")+'</h4>';
     html += '<p class="fsLead">'+(
-      st==="shipped" ? "Your change is on the site. Refresh to see it."
+      LAST_ST==="shipped" ? "Your change is on the site. Refresh to see it."
       : failed ? "The AI reviewed it but didn't auto-ship (too big or needs a human). We've got it either way."
       : "Follow along — small improvements usually land in a few minutes."
     )+'</p><ul id="fsSteps">';
     STEPS.forEach(function(s, i){
       var cls = "";
       if(failed && i > stepIdx) cls = "";
-      else if(st==="shipped" || i < stepIdx) cls = "done";
+      else if(LAST_ST==="shipped" || i < stepIdx) cls = "done";
       else if(i === stepIdx) cls = failed ? "fail" : "active";
       var icon = (cls==="done") ? "✓" : (cls==="active" ? "●" : (cls==="fail" ? "!" : String(i+1)));
       var sub = s.sub;
@@ -1278,27 +1349,43 @@ document.documentElement.setAttribute("data-theme","day");
       html += '<li class="'+cls+'"><div class="fsStepDot">'+icon+'</div><div class="fsStepBody"><b>'+s.label+'</b><span>'+sub+'</span></div></li>';
     });
     html += '</ul><div id="fsJActions">';
-    if(st==="shipped"){
+    if(LAST_ST==="shipped"){
       html += '<button id="fsReload" type="button">Refresh page</button>';
     }
-    html += '<button id="fsJDismiss" type="button">'+(st==="shipped"||failed?"Dismiss":"Hide")+'</button>';
+    // Hide = collapse to pill (always recoverable). Dismiss only when terminal.
+    if(LAST_ST==="shipped"||failed){
+      html += '<button id="fsJDismiss" type="button">Dismiss</button>';
+    } else {
+      html += '<button id="fsJDismiss" type="button">Hide</button>';
+    }
     html += '</div>';
     journey.innerHTML = html;
     openJourney(true);
+    showMini(false);
     openPanel(false);
     var dismiss=document.getElementById("fsJDismiss");
     if(dismiss) dismiss.onclick=function(){
-      if(st==="shipped"||failed){ stopWatch(); }
-      openJourney(false);
+      if(LAST_ST==="shipped"||failed){
+        // Truly done — clear watch and pill.
+        stopWatch();
+        openJourney(false);
+        showMini(false);
+        JOURNEY_COLLAPSED = false;
+      } else {
+        // Still building — collapse to a re-openable pill, keep watching.
+        collapseJourney();
+      }
     };
     var reload=document.getElementById("fsReload");
-    if(reload) reload.onclick=function(){ stopWatch(); location.reload(); };
+    if(reload) reload.onclick=function(){ stopWatch(); showMini(false); location.reload(); };
   }
 
   function stopWatch(){
     var dropId=ACTIVE_ID;
     ACTIVE_ID=null; ACTIVE_SINCE=0;
+    JOURNEY_COLLAPSED=false;
     if(POLL_T){ clearInterval(POLL_T); POLL_T=null; }
+    showMini(false);
     try{
       var pend=JSON.parse(localStorage.getItem("fsPending")||"[]");
       if(dropId!=null) pend=pend.filter(function(p){ return p.id!==dropId; });
