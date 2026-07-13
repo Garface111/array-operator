@@ -180,7 +180,7 @@
   }
 
   // ---- helpers ----------------------------------------------------------------
-  var VENDORS = { solaredge: 1, fronius: 1, sma: 1, chint: 1, locus: 1, cps: 1, enphase: 1 };
+  var VENDORS = { solaredge: 1, alsoenergy: 1, fronius: 1, sma: 1, chint: 1, locus: 1, cps: 1, enphase: 1 };
   function vendorTag(v) {
     var k = String(v || "").toLowerCase();
     return VENDORS[k] ? k : (k || "");
@@ -249,7 +249,7 @@
   var UNASSIGNED = "Unassigned";
   // canonical display names for known vendor keys (Title-case per Ford's spec)
   var VENDOR_LABEL = {
-    solaredge: "SolarEdge", fronius: "Fronius", sma: "SMA", chint: "CHINT",
+    solaredge: "SolarEdge", alsoenergy: "AlsoEnergy", fronius: "Fronius", sma: "SMA", chint: "CHINT",
     locus: "Locus", cps: "CPS", enphase: "Enphase"
   };
   function vendorLabel(key) {

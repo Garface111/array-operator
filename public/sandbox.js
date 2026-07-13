@@ -56,20 +56,13 @@
 
   // Vendor catalog — copied VERBATIM from public/onboarding.html so the add-array
   // picker offers the same brands + field logic the wizard does.
+  // Default order = featured order in the picker. AlsoEnergy sits up front with
+  // SolarEdge (one login → every site); newly live utilities are in utilFeatured.
   const VENDORS = [
     { code:"solaredge", label:"SolarEdge", meta:"One account key", available:true, discover:true,
       fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
                hint:"The one key that unlocks every site on your account.",
                ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="https://monitoring.solaredge.com" target="_blank" rel="noopener">Open the SolarEdge portal →</a>`}] },
-    { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
-      note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
-      fields:[
-        {name:"client_id", label:"Client ID"},
-        {name:"client_secret", label:"Client Secret", secret:true},
-        {name:"username", label:"SolarNOC username"},
-        {name:"password", label:"SolarNOC password", secret:true},
-        {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
-      ] },
     { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack · 1 login", available:true, discover:true,
       note:"One AlsoEnergy / PowerTrack login attaches every site on the account — same username & password you use at hmi.alsoenergy.com. Leave Site ID blank to connect them all.",
       fields:[
@@ -89,6 +82,15 @@
         {name:"system_id", label:"Plant / System ID"},
         {name:"client_id", label:"Client ID (advanced, optional)", optional:true},
         {name:"client_secret", label:"Client Secret (advanced, optional)", secret:true, optional:true},
+      ] },
+    { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
+      note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
+      fields:[
+        {name:"client_id", label:"Client ID"},
+        {name:"client_secret", label:"Client Secret", secret:true},
+        {name:"username", label:"SolarNOC username"},
+        {name:"password", label:"SolarNOC password", secret:true},
+        {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
       ] },
     { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false,
       note:"Chint/CPS has no key to paste — use the one-click 'Log in with Chint' option above. Support is in final verification against live accounts." },
@@ -512,7 +514,7 @@
   const _syncState = {};   // vendor -> {phase:"syncing"|"signin"|"failed"|"needext", msg?}
   const _syncTimers = {};  // vendor -> setTimeout id
   const _SYNCABLE_VENDORS = new Set(["fronius","sma","chint"]); // extension-captured → user can sync
-  const _POLLED_VENDORS = new Set(["solaredge"]);               // server-polled → passive "as of" only
+  const _POLLED_VENDORS = new Set(["solaredge","alsoenergy"]);  // server-polled → passive "as of" only
   const REFRESH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
 
   function _friendlySyncFail(reason, vlabel){
@@ -4099,7 +4101,12 @@
   // module-level SO_CAPTURE_FAILED listener below needs this to avoid writing an
   // unrelated vendor's error into whatever modal happens to be open (see below).
   let _ovUtilityOnly = false;
-  const _INVERTER_VENDORS = ["solaredge","fronius","sma","chint"];
+  // Default inverter chips shown in Add-array (keys + one-click). AlsoEnergy is
+  // API-login (opens credential form), not extension portal scrape.
+  const _INVERTER_VENDORS = ["solaredge","alsoenergy","fronius","sma","chint"];
+  // API-credential vendors: "Log in" opens the keys form for that brand instead
+  // of a browser portal tab (no extension scrape path).
+  const _API_KEY_VENDORS = new Set(["solaredge","alsoenergy","locus"]);
   function ensureOv(){
     if(_ov) return _ov;
     _ov = document.createElement("div");
@@ -4153,7 +4160,12 @@
         // clean row-card with a brand badge + chevron. The repetitive "utility
         // meter" copy now lives once in the section subtitle, not on every row.
         const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", alsoenergy:"AE", gmp:"GMP", vec:"VEC", wec:"WEC", eversource:"EV", cmp:"CM" };
-        const SUBS  = {};   // (Chint used to need a per-site note; it auto-walks every site now)
+        const SUBS  = {
+          alsoenergy: "1 PowerTrack login · every site",
+          solaredge: "1 account key · every site",
+          eversource: "CT · MA · NH",
+          cmp: "Maine",
+        };
         const card = code => `
           <button type="button" class="sb-login-btn" data-login="${code}">
             <span class="sb-login-ico ${code}">${esc(ICONS[code] || (BRAND[code]||code).slice(0,2))}</span>
@@ -4168,8 +4180,8 @@
             <div class="sb-login-sec-h">${title}${note ? `<span>${note}</span>` : ""}</div>
             <div class="sb-login-grid">${codes.map(card).join("")}</div>
           </div>`;
-        // Utility meter quick-picks: VT trio + Eversource + CMP; search covers
-        // the other ~470 live utilities (mostly SmartHub co-ops).
+        // Utility meter quick-picks — defaults always visible (incl. newly live
+        // Eversource + CMP). Search covers the other ~470 live utilities.
         const utilFeatured = ["gmp","vec","wec","eversource","cmp"];
         const utilCard = p => `
           <button type="button" class="sb-login-btn" data-login="${esc(p.code)}">
@@ -4190,11 +4202,11 @@
               <div id="sbUtilResults" style="margin-top:.5rem"></div>
             </div>
           </div>`;
-        // AlsoEnergy is API-credential (PowerTrack login), not extension scrape —
-        // it lives under "Enter keys manually" with discover:true, not this list.
+        // Default inverter chips — AlsoEnergy sits next to SolarEdge (1-login API).
+        const invFeatured = ["solaredge","alsoenergy","fronius","sma","chint"];
         const loginSections = utilityOnly
           ? utilSection
-          : section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
+          : section("Inverter monitoring", "", invFeatured) + utilSection;
         // Warm the catalog, then backfill the live utility count into the lede (no
         // hardcoded number — it grows as discovery wires more SmartHub hosts).
         getProviders().then(() => {
@@ -4243,7 +4255,18 @@
         foot.innerHTML = `<button class="sb-mbtn ghost" type="button" id="sbCancel">Close</button>`;
 
         body.querySelectorAll("[data-login]").forEach(b => {
-          b.onclick = () => openPortalLogin(b.dataset.login);
+          b.onclick = () => {
+            const code = b.dataset.login;
+            // API-credential vendors: jump straight to the keys form for that brand
+            // (AlsoEnergy / SolarEdge / Locus) instead of a portal tab with no capture.
+            if(_API_KEY_VENDORS.has(code)){
+              manual = true;
+              vendor = code;
+              renderAddModalBody();
+              return;
+            }
+            openPortalLogin(code);
+          };
         });
         // Live utility search → render matching co-ops as the SAME login cards.
         const utilSearch = body.querySelector("#sbUtilSearch");
@@ -4297,13 +4320,15 @@
         // ── Manual key-entry view (buried behind the button) ──
         body.innerHTML = `
           <button type="button" class="sb-linkbtn sb-back" id="sbBackToLogin">← Back to one-click login</button>
-          <p class="sb-modal-lede">Paste your monitoring credentials. SolarEdge unlocks every site on your account with one key; Locus, Fronius and SMA connect per array.</p>
+          <p class="sb-modal-lede">Paste your monitoring credentials. SolarEdge and AlsoEnergy unlock every site on the account with one login; Fronius is one API key for the whole fleet; Locus / SMA can connect per array.</p>
           <div class="sb-vendgrid" id="sbVendGrid"></div>
           <div id="sbVendFields"></div>`;
         foot.innerHTML = `
           <button class="sb-mbtn ghost" type="button" id="sbCancel">Cancel</button>
           <button class="sb-mbtn primary" type="button" id="sbConnect" disabled>Connect</button>`;
         body.querySelector("#sbBackToLogin").onclick = () => { manual = false; renderAddModalBody(); };
+        // Pre-select vendor when opened via an AlsoEnergy / SolarEdge chip.
+        if(vendor && vendorByCode(vendor)){ /* keep */ } else { vendor = "solaredge"; }
         wireManualFlow();
         foot.querySelector("#sbConnect").onclick = submitConnect;
       }
@@ -4960,6 +4985,8 @@
   // fixed list. Utility portals are DYNAMIC — we support GMP + ~1,600 SmartHub
   // co-ops/munis (GET /v1/providers), and the extension vault accepts any of
   // them (and multiple logins per utility). See renderUtilityPortals below.
+  // Extension-vault / cloud-harvester password portals (browser login). AlsoEnergy
+  // + SolarEdge use their own API cards below — not these scrape rows.
   const AR_INVERTERS = [
     { id: "fronius", label: "Fronius (Solar.web)", ph: "Solar.web username / email" },
     { id: "sma", label: "SMA (Sunny Portal)", ph: "Sunny Portal username / email" },
@@ -5715,12 +5742,39 @@
       <div class="ar-se-stat ar-cloud-stat" aria-live="polite"></div>
     </div>`;
 
+    // AlsoEnergy PowerTrack — username+password API (not extension vault). Same
+    // home as SolarEdge so it's "right there" with the other inverter sources.
+    const alsoEnergyCardHTML = () => {
+      let nAe = 0;
+      try {
+        nAe = (window.FleetStore && FleetStore.snapshot().arrays || [])
+          .filter(a => (a.vendor || a.source_vendor) === "alsoenergy").length;
+      } catch (e) {}
+      const stat = nAe
+        ? `<div class="ar-cloud-stat" style="color:var(--good,#0a7d4f)">${nAe} array${nAe===1?"":"s"} connected via PowerTrack</div>`
+        : `<div class="ar-cloud-stat" style="color:var(--faint)">One PowerTrack login attaches every site on the account.</div>`;
+      return `<div class="ar-util" data-code="alsoenergy">
+      <div class="ar-util-name">AlsoEnergy (PowerTrack)</div>
+      ${stat}
+      <div class="ar-fields ar-ae-add">
+        <input class="ar-ae-user" type="email" autocomplete="username" placeholder="PowerTrack username (email)">
+        <input class="ar-ae-pass" type="password" autocomplete="current-password" placeholder="PowerTrack password">
+        <div class="ar-actions">
+          <button class="acct-btn primary ar-ae-save" type="button">Connect all sites</button>
+        </div>
+      </div>
+      <div class="ar-ae-stat ar-cloud-stat" aria-live="polite"></div>
+    </div>`;
+    };
+
     listEl.innerHTML = `
       <div class="ar-card ar-card-live">${buildLiveBoardHTML(status, mode, catalog)}</div>
       ${mode === "cloud" ? `<div class="ar-card ar-card-consent">${_arConsentHTML()}${_arCloudWarnHTML()}</div>` : ""}
       <div class="ar-card ar-card-group">
         <div class="ar-group">
           <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
+          ${alsoEnergyCardHTML()}
+          ${solarEdgeCardHTML()}
           ${mode === "cloud"
             ? AR_INVERTERS.map(invCard).join("")
             : AR_INVERTERS.map(v => {
@@ -5729,7 +5783,6 @@
                 // username so a login saved in the extension popup reads as present.
                 return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
               }).join("")}
-          ${solarEdgeCardHTML()}
         </div>
       </div>
       <div class="ar-card ar-card-group">
@@ -5794,6 +5847,49 @@
         } catch (e) {
           if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat err"; seStat.textContent = "Network error. Try again."; }
           seSave.disabled = false; seSave.textContent = seLabel;
+        }
+      });
+    }
+    // ── AlsoEnergy PowerTrack: username+password → connect-account (all sites)
+    const aeSave = listEl.querySelector(".ar-ae-save");
+    if (aeSave) {
+      const aeUser = listEl.querySelector(".ar-ae-user");
+      const aePass = listEl.querySelector(".ar-ae-pass");
+      const aeStat = listEl.querySelector(".ar-ae-stat");
+      const aeLabel = aeSave.textContent;
+      aeSave.addEventListener("click", async () => {
+        const username = (aeUser && aeUser.value || "").trim();
+        const password = (aePass && aePass.value) || "";
+        if (!username || !password) {
+          aeSave.textContent = "Enter login";
+          setTimeout(() => aeSave.textContent = aeLabel, 1500);
+          return;
+        }
+        aeSave.disabled = true; aeSave.textContent = "Connecting…";
+        if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat"; aeStat.textContent = ""; }
+        try {
+          const r = await fetch("/v1/array-owners/alsoenergy/connect-account", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ username, password }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.ok) {
+            if (aePass) aePass.value = "";
+            if (aeStat) {
+              aeStat.className = "ar-ae-stat ar-cloud-stat ok";
+              aeStat.textContent = d.message || "Connected.";
+            }
+            try { if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch(); } catch (e) {}
+            setTimeout(() => { wireAutoRefreshRow(); }, 900);
+          } else {
+            const msg = (d && d.detail) ? d.detail : ("Couldn't connect (HTTP " + r.status + ").");
+            if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat err"; aeStat.textContent = msg; }
+            aeSave.disabled = false; aeSave.textContent = aeLabel;
+          }
+        } catch (e) {
+          if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat err"; aeStat.textContent = "Network error. Try again."; }
+          aeSave.disabled = false; aeSave.textContent = aeLabel;
         }
       });
     }

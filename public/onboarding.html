@@ -371,6 +371,13 @@ const VENDORS = [
     fields:[{name:"apiKey", label:"SolarEdge account API key", secret:true,
              hint:"The one key that unlocks every site on your account.",
              ph:"ABCD1234…", help:`Find it in your SolarEdge monitoring portal under <b>Admin → Site Access → API Access</b> (an <i>account</i>-level key, read-only). Don't have it handy? <a href="https://monitoring.solaredge.com" target="_blank" rel="noopener">Open the SolarEdge portal →</a>`}] },
+  { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack · 1 login", available:true, discover:true,
+    note:"One AlsoEnergy / PowerTrack login attaches every site on the account — same username & password you use at hmi.alsoenergy.com. Leave Site ID blank to connect them all.",
+    fields:[
+      {name:"username", label:"AlsoEnergy username (email)"},
+      {name:"password", label:"AlsoEnergy password", secret:true},
+      {name:"site_id", label:"Site ID (optional — leave blank for every site)", optional:true, hint:"Only if you want one site."},
+    ] },
   { code:"enphase", label:"Enphase", meta:"Enlighten", available:false, discover:false,
     note:"Enphase connects through the Enlighten developer API — paste your Enphase app key + client ID/secret and your System ID. We're in final verification against live Enphase accounts, and a one-click owner sign-in is on the way.",
     fields:[
@@ -402,13 +409,6 @@ const VENDORS = [
       {name:"username", label:"SolarNOC username"},
       {name:"password", label:"SolarNOC password", secret:true},
       {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
-    ] },
-  { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack · 1 login", available:true, discover:true,
-    note:"One AlsoEnergy / PowerTrack login attaches every site on the account — same username & password you use at hmi.alsoenergy.com. Leave Site ID blank to connect them all.",
-    fields:[
-      {name:"username", label:"AlsoEnergy username (email)"},
-      {name:"password", label:"AlsoEnergy password", secret:true},
-      {name:"site_id", label:"Site ID (optional — leave blank for every site)", optional:true, hint:"Only if you want one site."},
     ] },
   { code:"fronius", label:"Fronius", meta:"One account key", available:true, discover:false,
     note:"Paste your Solar.web REST API keys (Solar.web → Settings → REST API → CREATE NEW KEY) and we'll list every PV system on your account at once — same one-key connect as SolarEdge. US accounts: Fronius enables API access on request; the Query API is a paid Fronius service.",
@@ -1170,11 +1170,13 @@ async function wireCloudVault(){
     return `<div class="cv-portal" data-code="${esc(code)}"><div class="cv-portal-name">${esc(name)}</div>${saved}${add}</div>`;
   };
 
-  // Which utilities to show: GMP (common default) + any with a saved login + any
-  // the operator just picked from the catalog.
+  // Defaults always visible: GMP + Eversource + CMP (newly live), then any
+  // saved logins + anything just picked from the catalog.
   const shownCodes = [];
   const pushCode = (c) => { if(c && shownCodes.indexOf(c)===-1) shownCodes.push(c); };
   pushCode("gmp");
+  pushCode("eversource");
+  pushCode("cmp");
   Object.keys(byCode).filter(c => byCode[c].some(l=>l.utility)).sort().forEach(pushCode);
   (_cloudAddedUtils||[]).forEach(pushCode);
 
