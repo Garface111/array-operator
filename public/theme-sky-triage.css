@@ -1,0 +1,423 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY THEME — TRIAGE DEEP PASS                                   (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   Per-view deep pass over three surfaces, extending theme-sky.css (whose
+   tokens — --sky-*, the re-pointed --good/--line/--card families — are the
+   only vocabulary used here; nothing new is invented):
+
+     1 · Fleet Triage tab (#panelDashboard): .dash-* header, #fleetCommander
+         .fcg KPI tiles, #ccQueue triage queue + the shared .cc-* vocabulary
+         (which also styles the Arrays-tab #commandCenter instance).
+     2 · Inverters tab SPREADSHEET sub-view (#sheetWrap / #vendorSheet): the
+         .vs-* vendor-grouped table, gauges, freshness chips, .vs-seg toggle.
+     3 · Sandbox leftovers the foundation skipped: overview strip tiles
+         (.sb-tile grid), the inverter detail-modal INTERIOR (big card, chips,
+         stats, $-lost banner, origin links), context menus, toast states.
+
+   SPECIFICITY NOTE: theme-day.css saturates these surfaces with !important —
+   generic rules at (0,2,*) and the DIVINE DASHBOARD block at (1,2,*) under
+   #panelDashboard. html.sky mirrors [data-theme=day] exactly and this file
+   loads later, so MIRRORING each selector shape (adding #panelDashboard where
+   theme-day does) wins every war by source order. Where theme-day keeps a
+   semantic variant (warn/bad ramps), the base rule here is scoped so the
+   variant's higher specificity still wins — status meaning is never re-mapped.
+
+   PERF: zero backdrop-filter on any repeated row/card/tile. Blur appears ONLY
+   on the two singular modal sheets (.vs-dc-modal, and the .sb-dc backdrop tint
+   which already blurred in the base sheet). Everything else is the solid glass
+   tier: translucent white fill + 1px white inner edge + soft blue shadow.
+
+   PRESERVED SEMANTICS: healthy blue / live-green working / watch amber /
+   critical red / octarine machine-computed; '~' + 'est.' markers; the
+   two-state health rule; severity left-rails; verdict pill colors. This file
+   restyles chrome and re-points EMERALD-ERA leaks (night-palette greens that
+   meant "accent", never "live state") to sky blue — it never touches meaning.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ 1 · FLEET TRIAGE TAB (#panelDashboard) ═══════════════════════════════ */
+
+/* — header: gradient-clipped title re-graded into the sky ink ramp — */
+html.sky #panelDashboard .dash-head h2{
+  font-weight:800 !important; letter-spacing:-.03em !important;
+  background:linear-gradient(165deg,#0E1420 20%,#2B5D96) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important;
+}
+/* production stat-pills become floating glass pills */
+html.sky #panelDashboard .dash-prod .dp{
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  box-shadow:0 2px 12px rgba(20,60,120,.08) !important;
+}
+html.sky #panelDashboard .dash-prod .dp-skel{
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+}
+html.sky #panelDashboard .dash-prod .dp-skel-bar{
+  background:linear-gradient(90deg, rgba(20,60,120,.08) 25%, rgba(20,60,120,.16) 37%, rgba(20,60,120,.08) 63%) !important;
+  background-size:280% 100% !important;
+}
+
+/* — KPI tile grid: solid-tier glass (beats DIVINE DASHBOARD's opaque white) — */
+html.sky #panelDashboard .fcg-tile{
+  background:rgba(255,255,255,.8) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card), inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+/* lead health tile: sky wash + %, gradient-clipped in the sky-primary ramp.
+   The .warn/.bad variants keep theme-day's amber/red (their selectors carry an
+   extra class, out-specifying these base rules — semantics preserved). */
+html.sky #panelDashboard .fcg-tile--health{
+  border-color:rgba(255,255,255,.85) !important;
+  background:linear-gradient(135deg,rgba(33,150,243,.12),rgba(86,180,240,.04) 55%,transparent) rgba(255,255,255,.8) !important;
+}
+html.sky #panelDashboard .fcg-tile--health .fcg-v b{
+  background:linear-gradient(160deg,#1876D3,#43ABF3) !important;
+  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important;
+}
+/* health meter: blue-tinted glass track; ok fill = the sky gradient itself.
+   (--ok only — theme-day's --warn/--bad fills keep their amber/red.) */
+html.sky #panelDashboard .fcg-meter{ background:rgba(20,60,120,.10) !important; }
+html.sky #panelDashboard .fcg-fill--ok{ background:linear-gradient(90deg,var(--sky-primary),var(--sky-mid)) !important; }
+/* alerts button: glass ghost pill */
+html.sky #panelDashboard .fc-alerts-btn{
+  background:rgba(255,255,255,.7) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.07) !important;
+  color:var(--muted) !important;
+}
+html.sky #panelDashboard .fc-alerts-btn:hover{
+  background:rgba(255,255,255,.95) !important;
+  border-color:rgba(33,150,243,.45) !important;
+  color:var(--sky-primary-deep) !important;
+}
+
+/* — toolbar: search + severity chips on glass — */
+html.sky #panelDashboard .cc-search input{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:none !important;
+}
+html.sky #panelDashboard .cc-chips{
+  background:rgba(255,255,255,.6) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  padding:4px !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.06) !important;
+}
+html.sky #panelDashboard .cc-chip{ border-radius:var(--sky-r-pill) !important; }
+html.sky #panelDashboard .cc-chip.on{
+  background:var(--sky-primary) !important; color:#fff !important;
+  box-shadow:0 2px 10px -2px rgba(33,150,243,.6) !important;
+}
+html.sky .cc-sel{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+}
+
+/* — the queue table: one crisp near-white sheet, airy rows, blue-tinted
+     hairlines (the sky world's rgba-ink hairline, per the brief) — */
+html.sky #panelDashboard .cc-tablewrap{
+  background:rgba(255,255,255,.82) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky #panelDashboard .cc-table thead th{
+  background:rgba(233,243,253,.75) !important;
+  border-bottom:1px solid rgba(14,20,32,.08) !important;
+}
+html.sky #panelDashboard .cc-table td{ border-bottom:1px solid rgba(14,20,32,.07) !important; }
+html.sky #panelDashboard .cc-table tbody tr.row:hover{ background:rgba(33,150,243,.05) !important; }
+html.sky #panelDashboard .cc-table tbody tr.row.sel{ background:rgba(33,150,243,.08) !important; }
+/* the same vocabulary on the Arrays-tab command center (no #panelDashboard) */
+html.sky .cc-tablewrap{
+  background:rgba(255,255,255,.82) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+}
+html.sky .cc-table thead th{
+  background:rgba(233,243,253,.75) !important;
+  border-bottom:1px solid rgba(14,20,32,.08) !important;
+}
+html.sky .cc-table tbody tr.row{ border-bottom:1px solid rgba(14,20,32,.07) !important; }
+html.sky .cc-table tbody tr.row:hover{ background:rgba(33,150,243,.05) !important; }
+html.sky .cc-table tbody tr.row.sel{ background:rgba(33,150,243,.08) !important; }
+html.sky .cc-search input{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+}
+html.sky .cc-chips{
+  background:rgba(255,255,255,.6) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+}
+html.sky .cc-chip{ border-radius:var(--sky-r-pill); }
+html.sky .cc-chip.on{
+  background:var(--sky-primary) !important; color:#fff !important;
+  box-shadow:0 2px 10px -2px rgba(33,150,243,.6);
+}
+html.sky .cc-chip.on .n{ color:rgba(255,255,255,.85) !important; }
+
+/* — expand drawer: azure inner sheet; evidence tiles as small glass cards;
+     the recommendation box loses its emerald-era tint (accent → sky) — */
+html.sky .cc-drawer .inner{ background:rgba(233,243,253,.6) !important; }
+html.sky .cc-evidence .e{
+  background:rgba(255,255,255,.75) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:12px;
+  box-shadow:0 1px 6px rgba(20,60,120,.06);
+}
+html.sky .cc-rec{ background:rgba(33,150,243,.07); border-left-color:var(--sky-primary); }
+
+/* — collapsible triage bar ("Show N flagged"): emerald-era hover → sky — */
+html.sky .cc-collapsible:hover{
+  background:rgba(255,255,255,.95) !important;
+  border-color:rgba(33,150,243,.45) !important;
+  box-shadow:0 10px 28px -14px rgba(20,60,120,.35) !important;
+}
+html.sky .cc-collapsible:hover h3{ color:var(--sky-primary-deep); }
+html.sky .cc-collapsible .cc-chevron{ background:rgba(33,150,243,.14); color:var(--sky-primary-deep); }
+html.sky .cc-collapsible:hover .cc-chevron{ background:rgba(33,150,243,.26); }
+html.sky .cc-collapsible .cc-collapse-hint{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary) !important;
+  color:#fff !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 18px -6px rgba(33,150,243,.55) !important;
+}
+
+/* — modeled-production target card interior (.ft-card is glassed by the
+     foundation; refine the track to the blue-tinted glass groove) — */
+html.sky .ft-track{ background:rgba(20,60,120,.10); }
+/* .ft-fill.ok / .ft-verdict.ok already follow the re-pointed --good tokens;
+   .warn stays amber — untouched. */
+
+/* ═══ 2 · SPREADSHEET SUB-VIEW (#sheetWrap / #vendorSheet) ═════════════════ */
+
+/* the Sandbox|Spreadsheet segmented toggle floats directly on the sky:
+   a glass pill track, sky-primary active segment (mirrors the tab bar) */
+html.sky .vs-seg{
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  padding:4px !important;
+  box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
+}
+html.sky .vs-seg-btn{ border-radius:var(--sky-r-pill) !important; padding:7px 18px; }
+html.sky .vs-seg-btn.on{
+  background:var(--sky-primary) !important; color:#fff !important;
+  box-shadow:0 3px 12px -3px rgba(33,150,243,.6) !important;
+}
+html.sky .vs-seg-btn:not(.on){ background:transparent !important; color:#33415A !important; opacity:.9; }
+html.sky .vs-seg-btn:not(.on):hover,
+html.sky .vs-seg-btn:not(.on):focus-visible{ background:rgba(255,255,255,.75) !important; color:var(--ink) !important; opacity:1; }
+
+/* the table container: near-white sheet on the blurred #sheetWrap glass —
+   data stays crisp, rows go transparent so the sheet reads as ONE material */
+html.sky #sheetWrap{ --gg-track:rgba(20,60,120,.14); }
+html.sky .vs-scroll{
+  background:rgba(255,255,255,.82) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+/* generous row height (brief: tables breathe) + ink hairlines */
+html.sky .vs-row{ padding:13px 16px; }
+html.sky .vs-colhead{
+  background:#F0F7FE !important;             /* sticky → must be opaque */
+  border-bottom:1px solid rgba(14,20,32,.09) !important;
+}
+html.sky .vs-arr{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.07); }
+html.sky .vs-arr:hover{ background:rgba(33,150,243,.05) !important; }
+html.sky .vs-arr.open{ background:rgba(33,150,243,.08) !important; }
+html.sky .vs-inv-wrap{ background:transparent !important; border-bottom:1px solid rgba(14,20,32,.07); }
+html.sky .vs-inv{ border-top:1px solid rgba(14,20,32,.06) !important; }
+html.sky .vs-inv:hover{ background:rgba(33,150,243,.04) !important; }
+/* vendor band + group spine keep their per-vendor hue (--vc, semantic);
+   only the mixing base follows the glass (color-mix against white reads fine) */
+html.sky .vs-vnote{ background:rgba(233,243,253,.65) !important; }
+
+/* freshness / lag chips: sky-blue pill (was hardcoded 2563eb-era blue) */
+html.sky .vs-vlag{
+  color:var(--sky-primary-deep); background:rgba(33,150,243,.10);
+  border-color:rgba(33,150,243,.32);
+}
+html.sky .vs-vlag:hover{ background:rgba(33,150,243,.18); border-color:var(--sky-primary); color:var(--sky-primary-deep); }
+html.sky .vs-vlag.vs-refreshing{ background:rgba(33,150,243,.14); border-color:var(--sky-primary); }
+/* .vs-vlag-done (green) / .vs-vlag-err (red) untouched — live-state colors */
+
+/* toolbar buttons: primary → sky action blue; sync-all keeps its GO-green
+   (live-green family) but adopts the sky shape; ghost → glass pill */
+html.sky .vs-addbtn{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary) !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 18px -6px rgba(33,150,243,.55) !important;
+}
+html.sky .vs-syncall{
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 18px -6px rgba(5,150,105,.45) !important;
+}
+html.sky .vs-closetabs{
+  background:rgba(255,255,255,.7) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.07);
+}
+html.sky .vs-closetabs:hover{ background:#fef2f2 !important; border-color:#fca5a5 !important; }
+html.sky .vs-search{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+}
+html.sky .vs-search:focus{
+  border-color:var(--sky-primary) !important;
+  box-shadow:0 0 0 3px rgba(33,150,243,.18) !important;
+}
+/* expand-all pill + inline-edit affordance: 2563eb-era tints → sky */
+html.sky .vs-expandall{
+  color:var(--sky-primary-deep); background:rgba(33,150,243,.10);
+  border-color:rgba(33,150,243,.28);
+}
+html.sky .vs-expandall:hover{ background:rgba(33,150,243,.16); }
+html.sky .vs-editable:hover{
+  outline-color:rgba(33,150,243,.35);
+  text-decoration-color:rgba(33,150,243,.5);
+}
+html.sky .vs-editable.vs-editing{ outline-color:var(--sky-primary); background:rgba(33,150,243,.08); }
+html.sky .vs-inv-details:hover{ background:rgba(33,150,243,.08); border-color:rgba(33,150,243,.4); }
+html.sky .vs-inv-detail{ background:rgba(33,150,243,.05) !important; }
+
+/* full-screen inverter detail (14-day chart): deep-sky scrim + one frosted
+   modal sheet (singular → blur budget OK) */
+html.sky .vs-dc-ov{ background:rgba(13,44,86,.38) !important; }
+html.sky .vs-dc-modal{
+  background:rgba(255,255,255,.86) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--sky-glass-edge) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+html.sky .vs-dc-x{
+  background:rgba(255,255,255,.8); border:1px solid rgba(255,255,255,.9);
+  border-radius:var(--sky-r-pill); box-shadow:0 2px 10px rgba(20,60,120,.08);
+}
+html.sky .vs-dc-diag{ background:rgba(233,243,253,.7); border-color:rgba(20,60,120,.12); }
+/* .vs-dc-diag.warn amber + chart bar/status colors untouched — semantic */
+
+/* ═══ 3 · SANDBOX LEFTOVERS ════════════════════════════════════════════════ */
+
+/* — overview strip tiles (.sb-tile grid): solid-tier glass cards. The left
+     status rail, dot, and flag colors ride the re-pointed tokens (healthy
+     blue / watch amber / critical red) — geometry + material only here. — */
+html.sky .sb-tile{
+  background:rgba(255,255,255,.8) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:16px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .sb-tile:hover{ box-shadow:0 12px 28px -12px rgba(20,60,120,.3) !important; }
+html.sky .sb-tile.ok{ border-color:rgba(255,255,255,.85) !important; }
+html.sky .sb-tile.ok:hover{ border-color:rgba(33,150,243,.45) !important; }
+/* warn/bad: theme-day's tonal amber/red washes, made glassy (state preserved) */
+html.sky .sb-tile.warn{
+  background:linear-gradient(168deg, rgba(255,251,235,.92), rgba(254,243,199,.8)) !important;
+  border-color:rgba(217,119,6,.32) !important;
+}
+html.sky .sb-tile.bad{
+  background:linear-gradient(168deg, rgba(254,242,242,.92), rgba(254,226,226,.8)) !important;
+  border-color:rgba(220,38,38,.32) !important;
+}
+html.sky .sb-tile-dot.ok{ box-shadow:0 0 8px rgba(33,150,243,.5) !important; }
+html.sky .sb-tile-flag.ok{ background:rgba(33,150,243,.10) !important; }
+
+/* — .sb-head extras the foundation's ghost sweep missed —
+     full-screen mode must shed the sheet's rounded glass frame (the foundation
+     radius would clip the fixed-inset board), and the CSS-overlay full-screen
+     needs an opaque ground so the sky doesn't bleed through the data. */
+html.sky #sbWrap.sb-fs{ border-radius:0 !important; border:0 !important; background:#EAF4FD !important; }
+html.sky .sb-showall[hidden]{ display:none !important; }  /* [hidden] vs author display war — codebase idiom */
+
+/* — inverter detail modal INTERIOR (click-to-zoom big card) — */
+html.sky .sb-dc-backdrop{ background:rgba(13,44,86,.44) !important; }
+html.sky .sb-dc-bigcard .sb-inv{
+  background:rgba(255,255,255,.92) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+/* tonal big-card variants stay amber/red, re-cut as light washes */
+html.sky .sb-dc-bigcard .sb-inv[data-tone="warn"]{ background:linear-gradient(168deg,#fffbeb,#fef3c7) !important; }
+html.sky .sb-dc-bigcard .sb-inv[data-tone="bad"]{ background:linear-gradient(168deg,#fef2f2,#fee2e2) !important; }
+/* the round ✕ close chip */
+html.sky .sb-dc-modal .sb-dc-x{
+  background:rgba(255,255,255,.9) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  color:var(--ink) !important;
+  box-shadow:0 4px 14px rgba(20,60,120,.2) !important;
+}
+html.sky .sb-dc-modal .sb-dc-x:hover{ color:var(--sky-primary-deep) !important; border-color:rgba(33,150,243,.5) !important; }
+/* status pill: the ok variant carried a night-emerald border while its ink
+   follows --good (now blue) — reunite the ok pill with the healthy-blue family.
+   warn/bad pills keep their amber/red tints exactly. */
+html.sky .sb-dc-pill.ok{
+  color:var(--sky-primary-deep); border-color:rgba(33,150,243,.45); background:rgba(33,150,243,.08);
+}
+/* $-lost banner: red is semantic — material only (light wash on glass) */
+html.sky .sb-dc-lost{ background:rgba(254,242,242,.85); }
+/* hero "$ lost" stat tile: light red wash instead of the night gradient */
+html.sky .sb-dc-stat.hero{
+  background:linear-gradient(165deg, rgba(254,242,242,.95), rgba(255,255,255,.92)) !important;
+  border-color:rgba(220,38,38,.3) !important;
+}
+/* origin / portal deep-links: emerald-era hover → sky */
+html.sky .sb-dc-actions .sb-dc-origin{
+  background:rgba(255,255,255,.85);
+  border:1px solid rgba(20,60,120,.16);
+  border-radius:var(--sky-r-btn);
+}
+html.sky .sb-dc-actions .sb-dc-origin:hover{ border-color:rgba(33,150,243,.5) !important; color:var(--sky-primary-deep) !important; }
+html.sky .sb-dc-origin:hover{ color:var(--sky-primary-deep); }
+/* dragging the small detail card: focus ring → sky */
+html.sky .sb-detail-host.sb-dragging .sb-detail-card{
+  box-shadow:0 24px 60px -20px rgba(20,60,120,.4), 0 0 0 1px rgba(33,150,243,.4) !important;
+}
+
+/* — context menus: opaque like the foundation's .sb-card-menu (menus must be
+     instantly legible; no translucency games over a busy canvas) — */
+html.sky .sb-ctxmenu{
+  background:#ffffff !important;
+  border:1px solid var(--line) !important;
+  border-radius:14px !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+/* its danger items stay red (delete affordance) — hover tint untouched */
+html.sky .sb-card-menu button:hover{ background:rgba(33,150,243,.08) !important; color:var(--sky-primary-deep) !important; }
+
+/* — toast states: the foundation's glass sheet flattened the ok/err/alert
+     border tints with its white edge — restore them (green=success is the
+     live-green family; red=error). Alert gets the light red wash. — */
+html.sky .sb-toast.ok{ border-color:rgba(22,163,74,.5) !important; }
+html.sky .sb-toast.err{ border-color:rgba(220,38,38,.5) !important; }
+html.sky .sb-toast.alert{
+  background:linear-gradient(165deg, rgba(255,255,255,.9), rgba(254,242,242,.9)) !important;
+  border-color:rgba(220,38,38,.45) !important;
+}
+
+/* ═══ 4 · SQUIRCLE — same progressive enhancement as the foundation ════════ */
+@supports (corner-shape: squircle){
+  html.sky .cc-tablewrap,
+  html.sky .vs-scroll,
+  html.sky .vs-seg,
+  html.sky .vs-dc-modal,
+  html.sky .sb-tile,
+  html.sky .dash-prod .dp,
+  html.sky .cc-chips{
+    corner-shape:squircle;
+  }
+}

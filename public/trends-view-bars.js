@@ -30,6 +30,13 @@
     return `rgba(${parseInt(h.substr(0,2),16)},${parseInt(h.substr(2,2),16)},${parseInt(h.substr(4,2),16)},${a})`;
   };
   const fmt0 = (C && C.fmt0) || (n => Math.round(n).toLocaleString());
+  // SKY demo flag (2026-07-12): the night-first white-alpha hairlines are
+  // invisible on the sky theme's light canvas — branch the constants only.
+  // Flag off ⇒ the exact rgba strings hexA() produced before.
+  const SKY = document.documentElement.classList.contains("sky");
+  const GRID_LINE    = SKY ? "rgba(14,20,32,.10)"   : hexA("#ffffff", 0.05);
+  const WEEKEND_TINT = SKY ? "rgba(20,60,120,.05)"  : hexA("#ffffff", 0.025);
+  const BASELINE     = SKY ? "rgba(14,20,32,.18)"   : hexA("#ffffff", 0.14);
   const easeOut = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const MONTHS3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -121,7 +128,7 @@
       ctx.font = fAxis + "px system-ui,sans-serif";
       ticks.forEach(tv => {
         const y = bottom - (tv / axMax) * plotH;
-        ctx.strokeStyle = hexA("#ffffff", 0.05); ctx.lineWidth = 1;
+        ctx.strokeStyle = GRID_LINE; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
         ctx.fillStyle = COL.faint;
         ctx.fillText(fmt0(tv), padL - 7, y);
@@ -141,7 +148,7 @@
 
         // weekend tint behind the bar slot
         if (d.dow === 0 || d.dow === 6) {
-          ctx.fillStyle = hexA("#ffffff", 0.025);
+          ctx.fillStyle = WEEKEND_TINT;
           ctx.fillRect(padL + slot * i, top, slot, plotH);
         }
       });
@@ -165,7 +172,7 @@
       });
 
       // baseline
-      ctx.strokeStyle = hexA("#ffffff", 0.14); ctx.lineWidth = 1;
+      ctx.strokeStyle = BASELINE; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(padL, bottom); ctx.lineTo(padL + plotW, bottom); ctx.stroke();
 
       // day labels — thin to fit (every kth so they never collide)

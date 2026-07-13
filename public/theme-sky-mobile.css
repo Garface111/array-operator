@@ -1,0 +1,251 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY THEME — MOBILE DEEP PASS (≤600px, + the 380px squeeze tier)
+   ─────────────────────────────────────────────────────────────────────────────
+   Loads LAST of the sky set (after theme-sky.css + the five per-view
+   fragments), so on a phone this file is the final word. Every rule is
+   scoped under html.sky AND inside a max-width media query — flag off or
+   desktop wide, this file is inert.
+
+   What lives here:
+     · the fixed bottom nav becomes a FLOATING GLASS PILL DOCK (chrome-tier
+       glass, safe-area aware, active tab = solid #2196F3 pill — sky's accent;
+       octarine stays reserved for machine-computed surfaces)
+     · the signed-out hero stacks: headline step-down, full-width CTAs,
+       pricing card as a full-width glass sheet over the photo band, the
+       LIVE-DEMO badge as a rotated sticker
+     · glass sheets go near edge-to-edge (slim sky gutter), radii tighten
+     · MOBILE GPU BUDGET: blur radii ~halved (24→12 chrome/modals, 16→8
+       content sheets); dense lists prefer near-solid white over glass
+     · tables keep their overflow-x scroll (restated at ≥ the specificity of
+       mobile.css's .cc-tablewrap !important war, so a sibling fragment can't
+       accidentally re-clip them)
+     · the sky gradient itself moves off background-attachment:fixed (iOS
+       ignores it / Android repaints per scroll) onto a fixed ::before layer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width:600px){
+
+  /* ── 0 · TOKENS — tighter radius scale on a phone. Everything in the sky
+        vocabulary that consumes these vars follows automatically. ─────────── */
+  html.sky{
+    --sky-r-sheet:24px;
+    --sky-r-card:18px;
+  }
+
+  /* ── 1 · THE SKY, scroll-safe — desktop paints the gradient on body with
+        background-attachment:fixed; iOS Safari ignores fixed-on-body and
+        Android repaints the huge gradient every scroll frame. On a phone the
+        world moves to a composited position:fixed ::before layer instead
+        (painted once, zero scroll cost). body goes transparent so the layer
+        shows through; the html.sky solid --sky-mid stays as the backstop. ── */
+  html.sky body{
+    background:none !important;
+    padding-bottom:calc(78px + env(safe-area-inset-bottom,0px)); /* dock clearance:
+      10px inset + 58px dock + 10px breathing (overrides mobile.css's 58px) */
+  }
+  html.sky body::before{
+    content:"";
+    position:fixed; inset:0; z-index:-1;
+    pointer-events:none;
+    background:
+      radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  }
+
+  /* ── 2 · THE DOCK — the fixed bottom nav becomes a floating glass pill.
+        mobile.css owns position:fixed/z-index/flex; this re-cuts the material
+        + geometry: inset from all edges, capsule radius, chrome glass at
+        HALF blur, riding above the home indicator via the bottom offset
+        (so the bar's own safe-area padding is retired). ─────────────────── */
+  html.sky .tabbar{
+    left:10px; right:10px; top:auto;
+    bottom:calc(10px + env(safe-area-inset-bottom,0px));
+    padding:6px;
+    gap:2px;
+    background:var(--sky-glass-chrome) !important;
+    -webkit-backdrop-filter:blur(12px) saturate(1.5);
+    backdrop-filter:blur(12px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.7) !important;
+    border-radius:999px !important;
+    box-shadow:0 14px 40px -14px rgba(15,50,110,.42), 0 2px 10px rgba(20,60,120,.10) !important;
+  }
+  html.sky .tab.tab-primary{
+    border-radius:999px;
+    color:#3D5170;                       /* slate-blue idle ink — reads on glass over sky */
+    transition:color .16s, background .16s;
+  }
+  /* active tab = SOLID action-blue pill, white icon + label (currentColor) */
+  html.sky .tabbar .tab.tab-primary.active{
+    background:var(--sky-primary) !important;
+    color:#ffffff !important;
+    box-shadow:0 4px 14px -4px rgba(33,150,243,.65);
+  }
+  html.sky .tabbar .tab.tab-primary.active .tab-ic::after{display:none} /* retire the
+      octarine indicator bar — the pill IS the active state in sky */
+  /* More button: open / hidden-tab-active states go blue-tint, not octarine */
+  html.sky .tabbar .tab.tab-more.on,
+  html.sky .tabbar .tab.tab-more.has-active{
+    background:rgba(33,150,243,.14) !important;
+    color:var(--sky-primary-deep) !important;
+  }
+
+  /* the More sheet floats just above the dock, same glass family */
+  html.sky .mob-more{
+    left:10px; right:10px;
+    bottom:calc(80px + env(safe-area-inset-bottom,0px));
+    background:rgba(255,255,255,.9) !important;
+    -webkit-backdrop-filter:blur(12px) saturate(1.4);
+    backdrop-filter:blur(12px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.9) !important;
+    border-radius:22px;
+    box-shadow:var(--sky-shadow-float);
+  }
+  html.sky .mob-more-item{border-radius:14px}
+  html.sky .mob-more-item:active{background:rgba(33,150,243,.10)}
+  html.sky .mob-more-ic{color:var(--sky-primary)}
+  html.sky .mob-more-backdrop{background:rgba(13,44,86,.32)}
+  /* the floating suggestion pill + alerts FAB sit at z 9000+ and cover the open
+     More sheet's rows — duck them while the sheet is up (self-critique R1) */
+  html.sky body:has(.mob-more:not([hidden])) #fsWrap,
+  html.sky body:has(.mob-more:not([hidden])) .ao-al-fab{
+    opacity:0; pointer-events:none; transition:opacity .15s;
+  }
+
+  /* floating widgets clear the floating dock (mobile.css pins them with
+     !important at 70/72/124px over the old full-width bar — re-derive) */
+  html.sky #fsWrap{bottom:calc(82px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .ao-al-fab{bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .ao-al-panel{bottom:calc(138px + env(safe-area-inset-bottom,0px)) !important}
+
+  /* ── 3 · NEAR-EDGE SHEETS — a slim sky gutter instead of desktop margins ── */
+  html.sky .wrap{padding:0 8px}
+  html.sky #sbWrap{padding:12px 10px 14px; border-radius:var(--sky-r-sheet) !important}
+  html.sky #panelDashboard .dash-wrap{padding:18px 12px 40px !important; margin-top:10px !important}
+  html.sky #sheetWrap{padding:14px 10px 32px; margin-top:10px}
+
+  /* content-glass tier on a phone: HALF blur, a touch more opaque for data */
+  html.sky #sbWrap,
+  html.sky #panelDashboard .dash-wrap{
+    background:rgba(255,255,255,.82) !important;
+    -webkit-backdrop-filter:blur(8px);
+    backdrop-filter:blur(8px);
+  }
+  /* dense data surfaces prefer near-solid white over glass (GPU + legibility):
+     the vendor spreadsheet + the Master Account list drop blur entirely */
+  html.sky #sheetWrap{
+    background:rgba(255,255,255,.88) !important;
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+  /* the vendor spreadsheet's 8-col rows (min ~660px) scroll inside .vs-scroll
+     (its overflow-y:auto computes overflow-x:auto) — keep that contract and
+     give it momentum scrolling; never clip it */
+  html.sky .vs-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  html.sky .acct-list{
+    background:rgba(255,255,255,.92) !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+  }
+
+  /* the four bare view roots (their sky fragments are desktop lanes) each get
+     a near-solid sheet on a phone so dense content never sits raw on the sky.
+     No blur — these are tall scrolling stacks. */
+  html.sky #reportsRoot,
+  html.sky #analysisRoot,
+  html.sky #trendsRoot,
+  html.sky #rsHost{
+    background:rgba(255,255,255,.86);
+    border:1px solid rgba(255,255,255,.85);
+    border-radius:var(--sky-r-sheet);
+    box-shadow:var(--sky-shadow-sheet);
+    padding:12px 10px;
+    margin-top:10px;
+  }
+
+  /* ── 4 · HERO — the stacked composition ──────────────────────────────────
+        headline step-down · full-width CTA pair · pricing card = full-width
+        glass sheet riding the photo band · sticker pill on its own line ── */
+  html.sky .demo-banner{margin:12px 0 8px; border-radius:22px}
+  html.sky .hero{padding:28px 18px 112px; gap:16px}
+  html.sky .hero .db-badge{font-size:9.5px; letter-spacing:.12em; padding:5px 11px}
+  html.sky .hero .hero-h1{font-size:27px; line-height:1.1}
+  html.sky .hero .hero-sub{font-size:13.5px}
+  html.sky .hero .hero-ctas{gap:10px; margin-top:16px}
+  html.sky .hero .hero-ctas .db-cta{flex:1 1 100%; text-align:center; padding:13px 18px}
+  /* on the stacked hero the ghost pill + trust line land on the photo's CLOUD
+     band — white-on-translucent-white washes out there. Deepen the pill to
+     sky-glass and harden the trust line's ink + shadow (self-critique R1). */
+  html.sky .hero .db-signin{
+    flex:1 1 100%; text-align:center;
+    background:rgba(11,42,82,.28);
+    border-color:rgba(255,255,255,.6);
+  }
+  html.sky .hero .db-signin:hover{background:rgba(11,42,82,.38)}
+  html.sky .hero .hero-trust{
+    font-size:11px;
+    color:rgba(255,255,255,.96);
+    text-shadow:0 1px 3px rgba(8,44,90,.6), 0 2px 18px rgba(8,44,90,.55);
+  }
+  html.sky .hero .hero-price{
+    flex:1 1 100%;
+    padding:18px;
+    border-radius:var(--sky-r-card) !important;
+    background:rgba(255,255,255,.84) !important;
+    -webkit-backdrop-filter:blur(8px);
+    backdrop-filter:blur(8px);
+  }
+  html.sky .hero .hp-num{font-size:32px}
+  html.sky .db-demostrip{
+    flex-direction:column; align-items:flex-start; gap:9px;
+    padding:14px 18px 16px;
+  }
+  html.sky .db-demostrip .db-badge.sm{transform:rotate(-3deg); margin-left:2px}
+
+  /* ── 5 · TABLES keep their scroll — restated at ≥ mobile.css's specificity
+        (its day-mode .cc-tablewrap war uses html[data-theme=day] + !important)
+        so no sibling fragment can accidentally re-clip them on a phone.
+        Skin: near-solid white (dense list rule). ─────────────────────────── */
+  html.sky .cc-tablewrap,
+  html.sky #panelDashboard .cc-tablewrap,
+  html.sky[data-theme="day"] #panelDashboard .cc-tablewrap{
+    overflow-x:auto !important; overflow-y:hidden !important;
+    -webkit-overflow-scrolling:touch;
+    background:rgba(255,255,255,.93) !important;
+    border-radius:var(--sky-r-card) !important;
+  }
+  html.sky .tr-tablewrap{
+    overflow-x:auto;
+    max-width:100%;
+    background:rgba(255,255,255,.93);
+    border-radius:var(--sky-r-card);
+  }
+
+  /* ── 6 · BLUR BUDGET, modal tier — chrome glass halves to 12px and gains
+        opacity so sheet content stays crisp over whatever it covers ──────── */
+  html.sky .ao-modal,
+  html.sky .sb-modal,
+  html.sky .cl-modal,
+  html.sky .sb-detail-card,
+  html.sky .sb-toast{
+    background:rgba(255,255,255,.88) !important;
+    -webkit-backdrop-filter:blur(12px) saturate(1.4);
+    backdrop-filter:blur(12px) saturate(1.4);
+  }
+}
+
+/* ── 7 · THE SMALLEST PHONES (mirrors mobile.css's 380px tier) ────────────── */
+@media (max-width:380px){
+  html.sky .wrap{padding:0 6px}
+  html.sky .tabbar{
+    left:6px; right:6px;
+    bottom:calc(6px + env(safe-area-inset-bottom,0px));
+  }
+  html.sky body{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  html.sky .mob-more{left:6px; right:6px; bottom:calc(74px + env(safe-area-inset-bottom,0px))}
+  html.sky #fsWrap{bottom:calc(76px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .ao-al-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .ao-al-panel{bottom:calc(132px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .hero{padding:24px 14px 96px}
+  html.sky .hero .hero-h1{font-size:24px}
+  html.sky .hero .hp-num{font-size:29px}
+}

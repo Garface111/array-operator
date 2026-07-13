@@ -14,6 +14,13 @@
   const C = window.AOTrends;
   if (!C || !C.registerView) return;
 
+  // SKY demo flag (2026-07-12): the night-first white-alpha hairlines are
+  // invisible on the sky theme's light canvas — branch the constants only.
+  // Flag off ⇒ the exact rgba strings hexA() produced before.
+  const SKY = document.documentElement.classList.contains("sky");
+  const GRID_LINE = SKY ? "rgba(14,20,32,.10)" : C.hexA("#ffffff", 0.05);
+  const BASELINE  = SKY ? "rgba(14,20,32,.18)" : C.hexA("#ffffff", 0.14);
+
   const easeOut = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const MONTHS3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -76,7 +83,7 @@
         ctx.font = fAxis + "px system-ui,sans-serif";
         for (const tv of ticks) {
           const y = bottom - (tv / axMax) * plotH;
-          ctx.strokeStyle = core.hexA("#ffffff", 0.05); ctx.lineWidth = 1;
+          ctx.strokeStyle = GRID_LINE; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
           ctx.fillStyle = core.COLORS.faint;
           ctx.fillText(core.kCompact(tv), padL - 7, y);
@@ -120,7 +127,7 @@
           }
         }
 
-        ctx.strokeStyle = core.hexA("#ffffff", 0.14); ctx.lineWidth = 1;
+        ctx.strokeStyle = BASELINE; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(padL, bottom); ctx.lineTo(padL + plotW, bottom); ctx.stroke();
 
         ctx.fillStyle = core.COLORS.faint; ctx.textAlign = "center"; ctx.textBaseline = "top";

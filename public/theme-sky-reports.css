@@ -1,0 +1,432 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY THEME — REPORTS / INVOICES TAB deep pass                    (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   Scope: everything reports.js renders into #reportsRoot — the rb- and rb2-
+   families (generator tabs, KPI glance line, send pipeline, the 3-level
+   provider→account→offtaker accordion, tinted group/section systems, add/edit
+   forms, bulk import, email studio, bill audit, archive).
+
+   Loaded AFTER theme-sky.css (the foundation) — every rule scoped html.sky.
+   Tokens come from the foundation ONLY (--sky-* + the re-pointed core vars);
+   the blue-hairline family rgba(20,60,120,x) and the primary-tint family
+   rgba(33,150,243,x) are the foundation's own literals.
+
+   TWO RULINGS IMPLEMENTED HERE:
+   1 · The scoped NEPOOL "cream skin" (command-center.css ~L951 re-points
+       --so-cream/--line/--card2/--day-hover for the whole .rb2 subtree) is
+       re-pointed AGAIN under html.sky to the sky glass equivalents — warm
+       cream hairlines become cool blue-tinted hairlines at EQUIVALENT contrast,
+       cream card grounds become content-tier glass.
+   2 · The rendered invoice LETTER / template preview / email reproduction
+       (.rb-doc-paper, .rb-eml, .rb-tpl-paper, .rb-doc-frame) stays PAPER-WHITE.
+       An invoice is a document; paper floating on glass is the point. Only its
+       drop shadow changes (soft lifted blue instead of the night-era black).
+       The letter interior (incl. the dark-forest header band) is untouched.
+
+   MATERIAL BUDGET (per the foundation's guardrail): backdrop-filter ONLY on
+   the three top-level .rb2 bands (head / pipe / listwrap-or-audit — the
+   Invoices tab's "sheets") + the email-studio overlay (a modal). Every
+   repeated card (.rb-acc ×N, .rb-au-card, tables, rows) is SOLID-tier
+   translucent white with NO blur.
+
+   PRESERVED SEMANTICS: amber = review flag (DOESN'T-MATCH-GMP, held, pending),
+   red = hard error, emerald = match/positive, octarine = machine-computed
+   (open-card spine, audit tab, rate hints), the pipeline's done/now/sched/later
+   state tints, honesty markers. Material changes; meaning does not.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · THE CREAM SKIN → SKY GLASS (ruling 1) ─────────────────────────────
+   command-center.css grounds the whole generator on warm cream via vars
+   declared on .rb2. Re-point them once; every consumer follows.
+   Contrast equivalence: cream hairline #e8e2d9 on #faf8f5 ≈ a 4% step —
+   rgba(20,60,120,.13) on white glass is the same weight, cooled. */
+html.sky .rb2{
+  --so-cream:var(--sky-glass-content);           /* band grounds → content glass */
+  --so-cream-bd:var(--sky-glass-edge);           /* band borders → glass edge */
+  --so-wood-bd:rgba(20,60,120,.16);
+  --so-shadow-card:var(--sky-shadow-card);
+  --line:rgba(20,60,120,.13);                    /* inner hairlines, cooled */
+  --card2:#F4F9FF;                               /* inner tints → azure white */
+  --day-hover:rgba(33,150,243,.07);              /* warm ochre hover → sky */
+  gap:16px;
+}
+
+/* ── 2 · TOP-LEVEL BANDS = GLASS SHEETS (content tier, blur allowed) ───────
+   .rb2-head, .rb2-pipe and .rb2-listwrap / .rb2 > .rb-au are the Invoices
+   tab's top-level sheets — the equivalents of #sbWrap on the Arrays tab. */
+html.sky .rb2-head,
+html.sky .rb2-pipe,
+html.sky .rb2-listwrap,
+html.sky .rb2 > .rb-au{
+  background:var(--sky-glass-content);
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:26px;
+  box-shadow:var(--sky-shadow-sheet);
+}
+/* generous air — the decluttering is spacing, not fewer facts */
+html.sky .rb2-head{padding:26px 32px 22px}
+html.sky .rb2-pipe{padding:20px 32px 22px}
+html.sky .rb2-listwrap{padding:24px 32px 36px}
+html.sky .rb2 > .rb-au{padding:24px 32px 36px}
+html.sky .rb2-id h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
+html.sky .rb2-id p{color:var(--muted)}
+
+/* ── 3 · GENERATOR TABS → GLASS PILL SEGMENT (mirrors the main tab bar) ────
+   The underline tabs become a pill track; active = solid action blue. */
+html.sky .rb2-tabrow{border-bottom:0;align-items:center;gap:14px;margin-top:15px}
+html.sky .rb2-subtabs.rb-subtabs{border-bottom:0;margin:0;gap:4px;padding:5px;
+  display:inline-flex;background:rgba(255,255,255,.55);
+  border:1px solid var(--sky-glass-edge);border-radius:var(--sky-r-pill);
+  box-shadow:0 2px 10px rgba(20,60,120,.06)}
+html.sky .rb2-subtabs .rb-subtab{border:0;border-bottom:0;margin-bottom:0;
+  border-radius:var(--sky-r-pill);padding:8px 16px;color:#33415A;font-weight:600;
+  transition:background .14s,color .14s}
+html.sky .rb2-subtabs .rb-subtab:hover{color:var(--ink);background:rgba(255,255,255,.75)}
+html.sky .rb2-subtabs .rb-subtab.on{background:var(--sky-primary);color:#fff;
+  box-shadow:0 4px 12px -4px rgba(33,150,243,.55)}
+/* the amber flag-count badge stays amber (ratified review signal); on the solid
+   blue active pill it sits on white so the amber ink still reads */
+html.sky .rb2-subtabs .rb-subtab.on .rb-au-genbadge{background:#fff;border-color:#fff}
+/* the KPI glance line loses its baseline rule (the border it hugged is gone) */
+html.sky .rb2-kpis{padding-bottom:2px}
+html.sky .rb2-gl-dot{color:rgba(20,60,120,.25)}
+html.sky .rb2-draftstat{color:#1565C0;background:rgba(33,150,243,.12);
+  border-color:rgba(33,150,243,.3)}
+
+/* ── 4 · SEND-PIPELINE BAND — cells stay a state-tinted strip; only the
+      neutral material cools. done/now/sched/later tints are semantics. ── */
+/* command-center's `font:700 10.5px/1 inherit` shorthand is invalid CSS
+   (CSS-wide keyword inside a shorthand) and silently drops, so the label
+   renders as a full-size h2. Restore the intended micro-eyebrow here. */
+html.sky .rb2-pipe-label h2{font-weight:700;font-size:10.5px;line-height:1}
+html.sky .rb2-pcell{border-color:rgba(20,60,120,.14)}
+html.sky .rb2-pcell:first-child{border-radius:14px 0 0 14px}
+html.sky .rb2-pcell:last-child{border-radius:0 14px 14px 0}
+@media (max-width:1100px){ html.sky .rb2-pcell{border-radius:14px!important} }
+html.sky .rb2-moderow{background:rgba(33,150,243,.06);border-color:rgba(33,150,243,.18);
+  border-radius:14px}
+html.sky .rb2-pswitch{background:rgba(255,255,255,.75);border-color:rgba(20,60,120,.16)}
+/* popovers over glass must be opaque to read (same ruling as .sb-card-menu) */
+html.sky .rb2-ctlpop,
+html.sky .rb2-exportpop,
+html.sky .rb-grp-pct-pop,
+html.sky .nmg-combo-list{background:#fff;border:1px solid rgba(20,60,120,.14);
+  border-radius:16px;box-shadow:var(--sky-shadow-float)}
+
+/* ── 5 · STICKY TOOLBAR — a floating near-solid bar (no blur: it lives inside
+      a blurred sheet; nesting backdrop-filters is off-budget) ─────────────── */
+html.sky .rb2-controls{background:rgba(255,255,255,.92);
+  border:1px solid var(--sky-glass-edge);border-radius:18px;
+  box-shadow:var(--sky-shadow-card);padding:12px 18px;top:10px}
+html.sky .rb2-controls-label{letter-spacing:-.01em}
+html.sky .rb-add-panel{scroll-margin-top:76px}
+
+/* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────
+   White glass bars; the per-provider hue spine is applied inline by reports.js
+   (PROV_HUE) and passes through untouched. */
+html.sky .rb-prov-head{background:rgba(255,255,255,.8);
+  border:1px solid rgba(255,255,255,.9);
+  border-left:3px solid var(--so-emerald,#059669);
+  border-radius:16px;box-shadow:var(--sky-shadow-card)}
+html.sky .rb-prov-head:hover{background:rgba(255,255,255,.95);
+  box-shadow:0 10px 26px -12px rgba(20,60,120,.24)}
+
+/* ── 7 · NET-METER GROUPS — the 8-tone var model, re-tinted to sky pastels ──
+   Same mechanism (data-grp-tone=array_id%8 → --grp-bg/bd/ink), same stable
+   hue per array; each tint now sits on a translucent white veil so groups
+   read as tinted glass instead of flat color washes. */
+html.sky .rb-grp-tinted{
+  background-color:rgba(255,255,255,.55);
+  background-image:linear-gradient(0deg,var(--grp-bg),var(--grp-bg));
+  border:1px solid var(--grp-bd);
+  border-radius:18px;
+  box-shadow:0 4px 16px -8px rgba(20,60,120,.10);
+  padding:8px 14px 10px;
+}
+html.sky .rb-grp-tinted .rb-grp-head:hover{background:rgba(255,255,255,.5)}
+html.sky .rb-grp-tinted[data-grp-tone="0"]{ --grp-bg:rgba(76,175,80,.12);   --grp-bd:rgba(76,175,80,.30);   --grp-ink:#2e7d32; }
+html.sky .rb-grp-tinted[data-grp-tone="1"]{ --grp-bg:rgba(33,150,243,.11);  --grp-bd:rgba(33,150,243,.30);  --grp-ink:#1565C0; }
+html.sky .rb-grp-tinted[data-grp-tone="2"]{ --grp-bg:rgba(245,158,11,.11);  --grp-bd:rgba(245,158,11,.30);  --grp-ink:#92600a; }
+html.sky .rb-grp-tinted[data-grp-tone="3"]{ --grp-bg:rgba(139,92,246,.11);  --grp-bd:rgba(139,92,246,.28);  --grp-ink:#6d28d9; }
+html.sky .rb-grp-tinted[data-grp-tone="4"]{ --grp-bg:rgba(244,63,94,.09);   --grp-bd:rgba(244,63,94,.24);   --grp-ink:#be123c; }
+html.sky .rb-grp-tinted[data-grp-tone="5"]{ --grp-bg:rgba(20,184,166,.11);  --grp-bd:rgba(20,184,166,.28);  --grp-ink:#0f766e; }
+html.sky .rb-grp-tinted[data-grp-tone="6"]{ --grp-bg:rgba(99,102,241,.11);  --grp-bd:rgba(99,102,241,.28);  --grp-ink:#4338ca; }
+html.sky .rb-grp-tinted[data-grp-tone="7"]{ --grp-bg:rgba(217,70,239,.09);  --grp-bd:rgba(217,70,239,.24);  --grp-ink:#a21caf; }
+html.sky .rb-grp-add{background:rgba(255,255,255,.7)}
+html.sky .rb-grp-add:hover{background:#fff}
+
+/* ── 8 · OFFTAKER ACCORDION CARDS — calm density ───────────────────────────
+   The foundation gave .rb-acc the generic 22px card treatment; in an 800-row
+   list that reads bulbous. Tighter radius, quieter rest shadow, and the open
+   card keeps its octarine machine-computed spine + a real dolly lift. */
+html.sky .rb-acc{
+  background:rgba(255,255,255,.72) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  border-radius:16px !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.06) !important;
+}
+html.sky .rb-acc:hover{border-color:rgba(33,150,243,.35) !important;
+  box-shadow:0 8px 22px -10px rgba(20,60,120,.18) !important}
+html.sky .rb-acc[data-open="true"]{
+  background:rgba(255,255,255,.92) !important;
+  border-color:rgba(255,255,255,.95) !important;
+  border-left:2px solid var(--octarine,#a368ff) !important;   /* preserved signature */
+  box-shadow:0 18px 44px -18px rgba(20,60,120,.30) !important;
+}
+html.sky .rb-acc-head:hover{background:rgba(33,150,243,.06)}
+html.sky .rb-acc[data-open="true"] .rb-acc-head{background:rgba(33,150,243,.06);
+  border-bottom-color:rgba(20,60,120,.12)}
+html.sky .rb-acc-inner{padding:18px 18px 20px}
+
+/* ── 9 · TINTED <details> SECTIONS inside the open card (.rb-sec) ──────────
+   Same tone model, same white-pill fields inside — the tint now floats on a
+   white veil like the groups, so open cards stay airy. */
+html.sky .rb-sec{
+  background-color:rgba(255,255,255,.6);
+  background-image:linear-gradient(0deg,var(--tone-bg),var(--tone-bg));
+  border-color:var(--tone-bd);
+  border-radius:16px;
+  box-shadow:none;
+}
+html.sky .rb-sec > summary:hover{background:rgba(255,255,255,.45)}
+html.sky .rb-fadv{border-color:rgba(20,60,120,.14);border-radius:14px;
+  background:rgba(255,255,255,.5)}
+
+/* ── 10 · PAPER STAYS PAPER (ruling 2) ─────────────────────────────────────
+   The rendered invoice letter, the operator's own template render, and the
+   email reproduction keep their pure-white document material — only the
+   shadow changes from the night-era black to a soft lifted blue, so the
+   paper visibly floats above the glass. Interiors untouched. */
+html.sky .rb-doc-paper,
+html.sky .rb-eml,
+html.sky .rb-tpl-paper,
+html.sky .rb-doc-frame{
+  background:#fff !important;
+  box-shadow:0 24px 60px -22px rgba(15,50,110,.38), 0 6px 18px -8px rgba(20,60,120,.16) !important;
+}
+/* styles.css's marketing `.brand{color:var(--ink)}` bleeds into the letter's
+   dark header band and paints the operator name dark-on-dark (broken in stock
+   day too — logged). Restore the letter's own intended ink. */
+html.sky .rb-doc-band .brand{color:#eafff5}
+html.sky .rb-tpl-lightbox{background:rgba(13,44,86,.55)}
+html.sky .rb-tpl-lb-inner{box-shadow:0 40px 110px -28px rgba(8,30,70,.7)}
+html.sky .rb-doc-empty{border-color:rgba(20,60,120,.22);
+  background:rgba(255,255,255,.35);border-radius:18px}
+
+/* the calc dashboard is an instrument, not a letter — solid-tier glass card */
+html.sky .rb-calc{background:rgba(255,255,255,.88);
+  border:1px solid rgba(255,255,255,.9);border-radius:16px;
+  box-shadow:var(--sky-shadow-card)}
+
+/* the editable cover-email note keeps its informational blue, tuned to sky */
+html.sky .rb-draft-msg{background:rgba(33,150,243,.07);
+  border-color:rgba(33,150,243,.25);border-radius:12px}
+html.sky .rb-draft-msg:focus{background:rgba(33,150,243,.1);
+  border-color:var(--sky-primary)}
+
+/* ── 11 · FORM CARDS + INPUT SWEEP ─────────────────────────────────────────
+   Add-offtaker / editor / wizard / quarterly cards become solid-tier glass.
+   (.rb-tpl excluded: when folded into an open offtaker card it is forced
+   flat by command-center.css — keep that contract.) */
+html.sky .rb2 .rep-card:not(.rb-tpl),
+html.sky .rb-wiz-card{
+  background:rgba(255,255,255,.8) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:18px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+/* the 700px .rep-card cap left the add-form hugging the left edge of the wide
+   glass sheet and CLIPPED the bulk-review table's Status column. Form width
+   stays readable but centered; the review table gets the full sheet (dense
+   data never truncates). */
+html.sky .rb2 .rep-card.rb-manual-form{margin-inline:auto}
+html.sky .rb2 .rep-card.rb-preview{max-width:none}
+/* fields the foundation's .rep-fld rule doesn't reach */
+html.sky .rb-mform-grid input, html.sky .rb-mform-grid select,
+html.sky .rb-cust-grid input, html.sky .rb-cust-grid select,
+html.sky .rb-wiz-cust-form input, html.sky .rb-wiz-cust-form select,
+html.sky .rb-wiz-yr-input, html.sky .rb-wiz-apct,
+html.sky .rb-gr-ctl input,
+html.sky .rb-q-controls select,
+html.sky .nmg-combo-input,
+html.sky .rb-tpl-html{
+  background:rgba(255,255,255,.85) !important;
+  color:var(--ink) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:var(--sky-r-btn) !important;
+}
+html.sky .rb-mform-grid input:focus, html.sky .rb-mform-grid select:focus,
+html.sky .rb-cust-grid input:focus, html.sky .rb-cust-grid select:focus,
+html.sky .nmg-combo-input:focus,
+html.sky .rb-tpl-html:focus{
+  border-color:var(--sky-primary) !important;
+  box-shadow:0 0 0 3px rgba(33,150,243,.18) !important;
+}
+/* dense-table inputs keep a tighter radius so rows stay compact */
+html.sky .rb-rev-table .rb-rev-in,
+html.sky .rb-col-select,
+html.sky .rb-rate-edit{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid rgba(20,60,120,.16) !important;
+  border-radius:9px !important;
+  color:var(--ink) !important;
+}
+html.sky .rb-rev-table .rb-rev-in:focus,
+html.sky .rb-col-select:focus{border-color:var(--sky-primary) !important;
+  background:#fff !important}
+/* segmented controls → glass pill tracks, active = solid action blue */
+html.sky .rb-seg, html.sky .rb-add-tabs, html.sky .rb-ofilter{
+  background:rgba(255,255,255,.6) !important;
+  border:1px solid var(--sky-glass-edge) !important;
+  border-radius:var(--sky-r-pill) !important;
+  padding:3px;
+}
+html.sky .rb-seg button, html.sky .rb-add-tabs button, html.sky .rb-ofilter-chip{
+  border-radius:var(--sky-r-pill) !important;color:#33415A}
+html.sky .rb-seg button.on, html.sky .rb-add-tabs button.on,
+html.sky .rb-slider button.on, html.sky .rb-ofilter-chip.on{
+  background:var(--sky-primary) !important;color:#fff !important;
+  box-shadow:0 3px 10px -3px rgba(33,150,243,.55)}
+html.sky .rb-ofilter-chip.on .rb-ofilter-n{background:rgba(255,255,255,.25);color:#fff}
+/* find-an-offtaker search → glass pill (its emerald "N of M" count pill is a
+   deliberate prominence choice — untouched) */
+html.sky .rb-osearch{background:rgba(255,255,255,.75);
+  border:1px solid rgba(255,255,255,.9);border-radius:var(--sky-r-pill);
+  padding:7px 14px;box-shadow:0 2px 10px rgba(20,60,120,.06)}
+html.sky .rb-osearch:focus-within{border-color:rgba(33,150,243,.5);
+  box-shadow:0 0 0 3px rgba(33,150,243,.15)}
+/* upload dropzone: hover goes primary (control affordance, not a status) */
+html.sky .rb-drop{background:rgba(255,255,255,.55) !important;
+  border-color:rgba(20,60,120,.22) !important;border-radius:16px}
+html.sky .rb-drop:hover, html.sky .rb-drop-over{
+  border-color:rgba(33,150,243,.55) !important;
+  background:rgba(33,150,243,.06) !important}
+/* file rows/tiles: hover accent joins the sky family */
+html.sky .rb-file:hover, html.sky .rb-file-feat:hover{
+  border-color:rgba(33,150,243,.5);background:rgba(33,150,243,.05)}
+/* wizard step dots: active step = action blue with white numeral (the night
+   rule paints dark ink on what is now a blue token — fix the pairing) */
+html.sky .rb-wiz-steps li.on .rb-wiz-num{background:var(--sky-primary);
+  border-color:var(--sky-primary);color:#fff}
+html.sky .rb-wiz-arr, html.sky .rb-wiz-cust-form, html.sky .rb-wiz-rev-item,
+html.sky .rb-wiz-arraysel{background:rgba(244,249,255,.6);
+  border-color:rgba(20,60,120,.12)}
+/* "offtaker added" rows stay green (positive state), pastel-ified */
+html.sky .rb-wiz-cust-row{background:rgba(76,175,80,.10);
+  border-color:rgba(76,175,80,.28)}
+
+/* ── 12 · BULK IMPORT — dense tables sit on near-solid white (data crispness;
+      no transparency games under numbers) ──────────────────────────────── */
+html.sky .rb-bulk-tablewrap, html.sky .rb-col-prevwrap{
+  background:rgba(255,255,255,.92);border-color:rgba(20,60,120,.14);
+  border-radius:14px}
+html.sky .rb-col-mapcard, html.sky .rb-col-prevcard{
+  background:rgba(255,255,255,.8);border-color:rgba(255,255,255,.9);
+  border-radius:16px;box-shadow:var(--sky-shadow-card)}
+/* row states (ok/err/needs_review/blocked tints) pass through untouched */
+
+/* ── 13 · BILL AUDIT — white instrument cards; every amber flag, at-stake
+      chip and octarine eyebrow passes through untouched ────────────────── */
+html.sky .rb-au-card, html.sky .rb-au-clean-drawer{
+  background:rgba(255,255,255,.85);border-color:rgba(20,60,120,.13);
+  border-radius:16px;box-shadow:var(--sky-shadow-card)}
+html.sky .rb-au-master{background:linear-gradient(180deg,#F4F9FF,#fff)}
+html.sky .rb-au-card-flag .rb-au-master{
+  background:linear-gradient(180deg,rgba(255,247,232,.85),#fff)}  /* flagged stays warm */
+html.sky .rb-au-tab{background:rgba(255,255,255,.75);
+  border-color:rgba(255,255,255,.9);border-radius:var(--sky-r-pill);
+  box-shadow:0 2px 8px rgba(20,60,120,.05)}
+html.sky .rb-au-tab:hover{border-color:rgba(33,150,243,.4)}
+/* the active tab keeps its octarine machine-computed signature — as a visible
+   pill ring now that the underline idiom is gone */
+html.sky .rb-au-tab.on{border-color:var(--octarine,#a368ff);
+  box-shadow:0 0 0 1px var(--octarine,#a368ff), 0 3px 10px -2px rgba(163,104,255,.35)}
+
+/* ── 14 · INVOICE ARCHIVE ──────────────────────────────────────────────────── */
+html.sky .rb-arch{background:rgba(255,255,255,.78);
+  border:1px solid rgba(255,255,255,.88);border-radius:16px;
+  box-shadow:var(--sky-shadow-card)}
+html.sky .rb-arch-sum:hover{background:rgba(33,150,243,.05)}
+html.sky .rb-arch-array{background:rgba(244,249,255,.55);
+  border-color:rgba(20,60,120,.10);border-radius:12px}
+
+/* ── 15 · SPREADSHEET TRACKER + VEC BILL BOX — keep the blue "nested/derived"
+      left accent; ground cools from hardcoded gray-blue to azure glass ──── */
+html.sky .rb-track, html.sky .rb-vecbill{
+  background:rgba(244,249,255,.7);border-color:rgba(20,60,120,.12);
+  border-radius:16px}
+html.sky .rb-track-sub, html.sky .rb-vecbill{border-left:3px solid var(--sky-primary)}
+html.sky .rb-track-chip{border-color:rgba(20,60,120,.14)}
+/* informational resync banner: same blue meaning, sky family */
+html.sky .rb-resync{background:rgba(33,150,243,.08);
+  border-color:rgba(33,150,243,.3);border-radius:12px}
+
+/* ── 16 · EMAIL STUDIO — the overlay becomes a frosted sheet over the sky
+      world (modal tier: blur allowed); the mail preview is a document →
+      paper-white with the lifted shadow (ruling 2 applies to it too) ────── */
+html.sky .rb-es-overlay{
+  background:rgba(234,244,253,.55);
+  -webkit-backdrop-filter:blur(28px) saturate(1.4);
+  backdrop-filter:blur(28px) saturate(1.4);
+}
+html.sky .rb-es-head{background:rgba(255,255,255,.7);
+  border-bottom:1px solid var(--sky-glass-edge)}
+html.sky .rb-es-left{border-right-color:rgba(20,60,120,.12)}
+html.sky .rb-es-mail{background:#fff;border:0;border-radius:16px;
+  box-shadow:0 24px 60px -22px rgba(15,50,110,.38), 0 6px 18px -8px rgba(20,60,120,.16)}
+html.sky .rb-es-signoff{background:rgba(255,255,255,.8);
+  border-color:rgba(255,255,255,.9);border-radius:14px}
+html.sky .rb-es-input, html.sky .rb-es-ta,
+html.sky .rb-es-chat-in textarea{
+  background:rgba(255,255,255,.85);border-color:rgba(20,60,120,.16)}
+html.sky .rb-es-input:focus, html.sky .rb-es-ta:focus,
+html.sky .rb-es-chat-in textarea:focus{border-color:var(--sky-primary);
+  box-shadow:0 0 0 3px rgba(33,150,243,.15)}
+html.sky .rb-es-token{background:rgba(255,255,255,.8);
+  border-color:rgba(20,60,120,.16)}
+html.sky .rb-es-token:hover{border-color:rgba(33,150,243,.5);
+  background:rgba(33,150,243,.07)}
+html.sky .rb-es-chat{background:rgba(255,255,255,.94);
+  border:1px solid var(--sky-glass-edge);border-radius:20px;
+  box-shadow:var(--sky-shadow-float)}
+html.sky .rb-es-ai{box-shadow:0 10px 30px -10px rgba(33,150,243,.6),
+  0 0 0 3px rgba(33,150,243,.15)}
+
+/* ── 17 · SETUP LINK + SMALL CHROME ──────────────────────────────────────── */
+html.sky .rb-setup-link{background:rgba(255,255,255,.7);
+  border:1px solid rgba(255,255,255,.9);border-radius:var(--sky-r-pill)}
+html.sky .rb-setup-link:hover{border-color:rgba(33,150,243,.45);
+  color:var(--sky-primary-deep)}
+html.sky .rb-gr-eff b{color:var(--sky-primary-deep)}
+html.sky .rb-listwrap .empty{color:#46658C}
+
+/* ── 18 · SQUIRCLE PROGRESSIVE ENHANCEMENT (Chrome 139+, no-op elsewhere) ── */
+@supports (corner-shape: squircle){
+  html.sky .rb2-head,
+  html.sky .rb2-pipe,
+  html.sky .rb2-listwrap,
+  html.sky .rb2 > .rb-au,
+  html.sky .rb2-controls,
+  html.sky .rb-prov-head,
+  html.sky .rb-grp-tinted,
+  html.sky .rb-acc,
+  html.sky .rb-sec,
+  html.sky .rb-calc,
+  html.sky .rb-doc-paper,
+  html.sky .rb-eml,
+  html.sky .rb-arch,
+  html.sky .rb-au-card,
+  html.sky .rb-es-mail,
+  html.sky .rb-es-chat{corner-shape:squircle}
+}
+
+/* ── 19 · PHONE GUARD — keep the sheets breathable at small widths (the
+      mobile layer loads after this and owns real phone reflow) ──────────── */
+@media (max-width:700px){
+  html.sky .rb2-head{padding:20px 18px 16px}
+  html.sky .rb2-pipe{padding:14px 18px 16px}
+  html.sky .rb2-listwrap, html.sky .rb2 > .rb-au{padding:16px 14px 26px;border-radius:20px}
+  html.sky .rb2-controls{padding:10px 12px}
+}

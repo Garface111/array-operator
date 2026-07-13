@@ -1,0 +1,555 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY · ACCOUNT DEEP PASS                                        (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   Surfaces owned by this file (loaded after theme-sky.css, before -mobile):
+     · Master Account tab (#account / #acctList): rows, plan row + picker,
+       billing summary + trial banners, add-card CTA, danger zone
+     · Credential Vault / Auto-refresh panel (.ar-* family) — the trust surface;
+       the most SOLID, calm glass in the app. Octarine stays its signature,
+       cooled/softened for the sky (local token re-point, scoped to the vault).
+     · .ao-al-* fleet-alerts widget (own --al-* island — re-pointed on the
+       fab/panel roots, NOT by merging the two :roots)
+     · app.js inline-styled modal family (.ao-modal internals, AODialog,
+       claim/diagnosis) + the full-page lockout gates (#aoCancelledGate /
+       #aoFrozenGate) — CSS-only !important counter-styling of known inline
+       properties, same approach styles.css already uses
+     · Banner/nudge family from index.html (.gmp-gate, .trial-nudge variants)
+
+   Every rule scoped under html.sky. Tokens come from theme-sky.css — nothing
+   new invented. PRESERVED SEMANTICS: amber=warn · red=hard error/destructive ·
+   --ao-live green=working · octarine=machine-computed/vault signature ·
+   blue-is-good. Material changes only, meaning untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · MASTER ACCOUNT SHEET — rows breathe inside the content-glass sheet
+      (theme-sky.css already made .acct-list the glass sheet; this insets the
+      content so child cards' corners never get clipped by the sheet radius) ── */
+html.sky .acct-list{padding:14px 18px 18px}
+html.sky .acct-row{padding:16px 8px;border-bottom:1px solid var(--line)}
+html.sky .acct-row .r-k{color:#46658C;font-weight:750;letter-spacing:.11em}
+html.sky .acct-row .r-v{color:var(--ink)}
+html.sky .acct-row .r-v .r-big{font-size:22px;font-weight:800;letter-spacing:-.02em}
+html.sky .acct-pw-edit{border-top:1px solid var(--line)}
+html.sky .acct-pw-hint{color:var(--faint)}
+/* auto-save whisper: keep it quiet, blue-is-good */
+html.sky .acct-msg{color:var(--muted)}
+html.sky .acct-msg.ok{color:var(--sky-primary-deep)}
+/* identity/password inputs: theme-sky §7 already glasses them; add the focus
+   ring theme-day painted its own blue on (mine loads later, same weight) */
+html.sky .acct-edit .r-v input:focus,
+html.sky .acct-pw-edit input:focus{
+  border-color:var(--sky-primary) !important;
+  box-shadow:0 0 0 3px rgba(33,150,243,.16) !important;
+}
+
+/* ── 2 · PLAN ROW + PLAN PICKER + UPGRADE POPOVER ─────────────────────────── */
+html.sky #acctPlanVal{color:var(--sky-primary-deep)}
+/* the picker overlay (its own .ao-modal-ov scrim — foundation covered
+   .ao-overlay but not this one): deep-sky dim */
+html.sky .ao-modal-ov{background:rgba(13,44,86,.38) !important}
+/* plan cards: solid-tier glass ON the frosted modal (no per-card blur) */
+html.sky .ao-plan-card{
+  background:rgba(255,255,255,.72) !important;
+  border:1.5px solid rgba(255,255,255,.95) !important;
+  border-radius:16px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .ao-plan-card:hover{
+  border-color:var(--sky-primary) !important;
+  background:#ffffff !important;
+}
+html.sky .ao-plan-card.on{
+  border-color:var(--sky-primary) !important;
+  background:rgba(33,150,243,.10) !important;
+}
+html.sky .ao-plan-h h2{color:var(--ink)}
+html.sky .ao-plan-h p{color:var(--muted)}
+html.sky .ao-plan-card .t{color:var(--ink)}
+html.sky .ao-plan-card .d{color:var(--muted)}
+html.sky .ao-plan-card .p{color:var(--sky-primary-deep)}
+html.sky .ao-plan-close,
+html.sky .ao-plan-msg{color:var(--muted)}
+/* locked-tab upgrade popover: opaque (floats over arbitrary content, no blur) */
+html.sky .ao-upgrade-pop{
+  background:#ffffff;border:1px solid var(--line);
+  border-radius:14px;box-shadow:var(--sky-shadow-float);
+}
+html.sky .ao-up-arrow{background:#ffffff;border-left-color:var(--line);border-top-color:var(--line)}
+html.sky .ao-upgrade-pop b{color:var(--ink)}
+html.sky .ao-upgrade-pop p{color:var(--muted)}
+html.sky .ao-up-btn{border-color:var(--line);border-radius:10px;color:var(--ink)}
+html.sky .ao-up-btn.primary{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary);
+  border-color:transparent;color:#ffffff;
+  box-shadow:0 5px 14px -5px rgba(33,150,243,.55);
+}
+html.sky .ao-up-btn.ghost{color:var(--muted)}
+
+/* ── 3 · BILLING SUMMARY ("Your bill") — money keeps its greens ───────────── */
+html.sky .ao-bill-line .bl-k b,
+html.sky .ao-bill-line .bl-v{color:var(--ink)}
+html.sky .ao-bill-line .bl-calc{color:var(--muted)}
+html.sky .ao-bill-line .bl-desc{color:var(--faint)}
+/* total band: the sky's pastel-green moment (money = green, ratified) */
+html.sky .ao-bill-total{
+  background:linear-gradient(180deg, rgba(211,242,206,.55), rgba(211,242,206,.35));
+  border:1px solid rgba(76,175,80,.35);
+  border-radius:12px;
+}
+html.sky .ao-bill-ctx{color:var(--muted)}
+html.sky .ao-bill-empty, html.sky .ao-bill-load{color:var(--faint)}
+/* trial banner: amber = counting down (kept), translucent on glass */
+html.sky .ao-bill-trial{
+  background:rgba(254,243,199,.5);
+  border-color:rgba(217,119,6,.32);
+  border-radius:12px;
+}
+/* complimentary banner: octarine = machine/comped signature, cooled for sky */
+html.sky .ao-bill-trial--comp{
+  background:rgba(99,80,224,.08);
+  border-color:rgba(99,80,224,.30);
+}
+html.sky .ao-bill-trial--comp .ao-bill-trial-tx b{color:#4938C9}
+html.sky .ao-bill-trial--comp .ao-bill-trial-tx > span{color:#6350E0}
+html.sky .ao-bill-trial--comp .ao-bill-trial-badge{
+  color:#5647D6;background:rgba(99,80,224,.12);border-color:rgba(99,80,224,.35);
+}
+
+/* ── 4 · DANGER ZONE — theme-sky's blanket .acct-btn glass clobbered the
+      destructive reds (inline-styled in sandbox.js cancelRow). Restore them:
+      red stays red, only the material modernizes. ─────────────────────────── */
+html.sky #rowCancel .r-k{color:#dc2626 !important}
+html.sky #cancelStart{
+  color:#dc2626 !important;
+  border-color:rgba(220,38,38,.35) !important;
+  background:rgba(255,255,255,.7) !important;
+}
+html.sky #cancelStart:hover{
+  border-color:#dc2626 !important;
+  background:rgba(254,242,242,.9) !important;
+  color:#b91c1c !important;
+}
+html.sky #cancelYes{
+  background:linear-gradient(180deg,#ef4444,#dc2626) !important;
+  border-color:transparent !important;
+  color:#ffffff !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 16px -6px rgba(220,38,38,.55) !important;
+}
+html.sky #cancelYes:hover{filter:brightness(1.05)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 · THE CREDENTIAL VAULT (.ar-*) — the trust surface.
+   The most solid, calm glass in the app: near-opaque white card, sky hairlines,
+   NO backdrop-filter anywhere inside (repeated cred cards — perf guardrail).
+   Octarine signature COOLED for the sky: #7c3aed → #6350E0, re-pointed as a
+   scoped token so every var(--ao-oct*) consumer inside follows. Green/amber/red
+   stay strictly LIVE-state. The pulse keeps pulsing.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.sky .ar-panel{
+  /* cooled octarine, vault-scoped (inherits to every .ar-* child) */
+  --ao-oct:#6350E0;
+  --ao-oct-soft:rgba(99,80,224,.09);
+  --ao-oct-line:rgba(99,80,224,.30);
+  background:rgba(255,255,255,.92) !important;
+  border:1px solid rgba(255,255,255,.95) !important;
+  border-radius:var(--sky-r-card) !important;
+  box-shadow:var(--sky-shadow-card) !important;
+  margin:2px 0 18px;
+}
+html.sky .ar-panel-hd h3{color:var(--ink)}
+html.sky .ar-panel-hd p{color:var(--muted)}
+html.sky .ar-panel-hd p b{color:var(--ink)}
+/* device/cloud mode segmented control: glass options, octarine active */
+html.sky .ar-mode-opt{
+  background:rgba(255,255,255,.7);
+  border:1px solid var(--line);
+  border-radius:13px;
+  box-shadow:0 1px 4px rgba(20,60,120,.05);
+}
+html.sky .ar-mode-opt:hover{border-color:var(--ao-oct-line);background:#ffffff}
+html.sky .ar-mode-opt.active{
+  border-color:var(--ao-oct);
+  background:var(--ao-oct-soft);
+  box-shadow:0 0 0 1px var(--ao-oct) inset, 0 4px 14px -6px rgba(99,80,224,.35);
+}
+html.sky .ar-mode-opt b{color:var(--ink)}
+html.sky .ar-mode-opt span{color:var(--muted)}
+html.sky .ar-mode-opt.active b{color:var(--ao-oct)}
+/* consent gate — the trust moment: calm sky-blue tint, unmistakably a choice */
+html.sky .ar-consent{
+  background:rgba(33,150,243,.06);
+  border:1px solid rgba(33,150,243,.25);
+  border-radius:12px;
+  color:var(--muted);
+}
+html.sky .ar-consent input{accent-color:var(--sky-primary)}
+html.sky .ar-consent a{color:var(--sky-primary-deep)}
+/* cloud sign-in heads-up: amber = attention (kept), translucent */
+html.sky .ar-cloud-warn{
+  background:rgba(254,243,199,.5);
+  border-color:rgba(217,119,6,.28);
+  border-radius:12px;
+  color:var(--muted);
+}
+/* group heads: octarine dash follows the cooled token automatically */
+html.sky .ar-group-title{color:var(--ink)}
+html.sky .ar-group-sub{color:var(--faint)}
+/* portal cards (repeated — SOLID tier, zero blur) */
+html.sky .ar-util{
+  background:linear-gradient(180deg,#ffffff,#F7FAFF);
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+html.sky .ar-util-name{color:var(--ink)}
+html.sky .ar-row{
+  background:rgba(255,255,255,.75);
+  border:1px solid var(--line);
+  border-radius:13px;
+}
+html.sky .ar-panel .ar-row{background:rgba(255,255,255,.75)}
+html.sky .ar-util .ar-row{background:rgba(20,60,120,.035);border-color:rgba(20,60,120,.08)}
+html.sky .ar-vendor{color:var(--ink)}
+/* credential fields: crisp white, octarine focus (signature-on-interaction) */
+html.sky .ar-fields input{
+  background:#ffffff;
+  color:var(--ink);
+  border:1px solid rgba(20,60,120,.16);
+  border-radius:11px;
+}
+html.sky .ar-fields input::placeholder{color:var(--faint)}
+html.sky .ar-fields input:focus{
+  border-color:var(--ao-oct) !important;
+  box-shadow:0 0 0 3px var(--ao-oct-soft);
+}
+/* save/error button states — theme-sky's .acct-btn.primary blanket outranked
+   these (same importance, higher specificity); re-assert with the html.sky
+   prefix so ✓ Saved flips green and errors flip amber again */
+html.sky .ar-save.ar-saved-ok{
+  background:#0f9d58 !important;border-color:#0f9d58 !important;color:#ffffff !important;
+  box-shadow:0 6px 16px -6px rgba(15,157,88,.5) !important;
+}
+html.sky .ar-save.ar-save-err{
+  background:#b45309 !important;border-color:#b45309 !important;color:#ffffff !important;
+  box-shadow:0 6px 16px -6px rgba(180,83,9,.5) !important;
+}
+/* duplicate-username hint keeps its amber semantics; soften onto glass */
+html.sky .ar-dup-hint{background:rgba(180,83,9,.08);border-color:rgba(180,83,9,.28)}
+/* pending-confirm note: was a hardcoded stray octarine (#a368ff) — fold it
+   into the cooled signature */
+html.sky .ar-pending-note{
+  border-color:var(--ao-oct-line);
+  border-left:3px solid var(--ao-oct);
+  background:var(--ao-oct-soft);
+  color:var(--muted);
+}
+html.sky .ar-pending-note b{color:var(--ao-oct)}
+/* utility picker: quiet blue well; octarine interaction hovers (was emerald) */
+html.sky .ar-picker{
+  background:#F2F7FE;
+  border:1px solid rgba(20,60,120,.14);
+  border-radius:14px;
+}
+html.sky .ar-picker-search{
+  background:#ffffff;color:var(--ink);
+  border:1px solid rgba(20,60,120,.16);border-radius:11px;
+}
+html.sky .ar-picker-search:focus{
+  border-color:var(--ao-oct) !important;
+  box-shadow:0 0 0 3px var(--ao-oct-soft);
+}
+html.sky .ar-picker-item{color:var(--ink)}
+html.sky .ar-picker-item:hover{
+  border-color:rgba(99,80,224,.40);
+  background:rgba(99,80,224,.07);
+}
+html.sky .ar-picker-state,
+html.sky .ar-picker-hint{color:var(--faint)}
+/* "+ Add a utility login": a dashed glass card, not a pill (theme-sky's blanket
+   .acct-btn pill radius reads wrong on a 52px full-width card button) */
+html.sky .ar-addutil-btn{
+  border-radius:14px !important;
+  border:1.5px dashed rgba(70,101,140,.5) !important;
+  background:rgba(33,150,243,.04) !important;
+  color:#46658C !important;
+  font-weight:650 !important;
+  box-shadow:none !important;
+}
+html.sky .ar-addutil-btn:hover{
+  border-color:var(--ao-oct) !important;
+  color:var(--ao-oct) !important;
+  background:var(--ao-oct-soft) !important;
+}
+/* request-a-utility queue: octarine chips/CTAs follow the cooled token via
+   their var(--ao-oct,…) fallbacks; just round the corners into the system */
+html.sky .ar-req-add{border-radius:10px}
+/* the send CTA's stock gradient mixes toward BLACK at the bottom — too heavy
+   on the light panel; keep it pure cooled octarine */
+html.sky .ar-req-send{
+  border-radius:11px;
+  background:linear-gradient(180deg,#6F5CE8,#5847D2);
+  box-shadow:0 5px 16px -6px rgba(99,80,224,.55);
+}
+html.sky .ar-req-queue{border-top:1px dashed var(--line)}
+html.sky .ar-req-head{color:var(--faint)}
+html.sky .ar-req-tip{color:var(--faint)}
+/* SolarEdge key rows: green = connected/working (LIVE semantics, kept) */
+html.sky .ar-se-krow{
+  background:rgba(15,157,88,.07);
+  border-color:rgba(15,157,88,.24);
+  border-radius:10px;
+}
+html.sky .ar-se-kdot{color:#0f9d58}
+html.sky .ar-se-kval{background:rgba(20,60,120,.06);color:var(--ink)}
+html.sky .ar-se-reveal{color:var(--sky-primary-deep)}
+html.sky .ar-se-karr{color:var(--faint)}
+
+/* ── 5b · THE LIVE DATA BOARD — octarine frames it (signature), green means
+      working, the pulse stays. Calm near-solid glass, no blur. ────────────── */
+html.sky .ar-live{
+  background:#ffffff;
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 4px 16px -8px rgba(20,60,120,.14);
+}
+html.sky .ar-live::before{background:linear-gradient(180deg,var(--ao-oct),rgba(99,80,224,.55))}
+html.sky .ar-live-head{
+  background:linear-gradient(180deg, var(--ao-oct-soft), rgba(99,80,224,.04));
+  border-bottom:1px solid var(--line);
+}
+html.sky .ar-live-badge{color:var(--ao-oct)}
+html.sky .ar-live-count{color:var(--muted)}
+html.sky .ar-live-count b{color:var(--ink)}
+html.sky .ar-live-fresh{color:var(--muted)}
+html.sky .ar-live-row + .ar-live-row{border-top:1px solid rgba(20,60,120,.08)}
+html.sky .ar-live-name b{color:var(--ink)}
+html.sky .ar-live-name span{color:var(--muted)}
+html.sky .ar-live-meta .t{color:var(--ink)}
+html.sky .ar-live-empty{color:var(--muted)}
+html.sky .ar-live-empty b{color:var(--ink)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · FLEET-ALERTS WIDGET (.ao-al-*) — its own --al-* light island; re-point
+   the tokens ON the fab/panel roots (never on :root — the two :roots stay
+   unmerged). Material: floating glass chrome — the panel is a singular
+   modal-tier overlay, so blur is allowed here (not a repeated card).
+   Watch-dot + status colors (red/amber/slate/green) are semantics — kept.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.sky .ao-al-fab,
+html.sky .ao-al-panel{
+  --al-ink:#0E1420;
+  --al-muted:#4A5B75;
+  --al-faint:#7C8798;
+  --al-line:rgba(20,60,120,.14);
+  --al-blue:var(--sky-primary);
+  --al-card:rgba(255,255,255,.9);
+}
+html.sky .ao-al-fab{
+  -webkit-backdrop-filter:blur(14px) saturate(1.4);
+  backdrop-filter:blur(14px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.8);
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .ao-al-fab:hover{box-shadow:0 12px 30px -10px rgba(20,60,120,.3)}
+html.sky .ao-al-fab.open{border-color:rgba(33,150,243,.45)}
+html.sky .ao-al-panel{
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:20px;
+  box-shadow:var(--sky-shadow-float);
+}
+html.sky .ao-al-head{
+  background:linear-gradient(180deg, rgba(233,243,253,.7), rgba(255,255,255,.4));
+  border-bottom:1px solid var(--al-line);
+}
+html.sky .ao-al-h-ic{background:rgba(33,150,243,.12)}
+html.sky .ao-al-foot{
+  background:rgba(233,243,253,.6);
+  border-top:1px solid var(--al-line);
+}
+html.sky .ao-al-input{background:rgba(255,255,255,.85)}
+html.sky .ao-al-input:focus{
+  border-color:var(--sky-primary);
+  box-shadow:0 0 0 3px rgba(33,150,243,.14);
+}
+html.sky .ao-al-seg{
+  background:rgba(255,255,255,.7);
+  border-color:var(--al-line);
+  border-radius:11px;
+}
+html.sky .ao-al-seg:hover{border-color:rgba(33,150,243,.35)}
+html.sky .ao-al-seg.on{
+  background:rgba(33,150,243,.12);
+  border-color:rgba(33,150,243,.45);
+}
+html.sky .ao-al-preview{
+  background:rgba(227,240,252,.5);
+  border-color:var(--al-line);
+  border-radius:12px;
+}
+html.sky .ao-al-track{background:rgba(20,60,120,.20)}
+html.sky .ao-al-save{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary);
+  border-radius:11px;
+  box-shadow:0 5px 14px -5px rgba(33,150,243,.55);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7 · APP.JS MODAL FAMILY — counter-style the known inline properties so the
+   shared modal (openModal / AODialog / claim / diagnosis) reads as foundation
+   glass. theme-sky.css already frosted the shell (.ao-modal/.ao-overlay/foot/
+   buttons/inputs); this finishes the interior.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.sky .ao-modal-head{border-bottom:1px solid var(--line) !important;background:transparent !important}
+html.sky .ao-modal-title{color:var(--ink) !important}
+html.sky .ao-modal-close{
+  width:32px;height:32px;display:grid;place-items:center;
+  background:rgba(255,255,255,.6) !important;
+  color:var(--muted) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:999px !important;
+}
+html.sky .ao-modal-close:hover{background:#ffffff !important;color:var(--ink) !important;border-color:rgba(33,150,243,.4) !important}
+html.sky .ao-dialog-msg{color:var(--ink)}
+html.sky .ao-label{color:#46658C !important}
+html.sky .ao-note{color:var(--muted) !important}
+/* evidence chip (claim modal): the system computed this → cool sky-blue tint */
+html.sky .ao-evidence{
+  background:rgba(33,150,243,.07) !important;
+  border:1px solid rgba(33,150,243,.22) !important;
+  border-radius:12px !important;
+  color:var(--ink) !important;
+}
+html.sky .ao-diag-stat{
+  background:rgba(255,255,255,.85) !important;
+  border:1px solid var(--line) !important;
+  border-radius:12px !important;
+}
+html.sky .ao-diag-num{color:var(--sky-primary-deep) !important}
+html.sky .ao-diag-cap{color:var(--muted) !important}
+html.sky .ao-sites,
+html.sky .ao-site{
+  background:rgba(255,255,255,.8) !important;
+  border:1px solid var(--line) !important;
+  border-radius:12px !important;
+}
+html.sky .ao-causes{color:var(--muted) !important}
+/* destructive confirm: theme-sky's .ao-btn-primary blanket (same importance,
+   higher specificity) painted AODialog danger:true buttons ACTION BLUE — a
+   "Delete" must never read like a routine confirm. Re-assert red at higher
+   specificity; only the shape stays modern. */
+html.sky .ao-btn-danger,
+html.sky .ao-btn-primary.ao-btn-danger{
+  background:linear-gradient(180deg,#ef4444,#dc2626) !important;
+  color:#ffffff !important;
+  border-radius:var(--sky-r-btn) !important;
+  box-shadow:0 6px 18px -6px rgba(220,38,38,.55) !important;
+}
+html.sky .ao-btn-primary.ao-btn-danger:hover{
+  background:linear-gradient(180deg,#f05252,#dc2626) !important;
+  box-shadow:0 9px 24px -7px rgba(220,38,38,.6) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8 · FULL-PAGE LOCKOUT GATES — cancelled + trial-frozen. Inline-styled top to
+   bottom in app.js; !important counter-styles turn the card into foundation
+   frosted glass over a deep-sky scrim. The frozen gate keeps its Ford-ratified
+   emerald CTA (green = the go/positive moment there); the cancelled gate's
+   legacy #137a4a green CTA moves to the sky's primary action blue.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.sky #aoCancelledGate,
+html.sky #aoFrozenGate{
+  background:rgba(13,44,86,.5) !important;
+  -webkit-backdrop-filter:blur(10px) saturate(1.2) !important;
+  backdrop-filter:blur(10px) saturate(1.2) !important;
+}
+html.sky #aoCancelledGate > div,
+html.sky #aoFrozenGate > div{
+  background:rgba(255,255,255,.88) !important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.7) !important;
+  border-radius:26px !important;
+  box-shadow:var(--sky-shadow-float) !important;
+}
+html.sky #aoCancelledGate h1,
+html.sky #aoFrozenGate h1{color:var(--ink) !important}
+/* cancelled: slate lock chip → sky tint; CTA → action blue */
+html.sky #aoCancelledGate > div > div:first-child{background:#E3F0FC !important}
+html.sky #aoCancelledGate > div > div:first-child svg{stroke:var(--sky-primary-deep)}
+html.sky #aoCancelledGate p[style*="137a4a"]{color:#0f9d58 !important}
+html.sky #aoReactivateBtn{
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 42%), var(--sky-primary) !important;
+  border-radius:13px !important;
+  box-shadow:0 10px 26px -8px rgba(33,150,243,.55) !important;
+}
+html.sky #aoReactivateBtn:hover{filter:brightness(1.06)}
+/* frozen: mint chip + emerald CTA kept; just the ink cools onto the glass */
+html.sky #aoFrozenGate h1[style*="0f2a1e"]{color:var(--ink) !important}
+html.sky #aoFrozenAddCard{border-radius:13px !important}
+html.sky #aoCancelledSignOut,
+html.sky #aoFrozenSignOut{color:#7C8798 !important}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9 · BANNER / NUDGE FAMILY — glass cards; state colors (amber warn, blue
+   almost-done, left-rail tiers) preserved exactly.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* GMP "you're not done" gate: amber stays amber — translucent amber glass */
+html.sky .gmp-gate{
+  background:linear-gradient(115deg, rgba(255,251,235,.94), rgba(254,243,199,.8)) !important;
+  border:1px solid rgba(217,119,6,.30) !important;
+  border-radius:18px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+/* "almost there" variant: blue — harmonized to the sky's action blue */
+html.sky .gmp-gate.almost{
+  background:linear-gradient(115deg, rgba(227,240,252,.94), rgba(214,234,250,.8)) !important;
+  border-color:rgba(33,150,243,.35) !important;
+}
+html.sky .gmp-gate.almost .gmp-gate-badge,
+html.sky .gmp-gate.almost .gmp-gate-cta{background:var(--sky-primary) !important;color:#ffffff !important}
+html.sky .gmp-gate.almost .gmp-gate-cta{box-shadow:0 6px 18px -8px rgba(33,150,243,.6) !important}
+html.sky .gmp-gate-cta{border-radius:11px !important}
+/* trial/ext-live/vault nudges: one quiet glass card, tier rails re-asserted */
+html.sky .trial-nudge{
+  background:rgba(255,255,255,.78) !important;
+  border-color:rgba(255,255,255,.85) !important;
+  border-radius:16px !important;
+  box-shadow:var(--sky-shadow-card) !important;
+}
+html.sky .trial-nudge.urgent{border-left:2px solid #d97706 !important}
+html.sky .trial-nudge.success{border-left:2px solid var(--good) !important}
+html.sky .trial-nudge.neutral{border-left:2px solid rgba(20,60,120,.28) !important}
+html.sky .trial-nudge-copy{color:var(--muted)}
+html.sky .trial-nudge-copy b{color:var(--ink)}
+html.sky .trial-nudge-cta{
+  color:var(--sky-primary-deep) !important;
+  border:1px solid rgba(33,150,243,.30) !important;
+  background:rgba(255,255,255,.6) !important;
+  border-radius:999px !important;
+}
+html.sky .trial-nudge-cta:hover{
+  border-color:var(--sky-primary) !important;
+  background:#ffffff !important;
+}
+
+/* ── 10 · SQUIRCLE — extend the foundation's progressive enhancement to this
+      pass's card vocabulary (Chrome 139+; harmless no-op elsewhere) ───────── */
+@supports (corner-shape: squircle){
+  html.sky .ar-panel,
+  html.sky .ar-util,
+  html.sky .ar-row,
+  html.sky .ar-live,
+  html.sky .ar-mode-opt,
+  html.sky .ao-plan-card,
+  html.sky .ao-al-panel,
+  html.sky .ao-upgrade-pop,
+  html.sky .trial-nudge,
+  html.sky .gmp-gate,
+  html.sky #aoCancelledGate > div,
+  html.sky #aoFrozenGate > div{
+    corner-shape:squircle;
+  }
+}

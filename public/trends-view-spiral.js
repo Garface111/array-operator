@@ -6,6 +6,10 @@
   const C = window.AOTrends;
   const TAU = Math.PI * 2;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // SKY demo flag (2026-07-12): reference rings/spokes are night-first white
+  // alpha, invisible on the sky theme's light canvas. Constant branch only.
+  const SKY = document.documentElement.classList.contains("sky");
+  const RING = SKY ? "rgba(14,20,32,.10)" : "rgba(255,255,255,.05)";
 
   C.registerView("spiral", {
     label: "Solar Spiral", badge: "B", order: 2,
@@ -103,7 +107,7 @@
         ctx.lineWidth = 1;
         for (let i = 1; i <= 4; i++) {
           const r = Rmin + (Rmax - Rmin) * i / 4;
-          ctx.strokeStyle = "rgba(255,255,255,.05)";
+          ctx.strokeStyle = RING;
           ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
         }
 
@@ -111,7 +115,7 @@
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         for (let m = 1; m <= 12; m++) {
           const a = ang(m), hot = m === hoverMonth;
-          ctx.strokeStyle = hot ? C.hexA(C.COLORS.gold, .22) : "rgba(255,255,255,.05)";
+          ctx.strokeStyle = hot ? C.hexA(C.COLORS.gold, .22) : RING;
           ctx.lineWidth = hot ? 1.6 : 1;
           ctx.beginPath();
           ctx.moveTo(cx + Math.cos(a) * Rmin, cy + Math.sin(a) * Rmin);

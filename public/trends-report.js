@@ -26,7 +26,10 @@
   // invisible and a near-black halo makes the YoY line + % labels read muddy,
   // so flip to dark-on-light grid/axis and a WHITE halo (the page cut-out).
   const isDay = () => document.documentElement.getAttribute("data-theme") === "day";
-  const GRID = () => isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.07)";
+  // SKY demo flag (2026-07-12): sky rides the day branch; only the gridline
+  // hairline moves to the sky grammar value. Flag off is byte-identical stock.
+  const SKY = document.documentElement.classList.contains("sky");
+  const GRID = () => SKY ? "rgba(14,20,32,.10)" : isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.07)";
   const AXIS = () => isDay() ? "rgba(15,23,42,.22)" : "rgba(255,255,255,.20)";
   const HALO = () => isDay() ? "rgba(255,255,255,.95)" : "rgba(7,11,17,.88)";
   // YoY-line/label accent. The day theme repoints --gold2 to a deep brown

@@ -27,6 +27,11 @@
     } catch (e) { return fallback; }
   }
 
+  // SKY demo flag (flag-gated "Sky" redesign, 2026-07-12). Canvas draw code
+  // can't be re-themed from CSS, so palette CONSTANTS branch on the flag here.
+  // Flag off ⇒ every value below is byte-identical to stock.
+  const SKY = document.documentElement.classList.contains("sky");
+
   // Brand palette — pulled live from styles.css :root, with fallbacks so the
   // renderers work even if loaded standalone (e.g. an agent's test harness).
   const COLORS = {
@@ -40,13 +45,20 @@
     get muted() { return cssVar("--muted", "#8b97a8"); },
     get faint() { return cssVar("--faint", "#6b7686"); },
     get bg()    { return cssVar("--bg", "#0a0e14"); },
-    line: "rgba(255,255,255,.08)",
+    line: SKY ? "rgba(14,20,32,.10)" : "rgba(255,255,255,.08)",
   };
 
   // Deterministic year -> hue. Newest year = boldest green; then gold, sky,
   // violet, gold, teal… Up to 8 distinct years before repeating.
-  const YEAR_PALETTE = ["#3fd68a", "#f5b942", "#5ec2ff", "#b07cf0",
-                        "#2bb6a8", "#e6a23c", "#9aa0aa", "#d4a017"];
+  // Sky theme: newest year = the action blue, prior year = deep sky-700 (the
+  // day theme's ratified readable blue — year colors also render as 11px
+  // tooltip TEXT, where the brief's light #56B4F0 fails contrast on white),
+  // then day-legible amber/violet/teal — same hue ROLES, re-cut for light.
+  const YEAR_PALETTE = SKY
+    ? ["#2196F3", "#0369A1", "#D97706", "#7C3AED",
+       "#0D9488", "#B45309", "#64748B", "#A16207"]
+    : ["#3fd68a", "#f5b942", "#5ec2ff", "#b07cf0",
+       "#2bb6a8", "#e6a23c", "#9aa0aa", "#d4a017"];
   function yearColor(year, years) {
     const desc = [...years].sort((a, b) => b - a);
     const i = desc.indexOf(year);

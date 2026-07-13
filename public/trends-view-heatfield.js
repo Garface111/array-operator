@@ -4,6 +4,16 @@
 (function () {
   "use strict";
   const C = window.AOTrends;
+  // SKY demo flag (2026-07-12): the heat ramp + empty-cell fill + tooltip
+  // delta colors are night-first hardcodes. Constant branches only — flag off
+  // is byte-identical stock. Sky ramp: pale azure → light sky → action blue →
+  // deep cobalt (hot months read as the DEEPEST blue on the light canvas).
+  const SKY = document.documentElement.classList.contains("sky");
+  const HEAT_STOPS = SKY
+    ? [[227, 240, 252], [86, 180, 240], [33, 150, 243], [13, 71, 161]]
+    : [[10, 30, 24], [63, 214, 138], [245, 185, 66], [255, 212, 121]];
+  const EMPTY_CELL = SKY ? "rgba(14,20,32,.05)" : "rgba(255,255,255,.025)";
+  const YOY_DOWN = SKY ? "#DC2626" : "#f3a08a";
   C.registerView("heatfield", {
     label: "Heat-Field", badge: "D", order: 4,
     describe: "A month × year grid where every cell glows with its production. Bright summer bands, the diagonal of fleet growth, and any dark down-month jump out instantly.",
@@ -27,7 +37,7 @@
       let layout = null;          // last computed geometry, for hit-testing
 
       function heat(f) {
-        const stops = [[10, 30, 24], [63, 214, 138], [245, 185, 66], [255, 212, 121]];
+        const stops = HEAT_STOPS;
         const seg = f * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(seg)), tt = seg - i;
         const a = stops[i], b = stops[i + 1];
         return `rgb(${a[0] + (b[0] - a[0]) * tt | 0},${a[1] + (b[1] - a[1]) * tt | 0},${a[2] + (b[2] - a[2]) * tt | 0})`;
@@ -77,7 +87,7 @@
         if (prev != null && prev > 0) {
           const pct = (kwh - prev) / prev * 100;
           const up = pct >= 0;
-          const col = up ? C.COLORS.good2 : "#f3a08a";
+          const col = up ? C.COLORS.good2 : YOY_DOWN;
           delta = `<span class="trv-heatfield-d" style="color:${col}">${up ? "▲" : "▼"} ${Math.abs(pct).toFixed(1)}% YoY</span>`;
         }
         tip.innerHTML = `<b>${C.esc(label)}</b> · ${C.fmt0(kwh)} kWh` + (delta ? "<br>" + delta : "");
@@ -124,7 +134,7 @@
             const x = PAD.l + cw * (m - 1) + gap, yy = PAD.t + ch * ri + gap;
             const v = series[y][m];
             if (v == null) {
-              ctx.fillStyle = "rgba(255,255,255,.025)";
+              ctx.fillStyle = EMPTY_CELL;
               rr(ctx, x, yy, cwi, chi, radius); ctx.fill();
               continue;
             }

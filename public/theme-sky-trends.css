@@ -1,0 +1,191 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY THEME — TRENDS TAB deep pass (#trends / #trendsRoot)      (2026-07-12)
+   ─────────────────────────────────────────────────────────────────────────────
+   Loaded ONLY when the sky flag is on, after theme-sky.css (see index.html's
+   flag script). Every rule is scoped under html.sky; flag off ⇒ this file
+   never loads. Where a rule fights theme-day.css's !important trends patches
+   (.tr-glow / .tr-export / .tr-chartblock accent / .tr-stack-dot / .an-g.on /
+   .an-tip / .rp-tip) it must carry !important too — equal specificity, later
+   sheet wins.
+
+   Material map for this tab (per the theme-sky.css tiers):
+     · #trendsRoot        — THE one content-glass sheet for the view
+                            (blur allowed: one element, not repeated)
+     · every card on it   — solid tier: rgba(255,255,255,.8+), white 1px edge,
+                            soft blue shadow, NO backdrop-filter (they repeat)
+   Canvas palettes live in the trends*.js files (SKY-gated constants);
+   this sheet only touches DOM chrome.
+
+   PRESERVED SEMANTICS: pos/neg delta colors (day's ratified sky-700 positives
+   stay), amber=warn, red=hard error, '~'/est. honesty markers, the honest
+   "needs 2+ years" captions. Material changes only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · THE VIEW SHEET — #trendsRoot floats as one glass sheet on the sky ── */
+html.sky #trendsRoot{
+  background:var(--sky-glass-content);
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:var(--sky-r-sheet);
+  box-shadow:var(--sky-shadow-sheet);
+  padding:20px 26px 30px;
+  margin-top:14px;
+}
+@media (max-width:600px){
+  html.sky #trendsRoot{padding:14px 12px 22px;border-radius:24px}
+}
+
+/* ── 2 · STAT BAND — four floating glass tiles ─────────────────────────────── */
+html.sky .tr-stat{
+  background:rgba(255,255,255,.8);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:var(--sky-r-card);
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .tr-stat::after{box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+/* stat-tile ambient glow: theme-day forces its blue with !important — re-cut
+   to the sky action blue */
+html.sky .tr-glow{background:radial-gradient(circle at 50% 0%,rgba(33,150,243,.13),transparent 70%) !important}
+
+/* ── 3 · CHART CARDS (solid tier — the framed instruments) ─────────────────── */
+html.sky .tr-chartblock,
+html.sky #trendsRoot .an-wrap,
+html.sky .rp-card,
+html.sky .tr-adv-btn{
+  background:rgba(255,255,255,.86);
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .tr-chartblock{border-radius:var(--sky-r-card)}
+html.sky .rp-card{border-radius:var(--sky-r-card)}
+
+/* per-view accents: theme-day flattens every block to #2563eb !important —
+   restore per-view tinting in the sky family (canvas palettes match) */
+html.sky .tr-chartblock{--tr-accent:#2196F3 !important}
+html.sky .tr-chartblock:has(#trHost_spiral){--tr-accent:#D97706 !important}
+html.sky .tr-chartblock:has(#trHost_heatfield){--tr-accent:#1565C0 !important}
+html.sky .tr-stack-dot{
+  background:var(--tr-accent) !important;
+  box-shadow:0 0 8px color-mix(in srgb, var(--tr-accent) 55%, transparent) !important;
+}
+/* the ambient breathe reads much stronger on white than on night glass */
+html.sky .tr-ambient{opacity:.5}
+
+/* ── 4 · CONTROLS — segmented pills, selects, buttons ──────────────────────── */
+/* granularity + (legacy) view switcher tracks: blue-tint wells on the card */
+html.sky .an-gran,
+html.sky .tr-switch{
+  background:rgba(20,60,120,.06);
+  border-color:rgba(20,60,120,.12);
+  border-radius:var(--sky-r-pill);
+}
+html.sky .an-g{border-radius:var(--sky-r-pill)}
+/* the active granularity takes the per-granularity accent (JS sets
+   --an-accent inline on .an-wrap); beat theme-day's forced #2563eb */
+html.sky .an-g.on{
+  background:var(--an-accent,#2196F3) !important;
+  color:#ffffff !important;
+  box-shadow:0 4px 14px -4px color-mix(in srgb, var(--an-accent,#2196F3) 70%, transparent) !important;
+}
+html.sky .tr-seg{border-radius:var(--sky-r-pill)}
+html.sky .tr-seg-b{background:rgba(20,60,120,.18);color:#ffffff}
+html.sky .tr-seg.on .tr-seg-b{color:#ffffff}
+/* period nav ‹ › buttons */
+html.sky .an-navbtn{
+  background:rgba(255,255,255,.8);
+  border-color:rgba(20,60,120,.16);
+  border-radius:10px;
+}
+html.sky .an-navbtn:hover:not(:disabled){
+  background:#ffffff;
+  border-color:rgba(33,150,243,.45);
+  color:var(--sky-primary-deep);
+}
+/* array-filter select */
+html.sky .tr-select{
+  background:rgba(255,255,255,.85);
+  border-color:rgba(20,60,120,.16);
+  border-radius:var(--sky-r-btn);
+}
+html.sky .tr-select:hover{border-color:rgba(33,150,243,.5)}
+html.sky .tr-select:focus{
+  border-color:var(--sky-primary);
+  box-shadow:0 0 0 3px rgba(33,150,243,.18);
+}
+html.sky .tr-filter-scope,
+html.sky .tr-stack-tag{
+  background:rgba(20,60,120,.06);
+  border-color:rgba(20,60,120,.12);
+}
+/* CSV export: white glass pill, action-blue label (day forces its own with
+   !important, so match weight) */
+html.sky .tr-export{
+  background:rgba(255,255,255,.75) !important;
+  border:1px solid rgba(255,255,255,.9) !important;
+  border-radius:var(--sky-r-pill) !important;
+  color:var(--sky-primary-deep) !important;
+  box-shadow:0 2px 10px rgba(20,60,120,.08);
+}
+html.sky .tr-export:hover{
+  background:#ffffff !important;
+  border-color:rgba(33,150,243,.45) !important;
+}
+
+/* ── 5 · ANALYTICS INTERIOR — kpis, cards, tiles, attribution ──────────────── */
+html.sky .an-kpi,
+html.sky .an-card,
+html.sky .an-rectile,
+html.sky .an-envtile{
+  background:rgba(227,240,252,.5);
+  border:1px solid rgba(20,60,120,.09);
+}
+html.sky .an-kpi-prompt{border-style:dashed}
+html.sky .an-envtile{border-radius:12px}
+/* attribution bar track: white-alpha is invisible on white */
+html.sky .an-bar{background:rgba(20,60,120,.08)}
+/* negative delta chip: night's light salmon is washy on white */
+html.sky .an-delta.neg{color:#B91C1C;background:rgba(220,38,38,.08)}
+html.sky .an-tip-cmp .neg{color:#B91C1C}
+
+/* ── 6 · TOOLTIPS — .tr-tip is still night-dark even in day; lift to glass ── */
+html.sky .tr-tip{
+  background:rgba(255,255,255,.95);
+  border:1px solid color-mix(in srgb, var(--tr-accent,#2196F3) 30%, rgba(20,60,120,.14));
+  box-shadow:0 14px 34px -12px rgba(20,60,120,.35),0 0 0 1px rgba(255,255,255,.6);
+}
+html.sky .tr-tip b{color:var(--sky-primary-deep)}
+html.sky .trv-liquid-tip b{color:var(--sky-primary-deep)}
+/* an-tip / rp-tip already white via theme-day — just soften the shadow blue */
+html.sky .an-tip,
+html.sky .rp-tip{box-shadow:0 14px 34px -12px rgba(20,60,120,.35) !important}
+
+/* ── 7 · ADVANCED-VISUALIZATIONS COLLAPSE ──────────────────────────────────── */
+html.sky .tr-adv-btn{border-radius:18px}
+html.sky .tr-adv-btn:hover{border-color:rgba(33,150,243,.45)}
+html.sky .tr-adv-btn.open{
+  border-color:rgba(33,150,243,.4);
+  background:linear-gradient(170deg,rgba(33,150,243,.07),rgba(255,255,255,.86));
+}
+
+/* ── 8 · BY-ARRAY TABLE ────────────────────────────────────────────────────── */
+html.sky .tr-tablewrap{
+  background:rgba(255,255,255,.8);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:var(--sky-r-card);
+  box-shadow:var(--sky-shadow-card);
+}
+/* status chips: emerald tint → action-blue tint; "no data" well on white */
+html.sky .tr-astat-ok{background:rgba(33,150,243,.10)}
+html.sky .tr-astat-none{background:rgba(20,60,120,.06)}
+
+/* ── 9 · SQUIRCLE progressive enhancement (mirrors theme-sky.css §10) ──────── */
+@supports (corner-shape: squircle){
+  html.sky #trendsRoot,
+  html.sky .tr-stat,
+  html.sky .tr-chartblock,
+  html.sky #trendsRoot .an-wrap,
+  html.sky .rp-card,
+  html.sky .tr-adv-btn,
+  html.sky .tr-tablewrap{corner-shape:squircle}
+}

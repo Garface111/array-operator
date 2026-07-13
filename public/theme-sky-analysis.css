@@ -1,0 +1,289 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKY DEMO — ANALYSIS TAB deep pass (theme-sky-analysis.css)      2026-07-12
+   ─────────────────────────────────────────────────────────────────────────────
+   The Analysis NOC keeps its monitoring-grade density but sits on glass:
+   · ONE content-tier glass sheet per view — #panelAnalysis .an-wrap gets the
+     blur(16px) budget (same contract as #sbWrap / .dash-wrap in theme-sky.css).
+   · The 9 module cards (.an-card / .ansum-card) are SOLID near-white — NO
+     backdrop-filter on repeated cards (perf guardrail, brief §perf).
+   · Hairlines go rgba(14,20,32,.08) via a panel-scoped --line re-point: every
+     module reads var(--line), so one token line re-tints ~100 internal borders.
+
+   OVERRIDE STRATEGY (why this file wins without editing the JS):
+   The 9 analysis-*.js modules inject their own <style> tags into <head> AFTER
+   this <link>, but they use ZERO !important and only bare class selectors
+   (max ~(0,3,1)). Every rule here is prefixed `html.sky #panelAnalysis` —
+   (1,2,1)+ — so ID specificity beats them regardless of injection order.
+   COROLLARY: whenever a base rule here touches a property the module also
+   sets in a STATE variant (.on / :hover / :focus / [disabled]), that state
+   is re-declared here too, or this sheet would clobber it. Grep "state
+   re-declare" below for every instance.
+
+   The #panelAnalysis scope also firewalls the .an-* namespace collision with
+   trends.css (Production Analytics on the Trends tab uses .an-delta/.an-g —
+   another agent's file). Nothing here can leak onto Trends.
+
+   PRESERVED EXACTLY (ratified semantics — do not re-map):
+   amber var(--warn) / red var(--bad) washes+rings, severity left-rails,
+   .analm/.anevents chip rings per severity, 'monitoring'=warning, live dots,
+   file-type badge hues (pdf red / img cyan / sheet green), '~'/est. markers.
+   Only the BLUE family is re-tinted: the injected styles hardcode day-blue
+   rgba(37,99,235,·) + rgba(14,165,233,·) washes that pair with var(--good)/
+   var(--good2); sky re-points those tokens to #2196F3/#1E90E8, so the washes
+   follow to rgba(33,150,243,·)/rgba(30,144,232,·) to stay one hue family.
+
+   Charts: every SVG in these modules (sparklines, PI dial) strokes with
+   var(--good)/var(--good2)/var(--bg2)/currentColor — they retheme through
+   the tokens automatically. No canvas, no hardcoded chart palette here.
+
+   NO entrance animations anywhere in this file: renderAll() re-paints every
+   module via innerHTML on debounced 5s live beats — any CSS animation on
+   the cards would visibly restart on every beat.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · PANEL-SCOPED TOKENS — the big lever ──────────────────────────────── */
+html.sky #panelAnalysis{
+  --line:rgba(14,20,32,.08);      /* the sky hairline, everywhere the modules
+                                     draw var(--line) borders/dividers */
+  --bg2:#EDF5FD;                  /* chip/track/group-head wash: light azure */
+  --card2:#F7FBFF;                /* sticky thead / tfoot / sub-head surfaces
+                                     (kept opaque — sticky must cover rows) */
+}
+
+/* ── 2 · THE VIEW SHEET — one content-glass surface for the whole NOC ──────
+   ⚠ NO backdrop-filter here, deliberately: this sheet is ~30,000px tall
+   (9 dense modules), and a blur filter forces it into one composited layer
+   that blows past GPU texture limits — live QA (2026-07-12) caught entire
+   viewportfuls of the sheet AND its children failing to rasterize (flat sky,
+   orphan rows). Over the smooth fixed gradient, translucent white + the
+   white edge + the sheet shadow read as the same glass without the blur.
+   The per-view blur budget stays spent on the tab bar + modals only. ─────── */
+html.sky #panelAnalysis .an-wrap{
+  margin-block:14px 46px;         /* margin-INLINE stays analysis.css's
+                                     full-bleed breakout calc — untouched */
+  padding:34px 42px 54px;
+  background:rgba(255,255,255,.6);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:var(--sky-r-sheet);
+  box-shadow:var(--sky-shadow-sheet);
+}
+/* trends.css's UNSCOPED `.an-wrap::before` (the Trends Production-Analytics
+   3px emerald #3fd68a accent bar) leaks onto THIS tab's .an-wrap — visible on
+   stock day too (pre-existing .an-* collision, see the frontend map §gotchas).
+   Kill it under the sky flag; the stock fix belongs to a trends.css scoping
+   pass, not this file. */
+html.sky #panelAnalysis .an-wrap::before{display:none}
+
+/* ── 3 · HEADER — calm, Jakarta, freshness as a floating glass pill ───────── */
+html.sky #panelAnalysis .an-head{margin:0 0 22px}
+html.sky #panelAnalysis .an-head h2{font-size:23px;font-weight:760;letter-spacing:-.02em}
+html.sky #panelAnalysis .an-asof{
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:var(--sky-r-pill);
+  padding:7px 14px;
+  box-shadow:0 2px 10px rgba(20,60,120,.07);
+}
+html.sky #panelAnalysis .an-livedot{box-shadow:0 0 0 3px rgba(30,144,232,.16)}
+/* state re-declare: base rule above outranks the module's `.an-livedot.demo` */
+html.sky #panelAnalysis .an-livedot.demo{box-shadow:0 0 0 3px rgba(217,119,6,.14)}
+
+/* ── 4 · MODULE CARD FRAME — solid near-white tier, hairline + soft lift ──── */
+html.sky #panelAnalysis .an-sections{gap:20px}
+html.sky #panelAnalysis .an-card{
+  background:rgba(255,255,255,.84);
+  border:1px solid rgba(14,20,32,.08);
+  border-radius:var(--sky-r-card);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85), var(--sky-shadow-card);
+}
+html.sky #panelAnalysis .an-card-head{
+  padding:15px 20px;
+  background:linear-gradient(180deg,rgba(33,150,243,.04),rgba(33,150,243,0));
+  border-bottom:1px solid var(--line);
+}
+html.sky #panelAnalysis .an-block-err{
+  background:rgba(255,255,255,.7);
+  border-radius:18px;
+}
+
+/* ── 5 · SEGMENTED CONTROLS → glass pill switches (PI↔CF, Group, Density) ─── */
+html.sky #panelAnalysis .an-seg{
+  background:rgba(20,60,120,.07);
+  border:1px solid rgba(255,255,255,.6);
+  border-radius:var(--sky-r-pill);
+  padding:3px;
+}
+html.sky #panelAnalysis .an-seg-btn{border-radius:var(--sky-r-pill);padding:6px 13px}
+/* state re-declares for the base radius/padding rule above */
+html.sky #panelAnalysis .an-seg-btn:hover{color:var(--ink)}
+html.sky #panelAnalysis .an-seg-btn.on{
+  background:#ffffff;
+  color:var(--sky-primary-deep);
+  box-shadow:0 1px 5px rgba(20,60,120,.16);
+}
+
+/* ── 6 · FLEET SUMMARY (.ansum-*) — KPI tiles + risk banner as glass tiles ──
+   The ::before health rails (blue/amber/red/faint) are semantic — untouched. */
+html.sky #panelAnalysis .ansum-card,
+html.sky #panelAnalysis .ansum-banner{
+  background:rgba(255,255,255,.84);
+  border:1px solid rgba(14,20,32,.08);
+  border-radius:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85), var(--sky-shadow-card);
+}
+html.sky #panelAnalysis .ansum-spot{
+  background:rgba(255,255,255,.6);
+  border-radius:14px;
+}
+
+/* ── 7 · HEALTH kWh/kW (.anhk-*) — blue-wash retints only; bars/dial/targets
+   are fully token-driven and follow --good/--warn/--bad on their own ─────── */
+html.sky #panelAnalysis .anhk-flag.exp.good{
+  background:rgba(33,150,243,.08);
+  border-color:rgba(33,150,243,.26);
+}
+
+/* ── 8 · FORECAST (.anfc-*) ───────────────────────────────────────────────── */
+html.sky #panelAnalysis .anfc-badge{
+  background:rgba(33,150,243,.10);
+  border-color:rgba(33,150,243,.30);
+}
+html.sky #panelAnalysis .anfc-spot{
+  background:rgba(33,150,243,.06);
+  border-color:rgba(33,150,243,.18);
+}
+
+/* ── 9 · SITES GRID (.ansg-*) — the flagship table ────────────────────────── */
+html.sky #panelAnalysis .ansg-search input{
+  background:rgba(255,255,255,.85);
+  border:1px solid rgba(20,60,120,.16);
+  border-radius:10px;
+}
+/* state re-declare (base border/background above beat the module's :focus) */
+html.sky #panelAnalysis .ansg-search input:focus{
+  border-color:var(--good2);
+  box-shadow:0 0 0 3px rgba(33,150,243,.16);
+}
+html.sky #panelAnalysis .ansg-dot.ok i{box-shadow:0 0 0 3px rgba(33,150,243,.16)}
+html.sky #panelAnalysis .ansg-livedot{box-shadow:0 0 0 2px rgba(30,144,232,.2)}
+html.sky #panelAnalysis .ansg-table tbody tr:hover{background:rgba(33,150,243,.055)}
+
+/* ── 10 · ALARMS (.analm-*) — rollup chips go glass; severity rings intact ── */
+html.sky #panelAnalysis .analm-chip{
+  border-radius:16px;
+  box-shadow:0 2px 8px rgba(20,60,120,.05);
+}
+/* state re-declares: the .on selection rings + hover, per severity, exactly
+   the module's colors with the glass shadow appended */
+html.sky #panelAnalysis .analm-chip:hover{border-color:var(--good)}
+html.sky #panelAnalysis .analm-chip.on{
+  border-color:var(--good);
+  box-shadow:0 0 0 2px var(--good) inset, 0 2px 8px rgba(20,60,120,.05);
+}
+html.sky #panelAnalysis .analm-chip[data-sev='critical'].on{
+  border-color:var(--bad);
+  box-shadow:0 0 0 2px var(--bad) inset, 0 2px 8px rgba(20,60,120,.05);
+}
+html.sky #panelAnalysis .analm-chip[data-sev='warning'].on{
+  border-color:var(--warn);
+  box-shadow:0 0 0 2px var(--warn) inset, 0 2px 8px rgba(20,60,120,.05);
+}
+html.sky #panelAnalysis .analm-list{border-radius:16px}
+html.sky #panelAnalysis .analm-row:hover{background:rgba(33,150,243,.055)}
+html.sky #panelAnalysis .analm-check{background:rgba(33,150,243,.14)}
+html.sky #panelAnalysis .analm-clear-state{
+  border-radius:16px;
+  background:linear-gradient(168deg,rgba(33,150,243,.07),rgba(30,144,232,.03));
+}
+
+/* ── 11 · EVENT LOG (.anevents-*) ─────────────────────────────────────────── */
+html.sky #panelAnalysis .anevents-chip{
+  background:rgba(255,255,255,.9);
+  box-shadow:0 2px 8px rgba(20,60,120,.05);
+}
+/* state re-declares for the chip base above */
+html.sky #panelAnalysis .anevents-chip:hover{border-color:var(--good);color:var(--ink)}
+html.sky #panelAnalysis .anevents-chip.on{
+  color:var(--ink);
+  border-color:var(--good);
+  box-shadow:0 0 0 2px var(--good) inset, 0 2px 8px rgba(20,60,120,.05);
+}
+html.sky #panelAnalysis .anevents-list{border-radius:16px}
+html.sky #panelAnalysis .anevents-row:hover{background:rgba(33,150,243,.055)}
+html.sky #panelAnalysis .anevents-btn{
+  background:rgba(255,255,255,.9);
+  border-radius:var(--sky-r-pill);
+  padding:5px 13px;
+}
+/* state re-declares: hover ring + the disabled-hover guard the module has */
+html.sky #panelAnalysis .anevents-btn:hover{border-color:var(--good)}
+html.sky #panelAnalysis .anevents-btn[disabled]:hover{border-color:var(--line)}
+html.sky #panelAnalysis .anevents-resolve textarea{border-radius:10px}
+html.sky #panelAnalysis .anevents-resolve textarea:focus{
+  border-color:var(--good);
+  box-shadow:0 0 0 3px rgba(33,150,243,.16);
+}
+html.sky #panelAnalysis .anevents-empty{
+  border-radius:16px;
+  background:linear-gradient(168deg,rgba(33,150,243,.07),rgba(30,144,232,.03));
+}
+html.sky #panelAnalysis .anevents-empty .ico{background:rgba(33,150,243,.14)}
+
+/* ── 12 · HARDWARE (.anhw-*) ──────────────────────────────────────────────── */
+html.sky #panelAnalysis .anhw-chip-ico{background:rgba(33,150,243,.13)}
+html.sky #panelAnalysis .anhw-pill.ok{
+  background:rgba(33,150,243,.11);
+  border-color:rgba(33,150,243,.24);
+}
+html.sky #panelAnalysis .anhw-ghead:hover{background:rgba(33,150,243,.055)}
+html.sky #panelAnalysis .anhw-row:hover{background:rgba(33,150,243,.055)}
+
+/* ── 13 · FILES (.anfiles-*) ──────────────────────────────────────────────── */
+html.sky #panelAnalysis .anfiles-sel,
+html.sky #panelAnalysis .anfiles-pick,
+html.sky #panelAnalysis .anfiles-retry{
+  background:rgba(255,255,255,.9);
+  border-radius:10px;
+}
+/* primary upload button = the house sky CTA (shine gradient over action blue) */
+html.sky #panelAnalysis .anfiles-go{
+  background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 42%), var(--sky-primary);
+  border-color:var(--sky-primary);
+  border-radius:var(--sky-r-btn);
+  box-shadow:0 5px 14px -5px rgba(33,150,243,.55);
+}
+/* state re-declare: keep the module's dimmed disabled state glow-free */
+html.sky #panelAnalysis .anfiles-go:disabled{box-shadow:none}
+html.sky #panelAnalysis .anfiles-note.ok{background:rgba(33,150,243,.08)}
+html.sky #panelAnalysis .anfiles-badge.doc{
+  background:rgba(33,150,243,.12);
+  border-color:rgba(33,150,243,.22);
+}
+html.sky #panelAnalysis .anfiles-row:hover{background:rgba(33,150,243,.055)}
+
+/* ── 14 · PERFORMANCE (.anperf-*) — dial + bars are token-driven ──────────── */
+html.sky #panelAnalysis .anperf-chip.conf-high{
+  background:rgba(33,150,243,.09);
+  border-color:rgba(33,150,243,.32);
+}
+
+/* ── 15 · SQUIRCLE — same progressive enhancement as theme-sky.css ────────── */
+@supports (corner-shape: squircle){
+  html.sky #panelAnalysis .an-wrap,
+  html.sky #panelAnalysis .an-card,
+  html.sky #panelAnalysis .ansum-card,
+  html.sky #panelAnalysis .ansum-banner,
+  html.sky #panelAnalysis .analm-chip,
+  html.sky #panelAnalysis .analm-list,
+  html.sky #panelAnalysis .anevents-list,
+  html.sky #panelAnalysis .anfiles-go{corner-shape:squircle}
+}
+
+/* ── 16 · SMALL SCREENS — the sheet hugs the viewport; theme-sky-mobile.css
+   loads after this file and wins any ≤600px tie by source order ──────────── */
+@media (max-width:900px){
+  html.sky #panelAnalysis .an-wrap{border-radius:22px;margin-block:10px 30px}
+}
+@media (max-width:760px){
+  html.sky #panelAnalysis .an-wrap{padding:20px 16px 40px}
+}

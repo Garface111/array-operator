@@ -59,7 +59,7 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- SKY DEMO THEME — only when the ao_sky flag is on (see the pre-paint script above).
      document.write keeps it parser-blocking (no FOUC) and positions it AFTER
      mobile.css so it is the final word in the cascade. -->
-<script>if (window.__AO_SKY__) document.write('<link rel="stylesheet" href="theme-sky.css?v=20260712sky2">');</script>
+<script>if (window.__AO_SKY__) ["theme-sky.css?v=20260712sky2","theme-sky-triage.css?v=20260712sky1","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky1","theme-sky-analysis.css?v=20260712sky1","theme-sky-trends.css?v=20260712sky1","theme-sky-mobile.css?v=20260712sky1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });</script>
 <meta name="theme-color" content="#f6f8fb">
 <style>
   /* Day/night toggle — small icon control living in the tab bar (styled for both themes) */
@@ -486,14 +486,14 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="analysis-events.js?v=1"></script>
 <script src="analysis-hardware.js?v=2"></script>
 <script src="analysis-files.js?v=20260712dlg"></script>
-<script src="trends-core.js"></script>
-<script src="trends-analytics.js"></script>
-<script src="trends-report.js"></script>
-<script src="trends-view-bars.js"></script>
-<script src="trends-view-monthly.js"></script>
+<script src="trends-core.js?v=20260712sky1"></script>
+<script src="trends-analytics.js?v=20260712sky1"></script>
+<script src="trends-report.js?v=20260712sky1"></script>
+<script src="trends-view-bars.js?v=20260712sky1"></script>
+<script src="trends-view-monthly.js?v=20260712sky1"></script>
 <script src="trends-view-liquid.js"></script>
-<script src="trends-view-spiral.js"></script>
-<script src="trends-view-heatfield.js"></script>
+<script src="trends-view-spiral.js?v=20260712sky1"></script>
+<script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js"></script>
 <script>
   /* Day/night toggle wiring — persists choice in localStorage (ao_theme) and

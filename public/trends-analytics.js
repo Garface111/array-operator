@@ -24,8 +24,23 @@
 
   const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+  // SKY demo flag (2026-07-12): palette constants only — flag off is stock.
+  const SKY = document.documentElement.classList.contains("sky");
+
   // Stable color per data-source family for the attribution layer.
-  const SRC_COLOR = {
+  // Sky theme keeps the same hue ROLE per source, deepened for the light glass.
+  const SRC_COLOR = SKY ? {
+    gmp:       "#0891B2",  // utility meter — cyan
+    solaredge: "#16A34A",  // brand green
+    fronius:   "#D97706",  // gold → amber-600
+    sma:       "#7C3AED",  // violet
+    chint:     "#0D9488",  // teal
+    inverter:  "#059669",  // generic extension feed — deep green
+    csv:       "#94A3B8",  // gray
+    manual:    "#64748B",
+    bill:      "#475569",
+    other:     "#334155",
+  } : {
     gmp:       "#5ec2ff",  // utility meter — sky
     solaredge: "#3fd68a",  // brand green
     fronius:   "#f5b942",  // gold
@@ -63,15 +78,19 @@
   // colors without rebuilding anything.
   const isDay = () => document.documentElement.getAttribute("data-theme") === "day";
   const ACC_NIGHT = { day:"#5ec2ff", month:"#3fd68a", year:"#f5b942", lifetime:"#7ff0bb" };
-  const ACC_DAY   = { day:"#0ea5e9", month:"#2563eb", year:"#d97706", lifetime:"#0891b2" };
+  // Sky rides the day branch (data-theme stays 'day'); only Month moves to the
+  // sky action blue #2196F3 — the other granularity accents are already right.
+  const ACC_DAY   = SKY
+    ? { day:"#0EA5E9", month:"#2196F3", year:"#D97706", lifetime:"#0891B2" }
+    : { day:"#0ea5e9", month:"#2563eb", year:"#d97706", lifetime:"#0891b2" };
   const accentFor = (g) => (isDay() ? ACC_DAY : ACC_NIGHT)[g] || (isDay() ? ACC_DAY.month : ACC_NIGHT.month);
   const C = {
-    grid:   () => isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.06)",
+    grid:   () => SKY ? "rgba(14,20,32,.10)" : isDay() ? "rgba(15,23,42,.07)" : "rgba(255,255,255,.06)",
     ghost:  () => isDay() ? "rgba(15,23,42,.10)" : "rgba(255,255,255,.16)",
-    ylab:   () => isDay() ? "#64748b" : "#6b7686",
-    axis:   () => isDay() ? "#475569" : "#8b97a8",
-    xlab:   () => isDay() ? "#64748b" : "#8b97a8",
-    xlabOn: () => isDay() ? "#0f172a" : "#eaf0f7",
+    ylab:   () => SKY ? "#5A6572" : isDay() ? "#64748b" : "#6b7686",
+    axis:   () => SKY ? "#5A6572" : isDay() ? "#475569" : "#8b97a8",
+    xlab:   () => SKY ? "#5A6572" : isDay() ? "#64748b" : "#8b97a8",
+    xlabOn: () => SKY ? "#0E1420" : isDay() ? "#0f172a" : "#eaf0f7",
   };
 
   // ── data shaping ───────────────────────────────────────────────────────────
