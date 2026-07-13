@@ -70,12 +70,12 @@
         {name:"password", label:"SolarNOC password", secret:true},
         {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
       ] },
-    { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack", available:true, discover:false,
-      note:"Sign in with your AlsoEnergy / PowerTrack portal login — the same username & password you use at hmi.alsoenergy.com. Add a Site ID to connect one site.",
+    { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack · 1 login", available:true, discover:true,
+      note:"One AlsoEnergy / PowerTrack login attaches every site on the account — same username & password you use at hmi.alsoenergy.com. Leave Site ID blank to connect them all.",
       fields:[
-        {name:"username", label:"AlsoEnergy username"},
+        {name:"username", label:"AlsoEnergy username (email)"},
         {name:"password", label:"AlsoEnergy password", secret:true},
-        {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
+        {name:"site_id", label:"Site ID (optional — leave blank for every site)", optional:true, hint:"Only if you want one site; otherwise we attach the whole account."},
       ] },
     { code:"fronius", label:"Fronius", meta:"Solar.web", available:true, discover:true,
       note:"One key unlocks every PV system on your Solar.web account — verified working for US arrays. Find it (or create one) at api-mgmt.solarweb.com, under your account's API keys.",
@@ -118,6 +118,8 @@
     fronius:   "https://www.solarweb.com/",
     sma:       "https://ennexos.sunnyportal.com/",
     chint:     "https://monitor.chintpowersystems.com/",
+    alsoenergy:"https://hmi.alsoenergy.com/",
+    locus:     "https://hmi.alsoenergy.com/",
     gmp:       "https://greenmountainpower.com/",
     vec:       "https://vermontelectric.smarthub.coop/",
     wec:       "https://washingtonelectric.smarthub.coop/",
@@ -4150,7 +4152,7 @@
         // Vendor picker — grouped (inverter monitoring vs utility meters), each a
         // clean row-card with a brand badge + chevron. The repetitive "utility
         // meter" copy now lives once in the section subtitle, not on every row.
-        const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", gmp:"GMP", vec:"VEC", wec:"WEC", eversource:"EV", cmp:"CM" };
+        const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", alsoenergy:"AE", gmp:"GMP", vec:"VEC", wec:"WEC", eversource:"EV", cmp:"CM" };
         const SUBS  = {};   // (Chint used to need a per-site note; it auto-walks every site now)
         const card = code => `
           <button type="button" class="sb-login-btn" data-login="${code}">
@@ -4188,6 +4190,8 @@
               <div id="sbUtilResults" style="margin-top:.5rem"></div>
             </div>
           </div>`;
+        // AlsoEnergy is API-credential (PowerTrack login), not extension scrape —
+        // it lives under "Enter keys manually" with discover:true, not this list.
         const loginSections = utilityOnly
           ? utilSection
           : section("Inverter monitoring", "", ["solaredge","fronius","sma","chint"]) + utilSection;
@@ -4389,6 +4393,14 @@
         // 2026-07-08; see /v1/array-owners/fronius/connect-account).
         url = "/v1/array-owners/fronius/connect-account";
         body2 = { access_key_id: config.access_key_id, access_key_value: config.access_key_value };
+      } else if(vendor==="alsoenergy"){
+        // One PowerTrack login → every site (REST API, not extension scrape).
+        url = "/v1/array-owners/alsoenergy/connect-account";
+        body2 = { username: config.username || fields.username,
+                  password: config.password || fields.password };
+        if((config.site_id || fields.site_id || "").toString().trim()){
+          body2.site_ids = [parseInt(config.site_id || fields.site_id, 10)];
+        }
       } else if(vendor==="locus" && (fields.partner_id||"").trim()){
         url = "/v1/array-owners/locus/connect-account";
         body2 = { client_id: fields.client_id, client_secret: fields.client_secret,

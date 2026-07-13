@@ -403,12 +403,12 @@ const VENDORS = [
       {name:"password", label:"SolarNOC password", secret:true},
       {name:"partner_id", label:"Partner ID (optional — shows every site at once)"},
     ] },
-  { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack", available:true, discover:false,
-    note:"Sign in with your AlsoEnergy / PowerTrack portal login — the same username & password you use at hmi.alsoenergy.com. Add a Site ID to connect one site.",
+  { code:"alsoenergy", label:"AlsoEnergy", meta:"PowerTrack · 1 login", available:true, discover:true,
+    note:"One AlsoEnergy / PowerTrack login attaches every site on the account — same username & password you use at hmi.alsoenergy.com. Leave Site ID blank to connect them all.",
     fields:[
-      {name:"username", label:"AlsoEnergy username"},
+      {name:"username", label:"AlsoEnergy username (email)"},
       {name:"password", label:"AlsoEnergy password", secret:true},
-      {name:"site_id", label:"Site ID", hint:"Found in your PowerTrack site URL."},
+      {name:"site_id", label:"Site ID (optional — leave blank for every site)", optional:true, hint:"Only if you want one site."},
     ] },
   { code:"fronius", label:"Fronius", meta:"One account key", available:true, discover:false,
     note:"Paste your Solar.web REST API keys (Solar.web → Settings → REST API → CREATE NEW KEY) and we'll list every PV system on your account at once — same one-key connect as SolarEdge. US accounts: Fronius enables API access on request; the Query API is a paid Fronius service.",
@@ -1967,6 +1967,20 @@ async function finish(){
                 access_key_id: (state.fields.access_key_id||"").trim(),
                 access_key_value: (state.fields.access_key_value||"").trim()
               })
+            });
+            cd = await conn.json().catch(()=>({}));
+            state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
+          } else if(state.vendor==="alsoenergy"){
+            // One PowerTrack login → every site (REST API at api.alsoenergy.com).
+            const aeBody = {
+              username: (state.fields.username||"").trim(),
+              password: state.fields.password||""
+            };
+            if((state.fields.site_id||"").trim()){
+              aeBody.site_ids = [parseInt(state.fields.site_id, 10)];
+            }
+            conn = await fetch(`${API_BASE}/v1/array-owners/alsoenergy/connect-account`, {
+              method:"POST", headers:hdr, body: JSON.stringify(aeBody)
             });
             cd = await conn.json().catch(()=>({}));
             state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
