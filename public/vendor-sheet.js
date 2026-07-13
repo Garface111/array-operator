@@ -398,12 +398,14 @@
     // matching the card) so the tooltip can't read as "all fresh" either. Our capture
     // recency follows as the secondary "we did check recently" reassurance.
     if (src != null && src >= _liveWindowMin(c)) {
+      const when = _ageSincePhrase(src) || _fmtAge(src);
       parts.push((syn != null ? "We're syncing this every few minutes — but the " : "The ")
-        + v + " portal's own data hasn't updated since " + _fmtAge(src)
+        + v + " portal's own data last updated " + when
         + (c.is_daylight === false ? "; it pauses overnight while the panels aren't producing." : "."));
       return parts.join(" ");
     }
-    parts.push("The " + v + " data is live" + (syn != null ? " — synced " + _fmtAge(syn) : "") + ".");
+    const synWhen = syn != null ? (_ageSincePhrase(syn) || _fmtAge(syn)) : null;
+    parts.push("The " + v + " data is live" + (synWhen ? " — synced " + synWhen : "") + ".");
     return parts.join(" ");
   }
   // Vendor-GROUP sync summary for the collapsed header row (Ford: "the vendor was
