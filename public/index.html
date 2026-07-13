@@ -68,28 +68,34 @@ document.documentElement.setAttribute("data-theme","day");
      with the first paint. Media lists MIRROR the tier queries in
      theme-sky.css §2 + theme-sky-mobile.css §1/§6b EXACTLY — keep them in
      sync or a viewport double-fetches. Flag off → none of this runs. */
-  [["img/sky/world-1600.webp","(min-width:601px) and (max-width:1600px) and (max-resolution:1.49dppx)"],
-   ["img/sky/world-2560.webp","(min-width:1601px) and (max-width:1799px) and (max-resolution:1.49dppx)"],
-   ["img/sky/world-3840.webp","(min-width:601px) and (min-resolution:1.5dppx) and (max-resolution:1.99dppx), (min-width:1800px) and (max-resolution:1.99dppx)"],
-   ["img/sky/world-5120.webp","(min-width:601px) and (min-resolution:2dppx) and (max-resolution:2.49dppx)"],
-   ["img/sky/world-6144.webp","(min-width:601px) and (min-resolution:2.5dppx)"],
+  [["img/sky/world-sq-1600.webp","(min-width:601px) and (max-width:1600px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-sq-2560.webp","(min-width:1601px) and (max-width:1799px) and (max-resolution:1.49dppx)"],
+   ["img/sky/world-sq-3840.webp","(min-width:601px) and (min-resolution:1.5dppx) and (max-resolution:1.99dppx), (min-width:1800px) and (max-resolution:1.99dppx)"],
+   ["img/sky/world-sq-4864.webp","(min-width:601px) and (min-resolution:2dppx)"],
    ["img/sky/world-m-828.webp","(max-width:600px) and (max-resolution:1.5dppx)"],
    ["img/sky/world-m-1284.webp","(max-width:600px) and (min-resolution:1.51dppx) and (max-resolution:2.49dppx)"],
    ["img/sky/world-m-2496.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
    ["img/sky/world-m-3328.webp","(max-width:600px) and (min-resolution:3dppx)"]
   ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
-  ["theme-sky.css?v=20260713hires1","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky3","theme-sky-analysis.css?v=20260712sky2","theme-sky-trends.css?v=20260712sky2","theme-sky-resources.css?v=20260712sky1","theme-sky-mobile.css?v=20260713hires1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+  ["theme-sky.css?v=20260713desc1","theme-sky-triage.css?v=20260712sky2","theme-sky-reports.css?v=20260712sky1","theme-sky-account.css?v=20260712sky3","theme-sky-analysis.css?v=20260712sky2","theme-sky-trends.css?v=20260712sky2","theme-sky-resources.css?v=20260712sky1","theme-sky-mobile.css?v=20260713desc1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
-<!-- Mountain parallax: as you scroll, the world plate pans slightly so the UI
-     feels like glass floating over a real landscape you're moving through.
-     Only when Sky is on; honors prefers-reduced-motion. -->
+<!-- THE DESCENT — you arrive high in the plate's sky (background-position
+     center top) and the world drifts down at 0.1× the scroll speed, clamped
+     to the layer's real overflow (100vh + --sky-travel, measured — never a
+     hardcoded cap), so the glass slides float in midair while the panels are
+     slowly revealed. Only when Sky is on; honors prefers-reduced-motion
+     (CSS restores a static panels-visible framing). -->
 <script>if (window.__AO_SKY__){(function(){
   try{ if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
   var root = document.documentElement;
   var ticking = false;
-  var maxShift = 360;
-  // Gentle factor — enough to feel the crest, not enough to make UI lag.
-  var factor = (window.innerWidth && window.innerWidth <= 600) ? 0.10 : 0.16;
+  var maxShift = 0;
+  // Much slower than the content (Ford): the world is far away.
+  var factor = 0.10;
+  function measure(){
+    try{ maxShift = Math.max(0, (parseFloat(getComputedStyle(document.body, "::before").height) || 0) - window.innerHeight); }
+    catch(e){ maxShift = 0; }
+  }
   function paint(){
     ticking = false;
     var y = window.scrollY || window.pageYOffset || 0;
@@ -100,11 +106,9 @@ document.documentElement.setAttribute("data-theme","day");
   }
   function onScroll(){ if (!ticking){ ticking = true; requestAnimationFrame(paint); } }
   window.addEventListener("scroll", onScroll, { passive:true });
-  window.addEventListener("resize", function(){
-    factor = (window.innerWidth && window.innerWidth <= 600) ? 0.10 : 0.16;
-    paint();
-  }, { passive:true });
-  paint();
+  window.addEventListener("resize", function(){ measure(); paint(); }, { passive:true });
+  document.addEventListener("DOMContentLoaded", function(){ measure(); paint(); });
+  measure(); paint();
 })();}</script>
 <meta name="theme-color" content="#f6f8fb">
 <style>

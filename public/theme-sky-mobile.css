@@ -67,10 +67,22 @@
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-size:cover, auto, auto;
-    background-position:center bottom, center, center;
+    /* ARRIVE HIGH (Ford): frame the portrait plate's sky first; the descent
+       driver reveals the ridge panels at the plate foot as you scroll. */
+    background-position:center top, center, center;
     background-repeat:no-repeat;
     transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
     will-change:transform;
+  }
+  /* reduced-motion phones: static framing must still SHOW the panels — the
+     base sheet's center-70% restore is for the square desktop plate; the
+     portrait plate's panels live at its foot. */
+  @media (prefers-reduced-motion: reduce){
+    html.sky body::before{
+      height:100vh;
+      transform:none; will-change:auto;
+      background-position:center bottom, center, center;
+    }
   }
 
   /* ── 2 · THE DOCK — the fixed bottom nav becomes a floating glass pill.

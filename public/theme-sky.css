@@ -128,12 +128,16 @@ html.sky{
    body's own background must be NONE — an in-flow body background paints
    ABOVE a negative-z fixed ::before (CSS 2.1 App. E paint order), so any
    body fill would hide the world.
-   Plate tiers (mirrored by the flag-gated preloads in index.html — keep in
-   sync): ≤1600px viewports stream world-1600 · default world-2560 ·
-   ≥2200px or ≥1.5dppx world-3840. JPG for no-webp/image-set browsers.
-   background-position "center 70%": 16:9/16:10 windows fit the plate with
-   no vertical crop; ultrawides shed the surplus 70/30 off the top sky
-   (which owns half the frame) so the panels + valley never leave view.
+   Plate tiers (mirrored by the sky preloads in index.html — keep in sync):
+   the desktop plate is the SQUARE descent plate world-sq-* (sky-heavy top,
+   panel field at the foot): ≤1600 @1x sq-1600 · default sq-2560 ·
+   ≥1800/1.5x sq-3840 · 2x sq-4864 (full master). JPG fallbacks sq-2560/3840.
+   THE DESCENT (Ford 2026-07-12/13): you ARRIVE HIGH — background-position
+   center top frames the plate's pure sky; the layer is 100vh+--sky-travel
+   tall, and the sky-parallax driver (index.html) drifts it up at 0.1× scroll
+   speed, clamped to the layer overflow, so the glass slides float in midair
+   while the panels are slowly revealed. Reduced-motion restores the static
+   center-70% framing at 100vh (panels visible without motion).
    ≤600px is re-plated portrait by theme-sky-mobile.css (loads after).   ── */
 html.sky{
   background:var(--sky-mid) !important;
@@ -150,48 +154,50 @@ html.sky body{
   background:none !important;
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
 }
+html.sky{--sky-travel:62vh}
 html.sky body::before{
   content:"";
   position:fixed;
   left:0; right:0; top:0;
-  /* Taller than the viewport so the mountain-parallax transform has room to
-     pan without revealing the solid --sky-mid fallback at the edges
-     (Ford 2026-07-13: "on top of the mountain… physically move around it"). */
-  height:130vh;
+  /* Taller than the viewport by --sky-travel: the descent's pan room. */
+  height:calc(100vh + var(--sky-travel,62vh));
   z-index:-1;
   pointer-events:none;
-  /* Default plate: 2560 — rebuilt 2026-07-13 from the 6K master at high quality
-     (prior 3840.webp was a soft over-compressed upscale @ ~0.5MB; new tiers
-     preserve real edge detail and serve density-matched sizes). */
+  /* SQUARE descent plate (sky-heavy top, panels at the foot) — 16:9 plates
+     have no vertical slack for the arrive-high→reveal move. */
   background-image:
-    url("img/sky/world-2560.jpg"),
+    url("img/sky/world-sq-2560.jpg"),
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   background-image:
-    image-set(url("img/sky/world-2560.webp") type("image/webp"),
-              url("img/sky/world-2560.jpg") type("image/jpeg")),
+    image-set(url("img/sky/world-sq-2560.webp") type("image/webp"),
+              url("img/sky/world-sq-2560.jpg") type("image/jpeg")),
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   background-size:cover, auto, auto;
-  background-position:center 70%, center, center;
+  background-position:center top, center, center;
   background-repeat:no-repeat;
   /* scroll-driven pan — set by the sky-parallax script on html { --sky-py } */
   transform:translate3d(0, calc(var(--sky-py, 0px) * -1), 0);
   will-change:transform;
 }
 @media (prefers-reduced-motion: reduce){
-  html.sky body::before{transform:none;will-change:auto}
+  html.sky body::before{
+    transform:none;will-change:auto;
+    height:100vh;
+    background-position:center 70%, center, center; /* static framing keeps the panels in view */
+  }
 }
 /* small 1x desktops — lightest plate */
 @media (max-width:1600px) and (max-resolution:1.49dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-2560.jpg"),
+      url("img/sky/world-sq-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-1600.webp") type("image/webp"),
-                url("img/sky/world-2560.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-sq-1600.webp") type("image/webp"),
+                url("img/sky/world-sq-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -200,12 +206,12 @@ html.sky body::before{
 @media (min-width:1800px), (min-resolution:1.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-3840.jpg"),
+      url("img/sky/world-sq-3840.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-3840.webp") type("image/webp"),
-                url("img/sky/world-3840.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-sq-3840.webp") type("image/webp"),
+                url("img/sky/world-sq-3840.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -214,12 +220,12 @@ html.sky body::before{
 @media (min-resolution:2dppx), (min-width:2400px) and (min-resolution:1.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-3840.jpg"),
+      url("img/sky/world-sq-3840.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-5120.webp") type("image/webp"),
-                url("img/sky/world-3840.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-sq-4864.webp") type("image/webp"),
+                url("img/sky/world-sq-3840.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -228,12 +234,12 @@ html.sky body::before{
 @media (min-resolution:2.5dppx), (min-width:2800px) and (min-resolution:2dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-3840.jpg"),
+      url("img/sky/world-sq-3840.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-6144.webp") type("image/webp"),
-                url("img/sky/world-3840.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-sq-4864.webp") type("image/webp"),
+                url("img/sky/world-sq-3840.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
