@@ -582,15 +582,15 @@
     }
     return `<svg class="vs-dc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Daily output, last 14 days">${grid}${bars}${peerLine}</svg>`;
   }
-  // Build + open the full-screen detail overlay for one inverter.
-  function openInvDetail(iv, cohort, peers, isDaylight) {
+  // The stats grid for ONE inverter (Live now / vs neighbors / 14-day / range / model / rated).
+  function _invStats(iv) {
     const _alloc = isAllocatedPower(iv);
     const _pm = pctOfMax(iv);
     const live = iv.current_power_w != null
       ? `${_alloc ? "~" : ""}${esc(kw(iv.current_power_w))}${_pm ? ` · ${_pm}` : ""}` : "—";
     const stat = (k, v) => (v == null || v === "") ? "" :
       `<div class="vs-dc-stat"><span class="vs-dc-k">${k}</span><span class="vs-dc-v">${v}</span></div>`;
-    const stats = [
+    return [
       stat("Live now", live),
       stat("vs. neighbors", iv.peer_index != null ? esc(iv.peer_index.toFixed(2) + "×") : null),
       stat("14-day output", iv.window_kwh != null ? esc(Math.round(iv.window_kwh).toLocaleString() + " kWh") : null),
@@ -599,6 +599,10 @@
       stat("Model", iv.model ? esc(iv.model) : null),
       stat("Rated", iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null),
     ].join("");
+  }
+  // The FOCUS region: the selected inverter's header + live diagnosis + stats + big chart.
+  // Re-rendered in place when the operator picks a different card from the comparison deck.
+  function focusHTML(iv, cohort, peers, isDaylight) {
     const _lv = (iv.status === "ok" || iv.status == null) && peers && window.FleetStore && FleetStore.liveVerdict
       ? FleetStore.liveVerdict(iv, peers, isDaylight) : null;
     const diag = _lv === "dark"
@@ -608,19 +612,72 @@
       : (iv.diagnosis ? `<div class="vs-dc-diag">${esc(iv.diagnosis)}</div>` : "");
     const sub = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null, iv.sn ? "SN " + iv.sn : null]
       .filter(Boolean).map(esc).join(" · ");
+    return `<div class="vs-dc-head"><h3>${esc(iv.name || iv.sn || "Inverter")}</h3>${sub ? `<span class="vs-dc-sub">${sub}</span>` : ""}</div>
+      ${diag}
+      <div class="vs-dc-stats">${_invStats(iv)}</div>
+      <div class="vs-dc-chartwrap">
+        <div class="vs-dc-chart-h">Daily output · last 14 days${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average</span>` : ""}</div>
+        ${invChartHTML(iv, cohort)}
+      </div>`;
+  }
+  // Build + open the full-screen detail overlay for one inverter. Below the focused unit's
+  // own 14-day chart sits a COMPARISON DECK (Ford 2026-07-13): every inverter in the array
+  // rendered as an off-axis, isometric stack of cohort-scaled mini-charts — fanned best-to-
+  // weakest so the spread reads at a glance, and each card clickable to pull it into focus
+  // above. One sheet answers both "how is this one doing" and "how does it stack up".
+  function openInvDetail(iv, cohort, peers, isDaylight) {
+    const list = (peers && peers.length) ? peers.slice() : [iv];
+    // Rank strongest→weakest so the fan's shape itself encodes the ranking (front card = best).
+    const rankVal = a => a.peer_index != null ? a.peer_index
+      : (a.window_kwh != null ? a.window_kwh / 1e7 : -1);
+    const ranked = list.slice().sort((a, b) => rankVal(b) - rankVal(a));
+    const multi = ranked.length > 1;
+    let selId = iv.inverter_id;
+    const findIv = id => ranked.find(x => String(x.inverter_id) === String(id)) || iv;
+
     const ov = document.createElement("div");
     ov.className = "vs-dc-ov";
     ov.innerHTML =
-      `<div class="vs-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
+      `<div class="vs-dc-modal${multi ? " vs-dc-hasdeck" : ""}" role="dialog" aria-modal="true" aria-label="Inverter detail">
         <button type="button" class="vs-dc-x" aria-label="Close">✕</button>
-        <div class="vs-dc-head"><h3>${esc(iv.name || iv.sn || "Inverter")}</h3>${sub ? `<span class="vs-dc-sub">${sub}</span>` : ""}</div>
-        ${diag}
-        <div class="vs-dc-stats">${stats}</div>
-        <div class="vs-dc-chartwrap">
-          <div class="vs-dc-chart-h">Daily output · last 14 days${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average</span>` : ""}</div>
-          ${invChartHTML(iv, cohort)}
-        </div>
+        <div class="vs-dc-focus" id="vsDcFocus">${focusHTML(iv, cohort, peers, isDaylight)}</div>
+        ${multi ? `<div class="vs-cmp-wrap">
+          <div class="vs-cmp-h">Compare the array <span class="vs-cmp-sub">— ${ranked.length} inverters, strongest to weakest · click one to inspect</span></div>
+          <div class="vs-cmp-stage" id="vsCmpStage" style="--n:${ranked.length}"></div>
+        </div>` : ""}
       </div>`;
+    const focusEl = ov.querySelector("#vsDcFocus");
+    const stage = ov.querySelector("#vsCmpStage");
+
+    function deckCard(x, i) {
+      const st = invStatus(x, peers, isDaylight);
+      const peer = x.peer_index != null ? x.peer_index.toFixed(2) + "×" : "—";
+      const spk = sparkline(x.daily, cohort, { cls: "vs-cmp-sparksvg", w: 300, h: 58 });
+      const on = String(x.inverter_id) === String(selId);
+      return `<button type="button" class="vs-cmp-card st-${st.cls}${on ? " on" : ""}" data-cmp="${esc(String(x.inverter_id))}" style="--i:${i}" aria-pressed="${on}" title="${esc(x.name || x.sn || "Inverter")} — ${esc(st.label)}${x.peer_index != null ? " · " + peer : ""}">
+        <span class="vs-cmp-top"><span class="vs-cmp-name">${esc(x.name || x.sn || "Inverter")}</span><span class="vs-cmp-peer">${esc(peer)}</span></span>
+        <span class="vs-cmp-spark">${spk}</span>
+        <span class="vs-cmp-foot"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
+      </button>`;
+    }
+    function selectCard(id) {
+      selId = id;
+      const sel = findIv(id);
+      focusEl.innerHTML = focusHTML(sel, cohort, peers, isDaylight);
+      if (stage) stage.querySelectorAll(".vs-cmp-card").forEach(c => {
+        const isOn = String(c.getAttribute("data-cmp")) === String(id);
+        c.classList.toggle("on", isOn); c.setAttribute("aria-pressed", String(isOn));
+      });
+      try { focusEl.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
+    }
+    if (stage) {
+      stage.innerHTML = ranked.map(deckCard).join("");
+      stage.querySelectorAll("[data-cmp]").forEach(btn => btn.onclick = (e) => {
+        e.stopPropagation();
+        selectCard(btn.getAttribute("data-cmp"));
+      });
+    }
+
     const close = () => { ov.remove(); document.removeEventListener("keydown", onKey); };
     const onKey = e => { if (e.key === "Escape") close(); };
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
@@ -1183,15 +1240,20 @@
               const _peerTip = iv.peer_index != null ? ` title="14-day output vs its neighbors — 1.00× is right at the group median"` : "";
               // Inverter rows use the SAME 8-column grid as the vendor/array rows above them,
               // so every column — gauge, live, today, status — lines up in one vertical column
-              // (Ford 2026-07-12). The 14-day chart moved to the full-screen Details view.
-              h += `<div class="vs-row vs-inv">
+              // (Ford 2026-07-12). A compact 14-day sparkline rides in the Status cell, just
+              // LEFT of the verdict pill (Ford 2026-07-13: "show the graph again of the
+              // inverters… to the left of the OK"), cohort-scaled so an underperformer's bars
+              // visibly sit below its peers. The WHOLE row is clickable → the full Details
+              // chart + array comparison deck (a redundant "Details →" affordance stays too).
+              const _rowspark = sparkline(iv.daily, cohortScale, { cls: "vs-inv-rowspark", w: 116, h: 26, mini: true });
+              h += `<div class="vs-row vs-inv" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
                 <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? ` <span class="vs-inv-sub">${_sub}</span>` : ""}</span>
                 <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
                 <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
                 <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
-                <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
-                <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart">Details →</button></span>
+                <span class="vs-c-status vs-inv-statcell"><span class="vs-inv-rowspark-wrap" title="14-day daily output vs the neighbor average — click for the full chart">${_rowspark}</span><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
+                <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart + array comparison">Details →</button></span>
               </div>`;
             });
           }
@@ -1229,6 +1291,20 @@
       };
       b.onclick = go;
       b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
+    });
+    // The WHOLE inverter row opens the same Details view (Ford 2026-07-13: "re-add the
+    // ability to click on the inverter and see the graph"). The editable name swallows its
+    // own clicks (wireVsEditable stopPropagation), and the "Details →" button stops
+    // propagation too, so neither double-fires. Keyboard: Enter/Space on the row itself.
+    body.querySelectorAll("[data-inv-row]").forEach(row => {
+      const go = (e) => {
+        const rec = _invByKey[row.getAttribute("data-inv-row")];
+        if (rec) openInvDetail(rec.iv, rec.cohort, rec.peers, rec.isDaylight);
+      };
+      row.onclick = go;
+      row.onkeydown = (e) => {
+        if ((e.key === "Enter" || e.key === " ") && e.target === row) { e.preventDefault(); go(e); }
+      };
     });
     // The vendor NAME (data-vopen) opens the vendor's portal in a plain new tab — a normal
     // navigation, NOT the extension flow — so it takes the owner to the vendor site WITHOUT

@@ -352,6 +352,15 @@ html.sky .vs-dc-x{
 }
 html.sky .vs-dc-diag{ background:rgba(233,243,253,.7); border-color:rgba(20,60,120,.12); }
 /* .vs-dc-diag.warn amber + chart bar/status colors untouched — semantic */
+/* Comparison-deck cards read as light glass tiles on the frosted modal. No backdrop-filter
+   here (they sit ON the already-blurred sheet — one blur budget, per the Sky perf guardrail);
+   just a near-solid white so the tilted stack stays crisp. */
+html.sky .vs-cmp-card{ background:rgba(255,255,255,.74) !important; border-color:rgba(255,255,255,.85) !important; }
+html.sky .vs-cmp-card.on{ border-color:rgba(33,150,243,.55) !important; }
+html.sky .vs-cmp-card.on.st-warn{ border-color:rgba(217,119,6,.5) !important; }
+html.sky .vs-cmp-card.on.st-bad{ border-color:rgba(220,38,38,.5) !important; }
+html.sky .vs-inv-rowspark rect{ fill:var(--sky-primary,#2196f3); }
+html.sky .vs-cmp-sparksvg rect{ fill:var(--sky-primary,#2196f3); }
 
 /* ═══ 3 · SANDBOX LEFTOVERS ════════════════════════════════════════════════ */
 
