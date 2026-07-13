@@ -819,6 +819,14 @@
     const totalNp = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0) || 1;
     const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
     let flagged = 0, crit = 0, lostKwh = 0, liveAnoms = 0;
+    // Vendor-side outage (source_status.state === "stale" in daylight) is a real
+    // problem even when every inverter's 14-day peer verdict still says "ok"
+    // (frozen history). Without this the array card badges "All good" on a site
+    // whose monitoring vendor stopped reporting (Londonderry SolarEdge, Ford
+    // 2026-07-13). Overnight stale is "asleep", not flagged.
+    const _srcStale = col && col.source_status && col.source_status.state === "stale";
+    const _vendorOut = _srcStale && col.is_daylight !== false;
+    if(_vendorOut){ flagged = Math.max(flagged, 1); }
     for(const inv of invs){
       // A LIVE anomaly (dark, OR low vs peers, right now while peers produce) the
       // 14-day health hasn't flagged yet still counts as flagged here — otherwise the
@@ -842,7 +850,7 @@
     }
     const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
     const tone = crit ? "bad" : flagged ? "warn" : "ok";
-    return { tone, flagged, crit, lossMo, total: invs.length, liveAnoms };
+    return { tone, flagged, crit, lossMo, total: invs.length, liveAnoms, vendorOut: !!_vendorOut };
   }
 
   function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -2113,10 +2121,16 @@
       const aSleeping = (col.is_daylight === false) && !aOs.reporting;
       const aLs = arrayLiveState(col, aOs, h.tone, h.liveAnoms);
       const aNowChip = `<div class="sb-inv-now ${aLs.tone}"${aLs.title?` title="${esc(aLs.title)}"`:""}><span class="sb-now-dot"></span>${esc(aLs.label)}</div>`;
-      const aHealthLabel = h.tone === "ok" ? "All good"
+      // Vendor-side outage wins the badge copy — never "All good" / "N to check"
+      // when the monitoring portal is the thing that's broken (Ford 2026-07-13).
+      const aHealthLabel = h.vendorOut ? "Vendor issue"
+        : h.tone === "ok" ? "All good"
         : h.tone === "bad" ? `${h.crit||h.flagged} down`
         : `${h.flagged} to check`;
-      const aHealthBadge = `<div class="sb-inv-alert ${h.tone}" title="Array health over the last 14 days (${h.flagged} of ${h.total} inverter${h.total===1?'':'s'} flagged).">${esc(aHealthLabel)}</div>`;
+      const aHealthTitle = h.vendorOut
+        ? "The monitoring vendor has stopped reporting live data for this site — not an inverter fault. See the source banner above."
+        : `Array health over the last 14 days (${h.flagged} of ${h.total} inverter${h.total===1?'':'s'} flagged).`;
+      const aHealthBadge = `<div class="sb-inv-alert ${h.tone}" title="${esc(aHealthTitle)}">${esc(aHealthLabel)}</div>`;
       // total rated size pill (sum of inverter nameplates), like the inverter's kW pill
       const totNp = invs.reduce((t,i)=> t + (i.nameplate_kw||0), 0);
       const sizePill = totNp > 0 ? `<span class="sb-inv-size">${totNp>=100?Math.round(totNp):(Math.round(totNp*10)/10)} kW</span>` : "";
@@ -2301,9 +2315,11 @@
       .sort((a,b) => (rank[a.h.tone]-rank[b.h.tone]) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
 
     const tilesHTML = tiles.map(({col, h}) => {
-      const flaggedBadge = h.flagged
-        ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
-        : `<span class="sb-tile-flag ok">all good</span>`;
+      const flaggedBadge = h.vendorOut
+        ? `<span class="sb-tile-flag warn">vendor issue</span>`
+        : h.flagged
+          ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
+          : `<span class="sb-tile-flag ok">all good</span>`;
       const risk = h.lossMo >= 1
         ? `<span class="sb-tile-risk" title="${riskTip()}">${usd0(h.lossMo)}<small>/mo est.</small></span>`
         : ``;

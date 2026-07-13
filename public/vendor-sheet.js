@@ -174,20 +174,28 @@
   // of scraping a leading digit off the display string. Critical headlines like "An
   // inverter stopped earning" have no digit but alert.count knows the true number
   // (e.g. 3 dead), so scraping undercounted multi-dead arrays to 1.
+  //
+  // VENDOR ISSUE (Ford 2026-07-13): when the MONITORING VENDOR is the problem — SolarEdge
+  // source clock stale (Londonderry 15h+ with no live power), Chint harvesting zeros /
+  // failing harvest while the rest of the fleet produces — NEVER badge "All clear".
+  // The 14-day peer verdict can still say "ok" on frozen history; the status column
+  // must read the LIVE feed honesty layer and name the vendor.
   function arrStatus(c) {
     const a = c.alert || {};
     if (a.level === "critical") return { label: a.headline || "Fault", cls: "bad", count: a.count || 1 };
     if (a.level === "warn") return { label: a.count ? a.count + " need attention" : (a.headline || "Attention"), cls: "warn", count: a.count || 1 };
-    // A stale source is a PAUSED feed (the portal session lapsed, not a vendor API
-    // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
-    // matches that recoverable state; "offline" wrongly implied a hard outage.
-    if (_sourceIssue(c)) return { label: "Source paused", cls: "warn", count: 1 };
     // Dark overnight with a healthy login → asleep, not an issue (muted, not warn).
+    // Checked BEFORE vendor-issue so a normal night doesn't read as a vendor outage.
     if (_nightAsleep(c)) return { label: "Asleep", cls: "muted", count: 0 };
+    // Vendor-side outage / feed failure (stale source, failed harvest, whole array
+    // dark in daylight while fleet peers produce). Label is always "Vendor issue"
+    // so the operator doesn't need to decode "Source paused" vs "All clear".
+    const vIssue = _vendorIssue(c);
+    if (vIssue) return { label: "Vendor issue", cls: "warn", count: 1, tip: vIssue.tip };
     // A live anomaly (dark, or low vs peers, RIGHT NOW while >=2 daylight peers produce) the
     // 14-day alert hasn't flagged yet should still surface here — otherwise the array reads
     // "All clear" while a card inside shows "Dark now" / "Low vs peers" (Ford's Waterford case:
-    // one Fronius at 42% but the array said ALL CLEAR). Checked AFTER source-paused so a stale
+    // one Fronius at 42% but the array said ALL CLEAR). Checked AFTER vendor-issue so a stale
     // feed's 0 isn't mistaken for a live anomaly. Same FleetStore.liveVerdict classifier; each
     // inverter has exactly one verdict, so dark and low never double-count.
     const _invs = c.inverters || [];
@@ -227,10 +235,10 @@
   function statusRank(c) {
     const a = c.alert || {};
     if (a.level === "critical") return 3;
-    if (a.level === "warn" || _sourceIssue(c)) return 2;
+    if (a.level === "warn" || _vendorIssue(c) || _sourceIssue(c)) return 2;
     return 0;
   }
-  function invStatus(iv, cohort, isDaylight) {
+  function invStatus(iv, cohort, isDaylight, parentCol) {
     const s = iv.status || "ok";
     // NO ENERGY REGISTER (e.g. Tannery #7): live power but a dead cumulative-energy
     // meter → ungradeable, and its per-inverter power is an unreliable energy-share
@@ -239,6 +247,12 @@
     // can't drag it into a warn. Mirrors the card's "No energy data" + the digest.
     if (iv.no_energy_register) return { label: "No energy data", cls: "muted",
       tip: "Reports live power but no cumulative energy — a metering issue at the vendor, not an outage. Can't be peer-graded until the energy register is fixed." };
+    // Parent array has a vendor-side outage → don't leave inverters as green "OK"
+    // (Londonderry SolarEdge: 6× OK while the source clock is 15h stale).
+    if (parentCol && _vendorIssue(parentCol)) {
+      return { label: "Vendor issue", cls: "warn",
+        tip: "The monitoring vendor isn't delivering a usable live feed for this array right now — not an inverter fault we can grade." };
+    }
     // LIVE-DARK overlay: an inverter the 14-day peer verdict calls "ok" but that is producing ZERO
     // right now while >=2 of its daylight neighbors ARE producing — the exact live anomaly the
     // email alert fires on. Without this the table shows a bare "OK" for the very inverter we just
@@ -648,11 +662,11 @@
   // server refreshes 24/7, so the extension-only affordances (per-vendor "Open to sync",
   // tab-opening "Sync all", "Close tabs") change or disappear (Ford 2026-07-11).
   function _cloudMode(){ try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } }
-  // Cloud harvest health (provider → max harvest_fails), pulled from the Auto-refresh
-  // vault via sandbox.js's __aoCloudStatus. harvest_fails ONLY increments on a real
-  // login_failed (a scrape/overnight miss leaves it 0), so >=3 (paused) is the one
-  // signal that the LOGIN is genuinely broken — the only case where re-entering the
-  // password is the fix (Ford 2026-07-13). Cached 60s; a fresh load re-renders.
+  // Cloud harvest health, pulled from the Auto-refresh vault via sandbox.js's
+  // __aoCloudStatus. Per provider we track:
+  //   fails  — harvest_fails (>=3 = login paused; re-enter password)
+  //   ok     — last_harvest_ok (false = last harvest failed, even if fails still 0)
+  // Cached 60s; a fresh load re-renders.
   let _cloudHealth = {}, _cloudHealthAt = 0;
   async function _loadCloudHealth(){
     if (!_cloudMode() || typeof window.__aoCloudStatus !== "function") return;
@@ -662,20 +676,111 @@
       const cs = await window.__aoCloudStatus();
       if (cs && cs.ok && Array.isArray(cs.credentials)) {
         const m = {};
-        cs.credentials.forEach(c => { const p = (c.provider || "").toLowerCase(); m[p] = Math.max(m[p] || 0, c.harvest_fails || 0); });
+        cs.credentials.forEach(c => {
+          const p = (c.provider || "").toLowerCase();
+          const prev = m[p] || { fails: 0, ok: true };
+          m[p] = {
+            fails: Math.max(prev.fails, c.harvest_fails || 0),
+            // any credential for this vendor reporting a failed harvest is a problem
+            ok: prev.ok && (c.last_harvest_ok !== false),
+          };
+        });
         _cloudHealth = m;
         renderBody();
       }
     } catch(_) {}
   }
-  function _cloudLoginFailed(vendor){ return (_cloudHealth[(vendor || "").toLowerCase()] || 0) >= 3; }
+  function _cloudHealthEntry(vendor){ return _cloudHealth[(vendor || "").toLowerCase()] || null; }
+  function _cloudLoginFailed(vendor){
+    const e = _cloudHealthEntry(vendor);
+    return !!(e && e.fails >= 3);
+  }
+  function _cloudHarvestBad(vendor){
+    const e = _cloudHealthEntry(vendor);
+    if (!e) return false;
+    return e.fails >= 3 || e.ok === false;
+  }
   // A stale source is only an ISSUE when it isn't simply overnight — a dark array at
   // night is ASLEEP, not broken (Ford 2026-07-13). A genuine login failure is always an
   // issue; a stale feed in daylight is an issue; a stale feed overnight with a healthy
   // login is just "Asleep" (not counted in the vendor's issue tally, not a warn).
-  function _sourceStale(c){ return (c.source_status || {}).state === "stale"; }
+  function _sourceStale(c){
+    const ss = c && c.source_status;
+    if (ss && ss.state === "stale") return true;
+    // Belt for API-polled vendors only (SolarEdge/Locus): age past the 6h backend
+    // SOURCE-OFFLINE window even if state wasn't flipped — never green-light a
+    // 15h-old SolarEdge clock. Do NOT use the short extension live-window here
+    // (Chint ~8 min) — a brief capture lag is not a vendor outage.
+    const v = ((c && c.vendor) || "").toLowerCase();
+    if (v === "solaredge" || v === "locus") {
+      const h = ss && ss.age_hours;
+      if (h != null && h >= 6) return true;
+    }
+    return false;
+  }
   function _nightAsleep(c){ return _sourceStale(c) && c.is_daylight === false && !(_cloudMode() && _cloudLoginFailed(c.vendor)); }
   function _sourceIssue(c){ return _sourceStale(c) && !_nightAsleep(c); }
+
+  // True when OTHER arrays in the fleet are producing live power right now
+  // (used to tell "whole site dark" from "whole fleet asleep / no sun").
+  function _fleetPeersProducing(c){
+    try {
+      const cols = (window.FleetStore && FleetStore.toColumns && (FleetStore.toColumns().columns || [])) || [];
+      return cols.some(o =>
+        o && o.array_id !== c.array_id
+        && o.is_daylight !== false
+        && o.current_power_w != null
+        && o.current_power_w > 100);
+    } catch (_) { return false; }
+  }
+  // Whole array has no usable live output AND no measured today total.
+  function _arrayNoLiveOutput(c){
+    const live = c.current_power_w;
+    const today = c.produced_today_kwh;
+    const liveDead = live == null || live <= 25;          // null or ~0 W
+    const todayDead = today == null || today <= 0.05;     // nothing today
+    return liveDead && todayDead;
+  }
+  // VENDOR ISSUE — the monitoring vendor (SolarEdge / Chint / …) is the problem,
+  // not a single inverter fault and not "all clear". Returns a tip string when
+  // true, or null when the array is fine / just asleep.
+  // Cases (Ford 2026-07-13 screenshot: Londonderry SE "ALL CLEAR" with blank live
+  // + Chint at 0 kW while Fronius/SMA produce hundreds of kW):
+  //   1. Source clock stale in daylight (SolarEdge site stopped reporting to SE)
+  //   2. Cloud harvest failing / login broken for this vendor
+  //   3. Whole array dark in daylight while OTHER arrays in the fleet produce —
+  //      the vendor feed is lying or broken (or the site is offline; either way
+  //      we must NOT green-badge "All clear")
+  function _vendorIssue(c){
+    if (!c) return null;
+    const vl = vlabel(c.vendor);
+    // Overnight with a healthy login is asleep, not a vendor outage.
+    if (_nightAsleep(c)) return null;
+    if (_sourceIssue(c)) {
+      const age = _fmtAge(_ageMin(c));
+      return {
+        tip: (vl || "The monitoring vendor") + " last reported"
+          + (age ? " " + age : "")
+          + " — a data outage at the source, not Array Operator. Live data resumes when "
+          + (vl || "the vendor") + " reconnects.",
+      };
+    }
+    if (_cloudMode() && c.vendor && _cloudHarvestBad(c.vendor)) {
+      if (_cloudLoginFailed(c.vendor)) {
+        return { tip: "We can't sign in to " + (vl || "this vendor") + " — the saved password may have changed. Re-enter it in the Credential Vault." };
+      }
+      return { tip: "The last cloud harvest from " + (vl || "this vendor") + " failed. We're still retrying automatically." };
+    }
+    // Daylight + no live output + no today kWh + fleet peers ARE producing →
+    // this is not "all clear". Name it as a vendor/feed problem so the operator
+    // checks the portal rather than trusting a green badge on a dark site.
+    if (c.is_daylight !== false && _arrayNoLiveOutput(c) && _fleetPeersProducing(c)) {
+      return {
+        tip: (vl || "This vendor") + " is reporting no live output for this array while other arrays in your fleet are producing. Check the vendor portal — this is almost certainly a vendor-side feed issue, not a healthy clear site.",
+      };
+    }
+    return null;
+  }
 
   // The sortable columns (Vendor is the grouping, not sortable).
   const COLS = [
@@ -723,7 +828,7 @@
     switch (key) {
       case "pow": return iv.current_power_w == null ? -1 : iv.current_power_w;
       case "today": return iv.produced_today_kwh == null ? -1 : iv.produced_today_kwh;
-      case "status": return _INV_STATUS_RANK[invStatus(iv, cohort, isDaylight).cls] || 0;
+      case "status": return _INV_STATUS_RANK[invStatus(iv, cohort, isDaylight, /*parent*/null).cls] || 0;
       default: return (iv.name || iv.sn || "").toLowerCase();   // name
     }
   }
@@ -1132,7 +1237,7 @@
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
           <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
           ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
-          <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
+          <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
           <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
         </button>`;
         if (open) {
@@ -1172,7 +1277,7 @@
           } else {
             const cohortScale = cohortSpark(invs);   // shared y-scale across this array's inverters (order-independent)
             sortInvs(invs, c.is_daylight).forEach(iv => {
-              const ist = invStatus(iv, invs, c.is_daylight);
+              const ist = invStatus(iv, invs, c.is_daylight, c);
               const ikey = c.array_id + ":" + iv.inverter_id;
               _invByKey[ikey] = { iv, cohort: cohortScale, peers: invs, isDaylight: c.is_daylight };
               // Name vs. model: many inverters default their name TO the model string, so the
