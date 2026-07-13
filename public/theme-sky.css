@@ -10,14 +10,11 @@
    glass-squircle refinement + the 2026-07-12 "the photo IS the world"
    sharpening): Plus Jakarta Sans, glass-squircle sheets, pastel accents.
 
-   GATE — this file is loaded ONLY when the Sky flag is on:
-     · ?sky=1 in the URL (persists via localStorage ao_sky='1')
-     · ?sky=0 clears the flag
-   The inline pre-paint script in index.html adds class "sky" to <html> and
-   document.writes this <link> AFTER mobile.css, so it is the LAST sheet in
-   the cascade and wins every specificity war by source order. Every rule in
-   here is scoped under html.sky — with the flag off this file never loads
-   and NOTHING changes for real customers.
+   GATE — Sky is the DEFAULT theme (as of 2026-07-13). The pre-paint script in
+   index.html adds class "sky" to <html> unless the visitor opted out
+   (ao_sky='0' via ?sky=0). When on, it document.writes this <link> AFTER
+   mobile.css so it is the LAST sheet in the cascade. Every rule is scoped
+   under html.sky; opt-out visitors never load this file.
 
    MATERIAL TIERS (keep these straight when extending per-tab):
      · chrome glass  — rgba(255,255,255,.60) + blur(24px) saturate(1.5)
