@@ -277,7 +277,9 @@ html.sky ::selection{background:rgba(33,150,243,.22)}
   html.sky .tab.tab-whoami{
     background:rgba(255,255,255,.7) !important;
     border-color:var(--sky-glass-edge);
+    color:var(--ink) !important;           /* never inherit muted chrome ink */
   }
+  html.sky .tab.tab-whoami .whoami-email{color:var(--ink) !important; max-width:180px}
   html.sky .tab.tab-whoami:hover{background:rgba(255,255,255,.9) !important}
 }
 @media (max-width:600px){

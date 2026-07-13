@@ -6517,6 +6517,7 @@
       if(window.AO_DEMO && window.AO_DEMO.account){
         _account = window.AO_DEMO.account;
         renderAccountList(_account);
+        try { if(window.__aoPaintWhoami) window.__aoPaintWhoami(_account); } catch(e){}
         renderBilling(null);                 // null headers → renderBilling reads AO_DEMO
         return;
       }
@@ -6524,11 +6525,21 @@
       return;
     }
     list.innerHTML = `<div class="empty">Loading your account…</div>`;
+    // Hard timeout so a stuck /v1/account never leaves the tab on "Loading…" forever
+    // (and so the top-bar email chip can still recover via this same response).
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 15000) : null;
     try{
-      const r = await fetch("/v1/account", { headers: h });
+      const r = await fetch("/v1/account", {
+        headers: h,
+        signal: ctrl ? ctrl.signal : undefined,
+      });
+      if(to) clearTimeout(to);
       if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
       if(!r.ok) throw new Error("account " + r.status);
       _account = await r.json();
+      // Keep the top-bar identity chip in sync (app.js may have been stuck on "…").
+      try { if(window.__aoPaintWhoami) window.__aoPaintWhoami(_account); } catch(e){}
       // Server is authoritative for the auto-refresh mode → reconcile local + re-run the
       // extension "keep a tab open" nudge (it reads the mode) so a cloud owner never sees it.
       _arSyncModeFromAccount(_account);
@@ -6538,7 +6549,13 @@
       }
       renderAccountList(_account);
     }catch(e){
-      list.innerHTML = `<div class="empty">Couldn't load your account right now — please refresh.</div>`;
+      if(to) clearTimeout(to);
+      const aborted = e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
+      list.innerHTML = aborted
+        ? `<div class="empty">Account is taking too long to load — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`
+        : `<div class="empty">Couldn't load your account right now — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+      const btn = document.getElementById("acctRetryLoad");
+      if(btn) btn.onclick = () => loadAccount();
       return;
     }
     renderBilling(h);
@@ -6700,6 +6717,7 @@
       const a = await r.json().catch(()=>null);
       if(!a) return;
       _account = a;                        // share with Master Account renderer
+      try { if(window.__aoPaintWhoami) window.__aoPaintWhoami(a); } catch(e){}
       _entitlement = a.plan_features || null;
       applyTabGating();
       if(_entitlement && !_entitlement.plan_chosen) showPlanPicker();

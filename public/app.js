@@ -1403,8 +1403,26 @@ function renderFromSession(){
     }
   } catch(e){}
   // Signed-in identity chip (top-right): show which account this session is in.
-  // One lightweight /v1/account read fills the email; hidden when signed out or
-  // if the session is stale (so it never claims an account we can't confirm).
+  // Shared painter so Master Account's /v1/account load can fill the chip too
+  // (if this first fetch is slow/fails, we still paint the email when account lands).
+  function paintWhoami(a){
+    try {
+      const who = document.getElementById("tabWhoami");
+      const whoEmail = document.getElementById("whoamiEmail");
+      if(!who) return;
+      const email = a && (a.email || a.contact_email || a.operator_email);
+      if(email && whoEmail){
+        who.style.display = "";
+        whoEmail.textContent = email;
+        whoEmail.dataset.real = "1";
+        who.title = "Signed in as " + email + " — view your master account";
+      } else if(!whoEmail || whoEmail.dataset.real !== "1"){
+        // Only hide if we never successfully painted an email this session.
+        who.style.display = "none";
+      }
+    } catch(e){}
+  }
+  try { window.__aoPaintWhoami = paintWhoami; } catch(e){}
   try {
     const who = document.getElementById("tabWhoami");
     const whoEmail = document.getElementById("whoamiEmail");
@@ -1412,18 +1430,28 @@ function renderFromSession(){
       if(session){
         who.style.display = "";
         if(whoEmail && !whoEmail.dataset.real) whoEmail.textContent = "…";
-        fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+        const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        const t = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 12000) : null;
+        fetch("/v1/account", {
+          headers: { Authorization: "Bearer " + session },
+          signal: ctrl ? ctrl.signal : undefined,
+        })
           .then(r => r.ok ? r.json() : null)
           .then(a => {
-            if(a && aoIsCancelled(a)){ aoShowCancelledGate(); }
-            if(a && aoIsPausedNoCard(a)){ aoShowFrozenGate(session); }
-            if(a && a.email && whoEmail){
-              whoEmail.textContent = a.email;
-              whoEmail.dataset.real = "1";
-              who.title = "Signed in as " + a.email + " — view your master account";
-            } else { who.style.display = "none"; }
+            if(t) clearTimeout(t);
+            try { if(a && aoIsCancelled(a)) aoShowCancelledGate(); } catch(e){}
+            try { if(a && aoIsPausedNoCard(a)) aoShowFrozenGate(session); } catch(e){}
+            paintWhoami(a);
           })
-          .catch(() => { who.style.display = "none"; });
+          .catch(() => {
+            if(t) clearTimeout(t);
+            // Keep the chip visible with a soft placeholder if we already showed "…";
+            // Master Account / loadEntitlement may still fill the real email.
+            if(whoEmail && whoEmail.dataset.real !== "1"){
+              whoEmail.textContent = "Account";
+              who.title = "Signed in — open Master Account";
+            }
+          });
       } else {
         who.style.display = "none";
       }
