@@ -197,14 +197,9 @@ html[data-theme="day"] a.sb-brandlink.sma:hover{background:#0891b2 !important;co
 html[data-theme="day"] a.sb-brandlink.chint:hover{background:#db2777 !important;color:#fff !important}
 html[data-theme="day"] a.sb-brandlink.locus:hover{background:#0284c7 !important;color:#fff !important}
 
-/* Spreadsheet (vendor-data) group names: same vibrant per-vendor color as the sandbox's
- * "Open in <Vendor>" links in day mode, so the two views are color-consistent + legible
- * on the light table (instead of every vendor reading the same blue). */
-html[data-theme="day"] .vs-vbadge.vs-vendor-solaredge{ color:#c2410c; }
-html[data-theme="day"] .vs-vbadge.vs-vendor-fronius{ color:#4338ca; }
-html[data-theme="day"] .vs-vbadge.vs-vendor-sma{ color:#0e7490; }
-html[data-theme="day"] .vs-vbadge.vs-vendor-chint{ color:#be185d; }
-html[data-theme="day"] .vs-vbadge.vs-vendor-locus{ color:#0369a1; }
+/* Vendor group names: NO per-vendor color — the rainbow was removed (Ford 2026-07-12,
+ * "remove the colors of the vendors"). Every vendor name inherits the one uniform
+ * .vs-vbadge brand blue in day + sky, so the table reads clean and consistent. */
 
 /* ── progress / meter / peer tracks ───────────────────────────────────────── */
 html[data-theme="day"] .peerbar,

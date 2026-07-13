@@ -2256,13 +2256,10 @@ html[data-theme="day"] .rep-fld.req > select{
 button.vs-vbadge{ background:none; border:0; padding:0; margin:0; cursor:pointer;
   font-family:inherit; line-height:inherit; }
 button.vs-vbadge:hover{ text-decoration:underline; }
-/* Per-vendor color coding — same palette as the sandbox's "Open in <Vendor>" links so
-   the two views read identically at a glance. Night/base here; day overrides in theme-day.css. */
-.vs-vbadge.vs-vendor-solaredge{ color:#fdba74; }
-.vs-vbadge.vs-vendor-fronius{ color:#a5b4fc; }
-.vs-vbadge.vs-vendor-sma{ color:#67e8f9; }
-.vs-vbadge.vs-vendor-chint{ color:#f9a8d4; }
-.vs-vbadge.vs-vendor-locus{ color:#7dd3fc; }
+/* Vendor group NAMES are ONE uniform accent (the base .vs-vbadge brand blue) — Ford
+   2026-07-12 removed the per-vendor RAINBOW ("remove the colors of the vendors, it looks
+   weird and unprofessional, doesn't match our thing"). No per-vendor color override here
+   or in theme-day.css; every vendor name inherits the same blue in day + sky. */
 .vs-vcount{ font-size:11px; color:var(--faint); }
 .vs-vlag{ font-size:10.5px; font-weight:700; color:var(--good,#2563eb); background:rgba(37,99,235,.08);
   border:1px solid rgba(37,99,235,.28); border-radius:999px; padding:2px 10px; letter-spacing:.02em; cursor:pointer;

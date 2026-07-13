@@ -21,15 +21,12 @@
     alsoenergy: "AlsoEnergy",
   };
   const vlabel = v => BRAND[v] || (v ? v.charAt(0).toUpperCase() + v.slice(1) : "Other");
-  // Per-vendor accent hue (day-mode values, matches theme-day.css .vs-vendor-*). Drives the
-  // colored left bar + faint header/leaf tint that make each vendor's subtree a clear
-  // container — so vendor → array → inverter reads as three distinct levels (Ford 2026-07-10).
-  const VENDOR_HUE = {
-    solaredge: "#c2410c", fronius: "#4338ca", sma: "#0e7490", chint: "#be185d",
-    locus: "#0369a1", enphase: "#047857", solis: "#7c3aed", tigo: "#0f766e",
-    alsoenergy: "#9d174d",
-  };
-  const vhue = v => VENDOR_HUE[v] || "#64748b";
+  // Vendor subtree accent. Ford 2026-07-12: the per-vendor RAINBOW (a different hue per
+  // vendor) "looks weird and unprofessional — doesn't match our thing." Removed. No inline
+  // --vc is emitted anymore, so every vendor group falls back to ONE neutral slate spine +
+  // a barely-there header shade (the --vc fallbacks in command-center.css / theme-sky-
+  // triage.css) — the vendor → array → inverter levels still read as distinct containers,
+  // just monochrome instead of a clashing multi-color rainbow.
   // Fronius/SMA/Chint expose only ONE site-level instantaneous power; the backend
   // splits it across inverters by today's energy share — so a per-inverter "kW now"
   // is an ESTIMATE, not a measured per-device reading (data-honesty audit #5). The
@@ -129,6 +126,24 @@
     return (k >= 10 ? k.toFixed(0) : k.toFixed(1)) + " kW";
   }
   function kwh0(n) { return n == null ? "—" : Math.round(n).toLocaleString() + " kWh"; }
+
+  // When a LIVE-NOW or TODAY cell is blank ("—"), say WHY on hover so it reads as a known
+  // state, not a broken feed. OVERNIGHT the panels are down and live power is intentionally
+  // blank (the backend's daylight honesty gate — a stale midday reading must never show as
+  // "producing 17 kW at 2am"), and today's total is 0 until the sun is up; BY DAY a blank
+  // just means we haven't captured a fresh reading yet. Ford 2026-07-12 ("why isn't data
+  // showing under live now / today") — it was the middle of the night; this makes the blank
+  // explain itself instead of looking broken.
+  function liveEmptyTip(isDaylight) {
+    return isDaylight === false
+      ? "The panels are down for the night — live output is paused until sunrise."
+      : "No live reading captured yet — it fills in on the next sync.";
+  }
+  function todayEmptyTip(isDaylight) {
+    return isDaylight === false
+      ? "Nothing produced yet today — today's total starts building after sunrise."
+      : "No production captured yet today.";
+  }
 
   // "Today" provenance. The backend marks an array's today-kWh as an ESTIMATE when
   // it was smeared from a utility bill (produced_today_source === "bill_prorate"),
@@ -989,7 +1004,15 @@
     let h = "";
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
-      const vtot = list.reduce((t, c) => t + (c.current_power_w || 0), 0);
+      // Honest rollups: sum only arrays that actually carry a reading, and show null → "—"
+      // when NONE do (mirroring the array-level rule). The old `|| 0` sum printed a fake
+      // "0.0 kW / 0 kWh" on the vendor header while every array row under it honestly read
+      // "—" (the overnight contradiction Ford flagged 2026-07-12).
+      const _powVals = list.map(c => c.current_power_w).filter(x => x != null);
+      const vtot = _powVals.length ? Math.round(_powVals.reduce((t, x) => t + x, 0) * 10) / 10 : null;
+      const _todayVals = list.map(c => c.produced_today_kwh).filter(x => x != null);
+      const vTodayTot = _todayVals.length ? _todayVals.reduce((t, x) => t + x, 0) : null;
+      const _vDay = list.some(c => c.is_daylight !== false);   // vendor is in daylight if any array is
       const nInv = list.reduce((t, c) => t + (c.inverter_count || 0), 0);
       // Data syncs when the owner OPENS the vendor portal (signing in there lets the
       // EnergyAgent extension capture the latest readings) — that's the reliable path,
@@ -1010,8 +1033,7 @@
         ? `<button type="button" class="vs-vbadge vs-vendor-${esc(v)}" data-vopen="${esc(v)}" title="Open the ${esc(vlabel(v))} portal in a new tab (just visit — won't sync or pull you back here)">${esc(vlabel(v))}</button>`
         : `<span class="vs-vbadge vs-vendor-${esc(v)}">${esc(vlabel(v))}</span>`;
       const vnote = SYNC_NOTE[v] ? `<div class="vs-vnote">ℹ ${esc(SYNC_NOTE[v])}</div>` : "";
-      const vAlloc = isAllocatedVendor(v) && vtot > 0;
-      const vTodayTot = list.reduce((t, c) => t + (c.produced_today_kwh || 0), 0);
+      const vAlloc = isAllocatedVendor(v) && vtot != null && vtot > 0;
       const vStatus = vendorStatusSummary(list);
       // Vendors DEFAULT to collapsed (Ford: the spreadsheet should "start much less
       // overwhelming" — a fresh view is just the vendor headers, expand what you want).
@@ -1030,7 +1052,7 @@
       // inverter count, live now, today, or status at all, and Synced read cramped against
       // the kW total. Every column is now a real ROLLUP across the vendor's arrays, so the
       // collapsed row reads as a genuine summary, not just a label.
-      h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}" style="--vc:${vhue(v)}">
+      h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
         <div class="vs-row vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
              aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
           <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}
@@ -1038,8 +1060,8 @@
           <span class="vs-c-vendor">${lagChip}</span>
           <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", statusCls: vStatus.cls, statusLabel: vStatus.label })}</span>
           <span class="vs-c-inv">${nInv}</span>
-          <span class="vs-c-pow"${vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : ""}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
-          <span class="vs-c-today">${kwh0(vTodayTot)}</span>
+          <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
+          <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
           <span class="vs-c-status"><span class="vs-pill ${vStatus.cls}">${esc(vStatus.label)}</span></span>
           <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
         </div>${vnote}
@@ -1060,8 +1082,8 @@
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
-          <span class="vs-c-pow${stale ? " vs-stale" : ""}"${powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
-          ${(() => { const tp = todayProvenance(c); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${tp.est ? ` title="${esc(tp.tip)}"` : ""}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
+          <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
+          ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
           <span class="vs-c-status"><span class="vs-pill ${st.cls}">${esc(st.label)}</span></span>
           <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
         </button>`;
@@ -1118,8 +1140,8 @@
                 <span class="vs-c-vendor"></span>
                 <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
                 <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
-                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${_liveTip}>${_live}</span>
-                <span class="vs-c-today">${_today}</span>
+                <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
+                <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
                 <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart">Details →</button></span>
               </div>`;
