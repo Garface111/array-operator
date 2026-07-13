@@ -554,179 +554,328 @@ document.documentElement.setAttribute("data-theme","day");
     });
   })();
 </script>
-<!-- Always-building feature-suggestion widget (CC 2026-06-21). Subtle fixed pill
-     -> small panel -> POST /v1/feature-suggestion. -->
+<!-- Feature wish widget (redesign 2026-07-13): click → circle right here → short
+     message → follow the build live. Pipeline: POST /v1/feature-suggestion +
+     poll status (new → building → shipped). Mark-first so the spatial intent is
+     never optional theatre. -->
 <style>
-  #fsWrap{position:fixed;left:16px;bottom:16px;z-index:9020;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
-  #fsBtn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4);transition:color .15s,border-color .15s}
-  #fsBtn:hover{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896)}
-  #fsBtn .fsdot{color:var(--good,#34d896)}
-  #fsPanel{display:none;width:320px;max-width:calc(100vw - 32px);margin-top:10px;border:1px solid var(--line,#243530);background:var(--card,#15201c);border-radius:14px;padding:14px;box-shadow:0 8px 30px -8px rgba(0,0,0,.55)}
+  #fsWrap{
+    position:fixed;left:16px;bottom:16px;z-index:9020;
+    font:13px/1.45 "Plus Jakarta Sans",-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+    max-width:min(380px, calc(100vw - 28px));
+  }
+  #fsBtn{
+    display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    border:1px solid rgba(33,150,243,.28);background:rgba(255,255,255,.88);
+    color:#0E1420;border-radius:999px;padding:10px 16px;font-weight:650;
+    box-shadow:0 8px 28px -10px rgba(20,60,120,.28);
+    backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+    transition:transform .12s, box-shadow .12s, border-color .12s;
+  }
+  #fsBtn:hover{border-color:#2196F3;box-shadow:0 12px 32px -10px rgba(33,150,243,.35);transform:translateY(-1px)}
+  #fsBtn .fsdot{color:#2196F3;font-size:15px}
+  #fsBtn:focus-visible,#fsText:focus-visible,#fsSend:focus-visible,#fsCancel:focus-visible,
+  #fsSkipMark:focus-visible,#fsAttach:focus-visible{
+    outline:2px solid #2196F3;outline-offset:2px;
+  }
+
+  /* ── Live journey card (stays open after send) ── */
+  #fsJourney{
+    display:none;width:100%;box-sizing:border-box;
+    border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.92);
+    border-radius:18px;padding:14px 16px 12px;
+    box-shadow:0 18px 50px -16px rgba(20,60,120,.28);
+    backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);
+  }
+  #fsJourney.open{display:block}
+  #fsJourney h4{margin:0 0 2px;font-size:14.5px;font-weight:750;color:#0E1420;letter-spacing:-.01em}
+  #fsJourney .fsLead{margin:0 0 12px;font-size:12.5px;color:#4C596B}
+  #fsSteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+  #fsSteps li{
+    display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;
+    padding:7px 0;position:relative;
+  }
+  #fsSteps li:not(:last-child)::before{
+    content:"";position:absolute;left:10px;top:24px;bottom:-2px;width:2px;
+    background:rgba(33,150,243,.15);
+  }
+  #fsSteps li.done:not(:last-child)::before{background:rgba(33,150,243,.55)}
+  #fsSteps li.active:not(:last-child)::before{
+    background:linear-gradient(180deg,#2196F3,rgba(33,150,243,.15));
+  }
+  .fsStepDot{
+    width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;border:2px solid rgba(33,150,243,.25);color:#6B7789;background:#fff;
+    z-index:1;
+  }
+  #fsSteps li.done .fsStepDot{background:#2196F3;border-color:#2196F3;color:#fff}
+  #fsSteps li.active .fsStepDot{
+    border-color:#2196F3;color:#2196F3;
+    box-shadow:0 0 0 4px rgba(33,150,243,.15);
+    animation:fsPulse 1.4s ease-in-out infinite;
+  }
+  #fsSteps li.fail .fsStepDot{background:#fff;border-color:#dc2626;color:#dc2626}
+  .fsStepBody b{display:block;font-size:12.5px;font-weight:700;color:#0E1420}
+  .fsStepBody span{display:block;font-size:11.5px;color:#6B7789;margin-top:1px}
+  #fsSteps li.active .fsStepBody b{color:#1565C0}
+  #fsJActions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+  #fsJActions button{
+    cursor:pointer;border-radius:10px;padding:7px 12px;font-size:12.5px;font-weight:650;
+    border:1px solid rgba(33,150,243,.3);background:transparent;color:#1565C0;
+  }
+  #fsJActions #fsReload{
+    background:#2196F3;border-color:#2196F3;color:#fff;
+  }
+  #fsJActions #fsReload:hover{background:#1976D2}
+  #fsJActions #fsJDismiss{border:none;color:#6B7789;font-weight:500}
+
+  /* ── Compose panel (after markup) ── */
+  #fsPanel{
+    display:none;width:100%;box-sizing:border-box;
+    border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.94);
+    border-radius:18px;padding:16px;box-shadow:0 18px 50px -16px rgba(20,60,120,.28);
+    backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);
+  }
   #fsPanel.open{display:block}
-  #fsPanel h4{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--ink,#e8f1ec)}
-  #fsPanel p{margin:0 0 10px;font-size:12px;color:var(--muted,#8aa89b)}
-  #fsText{width:100%;box-sizing:border-box;min-height:78px;resize:vertical;border:1px solid var(--line,#243530);background:var(--bg,#0c1311);color:var(--ink,#e8f1ec);border-radius:10px;padding:9px;font:13px/1.4 inherit}
-  #fsRow{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px}
-  #fsCancel{cursor:pointer;background:none;border:none;color:var(--muted,#8aa89b);font-size:12.5px;padding:6px}
-  #fsSend{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:600}
-  #fsSend:hover{background:rgba(52,216,150,.08)}
-  #fsMsg{font-size:12px;margin-top:8px;min-height:1em}
-  /* Suggestion lifecycle pill (self-improving product, Ford 2026-07-10): after
-     you send a suggestion, judge-approved small improvements are built and
-     shipped by an agent — this pill is how you watch your own idea go live.
-     Same visual language as the trigger pill; sits quietly above the widget. */
-  #fsStatus{display:none;align-items:center;gap:8px;margin-bottom:10px;width:max-content;max-width:calc(100vw - 32px);border:1px solid var(--line,#243530);background:var(--card,#15201c);color:var(--muted,#8aa89b);border-radius:999px;padding:8px 14px;font-size:12.5px;box-shadow:0 2px 10px -4px rgba(0,0,0,.4)}
-  #fsStatus.show{display:flex}
-  #fsStatus .fsPulse{animation:fsPulse 1.6s ease-in-out infinite}
-  @keyframes fsPulse{0%,100%{opacity:.45}50%{opacity:1}}
-  #fsStatus button{cursor:pointer;border:1px solid var(--good,#34d896);background:transparent;color:var(--good,#34d896);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600}
-  #fsStatus button:hover{background:rgba(52,216,150,.08)}
-  #fsStatus #fsStDismiss{border:none;color:var(--muted,#8aa89b);font-weight:400;padding:2px 4px}
-  #fsStatus #fsStDismiss:hover{background:none;color:var(--ink,#e8f1ec)}
-  /* Keyboard focus: a clear octarine-leaning ring so tabbing through the widget is
-     visible (mouse clicks stay clean via :focus-visible). */
-  #fsBtn:focus-visible,#fsText:focus-visible,#fsSend:focus-visible,#fsCancel:focus-visible{
-    outline:2px solid var(--good,#34d896);outline-offset:2px;border-radius:9px}
-  #fsText:focus-visible{outline-offset:1px}
-  /* Mark-up-the-screen (MindSpace annotate pattern, Ford 2026-07-10): freeze a
-     screenshot of the live UI, circle/highlight on it, and the composited PNG
-     rides with the suggestion so the review agent SEES the intent. */
-  #fsMarkRow{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted,#8aa89b)}
-  #fsMarkBtn{cursor:pointer;border:1px dashed var(--line,#243530);background:transparent;color:var(--muted,#8aa89b);border-radius:9px;padding:6px 10px;font-size:12px}
-  #fsMarkBtn:hover{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896)}
-  #fsMarkThumb{display:none;align-items:center;gap:7px}
-  #fsMarkThumb img{height:30px;border-radius:5px;border:1px solid var(--line,#243530);display:block}
-  #fsMarkThumb button{cursor:pointer;background:none;border:none;color:var(--muted,#8aa89b);font-size:11.5px;padding:2px;text-decoration:underline}
-  #fsOverlay{position:fixed;inset:0;z-index:10050;background:rgba(5,10,8,.92);display:none;flex-direction:column;align-items:center;justify-content:center}
+  #fsPanel h4{margin:0 0 4px;font-size:15px;font-weight:750;color:#0E1420;letter-spacing:-.01em}
+  #fsPanel .fsLead{margin:0 0 12px;font-size:12.5px;color:#4C596B;line-height:1.45}
+  #fsText{
+    width:100%;box-sizing:border-box;min-height:72px;resize:vertical;
+    border:1px solid rgba(20,60,120,.14);background:#fff;color:#0E1420;
+    border-radius:12px;padding:11px 12px;font:13.5px/1.45 inherit;
+  }
+  #fsText::placeholder{color:#8A96A8}
+  #fsMarkRow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#4C596B;flex-wrap:wrap}
+  #fsMarkThumb{display:none;align-items:center;gap:8px}
+  #fsMarkThumb img{height:36px;width:auto;border-radius:8px;border:1px solid rgba(20,60,120,.14);display:block}
+  #fsMarkThumb button,#fsRemark{cursor:pointer;background:none;border:none;color:#1565C0;font-size:12px;padding:2px;font-weight:600;text-decoration:underline}
+  #fsMsg{font-size:12.5px;margin-top:8px;min-height:1.1em;color:#4C596B}
+  #fsRow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+  #fsRow .fsRight{display:flex;gap:8px;align-items:center}
+  #fsCancel{cursor:pointer;background:none;border:none;color:#6B7789;font-size:12.5px;padding:6px 8px;font-weight:500}
+  #fsSend{
+    cursor:pointer;border:none;background:#2196F3;color:#fff;border-radius:11px;
+    padding:9px 16px;font-size:13px;font-weight:700;
+    box-shadow:0 6px 18px -6px rgba(33,150,243,.55);
+  }
+  #fsSend:hover{background:#1976D2}
+  #fsSend:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+
+  @keyframes fsPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+
+  /* ── Full-screen mark overlay ── */
+  #fsOverlay{
+    position:fixed;inset:0;z-index:10050;background:rgba(8,20,40,.72);
+    display:none;flex-direction:column;align-items:center;justify-content:center;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  }
   #fsOverlay.open{display:flex}
-  #fsToolbar{display:flex;gap:6px;align-items:center;margin-bottom:10px;background:var(--card,#15201c);border:1px solid var(--line,#243530);border-radius:12px;padding:7px 10px;box-shadow:0 8px 30px -8px rgba(0,0,0,.55)}
-  #fsToolbar button{cursor:pointer;border:1px solid transparent;background:transparent;color:var(--muted,#8aa89b);border-radius:8px;padding:6px 11px;font:12.5px inherit}
-  #fsToolbar button.on{color:var(--ink,#e8f1ec);border-color:var(--good,#34d896);background:rgba(52,216,150,.08)}
-  #fsToolbar button:hover{color:var(--ink,#e8f1ec)}
-  #fsToolbar .fsSep{width:1px;height:18px;background:var(--line,#243530)}
-  #fsToolbar #fsAttach{color:var(--good,#34d896);border-color:var(--good,#34d896);font-weight:600}
-  #fsStage{position:relative;max-width:94vw;max-height:80vh;border-radius:10px;overflow:auto;box-shadow:0 12px 50px -10px rgba(0,0,0,.7);border:1px solid var(--line,#243530)}
+  #fsToolbar{
+    display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+    background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.8);
+    border-radius:14px;padding:8px 12px;box-shadow:0 12px 40px -12px rgba(15,50,110,.35);
+    max-width:94vw;
+  }
+  #fsToolbar .fsTip{
+    font-size:12.5px;font-weight:650;color:#0E1420;margin-right:4px;
+  }
+  #fsToolbar button{
+    cursor:pointer;border:1px solid transparent;background:transparent;color:#4C596B;
+    border-radius:9px;padding:7px 11px;font:12.5px inherit;font-weight:600;
+  }
+  #fsToolbar button.on{color:#1565C0;border-color:rgba(33,150,243,.35);background:rgba(33,150,243,.1)}
+  #fsToolbar button:hover{color:#0E1420}
+  #fsToolbar .fsSep{width:1px;height:18px;background:rgba(20,60,120,.12)}
+  #fsToolbar #fsAttach{
+    color:#fff;background:#2196F3;border-color:#2196F3;font-weight:700;
+  }
+  #fsToolbar #fsAttach:hover{background:#1976D2}
+  #fsToolbar #fsSkipMark{color:#6B7789;font-weight:500}
+  #fsStage{
+    position:relative;max-width:94vw;max-height:78vh;border-radius:12px;overflow:auto;
+    box-shadow:0 20px 60px -16px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.35);
+    background:#0a1628;
+  }
   #fsStage canvas{display:block}
   #fsInk{position:absolute;left:0;top:0;cursor:crosshair;touch-action:none}
+
+  @media (max-width:600px){
+    #fsWrap{left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:none}
+    #fsBtn{width:100%;justify-content:center}
+  }
 </style>
 <div id="fsWrap">
-  <div id="fsStatus" role="status" aria-live="polite"></div>
-  <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle" aria-label="Suggest a feature">
-    <h4 id="fsTitle">Ask, and the site changes.</h4>
-    <p>An <b>AI engineer</b> reads your idea — and your markup — and builds it. Small improvements go <b>live on this page in minutes</b>: watch the "building…" status, then refresh. Every change is safety-checked and verified before it ships, so there's <b>no fear of breaking anything</b>. Bigger ideas go to the team.</p>
-    <textarea id="fsText" aria-label="Your feature suggestion" placeholder="What would make Array Operator better for you?"></textarea>
+  <div id="fsJourney" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="fsPanel" role="dialog" aria-modal="true" aria-labelledby="fsTitle">
+    <h4 id="fsTitle">What should be here?</h4>
+    <p class="fsLead">You marked the spot. One short sentence is enough — an AI engineer builds small improvements and ships them live on this page.</p>
+    <textarea id="fsText" maxlength="800" aria-label="Your wish" placeholder="e.g. Put a total kWh badge right here on the array card"></textarea>
     <div id="fsMarkRow">
-      <button id="fsMarkBtn" type="button" title="Freeze a screenshot of this page and circle or highlight what you mean">&#9998; Mark up the screen</button>
-      <span id="fsMarkThumb"><img id="fsMarkImg" alt="Your marked-up screenshot"><button id="fsMarkDel" type="button">remove</button></span>
+      <span id="fsMarkThumb"><img id="fsMarkImg" alt="Your marked-up screenshot"><button id="fsMarkDel" type="button">remove mark</button></span>
+      <button id="fsRemark" type="button">Re-circle</button>
     </div>
     <div id="fsMsg"></div>
     <div id="fsRow">
       <button id="fsCancel" type="button">Cancel</button>
-      <button id="fsSend" type="button">Send &rarr;</button>
+      <div class="fsRight">
+        <button id="fsSend" type="button">Build this →</button>
+      </div>
     </div>
   </div>
-  <button id="fsBtn" type="button" aria-expanded="false"><span class="fsdot">&#10022;</span> Ask AI to improve this site</button>
+  <button id="fsBtn" type="button" aria-expanded="false" title="Circle a spot on the page and tell us what you wish was there">
+    <span class="fsdot">✦</span> Wish this was better
+  </button>
 </div>
-<div id="fsOverlay" role="dialog" aria-label="Mark up the screen">
+<div id="fsOverlay" role="dialog" aria-label="Circle the spot on the screen">
   <div id="fsToolbar">
-    <button id="fsToolPen" type="button" class="on" title="Freehand pen">&#9998; Pen</button>
-    <button id="fsToolHi" type="button" title="Wide translucent highlighter">&#9646; Highlight</button>
-    <button id="fsToolCirc" type="button" title="Drag to circle something">&#9711; Circle</button>
+    <span class="fsTip">Circle the spot that should change</span>
     <span class="fsSep"></span>
-    <button id="fsUndo" type="button" title="Undo last mark">&#8630; Undo</button>
+    <button id="fsToolCirc" type="button" class="on" title="Drag to circle">○ Circle</button>
+    <button id="fsToolPen" type="button" title="Freehand pen">✎ Pen</button>
+    <button id="fsToolHi" type="button" title="Highlighter">▮ Highlight</button>
     <span class="fsSep"></span>
-    <button id="fsAttach" type="button">&#10003; Attach markup</button>
-    <button id="fsMarkCancel" type="button">&#10005; Cancel</button>
+    <button id="fsUndo" type="button" title="Undo">↺ Undo</button>
+    <span class="fsSep"></span>
+    <button id="fsAttach" type="button">Next → describe it</button>
+    <button id="fsSkipMark" type="button">Skip mark</button>
+    <button id="fsMarkCancel" type="button">✕</button>
   </div>
   <div id="fsStage"><canvas id="fsShot"></canvas><canvas id="fsInk"></canvas></div>
 </div>
 <script>
 (function(){
-  var btn=document.getElementById("fsBtn"), panel=document.getElementById("fsPanel"),
-      txt=document.getElementById("fsText"), send=document.getElementById("fsSend"),
-      cancel=document.getElementById("fsCancel"), msg=document.getElementById("fsMsg");
+  var btn=document.getElementById("fsBtn"),
+      panel=document.getElementById("fsPanel"),
+      journey=document.getElementById("fsJourney"),
+      txt=document.getElementById("fsText"),
+      send=document.getElementById("fsSend"),
+      cancel=document.getElementById("fsCancel"),
+      msg=document.getElementById("fsMsg");
   if(!btn) return;
+  // Only for signed-in owners — anonymous visitors don't get the builder.
   try{ if(!localStorage.getItem("so_session")){ var _w=document.getElementById("fsWrap"); if(_w) _w.style.display="none"; return; } }catch(e){}
-  function open(o){
-    panel.classList.toggle("open", o);
-    btn.setAttribute("aria-expanded", o?"true":"false");
-    if(o){ msg.textContent=""; setTimeout(function(){ txt.focus(); }, 30); }
-    else { btn.focus(); }   // return focus to the trigger on close (a11y)
-  }
-  btn.onclick=function(){ open(!panel.classList.contains("open")); };
-  cancel.onclick=function(){ open(false); };
-  // Keyboard: Escape dismisses the dialog; Tab/Shift+Tab is trapped within the panel
-  // while it's open so focus can't escape to the page behind it (aria-modal contract).
-  panel.addEventListener("keydown", function(e){
-    if(!panel.classList.contains("open")) return;
-    if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); open(false); return; }
-    if(e.key==="Tab"){
-      var f=[txt,cancel,send].filter(function(el){ return el && !el.disabled; });
-      if(!f.length) return;
-      var first=f[0], last=f[f.length-1], a=document.activeElement;
-      if(e.shiftKey && (a===first || !panel.contains(a))){ e.preventDefault(); last.focus(); }
-      else if(!e.shiftKey && a===last){ e.preventDefault(); first.focus(); }
-    }
-  });
-  // ── Mark up the screen (MindSpace annotate pattern, Ford 2026-07-10) ──────
-  // Freeze a screenshot of the live page (html2canvas, lazy-loaded), let the
-  // customer draw on it (pen / highlighter / circle), composite ink over the
-  // shot, and send the PNG with the suggestion so the review agent SEES it.
-  var markBtn=document.getElementById("fsMarkBtn"), markThumb=document.getElementById("fsMarkThumb"),
-      markImg=document.getElementById("fsMarkImg"), markDel=document.getElementById("fsMarkDel"),
-      overlay=document.getElementById("fsOverlay"), stage=document.getElementById("fsStage"),
-      shotC=document.getElementById("fsShot"), inkC=document.getElementById("fsInk");
-  var MARK_B64=null, TOOL="pen", STROKES=[], CUR=null, SCL=1;
+
+  // ── State ──
+  var MARK_B64=null, TOOL="circ", STROKES=[], CUR=null, SCL=1;
+  var ACTIVE_ID=null, ACTIVE_SINCE=0, POLL_T=null;
+
+  var markThumb=document.getElementById("fsMarkThumb"),
+      markImg=document.getElementById("fsMarkImg"),
+      markDel=document.getElementById("fsMarkDel"),
+      remark=document.getElementById("fsRemark"),
+      overlay=document.getElementById("fsOverlay"),
+      shotC=document.getElementById("fsShot"),
+      inkC=document.getElementById("fsInk");
+
   function setThumb(){
-    if(MARK_B64){ markImg.src="data:image/png;base64,"+MARK_B64; markThumb.style.display="inline-flex"; markBtn.textContent="✎ Re-mark the screen"; }
-    else { markThumb.style.display="none"; markBtn.textContent="✎ Mark up the screen"; }
+    if(MARK_B64){
+      markImg.src="data:image/png;base64,"+MARK_B64;
+      markThumb.style.display="inline-flex";
+    } else {
+      markThumb.style.display="none";
+    }
   }
-  markDel.onclick=function(){ MARK_B64=null; setThumb(); };
+
+  function openPanel(o){
+    panel.classList.toggle("open", !!o);
+    btn.setAttribute("aria-expanded", o?"true":"false");
+    if(o){
+      msg.textContent="";
+      setTimeout(function(){ try{ txt.focus(); }catch(e){} }, 40);
+    }
+  }
+  function openJourney(o){
+    journey.classList.toggle("open", !!o);
+  }
+
+  // ── Capture + mark (THE entry path) ──
   function loadH2C(){
     return window.html2canvas ? Promise.resolve()
-      : new Promise(function(res,rej){ var s=document.createElement("script"); s.src="/vendor/html2canvas.min.js?v=pro158"; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+      : new Promise(function(res,rej){
+          var s=document.createElement("script");
+          s.src="/vendor/html2canvas.min.js?v=pro158";
+          s.onload=res; s.onerror=rej; document.head.appendChild(s);
+        });
   }
-  markBtn.onclick=function(){
-    markBtn.disabled=true; markBtn.textContent="Capturing…";
+
+  function startMark(fromSkip){
+    // Hide UI chrome while capturing so the shot is clean.
     var wrap=document.getElementById("fsWrap");
+    openPanel(false);
+    btn.disabled=true;
+    var prevLabel=btn.innerHTML;
+    btn.innerHTML='<span class="fsdot">✦</span> Capturing…';
     loadH2C().then(function(){
-      wrap.style.visibility="hidden";               // never capture the widget itself
-      // Capture ONLY what's on screen right now (the current viewport), not the whole
-      // unfolded scroll height — cropping to [scroll, viewport] keeps the markup canvas
-      // to what the customer is actually looking at (Ford 2026-07-11). Also far lighter,
-      // so tall pages stop failing capture.
+      wrap.style.visibility="hidden";
       var sx=Math.floor(window.scrollX||window.pageXOffset||0);
       var sy=Math.floor(window.scrollY||window.pageYOffset||0);
       var vw=Math.max(1,window.innerWidth||document.documentElement.clientWidth);
       var vh=Math.max(1,window.innerHeight||document.documentElement.clientHeight);
       return window.html2canvas(document.body,{
         scale:Math.min(window.devicePixelRatio||1,1.5), useCORS:true, logging:false,
-        x:sx, y:sy, width:vw, height:vh,             // crop the render to the visible viewport
+        x:sx, y:sy, width:vw, height:vh,
         ignoreElements:function(el){ return el&&(el.id==="fsWrap"||el.id==="fsOverlay"); }
       });
     }).then(function(cv){
       wrap.style.visibility="";
-      // Fit the shot into the stage; ink canvas overlays 1:1 in CSS pixels.
-      var maxW=Math.floor(window.innerWidth*0.94), maxH=Math.floor(window.innerHeight*0.80);
+      var maxW=Math.floor(window.innerWidth*0.94), maxH=Math.floor(window.innerHeight*0.78);
       SCL=Math.min(maxW/cv.width, maxH/cv.height, 1);
       var w=Math.max(1,Math.floor(cv.width*SCL)), h=Math.max(1,Math.floor(cv.height*SCL));
       shotC.width=w; shotC.height=h; inkC.width=w; inkC.height=h;
       inkC.style.width=w+"px"; inkC.style.height=h+"px";
       shotC.getContext("2d").drawImage(cv,0,0,w,h);
-      shotC._full=cv;                               // native-res shot for the composite
+      shotC._full=cv;
       STROKES=[]; CUR=null; drawInk();
+      // Default tool = circle (Ford: circle the location)
+      TOOL="circ";
+      ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){
+        document.getElementById(b).classList.toggle("on", b==="fsToolCirc");
+      });
       overlay.classList.add("open");
     }).catch(function(){
       wrap.style.visibility="";
-      msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't capture the screen here — send the words instead.";
-    }).then(function(){ markBtn.disabled=false; setThumb(); });
+      // Capture failed — fall through to text-only compose.
+      openPanel(true);
+      msg.style.color="#b45309";
+      msg.textContent="Couldn't freeze the screen here — describe what you want instead.";
+    }).then(function(){
+      btn.disabled=false;
+      btn.innerHTML=prevLabel;
+    });
+  }
+
+  // Primary CTA: go straight into mark mode (the "right here" moment).
+  btn.onclick=function(){
+    if(journey.classList.contains("open") && ACTIVE_ID){
+      // If a build is running, re-open the journey rather than starting another.
+      return;
+    }
+    startMark();
   };
-  function tool(id,name){ document.getElementById(id).onclick=function(){
-    TOOL=name; ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){ document.getElementById(b).classList.toggle("on", (b===id)); }); }; }
+
+  function tool(id,name){
+    document.getElementById(id).onclick=function(){
+      TOOL=name;
+      ["fsToolPen","fsToolHi","fsToolCirc"].forEach(function(b){
+        document.getElementById(b).classList.toggle("on", b===id);
+      });
+    };
+  }
   tool("fsToolPen","pen"); tool("fsToolHi","hi"); tool("fsToolCirc","circ");
   document.getElementById("fsUndo").onclick=function(){ STROKES.pop(); drawInk(); };
   document.getElementById("fsMarkCancel").onclick=function(){ overlay.classList.remove("open"); };
-  function pos(e){ var r=inkC.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+  document.getElementById("fsSkipMark").onclick=function(){
+    overlay.classList.remove("open");
+    MARK_B64=null; setThumb();
+    openPanel(true);
+    msg.textContent="No mark — describe the change in a sentence.";
+  };
+
+  function pos(e){
+    var r=inkC.getBoundingClientRect();
+    return {x:e.clientX-r.left, y:e.clientY-r.top};
+  }
   inkC.addEventListener("pointerdown",function(e){
     e.preventDefault(); inkC.setPointerCapture(e.pointerId);
     var p=pos(e);
@@ -738,99 +887,266 @@ document.documentElement.setAttribute("data-theme","day");
     drawInk();
   });
   inkC.addEventListener("pointerup",function(){ if(CUR){ STROKES.push(CUR); CUR=null; drawInk(); } });
+
   function paint(ctx,s,k){
     if(s.t==="circ"){
-      ctx.strokeStyle="#ff3b30"; ctx.lineWidth=3*k; ctx.beginPath();
-      ctx.ellipse((s.x0+s.x1)/2*k,(s.y0+s.y1)/2*k,Math.abs(s.x1-s.x0)/2*k+2,Math.abs(s.y1-s.y0)/2*k+2,0,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle="#FF3B30"; ctx.lineWidth=3.5*k; ctx.beginPath();
+      ctx.ellipse((s.x0+s.x1)/2*k,(s.y0+s.y1)/2*k,
+        Math.abs(s.x1-s.x0)/2*k+2, Math.abs(s.y1-s.y0)/2*k+2, 0,0,Math.PI*2);
+      ctx.stroke();
     } else {
-      ctx.strokeStyle = s.t==="hi" ? "rgba(255,235,59,.45)" : "#ff3b30";
+      ctx.strokeStyle = s.t==="hi" ? "rgba(255,235,59,.5)" : "#FF3B30";
       ctx.lineWidth = (s.t==="hi"?14:3)*k; ctx.lineCap="round"; ctx.lineJoin="round";
       ctx.beginPath();
-      for(var i=0;i<s.pts.length;i++){ var p=s.pts[i]; if(i===0) ctx.moveTo(p.x*k,p.y*k); else ctx.lineTo(p.x*k,p.y*k); }
+      for(var i=0;i<s.pts.length;i++){
+        var p=s.pts[i];
+        if(i===0) ctx.moveTo(p.x*k,p.y*k); else ctx.lineTo(p.x*k,p.y*k);
+      }
       ctx.stroke();
     }
   }
   function drawInk(){
-    var ctx=inkC.getContext("2d"); ctx.clearRect(0,0,inkC.width,inkC.height);
+    var ctx=inkC.getContext("2d");
+    ctx.clearRect(0,0,inkC.width,inkC.height);
     STROKES.concat(CUR?[CUR]:[]).forEach(function(s){ paint(ctx,s,1); });
   }
+
   document.getElementById("fsAttach").onclick=function(){
-    var full=shotC._full; if(!full){ overlay.classList.remove("open"); return; }
-    // Composite ink over the NATIVE-resolution shot (k rescales CSS-px strokes).
-    var out=document.createElement("canvas"); out.width=full.width; out.height=full.height;
-    var ctx=out.getContext("2d"); ctx.drawImage(full,0,0);
+    var full=shotC._full;
+    if(!full){ overlay.classList.remove("open"); openPanel(true); return; }
+    if(!STROKES.length){
+      // Nudge — circle something first, but allow attach empty if they insist twice.
+      if(!document.getElementById("fsAttach")._nudge){
+        document.getElementById("fsAttach")._nudge=true;
+        document.querySelector("#fsToolbar .fsTip").textContent="Drag a circle on the spot first — then Next";
+        return;
+      }
+    }
+    document.getElementById("fsAttach")._nudge=false;
+    var out=document.createElement("canvas");
+    out.width=full.width; out.height=full.height;
+    var ctx=out.getContext("2d");
+    ctx.drawImage(full,0,0);
     var k=full.width/inkC.width;
     STROKES.forEach(function(s){ paint(ctx,s,k); });
     var url=out.toDataURL("image/png");
-    if(url.length>2800000) url=out.toDataURL("image/jpeg",0.85);   // stay under the 4MB cap
+    if(url.length>2800000) url=out.toDataURL("image/jpeg",0.85);
     MARK_B64=url.split(",")[1];
-    overlay.classList.remove("open"); setThumb();
-    msg.style.color="var(--good,#34d896)"; msg.textContent="Markup attached — add a sentence and send.";
+    overlay.classList.remove("open");
+    setThumb();
+    openPanel(true);
+    msg.style.color="#1565C0";
+    msg.textContent=STROKES.length
+      ? "Marked. One short sentence — what should be there?"
+      : "No marks captured — describe the change in a sentence.";
   };
-  overlay.addEventListener("keydown",function(e){ if(e.key==="Escape") overlay.classList.remove("open"); });
+  overlay.addEventListener("keydown",function(e){
+    if(e.key==="Escape") overlay.classList.remove("open");
+  });
 
-  // ── Suggestion lifecycle pill (self-improving product, Ford 2026-07-10) ──
-  // We keep the ids of suggestions sent from this browser and quietly poll the
-  // PUBLIC status endpoint while a tab is open. Judge-approved small
-  // improvements get auto-built and shipped — the pill shows "being built…"
-  // and then "live — refresh the page" so the customer watches it happen.
-  var statusEl=document.getElementById("fsStatus");
-  var PEND_KEY="fsPending", POLL_MS=45000, PEND_TTL=7*24*3600*1000;
-  function pendGet(){ try{ var v=JSON.parse(localStorage.getItem(PEND_KEY)||"[]"); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
-  function pendSet(v){ try{ localStorage.setItem(PEND_KEY, JSON.stringify(v)); }catch(e){} }
-  function pendAdd(id){ if(!id) return; var v=pendGet().filter(function(p){ return p.id!==id; }); v.push({id:id, ts:Date.now()}); pendSet(v); setTimeout(pollPending, 5000); }
-  function pendDrop(ids){ pendSet(pendGet().filter(function(p){ return ids.indexOf(p.id)<0; })); }
-  function renderStatus(states){
-    var shipped=states.filter(function(s){ return s.st==="shipped"; }),
-        building=states.some(function(s){ return s.st==="building"; });
-    if(shipped.length){
-      statusEl.innerHTML='<span>&#9989;</span><span>Your suggestion is live &mdash; refresh the page</span>'+
-        '<button id="fsReload" type="button">Refresh</button>'+
-        '<button id="fsStDismiss" type="button" aria-label="Dismiss">&#10005;</button>';
-      var ids=shipped.map(function(s){ return s.id; });
-      document.getElementById("fsReload").onclick=function(){ pendDrop(ids); location.reload(); };
-      document.getElementById("fsStDismiss").onclick=function(){ pendDrop(ids); statusEl.classList.remove("show"); pollPending(); };
-      statusEl.classList.add("show");
-    } else if(building){
-      statusEl.innerHTML='<span class="fsPulse">&#10024;</span><span>Your suggestion is being built&hellip;</span>';
-      statusEl.classList.add("show");
-    } else {
-      statusEl.classList.remove("show");
+  markDel.onclick=function(){ MARK_B64=null; setThumb(); };
+  remark.onclick=function(){ startMark(); };
+  cancel.onclick=function(){ openPanel(false); MARK_B64=null; setThumb(); txt.value=""; };
+
+  // Keyboard trap while compose panel open
+  panel.addEventListener("keydown", function(e){
+    if(!panel.classList.contains("open")) return;
+    if(e.key==="Escape"){ e.preventDefault(); cancel.onclick(); return; }
+    if(e.key==="Tab"){
+      var f=[txt,cancel,send].filter(function(el){ return el && !el.disabled; });
+      if(!f.length) return;
+      var first=f[0], last=f[f.length-1], a=document.activeElement;
+      if(e.shiftKey && (a===first || !panel.contains(a))){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && a===last){ e.preventDefault(); first.focus(); }
     }
-  }
-  var _polling=false;
-  function pollPending(){
-    if(_polling) return;
-    var pend=pendGet().filter(function(p){ return Date.now()-p.ts < PEND_TTL; });
-    pendSet(pend);
-    if(!pend.length){ renderStatus([]); return; }
-    _polling=true;
-    Promise.all(pend.map(function(p){
-      return fetch("/v1/feature-suggestion/"+encodeURIComponent(p.id)+"/status")
-        .then(function(r){ if(r.status===404){ pendDrop([p.id]); return null; } return r.ok?r.json():null; })
-        .then(function(d){ return (d&&d.status)?{id:p.id, st:d.status}:null; })
-        .catch(function(){ return null; });
-    })).then(function(res){ _polling=false; renderStatus(res.filter(Boolean)); })
-      .catch(function(){ _polling=false; });
-  }
-  pollPending();
-  setInterval(pollPending, POLL_MS);
+  });
 
+  // ── Journey timeline ──
+  // Statuses from API: new | reviewed | building | shipped
+  // We expand into a story the customer can follow.
+  var STEPS = [
+    { key:"received",  label:"Received",           sub:"Got your mark-up and note" },
+    { key:"reading",   label:"AI is reading it",   sub:"Looking at what you circled" },
+    { key:"deciding",  label:"Planning the build", sub:"Figuring out the smallest safe change" },
+    { key:"building",  label:"Building",           sub:"Writing the code on a branch" },
+    { key:"deploying", label:"Deploying live",     sub:"Pushing to the site" },
+    { key:"live",      label:"Live on the site",   sub:"Refresh to see your change" }
+  ];
+
+  function mapStatusToStep(st, elapsedSec){
+    // Map backend status + time-on-clock to the furthest completed step index.
+    if(st==="shipped") return 5;
+    if(st==="building"){
+      // After ~2 min of building, show "deploying" as the active feel
+      return elapsedSec > 120 ? 4 : 3;
+    }
+    if(st==="reviewed") return 2;
+    // new — progress through early steps by wall-clock so it never feels stuck
+    if(elapsedSec < 8) return 0;
+    if(elapsedSec < 25) return 1;
+    return 2;
+  }
+
+  function renderJourney(st, opts){
+    opts = opts || {};
+    var elapsed = ACTIVE_SINCE ? Math.floor((Date.now()-ACTIVE_SINCE)/1000) : 0;
+    var stepIdx = mapStatusToStep(st || "new", elapsed);
+    var failed = !!opts.failed;
+    var html = '<h4>'+(st==="shipped"?"It's live.": failed ? "Couldn't auto-ship this one." : "Building your wish…")+'</h4>';
+    html += '<p class="fsLead">'+(
+      st==="shipped" ? "Your change is on the site. Refresh to see it."
+      : failed ? "The AI reviewed it but didn't auto-ship (too big or needs a human). We've got it either way."
+      : "Follow along — small improvements usually land in a few minutes."
+    )+'</p><ul id="fsSteps">';
+    STEPS.forEach(function(s, i){
+      var cls = "";
+      if(failed && i > stepIdx) cls = "";
+      else if(st==="shipped" || i < stepIdx) cls = "done";
+      else if(i === stepIdx) cls = failed ? "fail" : "active";
+      var icon = (cls==="done") ? "✓" : (cls==="active" ? "●" : (cls==="fail" ? "!" : String(i+1)));
+      var sub = s.sub;
+      if(cls==="active" && s.key==="building") sub = "Agent is editing the live frontend…";
+      if(cls==="active" && s.key==="deploying") sub = "Uploading to arrayoperator.com…";
+      if(cls==="active" && s.key==="reading" && elapsed > 10) sub = "Still reading — complex pages take a moment";
+      html += '<li class="'+cls+'"><div class="fsStepDot">'+icon+'</div><div class="fsStepBody"><b>'+s.label+'</b><span>'+sub+'</span></div></li>';
+    });
+    html += '</ul><div id="fsJActions">';
+    if(st==="shipped"){
+      html += '<button id="fsReload" type="button">Refresh page</button>';
+    }
+    html += '<button id="fsJDismiss" type="button">'+(st==="shipped"||failed?"Dismiss":"Hide")+'</button>';
+    html += '</div>';
+    journey.innerHTML = html;
+    openJourney(true);
+    openPanel(false);
+    var dismiss=document.getElementById("fsJDismiss");
+    if(dismiss) dismiss.onclick=function(){
+      if(st==="shipped"||failed){ stopWatch(); }
+      openJourney(false);
+    };
+    var reload=document.getElementById("fsReload");
+    if(reload) reload.onclick=function(){ stopWatch(); location.reload(); };
+  }
+
+  function stopWatch(){
+    var dropId=ACTIVE_ID;
+    ACTIVE_ID=null; ACTIVE_SINCE=0;
+    if(POLL_T){ clearInterval(POLL_T); POLL_T=null; }
+    try{
+      var pend=JSON.parse(localStorage.getItem("fsPending")||"[]");
+      if(dropId!=null) pend=pend.filter(function(p){ return p.id!==dropId; });
+      localStorage.setItem("fsPending", JSON.stringify(pend));
+    }catch(e){}
+  }
+
+  function pendAdd(id){
+    try{
+      var v=JSON.parse(localStorage.getItem("fsPending")||"[]");
+      if(!Array.isArray(v)) v=[];
+      v=v.filter(function(p){ return p.id!==id; });
+      v.push({id:id, ts:Date.now()});
+      localStorage.setItem("fsPending", JSON.stringify(v));
+    }catch(e){}
+  }
+
+  function startWatch(id){
+    ACTIVE_ID=id;
+    ACTIVE_SINCE=Date.now();
+    pendAdd(id);
+    renderJourney("new");
+    if(POLL_T) clearInterval(POLL_T);
+    // Fast poll while the customer is watching — 5s feels alive.
+    POLL_T=setInterval(tickStatus, 5000);
+    setTimeout(tickStatus, 1500);
+  }
+
+  function tickStatus(){
+    if(!ACTIVE_ID) return;
+    // Also re-render so time-based early steps advance even before status flips.
+    fetch("/v1/feature-suggestion/"+encodeURIComponent(ACTIVE_ID)+"/status")
+      .then(function(r){
+        if(r.status===404){ renderJourney("reviewed",{failed:true}); stopWatch(); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(function(d){
+        if(!d||!d.status){ renderJourney("new"); return; }
+        if(d.status==="shipped"){
+          renderJourney("shipped");
+          if(POLL_T){ clearInterval(POLL_T); POLL_T=null; }
+          // Keep journey open until they refresh/dismiss.
+        } else if(d.status==="reviewed"){
+          // Reviewed without auto-ship — treat as "planned, not auto-live"
+          var elapsed = Math.floor((Date.now()-ACTIVE_SINCE)/1000);
+          if(elapsed > 90){
+            renderJourney("reviewed",{failed:true});
+            if(POLL_T){ clearInterval(POLL_T); POLL_T=null; }
+          } else {
+            renderJourney("reviewed");
+          }
+        } else {
+          renderJourney(d.status);
+        }
+      })
+      .catch(function(){ /* keep current UI; next tick retries */ });
+  }
+
+  // Resume a pending watch after reload
+  (function resume(){
+    try{
+      var pend=JSON.parse(localStorage.getItem("fsPending")||"[]");
+      if(!Array.isArray(pend)||!pend.length) return;
+      // Drop older than 7 days
+      var now=Date.now();
+      pend=pend.filter(function(p){ return now-p.ts < 7*24*3600*1000; });
+      localStorage.setItem("fsPending", JSON.stringify(pend));
+      if(!pend.length) return;
+      var last=pend[pend.length-1];
+      ACTIVE_ID=last.id;
+      ACTIVE_SINCE=last.ts||now;
+      renderJourney("new");
+      POLL_T=setInterval(tickStatus, 5000);
+      tickStatus();
+    }catch(e){}
+  })();
+
+  // ── Send ──
   send.onclick=function(){
     var t=(txt.value||"").trim();
-    if(!t){ msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Type a suggestion first."; return; }
-    send.disabled=true; msg.style.color="var(--muted,#8aa89b)"; msg.textContent="Sending...";
+    if(!t){
+      msg.style.color="#b45309";
+      msg.textContent=MARK_B64
+        ? "One short sentence — what should be at the spot you circled?"
+        : "Type a short wish first.";
+      txt.focus();
+      return;
+    }
+    send.disabled=true;
+    msg.style.color="#4C596B";
+    msg.textContent="Sending to the AI engineer…";
     var h={"Content-Type":"application/json"};
     try{ var sess=localStorage.getItem("so_session"); if(sess) h["Authorization"]="Bearer "+sess; }catch(e){}
-    var payload={text:t}; if(MARK_B64) payload.screenshot_b64=MARK_B64;
+    var payload={text:t};
+    if(MARK_B64) payload.screenshot_b64=MARK_B64;
     fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(d){
-        if(d&&d.ok){ msg.style.color="var(--good,#34d896)"; msg.textContent="Thanks — your feedback is in. We're always listening."; txt.value=""; MARK_B64=null; setThumb(); pendAdd(d.id); setTimeout(function(){ open(false); }, 2200); }
-        else { msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't send just now — try again in a moment."; }
         send.disabled=false;
+        if(d&&d.ok&&d.id){
+          txt.value="";
+          MARK_B64=null; setThumb();
+          msg.textContent="";
+          openPanel(false);
+          startWatch(d.id);
+        } else {
+          msg.style.color="#b45309";
+          msg.textContent="Couldn't send just now — try again in a moment.";
+        }
       })
-      .catch(function(){ msg.style.color="var(--warn,#f5b942)"; msg.textContent="Couldn't reach us — check your connection."; send.disabled=false; });
+      .catch(function(){
+        send.disabled=false;
+        msg.style.color="#b45309";
+        msg.textContent="Couldn't reach us — check your connection.";
+      });
   };
 })();
 </script>
