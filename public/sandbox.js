@@ -5350,24 +5350,104 @@
   //    honestly reads "on device / refreshes on open". Octarine frames it (the vault's
   //    signature); green/amber/red are reserved strictly for live STATE.
   function _arLiveRank(dot){ return dot === "err" ? 0 : dot === "warn" ? 1 : dot === "live" ? 2 : 3; }
+  // Labels for LIVE-board rows (vault + API-linked sources).
+  const _AR_LIVE_LABELS = {
+    solaredge: "SolarEdge", alsoenergy: "AlsoEnergy (PowerTrack)", locus: "Locus Energy",
+    fronius: "Fronius (Solar.web)", sma: "SMA (Sunny Portal)", chint: "Chint",
+    enphase: "Enphase", solis: "Solis", tigo: "Tigo",
+    gmp: "Green Mountain Power (GMP)", vec: "Vermont Electric Cooperative (SmartHub)",
+    wec: "Washington Electric Coop (SmartHub)",
+    eversource: "Eversource Energy", eversource_ma: "Eversource Energy (MA)",
+    eversource_ct: "Eversource Energy (CT)", cmp: "Central Maine Power",
+  };
+  // API-polled vendors (no vault password) — always use server freshness branch.
+  const _AR_API_VENDORS = new Set(["solaredge","alsoenergy","locus","enphase","solis","tigo"]);
+
+  // Merge GET /linked-sources into the vault/cloud status map so the LIVE board
+  // lists every linked vendor + utility, not only harvester/vault logins.
+  async function _arMergeLinkedSources(status){
+    const out = Object.assign({}, status || {});
+    try{
+      const r = await fetch("/v1/array-owners/linked-sources", { headers: authHeaders() });
+      if(!r.ok) return out;
+      const d = await r.json().catch(() => ({}));
+      (d.sources || []).forEach(src => {
+        const code = (src.code || "").toLowerCase();
+        if(!code) return;
+        const isInv = src.kind === "inverter";
+        const existing = out[code];
+        // Prefer a richer vault row when it already has a real username; only
+        // fill gaps (API vendors / utilities never stored in the vault).
+        if(existing && existing.hasCreds && (existing.username || "").trim()
+            && !(existing.username || "").includes(" array")){
+          // Still upgrade freshness if linked-sources is newer
+          if(src.last_synced_at && (!existing._cloudAt
+              || Date.parse(src.last_synced_at) > Date.parse(existing._cloudAt))){
+            existing._cloudAt = src.last_synced_at;
+            if(existing._cloudOk == null) existing._cloudOk = true;
+          }
+          return;
+        }
+        out[code] = {
+          hasCreds: true,
+          enabled: true,
+          code,
+          inverter: isInv,
+          utility: !isInv,
+          username: src.detail || (src.count ? `${src.count} linked` : "linked"),
+          _cloudOk: !!src.last_synced_at,
+          _cloudAt: src.last_synced_at || null,
+          _cloudFails: 0,
+          _cloudStatus: src.last_synced_at ? "ok" : null,
+          _fromLinked: true,
+        };
+      });
+    }catch(e){ /* best-effort */ }
+    // Keep the existing SolarEdge keys injection as a richer override when present
+    try{
+      const seR = await fetch("/v1/array-owners/solaredge/keys", { headers: authHeaders() });
+      if(seR.ok){
+        const seD = await seR.json().catch(() => ({}));
+        const seKeys = seD.keys || [];
+        if(seKeys.length){
+          const seArrays = new Set(); seKeys.forEach(k => (k.arrays || []).forEach(a => seArrays.add(a)));
+          out.solaredge = {
+            hasCreds: true, enabled: true, code: "solaredge", inverter: true, utility: false,
+            username: `${seKeys.length} key${seKeys.length === 1 ? "" : "s"} · ${seArrays.size} array${seArrays.size === 1 ? "" : "s"}`,
+            _cloudOk: !!seD.last_synced_at, _cloudAt: seD.last_synced_at || null, _cloudFails: 0,
+            _cloudStatus: seD.last_synced_at ? "ok" : null,
+          };
+        }
+      }
+    }catch(e){}
+    return out;
+  }
+
   function buildLiveBoardHTML(status, mode, catalog){
     const rows = [];
     let live = 0, inv = 0, util = 0, freshest = 0;
     Object.keys(status).forEach(k => {
       const s = status[k]; if(!s || !s.hasCreds) return;
-      const code = s.code || k;
-      const isInv = !!s.inverter || AR_INVERTER_IDS.has(code);
+      const code = (s.code || k).toLowerCase();
+      // Skip multi-login vault slots (code::username) — base code already listed,
+      // or include them as separate rows only when username differs from the base.
+      if(code.includes("::") && status[code.split("::")[0]] && status[code.split("::")[0]].hasCreds){
+        // still show multi-login extras under the same board as separate rows
+      }
+      const isInv = !!s.inverter || AR_INVERTER_IDS.has(code) || _AR_API_VENDORS.has(code)
+        || !!(s.code && _AR_LIVE_LABELS[s.code] && !s.utility);
       let name;
-      if(isInv){ const v = AR_INVERTERS.find(x => x.id === code); name = v ? v.label : (code === "solaredge" ? "SolarEdge" : code.toUpperCase()); }
-      else { name = utilLabelFor(code, catalog); }
+      if(_AR_LIVE_LABELS[code]) name = _AR_LIVE_LABELS[code];
+      else if(isInv){
+        const v = AR_INVERTERS.find(x => x.id === code);
+        name = v ? v.label : code.toUpperCase();
+      } else { name = utilLabelFor(code, catalog); }
       const enabled = s.enabled !== false;
       const fails = s._cloudFails || 0, at = s._cloudAt || null, ok = s._cloudOk, hStatus = s._cloudStatus;
       let dot, stag, stxt, tTxt;
       if(!enabled){ dot = "off"; stag = "off"; stxt = "Paused"; tTxt = "—"; }
-      // SolarEdge always uses the freshness branch below regardless of the
-      // Device/Cloud toggle — its data syncs server-side via SolarEdge's OWN
-      // API unconditionally, it was never "on this device" to begin with.
-      else if(mode === "cloud" || code === "solaredge"){
+      // API vendors + cloud mode use server freshness (never "on device only").
+      else if(mode === "cloud" || _AR_API_VENDORS.has(code) || s._fromLinked){
         // Only a REAL login_failed is a credential problem — a bare ok===false also
         // covers scrape_failed (signed in fine, the data pull hit a transient snag,
         // doesn't count toward `fails`) and shouldn't blame the password. See the
@@ -5437,7 +5517,8 @@
         const cs = await cloudOp("status");
         const cur = document.getElementById("arLiveBoard");
         if(cur && cs && cs.ok){
-          const shape = cloudStatusToShape(cs);
+          let shape = cloudStatusToShape(cs);
+          shape = await _arMergeLinkedSources(shape);
           const catalog = await loadUtilCatalog();
           cur.outerHTML = buildLiveBoardHTML(shape, "cloud", catalog);
           // Anything not yet live (queued/starting/warn) → keep polling fast.
@@ -5570,30 +5651,10 @@
     }
     const catalog = await loadUtilCatalog();
 
-    // SolarEdge has no vault entry (it's an API key, not a login) so it never
-    // flowed into `status` — meaning it never showed up in the LIVE data board
-    // above, even though it's a real connected data source (Ford 2026-07-12:
-    // "add its status up here"). Fetch its own freshness (last_synced_at, from
-    // DailyGeneration's daily solaredge pull — see solar-operator array_owners.py)
-    // and splice it into `status` under the SAME shape every other row uses, so
-    // buildLiveBoardHTML renders it for free. Silently skipped if nothing's
-    // connected yet (mirrors every other row's hasCreds gate) or the fetch fails.
-    try{
-      const seR = await fetch("/v1/array-owners/solaredge/keys", { headers: authHeaders() });
-      if(seR.ok){
-        const seD = await seR.json().catch(() => ({}));
-        const seKeys = seD.keys || [];
-        if(seKeys.length){
-          const seArrays = new Set(); seKeys.forEach(k => (k.arrays || []).forEach(a => seArrays.add(a)));
-          status.solaredge = {
-            hasCreds: true, enabled: true, code: "solaredge", inverter: true, utility: false,
-            username: `${seKeys.length} key${seKeys.length === 1 ? "" : "s"} · ${seArrays.size} array${seArrays.size === 1 ? "" : "s"}`,
-            _cloudOk: !!seD.last_synced_at, _cloudAt: seD.last_synced_at || null, _cloudFails: 0,
-            _cloudStatus: seD.last_synced_at ? "ok" : null,
-          };
-        }
-      }
-    }catch(e){}
+    // Merge every linked inverter/API/utility source (AlsoEnergy, SolarEdge,
+    // Locus, GMP bill accounts, …) into `status` so the LIVE board lists them
+    // even when they aren't portal-vault logins (Ford 2026-07-13).
+    status = await _arMergeLinkedSources(status);
 
     // ── a single credential row (save/replace + optional remove) ──
     // key = the vault key clear/optout act on (an inverter id, or a utility slot).
