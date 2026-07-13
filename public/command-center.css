@@ -2291,6 +2291,11 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   line-height:1; color:var(--muted,#64748b); transition:transform var(--motion-fast) var(--ease-out); flex:none; }
 .vs-arr.open .vs-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
 .vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Row-TYPE glyphs (Ford 2026-07-13): a 2×2-panel mark on array rows, a device+sine mark on
+   inverter rows, so you can see what you're looking at. Sized to the text, centered on the
+   line (works inside the inverter name's baseline flex too), muted so they're a quiet cue —
+   never an interactive target. */
+.vs-rowicon{ width:15px; height:15px; flex:none; align-self:center; color:var(--muted,#64748b); opacity:.85; }
 /* Inline-editable array / inverter names (Spreadsheet view) — mirrors .sb-editable.
    A faint hover affordance (underline + a small pencil) signals the name is editable;
    editing gets a clear focus outline. The pencil is on the editable span only, so the
@@ -2345,7 +2350,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv{ cursor:default; border-top:1px solid var(--line,#e2e8f0); }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
-.vs-inv-name{ padding-left:40px; align-items:baseline; }
+/* Inverter names run as long as they need to: the name cell SPANS the (empty on inverter
+   rows) Vendor column too, reclaiming the dead space to its right. Every later column still
+   auto-places at grid cols 3-8, so the row stays aligned with the array/vendor rows above
+   (Ford 2026-07-13: "make the inverter name go all the way — there's dead space to the
+   right"). The empty <span class="vs-c-vendor"> was removed from the inverter row markup so
+   the gauge lands at col 3, not col 4. */
+.vs-inv-name{ padding-left:40px; align-items:baseline; grid-column:1 / 3; }
 .vs-inv-name .vs-editable{ font-weight:600; color:var(--ink,#0f172a);
   flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .vs-inv-sub{ font-size:11px; color:var(--faint); font-weight:400; flex:0 1 auto;

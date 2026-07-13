@@ -21,6 +21,13 @@
     alsoenergy: "AlsoEnergy",
   };
   const vlabel = v => BRAND[v] || (v ? v.charAt(0).toUpperCase() + v.slice(1) : "Other");
+  // Tiny row-TYPE glyphs so you can see what you're looking at at a glance (Ford 2026-07-13:
+  // "a little array icon next to arrays, a little inverter icon next to inverters"). Inline
+  // SVG — no external fetch. ARRAY = a 2×2 grid of panels (a field of modules); INVERTER =
+  // a device box with an AC sine wave (what an inverter does: DC→AC). Muted via CSS so they
+  // read as quiet structural cues, not decoration.
+  const ICON_ARRAY = '<svg class="vs-rowicon vs-rowicon-array" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.6" y="1.6" width="5.3" height="5.3" rx="1.1"/><rect x="9.1" y="1.6" width="5.3" height="5.3" rx="1.1"/><rect x="1.6" y="9.1" width="5.3" height="5.3" rx="1.1"/><rect x="9.1" y="9.1" width="5.3" height="5.3" rx="1.1"/></g></svg>';
+  const ICON_INVERTER = '<svg class="vs-rowicon vs-rowicon-inv" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="1.7" y="3.3" width="12.6" height="9.4" rx="2"/><path d="M4.3 9q1.35-2.6 2.85 0t2.85 0"/></g></svg>';
   // Vendor subtree accent. Ford 2026-07-12: the per-vendor RAINBOW (a different hue per
   // vendor) "looks weird and unprofessional — doesn't match our thing." Removed. No inline
   // --vc is emitted anymore, so every vendor group falls back to ONE neutral slate spine +
@@ -174,7 +181,9 @@
     // A stale source is a PAUSED feed (the portal session lapsed, not a vendor API
     // outage) — and the row offers an "Open portal to sync" recovery. "Source paused"
     // matches that recoverable state; "offline" wrongly implied a hard outage.
-    if ((c.source_status || {}).state === "stale") return { label: "Source paused", cls: "warn", count: 1 };
+    if (_sourceIssue(c)) return { label: "Source paused", cls: "warn", count: 1 };
+    // Dark overnight with a healthy login → asleep, not an issue (muted, not warn).
+    if (_nightAsleep(c)) return { label: "Asleep", cls: "muted", count: 0 };
     // A live anomaly (dark, or low vs peers, RIGHT NOW while >=2 daylight peers produce) the
     // 14-day alert hasn't flagged yet should still surface here — otherwise the array reads
     // "All clear" while a card inside shows "Dark now" / "Low vs peers" (Ford's Waterford case:
@@ -218,7 +227,7 @@
   function statusRank(c) {
     const a = c.alert || {};
     if (a.level === "critical") return 3;
-    if (a.level === "warn" || (c.source_status || {}).state === "stale") return 2;
+    if (a.level === "warn" || _sourceIssue(c)) return 2;
     return 0;
   }
   function invStatus(iv, cohort, isDaylight) {
@@ -406,7 +415,7 @@
     let worstCls = "ok", total = 0;
     list.forEach(c => {
       const st = arrStatus(c);
-      if (st.cls === "ok") return;
+      if (st.cls === "ok" || st.cls === "muted") return;   // "muted" = Asleep overnight — not an issue
       if (st.cls === "bad") worstCls = "bad";
       else if (worstCls !== "bad") worstCls = "warn";
       // Read the REAL flagged-inverter count off the status object (arrStatus now
@@ -628,6 +637,34 @@
   // server refreshes 24/7, so the extension-only affordances (per-vendor "Open to sync",
   // tab-opening "Sync all", "Close tabs") change or disappear (Ford 2026-07-11).
   function _cloudMode(){ try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } }
+  // Cloud harvest health (provider → max harvest_fails), pulled from the Auto-refresh
+  // vault via sandbox.js's __aoCloudStatus. harvest_fails ONLY increments on a real
+  // login_failed (a scrape/overnight miss leaves it 0), so >=3 (paused) is the one
+  // signal that the LOGIN is genuinely broken — the only case where re-entering the
+  // password is the fix (Ford 2026-07-13). Cached 60s; a fresh load re-renders.
+  let _cloudHealth = {}, _cloudHealthAt = 0;
+  async function _loadCloudHealth(){
+    if (!_cloudMode() || typeof window.__aoCloudStatus !== "function") return;
+    if (Date.now() - _cloudHealthAt < 60000) return;
+    _cloudHealthAt = Date.now();
+    try {
+      const cs = await window.__aoCloudStatus();
+      if (cs && cs.ok && Array.isArray(cs.credentials)) {
+        const m = {};
+        cs.credentials.forEach(c => { const p = (c.provider || "").toLowerCase(); m[p] = Math.max(m[p] || 0, c.harvest_fails || 0); });
+        _cloudHealth = m;
+        renderBody();
+      }
+    } catch(_) {}
+  }
+  function _cloudLoginFailed(vendor){ return (_cloudHealth[(vendor || "").toLowerCase()] || 0) >= 3; }
+  // A stale source is only an ISSUE when it isn't simply overnight — a dark array at
+  // night is ASLEEP, not broken (Ford 2026-07-13). A genuine login failure is always an
+  // issue; a stale feed in daylight is an issue; a stale feed overnight with a healthy
+  // login is just "Asleep" (not counted in the vendor's issue tally, not a warn).
+  function _sourceStale(c){ return (c.source_status || {}).state === "stale"; }
+  function _nightAsleep(c){ return _sourceStale(c) && c.is_daylight === false && !(_cloudMode() && _cloudLoginFailed(c.vendor)); }
+  function _sourceIssue(c){ return _sourceStale(c) && !_nightAsleep(c); }
 
   // The sortable columns (Vendor is the grouping, not sortable).
   const COLS = [
@@ -1078,7 +1115,7 @@
           : "";
         const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
         h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
-          <span class="vs-c-name"><span class="vs-caret">▸</span><span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
+          <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
           <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
           <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
           <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
@@ -1094,21 +1131,24 @@
           // vendor portal (extension re-captures on open). Reuses the existing
           // [data-vportal] click delegation, so no extra handler is wired.
           if (syncStale(c) && _cloudMode()) {
-            // A stale feed in cloud mode is NOT automatically a password problem
-            // (Ford 2026-07-13: this popped the Credential Vault and blamed the password
-            // when Fronius was simply DARK OVERNIGHT and the login was fine — harvest_fails=0,
-            // it just had no PV data to capture at 3am). Overnight the source pausing is
-            // EXPECTED — the harvester keeps checking and resumes at sunrise — so show
-            // NOTHING. Only a feed stale DURING DAYLIGHT gets a calm, honest note, and even
-            // then we don't accuse the password: a real "couldn't sign in" surfaces in the
-            // Credential Vault itself, so this is a "if it keeps up, go check" nudge, not a
-            // diagnosis.
-            if (c.is_daylight !== false) {
+            // Only accuse the password on a REAL login failure. The harvester pauses a
+            // login (harvest_fails>=3) when the saved password genuinely stops working;
+            // a stale feed with a HEALTHY login is a source/overnight issue, NOT the
+            // password (Ford 2026-07-13: it wrongly blamed the password when Fronius was
+            // just dark at 3am, harvest_fails=0).
+            if (_cloudLoginFailed(v)) {
               h += `<div class="vs-src-recover">
-                <span class="vs-src-recover-txt">${esc(vlabel(v))} hasn't published new readings in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep checking automatically. If it keeps up, check this login in your Credential Vault.</span>
+                <span class="vs-src-recover-txt">We can't sign in to ${esc(vlabel(v))} — the saved password may have changed. Re-enter it in your Credential Vault to resume automatic refresh.</span>
                 <button type="button" class="vs-src-recover-btn" onclick="window.__aoOpenCredentialVault && window.__aoOpenCredentialVault()">Open Credential Vault</button>
               </div>`;
+            } else if (c.is_daylight !== false) {
+              // Login is fine; stale during daylight → a calm, honest note. Nothing for the
+              // operator to fix (the source is just quiet), so no button and no accusation.
+              h += `<div class="vs-src-recover">
+                <span class="vs-src-recover-txt">${esc(vlabel(v))} hasn't published new readings in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep checking automatically.</span>
+              </div>`;
             }
+            // else overnight + login healthy → show nothing (expected pause).
           } else if (syncStale(c) && _portal) {
             h += `<div class="vs-src-recover">
               <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — auto-sync may need a hand. Open the portal to capture the latest.</span>
@@ -1145,8 +1185,7 @@
               // so every column — gauge, live, today, status — lines up in one vertical column
               // (Ford 2026-07-12). The 14-day chart moved to the full-screen Details view.
               h += `<div class="vs-row vs-inv">
-                <span class="vs-c-name vs-inv-name"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? ` <span class="vs-inv-sub">${_sub}</span>` : ""}</span>
-                <span class="vs-c-vendor"></span>
+                <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? ` <span class="vs-inv-sub">${_sub}</span>` : ""}</span>
                 <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
                 <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
@@ -1326,6 +1365,9 @@
     if (!host.querySelector("#vsSearch")) buildShell(host);   // build the persistent shell once
     renderBody();
     sizeScroll();
+    // In cloud mode, pull the per-login harvest health so the banner + statuses can tell
+    // a real login failure apart from a source pause/overnight (fire-and-forget, cached).
+    if (_cloudMode()) void _loadCloudHealth();
   }
 
   function showView(v) {
