@@ -7573,8 +7573,16 @@
         const r = await fetch(API + "/drafts/" + id + "/test", { method: "POST", headers: authHeaders() });
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
-          const to = (data.result && data.result.to || []).join(", ");
-          setSt("rb-status rb-ok", "Test sent to " + (to || "you") + " — check your inbox.");
+          const res = data.result || {};
+          const to = (res.to || []).join(", ");
+          let extra = "";
+          if (res.pay_url) {
+            extra = " · pay link attached";
+            try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
+          } else if (res.pay_skip_reason) {
+            extra = " · no pay link: " + String(res.pay_skip_reason).slice(0, 90);
+          }
+          setSt("rb-status rb-ok", "Test sent to " + (to || "you") + extra + " — check your inbox.");
         } else {
           setSt("rb-status rb-err", apiErr(data, "Test send failed."));
         }
