@@ -5312,9 +5312,21 @@
       wrap._wired = true;
       wrap.addEventListener("click", (e) => {
         const b = e.target.closest(".ar-mode-opt"); if(!b) return;
+        // Always stop — otherwise the click bubbles to #rowAutoRefresh and
+        // COLLAPSES the credential body (Paul/live dogfood 2026-07-13: picking
+        // "Store it with us" hid the vault; only a hard refresh unstuck it).
+        e.preventDefault();
+        e.stopPropagation();
         if(b.dataset.mode === _arGetMode()) return;
         _arSetMode(b.dataset.mode);
         _vaultStatusCache = null;
+        // Keep the vault OPEN so switching mode feels like continuing, not
+        // like the panel vanished.
+        try {
+          const body = document.getElementById("arBody");
+          if(body) body.classList.remove("ar-collapsed");
+          localStorage.setItem("ao_ar_open", "1");
+        } catch(_){}
         wireAutoRefreshRow();
       });
     }
@@ -5680,7 +5692,9 @@
     if(row && body && !row._wired){
       row._wired = true;
       row.addEventListener("click", (e) => {
-        if(e.target.closest(".ar-body")) return;   // cred fields aren't a collapse target
+        // Cred fields + interactive head controls are never a collapse target.
+        // (Mode tabs used to bubble here and hide the whole vault mid-setup.)
+        if(e.target.closest(".ar-body, .ar-mode, .ar-mode-opt, #arRefreshBtn, a, button, input, select, label, textarea")) return;
         const open = !body.classList.toggle("ar-collapsed");
         if(toggle){ toggle.classList.toggle("open", open); toggle.setAttribute("aria-expanded", String(open)); }
         try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
