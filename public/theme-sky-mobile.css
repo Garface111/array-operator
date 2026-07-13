@@ -55,12 +55,12 @@
     z-index:-1;
     pointer-events:none;
     background-image:
-      url("img/sky/world-zo2-2560.jpg"),
+      url("img/sky/world-zo3-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-zo2-1600.webp") type("image/webp"),
-                url("img/sky/world-zo2-2560.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo3-1600.webp") type("image/webp"),
+                url("img/sky/world-zo3-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-size:cover, auto, auto;
@@ -262,12 +262,12 @@
 @media (max-width:600px) and (max-resolution:1.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-zo2-2560.jpg"),
+      url("img/sky/world-zo3-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-zo2-1080.webp") type("image/webp"),
-                url("img/sky/world-zo2-2560.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo3-1080.webp") type("image/webp"),
+                url("img/sky/world-zo3-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -275,12 +275,12 @@
 @media (max-width:600px) and (min-resolution:2.5dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-zo2-2560.jpg"),
+      url("img/sky/world-zo3-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-zo2-2560.webp") type("image/webp"),
-                url("img/sky/world-zo2-2560.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo3-2560.webp") type("image/webp"),
+                url("img/sky/world-zo3-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
@@ -288,12 +288,12 @@
 @media (max-width:600px) and (min-resolution:3dppx){
   html.sky body::before{
     background-image:
-      url("img/sky/world-zo2-2560.jpg"),
+      url("img/sky/world-zo3-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-image:
-      image-set(url("img/sky/world-zo2-2560.webp") type("image/webp"),
-                url("img/sky/world-zo2-2560.jpg") type("image/jpeg")),
+      image-set(url("img/sky/world-zo3-2560.webp") type("image/webp"),
+                url("img/sky/world-zo3-2560.jpg") type("image/jpeg")),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
