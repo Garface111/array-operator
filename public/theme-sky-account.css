@@ -153,16 +153,20 @@ html.sky .ar-stack{
   background:transparent;
   margin:2px 0 22px;
 }
-/* Head card — still the most solid (the trust surface framing the mode choice) */
+/* Head card — the vault's frame. Ford 2026-07-13: match the #sheetWrap card
+   everywhere — so it now carries the signature frost (blur affordable: normal
+   height). The password INPUT fields stay solid white below for legibility. */
 html.sky .ar-stack .ar-card-head,
 html.sky .ar-panel{
   --ao-oct:#6350E0;
   --ao-oct-soft:rgba(99,80,224,.09);
   --ao-oct-line:rgba(99,80,224,.30);
-  background:rgba(255,255,255,.72) !important;
-  border:1px solid rgba(255,255,255,.9) !important;
+  background:var(--sky-glass-content) !important;
+  -webkit-backdrop-filter:var(--sky-sheet-blur);
+  backdrop-filter:var(--sky-sheet-blur);
+  border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-card) !important;
-  box-shadow:var(--sky-shadow-card) !important;
+  box-shadow:var(--sky-shadow-sheet) !important;
 }
 /* Body cards — more liquid so the sky is visible between and through them */
 html.sky .ar-stack .ar-card{

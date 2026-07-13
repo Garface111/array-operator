@@ -24,8 +24,8 @@
 /* ── 1 · THE VIEW SHEET — #trendsRoot floats as one glass sheet on the sky ── */
 html.sky #trendsRoot{
   background:var(--sky-glass-content);
-  -webkit-backdrop-filter:blur(16px) saturate(1.65);
-  backdrop-filter:blur(16px) saturate(1.65);
+  -webkit-backdrop-filter:var(--sky-sheet-blur);
+  backdrop-filter:var(--sky-sheet-blur);
   border:1px solid var(--sky-glass-edge);
   border-radius:var(--sky-r-sheet);
   box-shadow:var(--sky-shadow-sheet);

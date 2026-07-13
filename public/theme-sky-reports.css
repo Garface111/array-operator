@@ -59,8 +59,8 @@ html.sky .rb2-pipe,
 html.sky .rb2-listwrap,
 html.sky .rb2 > .rb-au{
   background:var(--sky-glass-content);
-  -webkit-backdrop-filter:blur(16px);
-  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:var(--sky-sheet-blur);
+  backdrop-filter:var(--sky-sheet-blur);
   border:1px solid var(--sky-glass-edge);
   border-radius:26px;
   box-shadow:var(--sky-shadow-sheet);

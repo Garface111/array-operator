@@ -161,8 +161,8 @@ html.sky #panelResources .feed{
 html.sky #panelResources .feed > .disc{grid-column:1/-1}
 html.sky #panelResources .item{
   display:flex; flex-direction:column; gap:10px;
-  background:rgba(255,255,255,.68);
-  border:1px solid rgba(255,255,255,.85);
+  background:rgba(255,255,255,.5); /* frosted-through to match the vendor card (Ford 2026-07-13) */
+  border:1px solid rgba(255,255,255,.8);
   border-radius:var(--sky-r-card);
   padding:18px 20px 17px;
   box-shadow:var(--sky-shadow-card);

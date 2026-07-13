@@ -83,8 +83,9 @@ html.sky{
      is what makes the no-blur card tier read liquid. Ink compensates below
      (muted/faint darkened one step, hairlines .12→.17) so data stays crisp. */
   --sky-glass-chrome:rgba(255,255,255,.60);
-  --sky-glass-content:rgba(255,255,255,.64);
+  --sky-glass-content:rgba(255,255,255,.56); /* Ford 2026-07-13: every view-sheet matches the #sheetWrap card he loved */
   --sky-glass-solid:rgba(255,255,255,.74);
+  --sky-sheet-blur:blur(18px) saturate(1.7); /* the signature liquid-glass frost — one material app-wide */
   --sky-glass-edge:rgba(255,255,255,.5);     /* the 1px inner border */
 
   /* soft blue-tinted shadows */
@@ -347,8 +348,8 @@ html.sky .ft-card,
 html.sky .cc-collapsible,
 html.sky .rb-card,
 html.sky .rb-acc{
-  background:rgba(255,255,255,.68) !important;
-  border:1px solid rgba(255,255,255,.85) !important;
+  background:rgba(255,255,255,.5) !important; /* frosted-through: the view-sheet + sky leak through, matching the vendor rows */
+  border:1px solid rgba(255,255,255,.8) !important;
   border-radius:var(--sky-r-card) !important;
   box-shadow:var(--sky-shadow-card) !important;
 }

@@ -69,7 +69,12 @@ html.sky #panelAnalysis .an-wrap{
   margin-inline: 0 !important;   /* kill the full-bleed breakout */
   margin-block:14px 46px;
   padding:34px 42px 54px;
-  background:rgba(255,255,255,.6);
+  /* matches the #sheetWrap alpha (Ford: "make all backgrounds look like this one"),
+     but NO backdrop-filter: this sheet runs tens of thousands of px tall and
+     blur blows Chromium's composited-layer limit (viewportfuls fail to paint).
+     Transparency alone still leaks the sky through — the frost is the one cost
+     we can't pay here. */
+  background:var(--sky-glass-content);
   border:1px solid var(--sky-glass-edge);
   border-radius:var(--sky-r-sheet);
   box-shadow:var(--sky-shadow-sheet);
