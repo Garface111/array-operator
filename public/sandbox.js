@@ -26,7 +26,7 @@
   const RENAME_KEY = "ao_renames";           // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
   const EXPAND_KEY = "ao_array_expanded";    // persisted set of array_ids whose inverter comb is expanded (JSON array)
   const ORIENT_KEY = "ao_sandbox_orient";    // "vertical" (arrays side-by-side, inverters below) | "horizontal" (arrays stacked left, inverters spread right)
-  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP", vec:"VEC", wec:"WEC" };
+  const BRAND = { solaredge:"SolarEdge", locus:"Locus", alsoenergy:"AlsoEnergy", fronius:"Fronius", sma:"SMA", chint:"Chint", gmp:"GMP", vec:"VEC", wec:"WEC", eversource:"Eversource", eversource_ma:"Eversource", eversource_ct:"Eversource" };
   // Surface (don't swallow) a corrupt localStorage preference. Each caller still
   // degrades to its safe default — this only makes a recurring poisoned/legacy value
   // diagnosable instead of vanishing silently.
@@ -121,6 +121,9 @@
     gmp:       "https://greenmountainpower.com/",
     vec:       "https://vermontelectric.smarthub.coop/",
     wec:       "https://washingtonelectric.smarthub.coop/",
+    eversource:    "https://www.eversource.com/security/account/login",
+    eversource_ma: "https://www.eversource.com/security/account/login",
+    eversource_ct: "https://www.eversource.com/security/account/login",
   };
   function extSend(type, extra){
     // Target the page's own origin, never "*": SO_PAIR carries the tenant key and
@@ -427,7 +430,7 @@
       try { window.__AO_EXT_PRESENT = true; } catch(e){}   // shared flag: the spreadsheet view's Refresh button uses it
       autoPairExtension();   // re-link the extension to this tenant's key — self-heals "Not connected"
     }
-    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec"].includes(d.provider)){
+    if(d.type === "SO_CAPTURE_LANDED" && ["solaredge","fronius","sma","chint","gmp","vec","wec","eversource","eversource_ma","eversource_ct"].includes(d.provider)){
       // A sync for this vendor landed — clear its chip state; handleCaptureLanded
       // reloads the fleet so the chip re-renders fresh (or vanishes).
       if(_syncState[d.provider]){ delete _syncState[d.provider]; if(_syncTimers[d.provider]) clearTimeout(_syncTimers[d.provider]); }
@@ -4134,7 +4137,7 @@
     const note = ov.querySelector("#sbNote");
 
     // Login-capable vendors (one-click via the helper).
-    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint","gmp","vec","wec"];
+    const LOGIN_VENDORS = ["solaredge","fronius","sma","chint","gmp","vec","wec","eversource"];
 
     // Render the modal body for the current mode. Exposed via closure so the
     // extension-present detector (handleCaptureLanded's sibling listener) can
@@ -4146,7 +4149,7 @@
         // Vendor picker — grouped (inverter monitoring vs utility meters), each a
         // clean row-card with a brand badge + chevron. The repetitive "utility
         // meter" copy now lives once in the section subtitle, not on every row.
-        const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", gmp:"GMP", vec:"VEC", wec:"WEC" };
+        const ICONS = { solaredge:"SE", fronius:"Fr", sma:"SMA", chint:"Ch", gmp:"GMP", vec:"VEC", wec:"WEC", eversource:"EV" };
         const SUBS  = {};   // (Chint used to need a per-site note; it auto-walks every site now)
         const card = code => `
           <button type="button" class="sb-login-btn" data-login="${code}">
@@ -4162,10 +4165,9 @@
             <div class="sb-login-sec-h">${title}${note ? `<span>${note}</span>` : ""}</div>
             <div class="sb-login-grid">${codes.map(card).join("")}</div>
           </div>`;
-        // Utility meter: the common VT trio stay as one-tap quick-picks, and a search
-        // covers the other ~470 live utilities (mostly NISC SmartHub co-ops nationwide)
-        // straight from /v1/providers — too many to list as buttons.
-        const utilFeatured = ["gmp","vec","wec"];
+        // Utility meter: VT trio + Eversource (CT/MA/NH) as one-tap quick-picks;
+        // search covers the other ~470 live utilities (mostly SmartHub co-ops).
+        const utilFeatured = ["gmp","vec","wec","eversource"];
         const utilCard = p => `
           <button type="button" class="sb-login-btn" data-login="${esc(p.code)}">
             <span class="sb-login-ico" style="background:var(--accent,#2563eb);color:#fff">${esc(String(p.label||p.code).replace(/[^A-Za-z]/g,"").slice(0,2).toUpperCase())}</span>
@@ -4974,6 +4976,9 @@
       });
     } catch(e){ /* offline / not present — fall back to code-derived labels */ }
     if(!map.gmp) map.gmp = { label: "Green Mountain Power" };   // GMP isn't a co-op registry row
+    // Eversource is a live bespoke Cloud Capture utility (CT/MA/NH); ensure the
+    // primary code is always pickable even if a providers fetch lags.
+    if(!map.eversource) map.eversource = { label: "Eversource Energy" };
     _utilCatalog = map;
     return map;
   }
@@ -4981,6 +4986,8 @@
     const c = catalog && catalog[code];
     if(c && c.label) return c.label + (catalog[code].host ? " (SmartHub)" : "");
     if(code === "gmp") return "Green Mountain Power";
+    if(code === "eversource" || code === "eversource_ma" || code === "eversource_ct")
+      return "Eversource Energy";
     if(/^sh_/.test(code)) return code.replace(/^sh_/, "").replace(/[-_]/g, " ").toUpperCase() + " (SmartHub)";
     return code.toUpperCase();
   }
@@ -5610,11 +5617,12 @@
       const code = s.code || k;
       (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus });
     });
-    // Which utilities to show as cards: GMP (common default) + every one with a
-    // saved login + anything the operator just picked from the catalog this session.
+    // Which utilities to show as cards: GMP + Eversource (common defaults) + every
+    // one with a saved login + anything the operator just picked this session.
     const shownCodes = [];
     const pushCode = (c) => { if(c && shownCodes.indexOf(c) === -1) shownCodes.push(c); };
     pushCode("gmp");
+    pushCode("eversource");
     Object.keys(utilByCode).sort().forEach(pushCode);
     (_arAddedUtils || []).forEach(pushCode);
 
