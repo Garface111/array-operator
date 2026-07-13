@@ -2231,7 +2231,13 @@ html[data-theme="day"] .rep-fld.req > select{
    never loses you. A per-vendor colored left bar (--vc, set inline per group) runs the
    whole subtree as a container; the vendor row is a bold color-tinted section band, array
    rows are plain white, inverter rows a faint tint indented deeper. */
-.vs-vgroup{ border-left:3px solid var(--vc,#cbd5e1); }
+/* Vendor accent = ONE cohesive Sky azure for every group (--vc, #2196F3 = --sky-primary),
+   not a per-vendor rainbow and not the muddy neutral gray it briefly became (Ford
+   2026-07-12: "make it less gray, redesign the colors"). Every group inherits this single
+   --vc, so the left spine, the frosted header band (color-mix below + the sky override in
+   theme-sky-triage.css), the caret and the hover all read as cool blue glass that belongs
+   to the Sky palette — uniform across vendors, alive instead of gray. */
+.vs-vgroup{ --vc:#2196f3; border-left:3px solid var(--vc); }
 .vs-vhead{ padding:12px 16px 10px;
   background:color-mix(in srgb, var(--vc,#64748b) 10%, var(--card,#fff));
   border-top:1px solid var(--line);
