@@ -4810,6 +4810,10 @@
   // Cloud "Sync all" for the vendor spreadsheet (vendor-sheet.js lives in another
   // module, so expose the op as a global). Forces a fresh server-side capture NOW.
   window.__aoCloudRefresh = () => cloudOp("refresh");
+  // Per-login cloud harvest health, so other surfaces (the vendor sheet) can tell a
+  // real login failure apart from a source pause/night — and only accuse the password
+  // when the login is genuinely failing (Ford 2026-07-13).
+  window.__aoCloudStatus = () => cloudOp("status");
   // "+ Add vendor" in cloud mode → the Credential Vault is where a server-side login
   // is added, so jump straight there (Master Account → Auto-refresh, cloud mode,
   // expanded + scrolled). Reuses the panel's own open/scroll/flash via _arWantOpen.
