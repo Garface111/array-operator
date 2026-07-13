@@ -4571,6 +4571,14 @@
         `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
         null,
         `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
+      // V2 offtaker pay-links: Connect Express so invoice emails get a Pay button
+      // and the platform scrapes a tiny application fee off each offtaker payment.
+      rowStatic("Collect offtaker payments",
+        `<span id="connectState">—</span>` +
+        `<span class="r-sub" id="connectSub">When enabled, every offtaker invoice includes a secure pay link. Money lands in your bank; we keep a small fee.</span>` +
+        `<div class="acct-msg" id="connectMsg"></div>`,
+        null,
+        `<button class="acct-btn primary" id="connectManage" type="button">Enable online pay</button>`) +
       `<div class="acct-row acct-files-row">
         <div class="r-k">Your files <span class="rb-files-count" id="acctFilesCount"></span></div>
         <div class="r-v"><div class="rb-files-body" id="acctFilesBody"><div class="rb-files-empty">Loading…</div></div></div>
@@ -4584,6 +4592,110 @@
     wireAutoRefreshRow();
     wireCancelRow();
     loadAcctFiles();
+    renderConnectPayouts(authHeaders());
+    // Stripe Connect return / refresh from Account Link.
+    try {
+      const q = new URLSearchParams(location.search || "");
+      if(q.get("connect") === "return" || q.get("connect") === "refresh"){
+        const msg = document.getElementById("connectMsg");
+        if(msg){
+          msg.className = "acct-msg";
+          msg.textContent = q.get("connect") === "return"
+            ? "Checking Stripe onboarding…"
+            : "Resuming Stripe onboarding…";
+        }
+        // Scrub the query so a refresh doesn't re-flash the toast.
+        try {
+          const u = new URL(location.href);
+          u.searchParams.delete("connect");
+          history.replaceState({}, "", u.pathname + u.search + (u.hash || "#account"));
+        } catch(_){}
+      }
+    } catch(_){}
+  }
+
+  async function renderConnectPayouts(h){
+    const stateEl = document.getElementById("connectState");
+    const subEl = document.getElementById("connectSub");
+    const btn = document.getElementById("connectManage");
+    const msg = document.getElementById("connectMsg");
+    if(!stateEl || !btn) return;
+    // Demo (signed-out): show the ready state with sample copy, no network.
+    if(!h && window.AO_DEMO){
+      stateEl.textContent = "Online payments on (demo)";
+      if(subEl) subEl.textContent = "Demo only — offtaker invoices would include a pay button. 1.5% platform fee on each payment.";
+      btn.textContent = "Demo — sign in to enable";
+      btn.disabled = true;
+      return;
+    }
+    if(!h){
+      stateEl.textContent = "Sign in to enable";
+      btn.disabled = true;
+      return;
+    }
+    btn.disabled = true;
+    stateEl.textContent = "Checking…";
+    let st = null;
+    try {
+      const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h });
+      if(r.ok) st = await r.json();
+    } catch(e){ st = null; }
+    btn.disabled = false;
+    if(!st || !st.ok){
+      stateEl.textContent = "Couldn't load status";
+      if(subEl) subEl.textContent = "Refresh the page, or try again in a moment.";
+      btn.textContent = "Retry";
+      btn.onclick = () => renderConnectPayouts(authHeaders());
+      return;
+    }
+    const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 150) / 100));
+    const feeTxt = (Math.round(feePct * 100) / 100) + "%";
+    if(st.ready || st.charges_enabled){
+      stateEl.innerHTML = `<b style="color:var(--good,#047857)">Online payments on</b>`;
+      if(subEl) subEl.textContent =
+        `Offtaker invoices include a secure pay link. Money goes to your bank; we keep ${feeTxt} per payment.`;
+      btn.textContent = "Update payouts";
+      btn.onclick = () => startConnectOnboarding(false);
+    } else if(st.connected || st.account_id){
+      stateEl.textContent = "Finish bank setup";
+      if(subEl) subEl.textContent =
+        `Almost there — complete Stripe onboarding so offtaker invoices can include a pay button (${feeTxt} fee).`;
+      btn.textContent = "Continue setup";
+      btn.onclick = () => startConnectOnboarding(true);
+    } else {
+      stateEl.textContent = "Off — offtakers pay you outside the app";
+      if(subEl) subEl.textContent =
+        `Turn on online pay and every invoice email gets a Pay button. We keep ${feeTxt}; the rest lands in your bank.`;
+      btn.textContent = "Enable online pay";
+      btn.onclick = () => startConnectOnboarding(true);
+    }
+    if(msg && !msg.textContent) msg.textContent = "";
+  }
+
+  async function startConnectOnboarding(primary){
+    const h = authHeaders();
+    const msg = document.getElementById("connectMsg");
+    const btn = document.getElementById("connectManage");
+    if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+    if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening secure Stripe setup…"; }
+    if(btn) btn.disabled = true;
+    try {
+      const r = await fetch("/v1/array-operator/billing/payments/connect", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, h),
+        body: "{}",
+      });
+      const d = await r.json().catch(() => ({}));
+      if(r.ok && d.url){ window.location = d.url; return; }
+      if(msg){
+        msg.className = "acct-msg err";
+        msg.textContent = (d && d.detail) || (d && d.error)
+          || "Couldn't start payout setup — please try again shortly.";
+      }
+    } catch(e){
+      if(msg){ msg.className = "acct-msg err"; msg.textContent = "Couldn't reach Stripe — check your connection."; }
+    }
+    if(btn) btn.disabled = false;
   }
 
   /* ---- Danger zone: cancel the account.

@@ -4798,6 +4798,8 @@
       }
       const drafts = await draftsP;
       INBOX_UTIL_ACCTS = utilAccts || [];
+      // Pay-link chips (V2) — best-effort, never block the offtaker list.
+      try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
       renderAccordion(subs, arrs, utilAccts, drafts);
       // Bill accuracy check: fetch the reconcile payload (once, cached) alongside the
       // list. When it lands, paint the top-level summary chip and — if a card is
@@ -4812,6 +4814,23 @@
     } catch (e) {
       list.innerHTML = `<div class="empty">Couldn't load your schedules — refresh to retry.</div>`;
     }
+  }
+
+  async function loadOfftakerPayments() {
+    if (!authHeaders()) { PAY_BY_SUB = {}; return; }
+    try {
+      const r = await fetch(API + "/payments?limit=200", { headers: authHeaders() });
+      if (!r.ok) return;
+      const j = await r.json().catch(() => ({}));
+      const map = {};
+      (j.payments || []).forEach(p => {
+        if (p.subscription_id == null) return;
+        const k = String(p.subscription_id);
+        // List is newest-first; keep the first (most recent) per offtaker.
+        if (!map[k]) map[k] = p;
+      });
+      PAY_BY_SUB = map;
+    } catch (e) { /* leave prior map */ }
   }
 
   // Group offtakers by the utility account they share (Ford, 2026-06-30: "when you
@@ -5458,6 +5477,14 @@
     const readyPill = draft
       ? `<span class="rb-chip rb-chip-ready">${draft.amount_usd != null ? money(draft.amount_usd) + " ready" : "Ready"}</span>`
       : "";
+    // V2 offtaker pay-link status (from /payments). Most-recent open/paid chip.
+    const pay = (typeof PAY_BY_SUB !== "undefined" && PAY_BY_SUB[String(s.id)]) || null;
+    let payPill = "";
+    if (pay && pay.status === "paid") {
+      payPill = `<span class="rb-chip rb-chip-live" title="Offtaker paid online">Paid online${pay.amount_usd != null ? " · " + money(pay.amount_usd) : ""}</span>`;
+    } else if (pay && pay.status === "open" && pay.pay_url) {
+      payPill = `<span class="rb-chip" title="Invoice includes a Stripe pay link">Pay link open</span>`;
+    }
     return `
       <div class="rb-acc ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}" data-open="false">
         <div class="rb-acc-head" role="button" tabindex="0" aria-expanded="false"
@@ -5465,7 +5492,7 @@
           <span class="rb-acc-caret" aria-hidden="true">▸</span>
           <div class="rb-acc-head-main">
             <div class="rb-acc-name">${esc(s.customer_name)}
-              ${readyPill}
+              ${readyPill}${payPill}
               <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
               ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
             </div>
@@ -5518,6 +5545,9 @@
                                 // name / email / utility-account; an active query force-expands
                                 // the provider→account hierarchy so matches surface in place.
   let DRAFT_BY_SUB = {};        // subscription_id -> its pending draft (refs INTO INBOX_DRAFTS)
+  // V2 offtaker pay-links: subscription_id -> most recent OfftakerPayment
+  // (open pay link or paid online). Populated by loadOfftakerPayments().
+  let PAY_BY_SUB = {};
   let ACTIVE_SUB_ID = null;     // the offtaker under review — the source of truth for the view
   let SEC_OPEN = {};            // collapsible-section title -> open bool. Persists which sections
                                // the operator has open ACROSS body re-renders (poll / recompute /
@@ -7609,8 +7639,18 @@
         const r = await fetch(API + "/drafts/" + id + "/approve", { method: "POST", headers: authHeaders() });
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) {
-          const to = (data.result && data.result.to || []).join(", ");
-          setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + ".");
+          const res = data.result || {};
+          const to = (res.to || []).join(", ");
+          let extra = "";
+          if (res.pay_url) {
+            extra = " · pay link attached";
+            // Refresh payment chips so this offtaker shows "Pay link open".
+            try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
+          } else if (res.payment_id == null && res.fee_cents == null) {
+            // No pay link — often Connect not ready; soft nudge once.
+            extra = "";
+          }
+          setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + extra + ".");
           setTimeout(refreshInbox, 900);
         } else {
           setSt("rb-status rb-err", apiErr(data, "Send failed."));
