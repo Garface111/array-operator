@@ -58,7 +58,7 @@
   // so the table paints its full weather columns immediately, then revalidate in
   // the background and repaint when fresh data lands. Bounded to ~6h so a very
   // stale cache never lingers.
-  var _FC_CACHE_KEY = "ao_forecast_fleet_v1";
+  var _FC_CACHE_KEY = "ao_forecast_fleet_v2";  // v2: per-array address/tilt/PR on rows
   var _FC_CACHE_MAX_AGE_MS = 6 * 3600 * 1000;
   function _sessFp(s) { return s ? String(s).slice(-10) : ""; }   // fingerprint, not the token
   function readForecastCache() {
@@ -177,6 +177,22 @@
     }).then(function (d) { reloadForecast(); return d; });
   };
 
+  // Auto-propagate model inputs: utility bill address → vendor site → place-from-name.
+  // Never overwrites operator-set geometry. Returns {addresses_filled, newly_located, …}.
+  window.__aoAutofillModel = function () {
+    var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to autofill"));
+    return fetch("/v1/array-owners/model-autofill", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+      body: "{}"
+    }).then(function (r) {
+      return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
+        var msg = e && e.detail;
+        if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
+        throw new Error(msg || ("Couldn't autofill (" + r.status + ")"));
+      });
+    }).then(function (d) { reloadForecast(); return d; });
+  };
+
   // Change the Analysis forecast window (7/10/14/30 days) and refetch.
   window.__aoSetForecastWindow = function (days) {
     var n = Number(days);
@@ -249,7 +265,11 @@
         kwh_per_kw_day: Math.round(act / np / 10 * 100) / 100,
         kwh_per_kw_window: Math.round(act / np * 10) / 10,
         expected_basis: "weather_model", expected_kwh_per_kw_day: null,
-        confidence: "high", tilt_assumed: false, weather_code: code
+        confidence: "high", tilt_assumed: true, azimuth_assumed: true,
+        performance_ratio_assumed: true,
+        tilt_deg: 44, azimuth_deg: 0, performance_ratio: 0.84,
+        address: (a.name || "").replace(/\s+\d.*/,"") + ", VT",
+        weather_code: code
       });
       sumE += exp; sumA += act; sumNp += np; sumNpDays += np * 10;
       if (code === 0 && (!spotlight || ratio > spotlight.ratio_pct)) {

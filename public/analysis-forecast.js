@@ -16,6 +16,8 @@
   var _howOpen = false;     // "how the number is built" drawer
   var _modelOpen = null;    // null = auto (open when needs setup); true/false force
   var _dirty = false;       // unsaved edits in the model list
+  var _autofillTried = false; // one auto-propagate per page load
+  var _autofilling = false;
 
   var CONF_LABEL = {
     high: "high confidence", medium: "moderate confidence",
@@ -30,6 +32,9 @@
     { v: 90, lab: "West" },
     { v: 180, lab: "North" }
   ];
+
+  // VT community-solar rule-of-thumb when we have no lat yet (≈ Burlington lat).
+  var DEFAULT_TILT_VT = 44;
 
   function num(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
   function windowDays(fc, ctx) {
@@ -50,6 +55,29 @@
       .trim();
   }
 
+  /** Derive a geocodable place from the array name (client-side mirror of backend). */
+  function placeFromName(name) {
+    if (!name) return "";
+    var s = String(name)
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+\d[\d.]*\s*(kW|kw|MW|mw)?\b/gi, " ")
+      .replace(/\b(SolarEdge|Fronius|SMA|Chint|CPS|Locus|Enphase)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^[\s\-_,]+|[\s\-_,]+$/g, "");
+    if (!s || s.length < 2) return "";
+    if (/^[\dA-Za-z_-]{1,6}$/.test(s)) return "";
+    if (!/,\s*[A-Za-z]{2}\b/.test(s)) s = s + ", VT";
+    return s;
+  }
+
+  function defaultTilt(lat) {
+    if (lat != null && isFinite(Number(lat))) {
+      var t = Math.abs(Number(lat));
+      return Math.round(Math.max(10, Math.min(60, t)) * 10) / 10;
+    }
+    return DEFAULT_TILT_VT;
+  }
+
   function azLabel(az) {
     var n = Number(az);
     for (var i = 0; i < AZ_OPTIONS.length; i++) {
@@ -58,28 +86,39 @@
     return (isFinite(n) ? n + "°" : "South");
   }
 
-  /** Build the unified list of arrays that can have model variables. */
+  /** Build the unified list of arrays that can have model variables.
+   *  Blanks are pre-filled with smart defaults so the form is never a wall of empty boxes:
+   *    address ← stored / place-from-name
+   *    tilt    ← stored / ≈ latitude / VT default 44°
+   *    facing  ← South
+   *    PR      ← 84%
+   */
   function modelableArrays(f) {
     var out = [];
     var seen = {};
     (f.rows || []).forEach(function (r) {
       seen[r.array_id] = true;
+      var addr = cleanAddress(r.address) || placeFromName(r.array_name);
+      var tilt = r.tilt_deg != null && r.tilt_deg !== ""
+        ? r.tilt_deg
+        : defaultTilt(r.latitude);
       out.push({
         array_id: r.array_id,
         array_name: r.array_name || ("Array " + r.array_id),
         nameplate_kw: r.nameplate_kw,
-        address: cleanAddress(r.address),
+        address: addr,
         raw_address: r.address || "",
         has_location: !!(r.latitude != null && r.longitude != null) || !!(r.address || r.geocode_source),
-        tilt_deg: r.tilt_deg,
+        tilt_deg: tilt,
         azimuth_deg: r.azimuth_deg != null ? r.azimuth_deg : 0,
         performance_ratio: r.performance_ratio != null ? r.performance_ratio : 0.84,
-        tilt_assumed: !!r.tilt_assumed,
+        tilt_assumed: r.tilt_assumed != null ? !!r.tilt_assumed : true,
         azimuth_assumed: r.azimuth_assumed != null ? !!r.azimuth_assumed : true,
         pr_assumed: r.performance_ratio_assumed != null ? !!r.performance_ratio_assumed : true,
         needs_location: false,
         ratio_pct: r.ratio_pct,
-        modeled: true
+        modeled: true,
+        addr_guessed: !cleanAddress(r.address) && !!placeFromName(r.array_name)
       });
     });
     (f.skipped || []).forEach(function (s) {
@@ -87,14 +126,15 @@
       // Only surfaces where the operator can still fix the model with inputs.
       if (s.reason !== "no_location" && s.reason !== "irradiance_unavailable") return;
       seen[s.array_id] = true;
+      var addrS = cleanAddress(s.address) || placeFromName(s.array_name);
       out.push({
         array_id: s.array_id,
         array_name: s.array_name || ("Array " + s.array_id),
         nameplate_kw: s.nameplate_kw,
-        address: cleanAddress(s.address),
+        address: addrS,
         raw_address: s.address || "",
         has_location: false,
-        tilt_deg: s.tilt_deg != null ? s.tilt_deg : "",
+        tilt_deg: s.tilt_deg != null && s.tilt_deg !== "" ? s.tilt_deg : defaultTilt(s.latitude),
         azimuth_deg: s.azimuth_deg != null ? s.azimuth_deg : 0,
         performance_ratio: s.performance_ratio != null ? s.performance_ratio : 0.84,
         tilt_assumed: true,
@@ -102,13 +142,20 @@
         pr_assumed: true,
         needs_location: s.reason === "no_location",
         ratio_pct: null,
-        modeled: false
+        modeled: false,
+        addr_guessed: !cleanAddress(s.address) && !!placeFromName(s.array_name)
       });
     });
     out.sort(function (a, b) {
       return String(a.array_name).localeCompare(String(b.array_name));
     });
     return out;
+  }
+
+  function anyBlankAddress(arrays) {
+    return arrays.some(function (a) {
+      return !a.raw_address && !a.has_location;
+    });
   }
 
   function needsSetup(arrays) {
@@ -290,21 +337,22 @@
       var azOpts = AZ_OPTIONS.map(function (o) {
         return '<option value="' + o.v + '"' + (Number(a.azimuth_deg) === o.v ? " selected" : "") + ">" + o.lab + "</option>";
       }).join("");
-      var meta = a.needs_location || !a.has_location
-        ? '<span class="need">add address to model weather</span>'
-        : (a.nameplate_kw != null
-          ? (a.nameplate_kw + " kW") +
-            (a.tilt_assumed || a.azimuth_assumed || a.pr_assumed
-              ? ' · <span class="assumed">defaults</span>'
-              : (a.ratio_pct != null ? " · " + a.ratio_pct + "% of expected" : ""))
-          : "");
-      return '<div class="anfc-row' + (a.needs_location || !a.has_location ? " needs" : "") + '" data-aid="' + esc(String(a.array_id)) + '" data-orig-addr="' + esc(a.address) + '">' +
+      var metaBits = [];
+      if (a.nameplate_kw != null) metaBits.push(a.nameplate_kw + " kW");
+      if (a.needs_location || !a.has_location) metaBits.push('<span class="need">needs location</span>');
+      else if (a.addr_guessed) metaBits.push('<span class="assumed">address from name</span>');
+      else if (a.tilt_assumed || a.azimuth_assumed || a.pr_assumed) metaBits.push('<span class="assumed">defaults</span>');
+      else if (a.ratio_pct != null) metaBits.push(a.ratio_pct + "% of expected");
+      var meta = metaBits.join(" · ");
+      // data-orig-addr is the STORED address (not the place-from-name guess) so
+      // saving a guess still posts it as a real location change.
+      return '<div class="anfc-row' + (a.needs_location || !a.has_location ? " needs" : "") + '" data-aid="' + esc(String(a.array_id)) + '" data-orig-addr="' + esc(cleanAddress(a.raw_address)) + '">' +
         '<div class="anfc-site"><div class="anfc-site-name" title="' + esc(a.array_name) + '">' + esc(a.array_name) + "</div>" +
         '<div class="anfc-site-meta">' + meta + "</div></div>" +
-        '<div class="anfc-addr"><input type="text" data-f="addr" placeholder="Town, state or street" value="' + esc(a.address) + '" autocomplete="street-address"></div>' +
-        '<div><input type="number" data-f="tilt" min="0" max="90" step="0.5" value="' + esc(String(tiltVal)) + '" placeholder="lat" title="Panel tilt in degrees from horizontal"></div>' +
-        '<div><select data-f="az">' + azOpts + "</select></div>" +
-        '<div><input type="number" data-f="pr" min="50" max="100" step="1" value="' + prPct + '" title="Performance ratio — losses from DC nameplate to AC"></div>' +
+        '<div class="anfc-addr"><input type="text" data-f="addr" placeholder="Town, state or street" value="' + esc(a.address) + '" autocomplete="street-address" title="' + (a.addr_guessed ? "Guessed from site name — confirm or edit" : "Site address") + '"></div>' +
+        '<div><input type="number" data-f="tilt" min="0" max="90" step="0.5" value="' + esc(String(tiltVal)) + '" placeholder="≈lat" title="Panel tilt ° from horizontal' + (a.tilt_assumed ? " (assumed ≈ latitude)" : "") + '"></div>' +
+        '<div><select data-f="az" title="' + (a.azimuth_assumed ? "Assumed south-facing" : "You set") + '">' + azOpts + "</select></div>" +
+        '<div><input type="number" data-f="pr" min="50" max="100" step="1" value="' + prPct + '" title="Performance ratio — losses from DC nameplate to AC' + (a.pr_assumed ? " (default 84%)" : "") + '"></div>' +
         "</div>";
     }).join("");
 
@@ -314,7 +362,7 @@
 
     var body =
       '<div class="anfc-model-body">' +
-      '<p class="anfc-model-intro">Set each array’s angle, facing, losses, and site address. Address is only re-geocoded when you change it.</p>' +
+      '<p class="anfc-model-intro">Angles, facing, losses, and address — pre-filled from utility bills, vendor portals, and site names where we know them. Tilt defaults to ≈ latitude; facing defaults to south; losses default to 84%. Address is only re-geocoded when you change it.</p>' +
       '<div class="anfc-model-tools">' +
       '<div class="anfc-fld anfc-fld-win"><label for="anfcWin">Comparison window</label>' +
       '<select id="anfcWin">' + winOpts + "</select></div>" +
@@ -322,6 +370,7 @@
       '<div class="anfc-list">' + head + rows + "</div>" +
       '<div class="anfc-edit-actions">' +
       '<button type="button" class="anfc-btn" id="anfcApply">Save &amp; recalculate</button>' +
+      '<button type="button" class="anfc-btn anfc-btn-ghost" id="anfcAutofill" title="Pull addresses from utility bills, vendor sites, and place names">Autofill from known data</button>' +
       '<button type="button" class="anfc-btn anfc-btn-ghost" id="anfcDone">Done</button>' +
       '<span class="anfc-edit-stat" id="anfcStat"></span>' +
       "</div></div>";
@@ -431,6 +480,47 @@
       _modelOpen = false;
       render(container, ctx);
     });
+
+    function runAutofill(btn) {
+      if (!window.__aoAutofillModel) {
+        setStat("Autofill unavailable.", "err");
+        return;
+      }
+      if (_autofilling) return;
+      _autofilling = true;
+      if (btn) btn.disabled = true;
+      setStat("Pulling addresses from utility bills & vendors…");
+      window.__aoAutofillModel().then(function (d) {
+        _autofilling = false;
+        if (btn) btn.disabled = false;
+        var n = (d && d.addresses_filled) || 0;
+        var loc = (d && d.newly_located) || 0;
+        var msg = n || loc
+          ? ("Filled " + n + " address" + (n === 1 ? "" : "es")
+            + (loc ? (" · located " + loc + " new") : "")
+            + " · recalculating…")
+          : "Already up to date — using defaults for tilt / facing / losses.";
+        setStat(msg, "ok");
+        _dirty = false;
+      }).catch(function (e) {
+        _autofilling = false;
+        if (btn) btn.disabled = false;
+        setStat((e && e.message) || "Autofill failed.", "err");
+      });
+    }
+
+    var autofillBtn = root.querySelector("#anfcAutofill");
+    if (autofillBtn) autofillBtn.addEventListener("click", function () {
+      runAutofill(autofillBtn);
+    });
+
+    // One automatic propagate when the editor opens and addresses are blank.
+    var arrays = modelableArrays(f || {});
+    if (!_autofillTried && !_autofilling && typeof window.__aoAutofillModel === "function"
+        && arrays.some(function (a) { return !a.raw_address; })) {
+      _autofillTried = true;
+      runAutofill(autofillBtn);
+    }
 
     var apply = root.querySelector("#anfcApply");
     if (!apply) return;
