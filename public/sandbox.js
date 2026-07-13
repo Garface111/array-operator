@@ -4565,6 +4565,139 @@
       setTimeout(()=>URL.revokeObjectURL(u),60000);
     }catch(e){ if(status)status.textContent="Couldn't open that file."; }
   }
+  // Suggestion #16 — directory view for the account "Your files" list.
+  // Group by role/account (or kind), collapsible folders, live search. Marker: acctFilesSearch
+  const _flDirCollapsed = Object.create(null); // session memory of which folders are shut
+
+  function _flNaturalKey(s){
+    return String(s || "").toLowerCase().replace(/(\d+)/g, (_, n) => n.padStart(8, "0"));
+  }
+  function _flFolderKey(f){
+    const role = (f.role || "").trim();
+    if(role) return role;
+    const kind = (f.kind || "").trim();
+    if(kind) return kind.charAt(0).toUpperCase() + kind.slice(1) + " files";
+    return "Other files";
+  }
+  function _flTile(f, demo){
+    const url = demo ? "" : (f.download || "");
+    return `<button type="button" class="rb-file" data-url="${esc(url)}" data-fl-name="${esc(f.name||"")}" data-fl-role="${esc(f.role||"")}" title="${esc(f.name)}"><span class="ico">${_flIcon(f.kind,f.name)}</span><span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role||"")}</small></span><span class="when">${esc(_flAgo(f.uploaded_at))}${f.size?" · "+_flSize(f.size):""}</span></button>`;
+  }
+  function _flDirHtml(files, demo){
+    // Bucket rest-of-list (not the hero) into labeled folders.
+    const map = new Map();
+    for(const f of files){
+      const k = _flFolderKey(f);
+      if(!map.has(k)) map.set(k, []);
+      map.get(k).push(f);
+    }
+    const keys = [...map.keys()].sort((a, b) => {
+      if(a === "Other files") return 1;
+      if(b === "Other files") return -1;
+      return _flNaturalKey(a).localeCompare(_flNaturalKey(b));
+    });
+    return keys.map(k => {
+      const list = map.get(k);
+      const closed = !!_flDirCollapsed[k];
+      return `<div class="rb-files-dir${closed?" is-collapsed":""}" data-fl-folder="${esc(k)}">` +
+        `<button type="button" class="rb-files-dir-head" aria-expanded="${closed?"false":"true"}">` +
+        `<span class="rb-files-dir-chev" aria-hidden="true">▾</span>` +
+        `<span class="rb-files-dir-name">${esc(k)}</span>` +
+        `<span class="rb-files-dir-count">${list.length}</span>` +
+        `</button>` +
+        `<div class="rb-files-dir-body" ${closed?'hidden':''}>${list.map(f => _flTile(f, demo)).join("")}</div>` +
+        `</div>`;
+    }).join("");
+  }
+  function _flWireDir(body, demo){
+    body.querySelectorAll(".rb-files-dir-head").forEach(btn => {
+      btn.onclick = () => {
+        const dir = btn.closest(".rb-files-dir");
+        if(!dir) return;
+        const key = dir.getAttribute("data-fl-folder") || "";
+        const open = btn.getAttribute("aria-expanded") !== "true";
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        dir.classList.toggle("is-collapsed", !open);
+        const bodyEl = dir.querySelector(".rb-files-dir-body");
+        if(bodyEl) bodyEl.hidden = !open;
+        if(key) _flDirCollapsed[key] = !open;
+      };
+    });
+    const search = body.querySelector("#acctFilesSearch");
+    const empty = body.querySelector("#acctFilesSearchEmpty");
+    if(search){
+      const apply = () => {
+        const q = (search.value || "").trim().toLowerCase();
+        let hits = 0;
+        body.querySelectorAll(".rb-files-dir").forEach(dir => {
+          let dirHits = 0;
+          dir.querySelectorAll(".rb-file").forEach(tile => {
+            const hay = ((tile.getAttribute("data-fl-name") || "") + " " +
+                         (tile.getAttribute("data-fl-role") || "")).toLowerCase();
+            const ok = !q || hay.includes(q);
+            tile.hidden = !ok;
+            if(ok) dirHits++;
+          });
+          hits += dirHits;
+          dir.hidden = q ? dirHits === 0 : false;
+          if(q && dirHits > 0){
+            // Auto-open folders that match while searching.
+            dir.classList.remove("is-collapsed");
+            const btn = dir.querySelector(".rb-files-dir-head");
+            const bodyEl = dir.querySelector(".rb-files-dir-body");
+            if(btn) btn.setAttribute("aria-expanded", "true");
+            if(bodyEl) bodyEl.hidden = false;
+          }
+        });
+        if(empty) empty.hidden = !(q && hits === 0);
+      };
+      search.oninput = apply;
+      search.onkeydown = e => { if(e.key === "Escape"){ search.value = ""; apply(); } };
+    }
+    body.querySelectorAll(".rb-file[data-url]").forEach(b => {
+      b.onclick = () => {
+        if(demo){
+          const s = document.getElementById("acctFilesStatus");
+          if(s) s.textContent = "Sign in to open your own files.";
+          return;
+        }
+        _flOpen(b.getAttribute("data-url"), document.getElementById("acctFilesStatus"));
+      };
+    });
+  }
+  function _flRenderList(body, files, demo){
+    const feat = files[0], rest = files.slice(1);
+    const featUrl = demo ? "" : (feat.download || "");
+    body.innerHTML =
+      `<button type="button" class="rb-file-feat" data-url="${esc(featUrl)}" title="${esc(feat.name)}">` +
+      `<span class="badge">Latest upload</span>` +
+      `<span class="ico">${_flIcon(feat.kind, feat.name)}</span>` +
+      `<span class="name">${esc(feat.name)}</span>` +
+      `<span class="role">${esc(feat.role || "")}</span>` +
+      `<span class="meta">${esc(_flAgo(feat.uploaded_at))}${feat.size ? " · " + _flSize(feat.size) : ""}${demo ? " · demo" : " · open ↗"}</span>` +
+      `</button>` +
+      (rest.length
+        ? `<div class="rb-files-toolbar">` +
+          `<input type="search" id="acctFilesSearch" class="rb-files-search" placeholder="Search files by name or account…" autocomplete="off" />` +
+          `</div>` +
+          `<div class="rb-files-dirlist" id="acctFilesDir">${_flDirHtml(rest, demo)}</div>` +
+          `<div class="rb-files-empty" id="acctFilesSearchEmpty" hidden>No files match your search.</div>`
+        : "") +
+      `<div class="rb-files-status" id="acctFilesStatus"></div>`;
+    // Hero click
+    const hero = body.querySelector(".rb-file-feat");
+    if(hero){
+      hero.onclick = () => {
+        if(demo){
+          const s = document.getElementById("acctFilesStatus");
+          if(s) s.textContent = "Sign in to open your own files.";
+          return;
+        }
+        _flOpen(hero.getAttribute("data-url"), document.getElementById("acctFilesStatus"));
+      };
+    }
+    _flWireDir(body, demo);
+  }
   async function loadAcctFiles(){
     const body=document.getElementById("acctFilesBody"), countEl=document.getElementById("acctFilesCount");
     if(!body) return;
@@ -4573,20 +4706,8 @@
     if(!authHeaders() && window.AO_DEMO && Array.isArray(window.AO_DEMO.files)){
       files = window.AO_DEMO.files;
       if(countEl)countEl.textContent=files.length?`${files.length} file${files.length===1?"":"s"}`:"";
-      const feat=files[0], rest=files.slice(1);
-      const tile=f=>`<button type="button" class="rb-file" data-url="" title="${esc(f.name)}"><span class="ico">${_flIcon(f.kind,f.name)}</span><span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role||"")}</small></span><span class="when">${esc(_flAgo(f.uploaded_at))}${f.size?" · "+_flSize(f.size):""}</span></button>`;
-      body.innerHTML=`
-        <button type="button" class="rb-file-feat" data-url="" title="${esc(feat.name)}">
-          <span class="badge">Latest upload</span>
-          <span class="ico">${_flIcon(feat.kind,feat.name)}</span>
-          <span class="name">${esc(feat.name)}</span>
-          <span class="role">${esc(feat.role||"")}</span>
-          <span class="meta">${esc(_flAgo(feat.uploaded_at))}${feat.size?" · "+_flSize(feat.size):""} · demo</span>
-        </button>
-        ${rest.length?`<div class="rb-files-list">${rest.map(tile).join("")}</div>`:""}
-        <div class="rb-files-status" id="acctFilesStatus"></div>`;
-      // Demo files aren't downloadable — clicking just notes it's a sample.
-      body.querySelectorAll("[data-url]").forEach(b=>b.onclick=()=>{ const s=document.getElementById("acctFilesStatus"); if(s)s.textContent="Sign in to open your own files."; });
+      if(!files.length){ body.innerHTML=`<div class="rb-files-empty">No demo files.</div>`; return; }
+      _flRenderList(body, files, true);
       return;
     }
     try{ const r=await fetch("/v1/array-operator/billing/files",{headers:authHeaders()});
@@ -4601,19 +4722,7 @@
     }
     if(countEl)countEl.textContent=files.length?`${files.length} file${files.length===1?"":"s"}`:"";
     if(!files.length){ body.innerHTML=`<div class="rb-files-empty">No files yet. Upload an invoice template on the Reports tab, add a billing workbook, or connect GMP — your invoice, workbook, and utility-bill files collect here.</div>`; return; }
-    const feat=files[0], rest=files.slice(1);
-    const tile=f=>`<button type="button" class="rb-file" data-url="${esc(f.download)}" title="${esc(f.name)}"><span class="ico">${_flIcon(f.kind,f.name)}</span><span class="meta"><b>${esc(f.name)}</b><small>${esc(f.role||"")}</small></span><span class="when">${esc(_flAgo(f.uploaded_at))}${f.size?" · "+_flSize(f.size):""}</span></button>`;
-    body.innerHTML=`
-      <button type="button" class="rb-file-feat" data-url="${esc(feat.download)}" title="${esc(feat.name)}">
-        <span class="badge">Latest upload</span>
-        <span class="ico">${_flIcon(feat.kind,feat.name)}</span>
-        <span class="name">${esc(feat.name)}</span>
-        <span class="role">${esc(feat.role||"")}</span>
-        <span class="meta">${esc(_flAgo(feat.uploaded_at))}${feat.size?" · "+_flSize(feat.size):""} · open ↗</span>
-      </button>
-      ${rest.length?`<div class="rb-files-list">${rest.map(tile).join("")}</div>`:""}
-      <div class="rb-files-status" id="acctFilesStatus"></div>`;
-    body.querySelectorAll("[data-url]").forEach(b=>b.onclick=()=>_flOpen(b.getAttribute("data-url"),document.getElementById("acctFilesStatus")));
+    _flRenderList(body, files, false);
   }
   window.__aoReloadFiles = loadAcctFiles;
 
