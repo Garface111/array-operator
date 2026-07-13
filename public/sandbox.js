@@ -5729,7 +5729,7 @@
     // the other vendor cards reveal an "add login" field (Ford 2026-07-10).
     const solarEdgeCardHTML = () => `<div class="ar-util" data-code="solaredge">
       <div class="ar-util-name">SolarEdge</div>
-      <div class="ar-cloud-stat" style="color:var(--faint)">Connects with your SolarEdge monitoring API key, not a saved login. Works the same in either mode above.</div>
+      <div class="ar-cloud-stat" style="color:var(--faint)">API key · every site on the account</div>
       <div class="ar-se-keys" aria-live="polite"></div>
       <button type="button" class="acct-btn ar-se-addbtn" hidden>+ Add another key</button>
       <div class="ar-fields ar-se-add" hidden>
@@ -5751,8 +5751,8 @@
           .filter(a => (a.vendor || a.source_vendor) === "alsoenergy").length;
       } catch (e) {}
       const stat = nAe
-        ? `<div class="ar-cloud-stat" style="color:var(--good,#0a7d4f)">${nAe} array${nAe===1?"":"s"} connected via PowerTrack</div>`
-        : `<div class="ar-cloud-stat" style="color:var(--faint)">One PowerTrack login attaches every site on the account.</div>`;
+        ? `<div class="ar-cloud-stat" style="color:var(--good,#0a7d4f)">${nAe} array${nAe===1?"":"s"} connected</div>`
+        : `<div class="ar-cloud-stat" style="color:var(--faint)">One login · every site on the account</div>`;
       return `<div class="ar-util" data-code="alsoenergy">
       <div class="ar-util-name">AlsoEnergy (PowerTrack)</div>
       ${stat}
@@ -5767,22 +5767,27 @@
     </div>`;
     };
 
+    // Vault inverter cards (Fronius / SMA / Chint) — same markup for cloud vs device.
+    const vaultInvHTML = mode === "cloud"
+      ? AR_INVERTERS.map(invCard).join("")
+      : AR_INVERTERS.map(v => {
+          const st = status[v.id] || { hasCreds:false, enabled:true };
+          return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
+        }).join("");
+
     listEl.innerHTML = `
       <div class="ar-card ar-card-live">${buildLiveBoardHTML(status, mode, catalog)}</div>
       ${mode === "cloud" ? `<div class="ar-card ar-card-consent">${_arConsentHTML()}${_arCloudWarnHTML()}</div>` : ""}
       <div class="ar-card ar-card-group">
-        <div class="ar-group">
+        <div class="ar-group ar-group-inv">
           <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production — pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
-          ${alsoEnergyCardHTML()}
-          ${solarEdgeCardHTML()}
-          ${mode === "cloud"
-            ? AR_INVERTERS.map(invCard).join("")
-            : AR_INVERTERS.map(v => {
-                const st = status[v.id] || { hasCreds:false, enabled:true };
-                // Device (extension) mode: single login per vendor. Show the saved
-                // username so a login saved in the extension popup reads as present.
-                return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
-              }).join("")}
+          <div class="ar-inv-row ar-inv-api">
+            ${alsoEnergyCardHTML()}
+            ${solarEdgeCardHTML()}
+          </div>
+          <div class="ar-inv-row ar-inv-vault">
+            ${vaultInvHTML}
+          </div>
         </div>
       </div>
       <div class="ar-card ar-card-group">
