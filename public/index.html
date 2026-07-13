@@ -510,10 +510,10 @@ document.documentElement.setAttribute("data-theme","day");
 </script>
 <!-- Analysis tab (PowerTrack-style fleet NOC). Orchestrator first, then the
      self-contained section modules (each registers on window.AnalysisSections). -->
-<script src="analysis.js?v=7"></script>
+<script src="analysis.js?v=8"></script>
 <script src="analysis-health.js?v=1"></script>
 <script src="analysis-fleet-summary.js?v=3"></script>
-<script src="analysis-forecast.js?v=3"></script>
+<script src="analysis-forecast.js?v=4"></script>
 <script src="analysis-sites-grid.js?v=20260712dlg"></script>
 <script src="analysis-performance.js?v=1"></script>
 <script src="analysis-alarms.js?v=2"></script>
@@ -790,14 +790,13 @@ document.documentElement.setAttribute("data-theme","day");
   }
 
   // ── Capture + mark (THE entry path) ──
-  // TRUST-CRITICAL: the mark-up shot MUST look like the real page. html2canvas
-  // cannot paint our Sky world correctly on its own because:
-  //   1. the alpine plate lives on body::before (position:fixed; z-index:-1)
-  //   2. glass uses backdrop-filter (unsupported → solid white cards)
-  // Bare html2canvas left a flat blue gradient (Ford 2026-07-13 screenshot —
-  // "breaks trust"). Fix: resolve the live plate URL, paint cover+gradient
-  // ourselves, capture the UI with a transparent background + no
-  // backdrop-filter in the clone, then composite UI over the plate.
+  // TRUST-CRITICAL: the freeze must look like the live page.
+  // html2canvas cannot paint body::before (fixed alpine plate) or backdrop-filter
+  // glass. v1 left a flat blue void; v2 tried translucent glass + manual composite
+  // but the plate often never loaded and glass-over-blue looked greyer (worse).
+  // v3: fetch the plate as pixels → paint cover into a data-URL <img> injected as
+  // a real fixed element → html2canvas captures that <img> behind the UI. Cards
+  // stay solid (readable); the world shows around them like the live page.
   function loadH2C(){
     return window.html2canvas ? Promise.resolve()
       : new Promise(function(res,rej){
@@ -807,7 +806,6 @@ document.documentElement.setAttribute("data-theme","day");
         });
   }
   function resolveSkyPlateUrl(){
-    // Prefer the same plate the browser is actually painting on body::before.
     try{
       var bg = (getComputedStyle(document.body, "::before").backgroundImage || "");
       var re = /url\(\s*(['"]?)([^"')]+)\1\s*\)/g, m, first=null;
@@ -819,11 +817,9 @@ document.documentElement.setAttribute("data-theme","day");
         if(!first) first = u;
       }
       if(first){
-        // Resolve relative URLs against the page.
         try{ return new URL(first, location.href).href; }catch(e){ return first; }
       }
     }catch(e){}
-    // Fallback matching theme-sky.css plate tiers.
     var dpr = window.devicePixelRatio || 1, w = window.innerWidth || 1200;
     var file = (w <= 600)
       ? (dpr >= 2.5 ? "world-zo6-2560" : dpr > 1.5 ? "world-zo6-1600" : "world-zo6-1080")
@@ -831,21 +827,6 @@ document.documentElement.setAttribute("data-theme","day");
       : (dpr >= 1.5 || w >= 1800) ? "world-zo6-2560"
       : (w <= 1600) ? "world-zo6-1600" : "world-zo6-2560";
     return new URL("img/sky/"+file+".webp", location.href).href;
-  }
-  function loadImg(url){
-    return new Promise(function(res, rej){
-      var img = new Image();
-      // Same-origin plate — CORS not required, but set it so a future CDN still works.
-      try{ img.crossOrigin = "anonymous"; }catch(e){}
-      img.onload = function(){ res(img); };
-      img.onerror = function(){
-        // webp may 404 on older cache → jpg twin
-        if(/\.webp(\?|$)/i.test(url)){
-          loadImg(url.replace(/\.webp/i, ".jpg")).then(res, rej);
-        } else rej(new Error("sky plate load failed"));
-      };
-      img.src = url;
-    });
   }
   // CSS background-size:cover + background-position:center 52% (theme-sky).
   function drawCover(ctx, img, w, h, posY){
@@ -858,7 +839,6 @@ document.documentElement.setAttribute("data-theme","day");
     ctx.drawImage(img, dx, dy, dw, dh);
   }
   function paintSkyWorld(ctx, w, h, img){
-    // Gradient under the photo — same tokens as --sky-top/mid/horizon.
     var g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0, "#1E90E8");
     g.addColorStop(0.48, "#56B4F0");
@@ -867,13 +847,68 @@ document.documentElement.setAttribute("data-theme","day");
     ctx.fillRect(0, 0, w, h);
     if(img && img.naturalWidth){
       drawCover(ctx, img, w, h, 0.52);
-      // Soft fog at the foot of the plate (matches the radial in theme-sky).
-      var rg = ctx.createRadialGradient(w/2, h*1.04, 0, w/2, h*1.04, Math.max(w,h)*0.55);
-      rg.addColorStop(0, "rgba(255,255,255,0.45)");
-      rg.addColorStop(0.55, "rgba(255,255,255,0)");
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, 0, w, h);
     }
+  }
+  // Fetch plate as blob → Image. Tries several candidates so a single 404 can't
+  // leave us with the flat gradient. Same-origin; no CORS drama.
+  function loadPlateImage(){
+    var urls = [], seen = {};
+    function add(u){ if(u && !seen[u]){ seen[u]=1; urls.push(u); } }
+    try{ add(resolveSkyPlateUrl()); }catch(e){}
+    var base = location.origin.replace(/\/$/,"") + "/img/sky/";
+    ["world-zo6-2560.webp","world-zo6-2560.jpg","world-zo6-1600.webp","world-zo6-1600.jpg","world-zo6-2048.webp"].forEach(function(f){ add(base+f); });
+    function tryOne(i){
+      if(i >= urls.length) return Promise.reject(new Error("no sky plate loaded"));
+      return fetch(urls[i], { credentials:"same-origin", cache:"force-cache" })
+        .then(function(r){ if(!r.ok) throw new Error("http "+r.status); return r.blob(); })
+        .then(function(blob){
+          if(!blob || blob.size < 1000) throw new Error("tiny blob");
+          return new Promise(function(res, rej){
+            var img = new Image();
+            var obj = URL.createObjectURL(blob);
+            img.onload = function(){ URL.revokeObjectURL(obj); if(img.naturalWidth<16) rej(new Error("bad dim")); else res(img); };
+            img.onerror = function(){ URL.revokeObjectURL(obj); rej(new Error("decode")); };
+            img.src = obj;
+          });
+        })
+        .catch(function(){ return tryOne(i+1); });
+    }
+    return tryOne(0);
+  }
+  // Punch only the flat sky FILLS html2canvas paints (exact theme stops), then
+  // lay the real alpine plate underneath. Leaves buttons (#2196F3) and content
+  // alone — those are a different blue. This is the reliability net when the
+  // injected <img> isn't painted into the capture (common with fixed+crop).
+  function compositePlateUnderUi(uiCv, skyImg){
+    var w = uiCv.width, h = uiCv.height;
+    var out = document.createElement("canvas");
+    out.width = w; out.height = h;
+    var ctx = out.getContext("2d");
+    paintSkyWorld(ctx, w, h, skyImg);
+
+    var ui = document.createElement("canvas");
+    ui.width = w; ui.height = h;
+    var ux = ui.getContext("2d");
+    ux.drawImage(uiCv, 0, 0);
+    var id = ux.getImageData(0, 0, w, h);
+    var d = id.data;
+    function near(a, b, tol){ return Math.abs(a - b) <= tol; }
+    // Theme sky stops only (NOT brand primary #2196F3 = 33,150,243).
+    for(var i = 0; i < d.length; i += 4){
+      var r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+      if(a < 8) continue;
+      // --sky-mid #56B4F0 (html2canvas backgroundColor fill)
+      if(near(r,86,14) && near(g,180,14) && near(b,240,14)){ d[i+3] = 0; continue; }
+      // --sky-top #1E90E8
+      if(near(r,30,14) && near(g,144,14) && near(b,232,14)){ d[i+3] = 0; continue; }
+      // --sky-horizon #BEE3FA
+      if(near(r,190,16) && near(g,227,16) && near(b,250,16)){ d[i+3] = 0; continue; }
+      // html.sky --bg #EAF4FD (light azure page fill, if it leaks in)
+      if(near(r,234,12) && near(g,244,12) && near(b,253,12)){ d[i+3] = 0; continue; }
+    }
+    ux.putImageData(id, 0, 0);
+    ctx.drawImage(ui, 0, 0);
+    return out;
   }
   function captureViewportFaithful(){
     var sx = Math.floor(window.scrollX || window.pageXOffset || 0);
@@ -881,49 +916,98 @@ document.documentElement.setAttribute("data-theme","day");
     var vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
     var vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
     var scale = Math.min(window.devicePixelRatio || 1, 1.5);
-    var plateUrl = resolveSkyPlateUrl();
-    return Promise.all([
-      loadH2C(),
-      loadImg(plateUrl).catch(function(){ return null; })
-    ]).then(function(pair){
-      var skyImg = pair[1];
+    var raised = [];
+    var proxy = null;
+    function cleanup(){
+      try{ document.documentElement.classList.remove("fs-capturing"); }catch(e){}
+      if(proxy && proxy.parentNode) proxy.parentNode.removeChild(proxy);
+      proxy = null;
+      raised.forEach(function(r){
+        try{
+          if(r.posReset) r.el.style.position = r.pos;
+          r.el.style.zIndex = r.z;
+        }catch(e){}
+      });
+      raised = [];
+    }
+    return loadH2C().then(function(){ return loadPlateImage(); }).then(function(skyImg){
+      // Bake cover plate → data-URL <img> so html2canvas has a real element to paint
+      // (it never paints body::before). Even if this is missed, compositePlateUnderUi
+      // still forces the plate under any flat sky fill.
+      var plate = document.createElement("canvas");
+      plate.width = Math.max(1, Math.round(vw * scale));
+      plate.height = Math.max(1, Math.round(vh * scale));
+      paintSkyWorld(plate.getContext("2d"), plate.width, plate.height, skyImg);
+
+      proxy = document.createElement("img");
+      proxy.id = "fsSkyPlateProxy";
+      proxy.alt = "";
+      proxy.src = plate.toDataURL("image/jpeg", 0.92);
+      proxy.style.cssText = [
+        "position:fixed","left:0","top:0",
+        "width:"+vw+"px","height:"+vh+"px",
+        "object-fit:fill","object-position:center",
+        "z-index:0","pointer-events:none",
+        "margin:0","padding:0","border:0","display:block",
+        "opacity:1","visibility:visible"
+      ].join(";");
+      document.body.insertBefore(proxy, document.body.firstChild);
+
+      Array.prototype.forEach.call(document.body.children, function(ch){
+        if(!ch || ch === proxy || ch.id === "fsWrap" || ch.id === "fsOverlay") return;
+        var cs = window.getComputedStyle(ch);
+        var entry = { el: ch, z: ch.style.zIndex, pos: ch.style.position, posReset: false };
+        if(cs.position === "static"){
+          ch.style.position = "relative";
+          entry.posReset = true;
+        }
+        var z = parseInt(cs.zIndex, 10);
+        if(isNaN(z) || z < 1) ch.style.zIndex = "1";
+        raised.push(entry);
+      });
+      document.documentElement.classList.add("fs-capturing");
+
       return window.html2canvas(document.body, {
-        // Transparent so our plate shows through glass/rgba layers.
-        backgroundColor: null,
+        // Solid sky-mid — we deliberately punch this exact fill out later and
+        // replace it with the real plate (avoids the grey-glass-over-blue mess).
+        backgroundColor: "#56B4F0",
         scale: scale,
         useCORS: true,
+        allowTaint: true,
         logging: false,
         x: sx, y: sy, width: vw, height: vh,
         ignoreElements: function(el){
-          return el && (el.id === "fsWrap" || el.id === "fsOverlay" || el.id === "fsSkyPlateProxy");
+          return el && (el.id === "fsWrap" || el.id === "fsOverlay");
         },
         onclone: function(doc){
-          // html2canvas cannot render backdrop-filter OR fixed body::before.
-          // Drop both in the clone so paint is honest translucent UI over our
-          // later plate composite (instead of opaque white cards on empty blue).
           try{
             var st = doc.createElement("style");
             st.textContent = [
-              "html, body { background: transparent !important; }",
-              "html.sky body::before, html.sky body::after { content: none !important; display: none !important; background: none !important; }",
-              "* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }",
-              // Nudge the glass tokens a touch more translucent so the plate
-              // reads through the way the live frosted UI does with blur.
-              "html.sky { --sky-glass-chrome: rgba(255,255,255,.55); --sky-glass-content: rgba(255,255,255,.50); --sky-glass-solid: rgba(255,255,255,.70); }"
+              "html.sky body::before, html.sky body::after, html.fs-capturing body::before{",
+              "  content:none!important;display:none!important;background:none!important;}",
+              // Keep cards solid/readable — do NOT force translucent glass.
+              "*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}",
+              "html.sky, html.fs-capturing{background:#56B4F0!important;}",
+              "html.sky body, html.fs-capturing body{background:transparent!important;}",
+              "#fsSkyPlateProxy{display:block!important;visibility:visible!important;",
+              "  opacity:1!important;z-index:0!important;position:fixed!important;}"
             ].join("\n");
             doc.head.appendChild(st);
+            var p = doc.getElementById("fsSkyPlateProxy");
+            if(p){
+              p.style.setProperty("display","block","important");
+              p.style.setProperty("visibility","visible","important");
+              p.style.setProperty("opacity","1","important");
+              p.style.setProperty("z-index","0","important");
+            }
           }catch(e){}
         }
-      }).then(function(uiCv){
-        // Composite: sky plate (cover) → UI layer. Same pixel size as the capture.
-        var out = document.createElement("canvas");
-        out.width = uiCv.width;
-        out.height = uiCv.height;
-        var ctx = out.getContext("2d");
-        paintSkyWorld(ctx, out.width, out.height, skyImg);
-        ctx.drawImage(uiCv, 0, 0);
-        return out;
-      });
+      }).then(function(cv){
+        cleanup();
+        // ALWAYS underlay the real plate: punch flat sky fills → mountain shows
+        // around the white cards. This is what makes the freeze match the live page.
+        return compositePlateUnderUi(cv, skyImg);
+      }, function(err){ cleanup(); throw err; });
     });
   }
 
