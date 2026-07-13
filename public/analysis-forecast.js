@@ -469,29 +469,19 @@
       parsed.forEach(function (p) {
         chain = chain.then(function (acc) {
           var step = Promise.resolve();
-          if (p.address_changed) {
+          var needLoc = p.address_changed || (!p.had_address && p.address);
+          if (needLoc) {
             if (!window.__aoSetArrayLocation) {
               acc.errors.push("Location edit unavailable");
               return acc;
             }
             step = step.then(function () {
-              return window.__aoSetArrayLocation(p.array_id, { place: p.address })
+              return window.__aoSetArrayLocation(p.array_id, { place: p.address, silent: true })
                 .then(function () { acc.nLoc++; })
                 .catch(function (e) {
                   acc.errors.push((e && e.message) || ("Address failed for array " + p.array_id));
                 });
             });
-          } else if (!p.had_address && p.address) {
-            // New address on a previously empty field.
-            if (window.__aoSetArrayLocation) {
-              step = step.then(function () {
-                return window.__aoSetArrayLocation(p.array_id, { place: p.address })
-                  .then(function () { acc.nLoc++; })
-                  .catch(function (e) {
-                    acc.errors.push((e && e.message) || ("Address failed for array " + p.array_id));
-                  });
-              });
-            }
           }
           return step.then(function () {
             if (!window.__aoSetArrayGeometry) {
@@ -501,7 +491,8 @@
             return window.__aoSetArrayGeometry(p.array_id, {
               tilt_deg: p.tilt_deg,
               azimuth_deg: p.azimuth_deg,
-              performance_ratio: p.performance_ratio
+              performance_ratio: p.performance_ratio,
+              silent: true
             }).then(function () {
               acc.nGeo++;
               return acc;
@@ -515,7 +506,7 @@
 
       chain.then(function (acc) {
         apply.disabled = false;
-        if (acc.errors.length) {
+        if (acc.errors.length && !acc.nGeo && !acc.nLoc) {
           setStat(acc.errors[0] + (acc.errors.length > 1 ? " (+" + (acc.errors.length - 1) + " more)" : ""), "err");
           _dirty = true;
           return;
@@ -524,26 +515,20 @@
         var parts = [];
         if (acc.nGeo) parts.push(acc.nGeo + " array" + (acc.nGeo === 1 ? "" : "s"));
         if (acc.nLoc) parts.push(acc.nLoc + " address" + (acc.nLoc === 1 ? "" : "es"));
-        setStat("Saved " + (parts.join(" · ") || "changes") + " · recalculating…", "ok");
-        // Collapse once everything that needs an address has one.
-        var stillNeed = parsed.some(function (p) {
-          return !p.had_address && !p.address && !p.address_changed;
-        });
-        // Prefer collapse after a clean save when no sites still lack an address.
-        if (!stillNeed && !needsSetup(modelableArrays(f).map(function (a) {
-          // Re-check from form state: if every row has an address now, collapse.
-          return a;
-        }))) {
-          /* fall through */
-        }
-        // After a successful save of a fully-addressed fleet, collapse the panel.
+        var msg = "Saved " + (parts.join(" · ") || "changes");
+        if (acc.errors.length) msg += " · " + acc.errors.length + " issue(s)";
+        setStat(msg + " · recalculating…", acc.errors.length ? "err" : "ok");
+        // After a clean save of a fully-addressed fleet, collapse the panel.
         var allHaveAddr = parsed.every(function (p) {
-          return p.had_address || p.address || p.address_changed;
+          return p.had_address || p.address;
         });
-        if (allHaveAddr) {
+        if (allHaveAddr && !acc.errors.length) {
           _modelOpen = false;
         }
-        // Forecast reload is triggered by the save helpers; a re-render follows.
+        // One forecast reload after the whole batch (silent saves skip per-row reload).
+        if (typeof window.__aoAnalysisReloadForecast === "function") {
+          window.__aoAnalysisReloadForecast();
+        }
       }).catch(function (e) {
         setStat((e && e.message) || "Couldn't save.", "err");
         apply.disabled = false;

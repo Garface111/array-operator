@@ -106,12 +106,16 @@
   // grid's "set location" affordance on arrays skipped as no_location.
   window.__aoSetArrayLocation = function (arrayId, opts) {
     var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to set a location"));
+    opts = opts || {};
+    var silent = !!opts.silent;
+    var body = Object.assign({}, opts);
+    delete body.silent;
     return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/location", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
-      body: JSON.stringify(opts || {})
+      body: JSON.stringify(body)
     }).then(function (r) {
       return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.detail || ("Couldn't set location (" + r.status + ")")); });
-    }).then(function (d) { reloadForecast(); return d; });
+    }).then(function (d) { if (!silent) reloadForecast(); return d; });
   };
 
   // Set/clear an array's operator-entered EXPECTED specific yield (kWh per kW
@@ -133,9 +137,11 @@
   };
 
   // Save tilt / azimuth / performance ratio for ONE array (or clear with nulls).
+  // Pass { silent: true } when batching many arrays, then call __aoAnalysisReloadForecast once.
   window.__aoSetArrayGeometry = function (arrayId, opts) {
     var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to edit model inputs"));
     opts = opts || {};
+    var silent = !!opts.silent;
     var body = {
       tilt_deg: opts.tilt_deg == null || opts.tilt_deg === "" ? null : Number(opts.tilt_deg),
       azimuth_deg: opts.azimuth_deg == null || opts.azimuth_deg === "" ? null : Number(opts.azimuth_deg),
@@ -152,7 +158,7 @@
         if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
         throw new Error(msg || ("Couldn't save geometry (" + r.status + ")"));
       });
-    }).then(function (d) { reloadForecast(); return d; });
+    }).then(function (d) { if (!silent) reloadForecast(); return d; });
   };
 
   // Bulk-apply model params across the fleet (only assumed values by default).
