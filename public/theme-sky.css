@@ -159,23 +159,17 @@ html.sky body{
   background:none !important;
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
 }
-/* --sky-base = the arrival "camera drop" (Ford 2026-07-13): the world starts
-   shifted UP by this much so you land already looking at the solar panels at
-   the foot of the plate, not the sky/valley. --sky-travel = the extra descent
-   pan below that. The layer is tall enough for BOTH; the index.html driver
-   subtracts --sky-base so scroll pan stays within --sky-travel. */
-html.sky{--sky-travel:48vh; --sky-base:32vh}
+/* THE PLATE AT NATURAL SCALE (Ford 2026-07-13: "do the SAME thing as onboarding").
+   A simple fixed full-viewport cover background — exactly onboarding's approach.
+   The earlier taller-than-viewport parallax layer had to scale the image UP to
+   fill its height, which magnified + softened it ("zoomed in and low res"). Fixed
+   inset:0 cover renders the plate at natural scale = crisp and expansive, and it
+   stays put as content scrolls over it. No parallax, no camera-drop transform. */
 html.sky body::before{
   content:"";
-  position:fixed;
-  left:0; right:0; top:0;
-  height:calc(100vh + var(--sky-base,32vh) + var(--sky-travel,48vh));
+  position:fixed; inset:0;
   z-index:-1;
   pointer-events:none;
-  /* PORTRAIT plate — the SAME sharp plate as mobile (Ford 2026-07-13: "use the
-     mobile one instead" / "portrait plate everywhere"). Sky-heavy top, the
-     array on the green knoll at the foot; a tall plate gives the descent its
-     vertical slack on every device. */
   background-image:
     url("img/sky/world-zo2-2560.jpg"),
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
@@ -186,21 +180,8 @@ html.sky body::before{
     radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   background-size:cover, auto, auto;
-  /* Ford 2026-07-13: start ~50% lower than the plate top so you arrive looking
-     at the mountains/valley, not pure sky; the descent still pans from here. */
-  background-position:center 50%, center, center;
+  background-position:center 52%, center, center;
   background-repeat:no-repeat;
-  /* start dropped by --sky-base (arrive on the panels), then the scroll-driven
-     --sky-py pans further down. */
-  transform:translate3d(0, calc(-1 * (var(--sky-base,32vh) + var(--sky-py,0px))), 0);
-  will-change:transform;
-}
-@media (prefers-reduced-motion: reduce){
-  html.sky body::before{
-    transform:none;will-change:auto;
-    height:100vh;
-    background-position:center bottom, center, center; /* portrait plate: the array sits at the foot — show it at rest */
-  }
 }
 /* small 1x desktops — lightest plate */
 @media (max-width:1600px) and (max-resolution:1.49dppx){

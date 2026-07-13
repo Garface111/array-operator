@@ -48,16 +48,12 @@
     padding-bottom:calc(78px + env(safe-area-inset-bottom,0px)); /* dock clearance:
       10px inset + 58px dock + 10px breathing (overrides mobile.css's 58px) */
   }
+  /* natural-scale fixed cover — matches theme-sky.css + onboarding (no parallax) */
   html.sky body::before{
     content:"";
-    position:fixed;
-    left:0; right:0; top:0;
-    /* 100vh + camera-drop base + 30vh phone pan (see theme-sky.css --sky-base) */
-    height:calc(100vh + var(--sky-base,32vh) + 30vh);
+    position:fixed; inset:0;
     z-index:-1;
     pointer-events:none;
-    /* Default phone plate: 1284 (≈3x logical width of ~390–430 CSS px) —
-       rebuilt 2026-07-13 from the 6K portrait master at high quality. */
     background-image:
       url("img/sky/world-zo2-2560.jpg"),
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
@@ -68,23 +64,8 @@
       radial-gradient(120% 42% at 50% 104%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 62%),
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
     background-size:cover, auto, auto;
-    /* Ford 2026-07-13: start ~50% lower so you arrive on the mountains/valley,
-       not pure sky; the descent driver still reveals the panels as you scroll. */
-    background-position:center 50%, center, center;
+    background-position:center 52%, center, center;
     background-repeat:no-repeat;
-    /* camera-drop base (arrive on the panels) + scroll pan */
-    transform:translate3d(0, calc(-1 * (var(--sky-base,32vh) + var(--sky-py,0px))), 0);
-    will-change:transform;
-  }
-  /* reduced-motion phones: static framing must still SHOW the panels — the
-     base sheet's center-70% restore is for the square desktop plate; the
-     portrait plate's panels live at its foot. */
-  @media (prefers-reduced-motion: reduce){
-    html.sky body::before{
-      height:100vh;
-      transform:none; will-change:auto;
-      background-position:center bottom, center, center;
-    }
   }
 
   /* ── 2 · THE DOCK — the fixed bottom nav becomes a floating glass pill.
