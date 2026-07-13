@@ -258,7 +258,9 @@
       ".anfc-btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(14,20,32,.1);box-shadow:none;}",
       ".anfc-btn-ghost:hover{color:var(--ink);border-color:rgba(14,20,32,.18);}",
       ".anfc-edit-stat{font-size:12.5px;color:var(--muted);}",
-      ".anfc-edit-stat.ok{color:var(--good);font-weight:650;} .anfc-edit-stat.err{color:var(--bad);font-weight:650;}",
+      ".anfc-edit-stat.ok{color:var(--good);font-weight:650;}",
+      ".anfc-edit-stat.info{color:var(--good,#2563eb);font-weight:650;}",
+      ".anfc-edit-stat.err{color:var(--bad);font-weight:650;}",
 
       /* quiet details */
       ".anfc-details{margin-top:16px;}",
@@ -551,7 +553,7 @@
         window.__aoSetForecastWindow(win);
       }
 
-      setStat("Saving…");
+      setStat("Saving…", "info");
       apply.disabled = true;
 
       // Sequential saves: location first (if changed), then geometry+PR per array.
@@ -596,6 +598,7 @@
 
       chain.then(function (acc) {
         apply.disabled = false;
+        // Hard fail only when nothing saved.
         if (acc.errors.length && !acc.nGeo && !acc.nLoc) {
           setStat(acc.errors[0] + (acc.errors.length > 1 ? " (+" + (acc.errors.length - 1) + " more)" : ""), "err");
           _dirty = true;
@@ -606,13 +609,16 @@
         if (acc.nGeo) parts.push(acc.nGeo + " array" + (acc.nGeo === 1 ? "" : "s"));
         if (acc.nLoc) parts.push(acc.nLoc + " address" + (acc.nLoc === 1 ? "" : "es"));
         var msg = "Saved " + (parts.join(" · ") || "changes");
-        if (acc.errors.length) msg += " · " + acc.errors.length + " issue(s)";
-        setStat(msg + " · recalculating…", acc.errors.length ? "err" : "ok");
-        // After a clean save of a fully-addressed fleet, collapse the panel.
+        // Partial address issues are notes, not alarms — success stays green/blue.
+        if (acc.errors.length) {
+          msg += " · " + acc.errors.length + " address note" + (acc.errors.length === 1 ? "" : "s");
+        }
+        setStat(msg + " · recalculating…", "ok");
+        // Collapse after a successful save when every row has an address string.
         var allHaveAddr = parsed.every(function (p) {
           return p.had_address || p.address;
         });
-        if (allHaveAddr && !acc.errors.length) {
+        if (allHaveAddr) {
           _modelOpen = false;
         }
         // One forecast reload after the whole batch (silent saves skip per-row reload).
