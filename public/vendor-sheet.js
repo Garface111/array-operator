@@ -322,12 +322,36 @@
   // still wins when the source data itself is current; the tooltip spells out BOTH
   // clocks so nothing is ambiguous. (freshness() above stays SOURCE-age — it's the
   // honest "this power reading is from X ago" basis, a different question.)
+  // Human age as "... ago" (e.g. "48 min ago", "now"). Fine for "last seen X" /
+  // "synced X" but NEVER splice into "in ${age}" — that produces "in now" /
+  // "in 48 min ago" (Ford screenshot 2026-07-13: "hasn't published new readings
+  // in now"). Use _ageSincePhrase for that.
   function _fmtAge(min) {
     if (min == null) return "";
     if (min < 1) return "now";
     if (min < 90) return Math.round(min) + " min ago";
     if (min < 1440) return Math.round(min / 60) + "h ago";
     return Math.round(min / 1440) + "d ago";
+  }
+  // Duration for "hasn't done X since …" / "last did X …" sentences. Returns a
+  // full natural phrase so callers don't glue "in " onto an "… ago" string.
+  //   0.3 → "just now"
+  //  48   → "48 minutes ago"
+  //  90   → "about 2 hours ago"
+  // 1500  → "about 1 day ago"
+  function _ageSincePhrase(min) {
+    if (min == null) return null;
+    if (min < 1) return "just now";
+    if (min < 90) {
+      const m = Math.max(1, Math.round(min));
+      return m + (m === 1 ? " minute ago" : " minutes ago");
+    }
+    if (min < 1440) {
+      const h = Math.max(1, Math.round(min / 60));
+      return "about " + h + (h === 1 ? " hour ago" : " hours ago");
+    }
+    const d = Math.max(1, Math.round(min / 1440));
+    return "about " + d + (d === 1 ? " day ago" : " days ago");
   }
   function _syncAgeMin(c) { const m = (c.sync_status || {}).age_min; return m == null ? null : m; }
   // Compact age for the narrow freshness column: "now" / "3m" / "2h" / "1d".
@@ -1258,16 +1282,22 @@
                 <button type="button" class="vs-src-recover-btn" onclick="window.__aoOpenCredentialVault && window.__aoOpenCredentialVault()">Open Credential Vault</button>
               </div>`;
             } else if (c.is_daylight !== false) {
-              // Login is fine; stale during daylight → a calm, honest note. Nothing for the
-              // operator to fix (the source is just quiet), so no button and no accusation.
+              // Login is fine; stale during daylight → a calm, honest note. Use the
+              // SOURCE data age (when the vendor last published), not our sync age
+              // (which can be "now" while the vendor data is 48 min old — Ford's
+              // "hasn't published new readings in now" screenshot, 2026-07-13).
+              const since = _ageSincePhrase(_ageMin(c)) || _ageSincePhrase(_syncAgeMin(c));
+              const when = since || "a while ago";
               h += `<div class="vs-src-recover">
-                <span class="vs-src-recover-txt">${esc(vlabel(v))} hasn't published new readings in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep checking automatically.</span>
+                <span class="vs-src-recover-txt">${esc(vlabel(v))} last published new readings ${esc(when)} — our servers keep checking automatically.</span>
               </div>`;
             }
             // else overnight + login healthy → show nothing (expected pause).
           } else if (syncStale(c) && _portal) {
+            const since = _ageSincePhrase(_syncAgeMin(c)) || _ageSincePhrase(_ageMin(c));
+            const when = since || "a while ago";
             h += `<div class="vs-src-recover">
-              <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — auto-sync may need a hand. Open the portal to capture the latest.</span>
+              <span class="vs-src-recover-txt">We last synced ${esc(vlabel(v))} ${esc(when)} — auto-sync may need a hand. Open the portal to capture the latest.</span>
               <button type="button" class="vs-src-recover-btn" data-vportal="${esc(v)}">↗ Open ${esc(vlabel(v))} to sync</button>
             </div>`;
           }
