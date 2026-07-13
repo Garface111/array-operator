@@ -1094,12 +1094,21 @@
           // vendor portal (extension re-captures on open). Reuses the existing
           // [data-vportal] click delegation, so no extra handler is wired.
           if (syncStale(c) && _cloudMode()) {
-            // Cloud mode: our servers own the refresh, so the fix isn't "open a portal"
-            // — it's re-entering the password if the saved one stopped working.
-            h += `<div class="vs-src-recover">
-              <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep retrying. If it persists, re-enter the password in your Credential Vault.</span>
-              <button type="button" class="vs-src-recover-btn" id="vsRecoverVault-${esc(v)}" onclick="window.__aoOpenCredentialVault && window.__aoOpenCredentialVault()">Open Credential Vault</button>
-            </div>`;
+            // A stale feed in cloud mode is NOT automatically a password problem
+            // (Ford 2026-07-13: this popped the Credential Vault and blamed the password
+            // when Fronius was simply DARK OVERNIGHT and the login was fine — harvest_fails=0,
+            // it just had no PV data to capture at 3am). Overnight the source pausing is
+            // EXPECTED — the harvester keeps checking and resumes at sunrise — so show
+            // NOTHING. Only a feed stale DURING DAYLIGHT gets a calm, honest note, and even
+            // then we don't accuse the password: a real "couldn't sign in" surfaces in the
+            // Credential Vault itself, so this is a "if it keeps up, go check" nudge, not a
+            // diagnosis.
+            if (c.is_daylight !== false) {
+              h += `<div class="vs-src-recover">
+                <span class="vs-src-recover-txt">${esc(vlabel(v))} hasn't published new readings in ${esc(_fmtAge(_syncAgeMin(c)))} — our servers keep checking automatically. If it keeps up, check this login in your Credential Vault.</span>
+                <button type="button" class="vs-src-recover-btn" onclick="window.__aoOpenCredentialVault && window.__aoOpenCredentialVault()">Open Credential Vault</button>
+              </div>`;
+            }
           } else if (syncStale(c) && _portal) {
             h += `<div class="vs-src-recover">
               <span class="vs-src-recover-txt">We haven't synced ${esc(vlabel(v))} in ${esc(_fmtAge(_syncAgeMin(c)))} — auto-sync may need a hand. Open the portal to capture the latest.</span>
