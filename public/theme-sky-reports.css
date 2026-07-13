@@ -336,21 +336,27 @@ html.sky .rb-slider button.on, html.sky .rb-ofilter-chip.on{
   background:var(--sky-primary) !important;color:#fff !important;
   box-shadow:0 3px 10px -3px rgba(33,150,243,.55)}
 html.sky .rb-ofilter-chip.on .rb-ofilter-n{background:rgba(255,255,255,.25);color:#fff}
-/* find-an-offtaker search — large full-width glass field */
+/* find-an-offtaker search — single clean glass field (no nested input box) */
 html.sky .rb-osearch{
-  background:rgba(255,255,255,.92);
-  border:2px solid rgba(33,150,243,.35);
-  border-radius:16px;
-  padding:15px 20px;
-  box-shadow:0 4px 16px rgba(20,60,120,.08), inset 0 1px 0 rgba(255,255,255,.95)}
+  background:rgba(255,255,255,.88);
+  border:1px solid rgba(20,60,120,.14);
+  border-radius:12px;
+  padding:10px 14px;
+  box-shadow:0 1px 3px rgba(20,60,120,.05)}
 html.sky .rb-osearch:focus-within{
-  border-color:rgba(33,150,243,.75);
-  box-shadow:0 0 0 4px rgba(33,150,243,.16), 0 6px 18px rgba(33,150,243,.14)}
-html.sky .rb-osearch-ico{color:var(--sky-primary,#2196F3);font-size:22px}
-html.sky .rb-osearch input{font-size:16.5px;font-weight:650;color:var(--ink)}
-html.sky .rb-osearch input::placeholder{color:#6b7c8f;font-weight:550}
-html.sky .rb-osearch-hint{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.18);
-  color:#3d5a80}
+  border-color:rgba(33,150,243,.55);
+  box-shadow:0 0 0 3px rgba(33,150,243,.12)}
+html.sky .rb-osearch-ico{color:#64748b}
+html.sky .rb-osearch input,
+html.sky .rb-osearch input[type="search"]{
+  font-size:15px;font-weight:600;color:var(--ink);
+  border:0 !important;outline:0 !important;box-shadow:none !important;
+  background:transparent !important;-webkit-appearance:none !important;appearance:none !important}
+html.sky .rb-osearch input:focus,
+html.sky .rb-osearch input:focus-visible{
+  border:0 !important;outline:0 !important;box-shadow:none !important}
+html.sky .rb-osearch input::placeholder{color:#94a3b8;font-weight:500}
+html.sky .rb-osearch-hint{background:rgba(33,150,243,.08);border:0;color:#5a6f85}
 /* upload dropzone: hover goes primary (control affordance, not a status) */
 html.sky .rb-drop{background:rgba(255,255,255,.55) !important;
   border-color:rgba(20,60,120,.22) !important;border-radius:16px}

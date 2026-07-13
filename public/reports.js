@@ -5232,9 +5232,15 @@
     const viewRows = q ? scopeRows.filter(matchesQuery) : scopeRows;
     const showSearch = OFFTAKERS.length >= 1;
     // Full-width search above the filter chips (always on when any offtakers exist).
+    // SVG icon (the old ⌕ glyph fell back to a hollow "o" on some fonts).
     const searchHTML = showSearch ? `
-      <div class="rb-osearch rb-osearch-lg">
-        <span class="rb-osearch-ico" aria-hidden="true">⌕</span>
+      <div class="rb-osearch rb-osearch-lg" role="search">
+        <span class="rb-osearch-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+          </svg>
+        </span>
         <input id="rbOSearch" type="search" placeholder="Search offtakers by name, email, or account number…"
                value="${esc(OFFTAKER_QUERY)}" autocomplete="off" spellcheck="false"
                aria-label="Search offtakers">

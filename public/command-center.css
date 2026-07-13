@@ -933,33 +933,52 @@ body.sb-fs-lock{ overflow:hidden; }
   background:var(--day-hover,rgba(15,23,42,.05)); border-radius:20px; padding:1px 7px; min-width:16px; text-align:center; }
 .rb-ofilter-chip.on .rb-ofilter-n{ color:var(--good,#2563eb); background:rgba(37,99,235,.14); }
 
-/* Find-an-offtaker search — full-width, large, primary lookup over the list.
+/* Find-an-offtaker search — one clean full-width field (no nested input box).
    Filter chips sit below it. */
 .rb-listtools{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:0 0 14px; }
 .rb-listtools-searchfirst{ flex-direction:column; align-items:stretch; gap:12px; }
 .rb-listtools .rb-ofilter{ margin:0; align-self:flex-start; }
 .rb-listtools .rb-osearch{ margin:0; width:100%; max-width:none; }
-.rb-osearch{ display:flex; align-items:center; gap:12px; flex:1 1 auto; width:100%;
+.rb-osearch{ display:flex; align-items:center; gap:10px; flex:1 1 auto; width:100%;
   max-width:none; min-width:0; box-sizing:border-box;
-  background:#fff; border:2px solid rgba(37,99,235,.28); border-radius:14px;
-  padding:14px 18px;
-  box-shadow:0 2px 10px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.9); }
-.rb-osearch-lg{ min-height:52px; }
-.rb-osearch:focus-within{ border-color:rgba(37,99,235,.7);
-  box-shadow:0 0 0 4px rgba(37,99,235,.14), 0 4px 14px rgba(37,99,235,.12); }
-.rb-osearch-ico{ color:#2563eb; font-size:22px; flex:none; line-height:1;
-  font-weight:700; opacity:.9; }
-.rb-osearch input{ border:0; outline:0; background:transparent; flex:1; min-width:0;
-  font:650 16px/1.35 inherit; color:var(--ink,#0f172a); letter-spacing:-.01em; }
-.rb-osearch input::placeholder{ color:#7a8a98; font-weight:550; }
-.rb-osearch-hint{ font-size:12.5px; font-weight:700; color:#5a6b7b;
-  background:rgba(15,23,42,.05); border:1px solid rgba(15,23,42,.08);
-  border-radius:999px; padding:5px 12px; white-space:nowrap; flex:none;
+  background:#fff; border:1px solid rgba(37,99,235,.22); border-radius:12px;
+  padding:10px 14px;
+  box-shadow:0 1px 3px rgba(15,23,42,.05); }
+.rb-osearch-lg{ min-height:44px; }
+.rb-osearch:focus-within{ border-color:rgba(37,99,235,.55);
+  box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.rb-osearch-ico{ display:inline-flex; align-items:center; justify-content:center;
+  flex:none; width:18px; height:18px; color:#64748b; opacity:.9; }
+.rb-osearch-ico svg{ width:18px; height:18px; display:block; }
+/* Flatten the native <input type=search> chrome — it paints its own inner
+   border/bezel on Chromium, which is the "box inside a box" in screenshots. */
+.rb-osearch input,
+.rb-osearch input[type="search"]{
+  -webkit-appearance:none !important; appearance:none !important;
+  border:0 !important; outline:0 !important; box-shadow:none !important;
+  background:transparent !important; border-radius:0 !important;
+  flex:1; min-width:0; margin:0; padding:0;
+  font:600 15px/1.35 inherit; color:var(--ink,#0f172a); letter-spacing:-.01em;
+}
+.rb-osearch input:focus,
+.rb-osearch input:focus-visible{
+  border:0 !important; outline:0 !important; box-shadow:none !important;
+}
+.rb-osearch input::-webkit-search-decoration,
+.rb-osearch input::-webkit-search-cancel-button,
+.rb-osearch input::-webkit-search-results-button,
+.rb-osearch input::-webkit-search-results-decoration{
+  -webkit-appearance:none; appearance:none; display:none;
+}
+.rb-osearch input::placeholder{ color:#94a3b8; font-weight:500; }
+.rb-osearch-hint{ font-size:12px; font-weight:650; color:#64748b;
+  background:rgba(15,23,42,.04); border:0;
+  border-radius:999px; padding:4px 10px; white-space:nowrap; flex:none;
   font-variant-numeric:tabular-nums; }
-/* Search match count — emerald pill, prominent while scanning. */
-.rb-osearch-n{ font-size:13px; font-weight:780; color:#047857;
-  background:rgba(16,185,129,.16); border:1px solid rgba(16,185,129,.32);
-  border-radius:999px; padding:5px 12px; white-space:nowrap; flex:none;
+/* Search match count — quiet emerald pill while filtering. */
+.rb-osearch-n{ font-size:12px; font-weight:700; color:#047857;
+  background:rgba(16,185,129,.12); border:0;
+  border-radius:999px; padding:4px 10px; white-space:nowrap; flex:none;
   font-variant-numeric:tabular-nums; }
 
 /* Reconciliation-in-progress: a small spinner + faint pulse so a slow bill audit
