@@ -506,6 +506,121 @@
     el.textContent = "$" + (b.remaining_usd != null ? b.remaining_usd.toFixed(2) : "—") + " left this week";
   }
 
+  /**
+   * Safe lightweight markdown for chat bubbles.
+   * Supports: **bold**, *italic*, `code`, ```blocks```, # headers, - lists,
+   * [links](https://…), line breaks. Escapes HTML first so model output can't inject tags.
+   */
+  function formatMsg(text) {
+    var raw = String(text == null ? "" : text);
+    // Normalize fancy quotes/asterisks models sometimes emit
+    raw = raw.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
+
+    // Protect fenced code blocks before escaping line structure
+    var blocks = [];
+    raw = raw.replace(/```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+      var i = blocks.length;
+      blocks.push(
+        '<pre class="ea-code"' +
+          (lang ? ' data-lang="' + esc(lang) + '"' : "") +
+          "><code>" +
+          esc(code.replace(/^\n+|\n+$/g, "")) +
+          "</code></pre>"
+      );
+      return "\n%%EA_BLOCK_" + i + "%%\n";
+    });
+
+    // Protect inline code
+    var inlines = [];
+    raw = raw.replace(/`([^`\n]+)`/g, function (_, code) {
+      var i = inlines.length;
+      inlines.push('<code class="ea-icode">' + esc(code) + "</code>");
+      return "%%EA_CODE_" + i + "%%";
+    });
+
+    // Escape the rest
+    var s = esc(raw);
+
+    // Headings (line-start)
+    s = s.replace(/^######\s+(.+)$/gm, '<div class="ea-h ea-h6">$1</div>');
+    s = s.replace(/^#####\s+(.+)$/gm, '<div class="ea-h ea-h5">$1</div>');
+    s = s.replace(/^####\s+(.+)$/gm, '<div class="ea-h ea-h4">$1</div>');
+    s = s.replace(/^###\s+(.+)$/gm, '<div class="ea-h ea-h3">$1</div>');
+    s = s.replace(/^##\s+(.+)$/gm, '<div class="ea-h ea-h2">$1</div>');
+    s = s.replace(/^#\s+(.+)$/gm, '<div class="ea-h ea-h1">$1</div>');
+
+    // Bold then italic (** before *)
+    s = s.replace(/\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/__([^_\n][\s\S]*?[^_\n]|\S)__/g, "<strong>$1</strong>");
+    // Single-asterisk italic — avoid matching inside already-processed strong tags
+    s = s.replace(/(^|[^*\\])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+
+    // Links — https only
+    s = s.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a class="ea-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+    // Restore inline code
+    s = s.replace(/%%EA_CODE_(\d+)%%/g, function (_, i) {
+      return inlines[Number(i)] || "";
+    });
+
+    // Line-based lists & paragraphs
+    var lines = s.split("\n");
+    var out = [];
+    var inUl = false;
+    var inOl = false;
+    function closeLists() {
+      if (inUl) { out.push("</ul>"); inUl = false; }
+      if (inOl) { out.push("</ol>"); inOl = false; }
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      // Restored code-block placeholders are whole lines
+      var blockM = line.match(/^%%EA_BLOCK_(\d+)%%$/);
+      if (blockM) {
+        closeLists();
+        out.push(blocks[Number(blockM[1])] || "");
+        continue;
+      }
+      // Heading already a div — flush lists
+      if (/^<div class="ea-h/.test(line)) {
+        closeLists();
+        out.push(line);
+        continue;
+      }
+      var ul = line.match(/^\s*[-•]\s+(.+)$/);
+      var ol = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
+      if (ul) {
+        if (inOl) { out.push("</ol>"); inOl = false; }
+        if (!inUl) { out.push('<ul class="ea-ul">'); inUl = true; }
+        out.push("<li>" + ul[1] + "</li>");
+        continue;
+      }
+      if (ol) {
+        if (inUl) { out.push("</ul>"); inUl = false; }
+        if (!inOl) { out.push('<ol class="ea-ol">'); inOl = true; }
+        out.push("<li>" + ol[2] + "</li>");
+        continue;
+      }
+      closeLists();
+      if (/^\s*$/.test(line)) {
+        out.push('<div class="ea-sp"></div>');
+      } else {
+        out.push('<p class="ea-p">' + line + "</p>");
+      }
+    }
+    closeLists();
+
+    // Restore any leftover block tokens
+    var html = out.join("");
+    html = html.replace(/%%EA_BLOCK_(\d+)%%/g, function (_, i) {
+      return blocks[Number(i)] || "";
+    });
+    return html || "";
+  }
+
   /** Single chat log for voice + text. Returns false if this is a near-duplicate of the last bubble. */
   function addMsg(role, text, opts) {
     opts = opts || {};
@@ -516,7 +631,7 @@
     // Dedupe: voice transcript path + turn() used to double-post the same line
     var last = host.lastElementChild;
     if (last && last.getAttribute("data-role") === role) {
-      var prev = (last.textContent || "").trim();
+      var prev = (last.getAttribute("data-raw") || last.textContent || "").trim();
       if (prev === t || prev.indexOf(t) === 0 || t.indexOf(prev) === 0) {
         return false;
       }
@@ -526,7 +641,12 @@
     var d = document.createElement("div");
     d.className = "ea-msg " + (role === "user" ? "user" : "agent");
     d.setAttribute("data-role", role);
-    d.textContent = t;
+    d.setAttribute("data-raw", t);
+    // Agent replies get full markdown; user bubbles stay plain (they typed it)
+    // unless they include obvious markdown markers.
+    var rich = role === "agent" || /\*\*|__|`|^#\s|^\s*[-•]\s/m.test(t);
+    if (rich) d.innerHTML = formatMsg(t);
+    else d.textContent = t;
     host.appendChild(d);
     host.scrollTop = host.scrollHeight;
     return true;
