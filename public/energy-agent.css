@@ -320,7 +320,8 @@ html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
 }
 
 .ea-tools{
-  max-height: 120px; overflow: auto; padding: 8px 14px;
+  /* Keep tool dump short so the conversation stays the scroll surface */
+  max-height: 72px; overflow: auto; padding: 8px 14px;
   border-bottom: 1px solid rgba(14,165,233,.1);
   background: rgba(14,165,233,.04);
   font-size: 11px; color: var(--muted,#64748b);
@@ -328,7 +329,8 @@ html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
   scrollbar-width: thin;
   scrollbar-color: rgba(14,165,233,.22) transparent;
 }
-.ea-tools:empty{ display: none; }
+.ea-tools:empty,
+.ea-tools[hidden]{ display: none !important; }
 .ea-tools::-webkit-scrollbar{ width: 5px; }
 .ea-tools::-webkit-scrollbar-thumb{ background: rgba(14,165,233,.2); border-radius: 99px; }
 .ea-tool{
@@ -337,9 +339,28 @@ html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
 .ea-tool b{ color: var(--ink); font-weight: 700; flex: 0 0 auto; }
 .ea-tool code{ font-size: 10.5px; opacity: .85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Mobile + AI home: never show raw tool dumps — answer is the product */
+@media (max-width: 960px){
+  #eaTools.ea-tools,
+  .ea-tools{ display: none !important; max-height: 0 !important; padding: 0 !important; border: 0 !important; }
+}
+body.mh-os #eaTools,
+body.mh-os .ea-tools{
+  display: none !important;
+}
+
 .ea-msgs{
-  flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto;
-  padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px;
+  flex: 1 1 auto;
+  min-height: 140px; /* never collapse to a single bubble */
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   /* Thin, unobtrusive scrollbar (Firefox + WebKit) */
   scrollbar-width: thin;
   scrollbar-color: rgba(14,165,233,.28) transparent;
@@ -353,6 +374,8 @@ html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
   background-clip: padding-box;
 }
 .ea-msgs::-webkit-scrollbar-thumb:hover{ background: rgba(14,165,233,.4); }
+/* History bubbles slightly quieter so live turns read as "now" */
+.ea-msg.history{ opacity: .92; }
 
 /* Live tour caption — one sticky line instead of spamming chat bubbles */
 .ea-tour-cap{

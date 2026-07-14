@@ -919,19 +919,28 @@
     if (!host) return false;
     var t = String(text || "").trim();
     if (!t) return false;
-    // Dedupe: voice transcript path + turn() used to double-post the same line
-    var last = host.lastElementChild;
-    if (last && last.getAttribute("data-role") === role) {
-      var prev = (last.getAttribute("data-raw") || last.textContent || "").trim();
-      if (prev === t || prev.indexOf(t) === 0 || t.indexOf(prev) === 0) {
-        return false;
+    // Dedupe: voice transcript path + turn() used to double-post the same line.
+    // NEVER apply when painting server history (prefix-match was collapsing threads).
+    if (!opts.history && !opts.skipDedup) {
+      var last = host.lastElementChild;
+      // Skip action-chip rows when finding last real bubble
+      while (last && last.classList && last.classList.contains("ea-mind-actions")) {
+        last = last.previousElementSibling;
+      }
+      if (last && last.getAttribute("data-role") === role) {
+        var prev = (last.getAttribute("data-raw") || "").trim();
+        // Exact match only — indexOf prefix was dropping distinct long replies
+        if (prev && prev === t) {
+          return false;
+        }
       }
     }
     if (opts.skipIfDup && state._lastUserSaid === t && role === "user") return false;
-    if (role === "user") state._lastUserSaid = t;
+    if (role === "user" && !opts.history) state._lastUserSaid = t;
     var d = document.createElement("div");
     d.className = "ea-msg " + (role === "user" ? "user" : "agent") +
-      (opts.mindUpdate ? " mind-update" : "");
+      (opts.mindUpdate ? " mind-update" : "") +
+      (opts.history ? " history" : "");
     d.setAttribute("data-role", role);
     d.setAttribute("data-raw", t);
     if (opts.mindUpdate) d.setAttribute("data-mind", "1");
@@ -941,13 +950,33 @@
     if (rich) d.innerHTML = formatMsg(t);
     else d.textContent = t;
     host.appendChild(d);
-    host.scrollTop = host.scrollHeight;
+    if (!opts.history) {
+      host.scrollTop = host.scrollHeight;
+    }
     return true;
   }
 
-  function addTool(name, detail) {
+  function clearTools() {
     var host = document.getElementById("eaTools");
     if (!host) return;
+    host.innerHTML = "";
+    host.hidden = true;
+  }
+
+  function addTool(name, detail) {
+    // Mobile OS / phone: never park raw tool dumps in the chat chrome —
+    // they steal vertical space from the answer the owner actually needs.
+    try {
+      if (
+        (typeof window.__aoMobileOsIsActive === "function" && window.__aoMobileOsIsActive()) ||
+        (window.matchMedia && matchMedia("(max-width: 960px)").matches)
+      ) {
+        return;
+      }
+    } catch (e) {}
+    var host = document.getElementById("eaTools");
+    if (!host) return;
+    host.hidden = false;
     var d = document.createElement("div");
     d.className = "ea-tool";
     d.innerHTML = "<b>" + esc(name) + "</b><code>" + esc(detail || "") + "</code>";
@@ -1209,13 +1238,23 @@
   function paintHistory(messages) {
     var host = document.getElementById("eaMsgs");
     if (!host) return 0;
-    // Only clear if empty / first load for this panel open
+    // Full replace so resume never stacks on a partial local thread
+    host.innerHTML = "";
     var n = 0;
     (messages || []).forEach(function (m) {
       if (!m || !m.content) return;
       var role = m.role === "user" ? "user" : "agent";
-      if (addMsg(role, m.content, { history: true })) n += 1;
+      // skipDedup + history: every server turn is kept
+      if (addMsg(role, m.content, { history: true, skipDedup: true })) n += 1;
     });
+    // Land on newest; user can scroll up for earlier turns / screenshots context
+    requestAnimationFrame(function () {
+      host.scrollTop = host.scrollHeight;
+    });
+    // Subtle cue when there's scrollback
+    if (n > 4) {
+      setStatus("Restored " + n + " messages — scroll up for earlier", "on");
+    }
     return n;
   }
 
@@ -1592,6 +1631,8 @@
     }
     state.thinking = true;
     setStatus("Thinking…", "think");
+    // Fresh turn: drop prior tool dump so the answer has room
+    clearTools();
     // Barge-in: user started a new turn — stop any leftover speech so we don't
     // double-talk. Do NOT cancel again later mid-turn (that caused self-interrupts).
     if (!state.touring) stopSpeak({ reason: "new_turn" });
@@ -1620,10 +1661,12 @@
       if (!r.ok) {
         var err = (d && (d.detail || d.error)) || ("HTTP " + r.status);
         addMsg("agent", String(err));
+        clearTools();
         setStatus("Error", "warn");
         return;
       }
       setBudget(d.budget);
+      // Desktop only: brief tool flash while UI cmds run; mobile skips entirely.
       (d.tool_trace || []).forEach(function (t) {
         addTool(t.name, JSON.stringify(t.args || {}).slice(0, 80));
       });
@@ -1649,7 +1692,9 @@
       if ((source || "") === "voice") {
         speakText = shortVoiceReply(reply);
       }
+      // Answer first, then clear tool strip — free vertical space for the brief
       addMsg("agent", reply);
+      clearTools();
       // One mouth: queue GPT voice (or stay silent if mouth disconnected — never
       // surprise the user with robotic browser TTS after they've used GPT voice).
       await enqueueSpeak(speakText, { source: "chat" });
