@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root{
-  --ho-rail: 400px;
+  --ho-rail: 380px;
   --ho-ink:#0E1420;
   --ho-muted:#4C596B;
   --ho-faint:#6B7789;
@@ -184,35 +184,36 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
   backdrop-filter:blur(24px) saturate(1.5);
 }
 
-/* ── header + vertical step list (top → bottom, never horizontal) ───────── */
-.ho-rail{
-  background:linear-gradient(165deg, rgba(30,144,232,.12), rgba(255,255,255,.35) 45%, rgba(211,242,206,.25));
-  border-bottom:1px solid var(--ho-line);
-  padding:20px 18px 14px;
-  display:flex; flex-direction:column; gap:14px;
-  flex:0 0 auto;
-  min-height:0;
+/* ── compact top + horizontal step pills (form gets the vertical space) ─── */
+.ho-sheet{
+  display:flex;
+  flex-direction:column;
 }
-.ho-brand{ display:flex; align-items:center; gap:10px; }
+.ho-top{
+  flex:0 0 auto;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px 10px;
+  background:linear-gradient(165deg, rgba(30,144,232,.12), rgba(255,255,255,.4) 60%);
+  border-bottom:1px solid var(--ho-line);
+}
+.ho-top-right{ display:flex; align-items:center; gap:8px; flex:0 0 auto }
+.ho-brand{ display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto }
 .ho-brand-mark{
-  width:36px; height:36px; border-radius:12px;
+  width:32px; height:32px; border-radius:10px;
   background:linear-gradient(145deg,#56B4F0,#2196F3 55%,#1976D2);
-  box-shadow:0 6px 16px rgba(33,150,243,.35);
+  box-shadow:0 4px 12px rgba(33,150,243,.32);
   position:relative; flex:0 0 auto;
 }
 .ho-brand-mark::after{
-  content:""; position:absolute; inset:8px; border-radius:50%;
+  content:""; position:absolute; inset:7px; border-radius:50%;
   background:radial-gradient(circle at 35% 30%,#fff,rgba(255,255,255,.2) 60%,transparent);
 }
-.ho-brand b{ font-size:14px; font-weight:750; letter-spacing:-.02em; display:block; line-height:1.2 }
-.ho-brand span{ font-size:11.5px; color:var(--ho-muted); font-weight:550 }
-
-.ho-score{
-  display:flex; align-items:center; gap:12px;
-  padding:12px; border-radius:16px;
-  background:rgba(255,255,255,.55);
-  border:1px solid var(--ho-line);
+.ho-brand b{ font-size:13.5px; font-weight:760; letter-spacing:-.02em; display:block; line-height:1.2 }
+.ho-brand span{
+  font-size:11px; color:var(--ho-muted); font-weight:600; line-height:1.3;
+  display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;
 }
+
 .ho-ring{
   --p:0;
   width:52px; height:52px; border-radius:50%; flex:0 0 auto;
@@ -226,83 +227,92 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
   position:relative; font-size:12.5px; font-weight:780; color:var(--ho-blue-deep);
   font-variant-numeric:tabular-nums;
 }
-.ho-score-copy b{ display:block; font-size:12.5px; font-weight:720 }
-.ho-score-copy span{ font-size:11.5px; color:var(--ho-muted); line-height:1.35 }
+.ho-ring-sm{
+  width:36px; height:36px;
+}
+.ho-ring-sm::before{ inset:4px }
+.ho-ring-sm strong{ font-size:10px }
 
+/* Horizontal pill stepper — replaces tall vertical task list */
 .ho-steps{
-  list-style:none; margin:0; padding:0;
-  display:flex; flex-direction:column; gap:4px;
   flex:0 0 auto;
-  max-height:none;
+  padding:10px 14px 12px;
+  background:rgba(255,255,255,.35);
+  border-bottom:1px solid var(--ho-line);
 }
-.ho-step{
-  display:grid; grid-template-columns:28px 1fr; gap:10px; align-items:center;
-  padding:8px 10px; border-radius:12px; border:1px solid transparent;
-  cursor:pointer; text-align:left; background:transparent; width:100%;
-  font:inherit; color:inherit; transition:background .15s, border-color .15s;
+.ho-stepper{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:2px; margin:0 0 8px;
 }
-.ho-step:hover{ background:rgba(255,255,255,.4) }
-.ho-step.is-active{
-  background:rgba(255,255,255,.7);
-  border-color:rgba(33,150,243,.28);
-  box-shadow:0 4px 14px rgba(20,60,120,.06);
-}
-.ho-step.is-done .ho-dot{
-  background:var(--ho-green-soft); color:var(--ho-green); border-color:rgba(23,138,78,.25);
-}
-.ho-step.is-done .ho-step-t{ color:var(--ho-green) }
-.ho-dot{
-  width:28px; height:28px; border-radius:10px;
+.ho-sp{
+  width:28px; height:28px; border-radius:999px; flex:0 0 auto;
   display:grid; place-items:center;
-  font-size:12px; font-weight:780;
-  background:rgba(255,255,255,.7);
+  font-size:11px; font-weight:780; font:inherit;
   border:1px solid var(--ho-line);
+  background:rgba(255,255,255,.75);
   color:var(--ho-muted);
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s, transform .12s;
 }
-.ho-step.is-active .ho-dot{
+.ho-sp:hover{ background:#fff; color:var(--ho-ink); transform:scale(1.05) }
+.ho-sp.is-active{
   background:linear-gradient(145deg,#56B4F0,#2196F3);
   color:#fff; border-color:transparent;
   box-shadow:0 4px 12px rgba(33,150,243,.35);
 }
-.ho-step-t{ font-size:12.5px; font-weight:700; line-height:1.25; letter-spacing:-.01em }
-.ho-step-s{ font-size:11px; color:var(--ho-muted); margin-top:2px; line-height:1.3 }
-.ho-rail-foot{ font-size:11px; color:var(--ho-faint); line-height:1.4; margin-top:2px }
+.ho-sp.is-done:not(.is-active){
+  background:var(--ho-green-soft); color:var(--ho-green);
+  border-color:rgba(23,138,78,.28);
+}
+.ho-sp-line{
+  flex:1 1 auto; height:2px; min-width:4px;
+  background:rgba(20,60,120,.12); border-radius:2px;
+}
+.ho-stepper-now{
+  display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;
+  min-height:1.2em;
+}
+.ho-stepper-now b{ font-size:13px; font-weight:760; letter-spacing:-.01em }
+.ho-stepper-now span{ font-size:11.5px; color:var(--ho-muted); font-weight:550 }
 
-/* ── main (scrollable body under vertical steps) ─────────────────────────── */
+/* ── main (scrollable body — owns most of the dock height) ──────────────── */
 .ho-main{
-  padding:20px 20px 22px;
+  padding:14px 16px 18px;
   display:flex; flex-direction:column; min-height:0; overflow:auto;
   position:relative;
   flex:1 1 auto;
+  -webkit-overflow-scrolling:touch;
 }
-#hoTour.ho-mode-dock .ho-main{ padding:16px 16px 20px }
+#hoTour.ho-mode-dock .ho-main{ padding:14px 14px 20px }
+#hoTour.ho-mode-dock .ho-sheet{
+  display:flex; flex-direction:column;
+}
 .ho-close{
-  position:absolute; top:14px; right:14px;
-  width:36px; height:36px; border-radius:12px;
-  border:1px solid var(--ho-line); background:rgba(255,255,255,.7);
+  width:34px; height:34px; border-radius:11px;
+  border:1px solid var(--ho-line); background:rgba(255,255,255,.75);
   color:var(--ho-muted); font-size:18px; line-height:1; cursor:pointer;
-  display:grid; place-items:center;
+  display:grid; place-items:center; flex:0 0 auto;
 }
 .ho-close:hover{ background:#fff; color:var(--ho-ink) }
 .ho-kicker{
   display:inline-flex; align-items:center; gap:6px;
-  font-size:11px; font-weight:720; letter-spacing:.04em; text-transform:uppercase;
+  font-size:10.5px; font-weight:720; letter-spacing:.04em; text-transform:uppercase;
   color:var(--ho-blue-deep);
   background:rgba(33,150,243,.1);
   border:1px solid rgba(33,150,243,.18);
-  padding:5px 10px; border-radius:999px;
-  width:fit-content; margin-bottom:14px;
+  padding:4px 9px; border-radius:999px;
+  width:fit-content; margin-bottom:10px;
 }
 .ho-kicker i{
   width:6px; height:6px; border-radius:50%; background:var(--ho-blue);
   box-shadow:0 0 0 3px rgba(33,150,243,.2); display:inline-block;
 }
 .ho-title{
-  font-size:clamp(20px, 3vw, 30px);
+  font-size:clamp(18px, 3vw, 26px);
   font-weight:780; letter-spacing:-.03em; line-height:1.15;
-  margin:0 0 10px; max-width:28ch; padding-right:36px;
+  margin:0 0 8px; max-width:28ch;
 }
-#hoTour.ho-mode-dock .ho-title{ font-size:20px; max-width:none }
+#hoTour.ho-mode-dock .ho-title{ font-size:18px; max-width:none }
 .ho-lede{
   font-size:15px; color:var(--ho-muted); line-height:1.55;
   margin:0 0 18px; max-width:52ch;

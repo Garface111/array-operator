@@ -492,29 +492,44 @@
     } catch (e) {}
   }
 
+  /** Compact horizontal stepper (was a tall vertical checklist that crushed the form). */
   function buildStepsHtml(live) {
-    return STEPS.map(function (s, i) {
+    var cur = STEPS[state.idx] || STEPS[0];
+    var pills = STEPS.map(function (s, i) {
       var done = stepComplete(s, live) || (s.id === "done" && requiredRemaining(live) === 0);
       var active = i === state.idx;
       var num = s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(i);
-      if (done && s.id !== "welcome") num = "✓";
+      if (done && s.id !== "welcome" && !active) num = "✓";
       return (
-        '<button type="button" class="ho-step' +
+        '<button type="button" class="ho-sp' +
         (active ? " is-active" : "") +
         (done ? " is-done" : "") +
         '" data-idx="' +
         i +
-        '">' +
-        '<span class="ho-dot">' +
-        num +
-        "</span>" +
-        "<span><div class=\"ho-step-t\">" +
+        '" title="' +
+        esc(s.rail + " — " + s.railSub) +
+        '" aria-label="' +
         esc(s.rail) +
-        '</div><div class="ho-step-s">' +
-        esc(s.railSub) +
-        "</div></span></button>"
+        '" aria-current="' +
+        (active ? "step" : "false") +
+        '">' +
+        num +
+        "</button>"
       );
-    }).join("");
+    }).join('<span class="ho-sp-line" aria-hidden="true"></span>');
+    return (
+      '<div class="ho-stepper" role="tablist">' +
+      pills +
+      "</div>" +
+      '<div class="ho-stepper-now">' +
+      "<b>" +
+      esc(cur.rail) +
+      "</b>" +
+      "<span>" +
+      esc(cur.railSub) +
+      "</span>" +
+      "</div>"
+    );
   }
 
   function scoreLine(live) {
@@ -542,10 +557,10 @@
     var pct = progressPct(live);
     var ring = root.querySelector(".ho-ring");
     var ringStrong = root.querySelector(".ho-ring strong");
-    var scoreSpan = root.querySelector(".ho-score-copy span");
     if (ring) ring.style.setProperty("--p", String(pct));
     if (ringStrong) ringStrong.textContent = pct + "%";
-    if (scoreSpan) scoreSpan.textContent = scoreLine(live);
+    var brandSub = root.querySelector(".ho-brand span");
+    if (brandSub) brandSub.textContent = scoreLine(live);
     var stepsHost = root.querySelector(".ho-steps");
     if (stepsHost) {
       stepsHost.innerHTML = buildStepsHtml(live);
@@ -597,41 +612,32 @@
     var live = state.live || {};
     var pct = progressPct(live);
     var mode = state.mode === "dock" ? "dock" : "modal";
-    var foot =
-      mode === "dock"
-        ? "Use the site while this stays open — checklist updates live."
-        : "Takes ~5 minutes. Close anytime — resume from the pill bottom-left.";
-
     var firstOpen = !state.open;
     var doAnim = animate && firstOpen;
     root.className =
       "ho-mode-" + mode + (firstOpen ? "" : " ho-open") + (doAnim ? " ho-anim" : "");
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
+    // Compact header: brand + mini % + close. Horizontal step pills. Main body gets the height.
     root.innerHTML =
       '<div class="ho-backdrop" data-ho="backdrop"></div>' +
       '<div class="ho-sheet">' +
-      '<aside class="ho-rail">' +
+      '<header class="ho-top">' +
       '<div class="ho-brand"><div class="ho-brand-mark" aria-hidden="true"></div>' +
-      "<div><b>Array Operator</b><span>Hands-off setup</span></div></div>" +
-      '<div class="ho-score">' +
-      '<div class="ho-ring" style="--p:' +
+      "<div><b>Hands-off setup</b><span>" +
+      esc(scoreLine(live)) +
+      "</span></div></div>" +
+      '<div class="ho-top-right">' +
+      '<div class="ho-ring ho-ring-sm" style="--p:' +
       pct +
-      '"><strong>' +
+      '" title="Hands-off readiness"><strong>' +
       pct +
       "%</strong></div>" +
-      '<div class="ho-score-copy"><b>Hands-off readiness</b><span>' +
-      esc(scoreLine(live)) +
-      "</span></div>" +
-      "</div>" +
-      '<div class="ho-steps" role="tablist">' +
+      '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
+      "</div></header>" +
+      '<div class="ho-steps">' +
       buildStepsHtml(live) +
       "</div>" +
-      '<div class="ho-rail-foot">' +
-      foot +
-      "</div>" +
-      "</aside>" +
       '<section class="ho-main">' +
-      '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
       renderBody(step, live) +
       "</section></div>";
 
@@ -948,8 +954,7 @@
     html += '<p class="ho-lede">' + step.lede + "</p>";
 
     if (step.kind === "welcome") {
-      html +=
-        '<div class="ho-welcome-art" aria-hidden="true"><div class="ho-orbits"><span></span><span></span><span></span></div></div>';
+      // No decorative bar — keep welcome tight so the CTA is above the fold
       html +=
         '<div class="ho-hero">' +
         '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Cloud auto-refresh</b><p>We sign in for you 24/7. No tab left open overnight.</p></div>' +
@@ -961,19 +966,23 @@
 
     if (step.kind === "step") {
       html += statusChips(step, live);
-      // Inline vault form first on login steps — highest-friction thing to remove
+      // Inline vault form first — highest-friction; bullets collapse so form has room
       if (step.loginForm) {
         html += loginFormHtml(step.loginForm, live);
       }
       if (step.bullets && step.bullets.length) {
         html +=
+          '<details class="ho-details"' +
+          (step.loginForm ? "" : " open") +
+          ">" +
+          "<summary>Tips for this step</summary>" +
           '<ul class="ho-bullets">' +
           step.bullets
             .map(function (b) {
               return "<li><span>" + b + "</span></li>";
             })
             .join("") +
-          "</ul>";
+          "</ul></details>";
       }
       if (step.callout) {
         html += '<div class="ho-callout">' + step.callout + "</div>";
@@ -1589,6 +1598,8 @@
 
   function wire(root) {
     root.querySelectorAll("[data-idx]").forEach(function (btn) {
+      if (btn._hoStepWired) return;
+      btn._hoStepWired = true;
       btn.addEventListener("click", function () {
         state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
         hardRender({ animate: false });
