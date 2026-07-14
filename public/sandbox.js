@@ -4863,7 +4863,9 @@
     // Plan row + tab gating show the REAL plan even when the initial loadEntitlement
     // ran before the session was ready (else the Plan row read null → "Choose your
     // plan" for an operator who's already on Both).
-    if(a && a.plan_features){ _entitlement = a.plan_features; applyTabGating(); }
+    try {
+      if(a && a.plan_features){ _entitlement = a.plan_features; applyTabGating(); }
+    } catch(e){}
     const operator = pick(a, ["operator_name","name","owner_name"], "");
     const email    = pick(a, ["email","operator_email"], "");
     // Company starts BLANK until the owner fills it in (Ford). New signups no longer
@@ -4878,41 +4880,55 @@
 
     // Auto-refresh LEADS (Ford: it's the heart of the service) as a full-width panel, then
     // the identity → login & password → plan → bill → payment rows below it.
-    list.innerHTML =
-      autoRefreshRow() +
-      rowEdit("Name", "name", operator, "Your name") +
-      rowEdit("Company", "company", company, "Add your company name") +
-      rowEdit("Email", "email", email, "you@example.com") +
-      rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
-      passwordRow(a) +
-      planRow() +
-      rowStatic("Your bill",
-        `<div class="ao-bill" id="aoBill"><span class="ao-bill-load">Loading…</span></div>`) +
-      rowStatic("Payment method",
-        `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
-        null,
-        `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
-      // V2 offtaker pay-links — full-width hand-holding card (not a thin row).
-      // Owner does ONE click; Stripe collects bank/card; we attach pay links forever.
-      `<div class="acct-row acct-pay-setup" id="aoPaySetup">
-        <div class="ao-pay-card" id="aoPayCard">
-          <div class="ao-pay-card-load">Checking online payments…</div>
-        </div>
-      </div>` +
-      `<div class="acct-row acct-files-row">
-        <div class="r-k">Your files <span class="rb-files-count" id="acctFilesCount"></span></div>
-        <div class="r-v"><div class="rb-files-body" id="acctFilesBody"><div class="rb-files-empty">Loading…</div></div></div>
-        <div class="r-a"></div>
-      </div>` +
-      cancelRow(a);
+    // Build identity FIRST so a throw in autoRefreshRow never leaves a blank Account tab.
+    let arHtml = "";
+    try { arHtml = autoRefreshRow(); } catch(e){
+      arHtml = `<section class="ar-stack" id="rowAutoRefresh"><div class="ar-card"><div class="acct-msg err">Auto-refresh panel failed to render — refresh the page. (${esc(String(e && e.message || e).slice(0,80))})</div></div></section>`;
+    }
+    let rest = "";
+    try {
+      rest =
+        rowEdit("Name", "name", operator, "Your name") +
+        rowEdit("Company", "company", company, "Add your company name") +
+        rowEdit("Email", "email", email, "you@example.com") +
+        rowStatic("Login", `<span id="loginEmail">${esc(email || "—")}</span>`, "the email you sign in with") +
+        passwordRow(a) +
+        planRow() +
+        rowStatic("Your bill",
+          `<div class="ao-bill" id="aoBill"><span class="ao-bill-load">Loading…</span></div>`) +
+        rowStatic("Payment method",
+          `<span id="payState">—</span><div class="acct-msg" id="billMsg"></div>`,
+          null,
+          `<button class="acct-btn primary" id="billManage" type="button">Add credit card</button>`) +
+        `<div class="acct-row acct-pay-setup" id="aoPaySetup">
+          <div class="ao-pay-card" id="aoPayCard">
+            <div class="ao-pay-card-load">Checking online payments…</div>
+          </div>
+        </div>` +
+        `<div class="acct-row acct-files-row">
+          <div class="r-k">Your files <span class="rb-files-count" id="acctFilesCount"></span></div>
+          <div class="r-v"><div class="rb-files-body" id="acctFilesBody"><div class="rb-files-empty">Loading…</div></div></div>
+          <div class="r-a"></div>
+        </div>` +
+        cancelRow(a);
+    } catch(e){
+      rest = `<div class="empty">Part of Account failed to render — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+    }
+    list.innerHTML = arHtml + rest;
+    const retry = document.getElementById("acctRetryLoad");
+    if(retry) retry.onclick = () => loadAccount();
 
-    wireAcctEdits();
-    wirePlanRow();
-    wirePasswordRow();
-    wireAutoRefreshRow();
-    wireCancelRow();
-    loadAcctFiles();
-    renderConnectPayouts(authHeaders());
+    // Secondary wiring never blocks identity paint — each call is isolated
+    try { wireAcctEdits(); } catch(e){}
+    try { wirePlanRow(); } catch(e){}
+    try { wirePasswordRow(); } catch(e){}
+    try { wireAutoRefreshRow(); } catch(e){
+      const listEl = document.getElementById("arList");
+      if(listEl) listEl.innerHTML = `<div class="acct-msg err">Couldn't load portal vault — tap ↻ or try again. (${esc(String(e && e.message || e).slice(0,60))})</div>`;
+    }
+    try { wireCancelRow(); } catch(e){}
+    try { loadAcctFiles(); } catch(e){}
+    try { renderConnectPayouts(authHeaders()); } catch(e){}
   }
 
   /** Hand-holding online-pay setup for offtaker invoices.
@@ -7219,11 +7235,11 @@
       return;
     }
     list.innerHTML = `<div class="empty">Loading your account…</div>`;
-    // Hard timeout so a stuck /v1/account never leaves the tab on "Loading…" forever
-    // (and so the top-bar email chip can still recover via this same response).
-    // 12s matches the fail-fast DB pool timeout on the API (was 15s; 2026-07-14 outage).
+    // Hard timeout: when the API is wedged (DB pool / hung workers), browsers wait
+    // forever on TCP. 8s is short enough to show Retry before customers bounce.
+    // 2026-07-14: full Railway hang — health timed out; Account sat on "Loading…".
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 12000) : null;
+    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 8000) : null;
     try{
       const r = await fetch("/v1/account", {
         headers: h,
@@ -7231,10 +7247,14 @@
       });
       if(to) clearTimeout(to);
       if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
-      // 503 = API intentionally fail-fast under DB pool pressure — ask them to retry,
-      // don't leave them on a perpetual "Loading…" spinner.
-      if(r.status === 503){
-        list.innerHTML = `<div class="empty">Server is busy for a moment — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+      // 503 = API intentionally fail-fast under DB pool pressure — ask them to retry.
+      // 502/504 = reverse-proxy timeout while Railway workers are wedged.
+      if(r.status === 503 || r.status === 502 || r.status === 504){
+        list.innerHTML = `<div class="empty">
+          <b>Server is recovering</b><br>
+          <span style="color:var(--muted);font-size:13px;line-height:1.45">Our API is busy (not your data — nothing was deleted). Wait a few seconds and try again.</span><br>
+          <button type="button" class="acct-btn primary" id="acctRetryLoad" style="margin-top:12px">Try again</button>
+        </div>`;
         const b503 = document.getElementById("acctRetryLoad");
         if(b503) b503.onclick = () => loadAccount();
         return;
@@ -7245,23 +7265,38 @@
       try { if(window.__aoPaintWhoami) window.__aoPaintWhoami(_account); } catch(e){}
       // Server is authoritative for the auto-refresh mode → reconcile local + re-run the
       // extension "keep a tab open" nudge (it reads the mode) so a cloud owner never sees it.
-      _arSyncModeFromAccount(_account);
+      try { _arSyncModeFromAccount(_account); } catch(e){}
       try { if(window.updateExtLiveNudge) window.updateExtLiveNudge(); } catch(e){}
       if(window.aoIsCancelled && window.aoIsCancelled(_account)){
         try { window.aoShowCancelledGate(); } catch(e){}
       }
-      renderAccountList(_account);
+      try {
+        renderAccountList(_account);
+      } catch(paintErr){
+        list.innerHTML = `<div class="empty">Account loaded but the page failed to paint — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+        const b = document.getElementById("acctRetryLoad");
+        if(b) b.onclick = () => loadAccount();
+        return;
+      }
     }catch(e){
       if(to) clearTimeout(to);
       const aborted = e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
       list.innerHTML = aborted
-        ? `<div class="empty">Account is taking too long to load — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`
-        : `<div class="empty">Couldn't load your account right now — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+        ? `<div class="empty">
+            <b>Account is taking too long</b><br>
+            <span style="color:var(--muted);font-size:13px;line-height:1.45">Usually a brief API blip — your logins and arrays are safe. Retry in a few seconds.</span><br>
+            <button type="button" class="acct-btn primary" id="acctRetryLoad" style="margin-top:12px">Try again</button>
+          </div>`
+        : `<div class="empty">
+            <b>Couldn't reach the server</b><br>
+            <span style="color:var(--muted);font-size:13px;line-height:1.45">Check your connection, then retry. Nothing was deleted from your account.</span><br>
+            <button type="button" class="acct-btn primary" id="acctRetryLoad" style="margin-top:12px">Try again</button>
+          </div>`;
       const btn = document.getElementById("acctRetryLoad");
       if(btn) btn.onclick = () => loadAccount();
       return;
     }
-    renderBilling(h);
+    try { renderBilling(h); } catch(e){}
   }
 
   /* ===========================================================================
