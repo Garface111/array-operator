@@ -480,25 +480,27 @@
     pill.classList.add("ho-pill-show");
     pill.classList.toggle("is-done", !incomplete);
     pill.classList.toggle("is-progress", !!incomplete);
+    // Single-line Alerts-style pill (no cramped two-line label)
     if (incomplete) {
       pill.innerHTML =
-        '<span class="ho-pill-badge" aria-hidden="true">' +
+        '<span class="ho-pill-ic" aria-hidden="true">' +
         left +
         "</span>" +
-        '<span class="ho-pill-txt">Hands-off' +
-        '<span class="ho-pill-sub">' +
-        left +
-        " step" +
-        (left === 1 ? "" : "s") +
-        " left</span></span>";
-      pill.setAttribute("aria-label", "Hands-off setup — " + left + " steps left");
+        '<span class="ho-pill-lab">Setup</span>';
+      pill.setAttribute(
+        "aria-label",
+        "Hands-off setup — " + left + " step" + (left === 1 ? "" : "s") + " left"
+      );
+      pill.title =
+        left + " step" + (left === 1 ? "" : "s") + " left · open hands-off setup";
     } else {
-      // Always-on replay affordance (like the Alerts pill)
       pill.innerHTML =
-        '<span class="ho-pill-badge ho-pill-play" aria-hidden="true">▶</span>' +
-        '<span class="ho-pill-txt">Hands-off' +
-        '<span class="ho-pill-sub">Replay setup</span></span>';
+        '<span class="ho-pill-ic ho-pill-play" aria-hidden="true">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>' +
+        "</span>" +
+        '<span class="ho-pill-lab">Setup</span>';
       pill.setAttribute("aria-label", "Replay hands-off setup walkthrough");
+      pill.title = "Replay hands-off setup walkthrough";
     }
   }
 
@@ -570,11 +572,6 @@
     var root = document.getElementById("hoTour");
     if (!root) return;
     var live = state.live || {};
-    var pct = progressPct(live);
-    var ring = root.querySelector(".ho-ring");
-    var ringStrong = root.querySelector(".ho-ring strong");
-    if (ring) ring.style.setProperty("--p", String(pct));
-    if (ringStrong) ringStrong.textContent = pct + "%";
     var brandSub = root.querySelector(".ho-brand span");
     if (brandSub) brandSub.textContent = scoreLine(live);
     var stepsHost = root.querySelector(".ho-steps");
@@ -626,14 +623,14 @@
     var root = ensureRoot();
     var step = STEPS[state.idx] || STEPS[0];
     var live = state.live || {};
-    var pct = progressPct(live);
     var mode = state.mode === "dock" ? "dock" : "modal";
     var firstOpen = !state.open;
     var doAnim = animate && firstOpen;
     root.className =
       "ho-mode-" + mode + (firstOpen ? "" : " ho-open") + (doAnim ? " ho-anim" : "");
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
-    // Compact header: brand + mini % + close. Horizontal step pills. Main body gets the height.
+    // Clean header: brand + close only (100% ring removed — cramped next to ×,
+    // readiness already reads in the subtitle + step pills; Ford 2026-07-14).
     root.innerHTML =
       '<div class="ho-backdrop" data-ho="backdrop"></div>' +
       '<div class="ho-sheet">' +
@@ -643,12 +640,7 @@
       esc(scoreLine(live)) +
       "</span></div></div>" +
       '<div class="ho-top-right">' +
-      '<div class="ho-ring ho-ring-sm" style="--p:' +
-      pct +
-      '" title="Hands-off readiness"><strong>' +
-      pct +
-      "%</strong></div>" +
-      '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
+      '<button type="button" class="ho-close" data-ho="close" aria-label="Close setup">×</button>' +
       "</div></header>" +
       '<div class="ho-steps">' +
       buildStepsHtml(live) +
@@ -1234,7 +1226,7 @@
     }
   }
 
-  /** Close panel → pill stays for re-access (unless fully done). */
+  /** Close panel → pill returns immediately (don't wait on network). */
   function minimizeTour() {
     markModalSeen();
     var root = document.getElementById("hoTour");
@@ -1249,13 +1241,14 @@
     }
     state.open = false;
     setShellOpen(false);
-    probeLive().then(function () {
-      // Auto-complete if required pillars are green
-      if (requiredRemaining(state.live) === 0) {
-        // Don't force done — let them mark done on finish screen; still show green pill
-      }
-      updatePill();
-    });
+    // Instant FAB restore — was waiting on probeLive() so the pill lagged after ×
+    updatePill();
+    // Refresh step counts in the background without blocking the pill
+    probeLive()
+      .then(function () {
+        if (!state.open) updatePill();
+      })
+      .catch(function () {});
   }
 
   function closeTourFinished() {

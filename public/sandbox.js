@@ -5809,12 +5809,6 @@
               </button>
             </h3>
             <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
-            <p class="ar-tour-link" style="margin:.45rem 0 0;font-size:12px">
-              <button type="button" id="hoTourRelaunch" class="ar-tour-btn"
-                style="appearance:none;border:0;background:transparent;color:var(--good,#2196F3);font:inherit;font-weight:700;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px">
-                ▶ Replay hands-off setup walkthrough
-              </button>
-            </p>
             <div class="ar-mode" id="arMode" role="tablist" aria-label="How we keep your data fresh">
               <button type="button" class="ar-mode-opt" data-mode="cloud" role="tab">
                 <b>Store it with us — live data</b><span>We keep your passwords secure and refresh your data 24/7. No tab, no computer needed.</span></button>
@@ -5861,18 +5855,8 @@
     const toggle = document.getElementById("arToggle");
     const body = document.getElementById("arBody");
     const showBtn = document.getElementById("arShowLogins");
-    // Reopen post-onboarding hands-off walkthrough (hands-off-tour.js)
-    const tourBtn = document.getElementById("hoTourRelaunch");
-    if(tourBtn && !tourBtn._wired){
-      tourBtn._wired = true;
-      tourBtn.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        try {
-          if(typeof window.__aoHandsOffTour === "function") window.__aoHandsOffTour({ force:true });
-          else location.href = "/?tour=hands-off#account";
-        } catch(err){}
-      });
-    }
+    // Hands-off walkthrough lives as the bottom-left Setup FAB (hands-off-tour.js),
+    // not a second link under Auto-refresh (Ford 2026-07-14).
     if(toggle && !toggle._wired){
       toggle._wired = true;
       toggle.addEventListener("click", (e) => {
