@@ -1256,13 +1256,20 @@
       if (passEl) passEl.value = "";
       setMsg("✓ Saved — we’ll refresh this feed automatically.", true);
       btn.textContent = "✓ Saved";
-      // Connecting… skeletons only for inverter portals (utility harvest is quieter)
+      // Connecting… skeletons for every inverter portal (SE/Fronius/SMA/Chint/…)
       try {
-        if (INVERTER_PENDING[provider] && window.__aoPendingFeeds) {
-          window.__aoPendingFeeds.mark(provider, {
-            label: label,
-            note: "saved from hands-off setup",
-          });
+        if (window.__aoPendingFeeds) {
+          if (typeof window.__aoPendingFeeds.markInverter === "function") {
+            window.__aoPendingFeeds.markInverter(provider, {
+              label: label,
+              note: "saved from hands-off setup",
+            });
+          } else if (INVERTER_PENDING[provider]) {
+            window.__aoPendingFeeds.mark(provider, {
+              label: label,
+              note: "saved from hands-off setup",
+            });
+          }
         }
       } catch (e) {}
       try {

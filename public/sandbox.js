@@ -209,11 +209,24 @@
     const note = _ov && _ov.querySelector("#sbNote");
     // Every provider that ISN'T an inverter portal is a utility meter — derive it
     // instead of hardcoding the trio, so any of the ~470 utilities reads correctly.
-    const isMeter = !["solaredge","fronius","sma","chint"].includes(code);
+    const isMeter = !["solaredge","fronius","sma","chint","locus","alsoenergy"].includes(code);
     if(note){
       note.className = "sb-note";
       const what = isMeter ? "solar production" : "inverters";
       note.innerHTML = `<span class="sb-spin"></span> Opening ${esc(provLabel(code))} — sign in there and your ${what} appear${isMeter?"s":""} here automatically.`;
+    }
+    // Optimistic Connecting… card on Inverters for EVERY inverter vendor (not just Chint).
+    // Portal walks + first harvest can take 30–60s; without this the sheet looks empty/broken.
+    if(!isMeter){
+      try {
+        if(window.__aoPendingFeeds){
+          const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+          mark.call(window.__aoPendingFeeds, code, {
+            label: BRAND[code] || provLabel(code) || code,
+            note: "portal open — waiting for capture",
+          });
+        }
+      } catch(e){}
     }
     // Pass the provider CODE so the extension arms the right capture intent — a
     // single SmartHub host serves every co-op, so the code disambiguates which one.
@@ -269,11 +282,13 @@
       return;
     }
     const hdr = { "Content-Type":"application/json", "Authorization":"Bearer "+session };
-    // Optimistic UI: show "Connecting…" on Inverters immediately (Chint walks can take 30–60s)
+    // Optimistic UI: Connecting… for every inverter vendor (SE / Fronius / SMA / Chint / …)
+    // — first fleet write can lag 30–60s after capture lands.
     try {
       const prov = (d.provider || "").toLowerCase();
       if(prov && window.__aoPendingFeeds){
-        window.__aoPendingFeeds.mark(prov, {
+        const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+        mark.call(window.__aoPendingFeeds, prov, {
           label: BRAND[prov] || d.provider,
           note: "capture landed — syncing to your account",
           sites: Array.isArray(d.sites) ? d.sites.length : null,
@@ -287,7 +302,7 @@
     // with an accountCount but NO accounts[] (and no kind:"utility_meter"). That's
     // a SUCCESS for connecting GMP — not a failure. Recognize it, refresh, and let
     // the live-usage capture (which DOES carry accounts[]) flow through below.
-    const isMeterProvider = !["solaredge","fronius","sma","chint"].includes(d.provider);
+    const isMeterProvider = !["solaredge","fronius","sma","chint","locus","alsoenergy"].includes(d.provider);
     const hasAccounts = Array.isArray(d.accounts) && d.accounts.length > 0;
     if(isMeterProvider && !hasAccounts && d.ok !== false && d.kind !== "utility_meter"){
       const nAcct = (typeof d.accountCount === "number") ? d.accountCount : 0;
@@ -310,7 +325,7 @@
       if(d.provider === "solaredge" && d.apiKey){
         r = await fetch("/v1/array-owners/solaredge/connect-account",
           { method:"POST", headers:hdr, body: JSON.stringify({ api_key: d.apiKey }) });
-      } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint") && Array.isArray(d.sites) && d.sites.length){
+      } else if((d.provider === "fronius" || d.provider === "sma" || d.provider === "chint" || d.provider === "locus" || d.provider === "alsoenergy") && Array.isArray(d.sites) && d.sites.length){
         r = await fetch("/v1/array-owners/inverter-capture",
           { method:"POST", headers:hdr, body: JSON.stringify({ provider: d.provider, sites: d.sites }) });
         armSmaOfficialApi(d, hdr);   // fire-and-forget; never blocks the visible "Connected" moment
@@ -333,7 +348,7 @@
       }
       data = {}; try { data = await r.json(); } catch(e){}
       const ok = r.ok && (data.ok || data.connected || data.created || data.matched || data.sites_captured || data.accounts_captured);
-      const isMeter = !["solaredge","fronius","sma","chint"].includes(d.provider);
+      const isMeter = !["solaredge","fronius","sma","chint","locus","alsoenergy"].includes(d.provider);
       if(ok){
         // HONEST GATE: an inverter capture can return ok/200 with site(s) but ZERO
         // inverters persisted — e.g. the portal SPA hadn't loaded its device list
@@ -1932,15 +1947,40 @@
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>`;
-      if(freshWindowActive()){
-        // Just came from onboarding — their connect is landing. Watch + reveal.
-        host.innerHTML = _head +
-          `<div class="sb-empty"><span class="sb-spin"></span> Finishing the connection — sign into your monitoring portal in the other tab and your arrays appear here on their own, no refresh.</div>`;
+      // Any mid-connect inverter vendor → blue Connecting… cards (all vendors, not just Chint)
+      let _pending = [];
+      try {
+        _pending = (window.__aoPendingFeeds && window.__aoPendingFeeds.list()) || [];
+      } catch(e){ _pending = []; }
+      if(_pending.length || freshWindowActive()){
+        const cards = _pending.length
+          ? _pending.map(p => {
+              const label = esc(p.label || p.vendor || "Vendor");
+              const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
+              const wait = ageSec < 15 ? "usually under a minute" : ageSec < 60 ? "still syncing…" : "almost there — large fleets can take a minute";
+              return `<div class="vs-pending" data-pending-vendor="${esc(p.vendor)}">
+                <div class="vs-pending-head">
+                  <span class="vs-pending-badge">${label}</span>
+                  <span class="vs-pending-pulse" aria-hidden="true"></span>
+                  <span class="vs-pending-stat">Connecting…</span>
+                </div>
+                <div class="vs-pending-body">
+                  <div class="vs-pending-skel"></div>
+                  <div class="vs-pending-skel vs-pending-skel-short"></div>
+                  <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (${esc(wait)}). This page updates automatically.</p>
+                </div>
+              </div>`;
+            }).join("")
+          : `<div class="sb-empty"><span class="sb-spin"></span> Finishing the connection — sign into your monitoring portal in the other tab and your arrays appear here on their own, no refresh.</div>`;
+        host.innerHTML = _head + cards;
         wireAddButton(host);
         wireNewArrayButton(host);
         wireCardButton(host);
         renderCards();
-        startFreshPoll();
+        if(freshWindowActive()) startFreshPoll();
+        try {
+          if(window.__aoPendingFeeds && window.__aoPendingFeeds.startPoll) window.__aoPendingFeeds.startPoll();
+        } catch(e){}
         return;
       }
       host.innerHTML = _head +
@@ -4482,6 +4522,16 @@
       note.className = "sb-note";
       note.textContent = v.discover ? `Reaching your ${v.label} account…` : `Connecting your ${v.label} system…`;
       if(connectBtn) connectBtn.disabled = true;
+      // Connecting… skeleton on Inverters for every API vendor (SE / Fronius / AE / Locus / …)
+      try {
+        if(window.__aoPendingFeeds){
+          const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+          mark.call(window.__aoPendingFeeds, vendor, {
+            label: v.label || BRAND[vendor] || vendor,
+            note: "api connect — attaching sites",
+          });
+        }
+      } catch(e){}
       try{
         const r = await fetch(url, {
           method:"POST",
@@ -4497,6 +4547,7 @@
           (r.status===403 && /tenant key|sign in|session/i.test((data && (data.detail||data.message))||""));
         if(authDead){
           try { localStorage.removeItem("so_session"); } catch(e){}
+          try { if(window.__aoPendingFeeds) window.__aoPendingFeeds.clear(vendor); } catch(e){}
           note.className = "sb-note err";
           note.innerHTML = `Your session expired — <a href="onboarding.html">sign in again →</a> to add this array. Your existing arrays are safe.`;
           if(connectBtn) connectBtn.disabled = false; return;
@@ -4511,15 +4562,23 @@
                 const all = (FleetStore.snapshot().arrays || []).map(a => a.id);
                 if(all.length) FleetStore.setFocus(all);
               }
+              try {
+                if(window.__aoPendingFeeds){
+                  window.__aoPendingFeeds.reconcile((FleetStore.snapshot() || {}).arrays || []);
+                  window.__aoPendingFeeds.startPoll();
+                }
+              } catch(e){}
             }
           } catch(e){}
           closeAddModal(); load(); return;
         }
+        try { if(window.__aoPendingFeeds) window.__aoPendingFeeds.clear(vendor); } catch(e){}
         note.className = "sb-note err";
         note.textContent = (data && (data.message || data.detail)) ||
           `Couldn't connect that ${v.label} account (HTTP ${r.status}). Double-check the credentials and try again.`;
         if(connectBtn) connectBtn.disabled = false;
       }catch(err){
+        try { if(window.__aoPendingFeeds) window.__aoPendingFeeds.clear(vendor); } catch(e){}
         note.className = "sb-note err";
         note.textContent = "We couldn't reach the connection service just now — check your network and try again.";
         const cb = foot.querySelector("#sbConnect"); if(cb) cb.disabled = false;
@@ -6080,6 +6139,13 @@
         seSave.disabled = true; seSave.textContent = "Connecting…";
         if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat"; seStat.textContent = ""; }
         try {
+          if (window.__aoPendingFeeds) {
+            const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+            mark.call(window.__aoPendingFeeds, "solaredge", {
+              label: "SolarEdge",
+              note: "api key connect — discovering sites",
+            });
+          }
           const r = await fetch("/v1/array-owners/solaredge/connect-account", {
             method: "POST",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
@@ -6089,14 +6155,22 @@
           if (r.ok && d.ok) {
             seKeyEl.value = "";
             if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat ok"; seStat.textContent = d.message || "Connected."; }
-            try { if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch(); } catch (e) {}
+            try {
+              if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch();
+              if (window.__aoPendingFeeds) {
+                window.__aoPendingFeeds.reconcile((FleetStore.snapshot() || {}).arrays || []);
+                window.__aoPendingFeeds.startPoll();
+              }
+            } catch (e) {}
             setTimeout(() => { wireAutoRefreshRow(); }, 900);
           } else {
+            try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("solaredge"); } catch (e) {}
             const msg = (d && d.detail) ? d.detail : ("Couldn't connect (HTTP " + r.status + ").");
             if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat err"; seStat.textContent = msg; }
             seSave.disabled = false; seSave.textContent = seLabel;
           }
         } catch (e) {
+          try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("solaredge"); } catch (e2) {}
           if (seStat) { seStat.className = "ar-se-stat ar-cloud-stat err"; seStat.textContent = "Network error. Try again."; }
           seSave.disabled = false; seSave.textContent = seLabel;
         }
@@ -6120,6 +6194,13 @@
         aeSave.disabled = true; aeSave.textContent = "Connecting…";
         if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat"; aeStat.textContent = ""; }
         try {
+          if (window.__aoPendingFeeds) {
+            const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+            mark.call(window.__aoPendingFeeds, "alsoenergy", {
+              label: "AlsoEnergy",
+              note: "api connect — discovering sites",
+            });
+          }
           const r = await fetch("/v1/array-owners/alsoenergy/connect-account", {
             method: "POST",
             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
@@ -6132,14 +6213,22 @@
               aeStat.className = "ar-ae-stat ar-cloud-stat ok";
               aeStat.textContent = d.message || "Connected.";
             }
-            try { if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch(); } catch (e) {}
+            try {
+              if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch();
+              if (window.__aoPendingFeeds) {
+                window.__aoPendingFeeds.reconcile((FleetStore.snapshot() || {}).arrays || []);
+                window.__aoPendingFeeds.startPoll();
+              }
+            } catch (e) {}
             setTimeout(() => { wireAutoRefreshRow(); }, 900);
           } else {
+            try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("alsoenergy"); } catch (e) {}
             const msg = (d && d.detail) ? d.detail : ("Couldn't connect (HTTP " + r.status + ").");
             if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat err"; aeStat.textContent = msg; }
             aeSave.disabled = false; aeSave.textContent = aeLabel;
           }
         } catch (e) {
+          try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("alsoenergy"); } catch (e2) {}
           if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat err"; aeStat.textContent = "Network error. Try again."; }
           aeSave.disabled = false; aeSave.textContent = aeLabel;
         }
@@ -6274,11 +6363,11 @@
               if(r.ok){
                 saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved";
                 saveBtn.classList.add("ar-saved-ok");
-                // Inverter portals can take 30–60s for first harvest — show Connecting… on Inverters
+                // Every inverter portal harvest can take 30–60s — Connecting… for all vendors
                 try {
-                  const invCodes = new Set(["chint","fronius","sma","solaredge","locus","alsoenergy"]);
-                  if(invCodes.has(String(saveCode||"").toLowerCase()) && window.__aoPendingFeeds){
-                    window.__aoPendingFeeds.mark(saveCode, {
+                  if(window.__aoPendingFeeds){
+                    const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+                    mark.call(window.__aoPendingFeeds, saveCode, {
                       label: (BRAND[saveCode] || saveCode),
                       note: "cloud harvest starting",
                     });

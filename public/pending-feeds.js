@@ -1,8 +1,12 @@
 /* ============================================================================
- * Pending feeds — optimistic "connecting…" state after a vendor portal connect.
+ * Pending feeds — optimistic "Connecting…" state after ANY inverter vendor connect.
  * Survives the onboarding → dashboard hop via localStorage, paints a loading
- * card on Inverters so a 30–40s Chint walk doesn't look like a failure, and
- * polls fleet-tree until arrays for that vendor appear (or we time out).
+ * card on Inverters so a 30–60s portal walk / cloud harvest doesn't look like a
+ * failure, and polls fleet-tree until arrays for that vendor appear (or we time out).
+ *
+ * Covered vendors: SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy (and any
+ * future inverter code registered in INVERTER_VENDORS). Utility meters are NOT
+ * pending-feed cards — they refresh bills, not the Inverters sheet.
  * ========================================================================== */
 (function () {
   "use strict";
@@ -15,7 +19,8 @@
   var _pollTimer = null;
   var _pollCount = 0;
 
-  var LABELS = {
+  /** Inverter monitoring portals only — utility meters use a different UX. */
+  var INVERTER_VENDORS = {
     chint: "Chint / CPS",
     fronius: "Fronius",
     sma: "SMA",
@@ -24,8 +29,26 @@
     alsoenergy: "AlsoEnergy",
   };
 
+  // Back-compat alias used by older call sites
+  var LABELS = INVERTER_VENDORS;
+
   function _now() {
     return Date.now();
+  }
+
+  function norm(vendor) {
+    return String(vendor || "")
+      .toLowerCase()
+      .trim();
+  }
+
+  function isInverter(vendor) {
+    return !!INVERTER_VENDORS[norm(vendor)];
+  }
+
+  function labelFor(vendor) {
+    var v = norm(vendor);
+    return INVERTER_VENDORS[v] || v || "Vendor";
   }
 
   function read() {
@@ -61,28 +84,33 @@
 
   function mark(vendor, meta) {
     meta = meta || {};
-    var v = String(vendor || "")
-      .toLowerCase()
-      .trim();
-    if (!v) return;
+    var v = norm(vendor);
+    if (!v) return false;
     var list = read().filter(function (p) {
       return p.vendor !== v;
     });
     list.push({
       vendor: v,
-      label: meta.label || LABELS[v] || v,
+      label: meta.label || labelFor(v),
       at: _now(),
       note: meta.note || null,
       sites: meta.sites != null ? meta.sites : null,
     });
     write(list);
     startPoll();
+    return true;
+  }
+
+  /** Prefer this from connect UIs — skips utilities so Inverters doesn't show a GMP skeleton. */
+  function markInverter(vendor, meta) {
+    if (!isInverter(vendor)) return false;
+    meta = meta || {};
+    if (!meta.label) meta.label = labelFor(vendor);
+    return mark(vendor, meta);
   }
 
   function clear(vendor) {
-    var v = String(vendor || "")
-      .toLowerCase()
-      .trim();
+    var v = norm(vendor);
     if (!v) {
       write([]);
       stopPoll();
@@ -100,22 +128,22 @@
   }
 
   function has(vendor) {
-    var v = String(vendor || "").toLowerCase();
+    var v = norm(vendor);
     return read().some(function (p) {
       return p.vendor === v;
     });
   }
 
-  /** Drop pending rows once that vendor has arrays in the live fleet. */
+  /** Drop pending rows once that vendor has arrays (or inverters) in the live fleet. */
   function reconcile(arrays) {
     arrays = arrays || [];
     var present = {};
     arrays.forEach(function (a) {
-      var v = (a.vendor || "").toLowerCase();
+      var v = norm(a.vendor);
       if (v) present[v] = (present[v] || 0) + 1;
       // also count inverter vendors nested under arrays
       (a.inverters || []).forEach(function (inv) {
-        var iv = (inv.vendor || "").toLowerCase();
+        var iv = norm(inv.vendor);
         if (iv) present[iv] = (present[iv] || 0) + 1;
       });
     });
@@ -187,12 +215,16 @@
 
   window.__aoPendingFeeds = {
     mark: mark,
+    markInverter: markInverter,
     clear: clear,
     list: list,
     has: has,
+    isInverter: isInverter,
+    labelFor: labelFor,
     reconcile: reconcile,
     startPoll: startPoll,
     labels: LABELS,
+    inverterVendors: INVERTER_VENDORS,
   };
 
   if (document.readyState === "loading") {

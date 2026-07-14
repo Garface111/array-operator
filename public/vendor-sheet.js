@@ -1658,9 +1658,11 @@
     } catch (e) { return []; }
   }
 
-  /** Skeleton vendor block while a just-connected portal is still landing. */
+  /** Skeleton vendor block while a just-connected portal is still landing.
+   *  Used for every inverter vendor (SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy). */
   function pendingVendorHtml(p) {
-    const label = esc(p.label || p.vendor || "Vendor");
+    const label = esc(p.label || (window.__aoPendingFeeds && window.__aoPendingFeeds.labelFor
+      ? window.__aoPendingFeeds.labelFor(p.vendor) : null) || p.vendor || "Vendor");
     const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
     const wait = ageSec < 15 ? "usually under a minute" : ageSec < 60 ? "still syncing…" : "almost there — large fleets can take a minute";
     return `<div class="vs-pending" data-pending-vendor="${esc(p.vendor)}">

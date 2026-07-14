@@ -545,8 +545,7 @@ function loginWithChint(){
   // the ROOT portal URL + the plain SO_OPEN_PORTAL post, nothing else. openPortalLogin already
   // sends {url, active:true, provider:"chint"} — identical to the spreadsheet view that works.
   // (The #/pv/sites route + custom-routing detours were my own divergence and the bug.)
-  openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
-  markPendingVendor("chint", "Chint / CPS", "portal open — waiting for capture");
+  openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint / CPS");
   if (_chintTimer) clearTimeout(_chintTimer);
   // In SYNC mode, never leave the tile spinning "signing in…" forever: if the capture hasn't
   // landed in ~75s (a generous window for the login + multi-site route walk), resolve it to a
@@ -1834,16 +1833,21 @@ function goDashboard(){
 }
 
 function markPendingVendor(code, label, note){
+  // Inverter vendors only — utilities don't use the Inverters Connecting… skeleton
+  const INV = { chint:1, fronius:1, sma:1, solaredge:1, locus:1, alsoenergy:1 };
+  const v = String(code || "").toLowerCase();
+  if (!INV[v]) return;
   try {
     if (window.__aoPendingFeeds) {
-      window.__aoPendingFeeds.mark(code, { label: label || code, note: note || null });
+      const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+      mark.call(window.__aoPendingFeeds, v, { label: label || code, note: note || null });
       return;
     }
   } catch (e) {}
   try {
     const KEY = "ao_pending_feeds";
-    const list = JSON.parse(localStorage.getItem(KEY) || "[]").filter(p => p && p.vendor !== code);
-    list.push({ vendor: code, label: label || code, at: Date.now(), note: note || null });
+    const list = JSON.parse(localStorage.getItem(KEY) || "[]").filter(p => p && p.vendor !== v);
+    list.push({ vendor: v, label: label || code, at: Date.now(), note: note || null });
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch (e) {}
 }
@@ -1937,6 +1941,16 @@ async function finish(){
           const v = vendorByCode(state.vendor);
           const hdr = {"Content-Type":"application/json","Authorization":`Bearer ${state.sessionToken}`};
           let conn, cd;
+          // Connecting… cards for every vendor we are about to attach (not just Chint)
+          try {
+            if (state.syncMode) {
+              Object.keys(state.captures || {}).forEach(code => {
+                markPendingVendor(code, (SYNC_ALL_LABEL && SYNC_ALL_LABEL[code]) || code, "attaching after signup");
+              });
+            } else if (state.vendor) {
+              markPendingVendor(state.vendor, (v && v.label) || state.vendor, "attaching after signup");
+            }
+          } catch (e) {}
           if(state.syncMode){
             // Sync-all: persist EVERY captured vendor — SolarEdge by its account
             // key, readings vendors (Fronius/SMA/Chint) by their captured sites.
