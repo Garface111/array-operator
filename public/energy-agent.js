@@ -88,7 +88,7 @@
         { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
         { label: "Invoices", hash: "#reports" },
         { label: "Resources", hash: "#resources" },
-        { label: "Master Account", hash: "#account" },
+        { label: "Account", hash: "#account" },
       ],
       path: location.pathname,
       title: document.title,
@@ -1017,7 +1017,7 @@
       "(there is no separate Trends tab)\n" +
       "4. **Invoices** — offtaker invoices, drafts, send pipeline\n" +
       "5. **Resources** — net-metering rates and regulatory news\n" +
-      "6. **Master Account** — company, email, plan, card, auto-refresh, files\n\n" +
+      "6. **Account** — company, email, plan, card, auto-refresh, files\n\n" +
       "Want me to open one and walk you through it?"
     );
   }
@@ -1041,7 +1041,7 @@
         || /\b(list|name|explain) (all )?(the )?tabs\b/i.test(text)
         || /\btabs (do i|are there|in (the )?(app|nav|bar))\b/i.test(text)) {
       addMsg("agent", tabsCheatSheet());
-      try { speak("Those are the six tabs in the top bar — Fleet Triage, Inverters, Analysis, Invoices, Resources, and Master Account."); } catch (e) {}
+      try { speak("Those are the six tabs in the top bar — Fleet Triage, Inverters, Analysis, Invoices, Resources, and Account."); } catch (e) {}
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
     }
@@ -1348,7 +1348,7 @@
     "#analysis": "Analysis",
     "#reports": "Invoices",
     "#resources": "Resources",
-    "#account": "Master Account",
+    "#account": "Account",
   };
   function tabLabel(hash) {
     var h = String(hash || "").toLowerCase();
@@ -1493,11 +1493,11 @@
       return [
         {
           hash: "#account",
-          say: "Master Account. I'll walk top to bottom — profile first, then auto-refresh, billing, and files.",
+          say: "Account. I'll walk top to bottom — profile first, then auto-refresh, billing, and files.",
         },
         {
           selector: "#tabAccount, a.tab[href='#account']",
-          say: "You're on the **Master Account** tab in the top bar.",
+          say: "You're on the **Account** tab in the top bar.",
         },
         {
           selector: ".acct-edit[data-field='company'], .acct-row[data-field='company']",
@@ -1524,7 +1524,7 @@
           say: "**Your files** — templates, workbooks, and captured utility PDFs.",
         },
         {
-          say: "That's Master Account, top to bottom. Ask about any section, or say Improve to change the UI.",
+          say: "That's Account, top to bottom. Ask about any section, or say Improve to change the UI.",
         },
       ];
     }

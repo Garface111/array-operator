@@ -860,7 +860,7 @@ function renderCheckoutReturn(session){
     const fallbackPoll = () => pollAccount(
       a => a.has_payment_method === true, 6, 2000,
       () => show("success", cardSavedCopy(null)),
-      () => show("success", "<b>Your card was saved with Stripe.</b> It can take a minute to appear here — check Master Account shortly."));
+      () => show("success", "<b>Your card was saved with Stripe.</b> It can take a minute to appear here — check Account shortly."));
     if(ret.sessionId){
       fetch("/v1/account/confirm-setup", { method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
@@ -1415,7 +1415,7 @@ function renderFromSession(){
         who.style.display = "";
         whoEmail.textContent = email;
         whoEmail.dataset.real = "1";
-        who.title = "Signed in as " + email + " — view your master account";
+        who.title = "Signed in as " + email + " — view your account";
       } else if(!whoEmail || whoEmail.dataset.real !== "1"){
         // Only hide if we never successfully painted an email this session.
         who.style.display = "none";
@@ -1449,7 +1449,7 @@ function renderFromSession(){
             // Master Account / loadEntitlement may still fill the real email.
             if(whoEmail && whoEmail.dataset.real !== "1"){
               whoEmail.textContent = "Account";
-              who.title = "Signed in — open Master Account";
+              who.title = "Signed in — open Account";
             }
           });
       } else {

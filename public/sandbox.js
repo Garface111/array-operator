@@ -4219,7 +4219,7 @@
         const _isCloud = (() => { try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch(e){ return false; } })();
         const cloudUtil = utilityOnly && _isCloud;
         const _lede = cloudUtil
-          ? `You're on <b>Cloud Capture</b> — we sign in and refresh your utility bills around the clock on our servers, no browser helper needed. Add your utility login in <b>Master Account</b> and we pull the bills in automatically.`
+          ? `You're on <b>Cloud Capture</b> — we sign in and refresh your utility bills around the clock on our servers, no browser helper needed. Add your utility login in <b>Account</b> and we pull the bills in automatically.`
           : utilityOnly
           ? (EXT_PRESENT
               ? `Connect the utility whose bills you invoice your offtakers against — we pull the bills in automatically. Pick yours below (any of <span id="sbUtilCount">hundreds of</span> supported utilities).`
@@ -4229,7 +4229,7 @@
               : "Connect the easy way — add the free EnergyAgent helper, then log into the monitoring site you already use and your inverters come in on their own.");
         const extBlock = cloudUtil
           ? `<p class="sb-modal-lede">${_lede}</p>
-             <button type="button" class="sb-mbtn primary" id="sbCloudLink">Add a utility login in Master Account →</button>`
+             <button type="button" class="sb-mbtn primary" id="sbCloudLink">Add a utility login in Account →</button>`
           : EXT_PRESENT
           ? `<p class="sb-modal-lede">${_lede}</p>
              ${loginSections}`
@@ -4520,7 +4520,7 @@
     for(const k of keys){ if(obj[k]!=null && obj[k]!=="") return obj[k]; }
     return dflt;
   }
-  function signInPrompt(){ return `<div class="empty">Sign in to manage your master account. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; }
+  function signInPrompt(){ return `<div class="empty">Sign in to manage your account. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; }
   function sessionExpired(){ return `<div class="empty">Your session expired — <a href="onboarding.html" style="color:var(--good)">sign in again →</a></div>`; }
 
   /* ---- horizontal-row builders for the flat "all business" account list ---- */
@@ -7191,7 +7191,7 @@
       <div class="ao-modal ao-plan" role="dialog" aria-modal="true" aria-label="Choose your plan">
         <div class="ao-plan-h">
           <h2>${opts.change ? "Change your plan" : "Welcome — what would you like to use?"}</h2>
-          <p>Pick what you need. You can change or upgrade anytime in Master Account.</p>
+          <p>Pick what you need. You can change or upgrade anytime in Account.</p>
         </div>
         <div class="ao-plan-cards">
           ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","from $20 per offtaker / mo")}

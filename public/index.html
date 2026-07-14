@@ -255,15 +255,15 @@ document.documentElement.setAttribute("data-theme","day");
          from resources.html at runtime (still a standalone page for external/deep links). -->
     <a class="tab" id="tabResources" href="#resources" role="tab"
        title="Vermont net-metering rates, active rate cases, and regulatory news — kept current.">Resources</a>
-    <!-- Master Account moved to the right of Resources (Ford 2026-07-13). -->
-    <a class="tab" id="tabAccount" href="#account" role="tab">Master Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
+    <!-- Account tab (was "Master Account"; shortened 2026-07-13). -->
+    <a class="tab" id="tabAccount" href="#account" role="tab">Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
     <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
     <a class="tab" id="tabSignIn" href="/login" style="margin-left:auto;display:none">Sign in →</a>
     <!-- Signed-in identity chip — which account am I in. Top-right, next to the
          Reports tab. Email filled from /v1/account; shown only when authed
          (toggled by renderFromSession in app.js). Click → Master Account. -->
     <a class="tab tab-whoami" id="tabWhoami" href="#account" role="tab"
-       title="You're signed in — view your master account" style="display:none">
+       title="You're signed in — view your account" style="display:none">
       <span class="whoami-dot" aria-hidden="true"></span>
       <span class="whoami-email" id="whoamiEmail">…</span>
     </a>
@@ -347,7 +347,7 @@ document.documentElement.setAttribute("data-theme","day");
     </div>
   </section>
 
-  <section class="panel" id="panelAccount" role="tabpanel" aria-label="Master Account">
+  <section class="panel" id="panelAccount" role="tabpanel" aria-label="Account">
     <div class="acct-list" id="acctList"><div class="empty">Loading your account…</div></div>
   </section>
 
