@@ -109,6 +109,9 @@
     mode: "modal", // "modal" | "dock"
     idx: 0,
     live: {},
+    _probeTimer: null,
+    _fleetSub: false,
+    _bootTried: false,
   };
 
   function session() {
@@ -148,29 +151,27 @@
     } catch (e) {}
   }
 
+  function queryWantsTour() {
+    var q = location.search || "";
+    return (
+      /[?&]tour=hands-off(&|$)/.test(q) ||
+      /[?&]fresh=1(&|$)/.test(q) ||
+      /[?&]setup=autorefresh(&|$)/.test(q)
+    );
+  }
+
   function shouldAutoOpen() {
+    // Explicit tour= link always opens (even if they finished before)
+    if (/[?&]tour=hands-off(&|$)/.test(location.search || "")) return true;
     if (!session()) return false;
     if (isTourComplete()) return false;
-    var q = location.search || "";
-    if (/[?&]tour=hands-off(&|$)/.test(q)) return true;
-    if (/[?&]fresh=1(&|$)/.test(q)) return true;
-    if (/[?&]setup=autorefresh(&|$)/.test(q)) return true;
-    return false;
+    return queryWantsTour();
   }
 
   function scrubTourParams() {
     try {
       var u = new URL(location.href);
       var changed = false;
-      ["tour", "fresh", "setup"].forEach(function (k) {
-        if (u.searchParams.has(k)) {
-          // keep setup=autorefresh intent by opening AR when we land — still scrub fresh/tour noise
-          if (k === "setup" && u.searchParams.get(k) === "autorefresh") return;
-          u.searchParams.delete(k);
-          changed = true;
-        }
-      });
-      // Always drop fresh=1 after we've consumed it
       if (u.searchParams.has("fresh")) {
         u.searchParams.delete("fresh");
         changed = true;
@@ -179,6 +180,7 @@
         u.searchParams.delete("tour");
         changed = true;
       }
+      // keep setup=autorefresh for AR open intent
       if (changed) {
         history.replaceState(null, "", u.pathname + (u.search ? u.search : "") + u.hash);
       }
@@ -423,14 +425,8 @@
     } catch (e) {}
   }
 
-  function render() {
-    var root = ensureRoot();
-    var step = STEPS[state.idx] || STEPS[0];
-    var live = state.live || {};
-    var pct = progressPct(live);
-    var mode = state.mode === "dock" ? "dock" : "modal";
-
-    var rail = STEPS.map(function (s, i) {
+  function buildStepsHtml(live) {
+    return STEPS.map(function (s, i) {
       var done = stepComplete(s, live) || (s.id === "done" && requiredRemaining(live) === 0);
       var active = i === state.idx;
       var num = s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(i);
@@ -452,14 +448,69 @@
         "</div></span></button>"
       );
     }).join("");
+  }
 
-    var body = renderBody(step, live);
+  function scoreLine(live) {
+    var left = requiredRemaining(live);
+    return left === 0
+      ? "Core feeds look good"
+      : left + " required step" + (left === 1 ? "" : "s") + " left";
+  }
+
+  /** Soft update: progress + step states + body — no full remount, no re-animation. */
+  function softUpdate() {
+    if (!state.open) {
+      updatePill();
+      return;
+    }
+    var root = document.getElementById("hoTour");
+    if (!root) return;
+    var live = state.live || {};
+    var pct = progressPct(live);
+    var ring = root.querySelector(".ho-ring");
+    var ringStrong = root.querySelector(".ho-ring strong");
+    var scoreSpan = root.querySelector(".ho-score-copy span");
+    if (ring) ring.style.setProperty("--p", String(pct));
+    if (ringStrong) ringStrong.textContent = pct + "%";
+    if (scoreSpan) scoreSpan.textContent = scoreLine(live);
+    var stepsHost = root.querySelector(".ho-steps");
+    if (stepsHost) {
+      stepsHost.innerHTML = buildStepsHtml(live);
+      stepsHost.querySelectorAll("[data-idx]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
+          hardRender({ animate: false });
+        });
+      });
+    }
+    var main = root.querySelector(".ho-main");
+    if (main) {
+      var step = STEPS[state.idx] || STEPS[0];
+      main.innerHTML =
+        '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
+        renderBody(step, live);
+      wireActions(main);
+    }
+    updatePill();
+  }
+
+  function hardRender(opts) {
+    opts = opts || {};
+    var animate = !!opts.animate;
+    var root = ensureRoot();
+    var step = STEPS[state.idx] || STEPS[0];
+    var live = state.live || {};
+    var pct = progressPct(live);
+    var mode = state.mode === "dock" ? "dock" : "modal";
     var foot =
       mode === "dock"
         ? "Use the site while this stays open — checklist updates live."
         : "Takes ~5 minutes. Close anytime — resume from the pill bottom-left.";
 
-    root.className = "ho-mode-" + mode + (state.open ? " ho-open" : "");
+    var firstOpen = !state.open;
+    var doAnim = animate && firstOpen;
+    root.className =
+      "ho-mode-" + mode + (firstOpen ? "" : " ho-open") + (doAnim ? " ho-anim" : "");
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
     root.innerHTML =
       '<div class="ho-backdrop" data-ho="backdrop"></div>' +
@@ -474,13 +525,11 @@
       pct +
       "%</strong></div>" +
       '<div class="ho-score-copy"><b>Hands-off readiness</b><span>' +
-      (requiredRemaining(live) === 0
-        ? "Core feeds look good"
-        : requiredRemaining(live) + " required step" + (requiredRemaining(live) === 1 ? "" : "s") + " left") +
+      esc(scoreLine(live)) +
       "</span></div>" +
       "</div>" +
       '<div class="ho-steps" role="tablist">' +
-      rail +
+      buildStepsHtml(live) +
       "</div>" +
       '<div class="ho-rail-foot">' +
       foot +
@@ -488,17 +537,26 @@
       "</aside>" +
       '<section class="ho-main">' +
       '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
-      body +
+      renderBody(step, live) +
       "</section></div>";
 
     root.hidden = false;
-    requestAnimationFrame(function () {
-      root.classList.add("ho-open");
-    });
     state.open = true;
     setShellOpen(mode === "dock");
     updatePill();
     wire(root);
+
+    if (doAnim) {
+      requestAnimationFrame(function () {
+        root.classList.add("ho-open");
+        setTimeout(function () {
+          root.classList.remove("ho-anim");
+        }, 420);
+      });
+    } else {
+      root.classList.add("ho-open");
+      root.classList.remove("ho-anim");
+    }
   }
 
   function statusChips(step, live) {
@@ -729,14 +787,10 @@
     if (pill) pill.classList.remove("ho-pill-show");
   }
 
-  function wire(root) {
-    root.querySelectorAll("[data-idx]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
-        render();
-      });
-    });
-    root.querySelectorAll("[data-ho]").forEach(function (btn) {
+  function wireActions(scope) {
+    (scope || document).querySelectorAll("[data-ho]").forEach(function (btn) {
+      if (btn._hoWired) return;
+      btn._hoWired = true;
       btn.addEventListener("click", function () {
         var act = btn.getAttribute("data-ho");
         if (act === "close" || act === "minimize") {
@@ -744,7 +798,6 @@
           return;
         }
         if (act === "backdrop") {
-          // Modal only: click outside minimizes to pill
           if (state.mode === "modal") minimizeTour();
           return;
         }
@@ -754,44 +807,71 @@
         }
         if (act === "next") {
           if (state.idx < STEPS.length - 1) state.idx++;
-          render();
+          hardRender({ animate: false });
           return;
         }
         if (act === "back") {
           if (state.idx > 0) state.idx--;
-          render();
+          hardRender({ animate: false });
           return;
         }
         if (act === "cta") {
           var hash = btn.getAttribute("data-hash");
           var ar = btn.getAttribute("data-ar") === "1";
-          // Jump into the site; if modal, switch to dock so they can work + checklist
           if (state.mode === "modal") {
             markModalSeen();
             state.mode = "dock";
-            render();
+            hardRender({ animate: true });
           }
           goHash(hash, ar);
           if (state.idx < STEPS.length - 1) {
             setTimeout(function () {
               state.idx++;
-              probeLive().then(render);
-            }, 400);
+              probeLive().then(function () {
+                hardRender({ animate: false });
+              });
+            }, 350);
           } else {
-            probeLive().then(function () {
-              if (state.open) render();
-              updatePill();
-            });
+            scheduleSoftProbe();
           }
         }
       });
     });
   }
 
+  function wire(root) {
+    root.querySelectorAll("[data-idx]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
+        hardRender({ animate: false });
+      });
+    });
+    wireActions(root);
+  }
+
+  function scheduleSoftProbe() {
+    if (state._probeTimer) clearTimeout(state._probeTimer);
+    state._probeTimer = setTimeout(function () {
+      state._probeTimer = null;
+      if (!session()) return;
+      probeLive().then(function () {
+        if (state.open) softUpdate();
+        else updatePill();
+      });
+    }, 1200);
+  }
+
   async function openTour(opts) {
     opts = opts || {};
-    if (!session() && !opts.force) return;
-    // Prefer dock after first modal; force mode if requested
+    // force: true bypasses complete flag (deep links / replay)
+    if (!session()) {
+      if (!opts.force && !queryWantsTour()) return;
+      // wait briefly for session shim
+      await new Promise(function (r) {
+        setTimeout(r, 400);
+      });
+      if (!session() && !opts.force) return;
+    }
     if (opts.mode === "modal" || opts.mode === "dock") {
       state.mode = opts.mode;
     } else if (modalAlreadySeen()) {
@@ -800,58 +880,71 @@
       state.mode = "modal";
     }
     if (opts.step != null) state.idx = opts.step;
-    else if (!state.open) state.idx = state.idx || 0;
+    else if (!state.open) state.idx = 0;
+
+    var firstPaint = !state.open;
     ensureRoot();
     ensurePill();
     await probeLive();
-    render();
-    setTimeout(function () {
-      if (!state.open) return;
-      probeLive().then(function () {
-        if (state.open) render();
-        else updatePill();
-      });
-    }, 1600);
+    hardRender({ animate: firstPaint });
+    scheduleSoftProbe();
+  }
+
+  function tryAutoOpen(attempt) {
+    attempt = attempt || 0;
+    if (!shouldAutoOpen()) {
+      // still show pill if signed in and incomplete
+      if (session() && !isTourComplete()) probeLive().then(updatePill);
+      return;
+    }
+    if (!session()) {
+      if (attempt < 12) {
+        setTimeout(function () {
+          tryAutoOpen(attempt + 1);
+        }, 350);
+      }
+      return;
+    }
+    scrubTourParams();
+    // Explicit tour= always opens; prefer modal first time, dock after
+    var forceModal = /[?&]tour=hands-off(&|$)/.test(location.search || "") || !modalAlreadySeen();
+    // After scrub, search is gone — use whether modal was seen
+    openTour({
+      force: true,
+      mode: modalAlreadySeen() ? "dock" : "modal",
+    });
   }
 
   function boot() {
     window.__aoHandsOffTour = function (opts) {
       opts = opts || { force: true };
-      // Replays default to dock (always available), unless first-time force modal
       if (!opts.mode) opts.mode = modalAlreadySeen() ? "dock" : "modal";
       openTour(opts);
     };
     window.__aoHandsOffTourProbe = probeLive;
     window.__aoHandsOffTourMinimize = minimizeTour;
 
-    // Always show resume pill for signed-in incomplete accounts
+    // Pill for incomplete signed-in accounts
     setTimeout(function () {
       if (!session() || isTourComplete()) return;
       probeLive().then(updatePill);
-    }, 900);
+    }, 800);
 
-    // Re-probe pill when fleet loads
+    // Soft-refresh only (no full remount / re-animation) when fleet data lands
     try {
-      if (window.FleetStore && FleetStore.subscribe) {
+      if (window.FleetStore && FleetStore.subscribe && !state._fleetSub) {
+        state._fleetSub = true;
         FleetStore.subscribe(function () {
-          if (!session() || isTourComplete()) return;
-          probeLive().then(function () {
-            if (state.open) render();
-            else updatePill();
-          });
+          if (!session()) return;
+          scheduleSoftProbe();
         });
       }
     } catch (e) {}
 
-    if (!shouldAutoOpen()) return;
+    // Auto-open with session retries (session-tabscope can land after first paint)
     setTimeout(function () {
-      if (!session()) return;
-      scrubTourParams();
-      // First land: big modal; later auto-opens stay dock if already seen
-      openTour({
-        mode: modalAlreadySeen() ? "dock" : "modal",
-      });
-    }, 700);
+      tryAutoOpen(0);
+    }, 500);
   }
 
   if (document.readyState === "loading") {
