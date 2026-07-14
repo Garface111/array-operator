@@ -1752,9 +1752,16 @@
       if (turnGen !== (state._turnAbortGen || 0)) return;
       if (!r.ok) {
         var err = (d && (d.detail || d.error)) || ("HTTP " + r.status);
-        addMsg("agent", String(err));
+        if (r.status === 402 || /budget|allowance|weekly/i.test(String(err))) {
+          var eb = d && d.budget ? d.budget : (d && d.detail && d.detail.budget);
+          if (eb) setBudget(Object.assign({}, eb, { ok: false, pct_used: 100 }));
+          else refreshBudget().then(function (rb) {
+            if (rb) setBudget(Object.assign({}, rb, { ok: false, pct_used: 100 }));
+          });
+        }
+        addMsg("agent", typeof err === "string" ? err : (err && err.error) || JSON.stringify(err));
         clearTools();
-        setStatus("Error", "warn");
+        setStatus(r.status === 402 ? "Weekly limit reached" : "Error", "warn");
         return;
       }
       setBudget(d.budget);
