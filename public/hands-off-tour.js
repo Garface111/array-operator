@@ -452,20 +452,17 @@
         if (e && e.preventDefault) e.preventDefault();
         if (e && e.stopPropagation) e.stopPropagation();
       } catch (err) {}
-      // Always force open; prefer dock after first view so it sits like a side panel
-      openTour({
-        force: true,
-        mode: modalAlreadySeen() || isTourComplete() ? "dock" : "modal",
-      }).catch(function (err) {
+      // Synchronous paint — never wait on network for the shell to appear
+      try {
+        openTourInstant({
+          force: true,
+          mode: modalAlreadySeen() || isTourComplete() ? "dock" : "modal",
+        });
+      } catch (err) {
         try {
-          console.error("[hands-off] openTour failed", err);
+          console.error("[hands-off] open failed", err);
         } catch (e2) {}
-        // Last-ditch: paint shell even if probe/render path threw earlier
-        try {
-          state.open = false;
-          hardRender({ animate: true });
-        } catch (e3) {}
-      });
+      }
     });
     return pill;
   }
@@ -637,12 +634,8 @@
     var step = STEPS[state.idx] || STEPS[0];
     var live = state.live || {};
     var mode = state.mode === "dock" ? "dock" : "modal";
-    var firstOpen = !state.open;
-    var doAnim = animate && firstOpen;
-    // Always paint with ho-open so the panel is visible immediately (rAF-only
-    // open left a frame where click appeared to do nothing).
-    root.className =
-      "ho-mode-" + mode + " ho-open" + (doAnim ? " ho-anim" : "");
+    // Instant show — no entrance animation (Ford: load instantly on Setup click)
+    root.className = "ho-mode-" + mode + " ho-open";
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
     // Clean header: brand + close only (100% ring removed — cramped next to ×,
     // readiness already reads in the subtitle + step pills; Ford 2026-07-14).
@@ -666,19 +659,14 @@
 
     root.hidden = false;
     try {
-      root.style.display = "";
-      root.style.opacity = "";
+      root.style.display = "flex";
+      root.style.opacity = "1";
+      root.style.pointerEvents = "auto";
     } catch (e) {}
     state.open = true;
     setShellOpen(mode === "dock");
     updatePill();
     wire(root);
-
-    if (doAnim) {
-      setTimeout(function () {
-        root.classList.remove("ho-anim");
-      }, 420);
-    }
   }
 
   function statusChips(step, live) {
@@ -1642,17 +1630,14 @@
     }, 1200);
   }
 
-  async function openTour(opts) {
+  /**
+   * Instant open — ZERO network awaits before paint.
+   * Status chips refresh in the background once probeLive finishes.
+   */
+  function openTourInstant(opts) {
     opts = opts || {};
-    // force: true bypasses complete flag (deep links / replay)
-    if (!session()) {
-      if (!opts.force && !queryWantsTour()) return;
-      // wait briefly for session shim
-      await new Promise(function (r) {
-        setTimeout(r, 400);
-      });
-      if (!session() && !opts.force) return;
-    }
+    if (!session() && !opts.force && !queryWantsTour()) return;
+
     if (opts.mode === "modal" || opts.mode === "dock") {
       state.mode = opts.mode;
     } else if (modalAlreadySeen()) {
@@ -1660,9 +1645,10 @@
     } else {
       state.mode = "modal";
     }
-    if (opts.step != null) state.idx = opts.step;
-    else if (!state.open) {
-      // Resume Online pay after Stripe Connect return
+
+    if (opts.step != null) {
+      state.idx = opts.step;
+    } else if (!state.open) {
       var resumeIdx = null;
       try {
         var resumeId = sessionStorage.getItem("ao_ho_resume_step");
@@ -1684,8 +1670,6 @@
           }
         }
       }
-      // Always start at Welcome when replaying from the FAB (force open while
-      // already complete) so the panel never opens on a blank mid-step shell.
       if (opts.force && isTourComplete() && resumeIdx == null && !queryConnectReturn()) {
         state.idx = 0;
       } else {
@@ -1693,37 +1677,22 @@
       }
     }
 
-    var firstPaint = !state.open;
     ensureRoot();
     ensurePill();
+    // No entrance animation — instant show
+    hardRender({ animate: false });
 
-    // CRITICAL: paint the shell FIRST. Waiting on probeLive() before hardRender
-    // made the Setup pill look dead whenever /v1/* was slow (Ford 2026-07-14).
-    try {
-      hardRender({ animate: firstPaint });
-    } catch (err) {
-      try {
-        console.error("[hands-off] hardRender failed", err);
-      } catch (e) {}
-      throw err;
-    }
-
-    // Refresh live status in the background; soft-update when ready
-    try {
-      await Promise.race([
-        probeLive(),
-        new Promise(function (resolve) {
-          setTimeout(resolve, 2500);
-        }),
-      ]);
-      if (state.open) softUpdate();
-    } catch (e) {
-      try {
-        console.warn("[hands-off] probeLive", e);
-      } catch (e2) {}
+    // Background status only — never blocks the shell
+    if (session()) {
+      probeLive()
+        .then(function () {
+          if (state.open) softUpdate();
+          else updatePill();
+        })
+        .catch(function () {});
     }
     scheduleSoftProbe();
-    // After Connect return, poll a few times — charges_enabled can lag webhooks
+
     if (opts.pollConnect || queryConnectReturn()) {
       var polls = 0;
       var pollT = setInterval(function () {
@@ -1736,6 +1705,18 @@
         if (polls >= 10) clearInterval(pollT);
       }, 2500);
     }
+  }
+
+  /** Async wrapper kept for callers that still await openTour (auto-open, deep links). */
+  async function openTour(opts) {
+    opts = opts || {};
+    // Only wait for session when we truly have none yet (onboarding hand-off)
+    if (!session() && (opts.force || queryWantsTour())) {
+      await new Promise(function (r) {
+        setTimeout(r, 200);
+      });
+    }
+    openTourInstant(opts);
   }
 
   function tryAutoOpen(attempt) {

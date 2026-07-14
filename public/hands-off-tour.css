@@ -100,7 +100,8 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
   color:var(--ho-ink);
   pointer-events:none;
   opacity:0;
-  transition:opacity .28s ease;
+  /* No fade — instant open (Ford 2026-07-14) */
+  transition:none;
 }
 #hoTour.ho-open{ pointer-events:auto; opacity:1; }
 #hoTour[hidden]{ display:none !important; }
@@ -108,7 +109,7 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
 .ho-backdrop{
   position:absolute; inset:0;
   background:rgba(10,18,32,.38);
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  /* Skip backdrop blur — expensive and made open feel laggy */
 }
 #hoTour.ho-mode-dock{
   align-items:stretch; justify-content:flex-start;
@@ -142,33 +143,18 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
   width:min(440px, 100%);
   max-height:min(920px, calc(100vh - 32px));
   overflow:auto;
-  background:var(--ho-glass);
-  border:1px solid rgba(255,255,255,.55);
+  /* Solid card — no glass blur (blur was lagging first paint) */
+  background:#fff;
+  border:1px solid rgba(20,60,120,.12);
   border-radius:var(--ho-r);
   box-shadow:
     0 28px 80px -28px rgba(15,40,80,.45),
     0 0 0 1px rgba(255,255,255,.4) inset;
-  backdrop-filter:blur(22px) saturate(1.2);
-  -webkit-backdrop-filter:blur(22px) saturate(1.2);
   display:flex; flex-direction:column;
-}
-#hoTour.ho-anim .ho-sheet{
-  animation:hoSheetIn .4s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes hoSheetIn{
-  from{ opacity:0; transform:translateY(16px) scale(.98) }
-  to{ opacity:1; transform:none }
-}
-#hoTour.ho-mode-dock.ho-anim .ho-sheet{
-  animation:hoDockIn .36s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes hoDockIn{
-  from{ opacity:0; transform:translateX(-18px) }
-  to{ opacity:1; transform:none }
 }
 
 html.sky #hoTour.ho-mode-dock .ho-sheet{
-  background:rgba(255,255,255,.86);
+  background:#fff;
 }
 
 /* header */
@@ -394,10 +380,10 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 .ho-done-item.is-on{ border-color:rgba(23,138,78,.3); background:var(--ho-green-soft) }
 .ho-done-item b{ display:block; font-size:11px; color:var(--ho-muted); font-weight:700; margin-bottom:2px }
 
-/* body.ho-shell-open — shift main wrap for dock mode */
+/* body.ho-shell-open — shift main wrap for dock mode (no slow slide) */
 body.ho-shell-open .wrap{
   margin-left:var(--ho-rail);
-  transition:margin-left .28s cubic-bezier(.16,1,.3,1);
+  transition:none;
 }
 @media(max-width:900px){
   body.ho-shell-open .wrap{ margin-left:0 }
