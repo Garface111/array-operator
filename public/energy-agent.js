@@ -939,6 +939,12 @@
   async function toggle() {
     ensureUi();
     if (!state.open) {
+      // Text-only mode (muted): open panel, no mic / no GPT voice — saves credits.
+      if (signedIn() && state.voiceMuted) {
+        await setOpen(true);
+        setStatus("Text only — voice off", "on");
+        return;
+      }
       // First click on the sun: request mic IMMEDIATELY (user gesture), then open.
       // Do not await session/network before getUserMedia — that can drop the gesture
       // in some browsers and skip the permission dialog.
@@ -965,8 +971,8 @@
           return;
         }
         await setOpen(true);
-        // startVoice uses the stream we already have
-        if (micOk && !state.listening) {
+        // startVoice uses the stream we already have (skipped when muted)
+        if (micOk && !state.listening && !state.voiceMuted) {
           try { await startVoice(true); } catch (e) {}
         }
       } else {
@@ -1001,9 +1007,11 @@
     if (state.open) {
       await ensureSession();
       // Voice usually already starting from toggle(); only start here if mic ready
-      // and we aren't listening yet (e.g. re-open after close).
-      if (signedIn() && !state.listening && state.micStream) {
+      // and we aren't listening yet (e.g. re-open after close). Never when muted.
+      if (signedIn() && !state.voiceMuted && !state.listening && state.micStream) {
         try { await startVoice(true); } catch (e) {}
+      } else if (state.voiceMuted) {
+        setStatus("Text only — voice off", "on");
       }
     } else {
       // Full teardown on panel close only (kills GPT voice pipe)
@@ -1751,8 +1759,8 @@
     if (ic) ic.textContent = muted ? "🔇" : "🔊";
     if (lbl) lbl.textContent = muted ? "Muted" : "Mute";
     b.title = muted
-      ? "Agent voice is off — click to unmute (chat text still works)"
-      : "Mute agent voice (keep text replies)";
+      ? "Text only — GPT voice fully off (no credit burn). Click to turn voice back on."
+      : "Turn off GPT voice — text chat only, saves credits";
   }
 
   /** Soft-mute Realtime <audio> element without tearing down the WebRTC pipe. */
@@ -1766,32 +1774,47 @@
   }
 
   /**
-   * Mute / unmute agent voice (speaker). Does NOT touch the mic.
-   * Text chat + tools keep working; tours skip spoken steps when muted.
+   * Mute = TEXT ONLY. Tear down GPT Realtime entirely so we don't burn OpenAI
+   * credits on a silent voice pipe (mic VAD / transcription / session).
+   * Unmute reconnects voice if the panel is open.
    */
   function setVoiceMuted(muted) {
     state.voiceMuted = !!muted;
     try { localStorage.setItem("ea_voice_muted", state.voiceMuted ? "1" : "0"); } catch (e) {}
-    applyVoiceMuteToAudio();
     if (state.voiceMuted) {
-      // Kill anything currently playing
+      // Full teardown of Realtime + browser TTS — not soft mute on the <audio> tag
       try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
       try { cancelRealtimeIfActive(); } catch (e) {}
       state.speaking = false;
       state.rtResponseActive = false;
-      state._speakSeq++; // abandon queued speak promises
+      state._speakSeq++;
       if (typeof state._onSpeakDone === "function") {
         try { state._onSpeakDone(); } catch (e) {}
-      } else {
-        holdMicWhileSpeaking(false);
       }
+      // Drop WebRTC / Realtime session completely (credits stop here)
+      try { stopVoice(false); } catch (e) {}
+      state.realtimeReady = false;
       if (state.open && !state.touring) {
-        setStatus(state.listening ? "Listening (voice muted)" : "Voice muted", state.listening ? "listen" : "on");
+        setStatus("Text only — voice off", "on");
       }
-    } else if (state.open && !state.touring) {
-      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+    } else {
+      applyVoiceMuteToAudio();
+      if (state.open && signedIn() && !state.touring) {
+        setStatus("Connecting voice…", "think");
+        // Fire-and-forget reconnect
+        startVoice(true).then(function () {
+          if (!state.voiceMuted && state.open) {
+            setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+          }
+        }).catch(function () {
+          if (!state.voiceMuted && state.open) setStatus("Ready", "on");
+        });
+      } else if (state.open && !state.touring) {
+        setStatus("Ready", "on");
+      }
     }
     syncMuteBtn();
+    syncMicBtn();
   }
 
   function isVoiceMuted() { return !!state.voiceMuted; }
@@ -2357,6 +2380,9 @@
 
   /** Primary: GPT Realtime over WebRTC via our server (unified /realtime-call). */
   async function startRealtimeVoice() {
+    if (state.voiceMuted) {
+      throw new Error("voice_muted");
+    }
     // Already connected — just re-enable the mic (don't renegotiate / double-greet)
     if (realtimeMouthOpen() && state.pc) {
       try { state.micStream && state.micStream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
@@ -2431,14 +2457,19 @@
         },
       });
       // Single greeting per panel open — text intro already exists from ensureSession
-      if (!state.greeted) {
+      if (!state.greeted && !state.voiceMuted) {
         state.greeted = true;
         enqueueSpeak(
           "Hi — Energy Agent here. I'm listening whenever you're ready.",
           { source: "greeting", force: true }
         );
       }
-      setStatus("Listening…", "listen");
+      if (state.voiceMuted) {
+        // Shouldn't happen (startRealtimeVoice guards) — leave text-only
+        setStatus("Text only — voice off", "on");
+      } else {
+        setStatus("Listening…", "listen");
+      }
     });
 
     var offer = await pc.createOffer();
@@ -2471,6 +2502,10 @@
 
   /** Fallback when OpenAI key missing or WebRTC fails: Web Speech + browser TTS */
   function startWebSpeechFallback(fromOpen) {
+    if (state.voiceMuted) {
+      setStatus("Text only — voice off", "on");
+      return;
+    }
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       if (!fromOpen) {
@@ -2535,6 +2570,12 @@
       addMsg("agent", "Sign in first.");
       return;
     }
+    // Muted = text only — never open Realtime / burn voice credits
+    if (state.voiceMuted) {
+      setStatus("Text only — voice off", "on");
+      syncMicBtn();
+      return;
+    }
     try {
       // Always request mic first (shows Chrome prompt if needed)
       await ensureMicStream();
@@ -2556,16 +2597,26 @@
       return;
     } catch (e) {
       var msg = String(e.message || e);
+      if (state.voiceMuted || /voice_muted/i.test(msg)) {
+        setStatus("Text only — voice off", "on");
+        return;
+      }
       if (/not configured|OPENAI_API_KEY|503/i.test(msg)) {
         addMsg("agent", "GPT voice isn’t configured yet (need OPENAI_API_KEY on Railway). Falling back to browser speech.");
       } else {
         addMsg("agent", "GPT voice connect failed: " + msg.slice(0, 180) + " — using browser fallback.");
       }
+      if (state.voiceMuted) return;
       startWebSpeechFallback(fromOpen);
     }
   }
 
   function toggleMic() {
+    if (state.voiceMuted) {
+      // Voice fully off — Live mic would only burn credits with nowhere to send audio
+      setStatus("Unmute first for voice · text still works", "on");
+      return;
+    }
     if (state.listening) {
       // Mute only — keep WebRTC data channel so GPT voice still speaks replies.
       // (Old path called stopVoice and fell back to robotic browser TTS.)
