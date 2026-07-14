@@ -2308,11 +2308,8 @@ html[data-theme="day"] .rep-fld.req > select{
    the fr ratio — identical on every row regardless of what it contains. The
    Vendor column keeps a small px floor (not 0) sized to its widest real button so
    that content still fits without wrapping/clipping. */
-/* Status col (7) min widened so [116px spark | UNDERPERFORMING pill] fits without
-   shoving graphs left of their column — graphs must share one vertical edge
-   across every inverter row (Ford 2026-07-14). */
-/* Status col min fits [116px spark | UNDERPERFORMING pill] without clipping the
-   pill background or shoving graphs (Ford 2026-07-14). */
+/* Status col min fits [116px spark | UNDERPERFORMING pill] — graphs stay aligned
+   and the orange fill never clips the label (Ford 2026-07-14). */
 .vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(268px,1.6fr) minmax(96px,.8fr);
   align-items:center; gap:12px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
