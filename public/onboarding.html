@@ -1330,7 +1330,7 @@ function cloudFinish(skipped){
   // so they actually land where credentials get added (Ford 2026-07-11). The
   // account/trial is already live (created at the email step). Finishing WITH
   // logins → the normal cloud done screen (arrays are already on the way).
-  if(skipped){ window.location.assign(`/?fresh=1&setup=autorefresh#account`); return; }
+  if(skipped){ window.location.assign(`/?fresh=1&tour=hands-off&setup=autorefresh#account`); return; }
   state.cloudMode = true;
   go(3);
   burst();
@@ -1780,7 +1780,7 @@ function doneScreen(){
   let cardCta;
   if(existing){
     // Returning user: link is already on its way. Give them a direct way in too.
-    cardCta = `<a class="btn btn-primary btn-lg" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard →</a>
+    cardCta = `<a class="btn btn-primary btn-lg" href="/?fresh=1&tour=hands-off" target="_blank" rel="noopener">Open dashboard →</a>
        <div class="helper" style="text-align:center">Open the link we just emailed you, or sign in from the dashboard.</div>`;
   } else if(!created){
     cardCta = `<button class="btn btn-primary btn-lg" onclick="finish()">Try again →</button>`;
@@ -1803,7 +1803,7 @@ function doneScreen(){
     ${refreshCallout}
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       ${cardCta}
-      ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1" target="_blank" rel="noopener">Open dashboard</a>` : ""}
+      ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1&tour=hands-off" target="_blank" rel="noopener">Open dashboard</a>` : ""}
     </div>
   </div></div>`;
 }
@@ -1813,7 +1813,7 @@ function doneScreen(){
 // read by app.js → live /v1/array-owners/overview. NOT /accounts (that proxies
 // to the NEPOOL verifier SPA — wrong product for an array owner).
 function goDashboard(){
-  window.location.assign(`/?fresh=1&t=${Date.now()}`);
+  window.location.assign(`/?fresh=1&tour=hands-off&t=${Date.now()}`);
 }
 
 // Create the trialing Array Operator account, then mint a session so we can
