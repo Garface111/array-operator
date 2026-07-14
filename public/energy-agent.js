@@ -1842,15 +1842,29 @@
       clearTools();
       // Operating mind: background plan started — same mind, quiet work
       if (d.mind) onMindPlanFromChat(d.mind);
-      // Run UI commands immediately (navigate has no confirm on server now)
       if (d.pending) showPending(d.pending);
       else showPending(null);
+
+      var reply = d.reply || "…";
+      // Voice: speak the OPENING clearly (never drop the lead-in). Full text in chat.
+      var speakText = (source || "") === "voice" ? shortVoiceReply(reply) : reply;
+      addMsg("agent", reply);
+      clearTools();
+
+      // SPEAK FIRST — don't wait on UI navigates/highlights (those delayed the mouth
+      // so Realtime often clipped the first half of the answer, Ford 2026-07-14).
+      var speakP = enqueueSpeak(speakText, { source: "chat" });
+
       var cmds = d.ui_commands || [];
       // Kill freehand multi-highlight "tours" from the LLM — replace with a real
       // preset for the named/current tab so we never box invented UI.
       cmds = coerceTourCommands(cmds, text);
       for (var i = 0; i < cmds.length; i++) {
         if (turnGen !== (state._turnAbortGen || 0)) return;
+        // Don't run a full tour while the mouth is still delivering this turn's answer
+        if (cmds[i] && cmds[i].type === "tour" && state.speaking) {
+          continue;
+        }
         await runCommand(cmds[i]);
       }
       // Also execute navigates that arrived as pending by mistake (legacy)
@@ -1859,18 +1873,7 @@
         showPending(null);
       }
       if (turnGen !== (state._turnAbortGen || 0)) return;
-      var reply = d.reply || "…";
-      // Voice: never monologue — cap spoken length; full text still in chat
-      var speakText = reply;
-      if ((source || "") === "voice") {
-        speakText = shortVoiceReply(reply);
-      }
-      // Answer first, then clear tool strip — free vertical space for the brief
-      addMsg("agent", reply);
-      clearTools();
-      // One mouth: queue GPT voice (or stay silent if mouth disconnected — never
-      // surprise the user with robotic browser TTS after they've used GPT voice).
-      await enqueueSpeak(speakText, { source: "chat" });
+      await speakP;
       if (turnGen !== (state._turnAbortGen || 0)) return;
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     } catch (e) {
@@ -1887,20 +1890,34 @@
     }
   }
 
-  /** First 1–2 short sentences for voice so we don't flood the mouth. */
+  /**
+   * Voice length cap — ALWAYS keep the opening (first 2–3 sentences).
+   * Never return a "middle/end only" slice; that made the mouth skip the lead-in.
+   */
   function shortVoiceReply(text) {
-    var plain = stripMd(String(text || "")).replace(/\s+/g, " ").trim();
+    var plain = stripMd(String(text || ""))
+      .replace(/\s+/g, " ")
+      .replace(/\s*[•\-]\s+/g, ". ")
+      .trim();
     if (!plain) return plain;
-    if (plain.length <= 220) return plain;
+    // Short enough — speak everything, including the first words
+    if (plain.length <= 420) return plain;
+    // Split on sentence enders; keep em-dash clauses attached to the lead sentence
     var parts = plain.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [plain];
     var out = "";
-    for (var i = 0; i < parts.length && i < 2; i++) {
-      var next = (out ? out + " " : "") + parts[i].trim();
-      if (next.length > 280 && out) break;
+    for (var i = 0; i < parts.length && i < 3; i++) {
+      var bit = (parts[i] || "").trim();
+      if (!bit) continue;
+      var next = out ? out + " " + bit : bit;
+      if (next.length > 480 && out) break;
       out = next;
-      if (out.length >= 160) break;
+      // Prefer at least ~2 sentences of lead-in before stopping early
+      if (out.length >= 280 && i >= 1) break;
     }
-    return out || plain.slice(0, 220);
+    // Always from the start of the reply — never slice from the middle
+    if (!out) out = plain.slice(0, 420);
+    if (out.length < plain.length && !/[.!?]$/.test(out)) out += ".";
+    return out;
   }
 
   /** Color / look / button styling — not data edits, not fleet. */
@@ -3054,7 +3071,8 @@
 
   /**
    * Guarded barge-in (GPT Live style):
-   * - Brief mic mute at TTS attack (~450ms) so the first syllable doesn't self-trigger.
+   * - Longer mic mute at TTS attack so the first phrase is fully audible
+   *   (450ms was too short — speaker bleed cancelled the lead-in, Ford 2026-07-14).
    * - Then re-open the mic so the user can interrupt with real speech.
    * - Transcripts still pass echo / garbage / length filters (see acceptUserTranscript).
    * Does NOT flip state.listening — user still shows as Live.
@@ -3080,6 +3098,7 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
+      // ~1.1s covers typical first phrase without feeling uninterruptible
       state._unmuteAfterSpeakTimer = setTimeout(function () {
         state._unmuteAfterSpeakTimer = null;
         state._micHeldForSpeak = false;
@@ -3093,7 +3112,7 @@
             state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
           } catch (e) {}
         }
-      }, 450);
+      }, 1100);
       return;
     }
     // Speech finished — ensure mic is open after a short settle (room reverb)
@@ -3191,18 +3210,19 @@
     ) {
       return false;
     }
-    // Mid-speech barge-in: require grace period + a bit more substance than idle turns
+    // Mid-speech barge-in: protect the first ~1.2s of TTS so speaker bleed
+    // doesn't cancel the opening words (user heard "second half only").
     if (isAgentMouthBusy() || state._micHeldForSpeak) {
       // Attack mute: still allow explicit STOP
       if (state._micHeldForSpeak && !isStopCommand(said)) return false;
       var started = state._speakStartedAt || 0;
-      if (started && now - started < 400 && !isStopCommand(said)) return false;
+      if (started && now - started < 1200 && !isStopCommand(said)) return false;
       var words = said.trim().split(/\s+/).filter(Boolean);
       var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|stop|wait|cancel|go|please|hey)$/i.test(
         said.trim().replace(/[.!?]+$/, "")
       );
       // Need a real interrupt phrase — single short noise words won't cut speech
-      if (!ack && words.length < 2 && said.trim().length < 10) return false;
+      if (!ack && words.length < 3 && said.trim().length < 14) return false;
     }
     return true;
   }
@@ -3493,29 +3513,32 @@
         prevDone();
       };
 
-      // Attack mute briefly, then reopen mic for barge-in (see holdMicWhileSpeaking)
+      // Attack mute, then reopen mic for barge-in (see holdMicWhileSpeaking)
       holdMicWhileSpeaking(true);
 
       // ── GPT Realtime mouth ────────────────────────────────────────────
       if (realtimeMouthOpen()) {
         try {
-          // Wait for prior response to finish instead of cancel-storm,
-          // unless barge-in already cleared rtResponseActive.
+          // Only cancel a *stale* prior response — never cancel the one we're about
+          // to start. A cancel race was clipping the first half of answers.
           if (state.rtResponseActive) {
             cancelRealtimeIfActive();
+            // Brief settle so cancel doesn't eat the next response.create
           }
           state.rtResponseActive = true;
           state.speaking = true;
           state._speakStartedAt = Date.now();
-          // Full chunk text (chunks are already ≤ ~900 chars) — no 1200 hard truncate
+          // Prefer verbatim read from the start — models sometimes "continue"
+          // mid-thought when instructions are loose.
+          var speakScript =
+            "Read the following aloud VERBATIM in natural English, starting from " +
+            "the FIRST word. Do not skip the opening. Do not summarize, reorder, " +
+            "or add greetings/questions. Speak the complete text:\n\n" +
+            plain;
           state.dc.send(JSON.stringify({
             type: "response.create",
             response: {
-              instructions:
-                "Speak the following to the user naturally, in English, no extra commentary. " +
-                "Do not add greeting or questions beyond the text. " +
-                "Speak the entire passage completely — do not stop early:\n\n" +
-                plain,
+              instructions: speakScript,
             },
           }));
           setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
