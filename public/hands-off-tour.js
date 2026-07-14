@@ -618,7 +618,6 @@
         // Optional completion callout — leave form untouched
       } else {
         main.innerHTML =
-          '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
           renderBody(step, live);
         wireActions(main);
         restoreLoginForm(main, formSnap);
@@ -647,9 +646,7 @@
       "<div><b>Hands-off setup</b><span>" +
       esc(scoreLine(live)) +
       "</span></div></div>" +
-      '<div class="ho-top-right">' +
-      '<button type="button" class="ho-close" data-ho="close" aria-label="Close setup">×</button>' +
-      "</div></header>" +
+      "</header>" +
       '<div class="ho-steps">' +
       buildStepsHtml(live) +
       "</div>" +
