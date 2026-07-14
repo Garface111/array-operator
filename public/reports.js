@@ -905,32 +905,92 @@
 
   // Show whether GMP utility bills are connected (and how many), with a direct
   // link to connect when none are present — answers "why is the dropdown empty?"
-  // ALSO answers "will this run by itself?": bills only refresh when the utility
-  // portal gets opened, so invoices are only AUTOMATIC once the operator saves
-  // their utility login in the extension vault (Account → Auto-refresh). We check
-  // the vault (via sandbox.js's shared __aoVaultStatus) for exactly the providers
-  // this tenant has connected, and nudge — or confirm — accordingly.
+  // ALSO answers "will this run by itself?":
+  //   • device mode → bills refresh when the extension vault has that utility login
+  //   • cloud mode  → bills refresh when Account → Auto-refresh has a server-side
+  //     credential for that provider (extension vault is irrelevant)
+  // Bug fixed 2026-07-14: cloud-mode owners still saw "Set up auto-refresh" because
+  // we only consulted __aoVaultStatus (device vault) and ignored cloud credentials.
   const _UTIL_LABEL = { gmp: "Green Mountain Power", vec: "Vermont Electric Co-op", wec: "Washington Electric Co-op" };
   const _utilLabel = (code) => _UTIL_LABEL[code] || String(code || "").replace(/^sh_/, "").toUpperCase();
-  async function utilityAutomationState(accts) {
-    // → {auto:true} all providers have saved logins; {auto:false, missing:[codes]}
-    //   some don't; null = can't know (no extension / vault unreachable / no accounts).
+  function _arModeIsCloud() {
+    try { return localStorage.getItem("ao_ar_mode") === "cloud"; } catch (e) { return false; }
+  }
+  async function _cloudProviderCoverage() {
+    // Set of provider codes that have an enabled cloud credential.
+    let status = null;
     try {
-      if (!accts.length || typeof window.__aoVaultStatus !== "function") return null;
-      const status = await window.__aoVaultStatus();
-      if (!status) return null;
+      if (typeof window.__aoCloudStatus === "function") {
+        const cs = await window.__aoCloudStatus();
+        if (cs && cs.ok !== false) status = cs;
+      }
+    } catch (e) { /* fall through to fetch */ }
+    if (!status) {
+      try {
+        const r = await fetch("/v1/cloud-capture/status", { headers: authHeaders() });
+        if (r.ok) status = await r.json();
+      } catch (e) { return null; }
+    }
+    if (!status) return null;
+    const covered = new Set();
+    (status.credentials || []).forEach((c) => {
+      if (c && c.enabled === false) return;
+      const p = String((c && c.provider) || "").toLowerCase();
+      if (p) covered.add(p);
+    });
+    return covered;
+  }
+  async function utilityAutomationState(accts) {
+    // → {auto:true, mode} all providers covered; {auto:false, missing, mode};
+    //   null = can't know (no accounts / both status paths unreachable).
+    // A provider is covered if EITHER cloud credentials OR the device vault has it —
+    // cloud-mode owners must not be nagged because the extension vault is empty.
+    try {
+      if (!accts.length) return null;
       const providers = [...new Set(accts.map(a => (a.provider || "gmp").toLowerCase()))];
-      const missing = providers.filter(p => !(status[p] && status[p].hasCreds));
-      return missing.length ? { auto: false, missing } : { auto: true };
+      const preferCloud = _arModeIsCloud();
+
+      const cloudCovered = await _cloudProviderCoverage(); // Set | null
+      let vaultStatus = null;
+      try {
+        if (typeof window.__aoVaultStatus === "function") {
+          vaultStatus = await window.__aoVaultStatus();
+        }
+      } catch (e) { vaultStatus = null; }
+
+      // Neither path available → unknown (don't flash a wrong nudge)
+      if (!cloudCovered && !vaultStatus) return null;
+
+      function vaultHas(p) {
+        if (!vaultStatus) return false;
+        if (vaultStatus[p] && vaultStatus[p].hasCreds) return true;
+        return Object.keys(vaultStatus).some((k) =>
+          (k === p || k.indexOf(p + "::") === 0) && vaultStatus[k] && vaultStatus[k].hasCreds
+        );
+      }
+      function cloudHas(p) {
+        return !!(cloudCovered && cloudCovered.has(p));
+      }
+
+      const missing = providers.filter((p) => !cloudHas(p) && !vaultHas(p));
+      // Prefer cloud messaging when mode is cloud OR only cloud covers everything
+      const anyCloud = providers.some(cloudHas);
+      const mode = preferCloud || (anyCloud && !providers.some(vaultHas)) ? "cloud" : "device";
+      return missing.length
+        ? { auto: false, missing, mode }
+        : { auto: true, mode };
     } catch (e) { return null; }
   }
-  function autoRefreshNudgeHTML(missing) {
+  function autoRefreshNudgeHTML(missing, mode) {
     const names = missing.map(_utilLabel).join(" and ");
     // Compact inline pill (Ford 2026-07-10 declutter): the full explanation moved
     // into the tooltip so the toolbar rail stays one slim line. Same #rbAutoRefreshLink
     // id + wireAutoRefreshLink wiring — it still deep-links to Account → Auto-refresh.
+    const tip = mode === "cloud"
+      ? `Save your ${names} login under Account → Auto-refresh (Store it with us) so bills refresh 24/7 without opening a portal.`
+      : `Invoices update only when you open your utility portal. Save your ${names} login once and they generate automatically every month.`;
     return `<a class="rb-gmp-arpill" id="rbAutoRefreshLink" role="button" tabindex="0"
-      title="Invoices update only when you open your utility portal. Save your ${esc(names)} login once and they generate automatically every month.">⚡ Set up auto-refresh</a>`;
+      title="${esc(tip)}">⚡ Set up auto-refresh</a>`;
   }
   function wireAutoRefreshLink() {
     const a = $("#rbAutoRefreshLink");
@@ -975,19 +1035,33 @@
     // All three states render as slim inline pills now (Ford 2026-07-10) — the rail
     // lives inside the toolbar row, so the long banners became short pills with the
     // detail in the tooltip. Same ids (#rbGmpInlineLink / #rbAutoRefreshLink) + wiring.
+    const mode = (autoState && autoState.mode) || (_arModeIsCloud() ? "cloud" : "device");
+    const autoOn = !!(autoState && autoState.auto);
+    const needNudge = !!(autoState && !autoState.auto);
+    const autoSuffix = autoOn
+      ? (mode === "cloud" ? " · cloud auto-refresh" : " · refreshing automatically")
+      : "";
     if (!accts.length) {
       host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
         title="Offtaker invoices bill from your utility bills. Link one to get started.">⚡ Link utility bills to start</a>`;
       wireConnectUtility();
     } else if (!withBills.length) {
+      const noBillTip = mode === "cloud"
+        ? `${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills yet. Cloud auto-refresh will pull them once the next harvest runs — or open Account → Auto-refresh and hit refresh.`
+        : `${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills yet. Open your utility portal again so the extension captures them.`;
       host.innerHTML = `<a class="rb-gmp-arpill" id="rbGmpInlineLink" role="button" tabindex="0"
-        title="${accts.length} utility account${accts.length === 1 ? "" : "s"} connected, but no bills yet. Open your utility portal again so the extension captures them.">⚡ ${fmt0(accts.length)} connected · no bills captured yet</a>` +
-        (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
+        title="${esc(noBillTip)}">⚡ ${fmt0(accts.length)} connected · no bills captured yet</a>` +
+        (needNudge ? autoRefreshNudgeHTML(autoState.missing, mode) : "");
       wireConnectUtility();
       wireAutoRefreshLink();
     } else {
-      host.innerHTML = `<span class="rb-gmp-ok" title="These utility bill sources are available to link when you add an offtaker.">✓ ${fmt0(withBills.length)} bill source${withBills.length === 1 ? "" : "s"}${autoState && autoState.auto ? " · refreshing automatically" : ""}</span>` +
-        (autoState && !autoState.auto ? autoRefreshNudgeHTML(autoState.missing) : "");
+      const okTip = autoOn
+        ? (mode === "cloud"
+          ? "Utility bills refresh via cloud auto-refresh (stored with us, 24/7)."
+          : "Utility bills refresh when your saved extension vault logins run.")
+        : "These utility bill sources are available to link when you add an offtaker.";
+      host.innerHTML = `<span class="rb-gmp-ok" title="${esc(okTip)}">✓ ${fmt0(withBills.length)} bill source${withBills.length === 1 ? "" : "s"}${autoSuffix}</span>` +
+        (needNudge ? autoRefreshNudgeHTML(autoState.missing, mode) : "");
       wireAutoRefreshLink();
     }
   }
