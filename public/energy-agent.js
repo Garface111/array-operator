@@ -34,6 +34,13 @@
     audioEl: null,
     voiceMode: "none", // realtime | webspeech | none
     rtResponseActive: false, // track open Realtime response — avoid cancel noise
+    greeted: false, // one Realtime greeting per panel session
+    touring: false,
+    // Speech pipeline — one mouth at a time
+    _onSpeakDone: null,
+    _speakQueue: Promise.resolve(),
+    _speakSeq: 0,
+    _lastSpokenPlain: "",
   };
 
   function token() {
@@ -871,7 +878,9 @@
         try { await startVoice(true); } catch (e) {}
       }
     } else {
-      stopVoice(true); // keep mic permission stream; just tear down WebRTC
+      // Full teardown on panel close only (kills GPT voice pipe)
+      stopVoice(true);
+      state.greeted = false;
     }
   }
 
@@ -1053,8 +1062,9 @@
     }
     state.thinking = true;
     setStatus("Thinking…", "think");
-    // While tools run, cancel any stray Realtime speech only if one is active
-    cancelRealtimeIfActive();
+    // Barge-in: user started a new turn — stop any leftover speech so we don't
+    // double-talk. Do NOT cancel again later mid-turn (that caused self-interrupts).
+    if (!state.touring) stopSpeak({ reason: "new_turn" });
     try {
       var r = await fetch(API.chat, {
         method: "POST",
@@ -1089,10 +1099,9 @@
       }
       var reply = d.reply || "…";
       addMsg("agent", reply);
-      if (reply !== _lastSpoken) {
-        _lastSpoken = reply;
-        speak(reply);
-      }
+      // One mouth: queue GPT voice (or stay silent if mouth disconnected — never
+      // surprise the user with robotic browser TTS after they've used GPT voice).
+      await enqueueSpeak(reply, { source: "chat" });
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     } catch (e) {
       addMsg("agent", "Network error — try again.");
@@ -1311,40 +1320,9 @@
     body.innerHTML = formatMsg(text).replace(/<\/?p[^>]*>/g, " ").replace(/<div class="ea-sp"><\/div>/g, " ");
   }
 
-  /**
-   * Speak and resolve only when audio finishes (or a length-based fallback).
-   * Keeps tour visuals in lockstep with voice.
-   */
+  /** Tour lockstep: wait until this line finishes before the next highlight. */
   function speakAndWait(text) {
-    var plain = stripMd(text);
-    if (!plain) return Promise.resolve();
-    return new Promise(function (resolve) {
-      var settled = false;
-      function done() {
-        if (settled) return;
-        settled = true;
-        state._onSpeakDone = null;
-        state.speaking = false;
-        resolve();
-      }
-      state._onSpeakDone = done;
-      // Estimate ~160 wpm + pad; clamp so we never hang the tour
-      var words = plain.split(/\s+/).filter(Boolean).length;
-      var fallbackMs = Math.min(14000, Math.max(2400, Math.round(words * 420) + 800));
-      var timer = setTimeout(done, fallbackMs);
-      var prev = state._onSpeakDone;
-      state._onSpeakDone = function () {
-        clearTimeout(timer);
-        if (typeof prev === "function" && prev !== done) { /* noop */ }
-        done();
-      };
-      try {
-        // During tours don't cancel mid-phrase unless starting a new step (speak does that)
-        speak(plain, { awaitable: true });
-      } catch (e) {
-        done();
-      }
-    });
+    return enqueueSpeak(text, { source: "tour", force: true });
   }
 
   /** User-visible tab names — must match the top tabbar labels exactly. */
@@ -1634,9 +1612,43 @@
     }
   }
 
+  /**
+   * Mute/unmute mic tracks WITHOUT tearing down WebRTC.
+   * Killing the data channel was forcing TTS into robotic browser speechSynthesis.
+   */
+  function setMicListening(on) {
+    if (state.micStream) {
+      try {
+        state.micStream.getTracks().forEach(function (t) { t.enabled = !!on; });
+      } catch (e) {}
+    }
+    state.listening = !!on;
+    if (state.voiceMode === "webspeech") {
+      if (!on && state.recog) {
+        try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
+        state.recog = null;
+      }
+    }
+    // Clear any residual input buffer on mute so VAD doesn't fire ghosts
+    if (!on && state.dc && state.dc.readyState === "open") {
+      try {
+        state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+      } catch (e) {}
+    }
+    syncMicBtn();
+  }
+
   function stopVoice(keepMic) {
     state.listening = false;
     state.speaking = false;
+    state.rtResponseActive = false;
+    // Abort any waiting speak queue callbacks
+    var cb = state._onSpeakDone;
+    state._onSpeakDone = null;
+    state._speakSeq++;
+    if (typeof cb === "function") {
+      try { cb(); } catch (e) {}
+    }
     // WebRTC
     try {
       if (state.dc) { state.dc.close(); }
@@ -1648,7 +1660,6 @@
     state.pc = null;
     if (state.micStream) {
       if (keepMic) {
-        // Stay permitted; mute until next listen
         try { state.micStream.getTracks().forEach(function (t) { t.enabled = false; }); } catch (e) {}
       } else {
         try { state.micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
@@ -1658,7 +1669,6 @@
     if (state.audioEl) {
       try { state.audioEl.pause(); state.audioEl.srcObject = null; } catch (e) {}
     }
-    // Web Speech fallback
     if (state.recog) {
       try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
       state.recog = null;
@@ -1668,70 +1678,138 @@
     syncMicBtn();
   }
 
-  function stopSpeak() {
-    // Barge-in: cancel browser TTS; only cancel Realtime if a response is active
+  function stopSpeak(opts) {
+    opts = opts || {};
+    // Barge-in / new turn: cancel current audio only
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     state.speaking = false;
     cancelRealtimeIfActive();
+    var cb = state._onSpeakDone;
+    state._onSpeakDone = null;
+    // Bump seq so any in-flight enqueueSpeak step is abandoned
+    if (opts.reason === "new_turn" || opts.reason === "barge_in") {
+      state._speakSeq++;
+    }
+    if (typeof cb === "function") {
+      try { cb(); } catch (e) {}
+    }
   }
 
-  function speak(text, opts) {
+  function realtimeMouthOpen() {
+    return !!(state.dc && state.dc.readyState === "open");
+  }
+
+  /**
+   * Serialize all TTS so we never stack multiple response.create calls.
+   * Prefer GPT Realtime mouth; only use robotic browser TTS if we never had Realtime
+   * (webspeech fallback mode). If Realtime was used but is briefly down, stay silent
+   * rather than switching voices mid-session.
+   */
+  function enqueueSpeak(text, opts) {
     opts = opts || {};
-    if (!text) return;
-    var plain = opts.awaitable ? String(text) : stripMd(text);
-    if (!plain) return;
-    // Prefer GPT Realtime TTS when connected
-    if (state.dc && state.dc.readyState === "open") {
-      try {
-        // If something is already speaking, cancel it first; then speak the new line
-        // (tours call speakAndWait which expects clean sequential audio)
-        cancelRealtimeIfActive();
-        state.rtResponseActive = true;
-        // Ask the Realtime model to speak this line (tools already ran server-side)
-        state.dc.send(JSON.stringify({
-          type: "response.create",
-          response: {
-            instructions:
-              "Speak the following to the user naturally, in English, no extra commentary:\n\n" +
-              plain.slice(0, 1200),
-          },
-        }));
-        state.speaking = true;
-        setStatus(state.touring ? "Tour… speaking" : "Speaking (GPT voice)…", "speak");
-        return;
-      } catch (e) {
+    var plain = stripMd(text);
+    if (!plain) return Promise.resolve();
+    // Dedupe identical consecutive lines (double chat + tour wrap-up)
+    if (plain === state._lastSpokenPlain && !opts.force) {
+      return Promise.resolve();
+    }
+    state._lastSpokenPlain = plain;
+    _lastSpoken = plain;
+
+    var seq = ++state._speakSeq;
+    state._speakQueue = state._speakQueue
+      .catch(function () {})
+      .then(function () {
+        if (seq !== state._speakSeq) return; // superseded by newer speech/barge-in
+        return speakNow(plain, opts);
+      });
+    return state._speakQueue;
+  }
+
+  function speakNow(plain, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var settled = false;
+      function done() {
+        if (settled) return;
+        settled = true;
+        state._onSpeakDone = null;
+        state.speaking = false;
         state.rtResponseActive = false;
-        if (state._onSpeakDone) {
-          try { state._onSpeakDone(); } catch (e2) {}
+        resolve();
+      }
+      state._onSpeakDone = done;
+
+      var words = plain.split(/\s+/).filter(Boolean).length;
+      // Generous fallback so we never hang; audio-complete should fire sooner
+      var fallbackMs = Math.min(20000, Math.max(2800, Math.round(words * 450) + 1200));
+      var timer = setTimeout(done, fallbackMs);
+
+      var prevDone = done;
+      state._onSpeakDone = function () {
+        clearTimeout(timer);
+        prevDone();
+      };
+
+      // ── GPT Realtime mouth ────────────────────────────────────────────
+      if (realtimeMouthOpen()) {
+        try {
+          // Wait for prior response to finish instead of cancel-storm,
+          // unless barge-in already cleared rtResponseActive.
+          if (state.rtResponseActive) {
+            cancelRealtimeIfActive();
+          }
+          state.rtResponseActive = true;
+          state.speaking = true;
+          state.dc.send(JSON.stringify({
+            type: "response.create",
+            response: {
+              instructions:
+                "Speak the following to the user naturally, in English, no extra commentary. " +
+                "Do not add greeting or questions beyond the text:\n\n" +
+                plain.slice(0, 1200),
+            },
+          }));
+          setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
+          return;
+        } catch (e) {
+          state.rtResponseActive = false;
         }
       }
-    }
-    // Fallback: browser speech synthesis
-    if (!window.speechSynthesis) {
-      if (state._onSpeakDone) {
-        try { state._onSpeakDone(); } catch (e) {}
-      }
-      return;
-    }
-    try { window.speechSynthesis.cancel(); } catch (e) {}
-    var u = new SpeechSynthesisUtterance(plain.slice(0, 800));
-    u.rate = 1.02;
-    u.onstart = function () { state.speaking = true; setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak"); };
-    u.onend = function () {
-      state.speaking = false;
-      if (state._onSpeakDone) {
-        try { state._onSpeakDone(); } catch (e) {}
-      } else {
+
+      // ── Never switch to robotic voice if this session used GPT voice ──
+      if (state.voiceMode === "realtime" || state.realtimeReady) {
+        // Mouth offline — text is already on screen; skip browser TTS
         setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+        done();
+        return;
       }
-    };
-    u.onerror = function () {
-      state.speaking = false;
-      if (state._onSpeakDone) {
-        try { state._onSpeakDone(); } catch (e) {}
+
+      // ── Browser TTS only in webspeech fallback mode ───────────────────
+      if (!window.speechSynthesis) {
+        done();
+        return;
       }
-    };
-    window.speechSynthesis.speak(u);
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+      var u = new SpeechSynthesisUtterance(plain.slice(0, 800));
+      u.rate = 1.02;
+      u.onstart = function () {
+        state.speaking = true;
+        setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
+      };
+      u.onend = function () { done(); };
+      u.onerror = function () { done(); };
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  /** @deprecated path — route through enqueueSpeak so the queue stays single-threaded */
+  function speak(text, opts) {
+    opts = opts || {};
+    var plain = opts.awaitable ? stripMd(text) : stripMd(text);
+    if (!plain) return;
+    // Legacy direct callers: still go through the queue
+    enqueueSpeak(plain, opts);
   }
 
   function dcSend(obj) {
@@ -1746,28 +1824,48 @@
     if (ev.type === "response.created" || ev.type === "response.output_item.added") {
       state.rtResponseActive = true;
     }
-    if (
-      ev.type === "response.done" ||
-      ev.type === "response.cancelled" ||
-      ev.type === "response.failed" ||
-      ev.type === "output_audio_buffer.stopped"
-    ) {
-      state.rtResponseActive = false;
-    }
     // Model audio lifecycle
     if (ev.type === "output_audio_buffer.started" || ev.type === "response.output_audio.delta") {
       state.speaking = true;
       state.rtResponseActive = true;
-      setStatus("Speaking (GPT voice)…", "speak");
+      setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
     }
-    if (ev.type === "output_audio_buffer.stopped" || ev.type === "response.done") {
+    // Prefer audio-buffer stopped (playback drained) — this is when the ear hears silence
+    if (ev.type === "output_audio_buffer.stopped") {
       state.speaking = false;
       state.rtResponseActive = false;
-      // Resolve speakAndWait (tour lockstep)
       if (typeof state._onSpeakDone === "function") {
         try { state._onSpeakDone(); } catch (e) {}
       } else if (state.listening && !state.touring) {
         setStatus("Listening…", "listen");
+      }
+    }
+    if (ev.type === "response.cancelled" || ev.type === "response.failed") {
+      state.speaking = false;
+      state.rtResponseActive = false;
+      if (typeof state._onSpeakDone === "function") {
+        try { state._onSpeakDone(); } catch (e) {}
+      }
+    }
+    if (ev.type === "response.done") {
+      // Text/tool complete — audio may still be draining. Don't clear the speak
+      // waiter here if we're still marked speaking (buffer stopped will finish it).
+      if (!state.speaking) {
+        state.rtResponseActive = false;
+        if (typeof state._onSpeakDone === "function") {
+          try { state._onSpeakDone(); } catch (e) {}
+        } else if (state.listening && !state.touring) {
+          setStatus("Listening…", "listen");
+        }
+      } else {
+        // Safety drain if buffer-stopped never arrives
+        setTimeout(function () {
+          if (typeof state._onSpeakDone === "function") {
+            state.speaking = false;
+            state.rtResponseActive = false;
+            try { state._onSpeakDone(); } catch (e) {}
+          }
+        }, 1200);
       }
     }
     // User finished speaking — ONE path: show once, then agent turn (tools + speak)
@@ -1775,8 +1873,10 @@
       var said = (ev.transcript || "").trim();
       // Ignore barge-ins during guided tours so steps stay ordered
       if (!said || state.thinking || state.touring) return;
-      // Only cancel if a response is actually running (avoids "no active response")
-      cancelRealtimeIfActive();
+      // Ignore while mic is muted (ghost VAD / residual buffer)
+      if (!state.listening) return;
+      // Barge-in: stop agent speech, then handle the user line
+      stopSpeak({ reason: "barge_in" });
       addMsg("user", said);
       if (state.sessionId) {
         fetch(API.transcript, {
@@ -1833,12 +1933,33 @@
 
   /** Primary: GPT Realtime over WebRTC via our server (unified /realtime-call). */
   async function startRealtimeVoice() {
+    // Already connected — just re-enable the mic (don't renegotiate / double-greet)
+    if (realtimeMouthOpen() && state.pc) {
+      try { state.micStream && state.micStream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
+      state.listening = true;
+      state.voiceMode = "realtime";
+      syncMicBtn();
+      setStatus("Listening…", "listen");
+      return;
+    }
+
     setStatus("Connecting GPT voice…", "think");
     var stream = await ensureMicStream();
+    try { stream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
 
     // Tear down prior peer connection but KEEP the mic stream (permission)
-    stopVoice(true);
+    // Use internal teardown without wiping voiceMode preference
+    try { if (state.dc) state.dc.close(); } catch (e) {}
+    state.dc = null;
+    try { if (state.pc) state.pc.close(); } catch (e) {}
+    state.pc = null;
+    if (state.recog) {
+      try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
+      state.recog = null;
+    }
+
     stream = await ensureMicStream();
+    try { stream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
 
     var pc = new RTCPeerConnection();
     state.pc = pc;
@@ -1848,7 +1969,6 @@
       state.audioEl = document.createElement("audio");
       state.audioEl.autoplay = true;
       state.audioEl.setAttribute("playsinline", "true");
-      // Keep element in DOM so autoplay policies are happier
       state.audioEl.style.cssText = "position:fixed;width:0;height:0;opacity:0;pointer-events:none;";
       document.body.appendChild(state.audioEl);
     }
@@ -1873,7 +1993,8 @@
           type: "realtime",
           instructions:
             "You are Energy Agent's voice. Only speak lines the app asks you to say via response.create. " +
-            "Do not invent your own answers to the user; the app handles reasoning and tools.",
+            "Do not invent your own answers to the user; the app handles reasoning and tools. " +
+            "Never speak over yourself; one utterance at a time.",
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
@@ -1882,16 +2003,15 @@
           },
         },
       });
-      // Single greeting (voice only; panel already has intro text from ensureSession)
-      dcSend({
-        type: "response.create",
-        response: {
-          instructions:
-            "Greet the user briefly as Energy Agent in one short sentence. " +
-            "Say you're ready to help with their solar fleet and invoices.",
-        },
-      });
-      setStatus("Listening (GPT Realtime)…", "listen");
+      // Single greeting per panel open — text intro already exists from ensureSession
+      if (!state.greeted) {
+        state.greeted = true;
+        enqueueSpeak(
+          "Hi — Energy Agent here. I'm listening whenever you're ready.",
+          { source: "greeting", force: true }
+        );
+      }
+      setStatus("Listening…", "listen");
     });
 
     var offer = await pc.createOffer();
@@ -1916,9 +2036,14 @@
 
     state.listening = true;
     state.voiceMode = "realtime";
+    state.realtimeReady = true;
     syncMicBtn();
-    setStatus("Listening (GPT Realtime)…", "listen");
-    addMsg("agent", "GPT voice connected — talk anytime. I’ll reply out loud.");
+    setStatus("Listening…", "listen");
+    // Text status only — voice greeting is queued once on dc open
+    if (!state._voiceConnectedNote) {
+      state._voiceConnectedNote = true;
+      addMsg("agent", "GPT voice connected — talk anytime. Replies use the same natural voice.");
+    }
   }
 
   /** Fallback when OpenAI key missing or WebRTC fails: Web Speech + browser TTS */
@@ -2019,11 +2144,18 @@
 
   function toggleMic() {
     if (state.listening) {
-      stopVoice(true);
-      setStatus("Mic off · type anytime", "on");
+      // Mute only — keep WebRTC data channel so GPT voice still speaks replies.
+      // (Old path called stopVoice and fell back to robotic browser TTS.)
+      setMicListening(false);
+      setStatus("Mic muted · GPT voice still on for replies", "on");
     } else {
-      // Click path — safe for permission prompt
-      requestMicFromClick();
+      // Click path — safe for permission prompt / reconnect
+      if (realtimeMouthOpen()) {
+        setMicListening(true);
+        setStatus("Listening…", "listen");
+      } else {
+        requestMicFromClick();
+      }
     }
   }
 
