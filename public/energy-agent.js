@@ -2331,95 +2331,361 @@
     } catch (e) {}
   }
 
+  /**
+   * Preset show-and-tell tours — ONE per top-bar tab.
+   * Rules (non-negotiable):
+   *  1. Selectors MUST match live DOM in index.html + the panel's render JS.
+   *  2. Order is top → bottom of what the owner actually sees.
+   *  3. optional:true for sections that only appear with data (pipeline, KPI flags).
+   *  4. Never invent labels that aren't on screen (no "Reports", "Dashboard", etc.).
+   */
   function presetTour(id) {
     var key = String(id || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
-    // Ordered TOP → BOTTOM of the LIVE Account panel (sandbox.js renderAccountList):
-    // Auto-refresh → Name → Company → Email → Login → Password → Plan → Bill →
-    // Payment method → Online pay → Files. Selectors must match that DOM only.
+
+    // ── Account (#account) — sandbox.js renderAccountList ──────────────────
+    // Order: Auto-refresh → Name → Company → Email → Password → Plan → Bill →
+    // Payment → Online pay → Files.
     if (key === "master_account" || key === "account") {
       return [
         {
           hash: "#account",
-          say: "Account. I'll walk top to bottom — auto-refresh first, then your profile, plan, and files.",
+          say: "Account. Top to bottom — auto-refresh first, then profile, plan, billing, and files.",
         },
         {
           selector: "#tabAccount",
-          say: "You're on the **Account** tab in the top bar.",
+          say: "You're on **Account** in the top bar — company, sign-in, plan, and payment live here.",
         },
         {
           selector: "#rowAutoRefresh",
-          say: "**Auto-refresh** leads the page — cloud vault or this computer. This is how production and bills stay fresh.",
+          say: "**Auto-refresh** leads the page — cloud vault or this computer. That's how production and utility bills stay fresh without you babysitting logins.",
+          waitMs: 6000,
         },
         {
           selector: "#panelAccount .acct-edit[data-field='name']",
           say: "**Name** — the operator on this account. Click to edit; it saves as you type.",
+          optional: true,
         },
         {
           selector: "#panelAccount .acct-edit[data-field='company']",
           say: "**Company** — your business name on this account.",
+          optional: true,
         },
         {
-          selector: "#panelAccount .acct-edit[data-field='email']",
-          say: "**Email** — the contact and sign-in address for this account.",
+          selector: "#panelAccount .acct-edit[data-field='email'], #loginEmail",
+          say: "**Email** — contact and sign-in address for this account.",
+          optional: true,
         },
         {
           selector: "#rowPassword",
-          say: "**Password** — set or change a password for email login, or keep using magic links.",
+          say: "**Password** — set one for email login, or keep using magic links.",
+          optional: true,
         },
         {
-          selector: "#acctPlanVal, #acctChangePlan",
-          say: "**Plan** — Live vendor data, Offtaker invoices, or Both. Change it here anytime.",
+          selector: "#acctPlanVal, #acctChangePlan, #panelAccount .acct-row",
+          say: "**Plan** — Live vendor data, Offtaker invoices, or Both. Change it anytime.",
+          optional: true,
         },
         {
           selector: "#aoBill",
-          say: "**Your bill** — what Array Operator charges for this subscription. Not offtaker invoices.",
+          say: "**Your bill** — what Array Operator charges *you* for this subscription. Not the offtaker invoices on the Invoices tab.",
+          optional: true,
         },
         {
           selector: "#billManage, #payState",
           say: "**Payment method** — add or manage the card on file for Array Operator.",
+          optional: true,
         },
         {
           selector: "#aoPaySetup, #aoPayCard",
           say: "**Online payments** — optional Stripe Connect so offtaker invoices can include a Pay button.",
+          optional: true,
         },
         {
-          selector: "#panelAccount .acct-files-row",
+          selector: "#panelAccount .acct-files-row, #acctFilesBody",
           say: "**Your files** — templates, workbooks, and captured utility PDFs.",
+          optional: true,
         },
         {
-          say: "That's Account, top to bottom. Ask about any section if you want to dig in.",
+          say: "That's Account. Ask about any row if you want to dig in.",
         },
       ];
     }
-    if (key === "arrays" || key === "inverters") {
+
+    // ── Invoices (#reports) — reports.js shell() ───────────────────────────
+    // Real surface: Offtaker invoicing head → Offtakers/Bill audit tabs →
+    // send pipeline → master rate → offtaker list + toolbar (Export, email,
+    // link utility, bulk import, add offtaker).
+    if (key === "reports" || key === "invoices" || key === "offtakers") {
       return [
-        { hash: "#arrays", say: "Inverters tab — your live fleet canvas. Starting at the top." },
-        { selector: "#tabArrays, a.tab[href='#arrays']", say: "This is the **Inverters** tab." },
-        { selector: "#panelArrays .vs-seg, #panelArrays .sb-head, #sbWrap", say: "Controls and the canvas live here — each column is a site, prongs are inverters." },
-        { say: "Name a site if you want a closer look." },
+        {
+          hash: "#reports",
+          say: "Invoices — offtaker solar-credit billing. Nothing emails until you approve it.",
+        },
+        {
+          selector: "#tabReports",
+          say: "You're on **Invoices** in the top bar. An offtaker is a customer who gets a share of your solar credits.",
+        },
+        {
+          selector: "#panelReports .rb2-head, #rbSubInvoice",
+          say: "This is **Offtaker invoicing** — every offtaker's credit invoice, generated from settled utility bills.",
+          waitMs: 8000,
+        },
+        {
+          selector: "#rb2Sub",
+          say: "The rule up top: invoices draft from bills, but **nothing sends until you approve** — unless you flip an offtaker to auto-send later.",
+          optional: true,
+        },
+        {
+          selector: "#rbGenTabs",
+          say: "Two views here: **Offtakers** (the roster and drafts) and **Bill audit** (does GMP's allocation match the shares you entered?).",
+        },
+        {
+          selector: "#rb2Kpis",
+          say: "This glance line is the one signal the pipeline doesn't carry — whether utility bills **reconcile with GMP**.",
+          optional: true,
+        },
+        {
+          selector: "#rb2Pipe",
+          say: "The **send pipeline** — last cycle delivered, this cycle's drafts waiting on bills or approval, and the next scheduled run.",
+          optional: true,
+        },
+        {
+          selector: "#rbGlobalRate",
+          say: "**Master solar credit rate** — optional fleet override. Leave blank and each offtaker is priced from *their own* utility bill credit rate.",
+          optional: true,
+        },
+        {
+          selector: "#panelReports .rb2-controls, #rbGmpBillsStatus",
+          say: "**Your offtakers** toolbar. The slim status pill shows which utility bills are linked and whether auto-refresh is healthy.",
+          optional: true,
+        },
+        {
+          selector: "#rb2ExportBtn",
+          say: "**Export** — download a batch for QuickBooks Online, Desktop, or Xero.",
+          optional: true,
+        },
+        {
+          selector: "#rbEmailStudio",
+          say: "**Customize email** — greeting, wording, and sign-off for every offtaker invoice, with merge tags.",
+          optional: true,
+        },
+        {
+          selector: "#rbLinkUtility",
+          say: "**Link utility bills** — connect GMP, VEC, or any of hundreds of co-ops. Offtakers invoice from these bills.",
+          optional: true,
+        },
+        {
+          selector: "#rbBulkImport",
+          say: "**Bulk import** — add many offtakers from a CSV: name, percent share, account number.",
+          optional: true,
+        },
+        {
+          selector: "#rbCustAdd",
+          say: "**Add an offtaker** — one at a time when you're not bulk-importing.",
+          optional: true,
+        },
+        {
+          selector: "#rbList",
+          say: "The **offtaker list** — each card is a customer: share, rate, draft invoices, template, and send mode. Open one to edit.",
+          waitMs: 6000,
+        },
+        {
+          say: "That's Invoices end to end. Say *open Bill audit* or name an offtaker if you want to go deeper.",
+        },
       ];
     }
-    if (key === "reports" || key === "invoices") {
+
+    // ── Inverters (#arrays) — sandbox + vendor-sheet ───────────────────────
+    if (key === "arrays" || key === "inverters" || key === "sandbox" || key === "spreadsheet") {
       return [
-        { hash: "#reports", say: "Invoices tab — offtaker billing. Starting at the top." },
-        { selector: "#tabReports, a.tab[href='#reports']", say: "This is **Invoices** in the top bar." },
-        { selector: "#panelReports, .rb-wrap, #rbRoot", say: "Offtakers, drafts, and the send pipeline are here." },
+        {
+          hash: "#arrays",
+          say: "Inverters — live fleet canvas. Sandbox is spatial; Spreadsheet is every array as rows.",
+        },
+        {
+          selector: "#tabArrays",
+          say: "You're on **Inverters** in the top bar.",
+        },
+        {
+          selector: "#panelArrays .vs-seg",
+          say: "Two sub-views: **Sandbox** (the spatial canvas) and **Spreadsheet** (rows by vendor). Same data either way.",
+        },
+        {
+          selector: "#vsSegSandbox",
+          say: "**Sandbox** — columns are sites, prongs are real inverters. Drag to rearrange how *you* think about the fleet.",
+        },
+        {
+          selector: "#vsSegSheet",
+          say: "**Spreadsheet** — every vendor and array as expandable rows: today, peers, status, without moving cards around.",
+        },
+        {
+          selector: "#sbWrap .sb-head, #sbViewMode",
+          say: "The toolbar: **Overview** grid versus **Tree** drill-in, undo/redo, full screen, show all inverters, and reset layout.",
+          optional: true,
+        },
+        {
+          selector: "#sbAddArray",
+          say: "**Add array** — one-click vendor login or link a utility. Manual keys stay behind a secondary option.",
+          optional: true,
+        },
+        {
+          selector: "#sandbox .sb-tile, #sandbox .sb-col, #sandbox",
+          say: "The canvas itself — click a site to zoom in; inverter cards show live output, peer health, and dollars at stake.",
+          waitMs: 6000,
+        },
+        {
+          selector: "#vendorSheet .vs-headrow, #vendorSheet",
+          say: "If you're on Spreadsheet, this header is search, add vendor, and sync — rows expand to every inverter.",
+          optional: true,
+        },
+        {
+          say: "That's Inverters. Name a site, or say *switch to spreadsheet*, if you want a closer look.",
+        },
       ];
     }
-    if (key === "analysis" || key === "trends") {
+
+    // ── Analysis (#analysis) — analysis.js shell + sections ────────────────
+    if (key === "analysis" || key === "trends" || key === "fleet_analysis") {
       return [
-        { hash: "#analysis", say: "Analysis tab — deeper digs. Trends live here as a sub-view, not their own top tab." },
-        { selector: "#tabAnalysis, a.tab[href='#analysis']", say: "This is **Analysis**." },
-        { selector: "#panelAnalysis .vs-seg, #panelAnalysis", say: "Use the segmented control for Through time and other views." },
+        {
+          hash: "#analysis",
+          say: "Analysis — deeper fleet digs. Trends is a sub-view here, not its own top tab.",
+        },
+        {
+          selector: "#tabAnalysis",
+          say: "You're on **Analysis** in the top bar.",
+        },
+        {
+          selector: "#panelAnalysis .an-sub-seg, #panelAnalysis .vs-seg",
+          say: "Segmented control: **Fleet analysis** (the NOC view) and **Trends** (multi-year portfolio lines).",
+        },
+        {
+          selector: "#analysisRoot .an-head, #analysisRoot .an-wrap",
+          say: "**Fleet analysis** header — portfolio performance, weather-adjusted, with a live-or-stale data stamp.",
+          waitMs: 7000,
+        },
+        {
+          selector: "#anSections [data-section='fleet-summary'], #anSections [data-section='health-kwhkw'], #anSections",
+          say: "Sections stack below: portfolio rollup, health, through-time, sites grid, performance, hardware, alarms — scroll the page.",
+          optional: true,
+        },
+        {
+          selector: "#anSections [data-section='sites-grid']",
+          say: "**Sites** — every array weather-adjusted actual versus expected. Sort and search to find underperformers.",
+          optional: true,
+        },
+        {
+          selector: "#anSections [data-section='performance']",
+          say: "**Performance** — performance index and capacity factor across the fleet.",
+          optional: true,
+        },
+        {
+          selector: "#panelAnalysis [data-ansub='trends']",
+          say: "Tap **Trends** anytime for long-run portfolio charts. There is no separate Trends tab in the top bar.",
+        },
+        {
+          say: "That's Analysis. Ask about a section by name if you want detail.",
+        },
       ];
     }
-    if (key === "dashboard" || key === "fleet_triage" || key === "triage") {
+
+    // ── Fleet Triage (#dashboard) — command-center.js ──────────────────────
+    if (key === "dashboard" || key === "fleet_triage" || key === "triage" || key === "fleet") {
       return [
-        { hash: "#dashboard", say: "Fleet Triage — who needs attention across the fleet. Starting at the top." },
-        { selector: "#tabDashboard, a.tab[href='#dashboard']", say: "This is **Fleet Triage**." },
-        { selector: "#panelDashboard, .dash-wrap", say: "Overview and attention flags live on this page." },
+        {
+          hash: "#dashboard",
+          say: "Fleet Triage — who needs attention across the whole fleet, worst first.",
+        },
+        {
+          selector: "#tabDashboard",
+          say: "You're on **Fleet Triage** in the top bar.",
+        },
+        {
+          selector: "#panelDashboard .dash-head, #dashProd",
+          say: "The header is **Fleet triage** plus a live production strip — kilowatts now, kilowatt-hours today, arrays producing.",
+          waitMs: 6000,
+        },
+        {
+          selector: "#fleetCommander .fcg, #fleetCommander",
+          say: "KPI tiles — fleet healthy percent, array and inverter counts, flagged, critical, watch, recoverable dollars, and monitoring.",
+        },
+        {
+          selector: "#fleetCommander .fcg-tile--health, #fleetCommander .fcg-tile",
+          say: "**Fleet healthy** leads — blue when the fleet is in good shape, orange when health drops.",
+          optional: true,
+        },
+        {
+          selector: "#fleetCommander .fcg-tile--risk",
+          say: "**Recoverable** — monthly dollars you can get back by fixing flagged inverters. Zero means all clear.",
+          optional: true,
+        },
+        {
+          selector: "#fcAlerts",
+          say: "**Alerts** — email when an inverter goes down or underperforms. Sensitivity and frequency live in that panel.",
+          optional: true,
+        },
+        {
+          selector: "#dashAttnH",
+          say: "Below the tiles: **Needs attention** when something is flagged, or **All clear** when the fleet is clean.",
+        },
+        {
+          selector: "#ccQueue",
+          say: "The attention queue — search, severity chips, and every flagged inverter worst-first. Open a row to jump into that site.",
+          optional: true,
+        },
+        {
+          say: "That's Fleet Triage. Ask about a flagged site if you want a diagnosis.",
+        },
       ];
     }
+
+    // ── Resources (#resources) — resources.js via #rsHost ──────────────────
+    if (key === "resources" || key === "briefing" || key === "rates") {
+      return [
+        {
+          hash: "#resources",
+          say: "Resources — net-metering context, REC market, and regulatory news for your state.",
+        },
+        {
+          selector: "#tabResources",
+          say: "You're on **Resources** in the top bar.",
+        },
+        {
+          selector: "#rsHost, #resApp",
+          say: "The briefing shell loads here — state picker, live news, REC market, and reference cards.",
+          waitMs: 8000,
+        },
+        {
+          selector: "#resEyebrow",
+          say: "The eyebrow names which state's operator briefing you're reading.",
+          optional: true,
+        },
+        {
+          selector: "#panelResources .res-picker, #rsHost .res-picker",
+          say: "**Your state** — pick Vermont, New Hampshire, and the other New England states. News and rates follow that choice.",
+          optional: true,
+        },
+        {
+          selector: "#resFeed, #resNewsMeta, #panelResources .newshead",
+          say: "**Latest and live** — commission dockets, rate cases, and REC moves for *your* state, refreshed daily.",
+          optional: true,
+        },
+        {
+          selector: "#panelResources .res-rec-sec, #rsHost .res-rec-card",
+          say: "**REC market** — indicative Class I pricing and how certificates work in your state. Reference only — confirm before counting dollars.",
+          optional: true,
+        },
+        {
+          selector: "#panelResources .card, #rsHost .card",
+          say: "Reference cards cover compensation style, key utilities, regulatory status, and links to primary sources.",
+          optional: true,
+        },
+        {
+          say: "That's Resources. Change the state chip anytime to re-scope the briefing.",
+        },
+      ];
+    }
+
     return null;
   }
   function fill(sel, value) {
