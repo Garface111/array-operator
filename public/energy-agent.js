@@ -73,6 +73,9 @@
     // Bumped on every stopVoice/mute so in-flight WebRTC connects abort quietly
     // instead of dumping "signalingState is closed" chat bubbles (Ford 2026-07-14).
     _voiceConnectGen: 0,
+    // Abort in-flight chat/LLM turns when user says "stop" (Ford 2026-07-14).
+    _turnAbortGen: 0,
+    _chatAbort: null,
   };
 
   function token() {
@@ -1525,6 +1528,12 @@
   async function turn(text, source, opts) {
     opts = opts || {};
     if (!text) return;
+    // Hard stop first — works even if a previous turn is still thinking/speaking
+    if (isStopCommand(text)) {
+      if (!opts.userAlreadyShown) addMsg("user", text);
+      handleStopCommand();
+      return;
+    }
     var sid = await ensureSession();
     if (!sid) return;
     if (!opts.userAlreadyShown) {
@@ -1534,6 +1543,12 @@
     if (isImproveIntent(text)) {
       openImproveFlow({ markFirst: true });
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      return;
+    }
+    // Visual / color / button look-and-feel: short ack + quiet improve path.
+    // Do NOT dump design-token lectures or multi-tool cascades (Ford 2026-07-14).
+    if (isVisualFixIntent(text)) {
+      await handleVisualFixFast(text, sid, source);
       return;
     }
     // Tab names must match the top bar — answer locally so the model can't invent Dashboard/Arrays/Reports
@@ -1580,8 +1595,13 @@
     // Barge-in: user started a new turn — stop any leftover speech so we don't
     // double-talk. Do NOT cancel again later mid-turn (that caused self-interrupts).
     if (!state.touring) stopSpeak({ reason: "new_turn" });
+    var turnGen = (state._turnAbortGen || 0);
+    if (state._chatAbort) {
+      try { state._chatAbort.abort(); } catch (e) {}
+    }
+    state._chatAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
     try {
-      var r = await fetch(API.chat, {
+      var fetchOpts = {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -1590,8 +1610,13 @@
           context: packContext(),
           source: source || "text",
         }),
-      });
+      };
+      if (state._chatAbort) fetchOpts.signal = state._chatAbort.signal;
+      var r = await fetch(API.chat, fetchOpts);
+      // Aborted by "stop" while waiting on the model
+      if (turnGen !== (state._turnAbortGen || 0)) return;
       var d = await r.json().catch(function () { return null; });
+      if (turnGen !== (state._turnAbortGen || 0)) return;
       if (!r.ok) {
         var err = (d && (d.detail || d.error)) || ("HTTP " + r.status);
         addMsg("agent", String(err));
@@ -1608,24 +1633,127 @@
       if (d.pending) showPending(d.pending);
       else showPending(null);
       var cmds = d.ui_commands || [];
-      for (var i = 0; i < cmds.length; i++) await runCommand(cmds[i]);
+      for (var i = 0; i < cmds.length; i++) {
+        if (turnGen !== (state._turnAbortGen || 0)) return;
+        await runCommand(cmds[i]);
+      }
       // Also execute navigates that arrived as pending by mistake (legacy)
       if (d.pending && d.pending.type === "navigate") {
         await runCommand(Object.assign({}, d.pending, { needs_confirm: false }));
         showPending(null);
       }
+      if (turnGen !== (state._turnAbortGen || 0)) return;
       var reply = d.reply || "…";
+      // Voice: never monologue — cap spoken length; full text still in chat
+      var speakText = reply;
+      if ((source || "") === "voice") {
+        speakText = shortVoiceReply(reply);
+      }
       addMsg("agent", reply);
       // One mouth: queue GPT voice (or stay silent if mouth disconnected — never
       // surprise the user with robotic browser TTS after they've used GPT voice).
-      await enqueueSpeak(reply, { source: "chat" });
+      await enqueueSpeak(speakText, { source: "chat" });
+      if (turnGen !== (state._turnAbortGen || 0)) return;
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     } catch (e) {
+      if (e && (e.name === "AbortError" || String(e.message || "").indexOf("abort") !== -1)) {
+        // User said stop — handleStopCommand already painted "Stopped."
+        return;
+      }
       addMsg("agent", "Network error — try again.");
       setStatus("Error", "warn");
     } finally {
-      state.thinking = false;
+      if (turnGen === (state._turnAbortGen || 0)) {
+        state.thinking = false;
+      }
     }
+  }
+
+  /** First 1–2 short sentences for voice so we don't flood the mouth. */
+  function shortVoiceReply(text) {
+    var plain = stripMd(String(text || "")).replace(/\s+/g, " ").trim();
+    if (!plain) return plain;
+    if (plain.length <= 220) return plain;
+    var parts = plain.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [plain];
+    var out = "";
+    for (var i = 0; i < parts.length && i < 2; i++) {
+      var next = (out ? out + " " : "") + parts[i].trim();
+      if (next.length > 280 && out) break;
+      out = next;
+      if (out.length >= 160) break;
+    }
+    return out || plain.slice(0, 220);
+  }
+
+  /** Color / look / button styling — not data edits, not fleet. */
+  function isVisualFixIntent(text) {
+    var t = String(text || "").toLowerCase();
+    if (!t || t.length < 8) return false;
+    // Exclude pure data/ops asks
+    if (/\b(share|percent|kwh|invoice|offtaker|underperform|fault|login password)\b/.test(t)
+        && !/\b(button|color|colour|look|ugly|style|design|theme)\b/.test(t)) {
+      return false;
+    }
+    var visual =
+      /\b(color|colour|look(s|ing)?|ugly|pretty|style|styling|theme|contrast|font|spacing|layout|clutter|busy|overwhelming)\b/.test(t)
+      || /\b(button|chip|badge|card|banner|header|nav).{0,40}(bad|ugly|wrong|fix|change|hard to|doesn.?t look)\b/.test(t)
+      || /\b(doesn.?t|does not|don.?t).{0,20}look (good|right|great)\b/.test(t)
+      || /\b(can we|could you|please).{0,20}fix.{0,30}(color|colour|button|look|style)\b/.test(t)
+      || /\bfix (the )?(color|colour|button|styling|look)\b/.test(t);
+    return visual;
+  }
+
+  async function handleVisualFixFast(text, sid, source) {
+    var turnGen = state._turnAbortGen || 0;
+    state.thinking = true;
+    setStatus("On it…", "think");
+    if (!state.touring) stopSpeak({ reason: "new_turn" });
+    var reply =
+      "Oh I see — I'll fix that. Working on it in the background; " +
+      "I'll nudge you when there's something to refresh and check.";
+    try {
+      // Prefer server path so mind + judge pipeline stay one brain
+      var r = await fetch(API.chat, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          session_id: sid,
+          message: text,
+          context: Object.assign({}, packContext(), {
+            visual_fix_fast: true,
+            prefer_short_reply: true,
+            voice_source: (source || "") === "voice",
+          }),
+          source: source || "text",
+        }),
+      });
+      if (turnGen !== (state._turnAbortGen || 0)) return;
+      var d = await r.json().catch(function () { return null; });
+      if (d && d.ok !== false && d.reply) {
+        reply = d.reply;
+        if (d.mind) onMindPlanFromChat(d.mind);
+        setBudget(d.budget);
+        var cmds = d.ui_commands || [];
+        for (var i = 0; i < cmds.length; i++) {
+          if (turnGen !== (state._turnAbortGen || 0)) return;
+          await runCommand(cmds[i]);
+        }
+      } else {
+        // Offline fallback: open improve flow with their words as hint
+        openImproveFlow({ markFirst: false });
+        var ta = document.getElementById("eaImproveText");
+        if (ta) ta.value = String(text).slice(0, 800);
+      }
+    } catch (e) {
+      openImproveFlow({ markFirst: false });
+    }
+    if (turnGen !== (state._turnAbortGen || 0)) return;
+    // Always short spoken line
+    var spoken = shortVoiceReply(reply);
+    addMsg("agent", reply);
+    await enqueueSpeak(spoken, { source: "chat" });
+    state.thinking = false;
+    setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
   }
 
   async function confirmPending(yes) {
@@ -2374,13 +2502,70 @@
     return !!(state.speaking || state.rtResponseActive);
   }
 
+  /** Hard stop / hold phrases — always interrupt, even mid-think / mid-tour / mid-speech. */
+  function isStopCommand(said) {
+    var t = String(said || "")
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    if (!t) return false;
+    if (
+      /^(stop|wait|cancel|pause|enough|quiet|silence|hold on|hold up|shut up|never mind|nevermind|forget it)$/.test(
+        t
+      )
+    ) {
+      return true;
+    }
+    if (
+      /^(stop (it|please|talking|now|that)|please stop|just stop|can you stop|shut up)$/.test(t)
+    ) {
+      return true;
+    }
+    if (/\b(stop talking|stop please|please stop|just stop)\b/.test(t)) return true;
+    return false;
+  }
+
+  /**
+   * Abort speech, in-flight chat, and tours. Same mind — just stops the mouth/work
+   * the user can hear. Background mind tasks may still finish quietly.
+   */
+  function handleStopCommand() {
+    state._turnAbortGen = (state._turnAbortGen || 0) + 1;
+    if (state._chatAbort) {
+      try { state._chatAbort.abort(); } catch (e) {}
+      state._chatAbort = null;
+    }
+    state.thinking = false;
+    if (state.touring) state.touring = false; // runTour checks this each step
+    stopSpeak({ reason: "barge_in" });
+    if (state.dc && state.dc.readyState === "open") {
+      try {
+        state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+      } catch (e) {}
+    }
+    addMsg("agent", "Stopped.");
+    setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+    // Short ack only — never queue a long monologue after stop
+    enqueueSpeak("Okay, stopped.", { source: "stop", force: true }).catch(function () {});
+  }
+
   /**
    * Whether a user transcript should start a turn (incl. mid-agent-speech barge-in).
    * Harder bar while the agent is talking so speaker bleed / room noise don't cut it off.
+   * STOP always wins — even while thinking or touring.
    */
   function acceptUserTranscript(said) {
     if (!said || !state.listening) return false;
-    if (state.thinking || state.touring) return false;
+    // Stop / wait / cancel: always accept (even mid-think / mid-tour)
+    if (isStopCommand(said)) return true;
+    if (state.thinking) return false;
+    // Mid-tour: allow barge-in with real speech (not just stop) so user can redirect
+    if (state.touring) {
+      var tw = said.trim().split(/\s+/).filter(Boolean);
+      if (tw.length < 2 && said.trim().length < 12) return false;
+      // Fall through to echo/garbage filters, then accept
+    }
     if (looksLikeEchoOfLastSpeech(said)) return false;
     if (isGarbageTranscript(said)) return false;
     var now = Date.now();
@@ -2393,10 +2578,10 @@
     }
     // Mid-speech barge-in: require grace period + a bit more substance than idle turns
     if (isAgentMouthBusy() || state._micHeldForSpeak) {
-      // Still in attack mute window — ignore
-      if (state._micHeldForSpeak) return false;
+      // Attack mute: still allow explicit STOP
+      if (state._micHeldForSpeak && !isStopCommand(said)) return false;
       var started = state._speakStartedAt || 0;
-      if (started && now - started < 500) return false;
+      if (started && now - started < 400 && !isStopCommand(said)) return false;
       var words = said.trim().split(/\s+/).filter(Boolean);
       var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|stop|wait|cancel|go|please|hey)$/i.test(
         said.trim().replace(/[.!?]+$/, "")
@@ -2463,10 +2648,13 @@
       type: "server_vad",
       // Higher = less sensitive (default 0.5 is jumpy with fans/keys/speakers)
       threshold: 0.78,
-      prefix_padding_ms: 280,
-      // Wait longer before declaring end-of-speech
-      silence_duration_ms: 900,
+      prefix_padding_ms: 320,
+      // Wait longer before declaring end-of-speech so multi-clause asks
+      // ("I'm looking at X and Y and it doesn't look good — can we fix…")
+      // aren't cut mid-thought (Ford 2026-07-14).
+      silence_duration_ms: 1400,
       create_response: false,
+      // Client owns replies; we cancel explicitly on barge-in / stop
       interrupt_response: false,
     };
   }
@@ -2858,6 +3046,13 @@
           }),
         }).catch(function () {});
       }
+      // Hard stop — never start a new LLM monologue after "stop"
+      if (isStopCommand(said)) {
+        handleStopCommand();
+        return;
+      }
+      // Mid-tour redirect: cancel tour so we hear the new ask
+      if (state.touring) state.touring = false;
       // userAlreadyShown: do not paint the same user line again in turn()
       turn(said, "voice", { userAlreadyShown: true });
     }
