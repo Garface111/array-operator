@@ -1647,8 +1647,22 @@ html[data-theme="day"] .rep-fld.req > select{
 .sb-fresh-dot{ width:7px; height:7px; border-radius:50%; flex:none;
   background:#94a3b8; box-shadow:0 0 5px rgba(148,163,184,.7); }
 .sb-fresh--stale .sb-fresh-dot{ background:#cbd5e1; }
+/* Demo / cloud-capture: calm green "always on" (no Open-to-sync CTA) */
+.sb-fresh--live{
+  background:rgba(16,185,129,.10); border-color:rgba(16,185,129,.28); color:#047857;
+}
+.sb-fresh--live .sb-fresh-dot{
+  background:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.18);
+}
 .sb-fresh-cta{ opacity:.72; font-weight:600; }
 .sb-fresh-txt{ flex:1 1 auto; min-width:0; }
+/* Demo brand row: plain vendor chip + cloud-capture note */
+.sb-cloud-cap{
+  display:inline-flex; align-items:center; gap:3px;
+  margin-left:6px; font-size:10.5px; font-weight:700; letter-spacing:.01em;
+  color:#047857; background:rgba(16,185,129,.10); border:1px solid rgba(16,185,129,.22);
+  border-radius:999px; padding:2px 8px; white-space:nowrap;
+}
 
 /* ── Plan entitlements: locked tabs + the login plan-picker + the upgrade popup ── */
 .tabbar .tab.locked{ opacity:.5; }

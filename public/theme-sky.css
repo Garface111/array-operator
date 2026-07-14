@@ -586,7 +586,7 @@ html.sky .hero .hp-eg-sub{color:var(--muted)}
 html.sky .hero .hp-list li{color:#3D4A5C}
 html.sky .hero .hp-list li::before{color:var(--sky-green)}
 /* demo strip: a frameless glass band floating in the world (no banner edge
-   to hang from any more); the badge stays the rotated sticker */
+   to hang from any more). Badge is level (not rotated) — Ford 2026-07-14. */
 html.sky .db-demostrip{
   background:rgba(255,255,255,.5) !important;
   -webkit-backdrop-filter:blur(12px) saturate(1.4);
@@ -601,7 +601,7 @@ html.sky .db-demostrip .db-badge.sm{
   background:#ffffff !important;
   border:0 !important;
   color:#1B6ACB !important;
-  transform:rotate(-2deg);
+  transform:none;
   box-shadow:0 4px 14px rgba(20,60,120,.18);
   padding:6px 11px;
   font-size:10px;

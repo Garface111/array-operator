@@ -81,6 +81,12 @@
     const url = VENDOR_PORTAL[v];
     if(!url) return "";
     const lbl = vendorLabel(v);
+    // Demo fleet is cloud-capture mode — no "Open portal to sync" CTAs.
+    try {
+      if(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()){
+        return `<span class="cc-vendor-link ${esc(v)}" title="Cloud capture keeps this feed fresh in the demo">${esc(lbl)} · auto-refresh</span>`;
+      }
+    } catch(_){}
     return `<a class="cc-vendor-link ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener" title="Open the ${esc(lbl)} monitoring portal in a new tab">Open in ${esc(lbl)} ↗</a>`;
   }
 

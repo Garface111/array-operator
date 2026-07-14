@@ -529,6 +529,13 @@
   function freshInner(vendor, ageStr){
     const vlabel = BRAND[vendor] || vendor;
     const dot = '<span class="sb-fresh-dot" aria-hidden="true"></span>';
+    // Demo fleet = cloud capture mode — never "Open portal to sync".
+    try {
+      if(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()){
+        return { cls:"sb-fresh--live", html: dot +
+          `<span class="sb-fresh-txt">Cloud capture · auto-refresh</span>` };
+      }
+    } catch(_){}
     // POLLED vendors (SolarEdge): refreshed server-side, nothing for the user to sync —
     // show an honest "Updated Xh ago" (audit #6) so an aging reading in the 15min–6h
     // window isn't read as live. No sync button (the poller handles it on its own).
@@ -1753,7 +1760,13 @@
     }
     return links;
   }
+  // Marketing demo fleet is "cloud capture" — no "Open portal to sync" CTAs.
+  function isDemoSim(){
+    try { return !!(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()); }
+    catch(_){ return false; }
+  }
   function originLinksHTML(col){
+    if(isDemoSim()) return "";   // cloud-capture demo: no portal-open prompts
     const links = originLinks(col);
     if(!links.length) return "";
     const rows = links.map(l => {
@@ -1765,10 +1778,15 @@
   // Single merged brand pill for a single-vendor array: a vendor-COLORED pill that
   // is ITSELF the portal link ("Open in SolarEdge ↗") when a URL resolves, else a
   // plain non-clickable brand pill. Returns "" when col has no single vendor.
+  // Demo: always a plain brand chip + cloud-capture note (no open-to-sync).
   function brandLinkHTML(col){
     if(!col.vendor) return "";
     const v = col.vendor;
     const label = BRAND[v] || v;
+    if(isDemoSim()){
+      return `<span class="sb-brand ${esc(v)}" title="Cloud capture keeps this feed fresh in the demo">${esc(label)}</span>` +
+        `<span class="sb-cloud-cap" title="Server-side cloud capture — no portal open required">☁ Auto-refresh</span>`;
+    }
     const links = originLinks(col);
     const url = links.length ? links[0].url : "";
     if(url){
@@ -2012,6 +2030,13 @@
   function freshnessHTML(col){
     const vs = col && col.vendor ? [col.vendor]
       : (col && Array.isArray(col.vendors) ? col.vendors : []);
+    // Demo: always show cloud-capture chip (no open-portal-to-sync story).
+    if(isDemoSim() && vs.length){
+      const vendor = vs[0];
+      const { cls, html } = freshInner(vendor, "live");
+      return `<div class="sb-fresh ${cls}" role="status" data-fresh-vendor="${esc(String(vendor))}" data-fresh-age="live"
+          title="Demo fleet uses cloud capture — feeds stay fresh without opening a vendor portal.">${html}</div>`;
+    }
     // Show for extension-captured (syncable) AND polled (SolarEdge) vendors — the
     // latter so an aging polled reading (15min–6h) gets an honest "Updated Xh ago"
     // instead of reading as live (audit #6).

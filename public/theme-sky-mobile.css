@@ -242,7 +242,7 @@
     padding:14px 18px 16px;
     border-radius:20px;      /* the base pill radius reads odd on a stacked column */
   }
-  html.sky .db-demostrip .db-badge.sm{transform:rotate(-3deg); margin-left:2px}
+  html.sky .db-demostrip .db-badge.sm{transform:none; margin-left:0}
 
   /* ── 5 · TABLES keep their scroll — restated at ≥ mobile.css's specificity
         (its day-mode .cc-tablewrap war uses html[data-theme=day] + !important)
