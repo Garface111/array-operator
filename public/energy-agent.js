@@ -140,6 +140,9 @@
       '    <span id="eaStatusText">Ready</span>' +
       '    <span class="ea-budget" id="eaBudget"></span></div>' +
       '  <div class="ea-tools" id="eaTools"></div>' +
+      '  <div class="ea-tour-cap" id="eaTourCap" hidden>' +
+      '    <span class="ea-tour-kicker" id="eaTourKicker">Tour</span>' +
+      '    <span id="eaTourCapText"></span></div>' +
       '  <div class="ea-msgs" id="eaMsgs"></div>' +
       '  <div class="ea-pending" id="eaPending" hidden></div>' +
       // Site-improve compose (screenshot markup → describe → judge pipeline)
@@ -1017,19 +1020,19 @@
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
     }
-    // Show-and-tell tours: don't wait on the LLM to remember to navigate
+    // Show-and-tell tours: run fully client-side (top→bottom, voice lockstep).
+    // Do NOT also call the LLM mid-tour — that was causing disjointed audio + spam bubbles.
     var tourId = detectTourId(text);
     if (tourId) {
       setStatus("Walking you through…", "think");
       try {
         await runTour({ tour_id: tourId });
-        // Also pull live account data so narration is accurate
+        // Quiet accurate wrap-up for Master Account only (no second tour)
         if (tourId === "master_account") {
-          // Let the LLM add a short summary with real numbers after the tour
           text = (
-            "I just ran a ui_tour of master_account (navigate+highlight). " +
-            "Now call account_summary and give a short accurate wrap-up of company, email, plan, " +
-            "and card-on-file — do NOT say email is null if contact_email is set. Keep it brief."
+            "Tour finished. Call ONLY account_summary (include_billing true). " +
+            "Reply in 2 short sentences: company, email (contact_email), plan, card-on-file. " +
+            "Do NOT navigate or run another tour. Do NOT invent null email."
           );
         } else {
           setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
@@ -1169,7 +1172,10 @@
         }
         ok = true;
         detail = { hash: hash, tab: tabLabel(hash) };
-        addMsg("agent", "Opening **" + tabLabel(hash) + "**…");
+        // Tours pass silent — avoid spamming "Opening…" over the guided narration
+        if (!(cmd.args && cmd.args.silent) && !state.touring) {
+          addMsg("agent", "Opening **" + tabLabel(hash) + "**…");
+        }
       } else if (cmd.type === "highlight") {
         ok = highlight(
           cmd.args && cmd.args.selector,
@@ -1224,27 +1230,121 @@
     } catch (e) {}
   }
 
-  function highlight(sel, ms, say) {
-    if (!sel) return false;
-    // Support comma-separated selectors — first match wins
+  function clearHighlights() {
+    try {
+      document.querySelectorAll(".ea-hl, .ea-hl-pulse").forEach(function (el) {
+        el.classList.remove("ea-hl", "ea-hl-pulse");
+      });
+    } catch (e) {}
+  }
+
+  function queryFirst(sel) {
+    if (!sel) return null;
     var el = null;
     String(sel).split(",").some(function (part) {
       try { el = document.querySelector(part.trim()); } catch (e) { el = null; }
-      return !!el;
+      return !!el && el.offsetParent !== null || !!el;
     });
+    return el;
+  }
+
+  async function waitForSelector(sel, timeoutMs) {
+    var t0 = Date.now();
+    var limit = timeoutMs || 4000;
+    while (Date.now() - t0 < limit) {
+      var el = queryFirst(sel);
+      if (el) return el;
+      await sleep(120);
+    }
+    return queryFirst(sel);
+  }
+
+  function highlight(sel, ms, say) {
+    if (!sel) return false;
+    clearHighlights();
+    var el = queryFirst(sel);
     if (!el) return false;
-    el.classList.add("ea-hl");
-    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-    if (say) {
+    el.classList.add("ea-hl", "ea-hl-pulse");
+    try { el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }); } catch (e) {}
+    // say is handled by the tour sequencer (speakAndWait) — keep highlight pure
+    if (say && !state.touring) {
       addMsg("agent", say);
       try { speak(say); } catch (e) {}
     }
-    setTimeout(function () { el.classList.remove("ea-hl"); }, ms || 4500);
+    setTimeout(function () {
+      el.classList.remove("ea-hl", "ea-hl-pulse");
+    }, ms || 4500);
     return true;
   }
 
   function sleep(ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function stripMd(text) {
+    return String(text || "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/#{1,6}\s+/g, "")
+      .replace(/\n+/g, " ")
+      .trim();
+  }
+
+  function setTourCaption(text, stepIdx, total) {
+    var cap = document.getElementById("eaTourCap");
+    var body = document.getElementById("eaTourCapText");
+    var kicker = document.getElementById("eaTourKicker");
+    if (!cap || !body) return;
+    if (!text) {
+      cap.hidden = true;
+      body.textContent = "";
+      return;
+    }
+    cap.hidden = false;
+    if (kicker) {
+      kicker.textContent = total
+        ? ("Tour · " + (stepIdx + 1) + " of " + total)
+        : "Tour";
+    }
+    // light markdown bold for caption
+    body.innerHTML = formatMsg(text).replace(/<\/?p[^>]*>/g, " ").replace(/<div class="ea-sp"><\/div>/g, " ");
+  }
+
+  /**
+   * Speak and resolve only when audio finishes (or a length-based fallback).
+   * Keeps tour visuals in lockstep with voice.
+   */
+  function speakAndWait(text) {
+    var plain = stripMd(text);
+    if (!plain) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var settled = false;
+      function done() {
+        if (settled) return;
+        settled = true;
+        state._onSpeakDone = null;
+        state.speaking = false;
+        resolve();
+      }
+      state._onSpeakDone = done;
+      // Estimate ~160 wpm + pad; clamp so we never hang the tour
+      var words = plain.split(/\s+/).filter(Boolean).length;
+      var fallbackMs = Math.min(14000, Math.max(2400, Math.round(words * 420) + 800));
+      var timer = setTimeout(done, fallbackMs);
+      var prev = state._onSpeakDone;
+      state._onSpeakDone = function () {
+        clearTimeout(timer);
+        if (typeof prev === "function" && prev !== done) { /* noop */ }
+        done();
+      };
+      try {
+        // During tours don't cancel mid-phrase unless starting a new step (speak does that)
+        speak(plain, { awaitable: true });
+      } catch (e) {
+        done();
+      }
+    });
   }
 
   /** User-visible tab names — must match the top tabbar labels exactly. */
@@ -1262,7 +1362,49 @@
     return TAB_LABELS[h] || hash;
   }
 
-  /** Show-and-tell: navigate + highlight + narrate steps in sequence. */
+  function panelSelectorForHash(hash) {
+    var map = {
+      "#dashboard": "#panelDashboard",
+      "#arrays": "#panelArrays",
+      "#analysis": "#panelAnalysis",
+      "#reports": "#panelReports",
+      "#resources": "#panelResources",
+      "#account": "#panelAccount",
+    };
+    var h = String(hash || "").toLowerCase();
+    if (h.charAt(0) !== "#") h = "#" + h;
+    return map[h] || null;
+  }
+
+  async function scrollPanelTop(hash) {
+    var panelSel = panelSelectorForHash(hash);
+    var panel = panelSel ? document.querySelector(panelSel) : null;
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      try { window.scrollTo(0, 0); } catch (e2) {}
+    }
+    if (panel) {
+      try {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) {}
+      // Inner scroll containers (acct list)
+      var list = panel.querySelector("#acctList, .acct-list, .dash-wrap, #sbWrap");
+      if (list) {
+        try { list.scrollTop = 0; } catch (e) {}
+      }
+      try { panel.scrollTop = 0; } catch (e) {}
+    }
+    // Also pin the tabbar active visual
+    try {
+      var tab = document.querySelector('#tabbar a[href="' + (hash || "") + '"]');
+      if (tab) tab.classList.add("ea-hl");
+      setTimeout(function () { if (tab) tab.classList.remove("ea-hl"); }, 2000);
+    } catch (e) {}
+    await sleep(450);
+  }
+
+  /** Show-and-tell: top-to-bottom, one step at a time, voice waits for visuals. */
   async function runTour(args) {
     args = args || {};
     var steps = args.steps || [];
@@ -1270,100 +1412,155 @@
       steps = presetTour(args.tour_id) || [];
     }
     if (!steps.length) return false;
+    if (state.touring) return false; // one tour at a time
+    state.touring = true;
+    state.thinking = true; // block concurrent voice turns mid-tour
     addTool("ui.tour", (args.tour_id || steps.length + " steps"));
-    for (var i = 0; i < steps.length; i++) {
-      var s = steps[i] || {};
-      var hash = s.hash || (s.navigate && s.navigate.hash);
-      if (hash || s.type === "navigate") {
-        await runCommand({
-          type: "navigate",
-          args: { hash: hash || (s.args && s.args.hash) || "#dashboard" },
-          id: "tour-nav-" + i,
-        });
-        await sleep(s.wait_ms || 500);
-      }
-      if (s.selector || s.type === "highlight") {
-        var okHl = highlight(s.selector, s.ms || 4200, s.say || s.label || null);
-        if (!okHl && s.say) {
-          // Still narrate even if selector missing (DOM not ready)
-          addMsg("agent", s.say);
+    setStatus("Guided tour…", "think");
+
+    // Count narrated steps for caption
+    var narrated = steps.filter(function (s) { return s && (s.say || s.selector); });
+    var nIdx = 0;
+
+    try {
+      for (var i = 0; i < steps.length; i++) {
+        if (!state.touring) break; // cancelled
+        var s = steps[i] || {};
+        var hash = s.hash || (s.navigate && s.navigate.hash);
+
+        if (hash || s.type === "navigate") {
+          var h = hash || (s.args && s.args.hash) || "#dashboard";
+          if (h.charAt(0) !== "#") h = "#" + h;
+          await runCommand({
+            type: "navigate",
+            args: { hash: h, silent: true },
+            id: "tour-nav-" + i,
+          });
+          // Wait for the panel to mount, then always start at the TOP
+          var psel = panelSelectorForHash(h) || "body";
+          await waitForSelector(psel + ".active, " + psel, 3500);
+          await sleep(350);
+          await scrollPanelTop(h);
+          if (s.say) {
+            setTourCaption(s.say, nIdx, narrated.length);
+            nIdx++;
+            await speakAndWait(s.say);
+          } else {
+            setTourCaption("Opened **" + tabLabel(h) + "** — starting at the top.", nIdx, narrated.length);
+            nIdx++;
+            await speakAndWait("Opened " + tabLabel(h) + ". Starting at the top.");
+          }
+          continue;
         }
-        await sleep((s.ms || 4200) + 200);
-      } else if (s.say && !hash) {
-        addMsg("agent", s.say);
-        try { speak(s.say); } catch (e) {}
-        await sleep(s.ms || 2200);
+
+        if (s.selector || s.type === "highlight") {
+          var el = await waitForSelector(s.selector, 3000);
+          if (el) {
+            // Ensure element is visible from a predictable top-down path
+            try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+            await sleep(280);
+            clearHighlights();
+            el.classList.add("ea-hl", "ea-hl-pulse");
+          }
+          var line = s.say || s.label || "";
+          if (line) {
+            setTourCaption(line, nIdx, narrated.length);
+            nIdx++;
+            await speakAndWait(line);
+          } else {
+            await sleep(s.ms || 2000);
+          }
+          // Hold highlight a beat after speech, then clear for next
+          await sleep(400);
+          clearHighlights();
+          continue;
+        }
+
+        if (s.say) {
+          setTourCaption(s.say, nIdx, narrated.length);
+          nIdx++;
+          await speakAndWait(s.say);
+        }
       }
+    } finally {
+      state.touring = false;
+      state.thinking = false;
+      clearHighlights();
+      setTourCaption(null);
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     }
     return true;
   }
 
   function presetTour(id) {
     var key = String(id || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+    // Ordered TOP → BOTTOM of each page. First step always navigates + scrolls top.
     if (key === "master_account" || key === "account") {
       return [
-        { hash: "#account", say: "Opening **Master Account** — your profile, plan, and billing." },
         {
-          selector: "#panelAccount, #acctList, .acct-list",
-          say: "This whole panel is Master Account — company, operator, email, plan, and utilities.",
-          ms: 3500,
+          hash: "#account",
+          say: "Master Account. I'll walk top to bottom — profile first, then auto-refresh, billing, and files.",
+        },
+        {
+          selector: "#tabAccount, a.tab[href='#account']",
+          say: "You're on the **Master Account** tab in the top bar.",
         },
         {
           selector: ".acct-edit[data-field='company'], .acct-row[data-field='company']",
-          say: "**Company** — the business name on invoices and the account card. Click to edit; it auto-saves.",
-          ms: 4000,
+          say: "**Company** — your business name. Click to edit; it saves as you type.",
         },
         {
           selector: ".acct-edit[data-field='name'], .acct-row[data-field='name']",
-          say: "**Operator name** — you, the human running this account.",
-          ms: 3500,
+          say: "**Operator name** — the person running this account.",
         },
         {
           selector: ".acct-edit[data-field='email'], .acct-row[data-field='email']",
-          say: "**Email** — contact email for this tenant (`contact_email` in the system). This is what shows on the profile.",
-          ms: 4000,
+          say: "**Email** — the contact address on this account.",
         },
         {
-          selector: "#rowAutoRefresh, .ar-stack, #arBody",
-          say: "**Auto-refresh** — how we keep inverter and utility data fresh (cloud vs this computer).",
-          ms: 4200,
+          selector: "#rowAutoRefresh, .ar-stack, .ar-card-head",
+          say: "**Auto-refresh** — how production and utility bills stay up to date, cloud or this computer.",
         },
         {
-          selector: "#aoPaySetup, .acct-pay-setup, #billManage, #payState",
-          say: "**Billing / card** — plan status and payment method for Array Operator itself (not offtaker invoices).",
-          ms: 4000,
+          selector: "#aoPaySetup, .acct-pay-setup, #billManage, #payState, .acct-row.acct-pay-setup",
+          say: "**Plan and card** — Array Operator billing for your subscription, not offtaker invoices.",
         },
         {
-          selector: "#acctFilesBody, .acct-files-row, #acctFilesCount",
-          say: "**Your files** — templates, workbooks, and captured utility PDFs stored on the account.",
-          ms: 3800,
+          selector: ".acct-files-row, #acctFilesBody, #acctFilesCount",
+          say: "**Your files** — templates, workbooks, and captured utility PDFs.",
         },
-        { say: "That's the Master Account tour. Ask about any section and I'll dig in — or say **Improve** to change the UI.", ms: 2500 },
+        {
+          say: "That's Master Account, top to bottom. Ask about any section, or say Improve to change the UI.",
+        },
       ];
     }
     if (key === "arrays" || key === "inverters") {
       return [
-        { hash: "#arrays", say: "Opening **Inverters** — your live fleet canvas (this is the tab labeled Inverters, not Arrays)." },
-        { selector: "#panelArrays, #sbWrap, .sb-wrap", say: "Each column is a site; the comb below is real inverters.", ms: 4000 },
-        { say: "Want health details on a specific site? Name it and I'll investigate.", ms: 2200 },
+        { hash: "#arrays", say: "Inverters tab — your live fleet canvas. Starting at the top." },
+        { selector: "#tabArrays, a.tab[href='#arrays']", say: "This is the **Inverters** tab." },
+        { selector: "#panelArrays .vs-seg, #panelArrays .sb-head, #sbWrap", say: "Controls and the canvas live here — each column is a site, prongs are inverters." },
+        { say: "Name a site if you want a closer look." },
       ];
     }
     if (key === "reports" || key === "invoices") {
       return [
-        { hash: "#reports", say: "Opening **Invoices** — offtaker billing (tab label is Invoices)." },
-        { selector: "#panelReports, .rb-wrap, #rbRoot", say: "Offtakers, drafts, and send pipeline live here.", ms: 4000 },
+        { hash: "#reports", say: "Invoices tab — offtaker billing. Starting at the top." },
+        { selector: "#tabReports, a.tab[href='#reports']", say: "This is **Invoices** in the top bar." },
+        { selector: "#panelReports, .rb-wrap, #rbRoot", say: "Offtakers, drafts, and the send pipeline are here." },
       ];
     }
     if (key === "analysis" || key === "trends") {
       return [
-        { hash: "#analysis", say: "Opening **Analysis** — deeper digs. Trends / Through time is a sub-view here, not its own top tab." },
-        { selector: "#panelAnalysis, .vs-seg", say: "Use the segmented control to switch Analysis sub-views (including through-time).", ms: 4200 },
+        { hash: "#analysis", say: "Analysis tab — deeper digs. Trends live here as a sub-view, not their own top tab." },
+        { selector: "#tabAnalysis, a.tab[href='#analysis']", say: "This is **Analysis**." },
+        { selector: "#panelAnalysis .vs-seg, #panelAnalysis", say: "Use the segmented control for Through time and other views." },
       ];
     }
     if (key === "dashboard" || key === "fleet_triage" || key === "triage") {
       return [
-        { hash: "#dashboard", say: "Opening **Fleet Triage** — who needs attention across the fleet." },
-        { selector: "#panelDashboard, .dash-wrap", say: "This is Fleet Triage (not Dashboard) — attention and overview live here.", ms: 4000 },
+        { hash: "#dashboard", say: "Fleet Triage — who needs attention across the fleet. Starting at the top." },
+        { selector: "#tabDashboard, a.tab[href='#dashboard']", say: "This is **Fleet Triage**." },
+        { selector: "#panelDashboard, .dash-wrap", say: "Overview and attention flags live on this page." },
       ];
     }
     return null;
@@ -1478,12 +1675,16 @@
     cancelRealtimeIfActive();
   }
 
-  function speak(text) {
+  function speak(text, opts) {
+    opts = opts || {};
     if (!text) return;
+    var plain = opts.awaitable ? String(text) : stripMd(text);
+    if (!plain) return;
     // Prefer GPT Realtime TTS when connected
     if (state.dc && state.dc.readyState === "open") {
       try {
         // If something is already speaking, cancel it first; then speak the new line
+        // (tours call speakAndWait which expects clean sequential audio)
         cancelRealtimeIfActive();
         state.rtResponseActive = true;
         // Ask the Realtime model to speak this line (tools already ran server-side)
@@ -1492,25 +1693,43 @@
           response: {
             instructions:
               "Speak the following to the user naturally, in English, no extra commentary:\n\n" +
-              String(text).slice(0, 1200),
+              plain.slice(0, 1200),
           },
         }));
         state.speaking = true;
-        setStatus("Speaking (GPT voice)…", "speak");
+        setStatus(state.touring ? "Tour… speaking" : "Speaking (GPT voice)…", "speak");
         return;
       } catch (e) {
         state.rtResponseActive = false;
+        if (state._onSpeakDone) {
+          try { state._onSpeakDone(); } catch (e2) {}
+        }
       }
     }
     // Fallback: browser speech synthesis
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) {
+      if (state._onSpeakDone) {
+        try { state._onSpeakDone(); } catch (e) {}
+      }
+      return;
+    }
     try { window.speechSynthesis.cancel(); } catch (e) {}
-    var u = new SpeechSynthesisUtterance(String(text).slice(0, 800));
-    u.rate = 1.05;
-    u.onstart = function () { state.speaking = true; setStatus("Speaking…", "speak"); };
+    var u = new SpeechSynthesisUtterance(plain.slice(0, 800));
+    u.rate = 1.02;
+    u.onstart = function () { state.speaking = true; setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak"); };
     u.onend = function () {
       state.speaking = false;
-      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      if (state._onSpeakDone) {
+        try { state._onSpeakDone(); } catch (e) {}
+      } else {
+        setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      }
+    };
+    u.onerror = function () {
+      state.speaking = false;
+      if (state._onSpeakDone) {
+        try { state._onSpeakDone(); } catch (e) {}
+      }
     };
     window.speechSynthesis.speak(u);
   }
@@ -1544,12 +1763,18 @@
     if (ev.type === "output_audio_buffer.stopped" || ev.type === "response.done") {
       state.speaking = false;
       state.rtResponseActive = false;
-      if (state.listening) setStatus("Listening…", "listen");
+      // Resolve speakAndWait (tour lockstep)
+      if (typeof state._onSpeakDone === "function") {
+        try { state._onSpeakDone(); } catch (e) {}
+      } else if (state.listening && !state.touring) {
+        setStatus("Listening…", "listen");
+      }
     }
     // User finished speaking — ONE path: show once, then agent turn (tools + speak)
     if (ev.type === "conversation.item.input_audio_transcription.completed") {
       var said = (ev.transcript || "").trim();
-      if (!said || state.thinking) return;
+      // Ignore barge-ins during guided tours so steps stay ordered
+      if (!said || state.thinking || state.touring) return;
       // Only cancel if a response is actually running (avoids "no active response")
       cancelRealtimeIfActive();
       addMsg("user", said);

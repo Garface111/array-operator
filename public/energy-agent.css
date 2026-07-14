@@ -205,8 +205,12 @@ body.ea-shell-open{
   background: rgba(14,165,233,.04);
   font-size: 11px; color: var(--muted,#64748b);
   flex: 0 0 auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(14,165,233,.22) transparent;
 }
 .ea-tools:empty{ display: none; }
+.ea-tools::-webkit-scrollbar{ width: 5px; }
+.ea-tools::-webkit-scrollbar-thumb{ background: rgba(14,165,233,.2); border-radius: 99px; }
 .ea-tool{
   display: flex; gap: 6px; padding: 3px 0; font-variant-numeric: tabular-nums;
 }
@@ -214,8 +218,40 @@ body.ea-shell-open{
 .ea-tool code{ font-size: 10.5px; opacity: .85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .ea-msgs{
-  flex: 1 1 auto; min-height: 0; overflow: auto;
+  flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto;
   padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px;
+  /* Thin, unobtrusive scrollbar (Firefox + WebKit) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(14,165,233,.28) transparent;
+}
+.ea-msgs::-webkit-scrollbar{ width: 6px; }
+.ea-msgs::-webkit-scrollbar-track{ background: transparent; margin: 6px 0; }
+.ea-msgs::-webkit-scrollbar-thumb{
+  background: rgba(14,165,233,.22);
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+.ea-msgs::-webkit-scrollbar-thumb:hover{ background: rgba(14,165,233,.4); }
+
+/* Live tour caption — one sticky line instead of spamming chat bubbles */
+.ea-tour-cap{
+  flex: 0 0 auto;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(14,165,233,.22);
+  background: linear-gradient(180deg, rgba(14,165,233,.1), rgba(14,165,233,.05));
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink, #0f172a);
+  box-shadow: 0 6px 16px -12px rgba(14,60,120,.35);
+}
+.ea-tour-cap[hidden]{ display: none !important; }
+.ea-tour-cap b{ font-weight: 760; }
+.ea-tour-cap .ea-tour-kicker{
+  display: block; font-size: 10.5px; font-weight: 720; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ea-sky2); margin-bottom: 3px;
 }
 .ea-msg{
   max-width: 94%; font-size: 13px; line-height: 1.5; padding: 10px 13px; border-radius: 14px;
@@ -595,13 +631,22 @@ body.ea-shell-open #fsWrap,
 #eaOrb ~ #fsWrap,
 html.ea-merged #fsWrap{ display: none !important; }
 
-/* highlight driver */
+/* highlight driver — stronger during tours */
 .ea-hl{
   outline: 3px solid var(--ea-sky2) !important;
   outline-offset: 3px !important;
   box-shadow: 0 0 0 6px rgba(14,165,233,.18) !important;
   transition: outline .15s, box-shadow .15s;
-  scroll-margin: 80px;
+  scroll-margin: 100px;
+  position: relative;
+  z-index: 5;
+}
+.ea-hl-pulse{
+  animation: eaHlPulse 1.2s ease-in-out infinite;
+}
+@keyframes eaHlPulse{
+  0%,100%{ box-shadow: 0 0 0 6px rgba(14,165,233,.16); }
+  50%{ box-shadow: 0 0 0 10px rgba(14,165,233,.28); }
 }
 
 /* Mobile: dock becomes overlay sheet; tab still top-left-ish */
