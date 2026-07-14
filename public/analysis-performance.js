@@ -316,13 +316,14 @@
     var headline = MODE === "PI" ? headlinePI(ctx) : headlineCF(ctx);
     var breakdown = MODE === "PI" ? breakdownPI(ctx) : breakdownCF(ctx);
 
+    var win = (ctx && ctx.windowDays) || 14;
     container.innerHTML =
       '<div class="an-card">' +
       '  <div class="an-card-head">' +
       '    <div><h3>Performance</h3>' +
       '    <div class="an-card-sub">' + (MODE === "PI"
-            ? 'Weather-adjusted production vs. expected'
-            : 'Output as a share of nameplate capacity') + '</div></div>' +
+            ? ('Weather-adjusted production vs. expected · last ' + win + ' days')
+            : ('Output as a share of nameplate · last ' + win + ' days')) + '</div></div>' +
       '    <div class="an-seg" role="tablist">' +
       '      <button type="button" class="an-seg-btn' + (MODE === "PI" ? " on" : "") + '" data-mode="PI">Performance Index</button>' +
       '      <button type="button" class="an-seg-btn' + (MODE === "CF" ? " on" : "") + '" data-mode="CF">Capacity Factor</button>' +

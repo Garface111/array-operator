@@ -313,8 +313,8 @@
             (notLoadedYet
               ? '<span class="analm-hcount">Checking your fleet…</span>'
               : totalFlagged
-              ? '<span class="analm-hcount">' + totalFlagged + ' inverter' + (totalFlagged === 1 ? '' : 's') + ' need attention</span>'
-              : '<span class="analm-hcount zero">All systems nominal</span>') +
+              ? '<span class="analm-hcount">' + totalFlagged + ' inverter' + (totalFlagged === 1 ? '' : 's') + ' need attention · live + 14-day peer</span>'
+              : '<span class="analm-hcount zero">All systems nominal · live + 14-day peer</span>') +
             '</div>';
     html += '  </div>';
     html += '  <div class="analm-body">';

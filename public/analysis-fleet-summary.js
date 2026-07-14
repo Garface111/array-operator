@@ -250,13 +250,14 @@
       var pTone = perfRatio >= 92 ? "good" : (perfRatio < 82 ? "bad" : "warn");
       var confTxt = f.confidence ? (CONF_LABEL[f.confidence] || f.confidence) : "";
       var modeled = _num(f.arrays_modeled);
-      var perfSub = "";
-      if (confTxt) perfSub = confTxt;
-      if (modeled != null) perfSub += (perfSub ? " · " : "") + modeled + (modeled === 1 ? " array modeled" : " arrays modeled");
-      html += card("Weather-adj. performance", fmt.pct(perfRatio), perfSub || "vs expected", { tone: pTone });
+      var fcWin = (f.window && f.window.days) || win;
+      var perfSub = "last " + fcWin + "d";
+      if (confTxt) perfSub += " · " + confTxt;
+      if (modeled != null) perfSub += " · " + modeled + (modeled === 1 ? " array modeled" : " arrays modeled");
+      html += card("Weather-adj. performance", fmt.pct(perfRatio), perfSub, { tone: pTone });
     } else {
       html += card("Weather-adj. performance", "—", "not modeled yet", { tone: "muted",
-        title: "Compares each site's measured production against the real sunlight that fell on it, over the last 10 days. "
+        title: "Compares each site's measured production against the real sunlight that fell on it, over the last " + win + " days. "
           + "It needs a location on file plus a few days of measured daily production — usually 3–4 full days after a site starts producing — then it fills in automatically." });
     }
 

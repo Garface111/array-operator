@@ -366,9 +366,9 @@
     html += '    <div class="an-card-sub"><span class="anevents-hcount">' +
               (total
                 ? (counts.open
-                    ? '<span class="open">' + counts.open + ' open</span> · ' + total + ' event' + (total === 1 ? '' : 's')
-                    : total + ' event' + (total === 1 ? '' : 's') + ' · all handled')
-                : 'No events yet') +
+                    ? '<span class="open">' + counts.open + ' open</span> · ' + total + ' event' + (total === 1 ? '' : 's') + ' · rolling history'
+                    : total + ' event' + (total === 1 ? '' : 's') + ' · all handled · rolling history')
+                : 'No events yet · opens as issues are detected') +
               '</span></div>';
     html += '  </div>';
     html += '  <div class="anevents-body">';
