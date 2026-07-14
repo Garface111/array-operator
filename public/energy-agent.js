@@ -2414,11 +2414,7 @@
     state.realtimeReady = true;
     syncMicBtn();
     setStatus("Listening…", "listen");
-    // Text status only — voice greeting is queued once on dc open
-    if (!state._voiceConnectedNote) {
-      state._voiceConnectedNote = true;
-      addMsg("agent", "GPT voice connected — talk anytime. Replies use the same natural voice.");
-    }
+    // No chat bubble for voice-connect — status pill already shows Listening…
   }
 
   /** Fallback when OpenAI key missing or WebRTC fails: Web Speech + browser TTS */
