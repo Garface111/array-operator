@@ -267,6 +267,100 @@ html:not(.sky) .ea-compose textarea{ background: var(--bg2,#0b1220); border-colo
   flex: 0 0 auto;
 }
 
+/* ── Improve-site compose (merged Wish this was better) ─────────────────── */
+.ea-improve{
+  margin: 0 12px 10px; padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(14,165,233,.22);
+  background: rgba(14,165,233,.06);
+  flex: 0 0 auto;
+}
+.ea-improve[hidden]{ display: none !important; }
+.ea-improve-head{
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.ea-improve-head b{ font-size: 13px; font-weight: 760; }
+.ea-improve-x{
+  border: 0; background: transparent; color: var(--muted,#64748b);
+  font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 6px;
+}
+.ea-improve-lead{
+  margin: 0 0 8px; font-size: 11.5px; color: var(--muted,#64748b); line-height: 1.35;
+}
+.ea-improve-thumb{
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.ea-improve-thumb[hidden]{ display: none !important; }
+.ea-improve-thumb img{
+  width: 72px; height: 48px; object-fit: cover; border-radius: 8px;
+  border: 1px solid rgba(14,165,233,.25);
+}
+.ea-improve-thumb button,
+.ea-improve-mark{
+  font: inherit; font-size: 12px; font-weight: 680; cursor: pointer;
+  border-radius: 9px; border: 1px solid rgba(14,165,233,.3);
+  background: #fff; color: var(--ea-sky2); padding: 6px 10px;
+}
+html:not(.sky) .ea-improve-mark,
+html:not(.sky) .ea-improve-thumb button{
+  background: var(--card,#111827); color: var(--ea-sky);
+}
+.ea-improve textarea{
+  width: 100%; min-height: 52px; resize: vertical; box-sizing: border-box;
+  font: inherit; font-size: 13px; padding: 9px 11px; border-radius: 12px;
+  border: 1px solid rgba(14,165,233,.2); background: #fff; color: inherit;
+  margin-bottom: 8px;
+}
+html:not(.sky) .ea-improve textarea{ background: var(--bg2,#0b1220); border-color: var(--line); }
+.ea-improve-row{ display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.ea-improve-send{
+  font: inherit; font-size: 12.5px; font-weight: 720; cursor: pointer;
+  border: 0; border-radius: 10px; padding: 8px 14px;
+  background: var(--ea-sky2); color: #fff;
+}
+.ea-improve-msg{ font-size: 11.5px; margin-top: 6px; color: var(--muted,#64748b); min-height: 1em; }
+.ea-improve-cta{
+  flex: 0 0 auto; height: 40px; border-radius: 12px; border: 1px solid rgba(14,165,233,.35);
+  font: inherit; font-size: 12px; font-weight: 720; cursor: pointer;
+  background: rgba(14,165,233,.1); color: var(--ea-sky2); padding: 0 10px;
+}
+.ea-improve-cta:hover{ background: rgba(14,165,233,.18); }
+
+/* Live build journey inside the dock */
+.ea-journey{
+  margin: 0 12px 10px; padding: 12px 12px 10px;
+  border-radius: 14px; border: 1px solid rgba(14,165,233,.2);
+  background: rgba(255,255,255,.75);
+  flex: 0 0 auto;
+}
+.ea-journey[hidden]{ display: none !important; }
+html:not(.sky) .ea-journey{ background: rgba(255,255,255,.04); }
+.ea-journey h4{ margin: 0 0 2px; font-size: 13.5px; font-weight: 760; }
+.ea-j-lead{ margin: 0 0 10px; font-size: 11.5px; color: var(--muted,#64748b); }
+.ea-j-steps{ list-style: none; margin: 0; padding: 0; }
+.ea-j-steps li{
+  display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start;
+  padding: 5px 0; font-size: 12px;
+}
+.ea-j-steps li i{
+  width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-style: normal; font-size: 10px; font-weight: 800;
+  border: 1.5px solid rgba(14,165,233,.3); color: var(--muted,#64748b);
+}
+.ea-j-steps li.done i{ background: var(--ea-sky2); border-color: var(--ea-sky2); color: #fff; }
+.ea-j-steps li.active i{ border-color: var(--ea-sky2); color: var(--ea-sky2); box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+.ea-j-steps li.fail i{ border-color: #dc2626; color: #dc2626; }
+.ea-j-steps b{ display: block; font-weight: 700; font-size: 12px; }
+.ea-j-steps span{ display: block; font-size: 11px; color: var(--muted,#64748b); }
+.ea-j-actions{ display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.ea-j-actions button{
+  font: inherit; font-size: 12px; font-weight: 680; cursor: pointer;
+  border-radius: 9px; padding: 6px 11px;
+  border: 1px solid rgba(14,165,233,.3); background: transparent; color: var(--ea-sky2);
+}
+.ea-j-actions #eaJReload{ background: var(--ea-sky2); border-color: var(--ea-sky2); color: #fff; }
+
 /* highlight driver */
 .ea-hl{
   outline: 3px solid var(--ea-sky2) !important;

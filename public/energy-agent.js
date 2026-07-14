@@ -122,7 +122,7 @@
     panel.innerHTML =
       '  <div class="ea-head">' +
       '    <div><h3>Energy Agent</h3>' +
-      '    <p>Voice-first solar operator — fleet, invoices, earnings. Confirms before changing anything.</p></div>' +
+      '    <p>Your operator + site improver — marks up changes, judges them, ships small UI live.</p></div>' +
       '    <button type="button" class="ea-x" id="eaClose" aria-label="Close">×</button>' +
       "  </div>" +
       '  <div class="ea-status"><i class="ea-dot" id="eaDot"></i>' +
@@ -131,12 +131,29 @@
       '  <div class="ea-tools" id="eaTools"></div>' +
       '  <div class="ea-msgs" id="eaMsgs"></div>' +
       '  <div class="ea-pending" id="eaPending" hidden></div>' +
+      // Site-improve compose (screenshot markup → describe → judge pipeline)
+      '  <div class="ea-improve" id="eaImprove" hidden>' +
+      '    <div class="ea-improve-head"><b>Improve this site</b>' +
+      '      <button type="button" class="ea-improve-x" id="eaImproveCancel" aria-label="Cancel improve">×</button></div>' +
+      '    <p class="ea-improve-lead" id="eaImproveLead">Circle the spot on the page, then describe the change.</p>' +
+      '    <div class="ea-improve-thumb" id="eaImproveThumb" hidden>' +
+      '      <img id="eaImproveImg" alt="Your marked screenshot">' +
+      '      <button type="button" id="eaImproveRemark">Re-circle</button></div>' +
+      '    <textarea id="eaImproveText" rows="2" maxlength="800" placeholder="e.g. Put a total kWh badge right here"></textarea>' +
+      '    <div class="ea-improve-row">' +
+      '      <button type="button" class="ea-improve-mark" id="eaImproveMark">Circle the spot</button>' +
+      '      <button type="button" class="ea-improve-send" id="eaImproveSend">Build this →</button>' +
+      '    </div>' +
+      '    <div class="ea-improve-msg" id="eaImproveMsg"></div>' +
+      "  </div>" +
+      '  <div class="ea-journey" id="eaJourney" hidden role="status" aria-live="polite"></div>' +
       '  <div class="ea-compose">' +
       '    <textarea id="eaInput" rows="1" placeholder="Ask or type… (or use the mic)"></textarea>' +
+      '    <button type="button" class="ea-improve-cta" id="eaImproveOpen" title="Mark up the page and ship a small improvement">Improve</button>' +
       '    <button type="button" class="ea-mic" id="eaMic" title="Toggle microphone">Mic</button>' +
       '    <button type="button" class="ea-send" id="eaSend">Send</button>' +
       "  </div>" +
-      '  <div class="ea-legal">Sessions may be transcribed to improve support. Only your account. Never other tenants. Mic stays on while the agent is open.</div>';
+      '  <div class="ea-legal">Sessions may be transcribed to improve support. Only your account. Site changes go through an AI judge (no billing/money edits). Mic stays on while open.</div>';
     document.body.appendChild(panel);
 
     // Lightweight marker root for status hooks that still look for #eaRoot
@@ -167,6 +184,265 @@
     document.getElementById("eaInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
     });
+    // Site improve (merged "Wish this was better")
+    document.getElementById("eaImproveOpen").onclick = function (e) {
+      e.preventDefault();
+      openImproveFlow({ markFirst: true });
+    };
+    document.getElementById("eaImproveCancel").onclick = function () { closeImproveCompose(); };
+    document.getElementById("eaImproveMark").onclick = function () { launchMarkCapture(); };
+    document.getElementById("eaImproveRemark").onclick = function () { launchMarkCapture(); };
+    document.getElementById("eaImproveSend").onclick = function () { submitImprove(); };
+    document.getElementById("eaImproveText").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitImprove(); }
+    });
+  }
+
+  // ── Improve-the-site (merged with feature-suggestion + judge pipeline) ──
+  var improve = {
+    shot: null,
+    activeId: null,
+    poll: null,
+    since: 0,
+  };
+
+  function openImproveFlow(opts) {
+    opts = opts || {};
+    ensureUi();
+    if (!state.open) {
+      // Open dock without killing mic if already open path
+      state.open = true;
+      var panel = document.getElementById("eaPanel");
+      var orb = document.getElementById("eaOrb");
+      if (panel) panel.classList.add("open");
+      if (orb) { orb.classList.add("open", "active"); }
+      document.body.classList.add("ea-shell-open");
+    }
+    showImproveCompose(true);
+    addMsg("agent",
+      "Let's improve the site. I'll freeze the page so you can circle the spot — " +
+      "then type one short sentence. An AI judge reviews it; small UI changes can ship live. " +
+      "Billing and money math never auto-ship.");
+    if (opts.markFirst !== false) {
+      setTimeout(launchMarkCapture, 350);
+    }
+  }
+
+  function showImproveCompose(show) {
+    var box = document.getElementById("eaImprove");
+    if (box) box.hidden = !show;
+  }
+
+  function closeImproveCompose() {
+    showImproveCompose(false);
+    improve.shot = null;
+    var img = document.getElementById("eaImproveImg");
+    var thumb = document.getElementById("eaImproveThumb");
+    var ta = document.getElementById("eaImproveText");
+    var msg = document.getElementById("eaImproveMsg");
+    if (img) img.removeAttribute("src");
+    if (thumb) thumb.hidden = true;
+    if (ta) ta.value = "";
+    if (msg) msg.textContent = "";
+  }
+
+  function launchMarkCapture() {
+    if (!window.__aoImprove || typeof window.__aoImprove.startMark !== "function") {
+      addMsg("agent", "Markup tools aren't loaded yet — refresh the page once and try Improve again.");
+      return;
+    }
+    setStatus("Circle the spot on the page…", "think");
+    window.__aoImprove.startMark({ viaAgent: true });
+  }
+
+  /** Called by the feature-wish markup script after the user circles a spot. */
+  window.__eaOpenImprove = function (payload) {
+    payload = payload || {};
+    ensureUi();
+    if (!state.open) {
+      state.open = true;
+      var panel = document.getElementById("eaPanel");
+      var orb = document.getElementById("eaOrb");
+      if (panel) panel.classList.add("open");
+      if (orb) { orb.classList.add("open", "active"); }
+      document.body.classList.add("ea-shell-open");
+    }
+    showImproveCompose(true);
+    improve.shot = payload.screenshot_b64 || null;
+    var thumb = document.getElementById("eaImproveThumb");
+    var img = document.getElementById("eaImproveImg");
+    var lead = document.getElementById("eaImproveLead");
+    var msg = document.getElementById("eaImproveMsg");
+    if (improve.shot && img && thumb) {
+      img.src = "data:image/png;base64," + improve.shot;
+      thumb.hidden = false;
+    } else if (thumb) {
+      thumb.hidden = true;
+    }
+    if (lead) {
+      lead.textContent = improve.shot
+        ? "Marked. One short sentence — what should be there?"
+        : (payload.skipped_mark
+          ? "No mark — describe the change in a sentence."
+          : "Describe the change (you can re-circle anytime).");
+    }
+    if (msg) msg.textContent = "";
+    setStatus("Describe the change…", "on");
+    setTimeout(function () {
+      var ta = document.getElementById("eaImproveText");
+      if (ta) ta.focus();
+    }, 80);
+  };
+
+  async function submitImprove() {
+    var ta = document.getElementById("eaImproveText");
+    var msg = document.getElementById("eaImproveMsg");
+    var text = (ta && ta.value || "").trim();
+    if (!text) {
+      if (msg) {
+        msg.style.color = "#b45309";
+        msg.textContent = improve.shot
+          ? "One short sentence — what should be at the spot you circled?"
+          : "Type a short wish first.";
+      }
+      return;
+    }
+    if (msg) { msg.style.color = ""; msg.textContent = "Sending to the AI engineer + judge…"; }
+    var sendBtn = document.getElementById("eaImproveSend");
+    if (sendBtn) sendBtn.disabled = true;
+    try {
+      var d = null;
+      if (window.__aoImprove && typeof window.__aoImprove.submitWish === "function") {
+        d = await window.__aoImprove.submitWish(text, improve.shot);
+      } else {
+        // Fallback direct API
+        var r = await fetch("/v1/feature-suggestion", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ text: text, screenshot_b64: improve.shot || undefined }),
+        });
+        d = await r.json().catch(function () { return null; });
+        if (!(d && d.ok && d.id)) throw new Error("submit failed");
+      }
+      if (ta) ta.value = "";
+      closeImproveCompose();
+      addMsg("user", "Improve site: " + text);
+      addMsg("agent", "Got it — the judge is reviewing. I'll update you as it builds.");
+      watchBuild(d.id);
+    } catch (e) {
+      if (msg) {
+        msg.style.color = "#b45309";
+        msg.textContent = "Couldn't send — try again in a moment.";
+      }
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+    }
+  }
+
+  function watchBuild(id) {
+    improve.activeId = id;
+    improve.since = Date.now();
+    renderEaJourney("new");
+    if (improve.poll) clearInterval(improve.poll);
+    improve.poll = setInterval(tickBuildStatus, 5000);
+    setTimeout(tickBuildStatus, 1200);
+  }
+  window.__eaBuildWatch = watchBuild;
+
+  function tickBuildStatus() {
+    if (!improve.activeId) return;
+    fetch("/v1/feature-suggestion/" + encodeURIComponent(improve.activeId) + "/status")
+      .then(function (r) {
+        if (r.status === 404) { renderEaJourney("reviewed", { failed: true }); stopBuildWatch(); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(function (d) {
+        if (!d || !d.status) { renderEaJourney("new"); return; }
+        if (d.status === "shipped") {
+          renderEaJourney("shipped");
+          addMsg("agent", "Your site change is live — refresh to see it.");
+          if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
+        } else if (d.status === "reviewed") {
+          var elapsed = Math.floor((Date.now() - improve.since) / 1000);
+          if (elapsed > 90) {
+            renderEaJourney("reviewed", { failed: true });
+            addMsg("agent",
+              "The judge didn't auto-ship this one (too large or needs a human). " +
+              "It's still logged for Ford — nothing was lost.");
+            if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
+          } else {
+            renderEaJourney("reviewed");
+          }
+        } else {
+          renderEaJourney(d.status);
+        }
+      })
+      .catch(function () {});
+  }
+
+  function stopBuildWatch() {
+    improve.activeId = null;
+    if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
+  }
+
+  var JOURNEY_STEPS = [
+    { key: "received", label: "Received", sub: "Got your mark-up and note" },
+    { key: "reading", label: "AI is reading it", sub: "Looking at what you circled" },
+    { key: "deciding", label: "Judge deciding", sub: "Approve, branch, or pass" },
+    { key: "building", label: "Building", sub: "Writing the code" },
+    { key: "deploying", label: "Deploying live", sub: "Pushing to the site" },
+    { key: "live", label: "Live on the site", sub: "Refresh to see your change" },
+  ];
+
+  function mapBuildStep(st, elapsedSec) {
+    if (st === "shipped") return 5;
+    if (st === "building") return elapsedSec > 120 ? 4 : 3;
+    if (st === "reviewed") return 2;
+    if (elapsedSec < 8) return 0;
+    if (elapsedSec < 25) return 1;
+    return 2;
+  }
+
+  function renderEaJourney(st, opts) {
+    opts = opts || {};
+    var host = document.getElementById("eaJourney");
+    if (!host) return;
+    var elapsed = improve.since ? Math.floor((Date.now() - improve.since) / 1000) : 0;
+    var stepIdx = mapBuildStep(st || "new", elapsed);
+    var failed = !!opts.failed;
+    host.hidden = false;
+    var title = st === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your wish…";
+    var lead = st === "shipped"
+      ? "Your change is on the site. Refresh to see it."
+      : failed
+        ? "Judge held this for a human (too big, or not pure UI). Logged for Ford."
+        : "Same pipeline as the old Wish button — judge first, then build.";
+    var html = "<h4>" + title + "</h4><p class=\"ea-j-lead\">" + lead + "</p><ul class=\"ea-j-steps\">";
+    JOURNEY_STEPS.forEach(function (s, i) {
+      var cls = "";
+      if (st === "shipped" || i < stepIdx) cls = "done";
+      else if (i === stepIdx) cls = failed ? "fail" : "active";
+      var icon = cls === "done" ? "✓" : cls === "active" ? "●" : cls === "fail" ? "!" : String(i + 1);
+      html += '<li class="' + cls + '"><i>' + icon + "</i><div><b>" + s.label + "</b><span>" + s.sub + "</span></div></li>";
+    });
+    html += "</ul><div class=\"ea-j-actions\">";
+    if (st === "shipped") {
+      html += '<button type="button" id="eaJReload">Refresh page</button>';
+    }
+    html += '<button type="button" id="eaJDismiss">' + (st === "shipped" || failed ? "Dismiss" : "Hide") + "</button></div>";
+    host.innerHTML = html;
+    var reload = document.getElementById("eaJReload");
+    if (reload) reload.onclick = function () { location.reload(); };
+    var dismiss = document.getElementById("eaJDismiss");
+    if (dismiss) dismiss.onclick = function () {
+      if (st === "shipped" || failed) {
+        stopBuildWatch();
+        host.hidden = true;
+        host.innerHTML = "";
+      } else {
+        host.hidden = true;
+      }
+    };
   }
 
   function showMicGate(show, reason) {
@@ -456,6 +732,15 @@
    * One conversation turn for BOTH voice and text.
    * opts.userAlreadyShown — voice path already painted the user bubble from transcript.
    */
+  /** Local short-circuit: user asks to improve the UI → markup flow, no LLM needed. */
+  function isImproveIntent(text) {
+    var t = String(text || "").toLowerCase().trim();
+    if (!t) return false;
+    return /^(improve|fix|change|redesign|update)\s+(this\s+)?(site|page|ui|screen|layout)\b/.test(t)
+      || /\b(wish this was better|make this better|improve the site|change the ui|mark.?up)\b/.test(t)
+      || /^(can you |please )?(improve|fix) (this|the) (site|page|ui)\??$/.test(t);
+  }
+
   async function turn(text, source, opts) {
     opts = opts || {};
     if (!text) return;
@@ -463,6 +748,12 @@
     if (!sid) return;
     if (!opts.userAlreadyShown) {
       addMsg("user", text);
+    }
+    // Seamless merge: site-improve intent opens mark-up without waiting on the brain
+    if (isImproveIntent(text)) {
+      openImproveFlow({ markFirst: true });
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      return;
     }
     state.thinking = true;
     setStatus("Thinking…", "think");
@@ -584,6 +875,18 @@
         if (ok) softRefreshUi(detail.body || detail);
       } else if (cmd.type === "ui_refresh" || cmd.type === "refresh") {
         softRefreshUi(cmd.args || {});
+        ok = true;
+        detail = cmd.args || {};
+      } else if (cmd.type === "improve_site" || cmd.type === "site_improve") {
+        // Merge path: freeze → circle → describe → judge pipeline
+        openImproveFlow({ markFirst: cmd.args && cmd.args.mark_first !== false });
+        if (cmd.args && cmd.args.suggestion_id) {
+          watchBuild(cmd.args.suggestion_id);
+        }
+        ok = true;
+        detail = cmd.args || {};
+      } else if (cmd.type === "watch_build") {
+        if (cmd.args && cmd.args.suggestion_id) watchBuild(cmd.args.suggestion_id);
         ok = true;
         detail = cmd.args || {};
       } else {

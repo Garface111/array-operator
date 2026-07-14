@@ -812,7 +812,11 @@ document.documentElement.setAttribute("data-theme","day");
       </div>
     </div>
   </div>
-  <button id="fsBtn" type="button" aria-expanded="false" title="Freeze this tab, then circle what should change">
+  <!-- Standalone "Wish this was better" CTA retired 2026-07-13: entry is Energy Agent
+       ("Improve site" / voice "make this better"). Keep button in DOM for a11y fallback
+       but hide it — markup overlay + journey pipeline still power the merge. -->
+  <button id="fsBtn" type="button" aria-expanded="false" title="Improve this site"
+          style="display:none" aria-hidden="true" tabindex="-1">
     <span class="fsdot">✦</span> Wish this was better
   </button>
 </div>
@@ -1209,6 +1213,11 @@ document.documentElement.setAttribute("data-theme","day");
   document.getElementById("fsSkipMark").onclick=function(){
     overlay.classList.remove("open");
     MARK_B64=null; setThumb();
+    if(window.__aoImprove && window.__aoImprove._viaAgent && typeof window.__eaOpenImprove==="function"){
+      window.__aoImprove._viaAgent = false;
+      window.__eaOpenImprove({ screenshot_b64: null, strokes: 0, skipped_mark: true });
+      return;
+    }
     openPanel(true);
     msg.textContent="No mark — describe the change in a sentence.";
   };
@@ -1254,7 +1263,13 @@ document.documentElement.setAttribute("data-theme","day");
 
   document.getElementById("fsAttach").onclick=function(){
     var full=shotC._full;
-    if(!full){ overlay.classList.remove("open"); openPanel(true); return; }
+    if(!full){
+      overlay.classList.remove("open");
+      if(window.__aoImprove && window.__aoImprove._viaAgent){
+        if(typeof window.__eaOpenImprove==="function") window.__eaOpenImprove({screenshot_b64:null});
+      } else openPanel(true);
+      return;
+    }
     if(!STROKES.length){
       // Nudge — circle something first, but allow attach empty if they insist twice.
       if(!document.getElementById("fsAttach")._nudge){
@@ -1275,6 +1290,15 @@ document.documentElement.setAttribute("data-theme","day");
     MARK_B64=url.split(",")[1];
     overlay.classList.remove("open");
     setThumb();
+    // Energy Agent merge path: hand mark-up back to the dock, skip the floating panel
+    if(window.__aoImprove && window.__aoImprove._viaAgent && typeof window.__eaOpenImprove==="function"){
+      window.__aoImprove._viaAgent = false;
+      window.__eaOpenImprove({
+        screenshot_b64: MARK_B64,
+        strokes: STROKES.length,
+      });
+      return;
+    }
     openPanel(true);
     msg.style.color="#1565C0";
     msg.textContent=STROKES.length
@@ -1520,6 +1544,50 @@ document.documentElement.setAttribute("data-theme","day");
         msg.style.color="#b45309";
         msg.textContent="Couldn't reach us — check your connection.";
       });
+  };
+
+  // ── Public API for Energy Agent merge (2026-07-13) ──
+  // One product mind: EA asks what you want → markup → same judge/auto-ship pipeline
+  // → live journey. Standalone wish button is hidden.
+  function submitWish(text, shotB64){
+    var t = (text || "").trim();
+    if(!t) return Promise.reject(new Error("empty"));
+    var h = {"Content-Type":"application/json"};
+    try{ var sess=localStorage.getItem("so_session"); if(sess) h["Authorization"]="Bearer "+sess; }catch(e){}
+    var payload = { text: t };
+    if(shotB64) payload.screenshot_b64 = shotB64;
+    else if(MARK_B64) payload.screenshot_b64 = MARK_B64;
+    return fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(d && d.ok && d.id){
+          MARK_B64 = null; setThumb();
+          openPanel(false);
+          startWatch(d.id);
+          // Mirror journey into Energy Agent dock when present
+          try{
+            if(typeof window.__eaBuildWatch==="function") window.__eaBuildWatch(d.id);
+          }catch(e){}
+          return d;
+        }
+        throw new Error("submit failed");
+      });
+  }
+
+  window.__aoImprove = {
+    startMark: function(opts){
+      opts = opts || {};
+      window.__aoImprove._viaAgent = !!opts.viaAgent;
+      window.__aoImprove._onMarked = opts.onMarked || null;
+      startMark();
+    },
+    startWatch: startWatch,
+    submitWish: submitWish,
+    getActiveId: function(){ return ACTIVE_ID; },
+    getMark: function(){ return MARK_B64; },
+    clearMark: function(){ MARK_B64=null; setThumb(); },
+    expandJourney: expandJourney,
+    isWatching: function(){ return !!ACTIVE_ID; },
   };
 })();
 </script>
