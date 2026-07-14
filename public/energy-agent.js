@@ -268,26 +268,39 @@
   async function toggle() {
     ensureUi();
     if (!state.open) {
-      // CRITICAL: getUserMedia must run in the click stack (no setTimeout).
-      // Chrome will not show a mic prompt from a delayed callback.
+      // First click on the sun: request mic IMMEDIATELY (user gesture), then open.
+      // Do not await session/network before getUserMedia — that can drop the gesture
+      // in some browsers and skip the permission dialog.
       if (signedIn()) {
+        var micOk = false;
         try {
           await ensureMicStream();
           showMicGate(false);
+          micOk = true;
         } catch (err) {
           var name = (err && err.name) || "";
-          showMicGate(true, name === "NotAllowedError" || name === "PermissionDeniedError"
-            ? "Mic blocked — click to allow"
-            : "Allow microphone");
-          // Still open the panel so they can type / retry
+          var blocked = name === "NotAllowedError" || name === "PermissionDeniedError";
+          showMicGate(true, blocked ? "Mic blocked — fix & retry" : "Allow microphone");
           await setOpen(true);
-          addMsg("agent",
-            "I need microphone access to talk. Click “Allow microphone” " +
-            "(or the Mic button) — Chrome only shows the prompt after you click.");
+          if (blocked) {
+            addMsg("agent",
+              "Microphone is blocked for this site. " +
+              "Click the lock icon in the address bar → Site settings → Microphone → Allow, " +
+              "then click the sun (or “Allow microphone”) again. " +
+              "You can still type below.");
+          } else {
+            addMsg("agent", "Mic error: " + ((err && err.message) || err) + " — you can still type.");
+          }
           return;
         }
+        await setOpen(true);
+        // startVoice uses the stream we already have
+        if (micOk && !state.listening) {
+          try { await startVoice(true); } catch (e) {}
+        }
+      } else {
+        await setOpen(true);
       }
-      await setOpen(true);
     } else {
       await setOpen(false);
     }
@@ -302,9 +315,10 @@
     if (orb) orb.classList.toggle("open", state.open);
     if (state.open) {
       await ensureSession();
-      // Voice start — mic stream should already exist from the click path
-      if (signedIn() && !state.listening) {
-        await startVoice(true);
+      // Voice usually already starting from toggle(); only start here if mic ready
+      // and we aren't listening yet (e.g. re-open after close).
+      if (signedIn() && !state.listening && state.micStream) {
+        try { await startVoice(true); } catch (e) {}
       }
     } else {
       stopVoice(true); // keep mic permission stream; just tear down WebRTC
@@ -656,7 +670,8 @@
     setStatus("Connecting GPT voice…", "think");
     var stream = await ensureMicStream();
 
-    stopVoice(); // clear previous pc but re-get stream if we killed it
+    // Tear down prior peer connection but KEEP the mic stream (permission)
+    stopVoice(true);
     stream = await ensureMicStream();
 
     var pc = new RTCPeerConnection();
@@ -834,38 +849,60 @@
 
   function toggleMic() {
     if (state.listening) {
-      stopVoice();
+      stopVoice(true);
       setStatus("Mic off · type anytime", "on");
     } else {
-      startVoice(false);
+      // Click path — safe for permission prompt
+      requestMicFromClick();
     }
   }
 
-  // ── mic permission on startup ────────────────────────────────────────────
-  function requestMicOnStartup() {
-    if (!signedIn()) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-    // Keep the stream warm (don't stop tracks) so later WebRTC connect is instant
-    // and Chrome has already granted permission.
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-      state.micStream = stream;
-      // Mute tracks until voice session starts (saves privacy; keeps permission)
-      try { stream.getTracks().forEach(function (t) { t.enabled = false; }); } catch (e) {}
-      setStatus("Mic allowed — click the sun to talk", "on");
-    }).catch(function (err) {
-      var name = (err && err.name) || "";
-      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        setStatus("Mic blocked — allow mic for this site", "warn");
-      }
-    });
+  // ── boot: show mic CTA (browsers block silent getUserMedia on load) ──────
+  function refreshMicGate() {
+    if (!signedIn()) {
+      showMicGate(false);
+      return;
+    }
+    // If we already hold a live stream, hide the gate
+    if (state.micStream && state.micStream.getTracks().some(function (t) {
+      return t.readyState === "live";
+    })) {
+      showMicGate(false);
+      setStatus("Mic ready — click the sun to talk", "on");
+      return;
+    }
+    // Permissions API (Chrome): show CTA when still "prompt" or "denied"
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "microphone" }).then(function (p) {
+        if (p.state === "granted") {
+          showMicGate(false);
+          setStatus("Mic ready — click the sun to talk", "on");
+          // Warm stream without needing another click when already granted
+          ensureMicStream().then(function () {
+            try { state.micStream.getTracks().forEach(function (t) { t.enabled = false; }); } catch (e) {}
+          }).catch(function () {});
+        } else if (p.state === "denied") {
+          showMicGate(true, "Mic blocked — fix in browser settings");
+          setStatus("Mic blocked", "warn");
+        } else {
+          // "prompt" — must click to trigger the browser dialog
+          showMicGate(true, "Allow microphone");
+          setStatus("Click “Allow microphone” to enable voice", "warn");
+        }
+        try {
+          p.onchange = function () { refreshMicGate(); };
+        } catch (e) {}
+      }).catch(function () {
+        // Safari etc. — always show the click-to-allow chip
+        showMicGate(true, "Allow microphone");
+      });
+    } else {
+      showMicGate(true, "Allow microphone");
+    }
   }
 
   // ── boot ─────────────────────────────────────────────────────────────────
   function boot() {
-    // Only show for signed-in product surfaces (not marketing alone)
-    if (!document.getElementById("tabbar") && !document.getElementById("analysisRoot")) {
-      // still allow on main app shell
-    }
     ensureUi();
     // Hide orb on pure login pages
     if (/\/login/i.test(location.pathname) && !signedIn()) {
@@ -873,9 +910,10 @@
       if (r) r.style.display = "none";
       return;
     }
-    // Request mic as soon as the signed-in app is up (slight delay so UI paints first).
     if (signedIn()) {
-      setTimeout(requestMicOnStartup, 600);
+      // Don't call getUserMedia here — Chrome ignores it without a user gesture.
+      // Show the clickable gate so the user can grant mic with one click.
+      setTimeout(refreshMicGate, 400);
     }
   }
 
