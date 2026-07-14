@@ -132,7 +132,9 @@
     const k = w / 1000;
     return (k >= 10 ? k.toFixed(0) : k.toFixed(1)) + " kW";
   }
-  function kwh0(n) { return n == null ? "—" : Math.round(n).toLocaleString() + " kWh"; }
+  // Empty cells stay blank (not "—") so missing today/kWh never clutters the row
+  // next to the sparklines (Ford 2026-07-14: little dashes in the way of the graphs).
+  function kwh0(n) { return n == null ? "" : Math.round(n).toLocaleString() + " kWh"; }
 
   // When a LIVE-NOW or TODAY cell is blank ("—"), say WHY on hover so it reads as a known
   // state, not a broken feed. OVERNIGHT the panels are down and live power is intentionally
@@ -622,10 +624,12 @@
     };
     const ownMax = Math.max(...real.map(p => valOf(p) || 0), 0.001);
     const max = shareScale ? cohort.peak : ownMax;
+    // Skip empty-day ticks entirely — the tiny gray dashes were visual noise next to
+    // real bars and read as data when they aren't (Ford 2026-07-14).
     const bars = slots.map((p, i) => {
-      if (!p) return `<rect class="vs-spark-empty" x="${(i * bw + 1).toFixed(1)}" y="${(H - 1.5).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="1.5" rx="1"/>`;
+      if (!p) return "";
       const v = valOf(p);
-      if (v == null) return `<rect class="vs-spark-empty" x="${(i * bw + 1).toFixed(1)}" y="${(H - 1.5).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="1.5" rx="1"/>`;
+      if (v == null) return "";
       const bh = Math.max(1.5, (v / max) * (H - 6));
       return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - bh).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1"/>`;
     }).join("");
@@ -1468,9 +1472,10 @@
                 iv.sn ? "SN " + esc(iv.sn) : null,
               ].filter(Boolean).join(" · ");
               const _al = isAllocatedPower(iv);
-              const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "—";
-              const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
-              const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";
+              const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "";
+              const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "";
+              // Peer index only when we have one — blank, not "—", keeps the row clean.
+              const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "";
               const _liveTip = _al ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : "";
               const _peerTip = iv.peer_index != null ? ` title="14-day output vs its neighbors — 1.00× is right at the group median"` : "";
               // Inverter rows use the SAME 8-column grid as the vendor/array rows above them,
