@@ -2311,7 +2311,9 @@ html[data-theme="day"] .rep-fld.req > select{
 /* Status col (7) min widened so [116px spark | UNDERPERFORMING pill] fits without
    shoving graphs left of their column — graphs must share one vertical edge
    across every inverter row (Ford 2026-07-14). */
-.vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(250px,1.55fr) minmax(100px,.82fr);
+/* Status col min fits [116px spark | UNDERPERFORMING pill] without clipping the
+   pill background or shoving graphs (Ford 2026-07-14). */
+.vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(268px,1.6fr) minmax(96px,.8fr);
   align-items:center; gap:12px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
@@ -2443,14 +2445,25 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    honest source-age detail still lives in the cell's hover tooltip. */
 .vs-c-fresh.vs-stale-syn{ color:var(--faint); font-weight:inherit; }
 .vs-vchip{ font-size:11.5px; font-weight:600; color:var(--muted); }
-.vs-pill{ display:inline-block; font-size:12px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; padding:4px 11px; border-radius:999px; white-space:nowrap; line-height:1.25; }
-/* STATUS column: terse pills ("ALL CLEAR", "2 NEED ATTENTION") sit on one line, but a long
-   critical headline ("An inverter stopped earning") WRAPS inside the cell instead of spilling
-   over the SYNCED column. max-width bounds it to the column so it can never overlap. */
-.vs-c-status .vs-pill{ white-space:normal; max-width:100%; text-align:center; }
+/* Pills size to their text (inline-flex + max-content) so the tinted background
+   always fully wraps the label — never a clipped orange bar under "UNDERPERFORMING"
+   with letters hanging past the capsule (Ford 2026-07-14). */
+.vs-pill{
+  display:inline-flex; align-items:center; justify-content:center;
+  box-sizing:border-box;
+  font-size:12px; font-weight:800; letter-spacing:.02em; text-transform:uppercase;
+  padding:5px 12px; border-radius:999px; white-space:nowrap; line-height:1.2;
+  width:max-content; max-width:none;
+}
+/* Vendor/array status: allow wrap only for long free-text headlines, and keep the
+   background painted on every line (box-decoration-break). */
+.vs-c-status:not(.vs-inv-statcell) .vs-pill{
+  white-space:normal; max-width:100%; text-align:center;
+  -webkit-box-decoration-break:clone; box-decoration-break:clone;
+}
 .vs-pill.ok{ color:#065f46; background:rgba(16,185,129,.20); }
-.vs-pill.warn{ color:#92400e; background:rgba(217,119,6,.22); }
-.vs-pill.bad{ color:#991b1b; background:rgba(220,38,38,.20); }
+.vs-pill.warn{ color:#92400e; background:rgba(217,119,6,.28); }
+.vs-pill.bad{ color:#991b1b; background:rgba(220,38,38,.22); }
 .vs-pill.muted{ color:var(--muted); background:var(--day-chip,#eef2f7); }
 /* Expanded inverter list. The vendor color is carried ONLY by the group's left bar
    (.vs-vgroup border-left) — NO background flood (Ford: "just hold the little line on
@@ -2512,10 +2525,12 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv-statcell > .vs-pill{
   grid-column:2;
   justify-self:end;
-  max-width:100%;
-  /* Keep one line so the pill width is predictable; long labels fit the wider status col */
+  /* Must NOT max-width:100% — that clipped the orange fill while the text still
+     painted past the capsule edge on UNDERPERFORMING (Ford 2026-07-14). */
+  max-width:none;
+  width:max-content;
   white-space:nowrap;
-  text-align:center;
+  flex-shrink:0;
 }
 .vs-inv-rowspark{ display:block; width:116px; height:26px; }
 .vs-inv-rowspark rect{ fill:var(--good,#2563eb); opacity:.78; }
