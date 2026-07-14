@@ -240,6 +240,28 @@
     background:rgba(255,255,255,.93);
     border-radius:var(--sky-r-card);
   }
+  /* Analysis sites grid + performance tables — same scroll contract as triage */
+  html.sky .ansg-wrap,
+  html.sky .anperf-wrap,
+  html.sky .anhw-wrap{
+    overflow-x:auto !important;
+    -webkit-overflow-scrolling:touch;
+    max-width:100%;
+    background:rgba(255,255,255,.93);
+    border-radius:var(--sky-r-card);
+  }
+  html.sky .ansg-table{
+    table-layout:auto !important;
+    min-width:640px;
+  }
+  html.sky .rb-bulk-tablewrap,
+  html.sky .rb-rev-tablewrap{
+    overflow-x:auto !important;
+    -webkit-overflow-scrolling:touch;
+    max-width:100%;
+    background:rgba(255,255,255,.93);
+    border-radius:var(--sky-r-card);
+  }
 
   /* ── 6 · BLUR BUDGET, modal tier — chrome glass halves to 12px and gains
         opacity so sheet content stays crisp over whatever it covers ──────── */

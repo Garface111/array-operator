@@ -108,6 +108,7 @@
     if (document.getElementById("eaPanel")) return;
 
     // Tab-style control: inject at LEFT of #tabbar (in line with Fleet Triage)
+    // Desktop entry point. On mobile this is CSS-hidden; #eaFab is the bubble.
     var tabbar = document.getElementById("tabbar");
     var orb = document.getElementById("eaOrb");
     if (!orb) {
@@ -131,6 +132,30 @@
         rootF.appendChild(orb);
         document.body.appendChild(rootF);
       }
+    }
+
+    // Mobile floating chat bubble — follows the user (position:fixed). Collapses
+    // the open sheet; expands it. Desktop CSS hides this node.
+    if (!document.getElementById("eaFab")) {
+      var fab = document.createElement("button");
+      fab.type = "button";
+      fab.id = "eaFab";
+      fab.setAttribute("aria-label", "Open Energy Agent");
+      fab.title = "Energy Agent — chat";
+      fab.innerHTML =
+        '<span class="ea-fab-ic" aria-hidden="true"></span>' +
+        '<span class="ea-fab-label">Energy Agent</span>';
+      document.body.appendChild(fab);
+    }
+
+    // Dim page while chat sheet is open on mobile (tap to collapse)
+    if (!document.getElementById("eaBackdrop")) {
+      var bd = document.createElement("button");
+      bd.type = "button";
+      bd.id = "eaBackdrop";
+      bd.setAttribute("aria-label", "Close Energy Agent");
+      bd.tabIndex = -1;
+      document.body.appendChild(bd);
     }
 
     // Mic gate + left-rail panel live on body (fixed)
@@ -224,6 +249,21 @@
       e.stopPropagation();
       toggle(); // async; mic requested first inside toggle (user gesture)
     };
+    var fabEl = document.getElementById("eaFab");
+    if (fabEl) {
+      fabEl.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggle();
+      };
+    }
+    var backdrop = document.getElementById("eaBackdrop");
+    if (backdrop) {
+      backdrop.onclick = function (e) {
+        e.preventDefault();
+        setOpen(false); // collapse chat sheet → bubble stays
+      };
+    }
     gate.onclick = function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -610,16 +650,20 @@
     var el = document.getElementById("eaStatusText");
     var dot = document.getElementById("eaDot");
     var orb = document.getElementById("eaOrb");
+    var fab = document.getElementById("eaFab");
     if (el) el.textContent = text;
     if (dot) {
       dot.className = "ea-dot" + (mode === "on" ? " on" : mode === "warn" ? " warn" : "");
     }
-    if (orb) {
-      orb.classList.toggle("listening", mode === "listen");
-      orb.classList.toggle("thinking", mode === "think");
-      orb.classList.toggle("speaking", mode === "speak");
-      orb.classList.toggle("open", state.open);
+    function paintOrb(node) {
+      if (!node) return;
+      node.classList.toggle("listening", mode === "listen");
+      node.classList.toggle("thinking", mode === "think");
+      node.classList.toggle("speaking", mode === "speak");
+      node.classList.toggle("open", state.open);
     }
+    paintOrb(orb);
+    paintOrb(fab);
   }
 
   /**
@@ -938,13 +982,21 @@
     state.open = !!o;
     var panel = document.getElementById("eaPanel");
     var orb = document.getElementById("eaOrb");
+    var fab = document.getElementById("eaFab");
     if (panel) panel.classList.toggle("open", state.open);
     if (orb) {
       orb.classList.toggle("open", state.open);
       orb.classList.toggle("active", state.open);
       orb.setAttribute("aria-pressed", state.open ? "true" : "false");
+      orb.setAttribute("aria-label", state.open ? "Close Energy Agent" : "Open Energy Agent");
     }
-    // Shift site content right; spawn left-rail card
+    if (fab) {
+      fab.classList.toggle("open", state.open);
+      fab.setAttribute("aria-pressed", state.open ? "true" : "false");
+      fab.setAttribute("aria-label", state.open ? "Minimize Energy Agent" : "Open Energy Agent");
+      fab.title = state.open ? "Minimize chat" : "Energy Agent — chat";
+    }
+    // Desktop: shift site content right. Mobile CSS zeroes the margin.
     document.body.classList.toggle("ea-shell-open", state.open);
     if (state.open) {
       await ensureSession();

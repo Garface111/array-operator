@@ -108,6 +108,79 @@
   .tr-table { min-width: 460px; }            /* keep columns readable; wrap scrolls */
   .tr-table th, .tr-table td { padding: 10px 12px; }
 
+  /* ── Analysis sites grid + dense tables: scroll INSIDE the wrap, never clip
+     columns or push the page sideways (Capacity / Expected used to get cut). ─ */
+  #panelAnalysis, #analysisRoot, .an-wrap, .an-sections, .an-block {
+    max-width: 100%; min-width: 0;
+  }
+  .ansg-wrap,
+  .anperf-wrap,
+  .anhw-wrap {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  .ansg-table {
+    /* fixed layout on desktop was ellipsizing; on phone allow natural width + scroll */
+    table-layout: auto !important;
+    min-width: 640px;
+    width: max-content;
+    max-width: none;
+  }
+  .ansg-table th, .ansg-table td {
+    white-space: nowrap;
+  }
+  .ansg-bar { gap: 8px; }
+  .ansg-search input { width: min(160px, 42vw); }
+
+  /* ── Reports / Invoices dense tables (bulk import, review, offtaker lists) ─ */
+  .rb-bulk-tablewrap,
+  .rb-rev-tablewrap,
+  .rb2 .rep-card,
+  #panelReports .rb-listtools,
+  #panelReports .rb-acc-body {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .rb-bulk-tablewrap,
+  .rb-rev-tablewrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  .rb-bulk-table,
+  .rb-rev-table {
+    min-width: 560px;
+  }
+  /* Offtaker provider headers: don't force horizontal page overflow */
+  .rb-prov-head, .rb-grp-head, .rb-acc-head {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .rb-acc-name, .rb-acc-sentence {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Sticky offtaker search / filters full width on phone */
+  .rb-listtools, .rb-osearch, .rb-osearch-lg {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  /* Generic safety net: any wide table in a panel scrolls inside a wrap */
+  #panelReports table,
+  #panelAnalysis table,
+  #panelAccount table {
+    max-width: none;
+  }
+  #panelReports, #panelAnalysis, #panelAccount, #panelDashboard {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
   /* ── Fleet-health KPI tile grid ("95% fleet healthy" + counts + $/mo on the
      landing demo + dashboard): 2-up tiles with slightly smaller numerals so
      all eight stay scannable without horizontal scroll. ──────────────────── */
@@ -137,7 +210,8 @@
      old top scroll-strip. Long desktop labels, auth chips and the theme toggle are
      hidden on mobile; the body gets bottom padding so the fixed bar never covers
      content. Octarine marks the active tab. ─────────────────────────────────── */
-  body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+  /* Bottom nav + Energy Agent FAB clearance */
+  body { padding-bottom: calc(58px + 72px + env(safe-area-inset-bottom, 0px)); }
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; top: auto;
     display: flex; align-items: stretch; gap: 0; z-index: 60; margin: 0;
@@ -205,6 +279,10 @@
   #fsWrap { bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important; }
   .ao-al-fab { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
   .ao-al-panel { bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* Energy Agent lives as a fixed FAB (energy-agent.css ≤720) — never a bottom-
+     nav tab. Keep non-primary tabs (incl. .ea-tab) out of the bar. */
+  .tabbar > .tab.ea-tab { display: none !important; }
 }
 
 /* Extra squeeze for the smallest phones. */
