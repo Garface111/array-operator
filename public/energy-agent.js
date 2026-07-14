@@ -1892,10 +1892,55 @@
   }
 
   /**
+   * Split long replies into speakable chunks (sentence-aware).
+   * Realtime response.create is happier with shorter payloads; the queue plays
+   * them back-to-back so explanations can run as long as needed.
+   */
+  function chunkForSpeech(plain, maxChars) {
+    maxChars = maxChars || 900;
+    var text = String(plain || "").replace(/\s+/g, " ").trim();
+    if (!text) return [];
+    if (text.length <= maxChars) return [text];
+    // Sentence-ish split without lookbehind (older browsers)
+    var parts = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [text];
+    var chunks = [];
+    var buf = "";
+    function flush() {
+      var t = buf.trim();
+      if (t) chunks.push(t);
+      buf = "";
+    }
+    for (var i = 0; i < parts.length; i++) {
+      var p = (parts[i] || "").trim();
+      if (!p) continue;
+      // Hard-split an oversized sentence on spaces
+      if (p.length > maxChars) {
+        flush();
+        var rest = p;
+        while (rest.length > maxChars) {
+          var cut = rest.lastIndexOf(" ", maxChars);
+          if (cut < maxChars * 0.4) cut = maxChars;
+          chunks.push(rest.slice(0, cut).trim());
+          rest = rest.slice(cut).trim();
+        }
+        if (rest) buf = rest;
+        continue;
+      }
+      if (buf && (buf.length + 1 + p.length) > maxChars) {
+        flush();
+      }
+      buf = buf ? buf + " " + p : p;
+    }
+    flush();
+    return chunks.length ? chunks : [text.slice(0, maxChars)];
+  }
+
+  /**
    * Serialize all TTS so we never stack multiple response.create calls.
    * Prefer GPT Realtime mouth; only use robotic browser TTS if we never had Realtime
    * (webspeech fallback mode). If Realtime was used but is briefly down, stay silent
    * rather than switching voices mid-session.
+   * Long explanations are chunked and spoken sequentially — no hard 20s cutoff.
    */
   function enqueueSpeak(text, opts) {
     opts = opts || {};
@@ -1912,14 +1957,23 @@
     state._lastSpokenPlain = plain;
     _lastSpoken = plain;
 
+    var chunks = chunkForSpeech(plain, 900);
     var seq = ++state._speakSeq;
-    state._speakQueue = state._speakQueue
-      .catch(function () {})
-      .then(function () {
-        if (seq !== state._speakSeq) return; // superseded by newer speech/barge-in
-        if (state.voiceMuted && !opts.force) return; // muted mid-queue
-        return speakNow(plain, opts);
-      });
+    chunks.forEach(function (chunk, i) {
+      var isLast = i === chunks.length - 1;
+      state._speakQueue = state._speakQueue
+        .catch(function () {})
+        .then(function () {
+          if (seq !== state._speakSeq) return; // superseded by newer speech/barge-in
+          if (state.voiceMuted && !opts.force) return;
+          return speakNow(chunk, {
+            source: opts.source,
+            force: true, // chunks must not dedupe against each other
+            // Keep mic held across multi-chunk explanations
+            keepMicHeld: !isLast,
+          });
+        });
+    });
     return state._speakQueue;
   }
 
@@ -1933,10 +1987,16 @@
         state._onSpeakDone = null;
         state.speaking = false;
         state.rtResponseActive = false;
-        // Re-open mic after agent finishes (with settle delay inside helper)
-        holdMicWhileSpeaking(false);
-        if (state.listening && !state.touring) {
-          setStatus(state.voiceMuted ? "Listening (voice muted)" : "Listening…", "listen");
+        // Only re-open mic after the LAST chunk of a long explanation
+        if (!opts.keepMicHeld) {
+          holdMicWhileSpeaking(false);
+          if (state.listening && !state.touring) {
+            setStatus(state.voiceMuted ? "Listening (voice muted)" : "Listening…", "listen");
+          }
+        } else {
+          // Stay "speaking" for the next chunk — don't let ambient VAD barge in
+          holdMicWhileSpeaking(true);
+          setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
         }
         resolve();
       }
@@ -1948,13 +2008,31 @@
       state._onSpeakDone = done;
 
       var words = plain.split(/\s+/).filter(Boolean).length;
-      // Generous fallback so we never hang; audio-complete should fire sooner
-      var fallbackMs = Math.min(20000, Math.max(2800, Math.round(words * 450) + 1200));
-      var timer = setTimeout(done, fallbackMs);
+      // Scale with content. Old hard cap of 20s cut long explanations mid-sentence
+      // (timer released the mic → ghost barge-in cancelled the Realtime response).
+      // ~450ms/word + headroom; floor 6s, ceiling 4 min per chunk. While audio is
+      // still playing we re-arm instead of force-ending.
+      var fallbackMs = Math.min(240000, Math.max(6000, Math.round(words * 450) + 4000));
+      var timer = null;
+      var totalArmed = 0;
+      function armFallback(ms) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          totalArmed += ms;
+          // Still playing — keep waiting (cap total hang recovery ~6 min per chunk)
+          if ((state.speaking || state.rtResponseActive) && totalArmed < 360000) {
+            armFallback(Math.min(90000, ms));
+            return;
+          }
+          done();
+        }, ms);
+      }
+      armFallback(fallbackMs);
 
       var prevDone = done;
       state._onSpeakDone = function () {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
+        timer = null;
         prevDone();
       };
 
@@ -1971,13 +2049,15 @@
           }
           state.rtResponseActive = true;
           state.speaking = true;
+          // Full chunk text (chunks are already ≤ ~900 chars) — no 1200 hard truncate
           state.dc.send(JSON.stringify({
             type: "response.create",
             response: {
               instructions:
                 "Speak the following to the user naturally, in English, no extra commentary. " +
-                "Do not add greeting or questions beyond the text:\n\n" +
-                plain.slice(0, 1200),
+                "Do not add greeting or questions beyond the text. " +
+                "Speak the entire passage completely — do not stop early:\n\n" +
+                plain,
             },
           }));
           setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
@@ -2001,7 +2081,8 @@
         return;
       }
       try { window.speechSynthesis.cancel(); } catch (e) {}
-      var u = new SpeechSynthesisUtterance(plain.slice(0, 800));
+      // Chunks are short enough; speak full chunk (no 800-char cut)
+      var u = new SpeechSynthesisUtterance(plain);
       u.rate = 1.02;
       u.onstart = function () {
         state.speaking = true;
