@@ -147,13 +147,23 @@
       '    <div class="ea-improve-msg" id="eaImproveMsg"></div>' +
       "  </div>" +
       '  <div class="ea-journey" id="eaJourney" hidden role="status" aria-live="polite"></div>' +
-      '  <div class="ea-compose">' +
-      '    <textarea id="eaInput" rows="1" placeholder="Ask or type… (or use the mic)"></textarea>' +
-      '    <button type="button" class="ea-improve-cta" id="eaImproveOpen" title="Mark up the page and ship a small improvement">Improve</button>' +
-      '    <button type="button" class="ea-mic" id="eaMic" title="Toggle microphone">Mic</button>' +
-      '    <button type="button" class="ea-send" id="eaSend">Send</button>' +
-      "  </div>" +
-      '  <div class="ea-legal">Sessions may be transcribed to improve support. Only your account. Site changes go through an AI judge (no billing/money edits). Mic stays on while open.</div>';
+      '  <div class="ea-footer">' +
+      '    <div class="ea-compose" id="eaCompose">' +
+      '      <div class="ea-compose-shell">' +
+      '        <textarea id="eaInput" rows="2" placeholder="Message Energy Agent…"></textarea>' +
+      '        <div class="ea-compose-bar">' +
+      '          <button type="button" class="ea-chip" id="eaImproveOpen" title="Mark up the page and ship a small improvement">' +
+      '            <span class="ea-chip-ic" aria-hidden="true">✦</span><span class="ea-chip-lbl">Improve</span></button>' +
+      '          <button type="button" class="ea-chip ea-mic" id="eaMic" title="Toggle microphone">' +
+      '            <span class="ea-chip-ic" aria-hidden="true">🎙</span><span class="ea-chip-lbl">Mic</span></button>' +
+      '          <span class="ea-compose-spacer"></span>' +
+      '          <button type="button" class="ea-send" id="eaSend" title="Send">' +
+      '            <span class="ea-send-lbl">Send</span><span class="ea-send-ic" aria-hidden="true">↑</span></button>' +
+      '        </div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="ea-legal">Only your account · site changes are judge-gated · no billing edits</div>' +
+      '  </div>';
     document.body.appendChild(panel);
 
     // Lightweight marker root for status hooks that still look for #eaRoot
@@ -181,9 +191,18 @@
       e.preventDefault();
       toggleMic();
     };
-    document.getElementById("eaInput").addEventListener("keydown", function (e) {
+    var eaIn = document.getElementById("eaInput");
+    eaIn.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
     });
+    // Auto-grow the raised composer row (cap ~5 lines)
+    function growInput() {
+      eaIn.style.height = "auto";
+      var h = Math.min(120, Math.max(52, eaIn.scrollHeight));
+      eaIn.style.height = h + "px";
+    }
+    eaIn.addEventListener("input", growInput);
+    setTimeout(growInput, 0);
     // Site improve (merged "Wish this was better")
     document.getElementById("eaImproveOpen").onclick = function (e) {
       e.preventDefault();
@@ -1100,7 +1119,10 @@
     var b = document.getElementById("eaMic");
     if (b) {
       b.classList.toggle("on", state.listening);
-      b.textContent = state.listening ? "Mic on" : "Mic";
+      var lbl = b.querySelector(".ea-chip-lbl");
+      if (lbl) lbl.textContent = state.listening ? "Live" : "Mic";
+      else b.textContent = state.listening ? "Live" : "Mic";
+      b.title = state.listening ? "Microphone on — click to mute" : "Toggle microphone";
     }
   }
 
