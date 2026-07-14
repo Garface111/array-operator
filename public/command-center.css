@@ -2308,7 +2308,10 @@ html[data-theme="day"] .rep-fld.req > select{
    the fr ratio — identical on every row regardless of what it contains. The
    Vendor column keeps a small px floor (not 0) sized to its widest real button so
    that content still fits without wrapping/clipping. */
-.vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(158px,1.4fr) minmax(100px,.82fr);
+/* Status col (7) min widened so [116px spark | UNDERPERFORMING pill] fits without
+   shoving graphs left of their column — graphs must share one vertical edge
+   across every inverter row (Ford 2026-07-14). */
+.vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(250px,1.55fr) minmax(100px,.82fr);
   align-items:center; gap:12px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
@@ -2481,20 +2484,54 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   background:transparent; border:1px solid transparent; border-radius:7px; padding:4px 8px; white-space:nowrap;
   transition:background .12s, border-color .12s; }
 .vs-inv-details:hover{ background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.4); }
-/* Inline 14-day sparkline in the Status cell, LEFT of the verdict pill (Ford 2026-07-13:
-   "show the graph again of the inverters… to the left of the OK"). The cell becomes a
-   right-aligned flex row [spark][pill] so the pill still shares the column's right edge
-   with the array/vendor rows above — alignment kept, graph restored. */
-.vs-inv .vs-c-status{ display:flex; align-items:center; justify-content:flex-end; gap:11px; }
-.vs-inv-rowspark-wrap{ flex:0 0 auto; display:flex; align-items:center; line-height:0; opacity:.92; }
+/* Inline 14-day sparkline LEFT of the verdict pill (Ford 2026-07-13).
+   CRITICAL: use a FIXED two-track grid, not flex-end. Flex-end packed [spark][pill]
+   to the right edge, so a long pill ("UNDERPERFORMING") shoved that row's graph
+   left of its OK neighbors — glance-compare was broken (Ford 2026-07-14).
+   Track 1 is always 116px for the spark (or "no history" placeholder); track 2
+   holds the pill, right-aligned. Every graph's left edge then lines up. */
+.vs-inv .vs-c-status.vs-inv-statcell{
+  display:grid;
+  grid-template-columns:116px minmax(0,1fr);
+  align-items:center;
+  column-gap:10px;
+  justify-items:stretch;
+  text-align:left; /* override the column's default text-align:right for this grid */
+}
+.vs-inv-rowspark-wrap{
+  grid-column:1;
+  width:116px;
+  max-width:116px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  line-height:0;
+  opacity:.92;
+  min-width:0;
+}
+.vs-inv-statcell > .vs-pill{
+  grid-column:2;
+  justify-self:end;
+  max-width:100%;
+  /* Keep one line so the pill width is predictable; long labels fit the wider status col */
+  white-space:nowrap;
+  text-align:center;
+}
 .vs-inv-rowspark{ display:block; width:116px; height:26px; }
 .vs-inv-rowspark rect{ fill:var(--good,#2563eb); opacity:.78; }
 .vs-inv-rowspark .vs-spark-empty{ fill:var(--line,#e6e9ef); opacity:1; }
 .vs-inv:hover .vs-inv-rowspark rect{ opacity:.92; }
-.vs-inv-nospark{ align-self:center; }
-@media(max-width:760px){ .vs-inv-rowspark{ width:78px; } }
+.vs-inv-nospark{ align-self:center; font-size:10.5px; line-height:1.2; white-space:normal; }
+@media(max-width:760px){
+  .vs-inv .vs-c-status.vs-inv-statcell{ grid-template-columns:78px minmax(0,1fr); }
+  .vs-inv-rowspark-wrap{ width:78px; max-width:78px; }
+  .vs-inv-rowspark{ width:78px; }
+}
 @media(max-width:640px){ .vs-inv-name{ padding-left:26px; }
-  .vs-inv-rowspark-wrap{ display:none; } }   /* phones: pill only, deck lives in Details */
+  .vs-inv-rowspark-wrap{ display:none; }
+  .vs-inv .vs-c-status.vs-inv-statcell{ grid-template-columns:1fr; }
+  .vs-inv-statcell > .vs-pill{ grid-column:1; justify-self:end; }
+}   /* phones: pill only, deck lives in Details */
 
 /* ── Full-screen inverter detail: the interactive 14-day chart (Ford + Martin 2026-07-12) ── */
 .vs-dc-ov{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
