@@ -44,6 +44,9 @@
     // Mic held closed while agent TTS plays so speakers don't re-enter as "user"
     _micHeldForSpeak: false,
     _unmuteAfterSpeakTimer: null,
+    // Debounce duplicate ghost transcripts
+    _lastUserSaid: "",
+    _lastUserSaidAt: 0,
     // Speaker mute — kill agent voice (Realtime + browser TTS); text still paints.
     // Persisted so it sticks across panel open/close (Ford 2026-07-13).
     voiceMuted: (function () {
@@ -1740,7 +1743,8 @@
       }
       return;
     }
-    // Release hold after a short tail so room echo / buffer drain doesn't fire VAD
+    // Release hold after a tail so room echo / buffer drain doesn't fire VAD.
+    // Slightly longer than GPT Live defaults — speakers + room reverb linger.
     if (!state._micHeldForSpeak) return;
     state._unmuteAfterSpeakTimer = setTimeout(function () {
       state._unmuteAfterSpeakTimer = null;
@@ -1754,7 +1758,7 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
-    }, 450);
+    }, 750);
   }
 
   /** True while agent audio is playing or mic is held closed for TTS. */
@@ -1764,8 +1768,8 @@
 
   /** Drop echo transcripts that closely match what we just spoke. */
   function looksLikeEchoOfLastSpeech(said) {
-    var a = String(said || "").toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
-    var b = String(state._lastSpokenPlain || "").toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+    var a = String(said || "").toLowerCase().replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
+    var b = String(state._lastSpokenPlain || "").toLowerCase().replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
     if (!a || !b) return false;
     if (a === b) return true;
     if (a.length >= 12 && (b.indexOf(a) !== -1 || a.indexOf(b) !== -1)) return true;
@@ -1774,6 +1778,56 @@
     var bw = b.split(" ").slice(0, 8).join(" ");
     if (aw.length >= 10 && (bw.indexOf(aw) !== -1 || aw.indexOf(bw) !== -1)) return true;
     return false;
+  }
+
+  /**
+   * Drop ghost VAD turns: empty-ish, filler-only, or noise that transcription
+   * turns into a single throwaway word. Still allows short real acks (yes/no/ok).
+   */
+  function isGarbageTranscript(said) {
+    var clean = String(said || "")
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    if (!clean) return true;
+    var words = clean.split(" ").filter(Boolean);
+    if (!words.length) return true;
+    // Explicit short confirmations / greetings — keep
+    var ack =
+      /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|go|please|thanks|thank you|hi|hello|hey|ready|stop|cancel|wait|help)$/;
+    var joined = words.join(" ");
+    if (
+      ack.test(joined) ||
+      /^(go ahead|do it|yes please|no thanks|never mind|nevermind)$/.test(joined)
+    ) {
+      return false;
+    }
+    // Filler / breathing noise
+    if (words.every(function (w) {
+      return /^(um+|uh+|ah+|er+|hm+|hmm+|mm+|m+|huh|eh+)$/.test(w);
+    })) {
+      return true;
+    }
+    // One tiny token that isn't an ack (clicks often become "a", "i", "the")
+    if (words.length === 1 && words[0].length <= 2) return true;
+    // Single very short mystery word from room noise (allow ≥4 chars — real words)
+    if (words.length === 1 && words[0].length < 3) return true;
+    return false;
+  }
+
+  /** Shared VAD knobs — keep in sync with api/energy_agent._realtime_session_config */
+  function realtimeVadConfig() {
+    return {
+      type: "server_vad",
+      // Higher = less sensitive (default 0.5 is jumpy with fans/keys/speakers)
+      threshold: 0.78,
+      prefix_padding_ms: 280,
+      // Wait longer before declaring end-of-speech
+      silence_duration_ms: 900,
+      create_response: false,
+      interrupt_response: false,
+    };
   }
 
   function stopVoice(keepMic) {
@@ -2042,6 +2096,19 @@
       // Speakers bleed into the mic and the agent "hears itself" → self-interrupt loop.
       if (isAgentMouthBusy()) return;
       if (looksLikeEchoOfLastSpeech(said)) return;
+      // Drop ghost/filler turns from over-sensitive VAD (keeps yes/no)
+      if (isGarbageTranscript(said)) return;
+      // Debounce double-fires (same line twice within 1.2s)
+      var now = Date.now();
+      if (
+        state._lastUserSaid &&
+        said.toLowerCase() === state._lastUserSaid &&
+        now - (state._lastUserSaidAt || 0) < 1200
+      ) {
+        return;
+      }
+      state._lastUserSaid = said.toLowerCase();
+      state._lastUserSaidAt = now;
       // True barge-in only when mouth is idle (user spoke after agent finished)
       stopSpeak({ reason: "barge_in" });
       addMsg("user", said);
@@ -2155,6 +2222,7 @@
     });
     dc.addEventListener("open", function () {
       // One system: Realtime = ears + mouth only. create_response false = we reply via /chat.
+      // VAD: less sensitive than OpenAI defaults so room noise / keys don't start turns.
       dcSend({
         type: "session.update",
         session: {
@@ -2166,7 +2234,8 @@
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
-              turn_detection: { type: "server_vad", create_response: false },
+              noise_reduction: { type: "near_field" },
+              turn_detection: realtimeVadConfig(),
             },
           },
         },
