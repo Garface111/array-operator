@@ -1,7 +1,7 @@
 /* Energy Agent — sky-themed voice orb + panel (2026-07-13) */
-/* Bottom-LEFT so we never cover the Alerts pill (ao-al-fab sits bottom-right). */
+/* Top-RIGHT — clears Alerts (bottom-right) and the wish pill / other bottom chrome. */
 #eaRoot{
-  position:fixed; left:22px; right:auto; bottom:22px; z-index:99980;
+  position:fixed; top:72px; right:18px; left:auto; bottom:auto; z-index:99980;
   font-family:inherit; color:var(--ink,#0f172a);
   --ea-sky:#38bdf8; --ea-sky2:#0ea5e9; --ea-sun:#fbbf24; --ea-glow:rgba(56,189,248,.45);
 }
