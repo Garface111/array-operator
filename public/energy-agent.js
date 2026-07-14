@@ -1437,15 +1437,16 @@
     var t = String(text || "").toLowerCase();
     // "what are the tabs" is not a tour — LLM answers from persona map
     if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/.test(t)) return null;
-    if (!/\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through)\b/.test(t)
-        && !/\bexplain\b.*\btab\b/.test(t)) {
+    if (!/\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through|walk\s+through)\b/.test(t)
+        && !/\bexplain\b.*\btab\b/.test(t)
+        && !/\bgive\s+me\s+a\s+(walkthrough|tour)\b/.test(t)) {
       if (!/\b(master\s*account|account\s+tab|invoices?\s+tab|inverters?\s+tab|fleet\s+triage|arrays?\s+tab)\b/.test(t)) {
         return null;
       }
       if (!/\b(show|open|explain|walk)\b/.test(t)) return null;
     }
     if (/\b(master\s*account|account\s+tab|#account)\b/.test(t)
-        || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain)\b/.test(t))) {
+        || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain|through)\b/.test(t))) {
       return "master_account";
     }
     if (/\b(invoice|offtaker)\b/.test(t) || (/\breports?\b/.test(t) && /\btab\b/.test(t))) {
@@ -1498,26 +1499,25 @@
       return;
     }
     // Show-and-tell tours: run fully client-side (top→bottom, voice lockstep).
-    // Do NOT also call the LLM mid-tour — that was causing disjointed audio + spam bubbles.
+    // NEVER also call the LLM for highlights mid/after tour — that hallucinated
+    // boxes + desynced speech (Ford 2026-07-14 Account walkthrough).
     var tourId = detectTourId(text);
     if (tourId) {
       setStatus("Walking you through…", "think");
       try {
         await runTour({ tour_id: tourId });
-        // Quiet accurate wrap-up for Master Account only (no second tour)
-        if (tourId === "master_account") {
-          text = (
-            "Tour finished. Call ONLY account_summary (include_billing true). " +
-            "Reply in 2 short sentences: company, email (contact_email), plan, card-on-file. " +
-            "Do NOT navigate or run another tour. Do NOT invent null email."
-          );
-        } else {
-          setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
-          return;
-        }
       } catch (e) {
         addMsg("agent", "Couldn't run the visual tour — I'll explain from data instead.");
+        // fall through to LLM for a text-only explanation only
       }
+      // Optional: one factual account_summary line AFTER the tour, with UI cmds stripped
+      if (tourId === "master_account" || tourId === "account") {
+        try {
+          await postTourAccountFacts(sid);
+        } catch (e2) {}
+      }
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      return;
     }
     // After a held ship, "yes escalate" → Ford without full LLM loop
     if (isEscalateYes(text)) {
@@ -1719,10 +1719,26 @@
 
   function queryFirst(sel) {
     if (!sel) return null;
+    // Prefer matches inside the active panel so tours don't box unrelated chrome
+    var roots = [];
+    try {
+      var active = document.querySelector(".panel.active");
+      if (active) roots.push(active);
+    } catch (e) {}
+    roots.push(document);
     var el = null;
     String(sel).split(",").some(function (part) {
-      try { el = document.querySelector(part.trim()); } catch (e) { el = null; }
-      return !!el && el.offsetParent !== null || !!el;
+      var p = part.trim();
+      if (!p) return false;
+      for (var r = 0; r < roots.length; r++) {
+        try {
+          el = roots[r].querySelector(p);
+        } catch (e) {
+          el = null;
+        }
+        if (el) return true;
+      }
+      return false;
     });
     return el;
   }
@@ -1902,24 +1918,34 @@
         }
 
         if (s.selector || s.type === "highlight") {
-          var el = await waitForSelector(s.selector, 3000);
-          if (el) {
-            // Ensure element is visible from a predictable top-down path
-            try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-            await sleep(280);
-            clearHighlights();
-            el.classList.add("ea-hl", "ea-hl-pulse");
+          // Scope wait to the active Account/Invoices panel when possible so we
+          // never box a random match elsewhere on the page.
+          var el = await waitForSelector(s.selector, 3500);
+          if (!el) {
+            // Skip missing sections honestly — don't highlight a wrong fallback
+            if (s.say) {
+              setTourCaption(s.say + " _(not on screen yet)_", nIdx, narrated.length);
+              nIdx++;
+              await speakAndWait(
+                stripMd(s.say) + " That section isn't on the page yet."
+              );
+            }
+            continue;
           }
+          try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+          await sleep(280);
+          clearHighlights();
+          el.classList.add("ea-hl", "ea-hl-pulse");
           var line = s.say || s.label || "";
           if (line) {
             setTourCaption(line, nIdx, narrated.length);
             nIdx++;
+            // Speak ONLY while this element is highlighted (lockstep)
             await speakAndWait(line);
           } else {
             await sleep(s.ms || 2000);
           }
-          // Hold highlight a beat after speech, then clear for next
-          await sleep(400);
+          await sleep(350);
           clearHighlights();
           continue;
         }
@@ -1940,45 +1966,96 @@
     return true;
   }
 
+  /**
+   * After a visual tour, optionally pull one factual account_summary for a short
+   * spoken wrap-up — strip ALL ui_commands so the model cannot re-highlight junk.
+   */
+  async function postTourAccountFacts(sid) {
+    if (!sid) return;
+    var r = await fetch(API.chat, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        session_id: sid,
+        message: (
+          "The visual Account tour just finished on the user's screen. " +
+          "Call ONLY account_summary (include_billing true). " +
+          "Reply in 2 short sentences with real values: company, email/contact_email, " +
+          "plan, card-on-file. Do NOT call ui_navigate, ui_highlight, ui_tour, or ui_fill. " +
+          "Do NOT invent null email."
+        ),
+        context: packContext(),
+        source: "tour_wrap",
+      }),
+    });
+    var d = await r.json().catch(function () { return null; });
+    if (!r.ok || !d) return;
+    // Explicitly ignore any UI driver commands — tour is over
+    var reply = (d.reply || "").trim();
+    if (!reply) return;
+    addMsg("agent", reply);
+    try {
+      await enqueueSpeak(reply, { source: "tour_wrap" });
+    } catch (e) {}
+  }
+
   function presetTour(id) {
     var key = String(id || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
-    // Ordered TOP → BOTTOM of each page. First step always navigates + scrolls top.
+    // Ordered TOP → BOTTOM of the LIVE Account panel (sandbox.js renderAccountList):
+    // Auto-refresh → Name → Company → Email → Login → Password → Plan → Bill →
+    // Payment method → Online pay → Files. Selectors must match that DOM only.
     if (key === "master_account" || key === "account") {
       return [
         {
           hash: "#account",
-          say: "Account. I'll walk top to bottom — profile first, then auto-refresh, billing, and files.",
+          say: "Account. I'll walk top to bottom — auto-refresh first, then your profile, plan, and files.",
         },
         {
-          selector: "#tabAccount, a.tab[href='#account']",
+          selector: "#tabAccount",
           say: "You're on the **Account** tab in the top bar.",
         },
         {
-          selector: ".acct-edit[data-field='company'], .acct-row[data-field='company']",
-          say: "**Company** — your business name. Click to edit; it saves as you type.",
+          selector: "#rowAutoRefresh",
+          say: "**Auto-refresh** leads the page — cloud vault or this computer. This is how production and bills stay fresh.",
         },
         {
-          selector: ".acct-edit[data-field='name'], .acct-row[data-field='name']",
-          say: "**Operator name** — the person running this account.",
+          selector: "#panelAccount .acct-edit[data-field='name']",
+          say: "**Name** — the operator on this account. Click to edit; it saves as you type.",
         },
         {
-          selector: ".acct-edit[data-field='email'], .acct-row[data-field='email']",
-          say: "**Email** — the contact address on this account.",
+          selector: "#panelAccount .acct-edit[data-field='company']",
+          say: "**Company** — your business name on this account.",
         },
         {
-          selector: "#rowAutoRefresh, .ar-stack, .ar-card-head",
-          say: "**Auto-refresh** — how production and utility bills stay up to date, cloud or this computer.",
+          selector: "#panelAccount .acct-edit[data-field='email']",
+          say: "**Email** — the contact and sign-in address for this account.",
         },
         {
-          selector: "#aoPaySetup, .acct-pay-setup, #billManage, #payState, .acct-row.acct-pay-setup",
-          say: "**Plan and card** — Array Operator billing for your subscription, not offtaker invoices.",
+          selector: "#rowPassword",
+          say: "**Password** — set or change a password for email login, or keep using magic links.",
         },
         {
-          selector: ".acct-files-row, #acctFilesBody, #acctFilesCount",
+          selector: "#acctPlanVal, #acctChangePlan",
+          say: "**Plan** — Live vendor data, Offtaker invoices, or Both. Change it here anytime.",
+        },
+        {
+          selector: "#aoBill",
+          say: "**Your bill** — what Array Operator charges for this subscription. Not offtaker invoices.",
+        },
+        {
+          selector: "#billManage, #payState",
+          say: "**Payment method** — add or manage the card on file for Array Operator.",
+        },
+        {
+          selector: "#aoPaySetup, #aoPayCard",
+          say: "**Online payments** — optional Stripe Connect so offtaker invoices can include a Pay button.",
+        },
+        {
+          selector: "#panelAccount .acct-files-row",
           say: "**Your files** — templates, workbooks, and captured utility PDFs.",
         },
         {
-          say: "That's Account, top to bottom. Ask about any section, or say Improve to change the UI.",
+          say: "That's Account, top to bottom. Ask about any section if you want to dig in.",
         },
       ];
     }
