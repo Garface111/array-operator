@@ -1846,14 +1846,13 @@
       else showPending(null);
 
       var reply = d.reply || "…";
-      // Voice: speak the OPENING clearly (never drop the lead-in). Full text in chat.
-      var speakText = (source || "") === "voice" ? shortVoiceReply(reply) : reply;
+      // Speak the full answer (voice used to truncate mid-reply). Chat bubble = same text.
       addMsg("agent", reply);
       clearTools();
 
       // SPEAK FIRST — don't wait on UI navigates/highlights (those delayed the mouth
       // so Realtime often clipped the first half of the answer, Ford 2026-07-14).
-      var speakP = enqueueSpeak(speakText, { source: "chat" });
+      var speakP = enqueueSpeak(reply, { source: "chat" });
 
       var cmds = d.ui_commands || [];
       // Kill freehand multi-highlight "tours" from the LLM — replace with a real
@@ -1891,33 +1890,24 @@
   }
 
   /**
-   * Voice length cap — ALWAYS keep the opening (first 2–3 sentences).
-   * Never return a "middle/end only" slice; that made the mouth skip the lead-in.
+   * Optional soft length hint for tours/acks only. Normal chat speaks FULL reply
+   * (user can talk as long as needed — Ford 2026-07-14).
    */
-  function shortVoiceReply(text) {
-    var plain = stripMd(String(text || ""))
-      .replace(/\s+/g, " ")
-      .replace(/\s*[•\-]\s+/g, ". ")
-      .trim();
+  function shortVoiceReply(text, maxChars) {
+    var plain = stripMd(String(text || "")).replace(/\s+/g, " ").trim();
     if (!plain) return plain;
-    // Short enough — speak everything, including the first words
-    if (plain.length <= 420) return plain;
-    // Split on sentence enders; keep em-dash clauses attached to the lead sentence
+    maxChars = maxChars || 800;
+    if (plain.length <= maxChars) return plain;
     var parts = plain.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [plain];
     var out = "";
-    for (var i = 0; i < parts.length && i < 3; i++) {
+    for (var i = 0; i < parts.length; i++) {
       var bit = (parts[i] || "").trim();
       if (!bit) continue;
       var next = out ? out + " " + bit : bit;
-      if (next.length > 480 && out) break;
+      if (next.length > maxChars && out) break;
       out = next;
-      // Prefer at least ~2 sentences of lead-in before stopping early
-      if (out.length >= 280 && i >= 1) break;
     }
-    // Always from the start of the reply — never slice from the middle
-    if (!out) out = plain.slice(0, 420);
-    if (out.length < plain.length && !/[.!?]$/.test(out)) out += ".";
-    return out;
+    return out || plain.slice(0, maxChars);
   }
 
   /** Color / look / button styling — not data edits, not fleet. */
@@ -1983,10 +1973,9 @@
       openImproveFlow({ markFirst: false });
     }
     if (turnGen !== (state._turnAbortGen || 0)) return;
-    // Always short spoken line
-    var spoken = shortVoiceReply(reply);
     addMsg("agent", reply);
-    await enqueueSpeak(spoken, { source: "chat" });
+    // Full reply — same long-form voice path as main chat
+    await enqueueSpeak(reply, { source: "chat" });
     state.thinking = false;
     setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
   }
@@ -3098,7 +3087,13 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
-      // ~1.1s covers typical first phrase without feeling uninterruptible
+      // Longer mute for long answers so the whole first phrase (and more) is safe
+      var muteMs = 1400;
+      try {
+        var wcount = (state._lastSpokenPlain || "").split(/\s+/).filter(Boolean).length;
+        if (wcount > 40) muteMs = 2200;
+        if (wcount > 80) muteMs = 3000;
+      } catch (e) {}
       state._unmuteAfterSpeakTimer = setTimeout(function () {
         state._unmuteAfterSpeakTimer = null;
         state._micHeldForSpeak = false;
@@ -3112,7 +3107,7 @@
             state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
           } catch (e) {}
         }
-      }, 1100);
+      }, muteMs);
       return;
     }
     // Speech finished — ensure mic is open after a short settle (room reverb)
@@ -3210,19 +3205,21 @@
     ) {
       return false;
     }
-    // Mid-speech barge-in: protect the first ~1.2s of TTS so speaker bleed
-    // doesn't cancel the opening words (user heard "second half only").
+    // Mid-speech barge-in: protect lead-in; require a real interrupt to cut long answers
     if (isAgentMouthBusy() || state._micHeldForSpeak) {
       // Attack mute: still allow explicit STOP
       if (state._micHeldForSpeak && !isStopCommand(said)) return false;
       var started = state._speakStartedAt || 0;
-      if (started && now - started < 1200 && !isStopCommand(said)) return false;
+      // Protect opening; long answers need a real interrupt (stop still always works)
+      if (started && now - started < 2500 && !isStopCommand(said)) return false;
       var words = said.trim().split(/\s+/).filter(Boolean);
       var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|stop|wait|cancel|go|please|hey)$/i.test(
         said.trim().replace(/[.!?]+$/, "")
       );
-      // Need a real interrupt phrase — single short noise words won't cut speech
-      if (!ack && words.length < 3 && said.trim().length < 14) return false;
+      // While speaking, need a clear multi-word interrupt — not speaker bleed
+      if (!ack && !isStopCommand(said) && (words.length < 5 || said.trim().length < 22)) {
+        return false;
+      }
     }
     return true;
   }
@@ -3435,8 +3432,11 @@
     state._lastSpokenPlain = plain;
     _lastSpoken = plain;
 
-    var chunks = chunkForSpeech(plain, 900);
+    // Larger chunks = fewer seams; Realtime can hold multi-minute scripts
+    var chunks = chunkForSpeech(plain, 1400);
     var seq = ++state._speakSeq;
+    // Track in-flight speak so response.done can't kill long audio early
+    state._speakHardDeadline = Date.now() + Math.max(120000, plain.split(/\s+/).length * 600 + 30000);
     chunks.forEach(function (chunk, i) {
       var isLast = i === chunks.length - 1;
       state._speakQueue = state._speakQueue
@@ -3449,6 +3449,7 @@
             force: true, // chunks must not dedupe against each other
             // Keep mic held across multi-chunk explanations
             keepMicHeld: !isLast,
+            speakSeq: seq,
           });
         });
     });
@@ -3459,10 +3460,25 @@
     opts = opts || {};
     return new Promise(function (resolve) {
       var settled = false;
+      var words = plain.split(/\s+/).filter(Boolean).length;
+      // Generous: ~550ms/word + headroom; floor 20s, ceiling 10 min per chunk
+      var fallbackMs = Math.min(600000, Math.max(20000, Math.round(words * 550) + 8000));
+      var maxArm = Math.min(900000, fallbackMs * 3); // hard hang recovery
+      var timer = null;
+      var earlyDoneTimer = null;
+      var totalArmed = 0;
+
+      function clearTimers() {
+        if (timer) { try { clearTimeout(timer); } catch (e) {} timer = null; }
+        if (earlyDoneTimer) { try { clearTimeout(earlyDoneTimer); } catch (e) {} earlyDoneTimer = null; }
+      }
+
       function done() {
         if (settled) return;
         settled = true;
+        clearTimers();
         state._onSpeakDone = null;
+        state._speakEarlyDoneTimer = null;
         state.speaking = false;
         state.rtResponseActive = false;
         // Only settle mic after the LAST chunk of a long explanation
@@ -3482,23 +3498,14 @@
         done();
         return;
       }
-      state._onSpeakDone = done;
 
-      var words = plain.split(/\s+/).filter(Boolean).length;
-      // Scale with content. Old hard cap of 20s cut long explanations mid-sentence
-      // (timer released the mic → ghost barge-in cancelled the Realtime response).
-      // ~450ms/word + headroom; floor 6s, ceiling 4 min per chunk. While audio is
-      // still playing we re-arm instead of force-ending.
-      var fallbackMs = Math.min(240000, Math.max(6000, Math.round(words * 450) + 4000));
-      var timer = null;
-      var totalArmed = 0;
       function armFallback(ms) {
         if (timer) clearTimeout(timer);
         timer = setTimeout(function () {
           totalArmed += ms;
-          // Still playing — keep waiting (cap total hang recovery ~6 min per chunk)
-          if ((state.speaking || state.rtResponseActive) && totalArmed < 360000) {
-            armFallback(Math.min(90000, ms));
+          // Still playing — keep waiting until hard hang limit
+          if ((state.speaking || state.rtResponseActive) && totalArmed < maxArm) {
+            armFallback(Math.min(120000, ms));
             return;
           }
           done();
@@ -3506,11 +3513,30 @@
       }
       armFallback(fallbackMs);
 
-      var prevDone = done;
+      // Called when audio truly ends (buffer stopped) OR confirmed cancel
       state._onSpeakDone = function () {
-        if (timer) clearTimeout(timer);
-        timer = null;
-        prevDone();
+        clearTimers();
+        done();
+      };
+      // Exposed so response.done can schedule a LONG safety drain, not 1.2s
+      state._scheduleSpeakSafetyDrain = function (delayMs) {
+        if (earlyDoneTimer) clearTimeout(earlyDoneTimer);
+        // Only force-end if buffer.stopped never arrives — wait based on remaining words
+        var wait = Math.max(delayMs || 0, Math.min(fallbackMs, 180000));
+        earlyDoneTimer = setTimeout(function () {
+          earlyDoneTimer = null;
+          // If still actively receiving audio deltas, keep going
+          if (state.speaking || state.rtResponseActive) {
+            if (Date.now() < (state._speakHardDeadline || 0)) {
+              state._scheduleSpeakSafetyDrain(30000);
+              return;
+            }
+          }
+          if (typeof state._onSpeakDone === "function") {
+            try { state._onSpeakDone(); } catch (e) {}
+          }
+        }, wait);
+        state._speakEarlyDoneTimer = earlyDoneTimer;
       };
 
       // Attack mute, then reopen mic for barge-in (see holdMicWhileSpeaking)
@@ -3523,17 +3549,16 @@
           // to start. A cancel race was clipping the first half of answers.
           if (state.rtResponseActive) {
             cancelRealtimeIfActive();
-            // Brief settle so cancel doesn't eat the next response.create
           }
           state.rtResponseActive = true;
           state.speaking = true;
           state._speakStartedAt = Date.now();
-          // Prefer verbatim read from the start — models sometimes "continue"
-          // mid-thought when instructions are loose.
+          // Verbatim full read — do not summarize or stop early
           var speakScript =
             "Read the following aloud VERBATIM in natural English, starting from " +
-            "the FIRST word. Do not skip the opening. Do not summarize, reorder, " +
-            "or add greetings/questions. Speak the complete text:\n\n" +
+            "the FIRST word and continuing until the LAST word. " +
+            "Do not skip, summarize, reorder, or stop early. " +
+            "Do not add greetings or questions. Take as long as you need:\n\n" +
             plain;
           state.dc.send(JSON.stringify({
             type: "response.create",
@@ -3616,24 +3641,18 @@
       }
     }
     if (ev.type === "response.done") {
-      // Text/tool complete — audio may still be draining. Don't clear the speak
-      // waiter here if we're still marked speaking (buffer stopped will finish it).
-      if (!state.speaking) {
-        state.rtResponseActive = false;
+      // Model finished *generating* — audio often still playing for a long time.
+      // NEVER force-end in ~1s (that cut mid-answer). Wait for buffer.stopped,
+      // or a long word-based safety drain only if buffer.stopped never arrives.
+      if (!state.speaking && !state.rtResponseActive) {
         if (typeof state._onSpeakDone === "function") {
           try { state._onSpeakDone(); } catch (e) {}
         } else if (state.listening && !state.touring) {
           setStatus("Listening…", "listen");
         }
-      } else {
-        // Safety drain if buffer-stopped never arrives
-        setTimeout(function () {
-          if (typeof state._onSpeakDone === "function") {
-            state.speaking = false;
-            state.rtResponseActive = false;
-            try { state._onSpeakDone(); } catch (e) {}
-          }
-        }, 1200);
+      } else if (typeof state._scheduleSpeakSafetyDrain === "function") {
+        // Long safety only — do not clip multi-minute speech
+        state._scheduleSpeakSafetyDrain(45000);
       }
     }
     // User finished speaking — ONE path: show once, then agent turn (tools + speak).
