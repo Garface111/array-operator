@@ -546,6 +546,7 @@ function loginWithChint(){
   // sends {url, active:true, provider:"chint"} — identical to the spreadsheet view that works.
   // (The #/pv/sites route + custom-routing detours were my own divergence and the bug.)
   openPortalLogin("chint", "https://monitor.chintpowersystems.com/", "Chint Power Monitor");
+  markPendingVendor("chint", "Chint / CPS", "portal open — waiting for capture");
   if (_chintTimer) clearTimeout(_chintTimer);
   // In SYNC mode, never leave the tile spinning "signing in…" forever: if the capture hasn't
   // landed in ~75s (a generous window for the login + multi-site route walk), resolve it to a
@@ -572,6 +573,8 @@ function openPortalLogin(vendor, url, label){
   state.userConnect = true;
   const scan = document.getElementById("scanArea");
   if (scan) scan.innerHTML = `<div class="scan"><span class="ring"></span> Opening ${label} — sign in there and we'll bring you right back here.</div>`;
+  // Dashboard Inverters shows a "Connecting…" card until fleet-tree has this vendor
+  markPendingVendor(vendor, label || vendor, "portal open — waiting for capture");
   extSend("SO_OPEN_PORTAL", { url, active: true, provider: vendor });
 }
 
@@ -1813,7 +1816,30 @@ function doneScreen(){
 // read by app.js → live /v1/array-owners/overview. NOT /accounts (that proxies
 // to the NEPOOL verifier SPA — wrong product for an array owner).
 function goDashboard(){
-  window.location.assign(`/?fresh=1&tour=hands-off&t=${Date.now()}`);
+  // If a vendor is mid-connect (Chint walks can take 30–60s), land on Inverters
+  // so the pending "Connecting…" card is visible instead of an empty fleet.
+  let hash = "";
+  try {
+    const pending = (window.__aoPendingFeeds && window.__aoPendingFeeds.list())
+      || JSON.parse(localStorage.getItem("ao_pending_feeds") || "[]");
+    if (pending && pending.length) hash = "#arrays";
+  } catch (e) {}
+  window.location.assign(`/?fresh=1&tour=hands-off&t=${Date.now()}${hash}`);
+}
+
+function markPendingVendor(code, label, note){
+  try {
+    if (window.__aoPendingFeeds) {
+      window.__aoPendingFeeds.mark(code, { label: label || code, note: note || null });
+      return;
+    }
+  } catch (e) {}
+  try {
+    const KEY = "ao_pending_feeds";
+    const list = JSON.parse(localStorage.getItem(KEY) || "[]").filter(p => p && p.vendor !== code);
+    list.push({ vendor: code, label: label || code, at: Date.now(), note: note || null });
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch (e) {}
 }
 
 // Create the trialing Array Operator account, then mint a session so we can

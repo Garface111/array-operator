@@ -1299,7 +1299,11 @@
         ? `${cols.length} of ${all.length} monitored arrays match "${_query}"`
         : `${monitoredTxt} · ${(data.summary || {}).inverters_total || invShown} inverters`;
     }
-    if (!cols.length) {
+    const pending = _pendingFeeds().filter(p => {
+      // Still pending if no column for that vendor yet
+      return !cols.some(c => (c.vendor || "").toLowerCase() === p.vendor);
+    });
+    if (!cols.length && !pending.length) {
       body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
       return;
     }
@@ -1307,6 +1311,8 @@
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
     let h = "";
+    // Pending vendors first (just-connected — user is watching for them)
+    pending.forEach(p => { h += pendingVendorHtml(p); });
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
       // Honest rollups: sum only arrays that actually carry a reading, and show null → "—"
@@ -1646,16 +1652,57 @@
   let _sizeRaf = 0;
   function sizeScrollSoon() { if (_sizeRaf) return; _sizeRaf = requestAnimationFrame(() => { _sizeRaf = 0; sizeScroll(); }); }
 
+  function _pendingFeeds() {
+    try {
+      return (window.__aoPendingFeeds && window.__aoPendingFeeds.list()) || [];
+    } catch (e) { return []; }
+  }
+
+  /** Skeleton vendor block while a just-connected portal is still landing. */
+  function pendingVendorHtml(p) {
+    const label = esc(p.label || p.vendor || "Vendor");
+    const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
+    const wait = ageSec < 15 ? "usually under a minute" : ageSec < 60 ? "still syncing…" : "almost there — large fleets can take a minute";
+    return `<div class="vs-pending" data-pending-vendor="${esc(p.vendor)}">
+      <div class="vs-pending-head">
+        <span class="vs-pending-badge">${label}</span>
+        <span class="vs-pending-pulse" aria-hidden="true"></span>
+        <span class="vs-pending-stat">Connecting…</span>
+      </div>
+      <div class="vs-pending-body">
+        <div class="vs-pending-skel"></div>
+        <div class="vs-pending-skel vs-pending-skel-short"></div>
+        <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (${esc(wait)}). This page updates automatically.</p>
+      </div>
+    </div>`;
+  }
+
   function render() {
     const host = $("#vendorSheet");
     if (!host || !window.FleetStore) return;
     const data = FleetStore.toColumns();
+    const pending = _pendingFeeds();
     if (!((data && data.columns) || []).length) {
       // Spreadsheet is the DEFAULT view, so it renders during the initial fleet load —
       // show a neutral "loading" state, not the misleading "no arrays", until data lands
       // (the FleetStore subscribe re-renders this once the tree arrives).
       const loading = !!(FleetStore.isLoaded && !FleetStore.isLoaded());
-      host.innerHTML = `<div class="vs-empty">${loading ? "Loading your fleet…" : "No arrays connected yet — add one from the Sandbox view, then they'll appear here."}</div>`;
+      if (pending.length) {
+        if (!host.querySelector("#vsSearch")) buildShell(host);
+        const bodyEl = host.querySelector("#vsBody");
+        if (bodyEl) {
+          bodyEl.innerHTML = pending.map(pendingVendorHtml).join("");
+        } else {
+          host.innerHTML = pending.map(pendingVendorHtml).join("");
+        }
+        const cnt = host.querySelector("#vsCount");
+        if (cnt) {
+          cnt.textContent = "Connecting " + pending.map(p => p.label || p.vendor).join(", ") + "…";
+        }
+        sizeScroll();
+        return;
+      }
+      host.innerHTML = `<div class="vs-empty">${loading ? "Loading your fleet…" : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
       return;
     }
     if (!host.querySelector("#vsSearch")) buildShell(host);   // build the persistent shell once
@@ -1696,6 +1743,11 @@
         if ($("#vsSearch")) renderBody(); else render();
       });
     }
+    // Pending vendor cards refresh when connect state changes
+    window.addEventListener("ao:pending-feeds", () => {
+      if (_view !== "spreadsheet") return;
+      if ($("#vsSearch")) renderBody(); else render();
+    });
     // Detect the EnergyAgent extension so the Refresh button can re-scrape. so_bridge
     // announces SO_EXTENSION_PRESENT at page load (we may have loaded after it), so we
     // both listen for it AND ask for status to prompt a fresh announce. Belt + the global.

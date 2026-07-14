@@ -269,6 +269,17 @@
       return;
     }
     const hdr = { "Content-Type":"application/json", "Authorization":"Bearer "+session };
+    // Optimistic UI: show "Connecting…" on Inverters immediately (Chint walks can take 30–60s)
+    try {
+      const prov = (d.provider || "").toLowerCase();
+      if(prov && window.__aoPendingFeeds){
+        window.__aoPendingFeeds.mark(prov, {
+          label: BRAND[prov] || d.provider,
+          note: "capture landed — syncing to your account",
+          sites: Array.isArray(d.sites) ? d.sites.length : null,
+        });
+      }
+    } catch(e){}
     if(note){ note.className = "sb-note"; note.innerHTML = `<span class="sb-spin"></span> Got your ${esc(BRAND[d.provider]||d.provider)} account — bringing your data in…`; }
     // ── GMP/VEC/WEC BILL-SYNC broadcast ──────────────────────────────────────
     // The bill-capture script (content.js → /v1/sync) already created the utility
@@ -361,6 +372,13 @@
               const all = (FleetStore.snapshot().arrays || []).map(a => a.id);
               if(all.length) FleetStore.setFocus(all);
             }
+            try {
+              if(window.__aoPendingFeeds){
+                window.__aoPendingFeeds.reconcile((FleetStore.snapshot() || {}).arrays || []);
+                // Keep polling if this vendor still hasn't shown (Chint multi-site lag)
+                window.__aoPendingFeeds.startPoll();
+              }
+            } catch(e){}
           }
         } catch(e){}
         // A meter capture (GMP/VEC/WEC) may have added new utility accounts — let
