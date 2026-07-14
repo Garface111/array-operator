@@ -1555,7 +1555,8 @@
           return;
         }
         if (act === "backdrop") {
-          if (state.mode === "modal") minimizeTour();
+          // Modal + dock: dimmed overlay click closes (dock now shows a light scrim)
+          minimizeTour();
           return;
         }
         if (act === "finish") {
