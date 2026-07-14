@@ -7,8 +7,8 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "ao_hands_off_tour";
-  var DISMISS_KEY = "ao_hands_off_tour_dismiss";
+  var STORAGE_KEY = "ao_hands_off_tour"; // "done" when fully finished
+  var MODAL_SEEN_KEY = "ao_hands_off_modal_seen"; // first-time modal shown/closed
 
   var STEPS = [
     {
@@ -106,14 +106,9 @@
 
   var state = {
     open: false,
+    mode: "modal", // "modal" | "dock"
     idx: 0,
-    live: {
-      arrays: null,
-      cloud: null,
-      deviceMode: null,
-      utilities: null,
-      offtakers: null,
-    },
+    live: {},
   };
 
   function session() {
@@ -131,12 +126,31 @@
     return h;
   }
 
+  function isTourComplete() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) === "done";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function modalAlreadySeen() {
+    try {
+      return localStorage.getItem(MODAL_SEEN_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function markModalSeen() {
+    try {
+      localStorage.setItem(MODAL_SEEN_KEY, "1");
+    } catch (e) {}
+  }
+
   function shouldAutoOpen() {
     if (!session()) return false;
-    try {
-      if (localStorage.getItem(DISMISS_KEY) === "1") return false;
-      if (localStorage.getItem(STORAGE_KEY) === "done") return false;
-    } catch (e) {}
+    if (isTourComplete()) return false;
     var q = location.search || "";
     if (/[?&]tour=hands-off(&|$)/.test(q)) return true;
     if (/[?&]fresh=1(&|$)/.test(q)) return true;
@@ -174,14 +188,18 @@
   function markDone() {
     try {
       localStorage.setItem(STORAGE_KEY, "done");
+      localStorage.setItem(MODAL_SEEN_KEY, "1");
     } catch (e) {}
   }
 
-  function markDismissed() {
-    try {
-      localStorage.setItem(DISMISS_KEY, "1");
-      localStorage.setItem(STORAGE_KEY, "done");
-    } catch (e) {}
+  /** Required pillars for “hands-off” (offtakers optional). */
+  function requiredRemaining(live) {
+    live = live || state.live || {};
+    var n = 0;
+    if (!live.arrays) n++;
+    if (!live.cloud) n++;
+    if (!(live.utilWithBills > 0 || live.utilCount > 0)) n++;
+    return n;
   }
 
   function esc(s) {
@@ -334,7 +352,6 @@
       if (k === "utility" && live.utilities) done++;
       if (k === "offtakers" && live.offtakers) done++;
     });
-    // offtakers optional for pure monitors — weight first 3 heavier in display
     return Math.round((done / 4) * 100);
   }
 
@@ -346,10 +363,64 @@
     el.id = "hoTour";
     el.hidden = true;
     el.setAttribute("role", "dialog");
-    el.setAttribute("aria-modal", "true");
     el.setAttribute("aria-label", "Hands-off setup walkthrough");
     document.body.appendChild(el);
     return el;
+  }
+
+  function ensurePill() {
+    var pill = document.getElementById("hoPill");
+    if (pill) return pill;
+    pill = document.createElement("button");
+    pill.type = "button";
+    pill.id = "hoPill";
+    pill.setAttribute("aria-label", "Open hands-off setup checklist");
+    document.body.appendChild(pill);
+    pill.addEventListener("click", function () {
+      openTour({ force: true, mode: "dock" });
+    });
+    return pill;
+  }
+
+  function updatePill() {
+    var pill = ensurePill();
+    if (!session() || isTourComplete()) {
+      pill.classList.remove("ho-pill-show");
+      return;
+    }
+    // Hide pill while modal/dock is open
+    if (state.open) {
+      pill.classList.remove("ho-pill-show");
+      return;
+    }
+    var live = state.live || {};
+    var left = requiredRemaining(live);
+    pill.classList.add("ho-pill-show");
+    if (left <= 0) {
+      pill.classList.add("is-done");
+      pill.innerHTML =
+        '<span class="ho-pill-badge">✓</span>' +
+        '<span class="ho-pill-txt">Hands-off ready' +
+        '<span class="ho-pill-sub">Tap to review checklist</span></span>';
+    } else {
+      pill.classList.remove("is-done");
+      pill.innerHTML =
+        '<span class="ho-pill-badge">' +
+        left +
+        "</span>" +
+        '<span class="ho-pill-txt">' +
+        left +
+        " step" +
+        (left === 1 ? "" : "s") +
+        " to complete" +
+        '<span class="ho-pill-sub">Hands-off setup</span></span>';
+    }
+  }
+
+  function setShellOpen(on) {
+    try {
+      document.body.classList.toggle("ho-shell-open", !!on);
+    } catch (e) {}
   }
 
   function render() {
@@ -357,9 +428,10 @@
     var step = STEPS[state.idx] || STEPS[0];
     var live = state.live || {};
     var pct = progressPct(live);
+    var mode = state.mode === "dock" ? "dock" : "modal";
 
     var rail = STEPS.map(function (s, i) {
-      var done = stepComplete(s, live) || (s.id === "done" && pct >= 75);
+      var done = stepComplete(s, live) || (s.id === "done" && requiredRemaining(live) === 0);
       var active = i === state.idx;
       var num = s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(i);
       if (done && s.id !== "welcome") num = "✓";
@@ -382,7 +454,13 @@
     }).join("");
 
     var body = renderBody(step, live);
+    var foot =
+      mode === "dock"
+        ? "Use the site while this stays open — checklist updates live."
+        : "Takes ~5 minutes. Close anytime — resume from the pill bottom-left.";
 
+    root.className = "ho-mode-" + mode + (state.open ? " ho-open" : "");
+    root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
     root.innerHTML =
       '<div class="ho-backdrop" data-ho="backdrop"></div>' +
       '<div class="ho-sheet">' +
@@ -395,15 +473,21 @@
       '"><strong>' +
       pct +
       "%</strong></div>" +
-      '<div class="ho-score-copy"><b>Hands-off readiness</b><span>Live check of your feeds</span></div>' +
+      '<div class="ho-score-copy"><b>Hands-off readiness</b><span>' +
+      (requiredRemaining(live) === 0
+        ? "Core feeds look good"
+        : requiredRemaining(live) + " required step" + (requiredRemaining(live) === 1 ? "" : "s") + " left") +
+      "</span></div>" +
       "</div>" +
       '<div class="ho-steps" role="tablist">' +
       rail +
       "</div>" +
-      '<div class="ho-rail-foot">Takes ~5 minutes. You can reopen anytime from Account.</div>' +
+      '<div class="ho-rail-foot">' +
+      foot +
+      "</div>" +
       "</aside>" +
       '<section class="ho-main">' +
-      '<button type="button" class="ho-close" data-ho="close" aria-label="Close">×</button>' +
+      '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
       body +
       "</section></div>";
 
@@ -412,6 +496,8 @@
       root.classList.add("ho-open");
     });
     state.open = true;
+    setShellOpen(mode === "dock");
+    updatePill();
     wire(root);
   }
 
@@ -550,10 +636,10 @@
       html +=
         '<button type="button" class="ho-btn ho-btn-primary" data-ho="next">Start hands-off setup →</button>';
       html +=
-        '<button type="button" class="ho-btn ho-btn-text" data-ho="dismiss">Explore on my own</button>';
+        '<button type="button" class="ho-btn ho-btn-text" data-ho="minimize">Explore site — keep checklist</button>';
     } else if (step.kind === "done") {
       html +=
-        '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Enter dashboard →</button>';
+        '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Done — enter dashboard →</button>';
       html +=
         '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Review Auto-refresh</button>';
     } else {
@@ -612,16 +698,35 @@
     }
   }
 
-  function closeTour(permanent) {
+  /** Close panel → pill stays for re-access (unless fully done). */
+  function minimizeTour() {
+    markModalSeen();
     var root = document.getElementById("hoTour");
-    if (!root) return;
-    root.classList.remove("ho-open");
-    setTimeout(function () {
-      root.hidden = true;
-      root.innerHTML = "";
-    }, 280);
+    if (root) {
+      root.classList.remove("ho-open");
+      setTimeout(function () {
+        if (!state.open) {
+          root.hidden = true;
+          root.innerHTML = "";
+        }
+      }, 280);
+    }
     state.open = false;
-    if (permanent) markDone();
+    setShellOpen(false);
+    probeLive().then(function () {
+      // Auto-complete if required pillars are green
+      if (requiredRemaining(state.live) === 0) {
+        // Don't force done — let them mark done on finish screen; still show green pill
+      }
+      updatePill();
+    });
+  }
+
+  function closeTourFinished() {
+    markDone();
+    minimizeTour();
+    var pill = document.getElementById("hoPill");
+    if (pill) pill.classList.remove("ho-pill-show");
   }
 
   function wire(root) {
@@ -632,23 +737,19 @@
       });
     });
     root.querySelectorAll("[data-ho]").forEach(function (btn) {
-      btn.addEventListener("click", function (e) {
+      btn.addEventListener("click", function () {
         var act = btn.getAttribute("data-ho");
-        if (act === "close" || act === "backdrop") {
-          // backdrop soft-dismiss without permanent? permanent for close X after welcome
-          if (act === "backdrop") return; // require explicit close — less accidental
-          markDismissed();
-          closeTour(true);
+        if (act === "close" || act === "minimize") {
+          minimizeTour();
           return;
         }
-        if (act === "dismiss") {
-          markDismissed();
-          closeTour(true);
+        if (act === "backdrop") {
+          // Modal only: click outside minimizes to pill
+          if (state.mode === "modal") minimizeTour();
           return;
         }
         if (act === "finish") {
-          markDone();
-          closeTour(true);
+          closeTourFinished();
           return;
         }
         if (act === "next") {
@@ -664,14 +765,23 @@
         if (act === "cta") {
           var hash = btn.getAttribute("data-hash");
           var ar = btn.getAttribute("data-ar") === "1";
-          // Stay open so they can continue after doing the action — or soft-minimize
+          // Jump into the site; if modal, switch to dock so they can work + checklist
+          if (state.mode === "modal") {
+            markModalSeen();
+            state.mode = "dock";
+            render();
+          }
           goHash(hash, ar);
-          // Advance to next so returning feels progressive
           if (state.idx < STEPS.length - 1) {
             setTimeout(function () {
               state.idx++;
               probeLive().then(render);
             }, 400);
+          } else {
+            probeLive().then(function () {
+              if (state.open) render();
+              updatePill();
+            });
           }
         }
       });
@@ -681,35 +791,66 @@
   async function openTour(opts) {
     opts = opts || {};
     if (!session() && !opts.force) return;
-    state.idx = opts.step != null ? opts.step : 0;
+    // Prefer dock after first modal; force mode if requested
+    if (opts.mode === "modal" || opts.mode === "dock") {
+      state.mode = opts.mode;
+    } else if (modalAlreadySeen()) {
+      state.mode = "dock";
+    } else {
+      state.mode = "modal";
+    }
+    if (opts.step != null) state.idx = opts.step;
+    else if (!state.open) state.idx = state.idx || 0;
     ensureRoot();
+    ensurePill();
     await probeLive();
     render();
-    // refresh live status once more after fleet store may load
     setTimeout(function () {
       if (!state.open) return;
       probeLive().then(function () {
         if (state.open) render();
+        else updatePill();
       });
-    }, 1800);
+    }, 1600);
   }
 
   function boot() {
-    // Expose for Account deep-link / Energy Agent
     window.__aoHandsOffTour = function (opts) {
-      try {
-        localStorage.removeItem(DISMISS_KEY);
-      } catch (e) {}
-      openTour(opts || { force: true });
+      opts = opts || { force: true };
+      // Replays default to dock (always available), unless first-time force modal
+      if (!opts.mode) opts.mode = modalAlreadySeen() ? "dock" : "modal";
+      openTour(opts);
     };
     window.__aoHandsOffTourProbe = probeLive;
+    window.__aoHandsOffTourMinimize = minimizeTour;
+
+    // Always show resume pill for signed-in incomplete accounts
+    setTimeout(function () {
+      if (!session() || isTourComplete()) return;
+      probeLive().then(updatePill);
+    }, 900);
+
+    // Re-probe pill when fleet loads
+    try {
+      if (window.FleetStore && FleetStore.subscribe) {
+        FleetStore.subscribe(function () {
+          if (!session() || isTourComplete()) return;
+          probeLive().then(function () {
+            if (state.open) render();
+            else updatePill();
+          });
+        });
+      }
+    } catch (e) {}
 
     if (!shouldAutoOpen()) return;
-    // Wait a beat for session + sky paint + fleet cache
     setTimeout(function () {
       if (!session()) return;
       scrubTourParams();
-      openTour();
+      // First land: big modal; later auto-opens stay dock if already seen
+      openTour({
+        mode: modalAlreadySeen() ? "dock" : "modal",
+      });
     }, 700);
   }
 
