@@ -1,0 +1,2183 @@
+{
+  "captured_at": "2026-07-14T23:38:08.847Z",
+  "base": "https://arrayoperator.com",
+  "session": "demo (/v1/demo/enter)",
+  "viewport": "1440x900",
+  "states": [
+    {
+      "name": "00-login",
+      "file": "shots/00-login.png",
+      "note": "Sign-in page (pre-session).",
+      "hash": "",
+      "title": "Sign in · Array Operator",
+      "headings": [
+        "Welcome back."
+      ],
+      "bodyTextSample": "Array Operator by EnergyAgent Welcome back. Sign in to your array dashboard. Password Email me a link Email Password Sign in → New here? Start your free trial →",
+      "tabs": [],
+      "segs": [],
+      "buttons": [],
+      "ids": [],
+      "activePanel": null
+    },
+    {
+      "name": "00b-anon-home",
+      "file": "shots/00b-anon-home.png",
+      "note": "Anonymous home — demo fleet / marketing (no so_session).",
+      "hash": "",
+      "title": "Array Operator — your array, working for you",
+      "headings": [
+        "Watch every inverter. Invoice every offtaker.",
+        "Fleet triage",
+        "All vendor data"
+      ],
+      "bodyTextSample": "FOR SOLAR ARRAY OWNERS & OPERATORS Watch every inverter. Invoice every offtaker. Array Operator watches every inverter for you — catching the quiet underperformer the day it slips, drafting the warranty claim when one dies — and turns your utility bills into a solar-credit invoice for every offtaker — the customer who receives a share of your solar credits — drafted and ready to send. One connection. Every panel. No spreadsheets. Start free — connect in 60 seconds → Sign in ✓ 14-day free trial, no card · ✓ Read-only — we only see production data · ✓ Disconnect anytime, purged in 24h PICK WHAT YOU NEED — PAY FOR WHAT YOU USE $0.15 / kW · month fleet monitoring ＋ $20 / offtaker you invoice run either, or both — a 100 kW array ≈ $15/mo monitoring; 3 offtakers ≈ $60/mo invoicing Live monitorin",
+      "tabs": [],
+      "segs": [],
+      "buttons": [],
+      "ids": [],
+      "activePanel": null
+    },
+    {
+      "name": "01-inverters-sandbox",
+      "file": "shots/01-inverters-sandbox.png",
+      "hash": "#arrays",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelArrays",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": true,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": false,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": true,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": false,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "All vendor data"
+      ],
+      "buttons": [
+        "Sandbox",
+        "Spreadsheet",
+        "⊞ Overview",
+        "⊞ All arrays",
+        "↶ Undo",
+        "↷ Redo",
+        "⛶ Full screen",
+        "⊖ Collapse all",
+        "New empty array",
+        "Reset layout",
+        "+ Add array",
+        "⠿",
+        "Sync Fronius now",
+        "▸ 12 inverters",
+        "▸ 20 inverters",
+        "▸ 1 inverter",
+        "▸ 6 inverters",
+        "+ Add vendor",
+        "✕ Close all vendor tabs",
+        "↻ Sync all vendors",
+        "Array ▲",
+        "Expand all",
+        "Inverters",
+        "Live now",
+        "Today",
+        "Status",
+        "Synced",
+        "Fronius",
+        "↗ Open Fronius to sync",
+        "▸Waterford Fronius 12 — Vendor issue latest data 25d ago",
+        "▸west chester Fronius 20 — Vendor issue latest data 25d ago",
+        "▸SolarEdge 2 arrays 7 6.7 kW 806 kWh 1 need attention latest data 9h ago",
+        "SolarEdge",
+        "▸Cover Rooftop SolarEdge 1 — 2 kWh 1 need attention latest data 9h ago",
+        "▸Londonderry Community Solar SolarEdge 6 6.7 kW 803 kWh All clear live"
+      ],
+      "ids": [
+        "vsSegSandbox",
+        "vsSegSheet",
+        "sbWrap",
+        "sandbox",
+        "sbViewMode",
+        "sbShowAll",
+        "sbUndo",
+        "sbRedo",
+        "sbFullscreen",
+        "sbExpandAll",
+        "sbNewArray",
+        "sbReset",
+        "sbAddArray",
+        "sbFoot",
+        "sheetWrap",
+        "vendorSheet",
+        "vsCount",
+        "vsAddVendor",
+        "vsCloseTabs",
+        "vsSyncAll",
+        "vsSearch",
+        "vsScroll",
+        "vsExpandAll",
+        "vsBody"
+      ],
+      "bodyTextSample": "Sandbox Spreadsheet ⊞ Overview ↶ Undo ↷ Redo ⛶ Full screen ⊖ Collapse all New empty array Reset layout + Add array healthy watch critical ⠿ ARRAY 150 kW Waterford 🌧️ Last synced 25 days ago ARRAY PRODUCTION · LAST 8 DAYS 6.1 MWh 6/12 6/15 now IDLE OUTPUT NOW array not producing right now All good Open in Fronius ↗ ▸ 12 inverters Primo 12.5-1 208-240 (1) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (10) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (11) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (12) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (2) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (3) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (4) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (5) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (6) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (7) 12.5 kW 6/12",
+      "note": "DEFAULT landing. Inverters tab · Sandbox sub-view (spatial fleet)."
+    },
+    {
+      "name": "02-inverters-spreadsheet",
+      "file": "shots/02-inverters-spreadsheet.png",
+      "hash": "#arrays",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelArrays",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": true,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": false,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "All vendor data"
+      ],
+      "buttons": [
+        "Sandbox",
+        "Spreadsheet",
+        "⊞ Overview",
+        "⊞ All arrays",
+        "↶ Undo",
+        "↷ Redo",
+        "⛶ Full screen",
+        "⊖ Collapse all",
+        "New empty array",
+        "Reset layout",
+        "+ Add array",
+        "⠿",
+        "Sync Fronius now",
+        "▸ 12 inverters",
+        "▸ 20 inverters",
+        "▸ 1 inverter",
+        "▸ 6 inverters",
+        "+ Add vendor",
+        "✕ Close all vendor tabs",
+        "↻ Sync all vendors",
+        "Array ▲",
+        "Expand all",
+        "Inverters",
+        "Live now",
+        "Today",
+        "Status",
+        "Synced",
+        "Fronius",
+        "↗ Open Fronius to sync",
+        "▸Waterford Fronius 12 — Vendor issue latest data 25d ago",
+        "▸west chester Fronius 20 — Vendor issue latest data 25d ago",
+        "▸SolarEdge 2 arrays 7 6.7 kW 806 kWh 1 need attention latest data 9h ago",
+        "SolarEdge",
+        "▸Cover Rooftop SolarEdge 1 — 2 kWh 1 need attention latest data 9h ago",
+        "▸Londonderry Community Solar SolarEdge 6 6.7 kW 803 kWh All clear live"
+      ],
+      "ids": [
+        "vsSegSandbox",
+        "vsSegSheet",
+        "sbWrap",
+        "sandbox",
+        "sbViewMode",
+        "sbShowAll",
+        "sbUndo",
+        "sbRedo",
+        "sbFullscreen",
+        "sbExpandAll",
+        "sbNewArray",
+        "sbReset",
+        "sbAddArray",
+        "sbFoot",
+        "sheetWrap",
+        "vendorSheet",
+        "vsCount",
+        "vsAddVendor",
+        "vsCloseTabs",
+        "vsSyncAll",
+        "vsSearch",
+        "vsScroll",
+        "vsExpandAll",
+        "vsBody"
+      ],
+      "bodyTextSample": "Sandbox Spreadsheet All vendor data 4 monitored arrays · 39 inverters To refresh a vendor, open its portal — click its ↗ Open to sync button and sign in. The EnergyAgent extension captures the latest readings automatically. + Add vendor ✕ Close all vendor tabs ↻ Sync all vendors ARRAY ▲ EXPAND ALL VENDOR OUTPUT INVERTERS LIVE NOW TODAY STATUS SYNCED ▸ FRONIUS 2 arrays ↗ Open Fronius to sync 32 — 2 × VENDOR ISSUE latest data 25d ago ▸ SOLAREDGE 2 arrays 7 6.7 kW 806 kWh 1 NEED ATTENTION latest data 9h ago",
+      "note": "Inverters · Spreadsheet sub-view (rows by vendor)."
+    },
+    {
+      "name": "03-fleet-triage",
+      "file": "shots/03-fleet-triage.png",
+      "hash": "#dashboard",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelDashboard",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": true,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": false,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Fleet triage",
+        "Needs attention"
+      ],
+      "buttons": [
+        "🔔 Alerts",
+        "All 1",
+        "Critical 0",
+        "Underperforming 1",
+        "Gone quiet 0",
+        "Open 0 warranty claims",
+        "Clear"
+      ],
+      "ids": [
+        "dashProd",
+        "fleetCommander",
+        "fcAlerts",
+        "ccAsof",
+        "dashAttnH",
+        "ccQueue",
+        "ccQ",
+        "ccSev",
+        "ccBulk",
+        "ccBulkClaim",
+        "ccBulkClear",
+        "ccAll",
+        "ccBody"
+      ],
+      "bodyTextSample": "Fleet triage 6.7 kW now 806 kWh today 1 /4 arrays producing 3 feeds paused FLEET HEALTHY 97 % 38 of 39 inverters ARRAYS 4 arrays on file INVERTERS 39 across 4 arrays FLAGGED 1 need attention below CRITICAL 0 no outages or faults WATCH 1 underperforming or gone quiet TO CHECK 1 live anomalies — no $ lost yet MONITORING 🔔 Alerts ● checked 11s ago · data as of 25d ago NEEDS ATTENTION All 1 Critical 0 Underperforming 1 Gone quiet 0 SITE INVERTER VERDICT VS PEERS $ / MO▾ RECOMMENDED ACTION STATUS Cover Rooftop— Inverter 1 · SE10000H-US000BEI4Open in SolarEdge ↗ Below its neighbors — no peers — See the diagnosis → New Showing flagged inverters only — the 38 healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at $0.21/kWh + 38/MWh RECs.",
+      "note": "Fleet Triage — KPI tiles + needs-attention queue."
+    },
+    {
+      "name": "04-analysis-fleet",
+      "file": "shots/04-analysis-fleet.png",
+      "hash": "#analysis",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelAnalysis",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": true,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": false,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": true,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": false,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Fleet analysis",
+        "Production vs expected",
+        "Fleet health · kWh/kW",
+        "Through time",
+        "Sites",
+        "Performance",
+        "Operations",
+        "Event log",
+        "Hardware",
+        "Files"
+      ],
+      "buttons": [
+        "Fleet analysis",
+        "Trends",
+        "Model4 sites · using default tilt / facing / losses4 sites▾",
+        "How the number is built",
+        "＋ target",
+        "None",
+        "Portfolio",
+        "Vendor",
+        "Comfortable",
+        "Compact",
+        "+ portfolio",
+        "+ note",
+        "Performance Index",
+        "Capacity Factor",
+        "0CriticalStopped or faulted",
+        "3WarningUnderperforming, quiet or dark",
+        "36HealthyProducing as expected",
+        "All0",
+        "Open0",
+        "Acknowledged0",
+        "Resolved0",
+        "Waterfordfronius12 invertersLast sync 25d ago",
+        "west chesterfronius20 invertersLast sync 25d ago",
+        "Cover Rooftopsolaredge1 inverterLast sync 0m ago",
+        "Londonderry Community Solarsolaredge6 invertersLast sync 0m ago",
+        "Choose file",
+        "Upload"
+      ],
+      "ids": [
+        "analysisRoot",
+        "anSub",
+        "anAsof",
+        "anSections",
+        "anfcEdit"
+      ],
+      "bodyTextSample": "Fleet analysis Trends Fleet analysis Portfolio performance, weather-adjusted — every site in one view. Data as of 25d ago · 3 arrays stale WEATHER-ADJUSTED Production vs expected What your fleet made against the real sunlight that fell on each site — not a seasonal average. 115% of weather-expected 9,479 kWh made 8,235 kWh expected at or above what the weather should yield ☀ Clearest day (2026-07-05, 7.29 kWh/m²): Cover Rooftop made 27 kWh vs 61 expected — 44% 10d window 4 sites modeled high confidence MODEL 4 sites · using default tilt / facing / losses 4 sites ▾ How the number is built Fleet health · kWh/kW Measured specific yield per array, last 10 days — worst first, problem flags inline 5.93kWh/kW · day ≈ 59.3 kWh per kW over the last 10 days Specific yield: measured production ÷ installed kW, nameplate-weighted across the fleet — measured days only, never extrapolated. The single best big-picture health number. 2 arrays ranked 160 kW counted last 10 days 1 flagged site — check the low end PER ARRAY · LOWEST YIELD FIRST kWh per kW per day · flags inline Cover Rooftop 1 lagging 41% of expected 2.12/day ＋ target Londonderry Community Solar 6.18/day ＋ target west chester no measu",
+      "note": "Analysis · Fleet analysis sub-view (NOC sections)."
+    },
+    {
+      "name": "05-analysis-trends",
+      "file": "shots/05-analysis-trends.png",
+      "hash": "#trends",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelTrends",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Monthly production & year-over-year change",
+        "Daily output",
+        "Production Analytics",
+        "Daily Generation",
+        "Monthly Production",
+        "Liquid Energy",
+        "Solar Spiral",
+        "Heat-Field"
+      ],
+      "buttons": [
+        "Fleet analysis",
+        "Trends",
+        "↓ Export CSV",
+        "Day",
+        "Month",
+        "Year",
+        "Lifetime",
+        "‹",
+        "›"
+      ],
+      "ids": [
+        "trendsRoot",
+        "trArraySel",
+        "trExport",
+        "rpHost",
+        "rpCombo",
+        "rpDaily",
+        "anHost",
+        "anPeriod",
+        "anCmp",
+        "anDelta",
+        "anChart",
+        "anKpis",
+        "anAttr",
+        "anEnv",
+        "anRecords",
+        "trAdvToggle",
+        "trAdvPanel",
+        "trHost_bars",
+        "trHost_monthly",
+        "trHost_liquid",
+        "trHost_spiral",
+        "trHost_heatfield"
+      ],
+      "bodyTextSample": "Fleet analysis Trends SHOWING All arrays (fleet) Londonderry Community Solar CVMC Main Campus Solar Lyndon Industrial Park Newport Lakefront Array Main Lodge Roof Catamount Ridge Solar Harwood Union High St Johnsbury Mill Roof Maple Ridge North Burke Mountain Lot Maple Ridge South Base Lodge Carport Hardwick Field Array Academy Building Roof CVMC Parking Deck Crossett Brook Middle Brewery Roof Array Riverbend Commons Walden Town Garage Waitsfield Elementary Athletic Field Array Greensboro Carport Putney Library Roof Craftsbury Common Roof Fellowship Hall Roof Dairy Barn Roof Riverbend Carport Maple Ridge Sugarhouse Parish Carport Sanctuary Roof Riverbend Workshop Town Hall Roof Homestead Roof Waterford Cover Rooftop west chester 36 arrays combined TRAILING 12 MO 3,012,578 kWh LIFETIME (FLEET) 9,409,888 kWh EST. VALUE (12 MO) $643,520 LATEST YOY -35.8% Through Jul 13, 2026 (2d ago) · 36 /36 arrays reporting ↓ Export CSV Monthly production & year-over-year change Bars: total production each month (2026). Line: % change vs the same month in 2025. Production (kWh) YoY change (%) Daily output Energy produced each day — last 31 days Production Analytics Day · Month · Year · Lifetime — co",
+      "note": "Analysis · Trends sub-view (NOT a top tab)."
+    },
+    {
+      "name": "06-invoices-offtakers",
+      "file": "shots/06-invoices-offtakers.png",
+      "hash": "#reports",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelReports",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": true,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": false,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Offtaker invoicing",
+        "Send pipeline",
+        "Master solar credit rate",
+        "This offtaker’s invoice template"
+      ],
+      "buttons": [
+        "Offtakers",
+        "Bill audit",
+        "Approve to send",
+        "Auto-send",
+        "— · deliveredran — 0 of 0 ✓ 0 sent",
+        "Save rate",
+        "⚡ Set up auto-refresh",
+        "⬇ Export",
+        "⬇ Download export",
+        "✉ Customize email",
+        "🔗 Link utility bills",
+        "⬆ Bulk import",
+        "＋ Add an offtaker",
+        "⬆ Upload template",
+        "Remove",
+        "Use this template",
+        "Default format"
+      ],
+      "ids": [
+        "reportsRoot",
+        "rbSubInvoice",
+        "rb2Sub",
+        "rbGenTabs",
+        "rbAuditTabBadge",
+        "rb2Kpis",
+        "rb2Pipe",
+        "rb2DraftStatus",
+        "rb2Mode",
+        "rb2CellLast",
+        "rbAuditView",
+        "rbGenList",
+        "rbGlobalRate",
+        "rbGrNet",
+        "rbGrDisc",
+        "rbGrSave",
+        "rbGrStatus",
+        "rbGrEff",
+        "rbGmpBillsStatus",
+        "rbAutoRefreshLink",
+        "rb2ExportBtn",
+        "rb2ExportPop",
+        "rbExportBox",
+        "rbExportFmt",
+        "rbExportDate",
+        "rbExportPeriod",
+        "rbExportMemo",
+        "rbExportAcctWrap",
+        "rbExportAcct",
+        "rbExportIifNote",
+        "rbExportGo",
+        "rbExportStat",
+        "rbEmailStudio",
+        "rbLinkUtility",
+        "rbBulkImport",
+        "rbCustAdd",
+        "rbArchiveHost",
+        "rbArch",
+        "rbCustManual",
+        "rbBulkHost",
+        "rbPayBanner",
+        "rbList",
+        "rbTplStash",
+        "rbTplHome",
+        "rbTpl",
+        "rbTplFile",
+        "rbTplPick",
+        "rbTplStatus",
+        "rbTplDel",
+        "rbTplEditRow",
+        "rbTplFmt",
+        "rbTplEStatus",
+        "rbSubQuarterly"
+      ],
+      "bodyTextSample": "Offtaker invoicing Every offtaker's solar credit invoice, generated from their settled utility bills. Nothing sends until you approve it. Offtakers Bill audit SEND PIPELINE monthly invoices fire the 1st · an invoice only generates once its utility bill settles last run — · next Aug 1 When an invoice is drafted Approve to send Auto-send — · DELIVERED ran — 0 of 0 ✓ 0 sent TODAY Jul 14 THIS CYCLE drafted from settled bills 0 waiting on bills ✓ all caught up AUG 1 · NEXT RUN fires in 18 days 0 scheduled 0 auto-send 0 draft for approval Master solar credit rate Optional fleet override. Leave blank and each offtaker is priced from the solar credit rate on their own utility sub-account bill (custom per offtaker). Fill this in to force one rate for everyone who doesn't have a per-offtaker override. Solar credit rate $ /kWh Discount % off Save rate Master rate is blank — each offtaker is priced from the solar credit rate on their own utility sub-account bill (custom per offtaker), then minus your 10% discount. Fill the box only if you want one rate for everyone. Your offtakers ✓ 53 bill sources ⚡ Set up auto-refresh ⬇ Export ✉ Customize email 🔗 Link utility bills ⬆ Bulk import ＋ Add an of",
+      "note": "Invoices · Offtakers list + pipeline + master rate."
+    },
+    {
+      "name": "07-invoices-bill-audit",
+      "file": "shots/07-invoices-bill-audit.png",
+      "hash": "#reports",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelReports",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Offtaker invoicing",
+        "Send pipeline",
+        "Master solar credit rate",
+        "This offtaker’s invoice template"
+      ],
+      "buttons": [
+        "Offtakers",
+        "Bill audit",
+        "Approve to send",
+        "Auto-send",
+        "— · deliveredran — 0 of 0 ✓ 0 sent",
+        "Save rate",
+        "⚡ Set up auto-refresh",
+        "⬇ Export",
+        "⬇ Download export",
+        "✉ Customize email",
+        "🔗 Link utility bills",
+        "⬆ Bulk import",
+        "＋ Add an offtaker",
+        "⬆ Upload template",
+        "Remove",
+        "Use this template",
+        "Default format"
+      ],
+      "ids": [
+        "reportsRoot",
+        "rbSubInvoice",
+        "rb2Sub",
+        "rbGenTabs",
+        "rbAuditTabBadge",
+        "rb2Kpis",
+        "rb2Pipe",
+        "rb2DraftStatus",
+        "rb2Mode",
+        "rb2CellLast",
+        "rbAuditView",
+        "rbGenList",
+        "rbGlobalRate",
+        "rbGrNet",
+        "rbGrDisc",
+        "rbGrSave",
+        "rbGrStatus",
+        "rbGrEff",
+        "rbGmpBillsStatus",
+        "rbAutoRefreshLink",
+        "rb2ExportBtn",
+        "rb2ExportPop",
+        "rbExportBox",
+        "rbExportFmt",
+        "rbExportDate",
+        "rbExportPeriod",
+        "rbExportMemo",
+        "rbExportAcctWrap",
+        "rbExportAcct",
+        "rbExportIifNote",
+        "rbExportGo",
+        "rbExportStat",
+        "rbEmailStudio",
+        "rbLinkUtility",
+        "rbBulkImport",
+        "rbCustAdd",
+        "rbArchiveHost",
+        "rbArch",
+        "rbCustManual",
+        "rbBulkHost",
+        "rbPayBanner",
+        "rbList",
+        "rbTplStash",
+        "rbTplHome",
+        "rbTpl",
+        "rbTplFile",
+        "rbTplPick",
+        "rbTplStatus",
+        "rbTplDel",
+        "rbTplEditRow",
+        "rbTplFmt",
+        "rbTplEStatus",
+        "rbSubQuarterly"
+      ],
+      "bodyTextSample": "Offtaker invoicing Every offtaker's solar credit invoice, generated from their settled utility bills. Nothing sends until you approve it. Offtakers Bill audit SEND PIPELINE monthly invoices fire the 1st · an invoice only generates once its utility bill settles last run — · next Aug 1 When an invoice is drafted Approve to send Auto-send — · DELIVERED ran — 0 of 0 ✓ 0 sent TODAY Jul 14 THIS CYCLE drafted from settled bills 0 waiting on bills ✓ all caught up AUG 1 · NEXT RUN fires in 18 days 0 scheduled 0 auto-send 0 draft for approval Connect an array's utility bill + its offtakers' bills to audit GMP's allocation. Once both are on file, this shows the array's group excess with each offtaker's share checked against what GMP actually credited them.",
+      "note": "Invoices · Bill audit sub-view."
+    },
+    {
+      "name": "08-resources",
+      "file": "shots/08-resources.png",
+      "hash": "#resources",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelResources",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Know the rules that move your credits.",
+        "Latest & live daily",
+        "New England REC market as of 2026-07",
+        "Vermont net-metering — at a glance",
+        "Go to the source"
+      ],
+      "buttons": [
+        "Vermont",
+        "New Hampshire",
+        "Maine",
+        "Massachusetts",
+        "Connecticut",
+        "Rhode Island"
+      ],
+      "ids": [
+        "rsHost",
+        "resEyebrow",
+        "resApp",
+        "resBody",
+        "resNewsMeta",
+        "resFeed"
+      ],
+      "bodyTextSample": "THE VERMONT SOLAR OPERATOR’S BRIEFING Know the rules that move your credits. Net-metering rates, Renewable Energy Credit (REC) market prices, active rate cases, and the regulatory changes that decide what your arrays earn across New England — tracked in one place and refreshed daily, so you never bill on a stale rate or miss a decision that affects your offtakers. YOUR STATE Vermont New Hampshire Maine Massachusetts Connecticut Rhode Island LATEST & LIVE DAILY Updated news Jul 10, 2026 · state/REC data Jul 13, 2026 · 7 updates for Vermont DAILY REFRESH AUG 1, 2026 DEADLINE New net-metering rates take effect August 1 Under the PUC's 2026 biennial order (Case 26-0291-INV), the Category I adjustor drops about 2¢/kWh and the small-solar siting charge rises from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. Existing arrays keep their locked-in rate. Vermont PUC ↗ JUN 1, 2026 ADVOCACY REV: 2026 net-metering cuts will further slow Vermont solar Renewable Energy Vermont's press statement notes applications for systems under 150 kW fell 24% from 2024 to 2025 and argues the PUC should have offset the loss of the federal residential solar tax credit rather than raise th",
+      "note": "Resources — state briefing, news, REC market."
+    },
+    {
+      "name": "09-account",
+      "file": "shots/09-account.png",
+      "hash": "#account",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelAccount",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": false,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": true,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Auto-refresh ▸ Hide logins"
+      ],
+      "buttons": [
+        "↻",
+        "▸ Hide logins",
+        "Show inverter & utility logins →",
+        "Show",
+        "Save password",
+        "Set a password",
+        "Choose plan",
+        "Add credit card",
+        "Set up payouts — takes ~2 min"
+      ],
+      "ids": [
+        "acctList",
+        "rowAutoRefresh",
+        "arRefreshBtn",
+        "arPanelStat",
+        "arToggle",
+        "arPanelSub",
+        "arMode",
+        "arBody",
+        "arList",
+        "arShowLogins",
+        "loginEmail",
+        "rowPassword",
+        "pwState",
+        "pwSub",
+        "pwEdit",
+        "pwNew",
+        "pwEye",
+        "pwConfirm",
+        "pwSave",
+        "pwMsg",
+        "pwToggle",
+        "acctPlanVal",
+        "acctChangePlan",
+        "aoBill",
+        "payState",
+        "billMsg",
+        "billManage",
+        "aoPaySetup",
+        "aoPayCard",
+        "connectMsg",
+        "acctFilesCount",
+        "acctFilesBody"
+      ],
+      "bodyTextSample": "↻ Auto-refresh ▸ Hide logins Keeps your live production and utility bills fresh automatically. Saved only on this device, encrypted — never sent to our servers. On by default; turn off any portal anytime. Store it with us — live data We keep your passwords secure and refresh your data 24/7. No tab, no computer needed. Keep it on my computer Passwords stay on your device via the browser extension. Data refreshes while a tab is open. Install the free EnergyAgent helper for on-device auto-refresh — or switch back to Store it with us above (no helper needed). Get the helper → INVERTER PORTALS Available after the helper is installed, or switch to cloud mode. NAME COMPANY EMAIL LOGIN demo@solaroperator.org the email you sign in with PASSWORD No password yet You currently sign in with the emailed magic link. Add a password to also sign in directly. Set a password PLAN Choose your plan Vendor data ✓ · Offtaker invoices ✓ Choose plan YOUR BILL Arrays 36 arrays × $15.00 $540.00 Monthly bill $540.00/mo PAYMENT METHOD No card on file Add credit card OFF COLLECT OFFTAKER PAYMENTS Get paid online — one setup Offtakers click Pay on their invoice. You get the money in your bank. We keep 0.5%. Take",
+      "note": "Account — auto-refresh, profile, plan, AO bill, files."
+    },
+    {
+      "name": "10-modal-add-array",
+      "file": "shots/10-modal-add-array.png",
+      "hash": "#arrays",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelArrays",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": true,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": false,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "All vendor data"
+      ],
+      "buttons": [
+        "Sandbox",
+        "Spreadsheet",
+        "⊞ Overview",
+        "⊞ All arrays",
+        "↶ Undo",
+        "↷ Redo",
+        "⛶ Full screen",
+        "⊖ Collapse all",
+        "New empty array",
+        "Reset layout",
+        "+ Add array",
+        "⠿",
+        "Sync Fronius now",
+        "▸ 12 inverters",
+        "▸ 20 inverters",
+        "▸ 1 inverter",
+        "▸ 6 inverters",
+        "+ Add vendor",
+        "✕ Close all vendor tabs",
+        "↻ Sync all vendors",
+        "Array ▲",
+        "Expand all",
+        "Inverters",
+        "Live now",
+        "Today",
+        "Status",
+        "Synced",
+        "Fronius",
+        "↗ Open Fronius to sync",
+        "▸Waterford Fronius 12 — Vendor issue latest data 25d ago",
+        "▸west chester Fronius 20 — Vendor issue latest data 25d ago",
+        "▸SolarEdge 2 arrays 7 6.7 kW 806 kWh 1 need attention latest data 9h ago",
+        "SolarEdge",
+        "▸Cover Rooftop SolarEdge 1 — 2 kWh 1 need attention latest data 9h ago",
+        "▸Londonderry Community Solar SolarEdge 6 6.7 kW 803 kWh All clear live"
+      ],
+      "ids": [
+        "vsSegSandbox",
+        "vsSegSheet",
+        "sbWrap",
+        "sandbox",
+        "sbViewMode",
+        "sbShowAll",
+        "sbUndo",
+        "sbRedo",
+        "sbFullscreen",
+        "sbExpandAll",
+        "sbNewArray",
+        "sbReset",
+        "sbAddArray",
+        "sbFoot",
+        "sheetWrap",
+        "vendorSheet",
+        "vsCount",
+        "vsAddVendor",
+        "vsCloseTabs",
+        "vsSyncAll",
+        "vsSearch",
+        "vsScroll",
+        "vsExpandAll",
+        "vsBody"
+      ],
+      "bodyTextSample": "Sandbox Spreadsheet ⊞ Overview ↶ Undo ↷ Redo ⛶ Full screen ⊖ Collapse all New empty array Reset layout + Add array healthy watch critical ⠿ ARRAY 150 kW Waterford 🌧️ Last synced 25 days ago ARRAY PRODUCTION · LAST 8 DAYS 6.1 MWh 6/12 6/15 now IDLE OUTPUT NOW array not producing right now All good Open in Fronius ↗ ▸ 12 inverters Primo 12.5-1 208-240 (1) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (10) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (11) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (12) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (2) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (3) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (4) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (5) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (6) 12.5 kW 6/12 6/15 now NO LIVE FEED no live feed from this inverter Primo 12.5-1 208-240 (7) 12.5 kW 6/12",
+      "note": "Modal: + Add array (one-click vendor login path)."
+    },
+    {
+      "name": "11-panel-fleet-alerts",
+      "file": "shots/11-panel-fleet-alerts.png",
+      "hash": "#dashboard",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelDashboard",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": true,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": false,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Fleet triage",
+        "Needs attention"
+      ],
+      "buttons": [
+        "🔔 Alerts",
+        "All 1",
+        "Critical 0",
+        "Underperforming 1",
+        "Gone quiet 0",
+        "Open 0 warranty claims",
+        "Clear"
+      ],
+      "ids": [
+        "dashProd",
+        "fleetCommander",
+        "fcAlerts",
+        "ccAsof",
+        "dashAttnH",
+        "ccQueue",
+        "ccQ",
+        "ccSev",
+        "ccBulk",
+        "ccBulkClaim",
+        "ccBulkClear",
+        "ccAll",
+        "ccBody"
+      ],
+      "bodyTextSample": "Fleet triage 6.7 kW now 806 kWh today 1 /4 arrays producing 3 feeds paused FLEET HEALTHY 97 % 38 of 39 inverters ARRAYS 4 arrays on file INVERTERS 39 across 4 arrays FLAGGED 1 need attention below CRITICAL 0 no outages or faults WATCH 1 underperforming or gone quiet TO CHECK 1 live anomalies — no $ lost yet MONITORING 🔔 Alerts ● checked 5s ago · data as of 25d ago NEEDS ATTENTION All 1 Critical 0 Underperforming 1 Gone quiet 0 SITE INVERTER VERDICT VS PEERS $ / MO▾ RECOMMENDED ACTION STATUS Cover Rooftop— Inverter 1 · SE10000H-US000BEI4Open in SolarEdge ↗ Below its neighbors — no peers — See the diagnosis → New Showing flagged inverters only — the 38 healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at $0.21/kWh + 38/MWh RECs.",
+      "note": "Fleet alerts settings panel (email when inverter needs attention)."
+    },
+    {
+      "name": "12-energy-agent-open",
+      "file": "shots/12-energy-agent-open.png",
+      "hash": "#dashboard",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelDashboard",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": true,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": false,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Fleet triage",
+        "Needs attention"
+      ],
+      "buttons": [
+        "🔔 Alerts",
+        "All 1",
+        "Critical 0",
+        "Underperforming 1",
+        "Gone quiet 0",
+        "Open 0 warranty claims",
+        "Clear"
+      ],
+      "ids": [
+        "dashProd",
+        "fleetCommander",
+        "fcAlerts",
+        "ccAsof",
+        "dashAttnH",
+        "ccQueue",
+        "ccQ",
+        "ccSev",
+        "ccBulk",
+        "ccBulkClaim",
+        "ccBulkClear",
+        "ccAll",
+        "ccBody"
+      ],
+      "bodyTextSample": "Fleet triage 6.7 kW now 806 kWh today 1 /4 arrays producing 3 feeds paused FLEET HEALTHY 97 % 38 of 39 inverters ARRAYS 4 arrays on file INVERTERS 39 across 4 arrays FLAGGED 1 need attention below CRITICAL 0 no outages or faults WATCH 1 underperforming or gone quiet TO CHECK 1 live anomalies — no $ lost yet MONITORING 🔔 Alerts ● checked 7s ago · data as of 25d ago NEEDS ATTENTION All 1 Critical 0 Underperforming 1 Gone quiet 0 SITE INVERTER VERDICT VS PEERS $ / MO▾ RECOMMENDED ACTION STATUS Cover Rooftop— Inverter 1 · SE10000H-US000BEI4Open in SolarEdge ↗ Below its neighbors — no peers — See the diagnosis → New Showing flagged inverters only — the 38 healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at $0.21/kWh + 38/MWh RECs.",
+      "note": "Energy Agent panel open (voice/chat orb)."
+    },
+    {
+      "name": "13-hands-off-setup",
+      "file": "shots/13-hands-off-setup.png",
+      "hash": "#dashboard",
+      "title": "Array Operator — your array, working for you",
+      "activePanel": "panelDashboard",
+      "tabs": [
+        {
+          "id": "tabDashboard",
+          "href": "#dashboard",
+          "label": "Fleet TriageFleet",
+          "active": false
+        },
+        {
+          "id": "tabArrays",
+          "href": "#arrays",
+          "label": "InvertersArrays",
+          "active": false
+        },
+        {
+          "id": "tabAnalysis",
+          "href": "#analysis",
+          "label": "AnalysisAnalysis",
+          "active": false
+        },
+        {
+          "id": "tabReports",
+          "href": "#reports",
+          "label": "InvoicesInvoices",
+          "active": false
+        },
+        {
+          "id": "tabResources",
+          "href": "#resources",
+          "label": "ResourcesResources",
+          "active": false
+        },
+        {
+          "id": "tabAccount",
+          "href": "#account",
+          "label": "AccountAccount",
+          "active": false
+        },
+        {
+          "id": "tabWhoami",
+          "href": "#account",
+          "label": "demo@solaroperator.org",
+          "active": false
+        }
+      ],
+      "segs": [
+        {
+          "text": "Sandbox",
+          "on": true,
+          "id": "vsSegSandbox",
+          "data": null
+        },
+        {
+          "text": "Spreadsheet",
+          "on": false,
+          "id": "vsSegSheet",
+          "data": null
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Fleet analysis",
+          "on": false,
+          "id": null,
+          "data": "analysis"
+        },
+        {
+          "text": "Trends",
+          "on": true,
+          "id": null,
+          "data": "trends"
+        },
+        {
+          "text": "Offtakers",
+          "on": false,
+          "id": null,
+          "data": "offtakers"
+        },
+        {
+          "text": "Bill audit",
+          "on": true,
+          "id": null,
+          "data": "audit"
+        }
+      ],
+      "headings": [
+        "Fleet triage",
+        "Needs attention"
+      ],
+      "buttons": [
+        "🔔 Alerts",
+        "All 1",
+        "Critical 0",
+        "Underperforming 1",
+        "Gone quiet 0",
+        "Open 0 warranty claims",
+        "Clear"
+      ],
+      "ids": [
+        "dashProd",
+        "fleetCommander",
+        "fcAlerts",
+        "ccAsof",
+        "dashAttnH",
+        "ccQueue",
+        "ccQ",
+        "ccSev",
+        "ccBulk",
+        "ccBulkClaim",
+        "ccBulkClear",
+        "ccAll",
+        "ccBody"
+      ],
+      "bodyTextSample": "Fleet triage 6.7 kW now 806 kWh today 1 /4 arrays producing 3 feeds paused FLEET HEALTHY 97 % 38 of 39 inverters ARRAYS 4 arrays on file INVERTERS 39 across 4 arrays FLAGGED 1 need attention below CRITICAL 0 no outages or faults WATCH 1 underperforming or gone quiet TO CHECK 1 live anomalies — no $ lost yet MONITORING 🔔 Alerts ● checked 7s ago · data as of 25d ago NEEDS ATTENTION All 1 Critical 0 Underperforming 1 Gone quiet 0 SITE INVERTER VERDICT VS PEERS $ / MO▾ RECOMMENDED ACTION STATUS Cover Rooftop— Inverter 1 · SE10000H-US000BEI4Open in SolarEdge ↗ Below its neighbors — no peers — See the diagnosis → New Showing flagged inverters only — the 38 healthy units are hidden by design. Verdicts are peer-measured: each inverter weighed against its neighbors under the same sky, so weather cancels out. $ figures estimate at $0.21/kWh + 38/MWh RECs.",
+      "note": "Hands-off setup walkthrough panel."
+    }
+  ],
+  "navigation": [
+    {
+      "from": "01-inverters-sandbox",
+      "to": "02-inverters-spreadsheet",
+      "via": "hash #arrays (+ sub-view click if any)",
+      "hash": "#arrays"
+    },
+    {
+      "from": "02-inverters-spreadsheet",
+      "to": "03-fleet-triage",
+      "via": "hash #dashboard (+ sub-view click if any)",
+      "hash": "#dashboard"
+    },
+    {
+      "from": "03-fleet-triage",
+      "to": "04-analysis-fleet",
+      "via": "hash #analysis (+ sub-view click if any)",
+      "hash": "#analysis"
+    },
+    {
+      "from": "04-analysis-fleet",
+      "to": "05-analysis-trends",
+      "via": "hash #trends (+ sub-view click if any)",
+      "hash": "#trends"
+    },
+    {
+      "from": "05-analysis-trends",
+      "to": "06-invoices-offtakers",
+      "via": "hash #reports (+ sub-view click if any)",
+      "hash": "#reports"
+    },
+    {
+      "from": "06-invoices-offtakers",
+      "to": "07-invoices-bill-audit",
+      "via": "hash #reports (+ sub-view click if any)",
+      "hash": "#reports"
+    },
+    {
+      "from": "07-invoices-bill-audit",
+      "to": "08-resources",
+      "via": "hash #resources (+ sub-view click if any)",
+      "hash": "#resources"
+    },
+    {
+      "from": "08-resources",
+      "to": "09-account",
+      "via": "hash #account (+ sub-view click if any)",
+      "hash": "#account"
+    },
+    {
+      "from": "01-inverters-sandbox",
+      "to": "10-modal-add-array",
+      "via": "click #sbAddArray"
+    },
+    {
+      "from": "03-fleet-triage",
+      "to": "11-panel-fleet-alerts",
+      "via": "click #fcAlerts"
+    },
+    {
+      "from": "any",
+      "to": "12-energy-agent-open",
+      "via": "open Energy Agent orb (global)"
+    },
+    {
+      "from": "any",
+      "to": "13-hands-off-setup",
+      "via": "click hands-off FAB"
+    },
+    {
+      "from": "00-login",
+      "to": "01-inverters-sandbox",
+      "via": "magic link / password / demo session → / #arrays"
+    },
+    {
+      "from": "00b-anon-home",
+      "to": "00-login",
+      "via": "Sign in"
+    },
+    {
+      "from": "00b-anon-home",
+      "to": "01-inverters-sandbox",
+      "via": "demo enter / onboarding complete"
+    }
+  ],
+  "product_nav": {
+    "top_tabs": [
+      {
+        "label": "Fleet Triage",
+        "hash": "#dashboard",
+        "panel": "#panelDashboard"
+      },
+      {
+        "label": "Inverters",
+        "hash": "#arrays",
+        "panel": "#panelArrays",
+        "default": true
+      },
+      {
+        "label": "Analysis",
+        "hash": "#analysis",
+        "panel": "#panelAnalysis"
+      },
+      {
+        "label": "Invoices",
+        "hash": "#reports",
+        "panel": "#panelReports"
+      },
+      {
+        "label": "Resources",
+        "hash": "#resources",
+        "panel": "#panelResources"
+      },
+      {
+        "label": "Account",
+        "hash": "#account",
+        "panel": "#panelAccount"
+      }
+    ],
+    "sub_views": {
+      "Inverters": [
+        {
+          "label": "Sandbox",
+          "control": "#vsSegSandbox"
+        },
+        {
+          "label": "Spreadsheet",
+          "control": "#vsSegSheet"
+        }
+      ],
+      "Analysis": [
+        {
+          "label": "Fleet analysis",
+          "control": "[data-ansub=\"analysis\"]",
+          "hash": "#analysis"
+        },
+        {
+          "label": "Trends",
+          "control": "[data-ansub=\"trends\"]",
+          "hash": "#trends"
+        }
+      ],
+      "Invoices": [
+        {
+          "label": "Offtakers",
+          "control": "[data-gentab=\"offtakers\"]"
+        },
+        {
+          "label": "Bill audit",
+          "control": "[data-gentab=\"audit\"]"
+        }
+      ]
+    },
+    "global": [
+      {
+        "label": "Energy Agent orb",
+        "note": "Always available when signed in"
+      },
+      {
+        "label": "Hands-off setup FAB",
+        "note": "Bottom-left when setup incomplete"
+      },
+      {
+        "label": "Fleet alerts",
+        "note": "From Fleet Triage Monitoring tile or Inverters"
+      }
+    ]
+  }
+}

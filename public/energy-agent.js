@@ -132,6 +132,48 @@
         fleetVendors = Object.keys(seen);
       }
     } catch (e) {}
+    // Macro/meso mental model for the open tab (server product_map surface_* is deeper)
+    var SURFACE_MESO = {
+      "#dashboard": {
+        macro: "Morning brief — who needs a human today across the fleet.",
+        meso: "Scan health tiles, open Needs attention, configure Alerts.",
+        surface_topic: "surface_fleet_triage",
+      },
+      "#arrays": {
+        macro: "Equipment map — Tenant→Array→Inverter made visible and rearrangeable.",
+        meso: "See every inverter; Sandbox spatial vs Spreadsheet rows; Add array.",
+        surface_topic: "surface_inverters",
+      },
+      "#analysis": {
+        macro: "Engineering NOC — weather-expected vs actual, sites, hardware.",
+        meso: "Explain yield vs sun; open Trends for multi-year shape.",
+        surface_topic: "surface_analysis",
+      },
+      "#trends": {
+        macro: "Long-run portfolio analytics (sub-view of Analysis, not a top tab).",
+        meso: "Compare years/arrays; export CSV.",
+        surface_topic: "surface_analysis",
+      },
+      "#reports": {
+        macro: "Bill offtakers for solar credits from settled utility bills × share.",
+        meso: "Pipeline, rates, offtaker list; Bill audit for GMP share check. Not AO subscription.",
+        surface_topic: "surface_invoices",
+      },
+      "#resources": {
+        macro: "Regulatory/market context for credits and rates by state.",
+        meso: "Pick state; scan news + REC; open sources.",
+        surface_topic: "surface_resources",
+      },
+      "#account": {
+        macro: "Identity, AO subscription bill, and Auto-refresh data plumbing.",
+        meso: "Cloud/device capture, plan, card, offtaker payouts, files.",
+        surface_topic: "surface_account",
+      },
+    };
+    var hKey = String(hash || "").toLowerCase();
+    if (hKey.charAt(0) !== "#") hKey = "#" + hKey;
+    var surface = SURFACE_MESO[hKey] || SURFACE_MESO["#arrays"];
+
     var ctx = {
       hash: hash,
       tab_label: tabLabel(hash),
@@ -143,6 +185,12 @@
         { label: "Invoices", hash: "#reports" },
         { label: "Resources", hash: "#resources" },
         { label: "Account", hash: "#account" },
+      ],
+      // 3-level page understanding for this hash (see product_map topic=surface)
+      surface: surface,
+      product_jobs: [
+        "Watch the fleet (Triage + Inverters + Analysis)",
+        "Invoice offtakers (Invoices; utility bills × share)",
       ],
       path: location.pathname,
       title: document.title,
@@ -270,7 +318,7 @@
       '        </span>' +
       '      </span>' +
       '    </span></div>' +
-      '  <div class="ea-tools" id="eaTools"></div>' +
+      '  <div class="ea-tools" id="eaTools" hidden aria-hidden="true"></div>' +
       '  <div class="ea-tour-cap" id="eaTourCap" hidden>' +
       '    <span class="ea-tour-kicker" id="eaTourKicker">Tour</span>' +
       '    <span id="eaTourCapText"></span></div>' +
@@ -1025,25 +1073,9 @@
     host.hidden = true;
   }
 
-  function addTool(name, detail) {
-    // Mobile OS / phone: never park raw tool dumps in the chat chrome —
-    // they steal vertical space from the answer the owner actually needs.
-    try {
-      if (
-        (typeof window.__aoMobileOsIsActive === "function" && window.__aoMobileOsIsActive()) ||
-        (window.matchMedia && matchMedia("(max-width: 960px)").matches)
-      ) {
-        return;
-      }
-    } catch (e) {}
-    var host = document.getElementById("eaTools");
-    if (!host) return;
-    host.hidden = false;
-    var d = document.createElement("div");
-    d.className = "ea-tool";
-    d.innerHTML = "<b>" + esc(name) + "</b><code>" + esc(detail || "") + "</code>";
-    host.appendChild(d);
-    host.scrollTop = host.scrollHeight;
+  /** Tool dump UI removed (Ford 2026-07-14) — answers only; tools still run server-side. */
+  function addTool(/* name, detail */) {
+    return;
   }
 
   function esc(s) {
@@ -1773,10 +1805,8 @@
         return;
       }
       setBudget(d.budget);
-      // Desktop only: brief tool flash while UI cmds run; mobile skips entirely.
-      (d.tool_trace || []).forEach(function (t) {
-        addTool(t.name, JSON.stringify(t.args || {}).slice(0, 80));
-      });
+      // tool_trace intentionally not rendered — keeps chat readable (tools still ran)
+      clearTools();
       // Operating mind: background plan started — same mind, quiet work
       if (d.mind) onMindPlanFromChat(d.mind);
       // Run UI commands immediately (navigate has no confirm on server now)
