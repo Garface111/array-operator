@@ -1397,53 +1397,73 @@
       wireGenTabs();   // the "Offtakers | Bill audit" toggle works in the demo too (audit shows the sign-in state)
       _demoBuilt = true;
     }
-    // A subtle demo affordance above the offtaker list (matches the page's demo banner).
+    // Demo note — big-operator snapshot (scale from AO_DEMO.meta when present).
     const head = $(".rb-list-head");
     if (head && !$("#rbDemoNote")) {
       const note = document.createElement("div");
       note.id = "rbDemoNote";
       note.className = "rb-gmp-ok";
-      note.style.cssText = "margin:2px 0 0;background:rgba(245,185,66,.08);border:1px solid rgba(245,185,66,.28);color:var(--muted)";
-      note.innerHTML = `Demo — a sample operator's offtakers. <a href="/onboarding" style="color:var(--good);font-weight:650">Set up your own →</a>`;
+      note.style.cssText = "margin:2px 0 0;background:rgba(33,150,243,.08);border:1px solid rgba(33,150,243,.22);color:var(--muted)";
+      const meta = D.meta || {};
+      const scale = meta.offtakers
+        ? `${meta.arrays || "—"} sites · ${meta.offtakers} offtakers`
+        : "sample operator";
+      note.innerHTML = `Demo — <b>Northeast Community Solar</b> (${scale}), frozen mid-cycle. <a href="/onboarding" style="color:var(--good);font-weight:650">Set up your own →</a>`;
       head.parentNode.insertBefore(note, head.nextSibling);
     }
-    // The GMP-bills status line: show the "connected" affordance (offtakers bill from bills).
     const gmpStatus = $("#rbGmpBillsStatus");
     if (gmpStatus) gmpStatus.innerHTML =
-      `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from this operator's utility bills.</div>`;
+      `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from multi-utility bills (GMP · VEC · WEC · Eversource · CMP).</div>`;
 
-    // ── Offtaker accordion — same cards as the live app, with demo arrays/accts. ──
-    const demoArrays = [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
-    const demoUtil = [{ utility_account_id: 9001, array_id: 1, provider: "gmp",
-      nickname: "Catamount Community Solar", service_address: "120 Main St, Waterbury, VT",
-      has_bill: true, bill_count: 6, account_number: "GMP-558210", latest_period_label: "2026-06" }];
+    // Multi-array / multi-utility book (falls back to a single site if old shape).
+    const demoArrays = (D.arrays && D.arrays.length)
+      ? D.arrays.map(a => ({ id: a.id, name: a.name, client_name: a.client_name || "" }))
+      : [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
+    const demoUtil = (D.utilAccounts && D.utilAccounts.length)
+      ? D.utilAccounts.slice()
+      : [{ utility_account_id: 9001, array_id: 1, provider: "gmp",
+          nickname: "Catamount Community Solar", service_address: "120 Main St, Waterbury, VT",
+          has_bill: true, bill_count: 6, account_number: "GMP-558210", latest_period_label: "2026-06" }];
 
-    // Populate the inbox globals so the accordion renders + expands from the demo data.
     OFFTAKERS = D.offtakers.slice();
     INBOX_DRAFTS = D.drafts.slice();
     DRAFT_BY_SUB = {};
     INBOX_DRAFTS.forEach(d => {
-      // match each draft to its offtaker by name (subscription_id is null in the demo).
       const sub = OFFTAKERS.find(s => s.customer_name === d.customer_name);
       if (sub) { d.subscription_id = null; DRAFT_BY_SUB[String(sub.id)] = d; }
     });
     INBOX_UTIL_ACCTS = demoUtil;
     ACC_ARRS = demoArrays;
-    TEMPLATE_STATE = { has: false, enabled: false };   // no template-PDF fetch in the demo
+    TEMPLATE_STATE = { has: false, enabled: false };
 
+    // Pipeline band — frozen mid-cycle action (healthy, not bounced).
+    if (D.pipeline) {
+      PIPE = D.pipeline;
+      try { renderPipeline(); renderKpis(); } catch (_) { /* pipeline optional */ }
+    }
+
+    // Hierarchical offtaker list (utility → account → offtaker) — same path as live
+    // for fleets > a handful; defaults collapsed so 300 offtakers don't paint 300 cards.
+    try {
+      renderAccordion(OFFTAKERS, demoArrays, demoUtil, INBOX_DRAFTS);
+    } catch (_) {
+      const list = $("#rbList");
+      if (list) {
+        const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
+        const headLine = pending
+          ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Nothing sends until you approve.`
+          : `Click an offtaker to review &amp; send their invoice. Nothing sends until you approve.`;
+        list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
+          OFFTAKERS.slice(0, 40).map(s => subCard(s, demoArrays, demoUtil)).join("") +
+          (OFFTAKERS.length > 40
+            ? `<div class="empty" style="padding:12px;color:var(--faint)">+ ${OFFTAKERS.length - 40} more offtakers — sign up to manage the full book.</div>`
+            : "");
+        wireAccordionHeaders(list);
+      }
+    }
+    ACTIVE_SUB_ID = null;
     const list = $("#rbList");
     if (list) {
-      const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
-      const headLine = pending
-        ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Nothing sends until you approve.`
-        : `Click an offtaker to review &amp; send their invoice. Nothing sends until you approve.`;
-      list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
-        OFFTAKERS.map(s => subCard(s, demoArrays, demoUtil)).join("");
-      wireAccordionHeaders(list);
-      // Leave every offtaker collapsed on load — matches the live app (no auto-open).
-      ACTIVE_SUB_ID = null;
-      // Intercept send/save actions to a sign-in nudge (no live fetch in the demo);
-      // local toggles (autogmp/summary) + the accordion expand/collapse stay live.
       const reintercept = () => {
         list.querySelectorAll("[data-dact]").forEach(b => {
           const act = b.getAttribute("data-dact");
@@ -1452,14 +1472,11 @@
         });
       };
       reintercept();
-      // The body re-renders on expand/edit, so re-intercept after any header click too.
       list.querySelectorAll("[data-acchead]").forEach(h => {
-        const sid = h.getAttribute("data-acchead");
         h.addEventListener("click", () => requestAnimationFrame(reintercept));
       });
     }
 
-    // Wire the "Add an offtaker" + "Link utility bills" header buttons to the sign-in nudge.
     const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
     const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
     const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
@@ -1838,7 +1855,10 @@
   function renderPipeline() {
     const host = document.getElementById("rb2Pipe");
     if (!host) return;
-    if (!PIPE || !authHeaders()) { host.hidden = true; return; }
+    // Signed-out demo paints a frozen pipeline from AO_DEMO.pipeline.
+    if (!PIPE || (!authHeaders() && !(window.AO_DEMO && window.AO_DEMO.pipeline))) {
+      host.hidden = true; return;
+    }
     const p = PIPE;
     const paused = !!p.paused;
     const monthly = p.next_monthly || {}, quarterly = p.next_quarterly || {};
@@ -1981,6 +2001,7 @@
   // "This cycle" counts settle to the truth) and refresh the offtaker cards.
   async function setDeliveryModeAll(mode) {
     if (PIPE) { PIPE.default_delivery_mode = mode; renderPipeline(); }   // instant slider feedback
+    if (!authHeaders()) return;   // signed-out demo: local flip only, no API
     try {
       const r = await fetch(API + "/subscriptions/bulk-delivery-mode", {
         method: "POST",

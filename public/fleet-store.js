@@ -910,7 +910,9 @@ window.FleetStore = (function(){
         });
     } else {
       // Anonymous visitor (marketing/preview) — the simulated fleet tells the story.
-      ingest(simulateFleet(), { simulated:true, recovered:18450 });
+      // Big-operator demo: ~20 sites / 200 inverters; recovered_ytd is a
+      // narrative KPI for the command-center hero (not a real ledger figure).
+      ingest(simulateFleet(), { simulated:true, recovered:248600 });
     }
   }
 
@@ -972,53 +974,68 @@ window.FleetStore = (function(){
     }));
   }
 
-  /* ---- deterministic 100-array simulated fleet (demo / preview) ---- */
+  /* ---- deterministic 20-array / ~200-inverter demo fleet (marketing preview) ----
+     Sized to match AO_DEMO (demo-data.js): a real-feeling NE community-solar book,
+     multi-vendor, mostly healthy with a few live issues so the fleet feels alive. */
   function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-  const REGIONS = ["Northern VT","Mad River Valley","Champlain Islands","NH Upper Valley","The Berkshires","Central VT"];
-  const HOSTS   = ["Green Mountain Solar","Catamount Energy Co-op","Maple Ridge Community","Sugarbush Holdings","Lakeside Dairy LLC","Riverbend Schools","Northfield Municipal","Birchwood Properties"];
-  const PLACES  = ["Londonderry","Maple Street","Cover Catamount","Stowe Hollow","Waitsfield","Bristol Cliffs","Hinesburg Flats","Richmond Bridge","Underhill","Jericho Center","Cabot Creamery","Hardwick","Craftsbury","Greensboro Bend","Morrisville","Johnson Mill","Enosburg Falls","Swanton Yard","Grand Isle","Vergennes","Middlebury","Brandon Depot","Rutland Yard","Killington Base","Ludlow Mill","Chester Depot","Springfield Works","Bellows Falls","Brattleboro","Wilmington Ridge","Dover Notch","Manchester Center","Bennington Mill","Pownal Flats","Arlington","Dorset Quarry","Pawlet","Poultney","Fair Haven","Castleton"];
-  const NAMEPLATES = [10,11.4,20,33.3];
+  const DEMO_SITES = [
+    { name:"Londonderry",           region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:8.25 },
+    { name:"Starlake",              region:"Central VT",       host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:7.5 },
+    { name:"Timberworks",           region:"Northern VT",      host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:6.2 },
+    { name:"Waterford",             region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:6.0 },
+    { name:"Tannery Brook",         region:"Central VT",       host:"Northeast Community Solar", vendor:"sma",       inv:10, np:5.5 },
+    { name:"Chester Commons",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:5.0 },
+    { name:"Cover Catamount",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:5.3 },
+    { name:"West Glover Ridge",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"chint",     inv:8,  np:6.25 },
+    { name:"Danville Big Buck",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:14, np:7.1 },
+    { name:"Norwich Union Village", region:"Upper Valley",     host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:5.6 },
+    { name:"Hardwick Field",        region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"locus",     inv:8,  np:4.75 },
+    { name:"Craftsbury Common",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:8,  np:4.7 },
+    { name:"Mad River School",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:4.4 },
+    { name:"Waitsfield Flats",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:4.2 },
+    { name:"Enosburg Dairy",        region:"Northwest VT",     host:"Northeast Community Solar", vendor:"chint",     inv:10, np:6.0 },
+    { name:"Swanton Yard",          region:"Northwest VT",     host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:6.5 },
+    { name:"Lebanon Crossing",      region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:5.8 },
+    { name:"Hanover Meadows",       region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:5.5 },
+    { name:"Brunswick Landing",     region:"Coastal ME",       host:"Northeast Community Solar", vendor:"alsoenergy",inv:12, np:6.7 },
+    { name:"Augusta Commons",       region:"Central ME",       host:"Northeast Community Solar", vendor:"chint",     inv:12, np:5.4 },
+  ];
   function simulateFleet(){
-    const rng = mulberry32(0x5ECA11);
-    const pick = arr => arr[Math.floor(rng()*arr.length)];
-    // Demo fleet spans every vendor Array Operator supports, weighted to look like a
-    // real mixed portfolio — so the signed-out Fleet Health + Vendor-data views show
-    // SolarEdge / Fronius / SMA / CHINT / Locus side by side, not one ecosystem.
-    const VMIX = [["solaredge",.38],["fronius",.22],["sma",.18],["chint",.12],["locus",.10]];
-    const pickVendor = () => { let x = rng(); for(const [v,w] of VMIX){ if((x-=w)<=0) return v; } return "solaredge"; };
+    const rng = mulberry32(0xC0FFEE42);
     const modelFor = (vendor, np) => { const r = Math.round(np); return ({
       solaredge:`SE${np}K`, fronius:`Symo ${r}.0-3-M`, sma:`STP ${r}.0-3AV-40`,
-      chint:`CPS SCA${r}KTL-DO`, locus:`LGate ${r}`,
+      chint:`CPS SCA${r}KTL-DO`, locus:`LGate ${r}`, alsoenergy:`AE ${r}kW`,
     }[vendor] || `SE${np}K`); };
     const arrays = [];
-    for(let n=0;n<100;n++){
-      const invCount = 8 + Math.floor(rng()*9);
-      const place = PLACES[n % PLACES.length];
-      const name = n < PLACES.length ? place : `${place} ${Math.floor(n/PLACES.length)+1}`;
-      const vendor = pickVendor();
+    // One deliberate "story" site with a live issue so Analysis isn't all green
+    const storyIdx = 7; // West Glover — underperforming Chint site
+    DEMO_SITES.forEach((site, n) => {
+      const invCount = site.inv;
+      const vendor = site.vendor;
       const inverters = [];
       for(let j=0;j<invCount;j++){
         const r = rng(); let status="ok";
-        if(r<0.020) status="dead"; else if(r<0.030) status="fault";
-        else if(r<0.085) status="underperforming"; else if(r<0.115) status="comm_gap";
-        const np = pick(NAMEPLATES);
+        // Mostly healthy fleet (cool big-account vibe); a few live issues
+        if(n===storyIdx && j===0) status="underperforming";
+        else if(n===storyIdx && j===1) status="comm_gap";
+        else if(r<0.012) status="underperforming";
+        else if(r<0.018) status="comm_gap";
+        else if(r<0.022) status="fault";
+        // nameplate per inverter — site total ~ site.np * invCount
+        const np = site.np;
         const fair = np * 4.6 * WINDOW_DAYS;
-        let pi=1+(rng()-0.5)*0.06, win=fair*pi, power=np*1000*(0.55+rng()*0.25);
-        if(status==="underperforming"){ pi=0.55+rng()*0.27; win=fair*pi; power=np*1000*(0.30+rng()*0.20); }
-        else if(status==="comm_gap"){ pi=null; win=fair*(0.6+rng()*0.3); power=null; }
-        else if(status==="dead"){ pi=null; win=0; power=0; }
-        else if(status==="fault"){ pi=0.18+rng()*0.18; win=fair*pi; power=np*1000*0.12; }
-        // synthetic 14-day daily kWh series for the demo card graph (demo fleet only;
-        // a real signed-in owner gets the backend's real per-inverter daily series).
-        const fairDay = np * 4.6;            // a "fair" day's kWh for this nameplate
+        let pi=1+(rng()-0.5)*0.05, win=fair*pi, power=np*1000*(0.55+rng()*0.28);
+        if(status==="underperforming"){ pi=0.58+rng()*0.22; win=fair*pi; power=np*1000*(0.28+rng()*0.18); }
+        else if(status==="comm_gap"){ pi=null; win=fair*(0.65+rng()*0.25); power=null; }
+        else if(status==="fault"){ pi=0.2+rng()*0.15; win=fair*pi; power=np*1000*0.1; }
+        const fairDay = np * 4.6;
         const daily = [];
         for(let day=0; day<WINDOW_DAYS; day++){
           let kwh;
-          if(status==="dead") kwh = day < WINDOW_DAYS-3 ? fairDay*(0.85+rng()*0.3) : 0;       // recently died
-          else if(status==="comm_gap") kwh = day < WINDOW_DAYS-2 ? fairDay*(0.8+rng()*0.3) : 0; // went quiet
-          else if(status==="underperforming") kwh = fairDay*(0.45+rng()*0.25);
-          else if(status==="fault") kwh = fairDay*(0.1+rng()*0.2);
-          else kwh = fairDay*(0.8+rng()*0.35);
+          if(status==="comm_gap") kwh = day < WINDOW_DAYS-2 ? fairDay*(0.82+rng()*0.28) : 0;
+          else if(status==="underperforming") kwh = fairDay*(0.48+rng()*0.22);
+          else if(status==="fault") kwh = fairDay*(0.12+rng()*0.18);
+          else kwh = fairDay*(0.82+rng()*0.32);
           daily.push({ date:`d-${WINDOW_DAYS-day}`, kwh: Math.round(kwh*10)/10 });
         }
         const kwhVals = daily.map(d=>d.kwh);
@@ -1027,12 +1044,16 @@ window.FleetStore = (function(){
           peer_index:pi, status, window_kwh:Math.round(win*10)/10,
           current_power_w: power==null?null:Math.round(power),
           daily, min_kwh: Math.round(Math.min(...kwhVals)*10)/10, peak_kwh: Math.round(Math.max(...kwhVals)*10)/10,
-          stale_hours: status==="comm_gap" ? Math.round(12+rng()*60) : (status==="dead"? Math.round(48+rng()*120):null),
-          diagnosis: "",
+          stale_hours: status==="comm_gap" ? Math.round(8+rng()*40) : null,
+          diagnosis: status==="underperforming" ? "Pulling below peer cohort — check DC string / soiling." : "",
         });
       }
-      arrays.push({ id:n+1, name, region:pick(REGIONS), host:pick(HOSTS), vendor, inverters });
-    }
+      arrays.push({
+        id: n+1, name: site.name, region: site.region, host: site.host, vendor,
+        portfolio_name: site.region,
+        inverters,
+      });
+    });
     return arrays;
   }
 
