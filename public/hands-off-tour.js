@@ -447,11 +447,24 @@
     pill.setAttribute("aria-label", "Hands-off setup walkthrough");
     pill.title = "Hands-off setup walkthrough";
     document.body.appendChild(pill);
-    pill.addEventListener("click", function () {
-      // Same as Alerts: open the panel; close returns the pill (minimizeTour → updatePill)
+    pill.addEventListener("click", function (e) {
+      try {
+        if (e && e.preventDefault) e.preventDefault();
+        if (e && e.stopPropagation) e.stopPropagation();
+      } catch (err) {}
+      // Always force open; prefer dock after first view so it sits like a side panel
       openTour({
         force: true,
         mode: modalAlreadySeen() || isTourComplete() ? "dock" : "modal",
+      }).catch(function (err) {
+        try {
+          console.error("[hands-off] openTour failed", err);
+        } catch (e2) {}
+        // Last-ditch: paint shell even if probe/render path threw earlier
+        try {
+          state.open = false;
+          hardRender({ animate: true });
+        } catch (e3) {}
       });
     });
     return pill;
@@ -1670,14 +1683,44 @@
           }
         }
       }
-      state.idx = resumeIdx != null ? resumeIdx : 0;
+      // Always start at Welcome when replaying from the FAB (force open while
+      // already complete) so the panel never opens on a blank mid-step shell.
+      if (opts.force && isTourComplete() && resumeIdx == null && !queryConnectReturn()) {
+        state.idx = 0;
+      } else {
+        state.idx = resumeIdx != null ? resumeIdx : state.idx || 0;
+      }
     }
 
     var firstPaint = !state.open;
     ensureRoot();
     ensurePill();
-    await probeLive();
-    hardRender({ animate: firstPaint });
+
+    // CRITICAL: paint the shell FIRST. Waiting on probeLive() before hardRender
+    // made the Setup pill look dead whenever /v1/* was slow (Ford 2026-07-14).
+    try {
+      hardRender({ animate: firstPaint });
+    } catch (err) {
+      try {
+        console.error("[hands-off] hardRender failed", err);
+      } catch (e) {}
+      throw err;
+    }
+
+    // Refresh live status in the background; soft-update when ready
+    try {
+      await Promise.race([
+        probeLive(),
+        new Promise(function (resolve) {
+          setTimeout(resolve, 2500);
+        }),
+      ]);
+      if (state.open) softUpdate();
+    } catch (e) {
+      try {
+        console.warn("[hands-off] probeLive", e);
+      } catch (e2) {}
+    }
     scheduleSoftProbe();
     // After Connect return, poll a few times — charges_enabled can lag webhooks
     if (opts.pollConnect || queryConnectReturn()) {
