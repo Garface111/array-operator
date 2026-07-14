@@ -215,7 +215,7 @@ body.ea-shell-open{
 
 .ea-msgs{
   flex: 1 1 auto; min-height: 0; overflow: auto;
-  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px;
 }
 .ea-msg{
   max-width: 94%; font-size: 13px; line-height: 1.5; padding: 10px 13px; border-radius: 14px;
@@ -306,27 +306,190 @@ html:not(.sky) .ea-msg .ea-code{
 .ea-yes{ background: var(--ea-sky2); color: #fff; }
 .ea-no{ background: transparent; border: 1px solid rgba(15,23,42,.12) !important; color: var(--ink); }
 
-.ea-compose{
-  display: flex; gap: 8px; padding: 10px 12px 8px; border-top: 1px solid rgba(14,165,233,.12);
-  align-items: flex-end;
+/* ── Footer: raised glass composer (higher, professional) ───────────────── */
+.ea-footer{
   flex: 0 0 auto;
+  padding: 0 12px 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(248,251,255,.92) 28%, rgba(248,251,255,.98) 100%);
+  border-top: 1px solid rgba(14,165,233,.1);
+  /* Lift the input off the absolute bottom so it reads as a toolbar, not a footer scrap */
+  margin-top: 0;
+  padding-top: 12px;
+  box-shadow: 0 -16px 28px -22px rgba(14,60,120,.18);
+  z-index: 2;
 }
-.ea-compose textarea{
-  flex: 1 1 auto; min-height: 40px; max-height: 100px; resize: vertical;
-  font: inherit; font-size: 13px; padding: 9px 11px; border-radius: 12px;
-  border: 1px solid rgba(14,165,233,.2); background: #fff; color: inherit;
+html:not(.sky) .ea-footer{
+  background: linear-gradient(180deg, transparent 0%, rgba(11,18,32,.92) 30%, rgba(11,18,32,.98) 100%);
+  border-top-color: var(--line, rgba(255,255,255,.08));
+  box-shadow: 0 -16px 28px -18px rgba(0,0,0,.45);
 }
-html:not(.sky) .ea-compose textarea{ background: var(--bg2,#0b1220); border-color: var(--line); }
-.ea-compose textarea:focus{ outline: none; border-color: var(--ea-sky2); box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
-.ea-send, .ea-mic{
-  flex: 0 0 auto; height: 40px; min-width: 40px; border-radius: 12px; border: 0;
-  font: inherit; font-size: 12.5px; font-weight: 720; cursor: pointer;
-  background: var(--ea-sky2); color: #fff; padding: 0 12px;
+
+.ea-compose{
+  display: block;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
 }
-.ea-mic{ background: rgba(14,165,233,.12); color: var(--ea-sky2); }
-.ea-mic.on{ background: #ef4444; color: #fff; }
+.ea-compose-shell{
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(14,165,233,.22);
+  background: rgba(255,255,255,.92);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.8) inset,
+    0 10px 28px -14px rgba(14,60,120,.28),
+    0 0 0 1px rgba(14,165,233,.04);
+  overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ea-compose-shell:focus-within{
+  border-color: rgba(14,165,233,.45);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.9) inset,
+    0 12px 32px -12px rgba(14,165,233,.35),
+    0 0 0 3px rgba(14,165,233,.12);
+}
+html:not(.sky) .ea-compose-shell{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  border-color: var(--line, rgba(255,255,255,.12));
+  box-shadow: 0 10px 28px -14px rgba(0,0,0,.5);
+}
+html:not(.sky) .ea-compose-shell:focus-within{
+  border-color: rgba(56,189,248,.45);
+  box-shadow: 0 0 0 3px rgba(56,189,248,.12), 0 12px 32px -12px rgba(0,0,0,.55);
+}
+
+.ea-compose textarea,
+.ea-compose-shell textarea{
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  flex: none;
+  min-height: 52px;
+  max-height: 120px;
+  resize: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  letter-spacing: -.01em;
+  padding: 12px 14px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  field-sizing: content; /* progressive: grows with content where supported */
+}
+.ea-compose textarea:focus,
+.ea-compose-shell textarea:focus{
+  outline: none;
+  box-shadow: none;
+}
+.ea-compose textarea::placeholder{
+  color: var(--muted,#94a3b8);
+  font-weight: 500;
+}
+
+.ea-compose-bar{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid rgba(14,165,233,.08);
+  background: linear-gradient(180deg, rgba(14,165,233,.03), rgba(14,165,233,.06));
+}
+html:not(.sky) .ea-compose-bar{
+  border-top-color: rgba(255,255,255,.06);
+  background: rgba(0,0,0,.15);
+}
+.ea-compose-spacer{ flex: 1 1 auto; min-width: 4px; }
+
+/* Quiet chip buttons (Improve / Mic) */
+.ea-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,233,.18);
+  background: rgba(255,255,255,.75);
+  color: #0c4a6e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 680;
+  letter-spacing: -.01em;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s, transform .1s;
+}
+.ea-chip:hover{
+  background: #fff;
+  border-color: rgba(14,165,233,.35);
+  transform: translateY(-0.5px);
+}
+.ea-chip:active{ transform: translateY(0); }
+.ea-chip-ic{ font-size: 12px; line-height: 1; opacity: .9; }
+.ea-chip-lbl{ line-height: 1; }
+html:not(.sky) .ea-chip{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.1);
+  color: #e2e8f0;
+}
+html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
+
+.ea-chip.ea-mic.on{
+  background: linear-gradient(180deg, #f87171, #ef4444);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px -4px rgba(239,68,68,.55);
+}
+.ea-chip.ea-mic.on:hover{ filter: brightness(1.05); }
+
+/* Primary send */
+.ea-send{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px 0 16px;
+  border-radius: 999px;
+  border: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 740;
+  letter-spacing: -.01em;
+  cursor: pointer;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  color: #fff;
+  box-shadow: 0 6px 16px -6px rgba(14,165,233,.65);
+  transition: filter .12s, transform .1s, box-shadow .12s;
+}
+.ea-send:hover{
+  filter: brightness(1.05);
+  box-shadow: 0 8px 18px -6px rgba(14,165,233,.75);
+  transform: translateY(-0.5px);
+}
+.ea-send:active{ transform: translateY(0); filter: brightness(.98); }
+.ea-send-ic{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  font-size: 12px; font-weight: 800; line-height: 1;
+}
+.ea-send-lbl{ line-height: 1; }
+
+/* Legacy class hooks (no-op if unused) */
+.ea-mic{ /* mic styling lives on .ea-chip.ea-mic */ }
+
 .ea-legal{
-  padding: 0 14px 12px; font-size: 10.5px; color: var(--faint,#94a3b8); line-height: 1.35;
+  padding: 8px 4px 0;
+  font-size: 10px;
+  color: var(--faint,#94a3b8);
+  line-height: 1.3;
+  text-align: center;
+  letter-spacing: .01em;
   flex: 0 0 auto;
 }
 
@@ -383,12 +546,7 @@ html:not(.sky) .ea-improve textarea{ background: var(--bg2,#0b1220); border-colo
   background: var(--ea-sky2); color: #fff;
 }
 .ea-improve-msg{ font-size: 11.5px; margin-top: 6px; color: var(--muted,#64748b); min-height: 1em; }
-.ea-improve-cta{
-  flex: 0 0 auto; height: 40px; border-radius: 12px; border: 1px solid rgba(14,165,233,.35);
-  font: inherit; font-size: 12px; font-weight: 720; cursor: pointer;
-  background: rgba(14,165,233,.1); color: var(--ea-sky2); padding: 0 10px;
-}
-.ea-improve-cta:hover{ background: rgba(14,165,233,.18); }
+/* Improve CTA is now .ea-chip in the compose bar */
 
 /* Live build journey inside the dock */
 .ea-journey{
