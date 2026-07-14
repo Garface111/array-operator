@@ -197,7 +197,63 @@ body.ea-shell-open{
 }
 .ea-dot.on{ background: var(--ea-sky2); box-shadow: 0 0 0 3px rgba(14,165,233,.18); }
 .ea-dot.warn{ background: #f59e0b; }
-.ea-budget{ margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 650; }
+/* Weekly AI usage meter — fills 0→100% toward the $5 thinking+voice cap */
+.ea-budget{
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.ea-usage{
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 140px;
+  cursor: default;
+  user-select: none;
+}
+.ea-usage-label{
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--muted,#64748b);
+  flex: 0 0 auto;
+}
+.ea-usage-track{
+  position: relative;
+  display: block;
+  width: 72px;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(14,165,233,.12);
+  box-shadow: inset 0 0 0 1px rgba(14,165,233,.14);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.ea-usage-fill{
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #38bdf8, #0ea5e9 55%, #0284c7);
+  box-shadow: 0 0 8px rgba(14,165,233,.35);
+  transition: width .45s cubic-bezier(.2,.8,.2,1), background .3s ease;
+}
+.ea-usage-warn .ea-usage-fill{
+  background: linear-gradient(90deg, #fbbf24, #f59e0b 60%, #d97706);
+  box-shadow: 0 0 8px rgba(245,158,11,.35);
+}
+.ea-usage-warn .ea-usage-label{ color: #b45309; }
+.ea-usage-full .ea-usage-fill{
+  background: linear-gradient(90deg, #f87171, #ef4444 55%, #dc2626);
+  box-shadow: 0 0 8px rgba(239,68,68,.35);
+}
+.ea-usage-full .ea-usage-label{ color: #b91c1c; }
+.ea-usage-full .ea-usage-track{
+  background: rgba(239,68,68,.12);
+  box-shadow: inset 0 0 0 1px rgba(239,68,68,.18);
+}
 
 .ea-tools{
   max-height: 120px; overflow: auto; padding: 8px 14px;
@@ -431,14 +487,14 @@ html:not(.sky) .ea-compose-shell:focus-within{
   font-weight: 500;
 }
 
-/* Compact action row — Improve / Mic / Mute / Send must all fit a 360px rail
-   (Ford 2026-07-13: Send was clipped by overflow + oversized chips). */
+/* Equal-width action row — Improve / Mic / Mute / Send share the rail evenly
+   (Ford 2026-07-13: no dead space, all same size). */
 .ea-compose-bar{
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: nowrap;
-  gap: 4px;
-  padding: 5px 6px 7px;
+  gap: 5px;
+  padding: 6px;
   border-top: 1px solid rgba(14,165,233,.08);
   background: linear-gradient(180deg, rgba(14,165,233,.03), rgba(14,165,233,.06));
   min-width: 0;
@@ -448,34 +504,37 @@ html:not(.sky) .ea-compose-bar{
   border-top-color: rgba(255,255,255,.06);
   background: rgba(0,0,0,.15);
 }
-/* Spacer collapses first so Send never gets pushed off-screen */
-.ea-compose-spacer{
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 8px;
-}
+/* Legacy spacer — hide so buttons fill the row with no gap */
+.ea-compose-spacer{ display: none !important; }
 
-/* Quiet chip buttons (Improve / Mic / Mute) — compact for the rail */
-.ea-chip{
+/* Shared geometry for every bar control */
+.ea-compose-bar > .ea-chip,
+.ea-compose-bar > .ea-send{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  flex: 0 1 auto;
+  gap: 4px;
+  flex: 1 1 0;
+  width: 0;            /* equal columns with flex */
   min-width: 0;
-  height: 28px;
-  padding: 0 7px;
+  height: 32px;
+  padding: 0 4px;
   border-radius: 999px;
-  border: 1px solid rgba(14,165,233,.18);
-  background: rgba(255,255,255,.75);
-  color: #0c4a6e;
   font: inherit;
   font-size: 11px;
-  font-weight: 680;
+  font-weight: 720;
   letter-spacing: -.015em;
   white-space: nowrap;
   cursor: pointer;
-  transition: background .12s, border-color .12s, color .12s, transform .1s;
+  box-sizing: border-box;
+  transition: background .12s, border-color .12s, color .12s, filter .12s, box-shadow .12s, transform .1s;
+}
+
+/* Quiet chip buttons (Improve / Mic / Mute) */
+.ea-chip{
+  border: 1px solid rgba(14,165,233,.18);
+  background: rgba(255,255,255,.75);
+  color: #0c4a6e;
 }
 .ea-chip:hover{
   background: #fff;
@@ -483,12 +542,12 @@ html:not(.sky) .ea-compose-bar{
   transform: translateY(-0.5px);
 }
 .ea-chip:active{ transform: translateY(0); }
-.ea-chip-ic{ font-size: 11px; line-height: 1; opacity: .9; flex: none; }
+.ea-chip-ic{ font-size: 11px; line-height: 1; opacity: .95; flex: none; }
 .ea-chip-lbl{
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 4.6em;
+  max-width: 100%;
 }
 html:not(.sky) .ea-chip{
   background: rgba(255,255,255,.06);
@@ -514,41 +573,27 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 }
 .ea-chip.ea-mute.on:hover{ filter: brightness(1.06); }
 
-/* Primary send — never shrink / never clip */
+/* Primary send — same size as chips, accent fill only */
 .ea-send{
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  height: 28px;
-  padding: 0 10px 0 11px;
-  border-radius: 999px;
   border: 0;
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 740;
-  letter-spacing: -.01em;
-  white-space: nowrap;
-  cursor: pointer;
   background: linear-gradient(180deg, #38bdf8, #0ea5e9);
   color: #fff;
-  box-shadow: 0 6px 16px -6px rgba(14,165,233,.65);
-  transition: filter .12s, transform .1s, box-shadow .12s;
+  box-shadow: 0 4px 12px -4px rgba(14,165,233,.55);
 }
 .ea-send:hover{
   filter: brightness(1.05);
-  box-shadow: 0 8px 18px -6px rgba(14,165,233,.75);
+  box-shadow: 0 6px 14px -4px rgba(14,165,233,.65);
   transform: translateY(-0.5px);
 }
 .ea-send:active{ transform: translateY(0); filter: brightness(.98); }
 .ea-send-ic{
   display: inline-flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; border-radius: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
   background: rgba(255,255,255,.22);
   font-size: 10px; font-weight: 800; line-height: 1;
   flex: none;
 }
-.ea-send-lbl{ line-height: 1; }
+.ea-send-lbl{ line-height: 1; overflow: hidden; text-overflow: ellipsis; }
 
 /* Legacy class hooks (no-op if unused) */
 .ea-mic{ /* mic styling lives on .ea-chip.ea-mic */ }
