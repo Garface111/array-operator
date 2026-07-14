@@ -898,7 +898,7 @@
     state._budgetPollTimer = setInterval(function () {
       if (!state.open || !signedIn()) return;
       refreshBudget().catch(function () {});
-    }, 20000);
+    }, 45000);
   }
 
   function stopBudgetPoll() {
@@ -1124,11 +1124,12 @@
   function startMindAwareness() {
     if (state.mindPollTimer) return;
     // Soft poll — cheap event cursor; heavy work only on backend when tasks exist
+    // Lighter poll cadence — less background chatter while talking (was 8s)
     state.mindPollTimer = setInterval(function () {
       pollMindEvents().catch(function () {});
-    }, 8000);
+    }, 15000);
     // First pull soon after open / chat plan
-    setTimeout(function () { pollMindEvents().catch(function () {}); }, 1200);
+    setTimeout(function () { pollMindEvents().catch(function () {}); }, 1800);
     // Wake the long-term mind when the panel opens (event-driven, not spam)
     if (!state._mindWokeThisOpen) {
       state._mindWokeThisOpen = true;
@@ -1270,30 +1271,38 @@
       } catch (e) {}
     }
 
-    // Refresh activity chip from snapshot (open tasks + latest insight)
-    try {
-      var snap = await fetch(API.mind, { headers: authHeaders() });
-      if (snap.ok) {
-        var mind = await snap.json().catch(function () { return null; });
-        var n = (mind && mind.open_tasks && mind.open_tasks.length) || 0;
-        state.mindOpenTasks = n;
-        if (n > 0 || openHint) {
-          setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
-        } else {
-          setMindActivity(false);
-        }
-        // Soft-surface latest proactive insight once per open (same mind, not a new agent)
-        var ins = mind && mind.insights && mind.insights[0];
-        if (ins && ins.headline && ins.id && state._lastInsightId !== ins.id) {
-          state._lastInsightId = ins.id;
-          if (Number(ins.importance || 0) >= 60 && !state.thinking) {
-            var line = ins.headline + (ins.detail ? " — " + String(ins.detail).slice(0, 160) : "");
-            injectMindSpeak(line, { force: false });
+    // Activity chip from events (cheap). Full /mind snapshot only every ~45s
+    // so we don't stack network while the user is talking (Ford speed pass).
+    if (openHint) {
+      setMindActivity(true, "Looking into it…");
+    }
+    var now = Date.now();
+    if (!state._lastMindSnapAt || now - state._lastMindSnapAt > 45000) {
+      state._lastMindSnapAt = now;
+      try {
+        var snap = await fetch(API.mind, { headers: authHeaders() });
+        if (snap.ok) {
+          var mind = await snap.json().catch(function () { return null; });
+          var n = (mind && mind.open_tasks && mind.open_tasks.length) || 0;
+          state.mindOpenTasks = n;
+          if (n > 0) {
+            setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
+          } else if (!openHint) {
+            setMindActivity(false);
+          }
+          // Soft-surface latest proactive insight once per open (same mind)
+          var ins = mind && mind.insights && mind.insights[0];
+          if (ins && ins.headline && ins.id && state._lastInsightId !== ins.id) {
+            state._lastInsightId = ins.id;
+            if (Number(ins.importance || 0) >= 60 && !state.thinking) {
+              var line = ins.headline + (ins.detail ? " — " + String(ins.detail).slice(0, 160) : "");
+              injectMindSpeak(line, { force: false });
+            }
           }
         }
+      } catch (e) {
+        if (openHint) setMindActivity(true, "Looking into it…");
       }
-    } catch (e) {
-      if (openHint) setMindActivity(true, "Looking into it…");
     }
   }
 
@@ -1329,7 +1338,7 @@
     if (!mind) return;
     setMindActivity(true, "Looking into it…");
     startMindAwareness();
-    // Drain-friendly: tick once client-side so events land sooner
+    // Background drain after the spoken reply path has room (don't race the chat)
     setTimeout(function () {
       fetch(API.mindTick, {
         method: "POST",
@@ -1338,7 +1347,7 @@
       }).then(function () {
         return pollMindEvents();
       }).catch(function () {});
-    }, 400);
+    }, 2500);
   }
 
   // ── session (server-persisted — survives refresh; mind survives cache clear) ──
@@ -2276,9 +2285,46 @@
     body.innerHTML = formatMsg(text).replace(/<\/?p[^>]*>/g, " ").replace(/<div class="ea-sp"><\/div>/g, " ");
   }
 
-  /** Tour lockstep: wait until this line finishes before the next highlight. */
+  /**
+   * How long a tour step should stay on screen so the eye can follow the
+   * narration. Tuned slightly slower than average speaking (~130–150 wpm) so
+   * visuals never race ahead of the description (Ford 2026-07-14).
+   */
+  function estimateTourDwellMs(text) {
+    var plain = stripMd(text);
+    var words = plain.split(/\s+/).filter(Boolean).length;
+    // ~420ms/word + lead-in for scroll/highlight settle; floor 2.8s, cap 50s
+    return Math.min(50000, Math.max(2800, Math.round(words * 420) + 1600));
+  }
+
+  /**
+   * Tour lockstep: speak the line (when voice is on), then hold the highlight
+   * until either speech finishes OR a reading-paced dwell — whichever is longer.
+   * When muted / no mouth, we still wait the full dwell so the UI stays in sync
+   * with what the caption is describing.
+   */
   function speakAndWait(text) {
-    return enqueueSpeak(text, { source: "tour", force: true });
+    var plain = stripMd(text);
+    var minMs = estimateTourDwellMs(plain);
+    var t0 = Date.now();
+    var speakP;
+    if (state.voiceMuted) {
+      // Don't force-unmute; caption carries the line — pace by reading time
+      speakP = Promise.resolve();
+    } else {
+      // force:true so tour lines aren't deduped against a prior chat reply
+      speakP = enqueueSpeak(text, { source: "tour", force: true });
+    }
+    return speakP
+      .catch(function () {})
+      .then(function () {
+        var elapsed = Date.now() - t0;
+        // Speech done (or silent): keep the highlight up until min dwell, then
+        // a short settle beat so the next jump never feels snappy.
+        var remain = Math.max(0, minMs - elapsed);
+        var settle = state.voiceMuted ? 400 : 900;
+        return sleep(remain + settle);
+      });
   }
 
   /** User-visible tab names — must match the top tabbar labels exactly. */
@@ -2333,12 +2379,14 @@
     try {
       var tab = document.querySelector('#tabbar a[href="' + (hash || "") + '"]');
       if (tab) tab.classList.add("ea-hl");
-      setTimeout(function () { if (tab) tab.classList.remove("ea-hl"); }, 2000);
+      setTimeout(function () { if (tab) tab.classList.remove("ea-hl"); }, 2800);
     } catch (e) {}
-    await sleep(450);
+    // Give smooth-scroll time to land before we talk about the panel
+    await sleep(900);
   }
 
-  /** Show-and-tell: top-to-bottom, one step at a time, voice waits for visuals. */
+  /** Show-and-tell: top-to-bottom, one step at a time — visuals stay on the
+   * current target for the full spoken line (+ reading dwell when muted). */
   async function runTour(args) {
     args = args || {};
     var steps = args.steps || [];
@@ -2373,7 +2421,7 @@
           // Wait for the panel to mount, then always start at the TOP
           var psel = panelSelectorForHash(h) || "body";
           await waitForSelector(psel + ".active, " + psel, 3500);
-          await sleep(350);
+          await sleep(700); // let tab transition + paint finish
           await scrollPanelTop(h);
           if (s.say) {
             setTourCaption(s.say, nIdx, narrated.length);
@@ -2384,6 +2432,8 @@
             nIdx++;
             await speakAndWait("Opened " + tabLabel(h) + ". Starting at the top.");
           }
+          // Pause before jumping to the next control so the tab still feels settled
+          await sleep(500);
           continue;
         }
 
@@ -2404,20 +2454,25 @@
             continue;
           }
           try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-          await sleep(280);
+          // Wait for scroll to finish BEFORE highlight + narration
+          await sleep(650);
           clearHighlights();
           el.classList.add("ea-hl", "ea-hl-pulse");
+          // Brief beat so the pulse is seen before the voice starts
+          await sleep(400);
           var line = s.say || s.label || "";
           if (line) {
             setTourCaption(line, nIdx, narrated.length);
             nIdx++;
-            // Speak ONLY while this element is highlighted (lockstep)
+            // Speak ONLY while this element is highlighted (lockstep + dwell)
             await speakAndWait(line);
           } else {
-            await sleep(s.ms || 2000);
+            await sleep(s.ms || 3200);
           }
-          await sleep(350);
+          // Hold the glow a moment after speech ends, then soft clear
+          await sleep(550);
           clearHighlights();
+          await sleep(350);
           continue;
         }
 
@@ -2425,6 +2480,7 @@
           setTourCaption(s.say, nIdx, narrated.length);
           nIdx++;
           await speakAndWait(s.say);
+          await sleep(400);
         }
       }
     } finally {
@@ -3339,10 +3395,9 @@
   }
 
   /**
-   * Serialize all TTS so we never stack multiple response.create calls.
-   * Prefer GPT Realtime mouth; only use robotic browser TTS if we never had Realtime
-   * (webspeech fallback mode). If Realtime was used but is briefly down, stay silent
-   * rather than switching voices mid-session.
+   * Serialize agent voice so we never stack multiple response.create calls.
+   * GPT Realtime only — never fall back to robotic browser speechSynthesis
+   * (Ford 2026-07-14: if the mouth breaks, go silent; text stays on screen).
    * Long explanations are chunked and spoken sequentially — no hard 20s cutoff.
    */
   function enqueueSpeak(text, opts) {
@@ -3470,31 +3525,15 @@
         }
       }
 
-      // ── Never switch to robotic voice if this session used GPT voice ──
-      if (state.voiceMode === "realtime" || state.realtimeReady) {
-        // Mouth offline — text is already on screen; skip browser TTS
+      // No Realtime mouth → silent. Never use browser speechSynthesis (robot voice).
+      // Text is already painted; tours still pace via speakAndWait dwell.
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      if (state.touring) {
+        setStatus("Tour… (voice silent)", "think");
+      } else {
         setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
-        done();
-        return;
       }
-
-      // ── Browser TTS only in webspeech fallback mode ───────────────────
-      if (!window.speechSynthesis) {
-        done();
-        return;
-      }
-      try { window.speechSynthesis.cancel(); } catch (e) {}
-      // Chunks are short enough; speak full chunk (no 800-char cut)
-      var u = new SpeechSynthesisUtterance(plain);
-      u.rate = 1.02;
-      u.onstart = function () {
-        state.speaking = true;
-        holdMicWhileSpeaking(true);
-        setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
-      };
-      u.onend = function () { done(); };
-      u.onerror = function () { done(); };
-      window.speechSynthesis.speak(u);
+      done();
     });
   }
 
@@ -3849,7 +3888,10 @@
     // No chat bubble for voice-connect — status pill already shows Listening…
   }
 
-  /** Fallback when OpenAI key missing or WebRTC fails: Web Speech + browser TTS */
+  /**
+   * Mic-only fallback when Realtime WebRTC fails: browser SpeechRecognition
+   * for listening. Agent replies stay silent (no speechSynthesis robot voice).
+   */
   function startWebSpeechFallback(fromOpen) {
     if (state.voiceMuted) {
       setStatus("Text only — voice off", "on");
@@ -3858,12 +3900,14 @@
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       if (!fromOpen) {
-        addMsg("agent", "No GPT voice key and no browser speech API — type instead.");
+        addMsg("agent", "Voice mouth offline — type instead. (No robot reader.)");
       }
       setStatus("Type to chat", "warn");
       return;
     }
     stopVoice();
+    // Kill any leftover browser reader from older sessions
+    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     // Keep mic permission warm
     ensureMicStream().catch(function () {});
 
@@ -3907,8 +3951,7 @@
       state.listening = true;
       state.voiceMode = "webspeech";
       syncMicBtn();
-      setStatus("Listening (browser fallback)…", "listen");
-      // No chat bubble — status pill is enough (Ford: mute toggle dump confused owners)
+      setStatus("Listening (replies silent until voice reconnects)…", "listen");
     } catch (e) {
       setStatus("Mic error", "warn");
     }
@@ -3964,11 +4007,13 @@
           }
         }
       }
-      // Never dump stack/API messages into the chat — status line only
+      // Never dump stack/API messages into the chat — status line only.
+      // Mic can still use browser SpeechRecognition for *listening*; agent
+      // replies stay silent if Realtime is down (no robot TTS).
       if (/not configured|OPENAI_API_KEY|503/i.test(msg)) {
         setStatus("Voice unavailable — type instead", "warn");
       } else {
-        setStatus("Using browser speech…", "listen");
+        setStatus("Mic only — agent voice offline", "warn");
       }
       if (state.voiceMuted) return;
       startWebSpeechFallback(fromOpen);
