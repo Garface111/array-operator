@@ -185,14 +185,30 @@
     el.textContent = "$" + (b.remaining_usd != null ? b.remaining_usd.toFixed(2) : "—") + " left this week";
   }
 
-  function addMsg(role, text) {
+  /** Single chat log for voice + text. Returns false if this is a near-duplicate of the last bubble. */
+  function addMsg(role, text, opts) {
+    opts = opts || {};
     var host = document.getElementById("eaMsgs");
-    if (!host) return;
+    if (!host) return false;
+    var t = String(text || "").trim();
+    if (!t) return false;
+    // Dedupe: voice transcript path + turn() used to double-post the same line
+    var last = host.lastElementChild;
+    if (last && last.getAttribute("data-role") === role) {
+      var prev = (last.textContent || "").trim();
+      if (prev === t || prev.indexOf(t) === 0 || t.indexOf(prev) === 0) {
+        return false;
+      }
+    }
+    if (opts.skipIfDup && state._lastUserSaid === t && role === "user") return false;
+    if (role === "user") state._lastUserSaid = t;
     var d = document.createElement("div");
     d.className = "ea-msg " + (role === "user" ? "user" : "agent");
-    d.textContent = text;
+    d.setAttribute("data-role", role);
+    d.textContent = t;
     host.appendChild(d);
     host.scrollTop = host.scrollHeight;
+    return true;
   }
 
   function addTool(name, detail) {
@@ -334,13 +350,24 @@
     await turn(text, "text");
   }
 
-  async function turn(text, source) {
+  /**
+   * One conversation turn for BOTH voice and text.
+   * opts.userAlreadyShown — voice path already painted the user bubble from transcript.
+   */
+  async function turn(text, source, opts) {
+    opts = opts || {};
     if (!text) return;
     var sid = await ensureSession();
     if (!sid) return;
-    addMsg("user", text);
+    if (!opts.userAlreadyShown) {
+      addMsg("user", text);
+    }
     state.thinking = true;
     setStatus("Thinking…", "think");
+    // While tools run, cancel any stray Realtime auto-speech so we stay one system
+    if (state.dc && state.dc.readyState === "open") {
+      try { state.dc.send(JSON.stringify({ type: "response.cancel" })); } catch (e) {}
+    }
     try {
       var r = await fetch(API.chat, {
         method: "POST",
@@ -363,10 +390,16 @@
       (d.tool_trace || []).forEach(function (t) {
         addTool(t.name, JSON.stringify(t.args || {}).slice(0, 80));
       });
+      // Run UI commands immediately (navigate has no confirm on server now)
       if (d.pending) showPending(d.pending);
       else showPending(null);
       var cmds = d.ui_commands || [];
       for (var i = 0; i < cmds.length; i++) await runCommand(cmds[i]);
+      // Also execute navigates that arrived as pending by mistake (legacy)
+      if (d.pending && d.pending.type === "navigate") {
+        await runCommand(Object.assign({}, d.pending, { needs_confirm: false }));
+        showPending(null);
+      }
       var reply = d.reply || "…";
       addMsg("agent", reply);
       if (reply !== _lastSpoken) {
@@ -412,9 +445,26 @@
       if (cmd.type === "navigate") {
         var hash = (cmd.args && cmd.args.hash) || "#dashboard";
         if (hash.charAt(0) !== "#") hash = "#" + hash;
+        // Normalize common aliases the model might say
+        var aliases = {
+          "#invoice": "#reports", "#invoices": "#reports", "#billing": "#reports",
+          "#offtaker": "#reports", "#offtakers": "#reports",
+          "#inverter": "#arrays", "#inverters": "#arrays",
+          "#fleet": "#dashboard", "#triage": "#dashboard",
+          "#master": "#account", "#settings": "#account",
+        };
+        var h = hash.toLowerCase();
+        if (aliases[h]) hash = aliases[h];
         location.hash = hash;
+        // Help sandbox router if it listens to hashchange
+        try {
+          window.dispatchEvent(new HashChangeEvent("hashchange"));
+        } catch (e) {
+          try { window.dispatchEvent(new Event("hashchange")); } catch (e2) {}
+        }
         ok = true;
         detail = { hash: hash };
+        addMsg("agent", "Opening " + hash + "…");
       } else if (cmd.type === "highlight") {
         ok = highlight(cmd.args && cmd.args.selector);
         detail = { selector: cmd.args && cmd.args.selector };
@@ -603,35 +653,28 @@
       state.speaking = false;
       if (state.listening) setStatus("Listening…", "listen");
     }
-    // User transcript (when available)
+    // User finished speaking — ONE path: show once, then agent turn (tools + speak)
     if (ev.type === "conversation.item.input_audio_transcription.completed") {
       var said = (ev.transcript || "").trim();
-      if (said) {
-        addMsg("user", said);
-        // Also run our tool brain (Grok/Claude) then speak the result via Realtime
-        turn(said, "voice");
-        if (state.sessionId) {
-          fetch(API.transcript, {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              session_id: state.sessionId,
-              lines: [{ role: "user", text: said }],
-              voice_seconds: Math.max(2, said.split(/\s+/).length * 0.4),
-            }),
-          }).catch(function () {});
-        }
+      if (!said || state.thinking) return;
+      // Cancel any default Realtime reply so we don't get dual conversations
+      try { state.dc && state.dc.send(JSON.stringify({ type: "response.cancel" })); } catch (e) {}
+      addMsg("user", said);
+      if (state.sessionId) {
+        fetch(API.transcript, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            lines: [{ role: "user", text: said }],
+            voice_seconds: Math.max(2, said.split(/\s+/).length * 0.4),
+          }),
+        }).catch(function () {});
       }
+      // userAlreadyShown: do not paint the same user line again in turn()
+      turn(said, "voice", { userAlreadyShown: true });
     }
-    // Assistant text transcript (for the chat panel)
-    if (ev.type === "response.output_audio_transcript.done" ||
-        ev.type === "response.audio_transcript.done") {
-      var tr = (ev.transcript || "").trim();
-      // Avoid double-adding if we already added from /chat reply
-      if (tr && !state.thinking) {
-        // only log if it looks like a pure voice turn
-      }
-    }
+    // Do NOT addMsg for assistant Realtime transcripts — agent bubble comes only from turn()
     if (ev.type === "error") {
       var msg = (ev.error && (ev.error.message || ev.error)) || "Realtime error";
       addMsg("agent", "Voice error: " + String(msg).slice(0, 200));
@@ -700,25 +743,29 @@
       try { handleRealtimeEvent(JSON.parse(e.data)); } catch (err) {}
     });
     dc.addEventListener("open", function () {
-      // Enable input transcription so we can run tools on what you said
+      // One system: Realtime = ears + mouth only. create_response false = we reply via /chat.
       dcSend({
         type: "session.update",
         session: {
           type: "realtime",
+          instructions:
+            "You are Energy Agent's voice. Only speak lines the app asks you to say via response.create. " +
+            "Do not invent your own answers to the user; the app handles reasoning and tools.",
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
+              turn_detection: { type: "server_vad", create_response: false },
             },
           },
         },
       });
-      // Greet the user in GPT voice
+      // Single greeting (voice only; panel already has intro text from ensureSession)
       dcSend({
         type: "response.create",
         response: {
           instructions:
-            "Greet the user briefly as Energy Agent. Say you're ready to help with their " +
-            "solar fleet, invoices, and earnings. One or two short sentences.",
+            "Greet the user briefly as Energy Agent in one short sentence. " +
+            "Say you're ready to help with their solar fleet and invoices.",
         },
       });
       setStatus("Listening (GPT Realtime)…", "listen");
