@@ -736,12 +736,14 @@ html.ea-merged #fsWrap{ display: none !important; }
    Desktop keeps the left dock. On phones the agent is a sun bubble that
    follows the user (position:fixed) and expands into a bottom chat sheet.
    Never shifts page content (no margin-left rail). ─────────────────────── */
-@media (max-width: 720px){
+/* ≤960 so Fold 5 open + large phones get the bubble (not a left rail that
+   squishes content). Desktop ≥961 keeps the dock. */
+@media (max-width: 960px){
   :root{
     --ea-rail: 0px;
     --ea-fab: 58px;
-    --ea-sheet-h: min(72vh, 580px);
-    --ea-bottom-clear: calc(68px + env(safe-area-inset-bottom, 0px));
+    --ea-sheet-h: min(68vh, 560px);
+    --ea-bottom-clear: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
   /* No content shift — bubble overlays, site stays full-width */
@@ -911,7 +913,22 @@ html.ea-merged #fsWrap{ display: none !important; }
 }
 
 /* Desktop: hide mobile-only FAB / backdrop */
-@media (min-width: 721px){
+@media (min-width: 961px){
   #eaFab{ display: none !important; }
   #eaBackdrop{ display: none !important; }
+}
+
+/* Fold open: slightly larger sheet, FAB clears floating dock insets */
+@media (min-width: 601px) and (max-width: 960px){
+  :root{
+    --ea-fab: 60px;
+    --ea-sheet-h: min(64vh, 600px);
+    --ea-bottom-clear: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+  #eaFab{ right: 22px; }
+  #eaPanel{
+    left: 18px;
+    right: 18px;
+    max-width: none;
+  }
 }

@@ -74,7 +74,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="trends.css"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260710a"><!-- Resources tab (in-app briefing); scoped to #panelResources -->
-<link rel="stylesheet" href="mobile.css?v=20260714mob5"><!-- phone overhaul; loaded LAST so it overrides every desktop sheet -->
+<link rel="stylesheet" href="mobile.css?v=20260714fold1"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
 <!-- SKY THEME — default-on (see the pre-paint script above). document.write keeps
      it parser-blocking (no FOUC) and positions it AFTER mobile.css so it is the
      final word in the cascade. Skipped only when the visitor opted out (?sky=0). -->
@@ -92,7 +92,7 @@ document.documentElement.setAttribute("data-theme","day");
    ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
    ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:3dppx)"]
   ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
-  ["theme-sky.css?v=20260713whoami","theme-sky-triage.css?v=20260713invgraph","theme-sky-reports.css?v=20260713mrate","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713anfc1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260714tables"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+  ["theme-sky.css?v=20260713whoami","theme-sky-triage.css?v=20260713invgraph","theme-sky-reports.css?v=20260713mrate","theme-sky-account.css?v=20260713glass1","theme-sky-analysis.css?v=20260713anfc1","theme-sky-trends.css?v=20260713glass1","theme-sky-resources.css?v=20260713glass2","theme-sky-mobile.css?v=20260714fold1"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
 <!-- (The scroll-parallax "descent" was removed 2026-07-13 — Ford: it magnified +
      softened the plate. The world is now a simple fixed cover background at
@@ -546,7 +546,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js"></script>
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
-<link rel="stylesheet" href="energy-agent.css?v=11">
+<link rel="stylesheet" href="energy-agent.css?v=12">
 <script src="energy-agent.js?v=10"></script>
 <script>
   /* Day/night toggle wiring — persists choice in localStorage (ao_theme) and
