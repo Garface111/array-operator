@@ -76,8 +76,13 @@
     var root = document.createElement("div");
     root.id = "eaRoot";
     root.innerHTML =
-      '<button type="button" id="eaOrb" aria-label="Open Energy Agent" title="Energy Agent">' +
+      '<button type="button" id="eaOrb" aria-label="Open Energy Agent" title="Energy Agent — click to talk">' +
       '<span class="ea-ring" aria-hidden="true"></span></button>' +
+      // Visible CTA — browsers only show the mic prompt after a real click
+      '<button type="button" id="eaMicGate" class="ea-mic-gate" hidden>' +
+      '  <span class="ea-mic-gate-ic" aria-hidden="true">🎙</span>' +
+      '  <span class="ea-mic-gate-txt">Allow microphone</span>' +
+      '</button>' +
       '<div id="eaPanel" role="dialog" aria-label="Energy Agent">' +
       '  <div class="ea-head">' +
       '    <div><h3>Energy Agent</h3>' +
@@ -99,13 +104,62 @@
       "</div>";
     document.body.appendChild(root);
 
-    document.getElementById("eaOrb").onclick = toggle;
+    document.getElementById("eaOrb").onclick = function (e) {
+      e.preventDefault();
+      toggle(); // async; mic requested first inside toggle (user gesture)
+    };
+    document.getElementById("eaMicGate").onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      requestMicFromClick();
+    };
     document.getElementById("eaClose").onclick = function () { setOpen(false); };
     document.getElementById("eaSend").onclick = sendText;
-    document.getElementById("eaMic").onclick = toggleMic;
+    document.getElementById("eaMic").onclick = function (e) {
+      e.preventDefault();
+      toggleMic();
+    };
     document.getElementById("eaInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
     });
+  }
+
+  function showMicGate(show, reason) {
+    var gate = document.getElementById("eaMicGate");
+    if (!gate) return;
+    if (show) {
+      gate.hidden = false;
+      var t = gate.querySelector(".ea-mic-gate-txt");
+      if (t) t.textContent = reason || "Allow microphone";
+    } else {
+      gate.hidden = true;
+    }
+  }
+
+  /** Must run from a click handler so Chrome shows the permission prompt. */
+  async function requestMicFromClick() {
+    try {
+      await ensureMicStream();
+      showMicGate(false);
+      setStatus("Mic allowed — opening agent…", "on");
+      // If panel closed, open it and connect voice
+      if (!state.open) await setOpen(true);
+      else if (!state.listening) await startVoice(true);
+      return true;
+    } catch (err) {
+      var name = (err && err.name) || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        showMicGate(true, "Mic blocked — click to retry");
+        setStatus("Mic blocked", "warn");
+        addMsg("agent",
+          "Chrome blocked the mic. Click the lock/tune icon in the address bar → " +
+          "Microphone → Allow, then click “Allow microphone” again.");
+      } else {
+        showMicGate(true, "Mic error — retry");
+        addMsg("agent", "Mic error: " + ((err && err.message) || err));
+      }
+      return false;
+    }
   }
 
   function setStatus(text, mode) {
@@ -213,7 +267,30 @@
 
   async function toggle() {
     ensureUi();
-    setOpen(!state.open);
+    if (!state.open) {
+      // CRITICAL: getUserMedia must run in the click stack (no setTimeout).
+      // Chrome will not show a mic prompt from a delayed callback.
+      if (signedIn()) {
+        try {
+          await ensureMicStream();
+          showMicGate(false);
+        } catch (err) {
+          var name = (err && err.name) || "";
+          showMicGate(true, name === "NotAllowedError" || name === "PermissionDeniedError"
+            ? "Mic blocked — click to allow"
+            : "Allow microphone");
+          // Still open the panel so they can type / retry
+          await setOpen(true);
+          addMsg("agent",
+            "I need microphone access to talk. Click “Allow microphone” " +
+            "(or the Mic button) — Chrome only shows the prompt after you click.");
+          return;
+        }
+      }
+      await setOpen(true);
+    } else {
+      await setOpen(false);
+    }
   }
 
   async function setOpen(o) {
@@ -225,12 +302,12 @@
     if (orb) orb.classList.toggle("open", state.open);
     if (state.open) {
       await ensureSession();
-      // Always-on voice when panel opens
+      // Voice start — mic stream should already exist from the click path
       if (signedIn() && !state.listening) {
-        setTimeout(function () { startVoice(true); }, 300);
+        await startVoice(true);
       }
     } else {
-      stopVoice();
+      stopVoice(true); // keep mic permission stream; just tear down WebRTC
     }
   }
 
@@ -418,12 +495,12 @@
     }
   }
 
-  function stopVoice() {
+  function stopVoice(keepMic) {
     state.listening = false;
     state.speaking = false;
     // WebRTC
     try {
-      if (state.dc) { state.dc.close(); } 
+      if (state.dc) { state.dc.close(); }
     } catch (e) {}
     state.dc = null;
     try {
@@ -431,8 +508,13 @@
     } catch (e) {}
     state.pc = null;
     if (state.micStream) {
-      try { state.micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
-      state.micStream = null;
+      if (keepMic) {
+        // Stay permitted; mute until next listen
+        try { state.micStream.getTracks().forEach(function (t) { t.enabled = false; }); } catch (e) {}
+      } else {
+        try { state.micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        state.micStream = null;
+      }
     }
     if (state.audioEl) {
       try { state.audioEl.pause(); state.audioEl.srcObject = null; } catch (e) {}

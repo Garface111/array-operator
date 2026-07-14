@@ -1,7 +1,6 @@
 /* Energy Agent — sky-themed voice orb + panel (2026-07-13) */
 /* Top-RIGHT — clears Alerts (bottom-right) and the wish pill / other bottom chrome.
-   Root is only as wide as the orb; panel anchors to its bottom-right and grows
-   down + left into the page. */
+   Root sizes to orb; panel + mic-gate position absolutely from it. */
 #eaRoot{
   position:fixed; top:72px; right:18px; left:auto; bottom:auto; z-index:99980;
   width:58px; height:58px;
@@ -9,6 +8,28 @@
   --ea-sky:#38bdf8; --ea-sky2:#0ea5e9; --ea-sun:#fbbf24; --ea-glow:rgba(56,189,248,.45);
 }
 #eaRoot *{box-sizing:border-box;}
+
+/* Click-to-allow mic chip (browsers require a user gesture for the prompt) */
+.ea-mic-gate{
+  position:absolute; top:0; right:66px; white-space:nowrap;
+  display:inline-flex; align-items:center; gap:7px;
+  padding:10px 14px; border-radius:999px; border:1px solid rgba(14,165,233,.35);
+  background:linear-gradient(180deg, #fff, #e0f2fe);
+  color:#0c4a6e; font:inherit; font-size:12.5px; font-weight:740;
+  cursor:pointer; box-shadow:0 10px 28px -12px rgba(14,165,233,.55);
+  animation:eaGatePulse 1.8s ease-in-out infinite;
+}
+.ea-mic-gate[hidden]{display:none !important;}
+.ea-mic-gate:hover{transform:translateY(-1px); border-color:rgba(14,165,233,.55);}
+.ea-mic-gate-ic{font-size:14px; line-height:1;}
+@keyframes eaGatePulse{
+  0%,100%{box-shadow:0 10px 28px -12px rgba(14,165,233,.45), 0 0 0 0 rgba(56,189,248,.25);}
+  50%{box-shadow:0 12px 32px -10px rgba(14,165,233,.7), 0 0 0 6px rgba(56,189,248,.12);}
+}
+html:not(.sky) .ea-mic-gate{
+  background:linear-gradient(180deg, var(--card,#111827), var(--card2,#0b1220));
+  color:var(--ink,#e5e7eb); border-color:rgba(56,189,248,.35);
+}
 
 /* orb */
 #eaOrb{
@@ -35,11 +56,17 @@
 }
 #eaOrb.open .ea-ring{opacity:1;}
 
-/* panel */
+/* panel: opens DOWN and to the LEFT from the orb (anchor = top-right of panel) */
 #eaPanel{
-  display:none; position:absolute; right:0; left:auto; top:66px; bottom:auto;
-  width:min(380px, calc(100vw - 28px));
-  max-height:min(560px, calc(100vh - 100px));
+  display:none;
+  position:absolute;
+  top:calc(100% + 10px);  /* fully below the orb */
+  right:0;                /* align to orb's right edge → grows left */
+  left:auto;
+  bottom:auto;
+  width:min(380px, calc(100vw - 36px));
+  max-height:min(560px, calc(100vh - 150px));
+  transform-origin:top right;
   background:linear-gradient(168deg, rgba(255,255,255,.97), rgba(240,249,255,.96));
   border:1px solid rgba(14,165,233,.22);
   border-radius:18px;
@@ -152,5 +179,10 @@ html:not(.sky) .ea-compose textarea{background:var(--bg2,#0b1220); border-color:
 
 @media (max-width:520px){
   #eaRoot{top:64px; right:10px; left:auto; bottom:auto;}
-  #eaPanel{width:calc(100vw - 20px); max-height:min(520px, calc(100vh - 90px));}
+  .ea-mic-gate{right:auto; left:0; top:66px; max-width:calc(100vw - 24px);}
+  #eaPanel{
+    width:min(380px, calc(100vw - 20px));
+    max-height:min(520px, calc(100vh - 120px));
+    right:0; left:auto; top:calc(100% + 8px);
+  }
 }
