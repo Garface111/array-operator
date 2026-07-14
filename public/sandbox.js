@@ -3429,13 +3429,15 @@
 
   // ── Inverter alerts — a floating bottom-left widget (Ford 2026-07-10 redesign) ──
   // A persistent bell FAB that opens a light, powerful control panel: recipient(s),
-  // what we watch, sensitivity + patience (presets + fine slider), a live plain-English
+  // what we watch, sensitivity + frequency (presets + fine slider), a live plain-English
   // preview, and a real "send test alert". Persists to /v1/array-owners/alert-settings;
   // the test button hits …/alert-settings/test. Replaces the old dark centered modal.
   const AL_API = "/v1/array-owners/alert-settings";
   const AL_BELL = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>`;
   const AL_SENS = [["Relaxed", 35], ["Balanced", 50], ["Sensitive", 70]];
-  const AL_PAT  = [["Fast", 2], ["Normal", 12], ["Patient", 24]];
+  // Frequency = how soon we alert after a sustained issue (grace hours).
+  // High frequency = alert sooner; rare = wait longer through weather/blips.
+  const AL_PAT  = [["Often", 2], ["Normal", 12], ["Rare", 24]];
   let _alPanelOpen = false;
 
   // The MONITORING-card / head "Alerts" button opens the same panel.
@@ -3516,7 +3518,7 @@
           <input type="range" id="aoAlThresh" class="ao-al-range" min="10" max="95" step="5" value="50">
         </div>
         <div class="ao-al-sec">
-          <div class="ao-al-lbl">Patience <span class="ao-al-lbl-v">wait <b id="aoAlGraceV">12h</b> · ignore passing clouds</span></div>
+          <div class="ao-al-lbl">Frequency <span class="ao-al-lbl-v">every <b id="aoAlGraceV">12h</b> · ignore passing clouds</span></div>
           <div class="ao-al-seg-row" id="aoAlPatSeg">${seg(AL_PAT, 12, "h")}</div>
           <input type="range" id="aoAlGrace" class="ao-al-range" min="0" max="48" step="1" value="12">
         </div>
@@ -3554,6 +3556,7 @@
         $("#aoAlPreview").innerHTML =
           `We’ll email <b>${esc(rec)}</b> <b>${gr}</b> when an inverter drops below <b>${thresh.value}%</b> of its neighbors — and stays there.`;
       }
+      // (Frequency label is the grace window: higher frequency = shorter wait.)
       panel.classList.toggle("off", !enabled.checked);
       $("#aoAlStatus").textContent = !enabled.checked
         ? "Off — no alerts sent"

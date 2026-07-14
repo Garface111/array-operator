@@ -622,14 +622,16 @@
   .ao-al-fab-dot{width:8px;height:8px;border-radius:50%;background:var(--al-faint);flex:none;
     box-shadow:0 0 0 3px rgba(148,163,184,.16)}
   .ao-al-fab-dot.on{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+  /* Grow to content height — no internal scrollbar (Ford 2026-07-14).
+     Cap only as a last resort on very short viewports so it can't go off-screen. */
   .ao-al-panel{position:fixed;right:20px;bottom:72px;z-index:9002;width:min(372px,calc(100vw - 40px));
-    max-height:min(78vh,720px);display:flex;flex-direction:column;border-radius:18px;overflow:hidden;
+    max-height:none;height:auto;display:flex;flex-direction:column;border-radius:18px;overflow:visible;
     background:var(--al-card);border:1px solid var(--al-line);color:var(--al-ink);
     box-shadow:0 28px 70px -22px rgba(15,23,42,.42),0 2px 6px rgba(15,23,42,.08);
     animation:aoAlUp .16s cubic-bezier(.2,.8,.2,1)}
   @keyframes aoAlUp{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
   .ao-al-head{display:flex;align-items:center;gap:11px;padding:15px 16px 13px;border-bottom:1px solid var(--al-line);
-    background:linear-gradient(180deg,#f7f9fc,#fff)}
+    background:linear-gradient(180deg,#f7f9fc,#fff);border-radius:18px 18px 0 0;flex:0 0 auto}
   .ao-al-h-ic{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;
     border-radius:10px;background:rgba(37,99,235,.1);color:var(--al-blue)}
   .ao-al-h-tt{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
@@ -646,7 +648,9 @@
   .ao-al-switch input:checked + .ao-al-track{background:var(--al-blue)}
   .ao-al-switch input:checked + .ao-al-track::after{transform:translateX(16px)}
   .ao-al-switch input:focus-visible + .ao-al-track{box-shadow:0 0 0 3px rgba(37,99,235,.35)}
-  .ao-al-body{padding:15px 16px 4px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+  /* No scroll — body grows with content so the whole card is visible at once */
+  .ao-al-body{padding:15px 16px 8px;overflow:visible;flex:0 0 auto;display:flex;flex-direction:column;gap:16px}
+  .ao-al-foot{flex:0 0 auto;border-radius:0 0 18px 18px}
   .ao-al-panel.off .ao-al-body{opacity:.5;pointer-events:none;filter:saturate(.8)}
   .ao-al-panel.off .ao-al-sec:first-child{opacity:1;pointer-events:auto;filter:none}
   .ao-al-sec{display:flex;flex-direction:column;gap:9px}
@@ -700,7 +704,8 @@
   .ao-al-preview b{color:var(--al-ink);font-weight:750}
   .ao-al-note{font-size:12px;color:#b45309;min-height:1px}
   .ao-al-note a{color:var(--al-blue)}
-  .ao-al-foot{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--al-line);background:#fbfcfe}
+  .ao-al-foot{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--al-line);
+    background:#fbfcfe;flex:0 0 auto;border-radius:0 0 18px 18px;overflow:visible}
   .ao-al-test{font:inherit;font-size:12.5px;font-weight:700;color:var(--al-blue);background:none;border:0;cursor:pointer;padding:6px 2px}
   .ao-al-test:hover{text-decoration:underline}
   .ao-al-test:disabled{color:var(--al-faint);cursor:default;text-decoration:none}
