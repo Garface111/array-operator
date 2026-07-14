@@ -43,18 +43,19 @@
       rail: "Auto-refresh",
       railSub: "The hands-off switch",
       kicker: "Step 2 of 4 · Capture",
-      title: "Turn on 24/7 auto-refresh",
+      title: "Save a portal login here",
       lede:
-        "This is the difference between “I have an account” and “it runs without me.” Choose <b>Store it with us</b> so passwords stay encrypted on our servers and we harvest around the clock.",
+        "This is the hands-off switch. Drop a monitoring login below — we store it encrypted and refresh your data around the clock. No hunting through Account.",
       kind: "step",
+      loginForm: "inverter",
       bullets: [
-        "Account → <b>Auto-refresh</b> → <b>Store it with us — live data</b>.",
-        "Save logins for every inverter portal and utility you use (GMP, co-ops, etc.).",
-        "Prefer passwords only on your PC? Device mode works — but needs a browser open. Cloud is true hands-off.",
+        "Add every inverter portal you use (Chint, Fronius, SMA…). SolarEdge can use an API key later in Account if you prefer.",
+        "We switch you to <b>Store it with us</b> automatically when you save here.",
+        "You can add more logins anytime from Account → Auto-refresh — or right here.",
       ],
       callout:
-        "<b>Hands-off rule:</b> if a login isn’t saved here, that feed only updates when someone opens the portal manually.",
-      cta: { label: "Set up Auto-refresh →", hash: "#account", openAr: true },
+        "<b>Hands-off rule:</b> if a login isn’t saved, that feed only updates when someone opens the portal manually.",
+      cta: { label: "Open full Auto-refresh →", hash: "#account", openAr: true },
       statusKey: "autorefresh",
     },
     {
@@ -62,14 +63,15 @@
       rail: "Utility bills",
       railSub: "Invoice source of truth",
       kicker: "Step 3 of 4 · Settlement",
-      title: "Link utility bills",
+      title: "Save your utility login",
       lede:
-        "Offtaker invoices are priced from utility paper bills — never from inverter guesswork. Connect GMP (or your co-op) so periods settle automatically.",
+        "Offtaker invoices use utility bills as source of truth. Save GMP or your co-op login here so bills keep landing without a portal tab.",
       kind: "step",
+      loginForm: "utility",
       bullets: [
-        "Same Auto-refresh vault: add your utility portal login under cloud capture.",
-        "Or use <b>Link utility bills</b> from the Invoices toolbar.",
-        "You’ll see “✓ N bill sources” when bills are flowing — that’s the green light for invoicing.",
+        "Green Mountain Power, Vermont Electric Co-op, Washington Electric, and other live SmartHub utilities work here.",
+        "After the first successful harvest you’ll see bill sources on Invoices.",
+        "Need a utility we don’t list? Tell us from Account — we’ll wire it.",
       ],
       cta: { label: "Open Invoices →", hash: "#reports" },
       statusKey: "utility",
@@ -485,11 +487,13 @@
     }
     var main = root.querySelector(".ho-main");
     if (main) {
+      var formSnap = snapshotLoginForm(main);
       var step = STEPS[state.idx] || STEPS[0];
       main.innerHTML =
         '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
         renderBody(step, live);
       wireActions(main);
+      restoreLoginForm(main, formSnap);
     }
     updatePill();
   }
@@ -618,6 +622,159 @@
     );
   }
 
+  var INVERTER_OPTS = [
+    { id: "chint", label: "Chint / CPS", ph: "Chint username / email" },
+    { id: "fronius", label: "Fronius (Solar.web)", ph: "Solar.web username / email" },
+    { id: "sma", label: "SMA (Sunny Portal)", ph: "Sunny Portal username / email" },
+    { id: "solaredge", label: "SolarEdge portal", ph: "Monitoring username / email" },
+  ];
+  var UTILITY_OPTS = [
+    { id: "gmp", label: "Green Mountain Power", ph: "GMP username / email", host: "" },
+    // SmartHub co-ops need login_host (backend rejects without it)
+    {
+      id: "vec",
+      label: "Vermont Electric Co-op",
+      ph: "VEC SmartHub email",
+      host: "vermontelectric.smarthub.coop",
+    },
+    {
+      id: "wec",
+      label: "Washington Electric Co-op",
+      ph: "WEC SmartHub email",
+      host: "washingtonelectric.smarthub.coop",
+    },
+  ];
+  var INVERTER_PENDING = { chint: 1, fronius: 1, sma: 1, solaredge: 1, locus: 1, alsoenergy: 1 };
+
+  /** Keep typed credentials across softUpdate re-renders (probe every ~1.2s). */
+  function snapshotLoginForm(main) {
+    var box = main && main.querySelector("[data-ho-login]");
+    if (!box) return null;
+    var active = document.activeElement;
+    var focus = null;
+    if (active && box.contains(active)) {
+      if (active.classList.contains("ho-login-provider")) focus = "provider";
+      else if (active.classList.contains("ho-login-user")) focus = "user";
+      else if (active.classList.contains("ho-login-pass")) focus = "pass";
+      else if (active.classList.contains("ho-login-consent-chk")) focus = "consent";
+    }
+    var sel = box.querySelector(".ho-login-provider");
+    var userEl = box.querySelector(".ho-login-user");
+    var passEl = box.querySelector(".ho-login-pass");
+    var consent = box.querySelector(".ho-login-consent-chk");
+    var msg = box.querySelector(".ho-login-msg");
+    var btn = box.querySelector(".ho-login-save");
+    var selStart = null;
+    var selEnd = null;
+    if (active && (active === userEl || active === passEl) && typeof active.selectionStart === "number") {
+      selStart = active.selectionStart;
+      selEnd = active.selectionEnd;
+    }
+    return {
+      provider: (sel && sel.value) || "",
+      user: (userEl && userEl.value) || "",
+      pass: (passEl && passEl.value) || "",
+      consent: !!(consent && consent.checked),
+      msg: (msg && msg.textContent) || "",
+      msgClass: (msg && msg.className) || "ho-login-msg",
+      btnText: (btn && btn.textContent) || "",
+      btnDisabled: !!(btn && btn.disabled),
+      focus: focus,
+      selStart: selStart,
+      selEnd: selEnd,
+    };
+  }
+
+  function restoreLoginForm(main, snap) {
+    if (!snap || !main) return;
+    var box = main.querySelector("[data-ho-login]");
+    if (!box) return;
+    var sel = box.querySelector(".ho-login-provider");
+    var userEl = box.querySelector(".ho-login-user");
+    var passEl = box.querySelector(".ho-login-pass");
+    var consent = box.querySelector(".ho-login-consent-chk");
+    var msg = box.querySelector(".ho-login-msg");
+    var btn = box.querySelector(".ho-login-save");
+    if (sel && snap.provider) {
+      sel.value = snap.provider;
+      var opt = sel.options[sel.selectedIndex];
+      var ph = opt && opt.getAttribute("data-ph");
+      if (ph && userEl) userEl.placeholder = ph;
+    }
+    if (userEl) userEl.value = snap.user || "";
+    if (passEl) passEl.value = snap.pass || "";
+    if (consent) consent.checked = !!snap.consent;
+    if (msg) {
+      msg.textContent = snap.msg || "";
+      msg.className = snap.msgClass || "ho-login-msg";
+    }
+    if (btn) {
+      if (snap.btnText) btn.textContent = snap.btnText;
+      btn.disabled = !!snap.btnDisabled;
+    }
+    var focusEl = null;
+    if (snap.focus === "provider") focusEl = sel;
+    else if (snap.focus === "user") focusEl = userEl;
+    else if (snap.focus === "pass") focusEl = passEl;
+    else if (snap.focus === "consent") focusEl = consent;
+    if (focusEl) {
+      try {
+        focusEl.focus();
+        if (
+          (focusEl === userEl || focusEl === passEl) &&
+          snap.selStart != null &&
+          typeof focusEl.setSelectionRange === "function"
+        ) {
+          focusEl.setSelectionRange(snap.selStart, snap.selEnd != null ? snap.selEnd : snap.selStart);
+        }
+      } catch (e) {}
+    }
+  }
+
+  function loginFormHtml(kind) {
+    var opts = kind === "utility" ? UTILITY_OPTS : INVERTER_OPTS;
+    var options = opts
+      .map(function (o) {
+        return '<option value="' + esc(o.id) + '" data-ph="' + esc(o.ph) + '">' + esc(o.label) + "</option>";
+      })
+      .join("");
+    var title =
+      kind === "utility" ? "Add a utility login" : "Add a monitoring login";
+    var sub =
+      kind === "utility"
+        ? "Encrypted on our servers · powers automatic offtaker invoices"
+        : "Encrypted on our servers · keeps production fresh 24/7";
+    return (
+      '<div class="ho-login" data-ho-login="' +
+      esc(kind) +
+      '">' +
+      '<div class="ho-login-hd"><b>' +
+      esc(title) +
+      "</b><span>" +
+      esc(sub) +
+      "</span></div>" +
+      '<label class="ho-login-field"><span>Portal</span>' +
+      '<select class="ho-login-provider" aria-label="Portal">' +
+      options +
+      "</select></label>" +
+      '<label class="ho-login-field"><span>Username / email</span>' +
+      '<input type="text" class="ho-login-user" autocomplete="username" spellcheck="false" placeholder="' +
+      esc(opts[0].ph) +
+      '"></label>' +
+      '<label class="ho-login-field"><span>Password</span>' +
+      '<input type="password" class="ho-login-pass" autocomplete="current-password" placeholder="Portal password"></label>' +
+      '<label class="ho-login-consent">' +
+      '<input type="checkbox" class="ho-login-consent-chk">' +
+      "<span>I authorize Array Operator to store this login encrypted and sign in on my behalf to keep my data fresh.</span></label>" +
+      '<div class="ho-login-actions">' +
+      '<button type="button" class="ho-btn ho-btn-primary ho-login-save">Save login →</button>' +
+      '<span class="ho-login-msg" aria-live="polite"></span>' +
+      "</div>" +
+      '<p class="ho-login-foot">Prefer device-only storage? Use Account → Auto-refresh → <b>Keep it on my computer</b> after you finish here.</p>' +
+      "</div>"
+    );
+  }
+
   function renderBody(step, live) {
     var html = "";
     html +=
@@ -641,6 +798,10 @@
 
     if (step.kind === "step") {
       html += statusChips(step, live);
+      // Inline vault form first on login steps — highest-friction thing to remove
+      if (step.loginForm) {
+        html += loginFormHtml(step.loginForm);
+      }
       if (step.bullets && step.bullets.length) {
         html +=
           '<ul class="ho-bullets">' +
@@ -656,7 +817,7 @@
       }
       if (stepComplete(step, live)) {
         html +=
-          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)"><b>Looks good on this step.</b> You can still review the screen, or continue.</div>';
+          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)"><b>Looks good on this step.</b> You can still add another login above, or continue.</div>';
       }
     }
 
@@ -787,7 +948,169 @@
     if (pill) pill.classList.remove("ho-pill-show");
   }
 
+  async function ensureCloudMode() {
+    try {
+      localStorage.setItem("ao_ar_mode", "cloud");
+    } catch (e) {}
+    var h = authHeaders();
+    if (!h.Authorization) return;
+    try {
+      await fetch("/v1/account/capture-mode", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, h),
+        body: JSON.stringify({ mode: "cloud" }),
+      });
+    } catch (e) {}
+  }
+
+  function loginHostFor(provider, kind) {
+    var opts = kind === "utility" ? UTILITY_OPTS : INVERTER_OPTS;
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].id === provider) return opts[i].host || "";
+    }
+    return "";
+  }
+
+  async function saveLoginFromForm(box) {
+    var kind = (box.getAttribute("data-ho-login") || "").trim();
+    var sel = box.querySelector(".ho-login-provider");
+    var userEl = box.querySelector(".ho-login-user");
+    var passEl = box.querySelector(".ho-login-pass");
+    var consent = box.querySelector(".ho-login-consent-chk");
+    var msg = box.querySelector(".ho-login-msg");
+    var btn = box.querySelector(".ho-login-save");
+    var provider = (sel && sel.value) || "";
+    var user = (userEl && userEl.value) || "";
+    user = user.trim();
+    var pass = (passEl && passEl.value) || "";
+    var label =
+      (sel && sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) ||
+      provider;
+    var loginHost = loginHostFor(provider, kind);
+
+    function setMsg(t, ok) {
+      if (!msg) return;
+      msg.textContent = t || "";
+      msg.className = "ho-login-msg" + (ok === true ? " is-ok" : ok === false ? " is-err" : "");
+    }
+
+    if (!provider) {
+      setMsg("Pick a portal.", false);
+      return;
+    }
+    if (!user || !pass) {
+      setMsg("Enter username and password.", false);
+      return;
+    }
+    if (!consent || !consent.checked) {
+      setMsg("Tick the authorization box first.", false);
+      return;
+    }
+    if (!session()) {
+      setMsg("Sign in to your account first.", false);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    setMsg("");
+    await ensureCloudMode();
+    try {
+      var body = {
+        provider: provider,
+        username: user,
+        password: pass,
+        enable: true,
+        consent: true,
+      };
+      if (loginHost) body.login_host = loginHost;
+      var r = await fetch("/v1/cloud-capture/credentials", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify(body),
+      });
+      var d = {};
+      try {
+        d = await r.json();
+      } catch (e) {}
+      if (!r.ok) {
+        var detail =
+          (typeof d.detail === "string" && d.detail) ||
+          (r.status === 403 ? "Cloud capture not enabled yet" : "Couldn't save — try again");
+        setMsg(detail.slice(0, 80), false);
+        btn.disabled = false;
+        btn.textContent = "Save login →";
+        return;
+      }
+      if (passEl) passEl.value = "";
+      setMsg("✓ Saved — we’ll refresh this feed automatically.", true);
+      btn.textContent = "✓ Saved";
+      // Connecting… skeletons only for inverter portals (utility harvest is quieter)
+      try {
+        if (INVERTER_PENDING[provider] && window.__aoPendingFeeds) {
+          window.__aoPendingFeeds.mark(provider, {
+            label: label,
+            note: "saved from hands-off setup",
+          });
+        }
+      } catch (e) {}
+      try {
+        window.dispatchEvent(new Event("ao:vault-changed"));
+      } catch (e) {}
+      // Refresh live chips without full remount thrash
+      setTimeout(function () {
+        probeLive().then(function () {
+          softUpdate();
+          // softUpdate rewires the button — find it again and set "Save another"
+          var root = document.getElementById("hoTour");
+          var newBtn = root && root.querySelector(".ho-login-save");
+          if (newBtn) {
+            newBtn.disabled = false;
+            newBtn.textContent = "Save another →";
+          }
+        });
+      }, 600);
+    } catch (e) {
+      setMsg("Network error — try again.", false);
+      btn.disabled = false;
+      btn.textContent = "Save login →";
+    }
+  }
+
+  function wireLoginForms(scope) {
+    (scope || document).querySelectorAll("[data-ho-login]").forEach(function (box) {
+      if (box._hoLoginWired) return;
+      box._hoLoginWired = true;
+      var sel = box.querySelector(".ho-login-provider");
+      var userEl = box.querySelector(".ho-login-user");
+      if (sel && userEl) {
+        sel.addEventListener("change", function () {
+          var opt = sel.options[sel.selectedIndex];
+          var ph = opt && opt.getAttribute("data-ph");
+          if (ph) userEl.placeholder = ph;
+        });
+      }
+      var save = box.querySelector(".ho-login-save");
+      if (save) {
+        save.addEventListener("click", function () {
+          saveLoginFromForm(box);
+        });
+      }
+      // Enter in password field submits
+      var pass = box.querySelector(".ho-login-pass");
+      if (pass) {
+        pass.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            saveLoginFromForm(box);
+          }
+        });
+      }
+    });
+  }
+
   function wireActions(scope) {
+    wireLoginForms(scope);
     (scope || document).querySelectorAll("[data-ho]").forEach(function (btn) {
       if (btn._hoWired) return;
       btn._hoWired = true;
