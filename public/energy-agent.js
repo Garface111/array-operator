@@ -56,6 +56,9 @@
     voiceMuted: (function () {
       try { return localStorage.getItem("ea_voice_muted") === "1"; } catch (e) { return false; }
     })(),
+    // Bumped on every stopVoice/mute so in-flight WebRTC connects abort quietly
+    // instead of dumping "signalingState is closed" chat bubbles (Ford 2026-07-14).
+    _voiceConnectGen: 0,
   };
 
   function token() {
@@ -2018,6 +2021,8 @@
     state.listening = false;
     state.speaking = false;
     state.rtResponseActive = false;
+    // Invalidate any in-flight startRealtimeVoice (mute toggle race)
+    state._voiceConnectGen = (state._voiceConnectGen || 0) + 1;
     // Abort any waiting speak queue callbacks
     var cb = state._onSpeakDone;
     state._onSpeakDone = null;
@@ -2441,6 +2446,10 @@
   // Avoid double-adding chat reply when Realtime is also speaking
   var _lastSpoken = "";
 
+  function _voiceConnectStale(gen) {
+    return !!state.voiceMuted || gen !== state._voiceConnectGen;
+  }
+
   /** Primary: GPT Realtime over WebRTC via our server (unified /realtime-call). */
   async function startRealtimeVoice() {
     if (state.voiceMuted) {
@@ -2456,8 +2465,12 @@
       return;
     }
 
+    // Generation token: if mute/stopVoice runs mid-connect, we abort quietly
+    // instead of setRemoteDescription on a closed PC + chat spam.
+    var gen = state._voiceConnectGen;
     setStatus("Connecting GPT voice…", "think");
     var stream = await ensureMicStream();
+    if (_voiceConnectStale(gen)) throw new Error("voice_muted");
     try { stream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
 
     // Tear down prior peer connection but KEEP the mic stream (permission)
@@ -2470,8 +2483,10 @@
       try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
       state.recog = null;
     }
+    if (_voiceConnectStale(gen)) throw new Error("voice_muted");
 
     stream = await ensureMicStream();
+    if (_voiceConnectStale(gen)) throw new Error("voice_muted");
     try { stream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
 
     var pc = new RTCPeerConnection();
@@ -2536,7 +2551,15 @@
     });
 
     var offer = await pc.createOffer();
+    if (_voiceConnectStale(gen) || state.pc !== pc) {
+      try { pc.close(); } catch (e) {}
+      throw new Error("voice_muted");
+    }
     await pc.setLocalDescription(offer);
+    if (_voiceConnectStale(gen) || state.pc !== pc) {
+      try { pc.close(); } catch (e) {}
+      throw new Error("voice_muted");
+    }
 
     var sdpRes = await fetch(API.realtimeCall, {
       method: "POST",
@@ -2546,6 +2569,10 @@
       },
       body: offer.sdp,
     });
+    if (_voiceConnectStale(gen) || state.pc !== pc) {
+      try { pc.close(); } catch (e) {}
+      throw new Error("voice_muted");
+    }
     if (!sdpRes.ok) {
       var errText = await sdpRes.text();
       var detail = errText;
@@ -2553,7 +2580,17 @@
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
     var answerSdp = await sdpRes.text();
+    if (_voiceConnectStale(gen) || state.pc !== pc) {
+      try { pc.close(); } catch (e) {}
+      throw new Error("voice_muted");
+    }
+    // Guard closed PC (mute mid-fetch) — never surface this as a chat bubble
+    if (pc.signalingState === "closed") throw new Error("voice_muted");
     await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+    if (_voiceConnectStale(gen) || state.pc !== pc) {
+      try { pc.close(); } catch (e) {}
+      throw new Error("voice_muted");
+    }
 
     state.listening = true;
     state.voiceMode = "realtime";
@@ -2622,9 +2659,9 @@
       state.voiceMode = "webspeech";
       syncMicBtn();
       setStatus("Listening (browser fallback)…", "listen");
-      addMsg("agent", "Using browser speech (fallback). For real GPT voice, set OPENAI_API_KEY on Railway.");
+      // No chat bubble — status pill is enough (Ford: mute toggle dump confused owners)
     } catch (e) {
-      addMsg("agent", "Couldn't start the mic: " + (e.message || e));
+      setStatus("Mic error", "warn");
     }
   }
 
@@ -2648,7 +2685,7 @@
         addMsg("agent", "Microphone permission denied. In Chrome: address bar lock → Site settings → Microphone → Allow, then click Mic.");
         setStatus("Mic blocked", "warn");
       } else {
-        addMsg("agent", "Mic error: " + (err.message || err));
+        // Status only — avoid technical error bubbles on mute/reconnect races
         setStatus("Mic error", "warn");
       }
       return;
@@ -2664,10 +2701,25 @@
         setStatus("Text only — voice off", "on");
         return;
       }
+      // Transient WebRTC race (mute mid-connect, closed PC) — quiet status + one retry
+      if (/signalingState|closed|InvalidStateError|AbortError/i.test(msg) && state.open && !state.voiceMuted) {
+        setStatus("Reconnecting voice…", "think");
+        try {
+          await startRealtimeVoice();
+          return;
+        } catch (e2) {
+          var msg2 = String(e2.message || e2);
+          if (state.voiceMuted || /voice_muted/i.test(msg2)) {
+            setStatus("Text only — voice off", "on");
+            return;
+          }
+        }
+      }
+      // Never dump stack/API messages into the chat — status line only
       if (/not configured|OPENAI_API_KEY|503/i.test(msg)) {
-        addMsg("agent", "GPT voice isn’t configured yet (need OPENAI_API_KEY on Railway). Falling back to browser speech.");
+        setStatus("Voice unavailable — type instead", "warn");
       } else {
-        addMsg("agent", "GPT voice connect failed: " + msg.slice(0, 180) + " — using browser fallback.");
+        setStatus("Using browser speech…", "listen");
       }
       if (state.voiceMuted) return;
       startWebSpeechFallback(fromOpen);
