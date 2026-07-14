@@ -19,70 +19,85 @@
   --ho-r:28px;
 }
 
-/* ── bottom-left pill (Stripe-style resume) ──────────────────────────────── */
+/* ── bottom-left FAB (matches Alerts pill language; always re-openable) ─────
+   Desktop: left corner (Alerts sits bottom-right). Mobile: stacked ABOVE the
+   Alerts FAB so both stay tappable above the bottom nav. Hides while the tour
+   is open; close → pill returns (Ford 2026-07-14). */
 #hoPill{
   position:fixed;
-  left:18px;
-  bottom:max(18px, env(safe-area-inset-bottom));
-  z-index:99960;
+  left:20px;
+  bottom:20px;
+  z-index:9001; /* same band as .ao-al-fab */
   display:none;
   align-items:center;
-  gap:10px;
-  padding:11px 16px 11px 12px;
-  border-radius:999px;
-  border:1px solid rgba(33,150,243,.28);
-  background:linear-gradient(180deg, rgba(255,255,255,.94), rgba(232,245,255,.92));
+  gap:8px;
+  padding:10px 15px 10px 12px;
+  border-radius:24px;
+  border:1px solid rgba(33,150,243,.32);
+  background:#fff;
   box-shadow:
-    0 10px 32px -12px rgba(15,50,110,.4),
-    0 0 0 1px rgba(255,255,255,.5) inset;
+    0 6px 22px -8px rgba(15,23,42,.28),
+    0 1px 2px rgba(15,23,42,.06);
   font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   font-size:13px;
-  font-weight:720;
+  font-weight:700;
   color:var(--ho-ink);
   cursor:pointer;
   -webkit-font-smoothing:antialiased;
-  transition:transform .15s, box-shadow .15s, left .22s ease;
-  max-width:min(320px, calc(100vw - 36px));
+  transition:transform .14s ease, box-shadow .14s ease, left .22s ease, bottom .22s ease;
+  max-width:min(280px, calc(100vw - 40px));
 }
 #hoPill.ho-pill-show{ display:inline-flex; }
 #hoPill:hover{
   transform:translateY(-2px);
-  box-shadow:0 14px 36px -12px rgba(15,50,110,.48);
+  box-shadow:0 12px 30px -10px rgba(15,23,42,.34), 0 2px 4px rgba(15,23,42,.08);
+  border-color:rgba(33,150,243,.5);
 }
 #hoPill:active{ transform:translateY(0) }
 #hoPill .ho-pill-badge{
-  min-width:26px; height:26px; border-radius:999px;
+  min-width:22px; height:22px; border-radius:999px;
   display:grid; place-items:center;
-  font-size:12px; font-weight:800;
+  font-size:11px; font-weight:800;
   background:linear-gradient(145deg,#56B4F0,#2196F3);
   color:#fff;
-  box-shadow:0 4px 12px rgba(33,150,243,.4);
+  box-shadow:0 2px 8px rgba(33,150,243,.35);
   flex:0 0 auto;
+  line-height:1;
 }
-#hoPill .ho-pill-txt{ line-height:1.25; letter-spacing:-.01em }
+#hoPill .ho-pill-badge.ho-pill-play{
+  font-size:10px;
+  padding-left:1px; /* optical center for ▶ */
+}
+#hoPill .ho-pill-txt{ line-height:1.2; letter-spacing:-.01em; text-align:left }
 #hoPill .ho-pill-sub{
-  display:block; font-size:11px; font-weight:600; color:var(--ho-muted); margin-top:1px;
+  display:block; font-size:10.5px; font-weight:600; color:var(--ho-muted); margin-top:1px;
+}
+#hoPill.is-progress{
+  border-color:rgba(33,150,243,.4);
+  background:linear-gradient(180deg, #fff, rgba(232,245,255,.95));
 }
 #hoPill.is-done{
-  border-color:rgba(23,138,78,.28);
-  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(211,242,206,.55));
+  border-color:rgba(33,150,243,.28);
+  background:#fff;
 }
 #hoPill.is-done .ho-pill-badge{
-  background:linear-gradient(145deg,#66bb6a,#43a047);
-  box-shadow:0 4px 12px rgba(67,160,71,.35);
+  background:linear-gradient(145deg,#56B4F0,#2196F3);
+  box-shadow:0 2px 8px rgba(33,150,243,.35);
 }
-/* sit clear of Energy Agent / hands-off docks */
+/* sit clear of Energy Agent / hands-off docks (when dock open the pill is hidden) */
 body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
-body.ho-shell-open #hoPill{ left:calc(var(--ho-rail) + 18px); }
-body.ho-shell-open.ea-shell-open #hoPill{
-  left:calc(var(--ho-rail) + var(--ea-rail,360px) + 18px);
-}
-/* mobile bottom nav clearance */
+/* mobile: clear bottom nav + stack ABOVE Alerts FAB (Alerts is also left on mobile) */
 @media(max-width:720px){
-  #hoPill{ bottom:max(72px, env(safe-area-inset-bottom)); left:12px; }
-  body.ea-shell-open #hoPill,
-  body.ho-shell-open #hoPill,
-  body.ho-shell-open.ea-shell-open #hoPill{ left:12px; }
+  #hoPill{
+    left:14px;
+    /* Alerts sits at ~72px above nav; this FAB sits one pill higher */
+    bottom:calc(124px + env(safe-area-inset-bottom, 0px));
+  }
+  body.ea-shell-open #hoPill{ left:14px; }
+}
+/* very narrow: icon+label only, drop sub if needed */
+@media(max-width:380px){
+  #hoPill .ho-pill-sub{ display:none }
 }
 
 /* ── tour shell ──────────────────────────────────────────────────────────── */
@@ -319,8 +334,10 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 }
 #hoTour.ho-mode-dock .ho-lede{ font-size:13.5px; max-width:none }
 
-.ho-hero{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 0 20px }
-#hoTour.ho-mode-dock .ho-hero{ grid-template-columns:1fr }
+.ho-hero{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 14px }
+#hoTour.ho-mode-dock .ho-hero{ grid-template-columns:1fr 1fr; gap:8px }
+#hoTour.ho-mode-dock .ho-hero-card{ padding:12px }
+#hoTour.ho-mode-dock .ho-hero-card p{ font-size:11.5px }
 .ho-hero-card{
   border-radius:18px; padding:16px 16px 14px;
   border:1px solid var(--ho-line);
@@ -415,46 +432,27 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 }
 .ho-actions-sp{ flex:1 1 auto }
 
-.ho-welcome-art{
-  height:160px; border-radius:20px; margin:0 0 20px;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.15), transparent 40%),
-    linear-gradient(180deg, #56B4F0 0%, #1E90E8 42%, #BEE3FA 100%);
-  border:1px solid rgba(255,255,255,.4);
-  box-shadow:0 12px 40px rgba(30,144,232,.25);
-  position:relative; overflow:hidden;
+/* Collapsible tips — keeps login forms roomy */
+.ho-details{
+  margin:0 0 12px;
+  border-radius:12px;
+  border:1px solid var(--ho-line);
+  background:rgba(255,255,255,.45);
+  padding:0 12px;
 }
-#hoTour.ho-mode-dock .ho-welcome-art{ height:100px }
-.ho-welcome-art::before{
-  content:""; position:absolute; left:12%; bottom:18%;
-  width:42%; height:28%;
-  background:linear-gradient(90deg, rgba(15,40,80,.35), rgba(15,40,80,.15));
-  clip-path:polygon(0 40%, 12% 0, 100% 55%, 88% 100%, 0 85%);
-  opacity:.9;
+.ho-details summary{
+  cursor:pointer; list-style:none;
+  font-size:12px; font-weight:700; color:var(--ho-muted);
+  padding:10px 0;
+  user-select:none;
 }
-.ho-welcome-art::after{
-  content:"HANDS-OFF";
-  position:absolute; right:18px; top:16px;
-  font-size:11px; font-weight:780; letter-spacing:.12em;
-  color:rgba(255,255,255,.92);
-  background:rgba(14,20,32,.18);
-  padding:6px 10px; border-radius:999px;
+.ho-details summary::-webkit-details-marker{ display:none }
+.ho-details summary::after{
+  content:"▾"; float:right; opacity:.55; font-size:11px;
 }
-.ho-orbits{
-  position:absolute; left:50%; top:48%; transform:translate(-50%,-50%);
-  width:88px; height:88px;
-}
-.ho-orbits span{
-  position:absolute; inset:0; border-radius:50%;
-  border:1.5px solid rgba(255,255,255,.45);
-  animation:hoOrbit 8s linear infinite;
-}
-.ho-orbits span:nth-child(2){ inset:12px; animation-duration:5.5s; animation-direction:reverse; opacity:.7 }
-.ho-orbits span:nth-child(3){
-  inset:26px; background:radial-gradient(circle at 35% 30%,#fff,#7ff0bb 40%,#3fd68a 80%);
-  border:0; box-shadow:0 0 24px rgba(127,240,187,.55); animation:none;
-}
-@keyframes hoOrbit{ to{ transform:rotate(360deg) } }
+.ho-details[open] summary::after{ content:"▴" }
+.ho-details .ho-bullets{ margin:0 0 10px }
+.ho-details .ho-bullets li{ font-size:12px; padding:6px 0 }
 
 .ho-done-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 18px }
 #hoTour.ho-mode-dock .ho-done-grid{ grid-template-columns:1fr }

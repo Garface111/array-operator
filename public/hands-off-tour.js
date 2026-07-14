@@ -443,46 +443,62 @@
     pill = document.createElement("button");
     pill.type = "button";
     pill.id = "hoPill";
-    pill.setAttribute("aria-label", "Open hands-off setup checklist");
+    pill.className = "ho-pill-fab";
+    pill.setAttribute("aria-label", "Hands-off setup walkthrough");
+    pill.title = "Hands-off setup walkthrough";
     document.body.appendChild(pill);
     pill.addEventListener("click", function () {
-      openTour({ force: true, mode: "dock" });
+      // Same as Alerts: open the panel; close returns the pill (minimizeTour → updatePill)
+      openTour({
+        force: true,
+        mode: modalAlreadySeen() || isTourComplete() ? "dock" : "modal",
+      });
     });
     return pill;
   }
 
+  /**
+   * Persistent bottom-left FAB (mirrors Alerts bottom-right). Always available
+   * for signed-in owners so they can replay hands-off setup anytime — not buried
+   * in Account → Auto-refresh (Ford 2026-07-14). Hidden only while the tour is
+   * open; closing the tour brings the pill back.
+   */
   function updatePill() {
     var pill = ensurePill();
-    if (!session() || isTourComplete()) {
+    if (!session()) {
       pill.classList.remove("ho-pill-show");
       return;
     }
-    // Hide pill while modal/dock is open
+    // Hide pill while modal/dock is open — returns on minimize/close
     if (state.open) {
       pill.classList.remove("ho-pill-show");
       return;
     }
     var live = state.live || {};
     var left = requiredRemaining(live);
+    var incomplete = left > 0 && !isTourComplete();
     pill.classList.add("ho-pill-show");
-    if (left <= 0) {
-      pill.classList.add("is-done");
+    pill.classList.toggle("is-done", !incomplete);
+    pill.classList.toggle("is-progress", !!incomplete);
+    if (incomplete) {
       pill.innerHTML =
-        '<span class="ho-pill-badge">✓</span>' +
-        '<span class="ho-pill-txt">Hands-off ready' +
-        '<span class="ho-pill-sub">Tap to review checklist</span></span>';
-    } else {
-      pill.classList.remove("is-done");
-      pill.innerHTML =
-        '<span class="ho-pill-badge">' +
+        '<span class="ho-pill-badge" aria-hidden="true">' +
         left +
         "</span>" +
-        '<span class="ho-pill-txt">' +
+        '<span class="ho-pill-txt">Hands-off' +
+        '<span class="ho-pill-sub">' +
         left +
         " step" +
         (left === 1 ? "" : "s") +
-        " to complete" +
-        '<span class="ho-pill-sub">Hands-off setup</span></span>';
+        " left</span></span>";
+      pill.setAttribute("aria-label", "Hands-off setup — " + left + " steps left");
+    } else {
+      // Always-on replay affordance (like the Alerts pill)
+      pill.innerHTML =
+        '<span class="ho-pill-badge ho-pill-play" aria-hidden="true">▶</span>' +
+        '<span class="ho-pill-txt">Hands-off' +
+        '<span class="ho-pill-sub">Replay setup</span></span>';
+      pill.setAttribute("aria-label", "Replay hands-off setup walkthrough");
     }
   }
 
@@ -1244,9 +1260,8 @@
 
   function closeTourFinished() {
     markDone();
+    // minimizeTour → updatePill restores the bottom-left Replay FAB (always accessible)
     minimizeTour();
-    var pill = document.getElementById("hoPill");
-    if (pill) pill.classList.remove("ho-pill-show");
   }
 
   async function ensureCloudMode() {
@@ -1689,8 +1704,9 @@
   function tryAutoOpen(attempt) {
     attempt = attempt || 0;
     if (!shouldAutoOpen()) {
-      // still show pill if signed in and incomplete
-      if (session() && !isTourComplete()) probeLive().then(updatePill);
+      // Always paint the bottom-left FAB for signed-in owners (replay anytime)
+      if (session()) probeLive().then(updatePill);
+      else updatePill();
       return;
     }
     if (!session()) {
@@ -1715,17 +1731,25 @@
   function boot() {
     window.__aoHandsOffTour = function (opts) {
       opts = opts || { force: true };
-      if (!opts.mode) opts.mode = modalAlreadySeen() ? "dock" : "modal";
+      if (!opts.mode) {
+        opts.mode =
+          modalAlreadySeen() || isTourComplete() ? "dock" : "modal";
+      }
       openTour(opts);
     };
     window.__aoHandsOffTourProbe = probeLive;
     window.__aoHandsOffTourMinimize = minimizeTour;
+    window.__aoHandsOffTourUpdatePill = updatePill;
 
-    // Pill for incomplete signed-in accounts
+    // Persistent bottom-left FAB for every signed-in owner (Ford 2026-07-14)
     setTimeout(function () {
-      if (!session() || isTourComplete()) return;
+      if (!session()) return;
       probeLive().then(updatePill);
-    }, 800);
+    }, 600);
+    // Session can land a beat after first paint (magic link / onboarding)
+    setTimeout(function () {
+      if (session()) probeLive().then(updatePill);
+    }, 2200);
 
     // Soft-refresh only (no full remount / re-animation) when fleet data lands
     try {
