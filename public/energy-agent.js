@@ -1586,54 +1586,62 @@
       || /\b(escalate|developer|ford)\b/.test(t);
   }
 
+  function tourIdFromHash(hash) {
+    var h = String(hash != null ? hash : location.hash || "").toLowerCase();
+    if (h.charAt(0) !== "#") h = "#" + h;
+    if (h === "#account") return "master_account";
+    if (h === "#reports") return "reports";
+    if (h === "#arrays" || h === "#sandbox") return "arrays";
+    if (h === "#analysis" || h === "#trends") return "analysis";
+    if (h === "#resources") return "resources";
+    if (h === "#dashboard" || h === "" || h === "#") return "dashboard";
+    return null;
+  }
+
   function detectTourId(text) {
     var t = String(text || "").toLowerCase();
     // "what are the tabs" is not a tour — LLM answers from persona map
     if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/.test(t)) return null;
     var wantsTour =
-      /\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through|walk\s+through)\b/.test(t)
-      || /\bexplain\b.*\btab\b/.test(t)
-      || /\bgive\s+me\s+a\s+(walkthrough|tour)\b/.test(t)
-      || /\bhow\s+does\s+(the\s+)?(account|invoices?|inverters?|analysis|resources|fleet\s+triage)\b/.test(t)
-      || /\borient\s+me\b/.test(t);
+      /\b(walk\s*me|walk\s*us|walkthrough|show\s+me|show\s+us|tour|guide\s+me|take\s+me\s+through|walk\s+through|show\s+me\s+around|look\s+around)\b/.test(t)
+      || /\bexplain\b.*\b(tab|page|screen|section|panel)\b/.test(t)
+      || /\b(explain|describe|overview)\b.*\b(invoices?|account|inverters?|analysis|resources|triage|offtakers?)\b/.test(t)
+      || /\bgive\s+me\s+a\s+(walkthrough|tour|overview|rundown)\b/.test(t)
+      || /\bhow\s+does\s+(the\s+)?(account|invoices?|inverters?|analysis|resources|fleet\s+triage|this)\b/.test(t)
+      || /\bhow\s+(do|does)\s+(invoices?|offtakers?|this\s+tab|this\s+page)\b/.test(t)
+      || /\borient\s+me\b/.test(t)
+      || /\bwhat('?s| is) on (the )?(invoices?|account|inverters?|analysis|resources|triage)\b/.test(t);
     // Named tab + walk/show/explain intent
     var tabHit =
       /\b(master\s*account|account\s+tab|invoices?\s+tab|inverters?\s+tab|fleet\s+triage|arrays?\s+tab|resources?\s+tab|analysis\s+tab)\b/.test(t);
-    if (!wantsTour && !(tabHit && /\b(show|open|explain|walk|through)\b/.test(t))) {
+    if (!wantsTour && !(tabHit && /\b(show|open|explain|walk|through|around|tour|guide)\b/.test(t))) {
       return null;
     }
     // Prefer specific tab mentions (order matters when multiple words appear)
-    if (/\b(invoice|offtaker|billing\s+report|credit\s+invoice)\b/.test(t)
+    if (/\b(invoices?|offtakers?|billing\s+report|credit\s+invoices?)\b/.test(t)
         || (/\breports?\b/.test(t) && /\btab\b/.test(t))) {
       return "reports";
     }
     if (/\b(master\s*account|account\s+tab|#account)\b/.test(t)
-        || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain|through)\b/.test(t))) {
+        || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain|through|around|guide)\b/.test(t))) {
       return "master_account";
     }
-    if (/\bfleet\s+triage\b/.test(t) || (/\btriage\b/.test(t) && /\b(walk|tour|show)\b/.test(t))) {
+    if (/\bfleet\s+triage\b/.test(t) || (/\btriage\b/.test(t) && /\b(walk|tour|show|around)\b/.test(t))) {
       return "dashboard";
     }
-    if (/\b(inverter|spreadsheet|sandbox|fleet\s+canvas)\b/.test(t)
-        || (/\barrays?\b/.test(t) && /\b(tab|walk|tour|show)\b/.test(t))) {
+    if (/\b(inverters?|spreadsheet|sandbox|fleet\s+canvas)\b/.test(t)
+        || (/\barrays?\b/.test(t) && /\b(tab|walk|tour|show|around)\b/.test(t))) {
       return "arrays";
     }
     if (/\banalysis\b/.test(t) || /\btrends?\b/.test(t) || /\bthrough\s+time\b/.test(t)) {
       return "analysis";
     }
-    if (/\bresources?\b/.test(t) || /\bnet.?meter|rates?\s+and\s+news|briefing\b/.test(t)) {
+    if (/\bresources?\b/.test(t) || /\bnet.?meter|rates?\s+and\s+news|briefing\b/.test(t)
+        || /\brec\s+market\b/.test(t)) {
       return "resources";
     }
     // Generic "walk me through this tab / the page" → current hash
-    if (wantsTour) {
-      var h = (location.hash || "").toLowerCase();
-      if (h === "#account") return "master_account";
-      if (h === "#reports") return "reports";
-      if (h === "#arrays" || h === "#sandbox") return "arrays";
-      if (h === "#analysis" || h === "#trends") return "analysis";
-      if (h === "#resources") return "resources";
-      if (h === "#dashboard") return "dashboard";
-    }
+    if (wantsTour) return tourIdFromHash();
     return null;
   }
 
@@ -1775,6 +1783,9 @@
       if (d.pending) showPending(d.pending);
       else showPending(null);
       var cmds = d.ui_commands || [];
+      // Kill freehand multi-highlight "tours" from the LLM — replace with a real
+      // preset for the named/current tab so we never box invented UI.
+      cmds = coerceTourCommands(cmds, text);
       for (var i = 0; i < cmds.length; i++) {
         if (turnGen !== (state._turnAbortGen || 0)) return;
         await runCommand(cmds[i]);
@@ -1927,6 +1938,48 @@
     }
   }
 
+  /**
+   * If the model tried a freehand multi-step highlight tour (or mixed tour_id with
+   * extra guessed highlights), collapse to a single preset tour. Never invent UI.
+   */
+  function coerceTourCommands(cmds, userText) {
+    cmds = cmds || [];
+    var tourCmd = null;
+    var hlCount = 0;
+    for (var i = 0; i < cmds.length; i++) {
+      var c = cmds[i];
+      if (!c) continue;
+      var ty = String(c.type || "").toLowerCase();
+      if (ty === "tour" || ty === "walkthrough" || ty === "ui_tour") {
+        tourCmd = c;
+      }
+      if (ty === "highlight" || ty === "ui_highlight") hlCount++;
+    }
+    var forcedId =
+      (tourCmd && tourCmd.args && (tourCmd.args.tour_id || tourCmd.args.id)) ||
+      detectTourId(userText) ||
+      null;
+    // 2+ freehand highlights = the model is inventing a walkthrough
+    if (hlCount >= 2 || (tourCmd && hlCount >= 1)) {
+      var tid = forcedId || tourIdFromHash();
+      if (tid && presetTour(tid)) {
+        return [{ type: "tour", args: { tour_id: tid }, id: "coerce-tour" }];
+      }
+    }
+    // Single ui_tour without freehand is fine — normalize type
+    if (tourCmd && hlCount === 0) {
+      return cmds.map(function (c) {
+        if (!c) return c;
+        var ty = String(c.type || "").toLowerCase();
+        if (ty === "ui_tour" || ty === "walkthrough") {
+          return Object.assign({}, c, { type: "tour" });
+        }
+        return c;
+      });
+    }
+    return cmds;
+  }
+
   // ── browser driver ───────────────────────────────────────────────────────
   async function runCommand(cmd) {
     if (!cmd) return;
@@ -1974,16 +2027,41 @@
         if (!(cmd.args && cmd.args.silent) && !state.touring) {
           addMsg("agent", "Opening **" + tabLabel(hash) + "**…");
         }
-      } else if (cmd.type === "highlight") {
-        ok = highlight(
-          cmd.args && cmd.args.selector,
-          (cmd.args && cmd.args.ms) || 4500,
-          cmd.args && cmd.args.say
-        );
-        detail = { selector: cmd.args && cmd.args.selector };
-      } else if (cmd.type === "tour" || cmd.type === "walkthrough") {
-        ok = await runTour(cmd.args || {});
-        detail = { steps: ((cmd.args && cmd.args.steps) || []).length };
+      } else if (cmd.type === "highlight" || cmd.type === "ui_highlight") {
+        // Never box a selector that isn't actually on screen (kills hallucinated targets)
+        var hsel = cmd.args && cmd.args.selector;
+        var hel = hsel ? queryFirst(hsel) : null;
+        if (!hel || !isTourVisible(hel)) {
+          ok = false;
+          detail = { selector: hsel, error: "not_visible" };
+        } else {
+          ok = highlight(
+            hsel,
+            (cmd.args && cmd.args.ms) || 4500,
+            cmd.args && (cmd.args.say || cmd.args.label)
+          );
+          detail = { selector: hsel };
+        }
+      } else if (cmd.type === "tour" || cmd.type === "walkthrough" || cmd.type === "ui_tour") {
+        // Prefer preset tour_id; drop freehand custom steps that invent selectors
+        var targs = Object.assign({}, cmd.args || {});
+        if (targs.tour_id || targs.id) {
+          targs.tour_id = targs.tour_id || targs.id;
+          delete targs.steps; // never mix guessed steps with a preset
+        } else if (targs.steps && targs.steps.length) {
+          var bad = targs.steps.some(function (s) {
+            return s && s.selector && !queryFirst(s.selector);
+          });
+          if (bad) {
+            var fb = tourIdFromHash();
+            targs = fb ? { tour_id: fb } : targs;
+          }
+        } else {
+          var fb2 = tourIdFromHash();
+          if (fb2) targs = { tour_id: fb2 };
+        }
+        ok = await runTour(targs);
+        detail = { tour_id: targs.tour_id || null, steps: (targs.steps || []).length };
       } else if (cmd.type === "fill") {
         ok = fill(cmd.args && cmd.args.selector, cmd.args && cmd.args.value);
       } else if (cmd.type === "click") {
@@ -2388,7 +2466,7 @@
           optional: true,
         },
         {
-          selector: "#acctPlanVal, #acctChangePlan, #panelAccount .acct-row",
+          selector: "#acctPlanVal, #acctChangePlan",
           say: "**Plan** — Live vendor data, Offtaker invoices, or Both. Change it anytime.",
           optional: true,
         },
@@ -2438,9 +2516,8 @@
           waitMs: 8000,
         },
         {
-          selector: "#rb2Sub",
+          selector: "#rb2Sub, #panelReports .rb2-id p, #panelReports .rb2-head",
           say: "The rule up top: invoices draft from bills, but **nothing sends until you approve** — unless you flip an offtaker to auto-send later.",
-          optional: true,
         },
         {
           selector: "#rbGenTabs",
@@ -2453,51 +2530,49 @@
         },
         {
           selector: "#rb2Pipe",
-          say: "The **send pipeline** — last cycle delivered, this cycle's drafts waiting on bills or approval, and the next scheduled run.",
+          say: "The **send pipeline** — last cycle delivered, this cycle's drafts waiting on bills or approval, and the next scheduled run. It appears once billing data is live.",
           optional: true,
         },
         {
           selector: "#rbGlobalRate",
           say: "**Master solar credit rate** — optional fleet override. Leave blank and each offtaker is priced from *their own* utility bill credit rate.",
-          optional: true,
         },
         {
-          selector: "#panelReports .rb2-controls, #rbGmpBillsStatus",
-          say: "**Your offtakers** toolbar. The slim status pill shows which utility bills are linked and whether auto-refresh is healthy.",
-          optional: true,
+          selector: "#panelReports .rb2-controls",
+          say: "**Your offtakers** toolbar — export, email template, link utility bills, bulk import, and add offtaker all live on this row.",
         },
         {
           selector: "#rb2ExportBtn",
           say: "**Export** — download a batch for QuickBooks Online, Desktop, or Xero.",
-          optional: true,
         },
         {
           selector: "#rbEmailStudio",
           say: "**Customize email** — greeting, wording, and sign-off for every offtaker invoice, with merge tags.",
-          optional: true,
         },
         {
           selector: "#rbLinkUtility",
           say: "**Link utility bills** — connect GMP, VEC, or any of hundreds of co-ops. Offtakers invoice from these bills.",
-          optional: true,
         },
         {
           selector: "#rbBulkImport",
           say: "**Bulk import** — add many offtakers from a CSV: name, percent share, account number.",
-          optional: true,
         },
         {
           selector: "#rbCustAdd",
           say: "**Add an offtaker** — one at a time when you're not bulk-importing.",
-          optional: true,
         },
         {
-          selector: "#rbList",
-          say: "The **offtaker list** — each card is a customer: share, rate, draft invoices, template, and send mode. Open one to edit.",
+          selector: "#rbOSearch, #rbList .rb-acc-lead, #rbList",
+          say: "Search and the **offtaker list** sit below. Each card is a customer: share, rate, draft invoices, template, and send mode.",
           waitMs: 6000,
         },
         {
-          say: "That's Invoices end to end. Say *open Bill audit* or name an offtaker if you want to go deeper.",
+          selector: "#rbList .rb-acc, #rbList .rb-grp, #rbList .rb-prov",
+          say: "Open any offtaker card to review their draft, edit share or rate, upload a template, and approve send.",
+          optional: true,
+        },
+        {
+          say: "That's Invoices end to end — real controls only, top to bottom. Say *Bill audit* or name an offtaker if you want to go deeper.",
         },
       ];
     }
