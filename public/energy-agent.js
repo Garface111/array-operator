@@ -19,6 +19,7 @@
     mindEvents: "/v1/energy-agent/mind/events",
     mindConsume: "/v1/energy-agent/mind/events/consume",
     mindTick: "/v1/energy-agent/mind/tick",
+    mindMetrics: "/v1/energy-agent/mind/metrics",
   };
 
   var state = {
@@ -127,7 +128,7 @@
         fleetVendors = Object.keys(seen);
       }
     } catch (e) {}
-    return {
+    var ctx = {
       hash: hash,
       tab_label: tabLabel(hash),
       // Always remind the model of live nav labels (hashes are internal only)
@@ -156,6 +157,21 @@
         api_keys: "SolarEdge/Locus/AlsoEnergy API keys — server poll, not portal scrape",
       },
     };
+    // Mobile OS: AI is the operating layer (setup checklist → systems overview).
+    // Inject live setup/ops context so the brain drives hands-off, not tab tourism.
+    try {
+      if (typeof window.__aoMobileOsContext === "function") {
+        var mos = window.__aoMobileOsContext();
+        if (mos && mos.mobile_os) {
+          ctx.mobile_os = mos;
+          ctx.is_mobile_os_home = !!(
+            typeof window.__aoMobileOsIsActive === "function" &&
+            window.__aoMobileOsIsActive()
+          );
+        }
+      }
+    } catch (e) {}
+    return ctx;
   }
 
   // ── DOM ──────────────────────────────────────────────────────────────────
@@ -289,7 +305,7 @@
       '        </div>' +
       '      </div>' +
       '    </div>' +
-      '    <div class="ea-legal">Only your account · site changes are judge-gated · no billing edits</div>' +
+      '    <div class="ea-legal" id="eaLegal">Only your account · one mind · site changes are judge-gated · no billing edits</div>' +
       '  </div>';
     document.body.appendChild(panel);
 
@@ -1013,6 +1029,10 @@
     state._mindInjecting = true;
     try {
       var painted = addMsg("agent", t, { mindUpdate: true });
+      // Optional accept/dismiss chips when the mind asks about a proposal
+      if (painted && opts.eventId && /proposal|want me|refresh/i.test(t)) {
+        addMindActionChips(opts.eventId, t);
+      }
       if (painted && !state.voiceMuted && !state.thinking) {
         // Soft speak — skip if already talking so we don't barge mid-reply
         if (!state.speaking) {
@@ -1023,6 +1043,49 @@
     } finally {
       state._mindInjecting = false;
     }
+  }
+
+  function addMindActionChips(eventId, speakText) {
+    var host = document.getElementById("eaMsgs");
+    if (!host) return;
+    var row = document.createElement("div");
+    row.className = "ea-mind-actions";
+    row.setAttribute("data-event-id", String(eventId));
+    var wantsProposal = /proposal|open a|want me/i.test(speakText || "");
+    if (wantsProposal) {
+      row.innerHTML =
+        '<button type="button" class="ea-mind-act yes" data-act="accepted">Yes, open it</button>' +
+        '<button type="button" class="ea-mind-act no" data-act="dismissed">Not now</button>';
+    } else {
+      row.innerHTML =
+        '<button type="button" class="ea-mind-act yes" data-act="accepted">Sounds good</button>' +
+        '<button type="button" class="ea-mind-act no" data-act="dismissed">Got it</button>';
+    }
+    host.appendChild(row);
+    host.scrollTop = host.scrollHeight;
+    row.querySelectorAll(".ea-mind-act").forEach(function (btn) {
+      btn.onclick = function () {
+        var act = btn.getAttribute("data-act") || "shown";
+        consumeMindEvents([eventId], act).catch(function () {});
+        row.remove();
+        if (act === "accepted" && wantsProposal) {
+          // Also drive the chat path so the mind plans propose_ui
+          turn("yes open proposal", "text").catch(function () {});
+        }
+      };
+    });
+  }
+
+  async function consumeMindEvents(ids, outcome) {
+    if (!ids || !ids.length) return;
+    await fetch(API.mindConsume, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        event_ids: ids,
+        outcome: outcome || "shown",
+      }),
+    });
   }
 
   async function pollMindEvents() {
@@ -1046,18 +1109,15 @@
       if (ev.kind === "task_queued" || ev.kind === "plan_created") {
         openHint = true;
       }
-      if (ev.kind === "task_done" || ev.kind === "task_failed") {
-        // activity may clear after drain
-      }
 
-      // Seamless interrupt: same mind voice, rare high-signal only
-      if (
-        (ev.kind === "interrupt_candidate" || (ev.speak_as_mind && ev.kind === "task_done")) &&
-        ev.speak_as_mind &&
-        !ev.consumed
-      ) {
-        var said = injectMindSpeak(ev.speak_as_mind);
-        if (said || ev.kind === "interrupt_candidate") {
+      // Seamless interrupt: policy-gated candidates only (importance on server)
+      if (ev.kind === "interrupt_candidate" && ev.speak_as_mind && !ev.consumed) {
+        var said = injectMindSpeak(ev.speak_as_mind, {
+          eventId: ev.id,
+          importance: ev.importance,
+        });
+        if (said) {
+          // Mark shown; accept/dismiss chips may upgrade outcome later
           toConsume.push(ev.id);
         }
       }
@@ -1065,11 +1125,7 @@
 
     if (toConsume.length) {
       try {
-        await fetch(API.mindConsume, {
-          method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({ event_ids: toConsume }),
-        });
+        await consumeMindEvents(toConsume, "shown");
       } catch (e) {}
     }
 
@@ -1089,6 +1145,33 @@
     } catch (e) {
       if (openHint) setMindActivity(true, "Looking into it…");
     }
+  }
+
+  /** Soft metrics line (Phase D) — cost per win when available. */
+  async function refreshMindMetrics() {
+    if (!signedIn()) return;
+    try {
+      var r = await fetch(API.mindMetrics + "?days=30", { headers: authHeaders() });
+      if (!r.ok) return;
+      var m = await r.json().catch(function () { return null; });
+      if (!m || !m.ok) return;
+      var el = document.getElementById("eaLegal");
+      if (!el) {
+        el = document.querySelector(".ea-legal");
+      }
+      if (!el) return;
+      var cpw = m.cost && m.cost.cost_per_successful_improvement_usd;
+      var cpp = m.cost && m.cost.cost_per_proposal_usd;
+      var sr = m.tasks && m.tasks.success_rate;
+      var ar = m.interrupts && m.interrupts.accept_rate;
+      var bits = ["Only your account · one mind"];
+      if (cpw != null) bits.push("$" + Number(cpw).toFixed(2) + "/win");
+      else if (cpp != null) bits.push("$" + Number(cpp).toFixed(2) + "/proposal");
+      if (sr != null) bits.push(Math.round(sr * 100) + "% tasks ok");
+      if (ar != null) bits.push(Math.round(ar * 100) + "% updates useful");
+      el.textContent = bits.join(" · ");
+      el.title = "Mind metrics (30d): worker cost and interrupt quality";
+    } catch (e) {}
   }
 
   /** After chat returns a mind plan, surface subtle awareness + accelerate poll. */
@@ -1131,7 +1214,32 @@
     state.brain = d.brain;
     state.realtimeReady = !!d.realtime_ready;
     setBudget(d.budget);
-    addMsg("agent", d.intro || "Hi — I'm Energy Agent.");
+    // Prefer server intro; on mobile OS override with phase-aware opener if server
+    // sent the generic line (mobile_os context may not have been on session body yet).
+    var intro = d.intro || "Hi — I'm Energy Agent.";
+    try {
+      if (
+        typeof window.__aoMobileOsIsActive === "function" &&
+        window.__aoMobileOsIsActive() &&
+        typeof window.__aoMobileOsContext === "function"
+      ) {
+        var mos = window.__aoMobileOsContext() || {};
+        if (mos.phase === "setup" && mos.next_setup_step) {
+          intro =
+            "I'm your operating layer on mobile. Let's get you hands-off. " +
+            "Next up: **" +
+            (mos.next_setup_step.label || "setup") +
+            "**. Tap a checklist chip or tell me what vendor/utility you use — " +
+            "I'll drive the fastest path.";
+        } else if (mos.phase === "running" || mos.hands_off_ready) {
+          intro =
+            "Hands-off is the goal and you're in ops mode. " +
+            "Ask for a status brief anytime — inverters, last sync, offtaker send rates. " +
+            "Need spreadsheets and deep edits? Tap **Detail** at the bottom.";
+        }
+      }
+    } catch (e) {}
+    addMsg("agent", intro);
     if (d.realtime_ready) {
       setStatus("GPT voice ready — connecting mic…", "on");
     } else {
@@ -1192,6 +1300,17 @@
 
   async function setOpen(o) {
     ensureUi();
+    // Mobile OS home: agent IS the shell — refuse hard-close (Detail mode exits OS).
+    var osHome = false;
+    try {
+      osHome = !!(
+        typeof window.__aoMobileOsIsActive === "function" &&
+        window.__aoMobileOsIsActive()
+      );
+    } catch (e) {}
+    if (!o && osHome) {
+      o = true;
+    }
     state.open = !!o;
     var panel = document.getElementById("eaPanel");
     var orb = document.getElementById("eaOrb");
@@ -1214,7 +1333,10 @@
     if (state.open) {
       await ensureSession();
       // Continuous mind awareness while the conversation window is open
-      if (signedIn()) startMindAwareness();
+      if (signedIn()) {
+        startMindAwareness();
+        refreshMindMetrics().catch(function () {});
+      }
       // Voice usually already starting from toggle(); only start here if mic ready
       // and we aren't listening yet (e.g. re-open after close). Never when muted.
       if (signedIn() && !state.voiceMuted && !state.listening && state.micStream) {
@@ -3031,4 +3153,13 @@
 
   window.__eaOpen = function () { setOpen(true); };
   window.__eaClose = function () { setOpen(false); };
+  /** Programmatic user turn (mobile OS chips, quick actions). */
+  window.__eaSendText = function (text, opts) {
+    opts = opts || {};
+    text = String(text || "").trim();
+    if (!text) return Promise.resolve();
+    return setOpen(true).then(function () {
+      return turn(text, opts.source || "programmatic", opts);
+    });
+  };
 })();

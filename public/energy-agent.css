@@ -239,6 +239,27 @@ body.ea-shell-open{
   border-left: 2px solid rgba(14,165,233,.45);
   padding-left: 10px;
 }
+/* Accept / dismiss chips on seamless mind updates (interrupt outcomes) */
+.ea-mind-actions{
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 0 2px 2px 12px; margin-top: -4px;
+}
+.ea-mind-act{
+  border: 1px solid rgba(14,165,233,.28);
+  background: rgba(14,165,233,.08);
+  color: var(--ink, #0f172a);
+  font-size: 11px; font-weight: 650;
+  padding: 4px 10px; border-radius: 99px;
+  cursor: pointer; line-height: 1.2;
+}
+.ea-mind-act:hover{ background: rgba(14,165,233,.16); }
+.ea-mind-act.yes{
+  border-color: rgba(16,185,129,.4);
+  background: rgba(16,185,129,.1);
+}
+.ea-mind-act.no{ opacity: .85; }
+html:not(.sky) .ea-mind-act{ color: #e2e8f0; }
+html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
 
 /* Weekly AI usage meter — fills 0→100% toward the $5 thinking+voice cap */
 .ea-budget{
