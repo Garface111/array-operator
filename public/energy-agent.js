@@ -62,8 +62,19 @@
         }
       }
     } catch (e) {}
+    var hash = location.hash || "#dashboard";
     return {
-      hash: location.hash || "#dashboard",
+      hash: hash,
+      tab_label: tabLabel(hash),
+      // Always remind the model of live nav labels (hashes are internal only)
+      nav_tabs: [
+        { label: "Fleet Triage", hash: "#dashboard" },
+        { label: "Inverters", hash: "#arrays" },
+        { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
+        { label: "Invoices", hash: "#reports" },
+        { label: "Resources", hash: "#resources" },
+        { label: "Master Account", hash: "#account" },
+      ],
       path: location.pathname,
       title: document.title,
       selection: sel,
@@ -944,21 +955,43 @@
 
   function detectTourId(text) {
     var t = String(text || "").toLowerCase();
+    // "what are the tabs" is not a tour — LLM answers from persona map
+    if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/.test(t)) return null;
     if (!/\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through)\b/.test(t)
         && !/\bexplain\b.*\btab\b/.test(t)) {
-      // "walk me through master account" OR "show me the master account tab"
-      if (!/\b(master\s*account|account\s+tab|invoices?\s+tab|arrays?\s+tab)\b/.test(t)) {
+      if (!/\b(master\s*account|account\s+tab|invoices?\s+tab|inverters?\s+tab|fleet\s+triage|arrays?\s+tab)\b/.test(t)) {
         return null;
       }
-      // allow "show me master account" without walkthrough verb
       if (!/\b(show|open|explain|walk)\b/.test(t)) return null;
     }
-    if (/\b(master\s*account|account\s+tab|#account)\b/.test(t) || /\baccount\b/.test(t) && /\b(walk|tour|show|explain)\b/.test(t)) {
+    if (/\b(master\s*account|account\s+tab|#account)\b/.test(t)
+        || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain)\b/.test(t))) {
       return "master_account";
     }
-    if (/\b(invoice|offtaker|reports?)\b/.test(t)) return "reports";
-    if (/\b(inverter|arrays?|fleet\s+canvas)\b/.test(t)) return "arrays";
+    if (/\b(invoice|offtaker)\b/.test(t) || (/\breports?\b/.test(t) && /\btab\b/.test(t))) {
+      return "reports";
+    }
+    if (/\b(inverter|fleet\s+triage|fleet\s+canvas)\b/.test(t)
+        || (/\barrays?\b/.test(t) && /\btab\b/.test(t))) {
+      return "arrays";
+    }
+    if (/\banalysis\b/.test(t) || /\btrends?\b/.test(t)) return "analysis";
     return null;
+  }
+
+  /** Local answer when user asks what the tabs are — never invent old names. */
+  function tabsCheatSheet() {
+    return (
+      "**Array Operator tabs** (exactly as labeled in the top bar):\n\n" +
+      "1. **Fleet Triage** — fleet health at a glance; who needs attention\n" +
+      "2. **Inverters** — live canvas of every inverter (columns = sites)\n" +
+      "3. **Analysis** — deeper digs; *Through time* / trends live here as a sub-view " +
+      "(there is no separate Trends tab)\n" +
+      "4. **Invoices** — offtaker invoices, drafts, send pipeline\n" +
+      "5. **Resources** — net-metering rates and regulatory news\n" +
+      "6. **Master Account** — company, email, plan, card, auto-refresh, files\n\n" +
+      "Want me to open one and walk you through it?"
+    );
   }
 
   async function turn(text, source, opts) {
@@ -972,6 +1005,15 @@
     // Seamless merge: site-improve intent opens mark-up without waiting on the brain
     if (isImproveIntent(text)) {
       openImproveFlow({ markFirst: true });
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+      return;
+    }
+    // Tab names must match the top bar — answer locally so the model can't invent Dashboard/Arrays/Reports
+    if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/i.test(text)
+        || /\b(list|name|explain) (all )?(the )?tabs\b/i.test(text)
+        || /\btabs (do i|are there|in (the )?(app|nav|bar))\b/i.test(text)) {
+      addMsg("agent", tabsCheatSheet());
+      try { speak("Those are the six tabs in the top bar — Fleet Triage, Inverters, Analysis, Invoices, Resources, and Master Account."); } catch (e) {}
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
     }
@@ -1093,16 +1135,31 @@
       if (cmd.type === "navigate") {
         var hash = (cmd.args && cmd.args.hash) || "#dashboard";
         if (hash.charAt(0) !== "#") hash = "#" + hash;
-        // Normalize common aliases the model might say
+        // Normalize aliases → real hashes. User-facing labels are separate (TAB_LABELS).
         var aliases = {
           "#invoice": "#reports", "#invoices": "#reports", "#billing": "#reports",
           "#offtaker": "#reports", "#offtakers": "#reports",
           "#inverter": "#arrays", "#inverters": "#arrays",
           "#fleet": "#dashboard", "#triage": "#dashboard",
+          "#fleettriage": "#dashboard", "#fleet-triage": "#dashboard",
           "#master": "#account", "#settings": "#account",
+          "#masteraccount": "#account", "#master-account": "#account",
+          "#trends": "#analysis", "#trend": "#analysis", "#through-time": "#analysis",
         };
-        var h = hash.toLowerCase();
+        var h = hash.toLowerCase().replace(/\s+/g, "");
         if (aliases[h]) hash = aliases[h];
+        // Spoken/legacy names without #
+        var nameAlias = {
+          dashboard: "#dashboard", "fleet triage": "#dashboard", fleettriage: "#dashboard",
+          arrays: "#arrays", inverters: "#arrays",
+          analysis: "#analysis", trends: "#analysis",
+          reports: "#reports", invoices: "#reports",
+          account: "#account", "master account": "#account",
+          resources: "#resources",
+        };
+        var rawName = String((cmd.args && (cmd.args.tab || cmd.args.name || cmd.args.label)) || "")
+          .toLowerCase().trim();
+        if (nameAlias[rawName]) hash = nameAlias[rawName];
         location.hash = hash;
         // Help sandbox router if it listens to hashchange
         try {
@@ -1111,8 +1168,8 @@
           try { window.dispatchEvent(new Event("hashchange")); } catch (e2) {}
         }
         ok = true;
-        detail = { hash: hash };
-        addMsg("agent", "Opening " + hash + "…");
+        detail = { hash: hash, tab: tabLabel(hash) };
+        addMsg("agent", "Opening **" + tabLabel(hash) + "**…");
       } else if (cmd.type === "highlight") {
         ok = highlight(
           cmd.args && cmd.args.selector,
@@ -1188,6 +1245,21 @@
 
   function sleep(ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  /** User-visible tab names — must match the top tabbar labels exactly. */
+  var TAB_LABELS = {
+    "#dashboard": "Fleet Triage",
+    "#arrays": "Inverters",
+    "#analysis": "Analysis",
+    "#reports": "Invoices",
+    "#resources": "Resources",
+    "#account": "Master Account",
+  };
+  function tabLabel(hash) {
+    var h = String(hash || "").toLowerCase();
+    if (h.charAt(0) !== "#") h = "#" + h;
+    return TAB_LABELS[h] || hash;
   }
 
   /** Show-and-tell: navigate + highlight + narrate steps in sequence. */
@@ -1271,15 +1343,27 @@
     }
     if (key === "arrays" || key === "inverters") {
       return [
-        { hash: "#arrays", say: "Opening **Inverters** — your live fleet canvas." },
-        { selector: "#panelArrays, #sbWrap, .sb-wrap", say: "Each column is an array; the comb below is real inverters.", ms: 4000 },
+        { hash: "#arrays", say: "Opening **Inverters** — your live fleet canvas (this is the tab labeled Inverters, not Arrays)." },
+        { selector: "#panelArrays, #sbWrap, .sb-wrap", say: "Each column is a site; the comb below is real inverters.", ms: 4000 },
         { say: "Want health details on a specific site? Name it and I'll investigate.", ms: 2200 },
       ];
     }
     if (key === "reports" || key === "invoices") {
       return [
-        { hash: "#reports", say: "Opening **Invoices** — offtaker billing." },
+        { hash: "#reports", say: "Opening **Invoices** — offtaker billing (tab label is Invoices)." },
         { selector: "#panelReports, .rb-wrap, #rbRoot", say: "Offtakers, drafts, and send pipeline live here.", ms: 4000 },
+      ];
+    }
+    if (key === "analysis" || key === "trends") {
+      return [
+        { hash: "#analysis", say: "Opening **Analysis** — deeper digs. Trends / Through time is a sub-view here, not its own top tab." },
+        { selector: "#panelAnalysis, .vs-seg", say: "Use the segmented control to switch Analysis sub-views (including through-time).", ms: 4200 },
+      ];
+    }
+    if (key === "dashboard" || key === "fleet_triage" || key === "triage") {
+      return [
+        { hash: "#dashboard", say: "Opening **Fleet Triage** — who needs attention across the fleet." },
+        { selector: "#panelDashboard, .dash-wrap", say: "This is Fleet Triage (not Dashboard) — attention and overview live here.", ms: 4000 },
       ];
     }
     return null;
