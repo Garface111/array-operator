@@ -429,7 +429,7 @@
     { key: "wx", label: "Sky", sortable: false, cls: "ansg-wxcell" },
     { key: "expected", label: "Expected", sortable: true, num: true },
     { key: "ratio", label: "Actual vs expected", sortable: true },
-    { key: "window", label: "This window", sortable: true, num: true },
+    { key: "window", label: "Window kWh", sortable: true, num: true },  // label set in headHtml to “14d kWh” etc.
     { key: "cap", label: "Capacity", sortable: true, num: true }
   ];
 
@@ -610,27 +610,32 @@
       }).join("") +
       '</div></div>';
 
-    // honest sub-line: how many sites can't be weather-modeled yet
+    // honest sub-line: how many sites can't be weather-modeled yet + time window
     var unmodeled = rows.filter(function (r) { return !r.hasForecast; }).length;
+    var win = (ctx.windowDays || 14);
     var subline;
     if (!ctx.forecast) {
       subline = ctx.simulated
-        ? "Measured performance across the demo fleet — connect a fleet to model expected vs actual."
-        : "Measured performance — not modeled yet.";
+        ? "Measured performance across the demo fleet · last " + win + " days"
+        : "Measured performance · last " + win + " days — not modeled yet.";
     } else if (unmodeled > 0) {
-      subline = rows.length + " sites · " + unmodeled + " not modeled yet";
+      subline = rows.length + " sites · " + unmodeled + " not modeled yet · last " + win + " days";
     } else {
-      subline = rows.length + " sites · all modeled";
+      subline = rows.length + " sites · all modeled · last " + win + " days";
     }
 
     // ---- header cells with sort affordance ------------------------------------
     var headHtml = COLS.map(function (c) {
       var extra = (c.key === "cap" ? "ansg-cap " : "") + (c.cls ? c.cls + " " : "");
-      if (!c.sortable) return '<th class="' + extra + (c.num ? "ansg-num " : "") + '">' + ctx.esc(c.label) + '</th>';
+      var lab = c.key === "window" ? (win + "d kWh")
+        : c.key === "trend" ? (win + "-day")
+        : c.key === "expected" ? ("Expected · " + win + "d")
+        : c.label;
+      if (!c.sortable) return '<th class="' + extra + (c.num ? "ansg-num " : "") + '">' + ctx.esc(lab) + '</th>';
       var on = sortKey === c.key;
       var arrow = on ? (sortDir === "asc" ? "▲" : "▼") : "";
       return '<th class="ansg-sortable ' + extra + (c.num ? "ansg-num " : "") + (on ? "ansg-on" : "") +
-        '" data-sort="' + c.key + '">' + ctx.esc(c.label) + '<span class="ansg-arrow">' + arrow + '</span></th>';
+        '" data-sort="' + c.key + '">' + ctx.esc(lab) + '<span class="ansg-arrow">' + arrow + '</span></th>';
     }).join("");
     var colgroupHtml =
       '<colgroup>' +
