@@ -639,8 +639,10 @@
     var mode = state.mode === "dock" ? "dock" : "modal";
     var firstOpen = !state.open;
     var doAnim = animate && firstOpen;
+    // Always paint with ho-open so the panel is visible immediately (rAF-only
+    // open left a frame where click appeared to do nothing).
     root.className =
-      "ho-mode-" + mode + (firstOpen ? "" : " ho-open") + (doAnim ? " ho-anim" : "");
+      "ho-mode-" + mode + " ho-open" + (doAnim ? " ho-anim" : "");
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
     // Clean header: brand + close only (100% ring removed — cramped next to ×,
     // readiness already reads in the subtitle + step pills; Ford 2026-07-14).
@@ -663,21 +665,19 @@
       "</section></div>";
 
     root.hidden = false;
+    try {
+      root.style.display = "";
+      root.style.opacity = "";
+    } catch (e) {}
     state.open = true;
     setShellOpen(mode === "dock");
     updatePill();
     wire(root);
 
     if (doAnim) {
-      requestAnimationFrame(function () {
-        root.classList.add("ho-open");
-        setTimeout(function () {
-          root.classList.remove("ho-anim");
-        }, 420);
-      });
-    } else {
-      root.classList.add("ho-open");
-      root.classList.remove("ho-anim");
+      setTimeout(function () {
+        root.classList.remove("ho-anim");
+      }, 420);
     }
   }
 
