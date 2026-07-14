@@ -264,6 +264,7 @@
       onlinePay: null,
       onlinePayConnected: false,
       onlinePayFee: null,
+      cloudLogins: [],
     };
     // arrays via FleetStore if ready
     try {
@@ -308,10 +309,19 @@
           if (cr.ok) cs = await cr.json();
         }
         if (cs && cs.credentials) {
-          live.cloudCreds = (cs.credentials || []).filter(function (c) {
+          var creds = (cs.credentials || []).filter(function (c) {
             return c && c.enabled !== false;
-          }).length;
+          });
+          live.cloudCreds = creds.length;
           live.cloud = live.cloudCreds > 0;
+          live.cloudLogins = creds.map(function (c) {
+            return {
+              provider: String(c.provider || "").toLowerCase(),
+              username: c.username || "",
+              lastOk: c.last_harvest_ok,
+              lastStatus: c.last_harvest_status || null,
+            };
+          });
         }
       }
       // device vault as alternate green
@@ -833,11 +843,12 @@
     }
   }
 
-  function loginFormHtml(kind) {
+  function loginFormHtml(kind, live) {
+    live = live || state.live || {};
     var opts = kind === "utility" ? UTILITY_OPTS : INVERTER_OPTS;
     var options = opts
       .map(function (o) {
-        return '<option value="' + esc(o.id) + '" data-ph="' + esc(o.ph) + '">' + esc(o.label) + "</option>";
+        return '<option value="' + esc(o.id) + '" data-ph="' + esc(o.ph) + '" data-label="' + esc(o.label) + '">' + esc(o.label) + "</option>";
       })
       .join("");
     var title =
@@ -846,6 +857,48 @@
       kind === "utility"
         ? "Encrypted on our servers · powers automatic offtaker invoices"
         : "Encrypted on our servers · keeps production fresh 24/7";
+    // Saved logins chips — makes multi-vendor clear (what's already in vs what you're adding)
+    var invSet = { chint: 1, fronius: 1, sma: 1, solaredge: 1, locus: 1, alsoenergy: 1 };
+    var utilSet = { gmp: 1, vec: 1, wec: 1 };
+    var chips = "";
+    var logins = live.cloudLogins || [];
+    var relevant = logins.filter(function (c) {
+      if (kind === "utility") return utilSet[c.provider] || !invSet[c.provider];
+      return invSet[c.provider];
+    });
+    if (relevant.length) {
+      chips =
+        '<div class="ho-login-saved" aria-label="Saved logins">' +
+        '<div class="ho-login-saved-lab">Already saved</div>' +
+        '<div class="ho-login-chips">' +
+        relevant
+          .map(function (c) {
+            var lab = c.provider;
+            for (var i = 0; i < opts.length; i++) {
+              if (opts[i].id === c.provider) {
+                lab = opts[i].label;
+                break;
+              }
+            }
+            var userShort = (c.username || "").length > 28
+              ? (c.username || "").slice(0, 26) + "…"
+              : c.username || "";
+            return (
+              '<span class="ho-login-chip" data-provider="' +
+              esc(c.provider) +
+              '" title="' +
+              esc(c.username || "") +
+              '"><i>✓</i><b>' +
+              esc(lab) +
+              "</b>" +
+              (userShort ? "<em>" + esc(userShort) + "</em>" : "") +
+              "</span>"
+            );
+          })
+          .join("") +
+        "</div></div>";
+    }
+    var firstLabel = opts[0].label;
     return (
       '<div class="ho-login" data-ho-login="' +
       esc(kind) +
@@ -855,24 +908,32 @@
       "</b><span>" +
       esc(sub) +
       "</span></div>" +
+      chips +
+      '<div class="ho-login-now" data-ho-now>' +
+      "Now adding: <b>" +
+      esc(firstLabel) +
+      "</b> — enter <em>that portal’s</em> username &amp; password below" +
+      "</div>" +
       '<label class="ho-login-field"><span>Portal</span>' +
       '<select class="ho-login-provider" aria-label="Portal">' +
       options +
       "</select></label>" +
-      '<label class="ho-login-field"><span>Username / email</span>' +
+      '<label class="ho-login-field"><span>Username / email for this portal</span>' +
       '<input type="text" class="ho-login-user" autocomplete="username" spellcheck="false" placeholder="' +
       esc(opts[0].ph) +
       '"></label>' +
-      '<label class="ho-login-field"><span>Password</span>' +
+      '<label class="ho-login-field"><span>Password for this portal</span>' +
       '<input type="password" class="ho-login-pass" autocomplete="current-password" placeholder="Portal password"></label>' +
       '<label class="ho-login-consent">' +
       '<input type="checkbox" class="ho-login-consent-chk">' +
       "<span>I authorize Array Operator to store this login encrypted and sign in on my behalf to keep my data fresh.</span></label>" +
       '<div class="ho-login-actions">' +
-      '<button type="button" class="ho-btn ho-btn-primary ho-login-save">Save login →</button>' +
+      '<button type="button" class="ho-btn ho-btn-primary ho-login-save">Save ' +
+      esc(firstLabel) +
+      " login →</button>" +
       '<span class="ho-login-msg" aria-live="polite"></span>' +
       "</div>" +
-      '<p class="ho-login-foot">Prefer device-only storage? Use Account → Auto-refresh → <b>Keep it on my computer</b> after you finish here.</p>' +
+      '<p class="ho-login-foot">Switch the portal above to add another vendor. Each portal keeps its own username &amp; password. Prefer device-only storage? Account → Auto-refresh → <b>Keep it on my computer</b>.</p>' +
       "</div>"
     );
   }
@@ -902,7 +963,7 @@
       html += statusChips(step, live);
       // Inline vault form first on login steps — highest-friction thing to remove
       if (step.loginForm) {
-        html += loginFormHtml(step.loginForm);
+        html += loginFormHtml(step.loginForm, live);
       }
       if (step.bullets && step.bullets.length) {
         html +=
@@ -1274,8 +1335,11 @@
         return;
       }
       if (passEl) passEl.value = "";
-      setMsg("✓ Saved — we’ll refresh this feed automatically.", true);
-      btn.textContent = "✓ Saved";
+      setMsg(
+        "✓ " + label + " saved — starting cloud harvest. Watch Inverters for Connecting…",
+        true
+      );
+      btn.textContent = "✓ " + label + " saved";
       // Connecting… skeletons for every inverter portal (SE/Fronius/SMA/Chint/…)
       try {
         if (window.__aoPendingFeeds) {
@@ -1283,14 +1347,24 @@
             window.__aoPendingFeeds.markInverter(provider, {
               label: label,
               note: "saved from hands-off setup",
+              rearm: true,
             });
           } else if (INVERTER_PENDING[provider]) {
             window.__aoPendingFeeds.mark(provider, {
               label: label,
               note: "saved from hands-off setup",
+              rearm: true,
             });
           }
         }
+      } catch (e) {}
+      // Kick harvester to pick this login up on the next tick (≤90s) — don't wait for cron
+      try {
+        fetch("/v1/cloud-capture/refresh", {
+          method: "POST",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: "{}",
+        }).catch(function () {});
       } catch (e) {}
       try {
         window.dispatchEvent(new Event("ao:vault-changed"));
@@ -1299,12 +1373,25 @@
       setTimeout(function () {
         probeLive().then(function () {
           softUpdate();
-          // softUpdate rewires the button — find it again and set "Save another"
           var root = document.getElementById("hoTour");
-          var newBtn = root && root.querySelector(".ho-login-save");
+          var box2 = root && root.querySelector("[data-ho-login]");
+          var newBtn = box2 && box2.querySelector(".ho-login-save");
+          var sel2 = box2 && box2.querySelector(".ho-login-provider");
+          var lab2 =
+            (sel2 && sel2.options[sel2.selectedIndex] && sel2.options[sel2.selectedIndex].text) ||
+            "next";
           if (newBtn) {
             newBtn.disabled = false;
-            newBtn.textContent = "Save another →";
+            newBtn.textContent = "Add another portal →";
+          }
+          // Nudge operator to pick a different portal for multi-vendor
+          var nowEl = box2 && box2.querySelector("[data-ho-now]");
+          if (nowEl) {
+            nowEl.innerHTML =
+              "<b>✓ " +
+              esc(label) +
+              " is saved.</b> Pick another portal above to add the next login, or continue.";
+            nowEl.classList.add("ho-login-now-ok");
           }
         });
       }, 600);
@@ -1321,23 +1408,102 @@
       box._hoLoginWired = true;
       var sel = box.querySelector(".ho-login-provider");
       var userEl = box.querySelector(".ho-login-user");
-      if (sel && userEl) {
+      var passEl = box.querySelector(".ho-login-pass");
+      var msg = box.querySelector(".ho-login-msg");
+      var save = box.querySelector(".ho-login-save");
+      var nowEl = box.querySelector("[data-ho-now]");
+      var prevProvider = (sel && sel.value) || "";
+
+      function applyProvider(opt, opts) {
+        opts = opts || {};
+        var ph = opt && opt.getAttribute("data-ph");
+        var lab = (opt && (opt.getAttribute("data-label") || opt.text)) || "portal";
+        if (ph && userEl) userEl.placeholder = ph;
+        if (passEl && opts.clearPass !== false) passEl.value = "";
+        if (msg) {
+          msg.textContent = "";
+          msg.className = "ho-login-msg";
+        }
+        if (save) {
+          save.disabled = false;
+          // If this portal is already saved, say Update
+          var already = false;
+          try {
+            var logins = (state.live && state.live.cloudLogins) || [];
+            var code = (opt && opt.value) || "";
+            already = logins.some(function (c) {
+              return c.provider === code;
+            });
+          } catch (e) {}
+          save.textContent = already
+            ? "Update " + lab + " login →"
+            : "Save " + lab + " login →";
+        }
+        if (nowEl) {
+          nowEl.classList.remove("ho-login-now-ok");
+          nowEl.innerHTML =
+            "Now adding: <b>" +
+            esc(lab) +
+            "</b> — enter <em>that portal’s</em> username &amp; password below" +
+            (opts.flash
+              ? ' <span class="ho-login-switched">switched</span>'
+              : "");
+          if (opts.flash) {
+            nowEl.classList.remove("ho-login-now-flash");
+            // reflow to restart CSS animation
+            void nowEl.offsetWidth;
+            nowEl.classList.add("ho-login-now-flash");
+            setTimeout(function () {
+              nowEl.classList.remove("ho-login-now-flash");
+              var sw = nowEl.querySelector(".ho-login-switched");
+              if (sw) sw.remove();
+            }, 1600);
+          }
+        }
+        // Clicking a saved chip can prefill username
+        if (opts.prefillUser != null && userEl) userEl.value = opts.prefillUser;
+      }
+
+      if (sel) {
         sel.addEventListener("change", function () {
           var opt = sel.options[sel.selectedIndex];
-          var ph = opt && opt.getAttribute("data-ph");
-          if (ph) userEl.placeholder = ph;
+          var code = opt && opt.value;
+          // Switching portal = new form fill — clear password so we never
+          // silently reuse the previous vendor's secret.
+          applyProvider(opt, {
+            flash: code !== prevProvider,
+            clearPass: true,
+          });
+          prevProvider = code || "";
         });
       }
-      var save = box.querySelector(".ho-login-save");
+      // Saved chips → jump to that portal for update
+      box.querySelectorAll(".ho-login-chip[data-provider]").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          var code = chip.getAttribute("data-provider");
+          if (!sel || !code) return;
+          sel.value = code;
+          var opt = sel.options[sel.selectedIndex];
+          var userHint = "";
+          try {
+            var logins = (state.live && state.live.cloudLogins) || [];
+            var hit = logins.find(function (c) {
+              return c.provider === code;
+            });
+            if (hit) userHint = hit.username || "";
+          } catch (e) {}
+          applyProvider(opt, { flash: true, clearPass: true, prefillUser: userHint });
+          prevProvider = code;
+          if (passEl) passEl.focus();
+        });
+      });
       if (save) {
         save.addEventListener("click", function () {
           saveLoginFromForm(box);
         });
       }
-      // Enter in password field submits
-      var pass = box.querySelector(".ho-login-pass");
-      if (pass) {
-        pass.addEventListener("keydown", function (e) {
+      if (passEl) {
+        passEl.addEventListener("keydown", function (e) {
           if (e.key === "Enter") {
             e.preventDefault();
             saveLoginFromForm(box);

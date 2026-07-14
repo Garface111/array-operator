@@ -6395,9 +6395,22 @@
                     mark.call(window.__aoPendingFeeds, saveCode, {
                       label: (BRAND[saveCode] || saveCode),
                       note: "cloud harvest starting",
+                      rearm: true,
                     });
                   }
                 } catch(e){}
+                // Kick harvester so the login doesn't sit until the next cron tick
+                try {
+                  await cloudOp("refresh");
+                } catch(e){
+                  try {
+                    await fetch("/v1/cloud-capture/refresh", {
+                      method: "POST",
+                      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+                      body: "{}",
+                    });
+                  } catch(e2){}
+                }
                 // Re-render so the row flips to the saved "On" state with a status line.
                 setTimeout(() => { wireAutoRefreshRow(); }, 700);
               } else {

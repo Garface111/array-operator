@@ -1682,30 +1682,53 @@
     return "almost there — large fleets can take a minute";
   }
 
+  function _pendingCopy(p, label) {
+    const st = p.status || "connecting";
+    if (st === "failed") {
+      return p.stuckMsg ||
+        `We couldn’t sign into <b>${label}</b> with the saved login. Check the password under Account → Auto-refresh, then save again.`;
+    }
+    if (st === "stuck") {
+      return p.stuckMsg ||
+        `Still working on <b>${label}</b> — your login is saved and we keep retrying. Large fleets can take a few minutes.`;
+    }
+    const wait = _waitPhrase(p);
+    return `We got your <b>${label}</b> sign-in — arrays are landing on your account now (<span data-pending-wait>${esc(wait)}</span>). This page updates automatically.`;
+  }
+
+  function _pendingStat(p) {
+    const st = p.status || "connecting";
+    if (st === "failed") return "Login issue";
+    if (st === "stuck") return "Still working…";
+    return "Connecting…";
+  }
+
   /** Skeleton vendor block while a just-connected portal is still landing.
    *  Used for every inverter vendor (SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy). */
   function pendingVendorHtml(p, opts) {
     opts = opts || {};
     const label = esc(p.label || (window.__aoPendingFeeds && window.__aoPendingFeeds.labelFor
       ? window.__aoPendingFeeds.labelFor(p.vendor) : null) || p.vendor || "Vendor");
-    const wait = _waitPhrase(p);
-    // is-enter only on first paint — later soft updates never re-animate
+    const st = p.status || "connecting";
     const enterCls = opts.animate === false ? "" : " is-enter";
-    return `<div class="vs-pending${enterCls}" data-pending-vendor="${esc(p.vendor)}">
+    const stCls = st === "failed" ? " is-failed" : st === "stuck" ? " is-stuck" : "";
+    const skel = st === "failed"
+      ? ""
+      : `<div class="vs-pending-skel"></div><div class="vs-pending-skel vs-pending-skel-short"></div>`;
+    return `<div class="vs-pending${enterCls}${stCls}" data-pending-vendor="${esc(p.vendor)}" data-pending-status="${esc(st)}">
       <div class="vs-pending-head">
         <span class="vs-pending-badge">${label}</span>
         <span class="vs-pending-pulse" aria-hidden="true"></span>
-        <span class="vs-pending-stat">Connecting…</span>
+        <span class="vs-pending-stat" data-pending-stat>${esc(_pendingStat(p))}</span>
       </div>
       <div class="vs-pending-body">
-        <div class="vs-pending-skel"></div>
-        <div class="vs-pending-skel vs-pending-skel-short"></div>
-        <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (<span data-pending-wait>${esc(wait)}</span>). This page updates automatically.</p>
+        ${skel}
+        <p class="vs-pending-copy" data-pending-copy>${_pendingCopy(p, label)}</p>
       </div>
     </div>`;
   }
 
-  /** In-place update of wait copy — never remount (avoids enter anim + shimmer restart). */
+  /** In-place update of wait copy / status — never remount (avoids enter anim + shimmer restart). */
   function softUpdatePendingCards(root, pending) {
     if (!root || !pending || !pending.length) return false;
     const nodes = root.querySelectorAll("[data-pending-vendor]");
@@ -1714,11 +1737,36 @@
       if (nodes[i].getAttribute("data-pending-vendor") !== pending[i].vendor) return false;
     }
     pending.forEach((p, i) => {
-      const waitEl = nodes[i].querySelector("[data-pending-wait]");
-      const phrase = _waitPhrase(p);
-      if (waitEl && waitEl.textContent !== phrase) waitEl.textContent = phrase;
-      // Drop one-shot enter class if still present
-      nodes[i].classList.remove("is-enter");
+      const el = nodes[i];
+      const st = p.status || "connecting";
+      const prev = el.getAttribute("data-pending-status") || "connecting";
+      // Status class change needs a light rebuild of that card only
+      if (prev !== st) {
+        const label = esc(p.label || p.vendor || "Vendor");
+        el.setAttribute("data-pending-status", st);
+        el.classList.toggle("is-failed", st === "failed");
+        el.classList.toggle("is-stuck", st === "stuck");
+        const stat = el.querySelector("[data-pending-stat]");
+        if (stat) stat.textContent = _pendingStat(p);
+        const copy = el.querySelector("[data-pending-copy]");
+        if (copy) copy.innerHTML = _pendingCopy(p, label);
+        const body = el.querySelector(".vs-pending-body");
+        if (body && st === "failed") {
+          body.querySelectorAll(".vs-pending-skel").forEach(s => s.remove());
+        }
+      } else if (st === "connecting") {
+        const waitEl = el.querySelector("[data-pending-wait]");
+        const phrase = _waitPhrase(p);
+        if (waitEl && waitEl.textContent !== phrase) waitEl.textContent = phrase;
+      } else {
+        const copy = el.querySelector("[data-pending-copy]");
+        const label = esc(p.label || p.vendor || "Vendor");
+        if (copy && p.stuckMsg) {
+          const next = _pendingCopy(p, label);
+          if (copy.innerHTML !== next) copy.innerHTML = next;
+        }
+      }
+      el.classList.remove("is-enter");
     });
     return true;
   }
