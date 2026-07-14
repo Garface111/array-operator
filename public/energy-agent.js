@@ -33,6 +33,7 @@
     micStream: null,
     audioEl: null,
     voiceMode: "none", // realtime | webspeech | none
+    rtResponseActive: false, // track open Realtime response — avoid cancel noise
   };
 
   function token() {
@@ -72,18 +73,53 @@
 
   // ── DOM ──────────────────────────────────────────────────────────────────
   function ensureUi() {
-    if (document.getElementById("eaRoot")) return;
-    var root = document.createElement("div");
-    root.id = "eaRoot";
-    root.innerHTML =
-      '<button type="button" id="eaOrb" aria-label="Open Energy Agent" title="Energy Agent — click to talk">' +
-      '<span class="ea-ring" aria-hidden="true"></span></button>' +
-      // Visible CTA — browsers only show the mic prompt after a real click
-      '<button type="button" id="eaMicGate" class="ea-mic-gate" hidden>' +
-      '  <span class="ea-mic-gate-ic" aria-hidden="true">🎙</span>' +
-      '  <span class="ea-mic-gate-txt">Allow microphone</span>' +
-      '</button>' +
-      '<div id="eaPanel" role="dialog" aria-label="Energy Agent">' +
+    if (document.getElementById("eaPanel")) return;
+
+    // Tab-style control: inject at LEFT of #tabbar (in line with Fleet Triage)
+    var tabbar = document.getElementById("tabbar");
+    var orb = document.getElementById("eaOrb");
+    if (!orb) {
+      orb = document.createElement("button");
+      orb.type = "button";
+      orb.id = "eaOrb";
+      orb.className = "tab ea-tab";
+      orb.setAttribute("role", "tab");
+      orb.setAttribute("aria-label", "Open Energy Agent");
+      orb.title = "Energy Agent — click to talk";
+      orb.innerHTML =
+        '<span class="ea-tab-ic" aria-hidden="true"></span>' +
+        '<span class="ea-tab-label">Energy Agent</span>';
+      if (tabbar) {
+        tabbar.insertBefore(orb, tabbar.firstChild);
+      } else {
+        // Fallback if tabbar not present yet
+        var rootF = document.createElement("div");
+        rootF.id = "eaRoot";
+        rootF.className = "ea-floating";
+        rootF.appendChild(orb);
+        document.body.appendChild(rootF);
+      }
+    }
+
+    // Mic gate + left-rail panel live on body (fixed)
+    var gate = document.getElementById("eaMicGate");
+    if (!gate) {
+      gate = document.createElement("button");
+      gate.type = "button";
+      gate.id = "eaMicGate";
+      gate.className = "ea-mic-gate";
+      gate.hidden = true;
+      gate.innerHTML =
+        '<span class="ea-mic-gate-ic" aria-hidden="true">🎙</span>' +
+        '<span class="ea-mic-gate-txt">Allow microphone</span>';
+      document.body.appendChild(gate);
+    }
+
+    var panel = document.createElement("div");
+    panel.id = "eaPanel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "Energy Agent");
+    panel.innerHTML =
       '  <div class="ea-head">' +
       '    <div><h3>Energy Agent</h3>' +
       '    <p>Voice-first solar operator — fleet, invoices, earnings. Confirms before changing anything.</p></div>' +
@@ -100,15 +136,24 @@
       '    <button type="button" class="ea-mic" id="eaMic" title="Toggle microphone">Mic</button>' +
       '    <button type="button" class="ea-send" id="eaSend">Send</button>' +
       "  </div>" +
-      '  <div class="ea-legal">Sessions may be transcribed to improve support. Only your account. Never other tenants. Mic stays on while the agent is open.</div>' +
-      "</div>";
-    document.body.appendChild(root);
+      '  <div class="ea-legal">Sessions may be transcribed to improve support. Only your account. Never other tenants. Mic stays on while the agent is open.</div>';
+    document.body.appendChild(panel);
 
-    document.getElementById("eaOrb").onclick = function (e) {
+    // Lightweight marker root for status hooks that still look for #eaRoot
+    if (!document.getElementById("eaRoot")) {
+      var root = document.createElement("div");
+      root.id = "eaRoot";
+      root.setAttribute("aria-hidden", "true");
+      root.style.cssText = "display:none";
+      document.body.appendChild(root);
+    }
+
+    orb.onclick = function (e) {
       e.preventDefault();
+      e.stopPropagation();
       toggle(); // async; mic requested first inside toggle (user gesture)
     };
-    document.getElementById("eaMicGate").onclick = function (e) {
+    gate.onclick = function (e) {
       e.preventDefault();
       e.stopPropagation();
       requestMicFromClick();
@@ -328,7 +373,13 @@
     var panel = document.getElementById("eaPanel");
     var orb = document.getElementById("eaOrb");
     if (panel) panel.classList.toggle("open", state.open);
-    if (orb) orb.classList.toggle("open", state.open);
+    if (orb) {
+      orb.classList.toggle("open", state.open);
+      orb.classList.toggle("active", state.open);
+      orb.setAttribute("aria-pressed", state.open ? "true" : "false");
+    }
+    // Shift site content right; spawn left-rail card
+    document.body.classList.toggle("ea-shell-open", state.open);
     if (state.open) {
       await ensureSession();
       // Voice usually already starting from toggle(); only start here if mic ready
@@ -339,6 +390,57 @@
     } else {
       stopVoice(true); // keep mic permission stream; just tear down WebRTC
     }
+  }
+
+  /** Soft-refresh live surfaces after agent data writes (no full page reload). */
+  function softRefreshUi(detail) {
+    detail = detail || {};
+    try {
+      if (typeof window.__aoLoadReports === "function") {
+        window.__aoLoadReports();
+      }
+    } catch (e) {}
+    try {
+      if (window.FleetStore && typeof window.FleetStore.refetch === "function") {
+        window.FleetStore.refetch();
+      }
+    } catch (e) {}
+    try {
+      window.dispatchEvent(new CustomEvent("ea:data-changed", { detail: detail }));
+    } catch (e) {
+      try { window.dispatchEvent(new Event("ea:data-changed")); } catch (e2) {}
+    }
+    // Nudge any open offtaker accordion inputs if share changed
+    try {
+      if (detail && detail.subscription_id != null && detail.allocation_pct != null) {
+        var pct = Number(detail.allocation_pct);
+        if (pct <= 1) pct = pct * 100;
+        var sel = '[data-sub-id="' + detail.subscription_id + '"] input[data-of="allocation_pct"],' +
+          '#rbAccBody-' + detail.subscription_id + ' input[data-of="allocation_pct"]';
+        document.querySelectorAll(sel).forEach(function (inp) {
+          inp.value = String(Math.round(pct * 1000) / 1000);
+          inp.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      }
+    } catch (e) {}
+  }
+
+  function cancelRealtimeIfActive() {
+    if (!state.rtResponseActive) return;
+    if (!(state.dc && state.dc.readyState === "open")) return;
+    try {
+      state.dc.send(JSON.stringify({ type: "response.cancel" }));
+    } catch (e) {}
+  }
+
+  function isBenignVoiceError(msg) {
+    var s = String(msg || "").toLowerCase();
+    return (
+      s.indexOf("no active response") !== -1 ||
+      s.indexOf("cancellation failed") !== -1 ||
+      s.indexOf("response_cancel") !== -1 ||
+      s.indexOf("already has an active response") !== -1
+    );
   }
 
   // ── chat ─────────────────────────────────────────────────────────────────
@@ -364,10 +466,8 @@
     }
     state.thinking = true;
     setStatus("Thinking…", "think");
-    // While tools run, cancel any stray Realtime auto-speech so we stay one system
-    if (state.dc && state.dc.readyState === "open") {
-      try { state.dc.send(JSON.stringify({ type: "response.cancel" })); } catch (e) {}
-    }
+    // While tools run, cancel any stray Realtime speech only if one is active
+    cancelRealtimeIfActive();
     try {
       var r = await fetch(API.chat, {
         method: "POST",
@@ -428,11 +528,17 @@
     });
     var d = await r.json().catch(function () { return null; });
     showPending(null);
-    if (d && d.command) {
-      addMsg("agent", yes ? "On it." : "Cancelled.");
-      await runCommand(d.command);
-    } else if (d && d.cancelled) {
+    if (d && d.cancelled) {
       addMsg("agent", "Cancelled.");
+      return;
+    }
+    if (d && d.command) {
+      addMsg("agent", yes ? "On it — applying now." : "Cancelled.");
+      await runCommand(d.command);
+      var extras = d.extra_commands || [];
+      for (var i = 0; i < extras.length; i++) await runCommand(extras[i]);
+      // Soft-refresh after any confirmed write
+      softRefreshUi((d.command.args && d.command.args.body) || {});
     }
   }
 
@@ -474,6 +580,11 @@
         ok = clickEl(cmd.args && cmd.args.selector);
       } else if (cmd.type === "api_patch" || cmd.type === "api") {
         ok = await apiProxy(cmd.args || {});
+        detail = cmd.args || {};
+        if (ok) softRefreshUi(detail.body || detail);
+      } else if (cmd.type === "ui_refresh" || cmd.type === "refresh") {
+        softRefreshUi(cmd.args || {});
+        ok = true;
         detail = cmd.args || {};
       } else {
         detail = { error: "unknown command type" };
@@ -533,10 +644,21 @@
       headers: authHeaders(),
       body: args.body ? JSON.stringify(args.body) : undefined,
     });
+    var d = null;
+    try { d = await r.clone().json(); } catch (e) { d = null; }
     if (args.open_url_field) {
-      var d = await r.json().catch(function () { return null; });
       var url = d && (d[args.open_url_field] || d.url || d.portal_url);
       if (url) window.open(url, "_blank", "noopener");
+    }
+    if (r.ok) {
+      softRefreshUi(Object.assign({}, args.body || {}, d && d.subscription ? {
+        subscription_id: d.subscription.id,
+        allocation_pct: d.subscription.allocation_pct,
+        array_share_pct: d.subscription.array_share_pct,
+      } : {}));
+    } else {
+      var errDetail = (d && d.detail) || ("HTTP " + r.status);
+      addMsg("agent", "Couldn't save that change: " + String(errDetail).slice(0, 180));
     }
     return r.ok;
   }
@@ -594,14 +716,10 @@
   }
 
   function stopSpeak() {
-    // Barge-in: cancel browser TTS; Realtime barge-in is handled by server VAD
+    // Barge-in: cancel browser TTS; only cancel Realtime if a response is active
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     state.speaking = false;
-    if (state.dc && state.dc.readyState === "open") {
-      try {
-        state.dc.send(JSON.stringify({ type: "response.cancel" }));
-      } catch (e) {}
-    }
+    cancelRealtimeIfActive();
   }
 
   function speak(text) {
@@ -609,6 +727,9 @@
     // Prefer GPT Realtime TTS when connected
     if (state.dc && state.dc.readyState === "open") {
       try {
+        // If something is already speaking, cancel it first; then speak the new line
+        cancelRealtimeIfActive();
+        state.rtResponseActive = true;
         // Ask the Realtime model to speak this line (tools already ran server-side)
         state.dc.send(JSON.stringify({
           type: "response.create",
@@ -621,7 +742,9 @@
         state.speaking = true;
         setStatus("Speaking (GPT voice)…", "speak");
         return;
-      } catch (e) {}
+      } catch (e) {
+        state.rtResponseActive = false;
+      }
     }
     // Fallback: browser speech synthesis
     if (!window.speechSynthesis) return;
@@ -644,21 +767,35 @@
 
   function handleRealtimeEvent(ev) {
     if (!ev || !ev.type) return;
+    // Track whether a Realtime response is in flight (so cancel is safe)
+    if (ev.type === "response.created" || ev.type === "response.output_item.added") {
+      state.rtResponseActive = true;
+    }
+    if (
+      ev.type === "response.done" ||
+      ev.type === "response.cancelled" ||
+      ev.type === "response.failed" ||
+      ev.type === "output_audio_buffer.stopped"
+    ) {
+      state.rtResponseActive = false;
+    }
     // Model audio lifecycle
     if (ev.type === "output_audio_buffer.started" || ev.type === "response.output_audio.delta") {
       state.speaking = true;
+      state.rtResponseActive = true;
       setStatus("Speaking (GPT voice)…", "speak");
     }
     if (ev.type === "output_audio_buffer.stopped" || ev.type === "response.done") {
       state.speaking = false;
+      state.rtResponseActive = false;
       if (state.listening) setStatus("Listening…", "listen");
     }
     // User finished speaking — ONE path: show once, then agent turn (tools + speak)
     if (ev.type === "conversation.item.input_audio_transcription.completed") {
       var said = (ev.transcript || "").trim();
       if (!said || state.thinking) return;
-      // Cancel any default Realtime reply so we don't get dual conversations
-      try { state.dc && state.dc.send(JSON.stringify({ type: "response.cancel" })); } catch (e) {}
+      // Only cancel if a response is actually running (avoids "no active response")
+      cancelRealtimeIfActive();
       addMsg("user", said);
       if (state.sessionId) {
         fetch(API.transcript, {
@@ -677,6 +814,11 @@
     // Do NOT addMsg for assistant Realtime transcripts — agent bubble comes only from turn()
     if (ev.type === "error") {
       var msg = (ev.error && (ev.error.message || ev.error)) || "Realtime error";
+      // Benign: cancel when nothing is speaking — ignore, do not alarm the user
+      if (isBenignVoiceError(msg)) {
+        state.rtResponseActive = false;
+        return;
+      }
       addMsg("agent", "Voice error: " + String(msg).slice(0, 200));
       setStatus("Voice error", "warn");
     }
