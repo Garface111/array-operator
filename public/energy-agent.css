@@ -345,7 +345,7 @@ html:not(.sky) .ea-msg .ea-code{
 /* ── Footer: raised glass composer (higher, professional) ───────────────── */
 .ea-footer{
   flex: 0 0 auto;
-  padding: 0 12px 14px;
+  padding: 0 10px 12px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(248,251,255,.92) 28%, rgba(248,251,255,.98) 100%);
   border-top: 1px solid rgba(14,165,233,.1);
@@ -354,6 +354,7 @@ html:not(.sky) .ea-msg .ea-code{
   padding-top: 12px;
   box-shadow: 0 -16px 28px -22px rgba(14,60,120,.18);
   z-index: 2;
+  min-width: 0;
 }
 html:not(.sky) .ea-footer{
   background: linear-gradient(180deg, transparent 0%, rgba(11,18,32,.92) 30%, rgba(11,18,32,.98) 100%);
@@ -378,7 +379,9 @@ html:not(.sky) .ea-footer{
     0 1px 0 rgba(255,255,255,.8) inset,
     0 10px 28px -14px rgba(14,60,120,.28),
     0 0 0 1px rgba(14,165,233,.04);
+  /* clip radius without eating the Send chip on a 360px rail */
   overflow: hidden;
+  min-width: 0;
   transition: border-color .15s, box-shadow .15s;
 }
 .ea-compose-shell:focus-within{
@@ -428,35 +431,49 @@ html:not(.sky) .ea-compose-shell:focus-within{
   font-weight: 500;
 }
 
+/* Compact action row — Improve / Mic / Mute / Send must all fit a 360px rail
+   (Ford 2026-07-13: Send was clipped by overflow + oversized chips). */
 .ea-compose-bar{
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px 8px;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 5px 6px 7px;
   border-top: 1px solid rgba(14,165,233,.08);
   background: linear-gradient(180deg, rgba(14,165,233,.03), rgba(14,165,233,.06));
+  min-width: 0;
+  box-sizing: border-box;
 }
 html:not(.sky) .ea-compose-bar{
   border-top-color: rgba(255,255,255,.06);
   background: rgba(0,0,0,.15);
 }
-.ea-compose-spacer{ flex: 1 1 auto; min-width: 4px; }
+/* Spacer collapses first so Send never gets pushed off-screen */
+.ea-compose-spacer{
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 8px;
+}
 
-/* Quiet chip buttons (Improve / Mic) */
+/* Quiet chip buttons (Improve / Mic / Mute) — compact for the rail */
 .ea-chip{
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 32px;
-  padding: 0 10px;
+  justify-content: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 7px;
   border-radius: 999px;
   border: 1px solid rgba(14,165,233,.18);
   background: rgba(255,255,255,.75);
   color: #0c4a6e;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 680;
-  letter-spacing: -.01em;
+  letter-spacing: -.015em;
+  white-space: nowrap;
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s, transform .1s;
 }
@@ -466,8 +483,13 @@ html:not(.sky) .ea-compose-bar{
   transform: translateY(-0.5px);
 }
 .ea-chip:active{ transform: translateY(0); }
-.ea-chip-ic{ font-size: 12px; line-height: 1; opacity: .9; }
-.ea-chip-lbl{ line-height: 1; }
+.ea-chip-ic{ font-size: 11px; line-height: 1; opacity: .9; flex: none; }
+.ea-chip-lbl{
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 4.6em;
+}
 html:not(.sky) .ea-chip{
   background: rgba(255,255,255,.06);
   border-color: rgba(255,255,255,.1);
@@ -492,19 +514,21 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 }
 .ea-chip.ea-mute.on:hover{ filter: brightness(1.06); }
 
-/* Primary send */
+/* Primary send — never shrink / never clip */
 .ea-send{
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px 0 16px;
+  gap: 4px;
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px 0 11px;
   border-radius: 999px;
   border: 0;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 740;
   letter-spacing: -.01em;
+  white-space: nowrap;
   cursor: pointer;
   background: linear-gradient(180deg, #38bdf8, #0ea5e9);
   color: #fff;
@@ -519,9 +543,10 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 .ea-send:active{ transform: translateY(0); filter: brightness(.98); }
 .ea-send-ic{
   display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 50%;
+  width: 15px; height: 15px; border-radius: 50%;
   background: rgba(255,255,255,.22);
-  font-size: 12px; font-weight: 800; line-height: 1;
+  font-size: 10px; font-weight: 800; line-height: 1;
+  flex: none;
 }
 .ea-send-lbl{ line-height: 1; }
 
