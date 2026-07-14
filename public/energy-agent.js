@@ -10,6 +10,7 @@
     chat: "/v1/energy-agent/chat",
     confirm: "/v1/energy-agent/confirm",
     realtime: "/v1/energy-agent/realtime-session",
+    realtimeCall: "/v1/energy-agent/realtime-call",
     transcript: "/v1/energy-agent/transcript",
     uiResult: "/v1/energy-agent/ui-result",
     budget: "/v1/energy-agent/budget",
@@ -25,6 +26,13 @@
     recog: null,
     budget: null,
     brain: null,
+    realtimeReady: false,
+    // GPT Realtime WebRTC
+    pc: null,
+    dc: null,
+    micStream: null,
+    audioEl: null,
+    voiceMode: "none", // realtime | webspeech | none
   };
 
   function token() {
@@ -189,9 +197,17 @@
     }
     state.sessionId = d.session_id;
     state.brain = d.brain;
+    state.realtimeReady = !!d.realtime_ready;
     setBudget(d.budget);
     addMsg("agent", d.intro || "Hi — I'm Energy Agent.");
-    setStatus(d.realtime_ready ? "Voice ready · " + (d.brain || "brain") : "Text ready · " + (d.brain || "brain"), "on");
+    if (d.realtime_ready) {
+      setStatus("GPT voice ready — connecting mic…", "on");
+    } else {
+      setStatus("Text ready (no OPENAI_API_KEY for GPT voice yet)", "warn");
+      addMsg("agent",
+        "Voice needs OPENAI_API_KEY on the server for the latest GPT Realtime model. " +
+        "You can still type. Brain: " + (d.brain || "stub") + ".");
+    }
     return state.sessionId;
   }
 
@@ -209,13 +225,12 @@
     if (orb) orb.classList.toggle("open", state.open);
     if (state.open) {
       await ensureSession();
-      // Auto-start mic after open (always-on once enabled)
+      // Always-on voice when panel opens
       if (signedIn() && !state.listening) {
-        setTimeout(function () { startMic(true); }, 400);
+        setTimeout(function () { startVoice(true); }, 300);
       }
     } else {
-      stopMic();
-      stopSpeak();
+      stopVoice();
     }
   }
 
@@ -261,8 +276,12 @@
       else showPending(null);
       var cmds = d.ui_commands || [];
       for (var i = 0; i < cmds.length; i++) await runCommand(cmds[i]);
-      addMsg("agent", d.reply || "…");
-      speak(d.reply || "");
+      var reply = d.reply || "…";
+      addMsg("agent", reply);
+      if (reply !== _lastSpoken) {
+        _lastSpoken = reply;
+        speak(reply);
+      }
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     } catch (e) {
       addMsg("agent", "Network error — try again.");
@@ -388,18 +407,267 @@
     click: clickEl,
   };
 
-  // ── voice (Web Speech API — always-on once open) ─────────────────────────
-  function canSpeech() {
-    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  // ── Voice: GPT Realtime WebRTC (primary) + Web Speech fallback ───────────
+  // Latest model (server-side): gpt-realtime-2.1 via /v1/energy-agent/realtime-call
+
+  function syncMicBtn() {
+    var b = document.getElementById("eaMic");
+    if (b) {
+      b.classList.toggle("on", state.listening);
+      b.textContent = state.listening ? "Mic on" : "Mic";
+    }
   }
 
-  function startMic(fromOpen) {
-    if (!canSpeech()) {
-      if (!fromOpen) addMsg("agent", "This browser has no speech recognition — type instead. Chrome works best.");
+  function stopVoice() {
+    state.listening = false;
+    state.speaking = false;
+    // WebRTC
+    try {
+      if (state.dc) { state.dc.close(); } 
+    } catch (e) {}
+    state.dc = null;
+    try {
+      if (state.pc) { state.pc.close(); }
+    } catch (e) {}
+    state.pc = null;
+    if (state.micStream) {
+      try { state.micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      state.micStream = null;
+    }
+    if (state.audioEl) {
+      try { state.audioEl.pause(); state.audioEl.srcObject = null; } catch (e) {}
+    }
+    // Web Speech fallback
+    if (state.recog) {
+      try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
+      state.recog = null;
+    }
+    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+    state.voiceMode = "none";
+    syncMicBtn();
+  }
+
+  function stopSpeak() {
+    // Barge-in: cancel browser TTS; Realtime barge-in is handled by server VAD
+    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+    state.speaking = false;
+    if (state.dc && state.dc.readyState === "open") {
+      try {
+        state.dc.send(JSON.stringify({ type: "response.cancel" }));
+      } catch (e) {}
+    }
+  }
+
+  function speak(text) {
+    if (!text) return;
+    // Prefer GPT Realtime TTS when connected
+    if (state.dc && state.dc.readyState === "open") {
+      try {
+        // Ask the Realtime model to speak this line (tools already ran server-side)
+        state.dc.send(JSON.stringify({
+          type: "response.create",
+          response: {
+            instructions:
+              "Speak the following to the user naturally, in English, no extra commentary:\n\n" +
+              String(text).slice(0, 1200),
+          },
+        }));
+        state.speaking = true;
+        setStatus("Speaking (GPT voice)…", "speak");
+        return;
+      } catch (e) {}
+    }
+    // Fallback: browser speech synthesis
+    if (!window.speechSynthesis) return;
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+    var u = new SpeechSynthesisUtterance(String(text).slice(0, 800));
+    u.rate = 1.05;
+    u.onstart = function () { state.speaking = true; setStatus("Speaking…", "speak"); };
+    u.onend = function () {
+      state.speaking = false;
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+    };
+    window.speechSynthesis.speak(u);
+  }
+
+  function dcSend(obj) {
+    if (state.dc && state.dc.readyState === "open") {
+      try { state.dc.send(JSON.stringify(obj)); } catch (e) {}
+    }
+  }
+
+  function handleRealtimeEvent(ev) {
+    if (!ev || !ev.type) return;
+    // Model audio lifecycle
+    if (ev.type === "output_audio_buffer.started" || ev.type === "response.output_audio.delta") {
+      state.speaking = true;
+      setStatus("Speaking (GPT voice)…", "speak");
+    }
+    if (ev.type === "output_audio_buffer.stopped" || ev.type === "response.done") {
+      state.speaking = false;
+      if (state.listening) setStatus("Listening…", "listen");
+    }
+    // User transcript (when available)
+    if (ev.type === "conversation.item.input_audio_transcription.completed") {
+      var said = (ev.transcript || "").trim();
+      if (said) {
+        addMsg("user", said);
+        // Also run our tool brain (Grok/Claude) then speak the result via Realtime
+        turn(said, "voice");
+        if (state.sessionId) {
+          fetch(API.transcript, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              session_id: state.sessionId,
+              lines: [{ role: "user", text: said }],
+              voice_seconds: Math.max(2, said.split(/\s+/).length * 0.4),
+            }),
+          }).catch(function () {});
+        }
+      }
+    }
+    // Assistant text transcript (for the chat panel)
+    if (ev.type === "response.output_audio_transcript.done" ||
+        ev.type === "response.audio_transcript.done") {
+      var tr = (ev.transcript || "").trim();
+      // Avoid double-adding if we already added from /chat reply
+      if (tr && !state.thinking) {
+        // only log if it looks like a pure voice turn
+      }
+    }
+    if (ev.type === "error") {
+      var msg = (ev.error && (ev.error.message || ev.error)) || "Realtime error";
+      addMsg("agent", "Voice error: " + String(msg).slice(0, 200));
+      setStatus("Voice error", "warn");
+    }
+  }
+
+  async function ensureMicStream() {
+    if (state.micStream) {
+      var live = state.micStream.getTracks().some(function (t) { return t.readyState === "live"; });
+      if (live) {
+        // Re-enable if we muted them after the startup permission grant
+        try { state.micStream.getTracks().forEach(function (t) { t.enabled = true; }); } catch (e) {}
+        return state.micStream;
+      }
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("This browser cannot access the microphone.");
+    }
+    var stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    state.micStream = stream;
+    return stream;
+  }
+
+  // Avoid double-adding chat reply when Realtime is also speaking
+  var _lastSpoken = "";
+
+  /** Primary: GPT Realtime over WebRTC via our server (unified /realtime-call). */
+  async function startRealtimeVoice() {
+    setStatus("Connecting GPT voice…", "think");
+    var stream = await ensureMicStream();
+
+    stopVoice(); // clear previous pc but re-get stream if we killed it
+    stream = await ensureMicStream();
+
+    var pc = new RTCPeerConnection();
+    state.pc = pc;
+
+    // Play model audio
+    if (!state.audioEl) {
+      state.audioEl = document.createElement("audio");
+      state.audioEl.autoplay = true;
+      state.audioEl.setAttribute("playsinline", "true");
+      // Keep element in DOM so autoplay policies are happier
+      state.audioEl.style.cssText = "position:fixed;width:0;height:0;opacity:0;pointer-events:none;";
+      document.body.appendChild(state.audioEl);
+    }
+    pc.ontrack = function (e) {
+      state.audioEl.srcObject = e.streams[0];
+      var p = state.audioEl.play();
+      if (p && p.catch) p.catch(function () {});
+    };
+
+    stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
+
+    var dc = pc.createDataChannel("oai-events");
+    state.dc = dc;
+    dc.addEventListener("message", function (e) {
+      try { handleRealtimeEvent(JSON.parse(e.data)); } catch (err) {}
+    });
+    dc.addEventListener("open", function () {
+      // Enable input transcription so we can run tools on what you said
+      dcSend({
+        type: "session.update",
+        session: {
+          type: "realtime",
+          audio: {
+            input: {
+              transcription: { model: "gpt-4o-mini-transcribe" },
+            },
+          },
+        },
+      });
+      // Greet the user in GPT voice
+      dcSend({
+        type: "response.create",
+        response: {
+          instructions:
+            "Greet the user briefly as Energy Agent. Say you're ready to help with their " +
+            "solar fleet, invoices, and earnings. One or two short sentences.",
+        },
+      });
+      setStatus("Listening (GPT Realtime)…", "listen");
+    });
+
+    var offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    var sdpRes = await fetch(API.realtimeCall, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token(),
+        "Content-Type": "application/sdp",
+      },
+      body: offer.sdp,
+    });
+    if (!sdpRes.ok) {
+      var errText = await sdpRes.text();
+      var detail = errText;
+      try { detail = JSON.parse(errText).detail || errText; } catch (e) {}
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    var answerSdp = await sdpRes.text();
+    await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+    state.listening = true;
+    state.voiceMode = "realtime";
+    syncMicBtn();
+    setStatus("Listening (GPT Realtime)…", "listen");
+    addMsg("agent", "GPT voice connected — talk anytime. I’ll reply out loud.");
+  }
+
+  /** Fallback when OpenAI key missing or WebRTC fails: Web Speech + browser TTS */
+  function startWebSpeechFallback(fromOpen) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      if (!fromOpen) {
+        addMsg("agent", "No GPT voice key and no browser speech API — type instead.");
+      }
+      setStatus("Type to chat", "warn");
       return;
     }
-    stopMic();
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    stopVoice();
+    // Keep mic permission warm
+    ensureMicStream().catch(function () {});
+
     var recog = new SR();
     recog.continuous = true;
     recog.interimResults = true;
@@ -415,36 +683,22 @@
       if (finalBuf.trim() && !state.thinking) {
         var said = finalBuf.trim();
         finalBuf = "";
-        // Barge-in: stop TTS
         stopSpeak();
         turn(said, "voice");
-        // log voice seconds estimate
-        if (state.sessionId) {
-          fetch(API.transcript, {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({
-              session_id: state.sessionId,
-              lines: [{ role: "user", text: said }],
-              voice_seconds: Math.max(2, said.split(/\s+/).length * 0.4),
-            }),
-          }).catch(function () {});
-        }
       } else if (interim) {
         setStatus("Hearing: " + interim.slice(0, 40), "listen");
       }
     };
     recog.onerror = function (e) {
       if (e.error === "not-allowed") {
-        addMsg("agent", "Microphone blocked — allow mic for this site, or type.");
+        addMsg("agent", "Microphone blocked — click the lock icon in the address bar → allow mic, then Mic on.");
         setStatus("Mic blocked", "warn");
         state.listening = false;
         syncMicBtn();
       }
     };
     recog.onend = function () {
-      // Always-on: restart while panel open
-      if (state.open && state.listening) {
+      if (state.open && state.listening && state.voiceMode === "webspeech") {
         try { recog.start(); } catch (e) {}
       }
     };
@@ -452,71 +706,75 @@
       recog.start();
       state.recog = recog;
       state.listening = true;
+      state.voiceMode = "webspeech";
       syncMicBtn();
-      setStatus("Listening…", "listen");
+      setStatus("Listening (browser fallback)…", "listen");
+      addMsg("agent", "Using browser speech (fallback). For real GPT voice, set OPENAI_API_KEY on Railway.");
     } catch (e) {
-      addMsg("agent", "Couldn't start the mic.");
+      addMsg("agent", "Couldn't start the mic: " + (e.message || e));
     }
   }
 
-  function stopMic() {
-    state.listening = false;
-    if (state.recog) {
-      try { state.recog.onend = null; state.recog.stop(); } catch (e) {}
-      state.recog = null;
+  async function startVoice(fromOpen) {
+    if (!signedIn()) {
+      addMsg("agent", "Sign in first.");
+      return;
     }
-    syncMicBtn();
+    try {
+      // Always request mic first (shows Chrome prompt if needed)
+      await ensureMicStream();
+    } catch (err) {
+      var name = (err && err.name) || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        addMsg("agent", "Microphone permission denied. In Chrome: address bar lock → Site settings → Microphone → Allow, then click Mic.");
+        setStatus("Mic blocked", "warn");
+      } else {
+        addMsg("agent", "Mic error: " + (err.message || err));
+        setStatus("Mic error", "warn");
+      }
+      return;
+    }
+
+    // Prefer GPT Realtime if server has OPENAI_API_KEY
+    try {
+      await startRealtimeVoice();
+      return;
+    } catch (e) {
+      var msg = String(e.message || e);
+      if (/not configured|OPENAI_API_KEY|503/i.test(msg)) {
+        addMsg("agent", "GPT voice isn’t configured yet (need OPENAI_API_KEY on Railway). Falling back to browser speech.");
+      } else {
+        addMsg("agent", "GPT voice connect failed: " + msg.slice(0, 180) + " — using browser fallback.");
+      }
+      startWebSpeechFallback(fromOpen);
+    }
   }
 
   function toggleMic() {
     if (state.listening) {
-      stopMic();
+      stopVoice();
       setStatus("Mic off · type anytime", "on");
-    } else startMic(false);
-  }
-
-  function syncMicBtn() {
-    var b = document.getElementById("eaMic");
-    if (b) {
-      b.classList.toggle("on", state.listening);
-      b.textContent = state.listening ? "Mic on" : "Mic";
+    } else {
+      startVoice(false);
     }
   }
 
-  function speak(text) {
-    if (!text || !window.speechSynthesis) return;
-    stopSpeak();
-    var u = new SpeechSynthesisUtterance(String(text).slice(0, 800));
-    u.rate = 1.05;
-    u.pitch = 1;
-    u.onstart = function () { state.speaking = true; setStatus("Speaking…", "speak"); };
-    u.onend = function () {
-      state.speaking = false;
-      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
-    };
-    window.speechSynthesis.speak(u);
-  }
-  function stopSpeak() {
-    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
-    state.speaking = false;
-  }
-
-  // ── mic permission on startup (Ford: request as soon as the app loads) ───
+  // ── mic permission on startup ────────────────────────────────────────────
   function requestMicOnStartup() {
     if (!signedIn()) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-    // Ask once per tab load so Chrome shows the prompt early, not after orb open.
-    // Stop tracks immediately — we only need the permission grant; SpeechRecognition
-    // opens its own stream when listening starts.
+    // Keep the stream warm (don't stop tracks) so later WebRTC connect is instant
+    // and Chrome has already granted permission.
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-      try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
-      setStatus("Mic ready — click the sun to talk", "on");
+      state.micStream = stream;
+      // Mute tracks until voice session starts (saves privacy; keeps permission)
+      try { stream.getTracks().forEach(function (t) { t.enabled = false; }); } catch (e) {}
+      setStatus("Mic allowed — click the sun to talk", "on");
     }).catch(function (err) {
       var name = (err && err.name) || "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        setStatus("Mic blocked — type or allow mic in the browser", "warn");
+        setStatus("Mic blocked — allow mic for this site", "warn");
       }
-      // Other errors (no device): stay quiet; text still works.
     });
   }
 
