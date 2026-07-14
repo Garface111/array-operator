@@ -19,6 +19,7 @@
     mindEvents: "/v1/energy-agent/mind/events",
     mindConsume: "/v1/energy-agent/mind/events/consume",
     mindTick: "/v1/energy-agent/mind/tick",
+    mindWake: "/v1/energy-agent/mind/wake",
     mindMetrics: "/v1/energy-agent/mind/metrics",
   };
 
@@ -1128,6 +1129,20 @@
     }, 8000);
     // First pull soon after open / chat plan
     setTimeout(function () { pollMindEvents().catch(function () {}); }, 1200);
+    // Wake the long-term mind when the panel opens (event-driven, not spam)
+    if (!state._mindWokeThisOpen) {
+      state._mindWokeThisOpen = true;
+      setTimeout(function () {
+        fetch(API.mindWake, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            reason: "session_open",
+            session_id: state.sessionId || null,
+          }),
+        }).then(function () { return pollMindEvents(); }).catch(function () {});
+      }, 900);
+    }
   }
 
   function stopMindAwareness() {
@@ -1255,7 +1270,7 @@
       } catch (e) {}
     }
 
-    // Refresh activity chip from snapshot (open tasks)
+    // Refresh activity chip from snapshot (open tasks + latest insight)
     try {
       var snap = await fetch(API.mind, { headers: authHeaders() });
       if (snap.ok) {
@@ -1266,6 +1281,15 @@
           setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
         } else {
           setMindActivity(false);
+        }
+        // Soft-surface latest proactive insight once per open (same mind, not a new agent)
+        var ins = mind && mind.insights && mind.insights[0];
+        if (ins && ins.headline && ins.id && state._lastInsightId !== ins.id) {
+          state._lastInsightId = ins.id;
+          if (Number(ins.importance || 0) >= 60 && !state.thinking) {
+            var line = ins.headline + (ins.detail ? " — " + String(ins.detail).slice(0, 160) : "");
+            injectMindSpeak(line, { force: false });
+          }
         }
       }
     } catch (e) {
