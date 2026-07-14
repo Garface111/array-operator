@@ -545,29 +545,56 @@
   let _sweepBody = null, _sweepIO = null;      // gauges sweep up when the sheet scrolls into view (per body build)
   let _query = "";                            // search filter (lowercased)
 
-  // Shared y-scale + per-day neighbor average for one array's inverter cohort, so the
-  // per-inverter sparkline can show an underperformer's bars sitting BELOW its peers.
-  // (Each chart used to self-normalize to its own peak, which made very different output
-  // render identically — the exact thing that hid why an inverter was flagged.)
+  // Shared y-scale + per-day neighbor average for one array's inverter cohort.
+  // ALWAYS in nameplate-normalized units (kWh per kW that day) so a 20 kW and a
+  // 10 kW on the same site compare fairly — absolute kWh made the big unit look
+  // "healthier" even when both were at the same % of capacity (Ford 2026-07-14).
+  function _nameplateKw(iv) {
+    const n = iv && iv.nameplate_kw;
+    return (typeof n === "number" && isFinite(n) && n > 0) ? n : null;
+  }
+  function _dayYield(kwh, np) {
+    if (kwh == null || np == null || !(np > 0)) return null;
+    return kwh / np;   // kWh per kW nameplate that calendar day
+  }
   function cohortSpark(invs) {
     const byDate = {};
     let peak = 0;
-    (invs || []).forEach(iv => (iv.daily || []).forEach(d => {
-      if (!d || d.kwh == null) return;
-      if (d.kwh > peak) peak = d.kwh;
-      if (d.date == null) return;
-      const k = String(d.date), e = byDate[k] || (byDate[k] = { sum: 0, n: 0 });
-      e.sum += d.kwh; e.n += 1;
-    }));
-    return { peak, byDate };
+    let anyNorm = false;
+    (invs || []).forEach(iv => {
+      const np = _nameplateKw(iv);
+      if (!np) return;
+      (iv.daily || []).forEach(d => {
+        if (!d || d.kwh == null) return;
+        const y = _dayYield(d.kwh, np);
+        if (y == null) return;
+        anyNorm = true;
+        if (y > peak) peak = y;
+        if (d.date == null) return;
+        const k = String(d.date);
+        const e = byDate[k] || (byDate[k] = { sumY: 0, n: 0 });
+        e.sumY += y;
+        e.n += 1;
+      });
+    });
+    // Fallback: no nameplates on file → absolute kWh (legacy). Prefer normalized.
+    if (!anyNorm) {
+      (invs || []).forEach(iv => (iv.daily || []).forEach(d => {
+        if (!d || d.kwh == null) return;
+        if (d.kwh > peak) peak = d.kwh;
+        if (d.date == null) return;
+        const k = String(d.date), e = byDate[k] || (byDate[k] = { sumY: 0, n: 0 });
+        e.sumY += d.kwh; e.n += 1;
+      }));
+      return { peak, byDate, unit: "kwh" };
+    }
+    return { peak, byDate, unit: "kwh_per_kw" };
   }
-  // A tiny bar sparkline of an inverter's recent daily output (last ~14 days). When a
-  // `cohort` is passed, bars are scaled to the COHORT peak (shared with its neighbors)
-  // and a faint dashed line traces the neighbor average each day (excluding this unit),
-  // so the gap that drives the underperforming verdict is visible across all weather.
-  // Always render N=14 columns (Ford 2026-07-12: "if they are 14 days they need 14 columns").
-  // A shorter history LEFT-PADS with empty slots so the last real day always sits at the far
-  // right and the bar width is constant — a 6-day-old array shows 8 empty + 6 filled columns.
+  // A tiny bar sparkline of an inverter's recent daily yield (last ~14 days).
+  // Bars are scaled to the cohort peak of kWh/kW (not raw kWh) so mixed-nameplate
+  // sites compare fairly. Dashed line = neighbor average yield that day.
+  // Always render N=14 columns (Ford 2026-07-12). A shorter history LEFT-PADS with
+  // empty slots so the last real day sits at the far right.
   function _slots14(daily) {
     const pts = (daily || []).filter(d => d && d.kwh != null).slice(-14);
     const pad = 14 - pts.length;
@@ -582,27 +609,49 @@
       ? `<span class="vs-inv-nospark" title="A sparkline needs a day of capture">no history yet</span>`
       : `<div class="vs-id-nospark">Not enough history yet — a sparkline needs a day of capture.</div>`;
     const W = opts.w || 240, H = opts.h || 40, N = 14, bw = W / N;
-    const ownMax = Math.max(...real.map(p => p.kwh), 0.001);
-    const max = (cohort && cohort.peak > 0) ? cohort.peak : ownMax;   // shared scale, else self
+    const np = _nameplateKw({ nameplate_kw: opts.nameplate_kw });
+    // Same unit as the cohort peak, or self-scale if this unit has no nameplate.
+    const useYield = !!(cohort && cohort.unit === "kwh_per_kw" && np);
+    const shareScale = !!(cohort && cohort.peak > 0 && (
+      (cohort.unit === "kwh_per_kw" && useYield) ||
+      (cohort.unit === "kwh" && !useYield)
+    ));
+    const valOf = (p) => {
+      if (!p || p.kwh == null) return null;
+      return useYield ? _dayYield(p.kwh, np) : p.kwh;
+    };
+    const ownMax = Math.max(...real.map(p => valOf(p) || 0), 0.001);
+    const max = shareScale ? cohort.peak : ownMax;
     const bars = slots.map((p, i) => {
       if (!p) return `<rect class="vs-spark-empty" x="${(i * bw + 1).toFixed(1)}" y="${(H - 1.5).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="1.5" rx="1"/>`;
-      const bh = Math.max(1.5, (p.kwh / max) * (H - 6));
+      const v = valOf(p);
+      if (v == null) return `<rect class="vs-spark-empty" x="${(i * bw + 1).toFixed(1)}" y="${(H - 1.5).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="1.5" rx="1"/>`;
+      const bh = Math.max(1.5, (v / max) * (H - 6));
       return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - bh).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="1"/>`;
     }).join("");
     let peerLine = "";
-    const by = cohort && cohort.byDate;
+    // Peer line only when we're on the shared scale (same units as byDate averages).
+    const by = shareScale && cohort && cohort.byDate;
     if (by) {
       const xy = slots.map((p, i) => {
         if (!p) return null;
         const e = p.date != null ? by[String(p.date)] : null;
-        if (!e || e.n < 2) return null;                         // need >= 1 neighbor that day
-        const avg = (e.sum - p.kwh) / (e.n - 1);                // peers only (exclude self)
+        if (!e || e.n < 2) return null;
+        const selfY = valOf(p);
+        if (selfY == null) return null;
+        const avg = (e.sumY - selfY) / (e.n - 1);   // peers only, same unit as bars
         const y = H - Math.max(1.5, (avg / max) * (H - 6));
         return `${(i * bw + bw / 2).toFixed(1)},${y.toFixed(1)}`;
       }).filter(Boolean);
-      if (xy.length >= 2) peerLine = `<polyline class="vs-id-peerline" fill="none" points="${xy.join(" ")}"><title>Neighbor average</title></polyline>`;
+      if (xy.length >= 2) {
+        const tip = useYield ? "Neighbor average (kWh per kW)" : "Neighbor average";
+        peerLine = `<polyline class="vs-id-peerline" fill="none" points="${xy.join(" ")}"><title>${tip}</title></polyline>`;
+      }
     }
-    return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Daily output, last 14 days, against the neighbor average">${bars}${peerLine}</svg>`;
+    const aria = useYield
+      ? "Daily yield (kWh per kW nameplate), last 14 days, vs neighbor average"
+      : "Daily output, last 14 days, against the neighbor average";
+    return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${aria}">${bars}${peerLine}</svg>`;
   }
   // ── Full-screen inverter detail (Ford + Martin 2026-07-12): each inverter row has a
   //    "Details" button that opens a big, interactive 14-column daily-output chart the owner
@@ -619,47 +668,79 @@
     return isNaN(d.getTime()) ? "" : (d.getMonth() + 1) + "/" + d.getDate();
   }
   function _kwhShort(v) { if (v == null) return ""; return v >= 1000 ? (v / 1000).toFixed(1) + "k" : String(Math.round(v)); }
-  function _peerAvgFor(cohort, p) {
+  function _yieldShort(v) {
+    if (v == null) return "";
+    if (v >= 10) return v.toFixed(1);
+    return v.toFixed(2);
+  }
+  // Peer average for a day in the chart's unit (kWh/kW when normalized, else kWh).
+  function _peerAvgFor(cohort, p, selfY) {
     const by = cohort && cohort.byDate; if (!by || !p || p.date == null) return null;
     const e = by[String(p.date)]; if (!e || e.n < 2) return null;
-    return (e.sum - p.kwh) / (e.n - 1);
+    if (selfY == null) return null;
+    return (e.sumY - selfY) / (e.n - 1);
   }
-  // The interactive 14-column daily-output chart. Bars carry a native tooltip (day · kWh ·
-  // peer avg) and highlight on hover; a dashed line traces the neighbor average.
+  // Interactive 14-column chart. Bars = daily kWh per kW nameplate (when known)
+  // so mixed capacities share one scale. Tooltips still show absolute kWh.
   function invChartHTML(iv, cohort) {
     const slots = _slots14(iv.daily);
     if (!slots || !slots.filter(Boolean).length)
       return `<div class="vs-dc-nohist">No daily history captured yet — this fills in as we pull each day.</div>`;
     const real = slots.filter(Boolean);
-    const ownMax = Math.max(...real.map(p => p.kwh), 0.001);
-    const max = (cohort && cohort.peak > 0) ? cohort.peak : ownMax;
-    const W = 720, H = 300, mL = 48, mR = 16, mT = 16, mB = 34;
+    const np = _nameplateKw(iv);
+    const useYield = !!(cohort && cohort.unit === "kwh_per_kw" && np);
+    const shareScale = !!(cohort && cohort.peak > 0 && (
+      (cohort.unit === "kwh_per_kw" && useYield) ||
+      (cohort.unit === "kwh" && !useYield)
+    ));
+    const valOf = (p) => {
+      if (!p || p.kwh == null) return null;
+      return useYield ? _dayYield(p.kwh, np) : p.kwh;
+    };
+    const ownMax = Math.max(...real.map(p => valOf(p) || 0), 0.001);
+    const max = shareScale ? cohort.peak : ownMax;
+    const W = 720, H = 300, mL = 52, mR = 16, mT = 16, mB = 34;
     const pw = W - mL - mR, ph = H - mT - mB, bw = pw / 14;
     const y = v => mT + ph - Math.max(0, v / max) * ph;
+    const axisFmt = useYield ? _yieldShort : _kwhShort;
     const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
       const gy = y(max * f);
       return `<line class="vs-dc-grid" x1="${mL}" y1="${gy.toFixed(1)}" x2="${W - mR}" y2="${gy.toFixed(1)}"/>` +
-             `<text class="vs-dc-ylab" x="${mL - 7}" y="${(gy + 3).toFixed(1)}" text-anchor="end">${_kwhShort(max * f)}</text>`;
+             `<text class="vs-dc-ylab" x="${mL - 7}" y="${(gy + 3).toFixed(1)}" text-anchor="end">${axisFmt(max * f)}</text>`;
     }).join("");
     const bars = slots.map((p, i) => {
       const x = mL + i * bw;
       if (!p) return `<rect class="vs-dc-bar vs-dc-empty" x="${(x + 2).toFixed(1)}" y="${(mT + ph - 1.5).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="1.5" rx="1"/>`;
-      const by = y(p.kwh), bh = mT + ph - by;
-      const peer = _peerAvgFor(cohort, p);
-      const tip = `${_dayLabel(p.date)} · ${_kwhShort(p.kwh)} kWh` + (peer != null ? ` · peers ${_kwhShort(peer)}` : "");
+      const v = valOf(p);
+      if (v == null) return `<rect class="vs-dc-bar vs-dc-empty" x="${(x + 2).toFixed(1)}" y="${(mT + ph - 1.5).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="1.5" rx="1"/>`;
+      const by = y(v), bh = mT + ph - by;
+      const peer = shareScale ? _peerAvgFor(cohort, p, v) : null;
+      let tip = `${_dayLabel(p.date)} · ${_kwhShort(p.kwh)} kWh`;
+      if (useYield) {
+        tip += ` · ${ _yieldShort(v) } kWh/kW`;
+        if (peer != null) tip += ` · peers ${_yieldShort(peer)} kWh/kW`;
+      } else if (peer != null) {
+        tip += ` · peers ${_kwhShort(peer)} kWh`;
+      }
       const lab = (i % 2 === 0 || i === 13) && p.date != null
         ? `<text class="vs-dc-xlab" x="${(x + bw / 2).toFixed(1)}" y="${H - 12}" text-anchor="middle">${_dayLabel(p.date)}</text>` : "";
       return `<rect class="vs-dc-bar" x="${(x + 2).toFixed(1)}" y="${by.toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${Math.max(1, bh).toFixed(1)}" rx="2"><title>${esc(tip)}</title></rect>${lab}`;
     }).join("");
     let peerLine = "";
-    if (cohort && cohort.byDate) {
+    if (shareScale && cohort && cohort.byDate) {
       const xy = slots.map((p, i) => {
-        const pv = _peerAvgFor(cohort, p); if (pv == null) return null;
+        const selfY = valOf(p);
+        const pv = _peerAvgFor(cohort, p, selfY); if (pv == null) return null;
         return `${(mL + i * bw + bw / 2).toFixed(1)},${y(pv).toFixed(1)}`;
       }).filter(Boolean);
-      if (xy.length >= 2) peerLine = `<polyline class="vs-dc-peer" points="${xy.join(" ")}"><title>Neighbor average</title></polyline>`;
+      if (xy.length >= 2) {
+        peerLine = `<polyline class="vs-dc-peer" points="${xy.join(" ")}"><title>Neighbor average${useYield ? " (kWh per kW)" : ""}</title></polyline>`;
+      }
     }
-    return `<svg class="vs-dc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Daily output, last 14 days">${grid}${bars}${peerLine}</svg>`;
+    const aria = useYield
+      ? "Daily yield in kWh per kW nameplate, last 14 days"
+      : "Daily output, last 14 days";
+    return `<svg class="vs-dc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${aria}">${grid}${bars}${peerLine}</svg>`;
   }
   // The stats grid for ONE inverter (Live now / vs neighbors / 14-day / range / model / rated).
   function _invStats(iv) {
@@ -694,7 +775,11 @@
       ${diag}
       <div class="vs-dc-stats">${_invStats(iv)}</div>
       <div class="vs-dc-chartwrap">
-        <div class="vs-dc-chart-h">Daily output · last 14 days${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average</span>` : ""}</div>
+        <div class="vs-dc-chart-h">${
+          (cohort && cohort.unit === "kwh_per_kw" && _nameplateKw(iv))
+            ? "Daily yield · kWh per kW nameplate · last 14 days"
+            : "Daily output · kWh · last 14 days"
+        }${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average (same units)</span>` : ""}</div>
         ${invChartHTML(iv, cohort)}
       </div>`;
   }
@@ -1377,14 +1462,17 @@
               // inverters… to the left of the OK"), cohort-scaled so an underperformer's bars
               // visibly sit below its peers. The WHOLE row is clickable → the full Details
               // chart + array comparison deck (a redundant "Details →" affordance stays too).
-              const _rowspark = sparkline(iv.daily, cohortScale, { cls: "vs-inv-rowspark", w: 116, h: 26, mini: true });
+              const _rowspark = sparkline(iv.daily, cohortScale, {
+                cls: "vs-inv-rowspark", w: 116, h: 26, mini: true,
+                nameplate_kw: iv.nameplate_kw,
+              });
               h += `<div class="vs-row vs-inv" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
                 <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? ` <span class="vs-inv-sub">${_sub}</span>` : ""}</span>
                 <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
                 <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
                 <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
                 <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
-                <span class="vs-c-status vs-inv-statcell"><span class="vs-inv-rowspark-wrap" title="14-day daily output vs the neighbor average — click for the full chart">${_rowspark}</span><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
+                <span class="vs-c-status vs-inv-statcell"><span class="vs-inv-rowspark-wrap" title="14-day daily yield (kWh per kW nameplate) vs neighbors — fair across different inverter sizes. Click for the full chart.">${_rowspark}</span><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
                 <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart + array comparison">Details →</button></span>
               </div>`;
             });
