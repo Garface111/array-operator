@@ -47,6 +47,9 @@
     // Debounce duplicate ghost transcripts
     _lastUserSaid: "",
     _lastUserSaidAt: 0,
+    // Weekly usage meter soft-warn once per panel session
+    _budgetWarned: false,
+    _budgetExhausted: false,
     // Speaker mute — kill agent voice (Realtime + browser TTS); text still paints.
     // Persisted so it sticks across panel open/close (Ford 2026-07-13).
     voiceMuted: (function () {
@@ -156,7 +159,14 @@
       "  </div>" +
       '  <div class="ea-status"><i class="ea-dot" id="eaDot"></i>' +
       '    <span id="eaStatusText">Ready</span>' +
-      '    <span class="ea-budget" id="eaBudget"></span></div>' +
+      '    <span class="ea-budget" id="eaBudget" aria-label="Weekly AI usage">' +
+      '      <span class="ea-usage ea-usage-ok">' +
+      '        <span class="ea-usage-label">Weekly</span>' +
+      '        <span class="ea-usage-track" aria-hidden="true">' +
+      '          <span class="ea-usage-fill" id="eaUsageFill" style="width:0%"></span>' +
+      '        </span>' +
+      '      </span>' +
+      '    </span></div>' +
       '  <div class="ea-tools" id="eaTools"></div>' +
       '  <div class="ea-tour-cap" id="eaTourCap" hidden>' +
       '    <span class="ea-tour-kicker" id="eaTourKicker">Tour</span>' +
@@ -612,11 +622,58 @@
     }
   }
 
+  /**
+   * Weekly AI usage meter ($5 thinking + voice combined).
+   * Fills 0→100% as spend approaches the cap — no cash countdown in the chrome.
+   */
   function setBudget(b) {
     state.budget = b;
     var el = document.getElementById("eaBudget");
     if (!el || !b) return;
-    el.textContent = "$" + (b.remaining_usd != null ? b.remaining_usd.toFixed(2) : "—") + " left this week";
+    var cap = Number(b.weekly_budget_usd);
+    if (!(cap > 0)) cap = 5;
+    var spent = Number(b.spent_usd) || 0;
+    var pct = b.pct_used != null
+      ? Number(b.pct_used)
+      : Math.min(100, (spent / cap) * 100);
+    if (!(pct >= 0)) pct = 0;
+    if (pct > 100) pct = 100;
+    var level = !b.ok || pct >= 99.5 ? "full" : (b.warn || pct >= 80) ? "warn" : "ok";
+    var bd = b.breakdown || {};
+    var tip =
+      "Weekly Energy Agent usage (thinking + voice) · " +
+      Math.round(pct) + "% of $" + cap.toFixed(0) + " · resets each week";
+    if (bd.thinking_usd != null || bd.voice_usd != null) {
+      tip +=
+        " · Thinking ~$" + (Number(bd.thinking_usd) || 0).toFixed(2) +
+        " · Voice ~$" + (Number(bd.voice_usd) || 0).toFixed(2);
+    }
+    el.innerHTML =
+      '<span class="ea-usage ea-usage-' + level + '" title="' + esc(tip) + '">' +
+      '<span class="ea-usage-label">Weekly</span>' +
+      '<span class="ea-usage-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" ' +
+      'aria-valuenow="' + Math.round(pct) + '" aria-label="Weekly usage ' + Math.round(pct) + ' percent">' +
+      '<span class="ea-usage-fill" id="eaUsageFill" style="width:' + pct.toFixed(1) + '%"></span>' +
+      "</span></span>";
+    el.setAttribute(
+      "aria-label",
+      "Weekly AI usage " + Math.round(pct) + " percent of " + cap.toFixed(0) + " dollar limit"
+    );
+    // One soft heads-up when crossing the warn line (not every refresh)
+    if (b.warn && !state._budgetWarned) {
+      state._budgetWarned = true;
+      try {
+        addMsg(
+          "agent",
+          "Heads up — you're past 80% of this week's Energy Agent allowance " +
+            "(thinking + voice). The meter fills up as you use it; at 100% I'll pause until next week."
+        );
+      } catch (e) {}
+    }
+    if (!b.ok && !state._budgetExhausted) {
+      state._budgetExhausted = true;
+      setStatus("Weekly limit reached", "warn");
+    }
   }
 
   /**
