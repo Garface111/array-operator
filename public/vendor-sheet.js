@@ -1304,15 +1304,27 @@
       return !cols.some(c => (c.vendor || "").toLowerCase() === p.vendor);
     });
     if (!cols.length && !pending.length) {
+      _paintedPendingSig = "";
       body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
+      return;
+    }
+    // Pending-only (still waiting on first arrays) — stable paint, no full remount thrash
+    if (!cols.length && pending.length) {
+      paintPendingBody(body, pending);
       return;
     }
     const byVendor = {};
     cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
     const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
     let h = "";
-    // Pending vendors first (just-connected — user is watching for them)
-    pending.forEach(p => { h += pendingVendorHtml(p); });
+    // Pending vendors first (just-connected — user is watching for them).
+    // Animate only newly appeared pending vendors.
+    const prevSig = _paintedPendingSig;
+    pending.forEach(p => {
+      const isNew = !prevSig || !prevSig.split("|").includes(p.vendor);
+      h += pendingVendorHtml(p, { animate: isNew });
+    });
+    _paintedPendingSig = _pendingSig(pending);
     vendors.forEach(v => {
       const list = sortCols(byVendor[v]);
       // Honest rollups: sum only arrays that actually carry a reading, and show null → "—"
@@ -1658,14 +1670,28 @@
     } catch (e) { return []; }
   }
 
+  function _pendingSig(pending) {
+    return (pending || []).map(p => p.vendor).sort().join("|");
+  }
+
+  function _waitPhrase(p) {
+    const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
+    // Coarse buckets so the line doesn't thrash every second
+    if (ageSec < 20) return "usually under a minute";
+    if (ageSec < 75) return "still syncing…";
+    return "almost there — large fleets can take a minute";
+  }
+
   /** Skeleton vendor block while a just-connected portal is still landing.
    *  Used for every inverter vendor (SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy). */
-  function pendingVendorHtml(p) {
+  function pendingVendorHtml(p, opts) {
+    opts = opts || {};
     const label = esc(p.label || (window.__aoPendingFeeds && window.__aoPendingFeeds.labelFor
       ? window.__aoPendingFeeds.labelFor(p.vendor) : null) || p.vendor || "Vendor");
-    const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
-    const wait = ageSec < 15 ? "usually under a minute" : ageSec < 60 ? "still syncing…" : "almost there — large fleets can take a minute";
-    return `<div class="vs-pending" data-pending-vendor="${esc(p.vendor)}">
+    const wait = _waitPhrase(p);
+    // is-enter only on first paint — later soft updates never re-animate
+    const enterCls = opts.animate === false ? "" : " is-enter";
+    return `<div class="vs-pending${enterCls}" data-pending-vendor="${esc(p.vendor)}">
       <div class="vs-pending-head">
         <span class="vs-pending-badge">${label}</span>
         <span class="vs-pending-pulse" aria-hidden="true"></span>
@@ -1674,9 +1700,51 @@
       <div class="vs-pending-body">
         <div class="vs-pending-skel"></div>
         <div class="vs-pending-skel vs-pending-skel-short"></div>
-        <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (${esc(wait)}). This page updates automatically.</p>
+        <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (<span data-pending-wait>${esc(wait)}</span>). This page updates automatically.</p>
       </div>
     </div>`;
+  }
+
+  /** In-place update of wait copy — never remount (avoids enter anim + shimmer restart). */
+  function softUpdatePendingCards(root, pending) {
+    if (!root || !pending || !pending.length) return false;
+    const nodes = root.querySelectorAll("[data-pending-vendor]");
+    if (nodes.length !== pending.length) return false;
+    for (let i = 0; i < pending.length; i++) {
+      if (nodes[i].getAttribute("data-pending-vendor") !== pending[i].vendor) return false;
+    }
+    pending.forEach((p, i) => {
+      const waitEl = nodes[i].querySelector("[data-pending-wait]");
+      const phrase = _waitPhrase(p);
+      if (waitEl && waitEl.textContent !== phrase) waitEl.textContent = phrase;
+      // Drop one-shot enter class if still present
+      nodes[i].classList.remove("is-enter");
+    });
+    return true;
+  }
+
+  // Track last painted pending signature so fleet-poll re-renders don't rebuild HTML
+  let _paintedPendingSig = "";
+
+  function paintPendingBody(bodyEl, pending, { force } = {}) {
+    if (!bodyEl) return;
+    const sig = _pendingSig(pending);
+    if (!force && sig === _paintedPendingSig && softUpdatePendingCards(bodyEl, pending)) {
+      return;
+    }
+    // If DOM already has the same cards, soft-update even when force is false
+    if (!force && softUpdatePendingCards(bodyEl, pending)) {
+      _paintedPendingSig = sig;
+      return;
+    }
+    bodyEl.innerHTML = pending.map(p => pendingVendorHtml(p, { animate: _paintedPendingSig !== sig })).join("");
+    _paintedPendingSig = sig;
+    // Drop enter class after first paint so a later full rebuild stays calm
+    requestAnimationFrame(() => {
+      bodyEl.querySelectorAll(".vs-pending.is-enter").forEach(el => {
+        el.classList.remove("is-enter");
+      });
+    });
   }
 
   function render() {
@@ -1693,17 +1761,20 @@
         if (!host.querySelector("#vsSearch")) buildShell(host);
         const bodyEl = host.querySelector("#vsBody");
         if (bodyEl) {
-          bodyEl.innerHTML = pending.map(pendingVendorHtml).join("");
+          paintPendingBody(bodyEl, pending);
         } else {
-          host.innerHTML = pending.map(pendingVendorHtml).join("");
+          host.innerHTML = pending.map(p => pendingVendorHtml(p)).join("");
+          _paintedPendingSig = _pendingSig(pending);
         }
         const cnt = host.querySelector("#vsCount");
         if (cnt) {
-          cnt.textContent = "Connecting " + pending.map(p => p.label || p.vendor).join(", ") + "…";
+          const txt = "Connecting " + pending.map(p => p.label || p.vendor).join(", ") + "…";
+          if (cnt.textContent !== txt) cnt.textContent = txt;
         }
         sizeScroll();
         return;
       }
+      _paintedPendingSig = "";
       host.innerHTML = `<div class="vs-empty">${loading ? "Loading your fleet…" : "No arrays connected yet — hit <b>+ Add vendor</b> above to connect one."}</div>`;
       return;
     }
@@ -1742,14 +1813,30 @@
       // (in the persistent shell) untouched, so a live refresh never steals focus.
       FleetStore.subscribe((s, kind) => {
         if (_view !== "spreadsheet" || kind === "live" || kind === "triage") return;
+        // While only showing Connecting… skeletons, soft-update — don't rebuild HTML.
+        const pending = _pendingFeeds();
+        const mon = _monitoredCols();
+        if (pending.length && !mon.length) {
+          const bodyEl = $("#vsBody");
+          if (bodyEl && softUpdatePendingCards(bodyEl, pending)) return;
+        }
         if ($("#vsSearch")) renderBody(); else render();
       });
     }
-    // Pending vendor cards refresh when connect state changes
+    // Pending vendor cards — only when the vendor set changes (mark/clear/reconcile).
+    // Quiet poll ticks no longer fire this event (pending-feeds.js write signature).
     window.addEventListener("ao:pending-feeds", () => {
       if (_view !== "spreadsheet") return;
       if ($("#vsSearch")) renderBody(); else render();
     });
+    // Soft-refresh wait-copy every ~8s without remounting the card
+    setInterval(() => {
+      if (_view !== "spreadsheet") return;
+      const pending = _pendingFeeds();
+      if (!pending.length) return;
+      const bodyEl = $("#vsBody");
+      if (bodyEl) softUpdatePendingCards(bodyEl, pending);
+    }, 8000);
     // Detect the EnergyAgent extension so the Refresh button can re-scrape. so_bridge
     // announces SO_EXTENSION_PRESENT at page load (we may have loaded after it), so we
     // both listen for it AND ask for status to prompt a fresh announce. Belt + the global.

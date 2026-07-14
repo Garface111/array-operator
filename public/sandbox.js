@@ -1947,18 +1947,40 @@
            <button class="sb-resetbtn" id="sbNewArray" type="button" title="Create an empty array to drag inverters into">New empty array</button>
            <button class="sb-addbtn" id="sbAddArray">+ Add array</button>
          </div></div></div>`;
-      // Any mid-connect inverter vendor → blue Connecting… cards (all vendors, not just Chint)
+      // Any mid-connect inverter vendor → blue Connecting… cards (all vendors, not just Chint).
+      // Soft-update if cards already painted — remounting every fleet poll made them glitch.
       let _pending = [];
       try {
         _pending = (window.__aoPendingFeeds && window.__aoPendingFeeds.list()) || [];
       } catch(e){ _pending = []; }
       if(_pending.length || freshWindowActive()){
+        const sig = _pending.map(p => p.vendor).sort().join("|");
+        const existing = host.querySelectorAll("[data-pending-vendor]");
+        let softOk = false;
+        if(_pending.length && existing.length === _pending.length){
+          softOk = true;
+          for(let i = 0; i < _pending.length; i++){
+            if(existing[i].getAttribute("data-pending-vendor") !== _pending[i].vendor){ softOk = false; break; }
+          }
+        }
+        if(softOk && host.querySelector(".sb-head")){
+          _pending.forEach((p, i) => {
+            const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
+            const wait = ageSec < 20 ? "usually under a minute" : ageSec < 75 ? "still syncing…" : "almost there — large fleets can take a minute";
+            const w = existing[i].querySelector("[data-pending-wait]");
+            if(w && w.textContent !== wait) w.textContent = wait;
+            existing[i].classList.remove("is-enter");
+          });
+          if(freshWindowActive()) startFreshPoll();
+          try { if(window.__aoPendingFeeds && window.__aoPendingFeeds.startPoll) window.__aoPendingFeeds.startPoll(); } catch(e){}
+          return;
+        }
         const cards = _pending.length
           ? _pending.map(p => {
               const label = esc(p.label || p.vendor || "Vendor");
               const ageSec = Math.max(0, Math.round((Date.now() - (p.at || Date.now())) / 1000));
-              const wait = ageSec < 15 ? "usually under a minute" : ageSec < 60 ? "still syncing…" : "almost there — large fleets can take a minute";
-              return `<div class="vs-pending" data-pending-vendor="${esc(p.vendor)}">
+              const wait = ageSec < 20 ? "usually under a minute" : ageSec < 75 ? "still syncing…" : "almost there — large fleets can take a minute";
+              return `<div class="vs-pending is-enter" data-pending-vendor="${esc(p.vendor)}">
                 <div class="vs-pending-head">
                   <span class="vs-pending-badge">${label}</span>
                   <span class="vs-pending-pulse" aria-hidden="true"></span>
@@ -1967,12 +1989,15 @@
                 <div class="vs-pending-body">
                   <div class="vs-pending-skel"></div>
                   <div class="vs-pending-skel vs-pending-skel-short"></div>
-                  <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (${esc(wait)}). This page updates automatically.</p>
+                  <p class="vs-pending-copy">We got your <b>${label}</b> sign-in — arrays are landing on your account now (<span data-pending-wait>${esc(wait)}</span>). This page updates automatically.</p>
                 </div>
               </div>`;
             }).join("")
           : `<div class="sb-empty"><span class="sb-spin"></span> Finishing the connection — sign into your monitoring portal in the other tab and your arrays appear here on their own, no refresh.</div>`;
         host.innerHTML = _head + cards;
+        requestAnimationFrame(() => {
+          host.querySelectorAll(".vs-pending.is-enter").forEach(el => el.classList.remove("is-enter"));
+        });
         wireAddButton(host);
         wireNewArrayButton(host);
         wireCardButton(host);
@@ -7108,8 +7133,9 @@
     list.innerHTML = `<div class="empty">Loading your account…</div>`;
     // Hard timeout so a stuck /v1/account never leaves the tab on "Loading…" forever
     // (and so the top-bar email chip can still recover via this same response).
+    // 12s matches the fail-fast DB pool timeout on the API (was 15s; 2026-07-14 outage).
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 15000) : null;
+    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 12000) : null;
     try{
       const r = await fetch("/v1/account", {
         headers: h,
@@ -7117,6 +7143,14 @@
       });
       if(to) clearTimeout(to);
       if(r.status === 401){ list.innerHTML = sessionExpired(); return; }
+      // 503 = API intentionally fail-fast under DB pool pressure — ask them to retry,
+      // don't leave them on a perpetual "Loading…" spinner.
+      if(r.status === 503){
+        list.innerHTML = `<div class="empty">Server is busy for a moment — <button type="button" class="acct-btn" id="acctRetryLoad">Try again</button></div>`;
+        const b503 = document.getElementById("acctRetryLoad");
+        if(b503) b503.onclick = () => loadAccount();
+        return;
+      }
       if(!r.ok) throw new Error("account " + r.status);
       _account = await r.json();
       // Keep the top-bar identity chip in sync (app.js may have been stuck on "…").

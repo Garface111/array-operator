@@ -2632,7 +2632,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   border:1px solid rgba(33,150,243,.28);
   background:linear-gradient(135deg, rgba(33,150,243,.08), rgba(255,255,255,.7) 55%, rgba(211,242,206,.15));
   box-shadow:0 6px 20px rgba(20,60,120,.06);
-  animation:vsPendingIn .35s ease both;
+  /* No continuous remount animation — only .is-enter on first paint */
+}
+.vs-pending.is-enter{
+  animation:vsPendingIn .4s ease both;
 }
 @keyframes vsPendingIn{
   from{ opacity:0; transform:translateY(6px) }
@@ -2647,15 +2650,16 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   color:#1976D2;
 }
 .vs-pending-pulse{
-  width:10px; height:10px; border-radius:50%;
+  width:10px; height:10px; border-radius:50%; flex:0 0 auto;
   background:#2196F3;
   box-shadow:0 0 0 0 rgba(33,150,243,.45);
-  animation:vsPulse 1.4s ease-out infinite;
+  /* Slower, calmer pulse — less "alarm blink" */
+  animation:vsPulse 2.4s ease-out infinite;
 }
 @keyframes vsPulse{
-  0%{ box-shadow:0 0 0 0 rgba(33,150,243,.45) }
-  70%{ box-shadow:0 0 0 10px rgba(33,150,243,0) }
-  100%{ box-shadow:0 0 0 0 rgba(33,150,243,0) }
+  0%{ box-shadow:0 0 0 0 rgba(33,150,243,.4); opacity:1 }
+  70%{ box-shadow:0 0 0 8px rgba(33,150,243,0); opacity:.85 }
+  100%{ box-shadow:0 0 0 0 rgba(33,150,243,0); opacity:1 }
 }
 .vs-pending-stat{
   margin-left:auto; font-size:12px; font-weight:720; color:#1976D2;
@@ -2663,9 +2667,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-pending-body{ padding:14px 16px 16px }
 .vs-pending-skel{
   height:12px; border-radius:8px; margin-bottom:8px; max-width:70%;
-  background:linear-gradient(90deg, rgba(33,150,243,.12), rgba(33,150,243,.22), rgba(33,150,243,.12));
+  background:linear-gradient(90deg, rgba(33,150,243,.10), rgba(33,150,243,.18), rgba(33,150,243,.10));
   background-size:200% 100%;
-  animation:vsShimmer 1.2s linear infinite;
+  /* Gentler shimmer so it doesn't feel like a full refresh */
+  animation:vsShimmer 2.2s ease-in-out infinite;
 }
 .vs-pending-skel-short{ max-width:42%; margin-bottom:12px }
 @keyframes vsShimmer{
@@ -2676,6 +2681,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   margin:0; font-size:12.5px; line-height:1.45; color:var(--muted,#4C596B);
 }
 .vs-pending-copy b{ color:var(--ink,#0E1420); font-weight:720 }
+@media (prefers-reduced-motion: reduce){
+  .vs-pending.is-enter, .vs-pending-pulse, .vs-pending-skel{ animation:none !important; }
+}
 /* search + sortable headers */
 /* Toolbar stacks into rows: the title/hint block, then a buttons row, then a
    full-width search row sitting directly above the table it filters. */

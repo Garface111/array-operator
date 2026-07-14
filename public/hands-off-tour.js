@@ -549,12 +549,32 @@
     var main = root.querySelector(".ho-main");
     if (main) {
       var formSnap = snapshotLoginForm(main);
+      // Don't remount the main panel while the operator is typing logins — only
+      // refresh status chips in place. Full rewrite caused a glitchy flicker.
+      var formDirty =
+        formSnap &&
+        (formSnap.user ||
+          formSnap.pass ||
+          formSnap.consent ||
+          formSnap.focus ||
+          (formSnap.msg && formSnap.msg.length));
       var step = STEPS[state.idx] || STEPS[0];
-      main.innerHTML =
-        '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
-        renderBody(step, live);
-      wireActions(main);
-      restoreLoginForm(main, formSnap);
+      if (formDirty && step.loginForm && main.querySelector("[data-ho-login]")) {
+        var chipHost = main.querySelector(".ho-status-row");
+        if (chipHost) {
+          var tmp = document.createElement("div");
+          tmp.innerHTML = statusChips(step, live);
+          var nextChips = tmp.firstChild;
+          if (nextChips) chipHost.replaceWith(nextChips);
+        }
+        // Optional completion callout — leave form untouched
+      } else {
+        main.innerHTML =
+          '<button type="button" class="ho-close" data-ho="close" aria-label="Minimize">×</button>' +
+          renderBody(step, live);
+        wireActions(main);
+        restoreLoginForm(main, formSnap);
+      }
     }
     updatePill();
   }
