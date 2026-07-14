@@ -483,6 +483,15 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 }
 .ea-chip.ea-mic.on:hover{ filter: brightness(1.05); }
 
+/* Speaker mute — agent voice off (text chat still works) */
+.ea-chip.ea-mute.on{
+  background: linear-gradient(180deg, #64748b, #475569);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px -4px rgba(71,85,105,.45);
+}
+.ea-chip.ea-mute.on:hover{ filter: brightness(1.06); }
+
 /* Primary send */
 .ea-send{
   display: inline-flex;

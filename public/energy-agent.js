@@ -44,6 +44,11 @@
     // Mic held closed while agent TTS plays so speakers don't re-enter as "user"
     _micHeldForSpeak: false,
     _unmuteAfterSpeakTimer: null,
+    // Speaker mute — kill agent voice (Realtime + browser TTS); text still paints.
+    // Persisted so it sticks across panel open/close (Ford 2026-07-13).
+    voiceMuted: (function () {
+      try { return localStorage.getItem("ea_voice_muted") === "1"; } catch (e) { return false; }
+    })(),
   };
 
   function token() {
@@ -180,6 +185,8 @@
       '            <span class="ea-chip-ic" aria-hidden="true">✦</span><span class="ea-chip-lbl">Improve</span></button>' +
       '          <button type="button" class="ea-chip ea-mic" id="eaMic" title="Toggle microphone">' +
       '            <span class="ea-chip-ic" aria-hidden="true">🎙</span><span class="ea-chip-lbl">Mic</span></button>' +
+      '          <button type="button" class="ea-chip ea-mute" id="eaMute" title="Mute agent voice">' +
+      '            <span class="ea-chip-ic" aria-hidden="true">🔊</span><span class="ea-chip-lbl">Mute</span></button>' +
       '          <span class="ea-compose-spacer"></span>' +
       '          <button type="button" class="ea-send" id="eaSend" title="Send">' +
       '            <span class="ea-send-lbl">Send</span><span class="ea-send-ic" aria-hidden="true">↑</span></button>' +
@@ -215,6 +222,12 @@
       e.preventDefault();
       toggleMic();
     };
+    document.getElementById("eaMute").onclick = function (e) {
+      e.preventDefault();
+      setVoiceMuted(!state.voiceMuted);
+    };
+    syncMuteBtn();
+    applyVoiceMuteToAudio();
     var eaIn = document.getElementById("eaInput");
     eaIn.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
@@ -1615,6 +1628,62 @@
     }
   }
 
+  function syncMuteBtn() {
+    var b = document.getElementById("eaMute");
+    if (!b) return;
+    var muted = !!state.voiceMuted;
+    b.classList.toggle("on", muted);
+    b.setAttribute("aria-pressed", muted ? "true" : "false");
+    var ic = b.querySelector(".ea-chip-ic");
+    var lbl = b.querySelector(".ea-chip-lbl");
+    if (ic) ic.textContent = muted ? "🔇" : "🔊";
+    if (lbl) lbl.textContent = muted ? "Muted" : "Mute";
+    b.title = muted
+      ? "Agent voice is off — click to unmute (chat text still works)"
+      : "Mute agent voice (keep text replies)";
+  }
+
+  /** Soft-mute Realtime <audio> element without tearing down the WebRTC pipe. */
+  function applyVoiceMuteToAudio() {
+    if (state.audioEl) {
+      try {
+        state.audioEl.muted = !!state.voiceMuted;
+        state.audioEl.volume = state.voiceMuted ? 0 : 1;
+      } catch (e) {}
+    }
+  }
+
+  /**
+   * Mute / unmute agent voice (speaker). Does NOT touch the mic.
+   * Text chat + tools keep working; tours skip spoken steps when muted.
+   */
+  function setVoiceMuted(muted) {
+    state.voiceMuted = !!muted;
+    try { localStorage.setItem("ea_voice_muted", state.voiceMuted ? "1" : "0"); } catch (e) {}
+    applyVoiceMuteToAudio();
+    if (state.voiceMuted) {
+      // Kill anything currently playing
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      try { cancelRealtimeIfActive(); } catch (e) {}
+      state.speaking = false;
+      state.rtResponseActive = false;
+      state._speakSeq++; // abandon queued speak promises
+      if (typeof state._onSpeakDone === "function") {
+        try { state._onSpeakDone(); } catch (e) {}
+      } else {
+        holdMicWhileSpeaking(false);
+      }
+      if (state.open && !state.touring) {
+        setStatus(state.listening ? "Listening (voice muted)" : "Voice muted", state.listening ? "listen" : "on");
+      }
+    } else if (state.open && !state.touring) {
+      setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+    }
+    syncMuteBtn();
+  }
+
+  function isVoiceMuted() { return !!state.voiceMuted; }
+
   /**
    * Mute/unmute mic tracks WITHOUT tearing down WebRTC.
    * Killing the data channel was forcing TTS into robotic browser speechSynthesis.
@@ -1778,6 +1847,10 @@
     opts = opts || {};
     var plain = stripMd(text);
     if (!plain) return Promise.resolve();
+    // Speaker mute: text already on screen; resolve immediately so tours don't stall.
+    if (state.voiceMuted && !opts.force) {
+      return Promise.resolve();
+    }
     // Dedupe identical consecutive lines (double chat + tour wrap-up)
     if (plain === state._lastSpokenPlain && !opts.force) {
       return Promise.resolve();
@@ -1790,6 +1863,7 @@
       .catch(function () {})
       .then(function () {
         if (seq !== state._speakSeq) return; // superseded by newer speech/barge-in
+        if (state.voiceMuted && !opts.force) return; // muted mid-queue
         return speakNow(plain, opts);
       });
     return state._speakQueue;
@@ -1808,9 +1882,14 @@
         // Re-open mic after agent finishes (with settle delay inside helper)
         holdMicWhileSpeaking(false);
         if (state.listening && !state.touring) {
-          setStatus("Listening…", "listen");
+          setStatus(state.voiceMuted ? "Listening (voice muted)" : "Listening…", "listen");
         }
         resolve();
+      }
+      // Speaker mute — never start audio
+      if (state.voiceMuted && !opts.force) {
+        done();
+        return;
       }
       state._onSpeakDone = done;
 
@@ -2059,6 +2138,7 @@
       state.audioEl.setAttribute("playsinline", "true");
       state.audioEl.style.cssText = "position:fixed;width:0;height:0;opacity:0;pointer-events:none;";
       document.body.appendChild(state.audioEl);
+      applyVoiceMuteToAudio();
     }
     pc.ontrack = function (e) {
       state.audioEl.srcObject = e.streams[0];
