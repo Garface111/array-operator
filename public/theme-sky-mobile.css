@@ -133,8 +133,15 @@
   /* floating widgets clear the floating dock (mobile.css pins them with
      !important at 70/72/124px over the old full-width bar — re-derive) */
   html.sky #fsWrap{bottom:calc(82px + env(safe-area-inset-bottom,0px)) !important}
-  html.sky .ao-al-fab{bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important}
-  html.sky .ao-al-panel{bottom:calc(138px + env(safe-area-inset-bottom,0px)) !important}
+  /* Alerts left; Energy Agent sun bubble owns the right */
+  html.sky .ao-al-fab{
+    left:14px !important; right:auto !important;
+    bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important;
+  }
+  html.sky .ao-al-panel{
+    left:12px !important; right:auto !important;
+    bottom:calc(138px + env(safe-area-inset-bottom,0px)) !important;
+  }
 
   /* ── 3 · FULL-WIDTH SHEETS — fill the wrap (Fold 5: no skinny left column) ── */
   html.sky .wrap{padding:0 12px; max-width:100% !important; width:100%}
@@ -364,6 +371,14 @@
     bottom:calc(86px + env(safe-area-inset-bottom,0px));
   }
   html.sky #fsWrap{bottom:calc(96px + env(safe-area-inset-bottom,0px)) !important}
+  html.sky .ao-al-fab{
+    left:18px !important; right:auto !important;
+    bottom:calc(96px + env(safe-area-inset-bottom,0px)) !important;
+  }
+  html.sky .ao-al-panel{
+    left:16px !important; right:auto !important;
+    bottom:calc(150px + env(safe-area-inset-bottom,0px)) !important;
+  }
   /* 2-col account / portal grids already in mobile.css; keep sheets breathable */
   html.sky #panelDashboard .dash-wrap{padding:22px 18px 48px !important}
   html.sky #sbWrap{padding:16px 16px 18px}

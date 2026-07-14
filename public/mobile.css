@@ -274,10 +274,20 @@
   .mob-more-ic svg { width: 22px; height: 22px; }
   .mob-more-go { margin-left: auto; color: var(--faint); }
 
-  /* Floating widgets must sit ABOVE the new bottom bar, not behind it. */
+  /* Floating widgets sit ABOVE the bottom bar. Energy Agent owns bottom-RIGHT
+     (sun bubble); Alerts pill moves to the LEFT so they never stack/cover. */
   #fsWrap { bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important; }
-  .ao-al-fab { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
-  .ao-al-panel { bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important; }
+  .ao-al-fab {
+    left: 14px !important;
+    right: auto !important;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .ao-al-panel {
+    left: 12px !important;
+    right: auto !important;
+    bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important;
+    width: min(372px, calc(100vw - 24px));
+  }
 
   /* Energy Agent lives as a fixed FAB (energy-agent.css) — never a bottom-nav tab. */
   .tabbar > .tab.ea-tab { display: none !important; }
@@ -358,7 +368,16 @@
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
   }
   #fsWrap { bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important; }
-  .ao-al-fab { bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important; }
+  .ao-al-fab {
+    left: 18px !important;
+    right: auto !important;
+    bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .ao-al-panel {
+    left: 16px !important;
+    right: auto !important;
+    bottom: calc(142px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 
   /* ── Fleet Triage: roomy KPI strip ─────────────────────────────────────── */
   .cc-kpis {
