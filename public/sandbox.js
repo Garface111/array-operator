@@ -5442,20 +5442,27 @@
       wrap._wired = true;
       wrap.addEventListener("click", (e) => {
         const b = e.target.closest(".ar-mode-opt"); if(!b) return;
-        // Always stop — otherwise the click bubbles to #rowAutoRefresh and
-        // COLLAPSES the credential body (Paul/live dogfood 2026-07-13: picking
-        // "Store it with us" hid the vault; only a hard refresh unstuck it).
         e.preventDefault();
         e.stopPropagation();
         if(b.dataset.mode === _arGetMode()) return;
         _arSetMode(b.dataset.mode);
         _vaultStatusCache = null;
-        // Keep the vault OPEN so switching mode feels like continuing, not
-        // like the panel vanished.
+        // Mode flip MUST keep logins visible — collapsing here felt like "everything
+        // disappeared" (only Name/Company/Email left below). Force open every switch.
         try {
-          const body = document.getElementById("arBody");
-          if(body) body.classList.remove("ar-collapsed");
-          localStorage.setItem("ao_ar_open", "1");
+          if(typeof _arSetBodyOpen === "function") _arSetBodyOpen(true);
+          else {
+            const body = document.getElementById("arBody");
+            if(body) body.classList.remove("ar-collapsed");
+            localStorage.setItem("ao_ar_open", "1");
+          }
+        } catch(_){}
+        // Optimistic paint so the vault never goes blank mid-fetch
+        try {
+          const listEl = document.getElementById("arList");
+          if(listEl){
+            listEl.innerHTML = `<div class="acct-msg" id="arMsg">Switching capture mode — loading portals…</div>`;
+          }
         } catch(_){}
         wireAutoRefreshRow();
       });
@@ -5795,7 +5802,12 @@
         <div class="ar-panel-head">
           <button type="button" class="ar-panel-ic" id="arRefreshBtn" title="Refresh now" aria-label="Refresh cloud status now">↻</button>
           <div class="ar-panel-hd">
-            <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span></h3>
+            <h3>Auto-refresh<span class="ar-panel-stat" id="arPanelStat"></span>
+              <button type="button" class="ar-toggle open" id="arToggle" aria-expanded="true" title="Show or hide logins">
+                <span class="ar-caret" aria-hidden="true">▸</span>
+                <span class="ar-toggle-lab">Hide logins</span>
+              </button>
+            </h3>
             <p id="arPanelSub">Keeps your live production and utility bills fresh automatically. Saved <b>only on this device</b>, encrypted — never sent to our servers. On by default; turn off any portal anytime.</p>
             <p class="ar-tour-link" style="margin:.45rem 0 0;font-size:12px">
               <button type="button" id="hoTourRelaunch" class="ar-tour-btn"
@@ -5813,18 +5825,42 @@
         </div>
       </div>
       <div class="ar-body" id="arBody">
-        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Checking…</div></div>
+        <div class="ar-list" id="arList"><div class="acct-msg" id="arMsg">Loading portals…</div></div>
       </div>
+      <button type="button" class="ar-show-logins" id="arShowLogins" hidden>
+        Show inverter &amp; utility logins →
+      </button>
     </section>`;
   }
 
+  // Serialize concurrent status pulls so a slow cloud/device flip can't wipe a
+  // newer render (or leave the vault looking "gone").
+  let _arWireGen = 0;
+
+  function _arSetBodyOpen(open){
+    const body = document.getElementById("arBody");
+    const toggle = document.getElementById("arToggle");
+    const showBtn = document.getElementById("arShowLogins");
+    if(body) body.classList.toggle("ar-collapsed", !open);
+    if(toggle){
+      toggle.classList.toggle("open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      const lab = toggle.querySelector(".ar-toggle-lab");
+      if(lab) lab.textContent = open ? "Hide logins" : "Show logins";
+    }
+    if(showBtn) showBtn.hidden = !!open;
+    try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
+  }
+
   async function wireAutoRefreshRow(){
-    // Collapsible header: tuck the (bulky) per-vendor cred cards away; remember the
-    // choice. Clicking ANYWHERE on the header row toggles it — except inside the
-    // expanded body, so typing/saving credentials never collapses the panel.
+    const gen = ++_arWireGen;
+    // Collapsible ONLY via the explicit Show/Hide control — never by clicking the
+    // whole Auto-refresh card. Dogfood: clicking near "Store it with us" collapsed
+    // arBody (display:none) and every portal/LIVE row vanished, leaving only Name/Email.
     const row = document.getElementById("rowAutoRefresh");
     const toggle = document.getElementById("arToggle");
     const body = document.getElementById("arBody");
+    const showBtn = document.getElementById("arShowLogins");
     // Reopen post-onboarding hands-off walkthrough (hands-off-tour.js)
     const tourBtn = document.getElementById("hoTourRelaunch");
     if(tourBtn && !tourBtn._wired){
@@ -5837,17 +5873,35 @@
         } catch(err){}
       });
     }
-    if(row && body && !row._wired){
-      row._wired = true;
-      row.addEventListener("click", (e) => {
-        // Cred fields + interactive head controls are never a collapse target.
-        // (Mode tabs used to bubble here and hide the whole vault mid-setup.)
-        if(e.target.closest(".ar-body, .ar-mode, .ar-mode-opt, #arRefreshBtn, a, button, input, select, label, textarea")) return;
-        const open = !body.classList.toggle("ar-collapsed");
-        if(toggle){ toggle.classList.toggle("open", open); toggle.setAttribute("aria-expanded", String(open)); }
-        try { localStorage.setItem("ao_ar_open", open ? "1" : "0"); } catch(e){}
+    if(toggle && !toggle._wired){
+      toggle._wired = true;
+      toggle.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const currentlyOpen = body && !body.classList.contains("ar-collapsed");
+        _arSetBodyOpen(!currentlyOpen);
       });
     }
+    if(showBtn && !showBtn._wired){
+      showBtn._wired = true;
+      showBtn.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        _arSetBodyOpen(true);
+        try { body && body.scrollIntoView({ behavior:"smooth", block:"nearest" }); } catch(err){}
+      });
+    }
+    // Default OPEN unless the user explicitly hid logins (and never leave a
+    // "vanished vault" after mode switch — see _arWireModeSwitch).
+    try {
+      const pref = localStorage.getItem("ao_ar_open");
+      if(pref === "0") _arSetBodyOpen(false);
+      else _arSetBodyOpen(true);
+    } catch(e){ _arSetBodyOpen(true); }
+    // Kill any legacy whole-card collapse handler (older builds attached it to #rowAutoRefresh).
+    if(row && row._wiredCollapse){
+      try { row.removeEventListener("click", row._wiredCollapse); } catch(e){}
+      row._wiredCollapse = null;
+    }
+    row && (row._wired = true);
     // Arrived from onboarding's "skip for now" (cloud path, no logins added yet) —
     // open, scroll to, and flash the Auto-refresh panel so they land exactly where
     // credentials get added (Ford 2026-07-11). One-shot; strips the param after.
@@ -5863,7 +5917,7 @@
         _arWantOpen = false;
         const _row = document.getElementById("rowAutoRefresh");
         const _body = document.getElementById("arBody");
-        if(_body) _body.classList.remove("ar-collapsed");   // ensure expanded
+        _arSetBodyOpen(true);   // ensure logins visible
         if(_row){
           setTimeout(() => { _row.scrollIntoView({ behavior:"smooth", block:"start" }); }, 60);
           _row.classList.add("ar-flash");
@@ -5898,34 +5952,68 @@
     let status = {};
     if(mode === "cloud"){
       const cs = await cloudOp("status");
+      if(gen !== _arWireGen){ _arStopSpin(); return; } // superseded by a newer wire
       if(!cs || !cs.ok){
-        listEl.innerHTML = (cs && cs.error === "signin")
-          ? `<div class="acct-msg">Sign in to set up hands-off cloud refresh.</div>`
-          : `<div class="acct-msg">Couldn't load cloud refresh status — tap ↻ to retry.</div>`;
+        // Keep any existing portal markup if we already painted once — only replace
+        // with a soft error strip, never a blank Account tab.
+        const err = (cs && cs.error === "signin")
+          ? `Sign in to set up hands-off cloud refresh.`
+          : `Couldn't load cloud refresh status — tap ↻ to retry.`;
+        if(!listEl.querySelector(".ar-card-group")){
+          listEl.innerHTML = `<div class="acct-msg err">${err}</div>`;
+        } else {
+          let banner = listEl.querySelector(".ar-load-err");
+          if(!banner){
+            banner = document.createElement("div");
+            banner.className = "acct-msg err ar-load-err";
+            listEl.prepend(banner);
+          }
+          banner.textContent = err;
+        }
         _arStopSpin();
         return;
       }
       status = cloudStatusToShape(cs);
     } else {
       if(!EXT_PRESENT){
-        listEl.innerHTML = `<div class="acct-msg">Install the free EnergyAgent helper to enable on-device auto-refresh — or switch to <b>Hands-off cloud</b> above, which needs no helper. <a href="onboarding.html" style="color:var(--good)">Get the helper →</a></div>`;
+        if(gen !== _arWireGen){ _arStopSpin(); return; }
+        // Still show the portal shells empty + install CTA (don't blank the vault)
+        listEl.innerHTML =
+          `<div class="acct-msg">Install the free EnergyAgent helper for on-device auto-refresh — or switch back to <b>Store it with us</b> above (no helper needed). <a href="onboarding.html" style="color:var(--good)">Get the helper →</a></div>` +
+          `<div class="ar-card ar-card-group"><div class="ar-group ar-group-inv">
+            <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">Available after the helper is installed, or switch to cloud mode.</span></div>
+          </div></div>`;
         _arStopSpin();
         return;
       }
       const resp = await vaultOp("status");
+      if(gen !== _arWireGen){ _arStopSpin(); return; }
       if(!resp || !resp.ok){
-        listEl.innerHTML = `<div class="acct-msg">Couldn't reach the EnergyAgent helper. Make sure it's installed and tap ↻ to retry.</div>`;
+        const err = `Couldn't reach the EnergyAgent helper. Make sure it's installed and tap ↻ to retry.`;
+        if(!listEl.querySelector(".ar-card-group")){
+          listEl.innerHTML = `<div class="acct-msg err">${err}</div>`;
+        } else {
+          let banner = listEl.querySelector(".ar-load-err");
+          if(!banner){
+            banner = document.createElement("div");
+            banner.className = "acct-msg err ar-load-err";
+            listEl.prepend(banner);
+          }
+          banner.textContent = err;
+        }
         _arStopSpin();
         return;
       }
       status = resp.status || {};
     }
     const catalog = await loadUtilCatalog();
+    if(gen !== _arWireGen){ _arStopSpin(); return; }
 
     // Merge every linked inverter/API/utility source (AlsoEnergy, SolarEdge,
     // Locus, GMP bill accounts, …) into `status` so the LIVE board lists them
     // even when they aren't portal-vault logins (Ford 2026-07-13).
     status = await _arMergeLinkedSources(status);
+    if(gen !== _arWireGen){ _arStopSpin(); return; }
 
     // ── a single credential row (save/replace + optional remove) ──
     // key = the vault key clear/optout act on (an inverter id, or a utility slot).

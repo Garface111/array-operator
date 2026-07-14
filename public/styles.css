@@ -218,13 +218,31 @@
     background:rgba(63,214,138,.16);color:var(--good);font-size:12px;font-weight:800;line-height:1;flex:none;
     transition:transform .15s,background .15s}
   .ar-toggle.open .ar-caret{transform:rotate(90deg)}
-  /* Whole header row is the click target (the body's cred fields are excluded in JS) */
-  #rowAutoRefresh{cursor:pointer;border-radius:12px;transition:background .12s}
-  #rowAutoRefresh:hover{background:rgba(63,214,138,.06)}
-  #rowAutoRefresh:hover .ar-caret{background:rgba(63,214,138,.3)}
-  #rowAutoRefresh:hover .ar-toggle{color:var(--good)}
+  /* Collapse is ONLY via #arToggle / #arShowLogins — never the whole card
+     (accidental clicks near mode tabs used to hide every portal). */
+  #rowAutoRefresh{border-radius:12px}
   #rowAutoRefresh .ar-body{cursor:default}
   .ar-body.ar-collapsed{display:none}
+  .ar-toggle{
+    display:inline-flex;align-items:center;gap:6px;margin-left:auto;
+    border:1px solid var(--line);background:rgba(255,255,255,.7);
+    border-radius:999px;padding:4px 10px 4px 6px;font:inherit;font-size:11.5px;
+    font-weight:700;color:var(--muted);cursor:pointer;line-height:1.2;
+    transition:background .12s,color .12s,border-color .12s;
+  }
+  .ar-toggle:hover{background:#fff;color:var(--ink);border-color:var(--good,#34d896)}
+  .ar-toggle.open .ar-caret{transform:rotate(90deg)}
+  .ar-toggle-lab{white-space:nowrap}
+  .ar-show-logins{
+    display:block;width:100%;box-sizing:border-box;margin:0;
+    border:1px dashed rgba(33,150,243,.4);border-radius:14px;
+    background:linear-gradient(180deg,rgba(33,150,243,.08),rgba(255,255,255,.7));
+    padding:14px 16px;font:inherit;font-size:13.5px;font-weight:750;
+    color:var(--ink);cursor:pointer;text-align:center;
+  }
+  .ar-show-logins:hover{background:rgba(33,150,243,.12)}
+  .ar-show-logins[hidden]{display:none !important}
+  .ar-panel-hd h3 .ar-toggle{font-weight:700}
   .ar-list{margin-top:10px;display:flex;flex-direction:column;gap:9px}
   /* Auto-refresh as the LEAD full-width panel of Master Account (Ford 2026-07-10): a real
      card with a header + value/privacy line, portals laid out in a responsive grid so the
