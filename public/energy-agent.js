@@ -1191,7 +1191,31 @@
     }, 400);
   }
 
-  // ── session ──────────────────────────────────────────────────────────────
+  // ── session (server-persisted — survives refresh; mind survives cache clear) ──
+  function storedSessionId() {
+    try { return localStorage.getItem("ea_session_id") || ""; } catch (e) { return ""; }
+  }
+  function persistSessionId(id) {
+    try {
+      if (id) localStorage.setItem("ea_session_id", id);
+      else localStorage.removeItem("ea_session_id");
+    } catch (e) {}
+  }
+
+  /** Paint prior turns from the server (no TTS spam on restore). */
+  function paintHistory(messages) {
+    var host = document.getElementById("eaMsgs");
+    if (!host) return 0;
+    // Only clear if empty / first load for this panel open
+    var n = 0;
+    (messages || []).forEach(function (m) {
+      if (!m || !m.content) return;
+      var role = m.role === "user" ? "user" : "agent";
+      if (addMsg(role, m.content, { history: true })) n += 1;
+    });
+    return n;
+  }
+
   async function ensureSession() {
     if (state.sessionId) return state.sessionId;
     if (!signedIn()) {
@@ -1199,10 +1223,17 @@
       return null;
     }
     setStatus("Starting…", "think");
+    // resume:true → server returns the open conversation + history from the DB.
+    // preferred_session_id is a local hint only; if cache was cleared, server
+    // still finds the latest open session for this signed-in tenant.
     var r = await fetch(API.session, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ context: packContext() }),
+      body: JSON.stringify({
+        context: packContext(),
+        resume: true,
+        preferred_session_id: storedSessionId() || null,
+      }),
     });
     var d = await r.json().catch(function () { return null; });
     if (!r.ok || !d || !d.session_id) {
@@ -1211,42 +1242,58 @@
       return null;
     }
     state.sessionId = d.session_id;
+    persistSessionId(d.session_id);
     state.brain = d.brain;
     state.realtimeReady = !!d.realtime_ready;
     setBudget(d.budget);
-    // Prefer server intro; on mobile OS override with phase-aware opener if server
-    // sent the generic line (mobile_os context may not have been on session body yet).
-    var intro = d.intro || "Hi — I'm Energy Agent.";
-    try {
-      if (
-        typeof window.__aoMobileOsIsActive === "function" &&
-        window.__aoMobileOsIsActive() &&
-        typeof window.__aoMobileOsContext === "function"
-      ) {
-        var mos = window.__aoMobileOsContext() || {};
-        if (mos.phase === "setup" && mos.next_setup_step) {
-          intro =
-            "I'm your operating layer on mobile. Let's get you hands-off. " +
-            "Next up: **" +
-            (mos.next_setup_step.label || "setup") +
-            "**. Tap a checklist chip or tell me what vendor/utility you use — " +
-            "I'll drive the fastest path.";
-        } else if (mos.phase === "running" || mos.hands_off_ready) {
-          intro =
-            "Hands-off is the goal and you're in ops mode. " +
-            "Ask for a status brief anytime — inverters, last sync, offtaker send rates. " +
-            "Need spreadsheets and deep edits? Tap **Detail** at the bottom.";
-        }
+
+    var resumed = !!d.resumed && (d.messages || []).length > 0;
+    if (resumed) {
+      paintHistory(d.messages);
+      // Quiet restore — no re-greeting intro, no voice of the whole history
+      if (d.welcome_back) {
+        // Optional one-line continuity cue (text only)
+        // skip — history itself is the continuity signal
       }
-    } catch (e) {}
-    addMsg("agent", intro);
+      setStatus("Picked up where we left off", "on");
+    } else {
+      // Fresh conversation — intro as before
+      var intro = d.intro || "Hi — I'm Energy Agent.";
+      try {
+        if (
+          typeof window.__aoMobileOsIsActive === "function" &&
+          window.__aoMobileOsIsActive() &&
+          typeof window.__aoMobileOsContext === "function"
+        ) {
+          var mos = window.__aoMobileOsContext() || {};
+          if (mos.phase === "setup" && mos.next_setup_step) {
+            intro =
+              "I'm your operating layer on mobile. Let's get you hands-off. " +
+              "Next up: **" +
+              (mos.next_setup_step.label || "setup") +
+              "**. Tap a checklist chip or tell me what vendor/utility you use — " +
+              "I'll drive the fastest path.";
+          } else if (mos.phase === "running" || mos.hands_off_ready) {
+            intro =
+              "Hands-off is the goal and you're in ops mode. " +
+              "Ask for a status brief anytime — inverters, last sync, offtaker send rates. " +
+              "Need spreadsheets and deep edits? Tap **Detail** at the bottom.";
+          }
+        }
+      } catch (e) {}
+      addMsg("agent", intro);
+    }
+
     if (d.realtime_ready) {
-      setStatus("GPT voice ready — connecting mic…", "on");
+      if (!resumed) setStatus("GPT voice ready — connecting mic…", "on");
+      else setStatus("Ready — conversation restored", "on");
     } else {
       setStatus("Text ready (no OPENAI_API_KEY for GPT voice yet)", "warn");
-      addMsg("agent",
-        "Voice needs OPENAI_API_KEY on the server for the latest GPT Realtime model. " +
-        "You can still type. Brain: " + (d.brain || "stub") + ".");
+      if (!resumed) {
+        addMsg("agent",
+          "Voice needs OPENAI_API_KEY on the server for the latest GPT Realtime model. " +
+          "You can still type. Brain: " + (d.brain || "stub") + ".");
+      }
     }
     return state.sessionId;
   }
