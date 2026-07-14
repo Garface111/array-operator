@@ -592,7 +592,8 @@ body.sb-fs-lock{ overflow:hidden; }
 .acct-files-row .r-k .rb-files-count{ display:block; margin-top:4px; font-size:10.5px;
   font-weight:500; letter-spacing:0; text-transform:none; color:var(--faint); }
 .acct-files-row .r-v{ font-weight:initial; }
-.rb-gr-ctl{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+/* Align controls on the INPUT row (not mid-label) so Save rate sits with the boxes */
+.rb-gr-ctl{ display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; }
 .rb-gr-ctl .rb-gr-dollar{ color:var(--muted); font-weight:700; }
 .rb-gr-ctl .rb-gr-unit{ color:var(--faint); font-size:12.5px; }
 .rb-gr-ctl input{ width:96px; box-sizing:border-box; background:rgba(255,255,255,.04);
@@ -603,7 +604,14 @@ body.sb-fs-lock{ overflow:hidden; }
 /* discount-model: two labeled fields + live effective-rate line */
 .rb-globalrate{ align-items:flex-start; }
 .rb-gr-field{ display:inline-flex; flex-direction:column; gap:4px; }
-.rb-gr-lbl{ font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.02em; }
+.rb-gr-lbl{ font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.02em; line-height:1.2; }
+/* Invisible label spacer so Save rate shares the same column geometry as the fields */
+.rb-gr-lbl-spacer{ visibility:hidden; user-select:none; pointer-events:none; }
+.rb-gr-save{ justify-content:flex-end; }
+.rb-gr-save .ao-btn{
+  min-height:38px; display:inline-flex; align-items:center; justify-content:center;
+  box-sizing:border-box;
+}
 .rb-gr-inwrap{ display:inline-flex; align-items:center; gap:6px; }
 .rb-gr-eff{ flex-basis:100%; margin-top:10px; font-size:12px; color:var(--muted);
   border-top:1px solid var(--line); padding-top:9px; }

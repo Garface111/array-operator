@@ -2138,7 +2138,12 @@
                      title="Percent off the credit rate offtakers pay (their solar savings). Blank = 10% default.">
               <span class="rb-gr-unit">% off</span></span>
           </label>
-          <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save rate</button>
+          <!-- Same column stack as the two rate fields so the button sits on the
+               input row (vertical center of the boxes), not mid-way up the labels. -->
+          <div class="rb-gr-field rb-gr-save">
+            <span class="rb-gr-lbl rb-gr-lbl-spacer" aria-hidden="true">&nbsp;</span>
+            <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save rate</button>
+          </div>
           <span class="rb-status" id="rbGrStatus"></span>
         </div>
         <div class="rb-gr-eff" id="rbGrEff"></div>
