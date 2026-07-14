@@ -5377,13 +5377,12 @@
         ? `<button type="button" class="rb-grp-add" data-grpadd="${esc(grpArrayId)}"
              title="Add an offtaker to ${esc(g.label)}">＋ Add offtaker</button>`
         : "";
-      // Only tint a group that holds 2+ offtakers (Ford 2026-07-11): "when there's
-      // less than two off takers, there should be no color for the off taker. It just
-      // looks a little weird right now." A lone offtaker has nothing to be told apart
-      // from, so it renders on the plain background — no tint, no tone.
-      const tinted = g.rows.length >= 2;
+      // Always wrap every master in the floating group card (Ford 2026-07-14):
+      // a 1-offtaker group (Timberworks) must look like a multi-offtaker one
+      // (Waterford) — same shell, same padding, same alternating zebra tone.
+      const tinted = true;
       return `
-        <div class="rb-grp${tinted ? " rb-grp-tinted" : ""}${collapsed ? " collapsed" : ""}"${tinted ? ` data-grp-tone="${_i % 2}"` : ""}>
+        <div class="rb-grp rb-grp-tinted${collapsed ? " collapsed" : ""}" data-grp-tone="${_i % 2}">
           <div class="rb-grp-head" data-grpcollapse="${esc(g.key)}" role="button" tabindex="0"
                aria-expanded="${!collapsed}" title="${collapsed ? "Expand" : "Collapse"} the offtakers ${g.shareMode === "array" ? "in this array" : "on this utility bill"}">
             <span class="rb-grp-caret" aria-hidden="true">▾</span>
