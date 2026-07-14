@@ -25,7 +25,7 @@
       id: "arrays",
       rail: "Arrays live",
       railSub: "Production feed",
-      kicker: "Step 1 of 4 · Hardware",
+      kicker: "Step 1 of 5 · Hardware",
       title: "Get every array talking",
       lede:
         "Hands-off starts with a live production feed. SolarEdge/Locus poll server-side; Fronius, SMA, and Chint need a portal login so we can keep reading them.",
@@ -42,7 +42,7 @@
       id: "autorefresh",
       rail: "Auto-refresh",
       railSub: "The hands-off switch",
-      kicker: "Step 2 of 4 · Capture",
+      kicker: "Step 2 of 5 · Capture",
       title: "Save a portal login here",
       lede:
         "This is the hands-off switch. Drop a monitoring login below — we store it encrypted and refresh your data around the clock. No hunting through Account.",
@@ -62,7 +62,7 @@
       id: "utility",
       rail: "Utility bills",
       railSub: "Invoice source of truth",
-      kicker: "Step 3 of 4 · Settlement",
+      kicker: "Step 3 of 5 · Settlement",
       title: "Save your utility login",
       lede:
         "Offtaker invoices use utility bills as source of truth. Save GMP or your co-op login here so bills keep landing without a portal tab.",
@@ -80,7 +80,7 @@
       id: "offtakers",
       rail: "Offtakers",
       railSub: "Who you bill",
-      kicker: "Step 4 of 4 · Customers",
+      kicker: "Step 4 of 5 · Customers",
       title: "Add offtakers (if you invoice)",
       lede:
         "Each offtaker is a customer who gets a share of solar credits. Bind their share and bill source once; monthly drafts appear for your approval — or auto-send if you trust the path.",
@@ -88,11 +88,32 @@
       bullets: [
         "Invoices → <b>Add an offtaker</b>: name, email, share %, master/sub utility.",
         "Set master solar credit rate only if you want one fleet override; blank uses each bill’s own rate.",
-        "Skip this step if you only monitor arrays — you can always come back.",
+        "Next step turns on <b>online pay</b> so those invoices can collect money without you chasing checks.",
       ],
       cta: { label: "Set up offtakers →", hash: "#reports" },
       secondary: { label: "I only monitor — skip", skip: true },
       statusKey: "offtakers",
+    },
+    {
+      id: "onlinepay",
+      rail: "Online pay",
+      railSub: "Collect without chasing",
+      kicker: "Step 5 of 5 · Payouts",
+      title: "Enable online pay for offtakers",
+      lede:
+        "Hands-off invoicing isn’t finished until offtakers can pay from the email. One ~2‑minute Stripe bank setup — then every invoice gets a secure <b>Pay</b> button and money lands in your bank.",
+      kind: "step",
+      bullets: [
+        "We use Stripe Connect Express — you type bank (or debit) details once on Stripe’s secure page. We never see your bank login.",
+        "After you’re live, every offtaker invoice email can include a pay link automatically.",
+        "Platform fee is a small % per payment (shown on Account). The rest is yours.",
+      ],
+      callout:
+        "<b>Hands-off rule:</b> offtakers without online pay still need you to collect — drafts alone aren’t set-and-forget.",
+      cta: { label: "Enable online pay — ~2 min →", action: "start-connect" },
+      secondaryCta: { label: "Open Account pay setup →", hash: "#account", openPay: true },
+      secondary: { label: "I only monitor / collect offline — skip", skip: true },
+      statusKey: "onlinepay",
     },
     {
       id: "done",
@@ -101,7 +122,7 @@
       kicker: "You’re ready",
       title: "Set it once. Let it run.",
       lede:
-        "When arrays, auto-refresh, and utility bills are green, Array Operator can keep production fresh and draft offtaker invoices without daily login theatre.",
+        "When arrays, auto-refresh, utility bills, and (if you invoice) online pay are green, Array Operator can keep production fresh and offtaker invoices collect without daily login theatre.",
       kind: "done",
     },
   ];
@@ -158,13 +179,21 @@
     return (
       /[?&]tour=hands-off(&|$)/.test(q) ||
       /[?&]fresh=1(&|$)/.test(q) ||
-      /[?&]setup=autorefresh(&|$)/.test(q)
+      /[?&]setup=autorefresh(&|$)/.test(q) ||
+      // Returning from Stripe Connect bank setup
+      /[?&]connect=(return|refresh)(&|$)/.test(q)
     );
+  }
+
+  function queryConnectReturn() {
+    return /[?&]connect=(return|refresh)(&|$)/.test(location.search || "");
   }
 
   function shouldAutoOpen() {
     // Explicit tour= link always opens (even if they finished before)
     if (/[?&]tour=hands-off(&|$)/.test(location.search || "")) return true;
+    // Always re-open after Stripe Connect so they see Online pay turn green
+    if (queryConnectReturn() && session()) return true;
     if (!session()) return false;
     if (isTourComplete()) return false;
     return queryWantsTour();
@@ -196,13 +225,18 @@
     } catch (e) {}
   }
 
-  /** Required pillars for “hands-off” (offtakers optional). */
+  /**
+   * Required pillars for “hands-off”.
+   * Offtakers alone are optional — but once you have offtakers, online pay is required
+   * (otherwise invoices still need manual collection).
+   */
   function requiredRemaining(live) {
     live = live || state.live || {};
     var n = 0;
     if (!live.arrays) n++;
     if (!live.cloud) n++;
     if (!(live.utilWithBills > 0 || live.utilCount > 0)) n++;
+    if (live.offtakers && !live.onlinePay) n++;
     return n;
   }
 
@@ -227,6 +261,9 @@
       utilWithBills: 0,
       offtakers: null,
       offtakerCount: 0,
+      onlinePay: null,
+      onlinePayConnected: false,
+      onlinePayFee: null,
     };
     // arrays via FleetStore if ready
     try {
@@ -321,6 +358,22 @@
       }
     } catch (e) {}
 
+    try {
+      var pr = await fetch("/v1/array-operator/billing/payments/connect", {
+        headers: authHeaders(),
+      });
+      if (pr.ok) {
+        var pd = await pr.json();
+        live.onlinePayConnected = !!(pd.connected || pd.account_id);
+        live.onlinePay = !!(pd.ready || pd.charges_enabled);
+        if (pd.fee_percent != null) {
+          live.onlinePayFee = (Math.round(Number(pd.fee_percent) * 100) / 100) + "%";
+        } else if (pd.fee_bps != null) {
+          live.onlinePayFee = Number(pd.fee_bps) / 100 + "%";
+        }
+      }
+    } catch (e) {}
+
     // fallback array count from overview if FleetStore empty
     if (live.arrays == null) {
       try {
@@ -344,19 +397,21 @@
     if (step.statusKey === "autorefresh") return !!live.cloud;
     if (step.statusKey === "utility") return !!(live.utilities && (live.utilWithBills > 0 || live.utilCount > 0));
     if (step.statusKey === "offtakers") return !!live.offtakers;
+    if (step.statusKey === "onlinepay") return !!live.onlinePay;
     return false;
   }
 
   function progressPct(live) {
-    var keys = ["arrays", "autorefresh", "utility", "offtakers"];
+    var keys = ["arrays", "autorefresh", "utility", "offtakers", "onlinepay"];
     var done = 0;
     keys.forEach(function (k) {
       if (k === "arrays" && live.arrays) done++;
       if (k === "autorefresh" && live.cloud) done++;
       if (k === "utility" && live.utilities) done++;
       if (k === "offtakers" && live.offtakers) done++;
+      if (k === "onlinepay" && live.onlinePay) done++;
     });
-    return Math.round((done / 4) * 100);
+    return Math.round((done / keys.length) * 100);
   }
 
   // ── DOM ──────────────────────────────────────────────────────────────────
@@ -453,10 +508,16 @@
   }
 
   function scoreLine(live) {
+    live = live || {};
     var left = requiredRemaining(live);
-    return left === 0
-      ? "Core feeds look good"
-      : left + " required step" + (left === 1 ? "" : "s") + " left";
+    if (left === 0) {
+      if (live.offtakers && live.onlinePay) return "Invoicing is hands-off ready";
+      return "Core feeds look good";
+    }
+    if (live.offtakers && !live.onlinePay && left === 1) {
+      return "Enable online pay to finish offtaker setup";
+    }
+    return left + " required step" + (left === 1 ? "" : "s") + " left";
   }
 
   /** Soft update: progress + step states + body — no full remount, no re-animation. */
@@ -607,6 +668,27 @@
             : "No offtakers yet (optional)"
         )
       );
+    }
+    if (step.statusKey === "onlinepay") {
+      if (live.onlinePay) {
+        chips.push(
+          chip(
+            true,
+            "Online pay ON" + (live.onlinePayFee ? " · fee " + live.onlinePayFee : "")
+          )
+        );
+      } else if (live.onlinePayConnected) {
+        chips.push(chip(false, "Started — finish bank details on Stripe"));
+      } else {
+        chips.push(
+          chip(
+            false,
+            live.offtakers
+              ? "Required for hands-off offtaker invoices"
+              : "Not enabled yet"
+          )
+        );
+      }
     }
     if (!chips.length) return "";
     return '<div class="ho-status-row">' + chips.join("") + "</div>";
@@ -816,8 +898,16 @@
         html += '<div class="ho-callout">' + step.callout + "</div>";
       }
       if (stepComplete(step, live)) {
+        var doneMsg =
+          step.statusKey === "onlinepay"
+            ? "<b>Online pay is live.</b> Future offtaker invoices can include a Pay button."
+            : step.loginForm
+              ? "<b>Looks good on this step.</b> You can still add another login above, or continue."
+              : "<b>Looks good on this step.</b> Continue when you’re ready.";
         html +=
-          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)"><b>Looks good on this step.</b> You can still add another login above, or continue.</div>';
+          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)">' +
+          doneMsg +
+          "</div>";
       }
     }
 
@@ -844,6 +934,14 @@
           ? "✓ " + live.offtakerCount + " ready"
           : "Optional — for credit invoices") +
         "</span></div>" +
+        '<div class="ho-done-card"><b>Online pay</b><span>' +
+        (live.onlinePay
+          ? "✓ Pay links on invoices" +
+            (live.onlinePayFee ? " · fee " + live.onlinePayFee : "")
+          : live.offtakers
+            ? "Needed — enable so offtakers can pay"
+            : "Optional until you invoice offtakers") +
+        "</span></div>" +
         "</div>";
       html +=
         '<div class="ho-callout"><b>Tip:</b> open the Energy Agent orb anytime and ask “what still needs setup for hands-off?” — it can walk the live UI with you.</div>';
@@ -863,13 +961,32 @@
         '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Review Auto-refresh</button>';
     } else {
       if (step.cta) {
+        if (step.cta.action === "start-connect") {
+          html +=
+            '<button type="button" class="ho-btn ho-btn-primary" data-ho="start-connect">' +
+            esc(step.cta.label) +
+            "</button>";
+        } else {
+          html +=
+            '<button type="button" class="ho-btn ho-btn-primary" data-ho="cta" data-hash="' +
+            esc(step.cta.hash || "") +
+            '"' +
+            (step.cta.openAr ? ' data-ar="1"' : "") +
+            (step.cta.openPay ? ' data-pay="1"' : "") +
+            ">" +
+            esc(step.cta.label) +
+            "</button>";
+        }
+      }
+      if (step.secondaryCta) {
         html +=
-          '<button type="button" class="ho-btn ho-btn-primary" data-ho="cta" data-hash="' +
-          esc(step.cta.hash) +
+          '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="' +
+          esc(step.secondaryCta.hash || "") +
           '"' +
-          (step.cta.openAr ? ' data-ar="1"' : "") +
+          (step.secondaryCta.openAr ? ' data-ar="1"' : "") +
+          (step.secondaryCta.openPay ? ' data-pay="1"' : "") +
           ">" +
-          esc(step.cta.label) +
+          esc(step.secondaryCta.label) +
           "</button>";
       }
       html +=
@@ -890,7 +1007,30 @@
     return html;
   }
 
-  function goHash(hash, openAr) {
+  function scrollToOnlinePay() {
+    var tries = 0;
+    function attempt() {
+      tries++;
+      var el =
+        document.getElementById("aoPaySetup") ||
+        document.getElementById("aoPayCard") ||
+        document.querySelector(".acct-pay-setup");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        try {
+          el.classList.add("ho-pay-pulse");
+          setTimeout(function () {
+            el.classList.remove("ho-pay-pulse");
+          }, 2200);
+        } catch (e) {}
+        return;
+      }
+      if (tries < 12) setTimeout(attempt, 180);
+    }
+    setTimeout(attempt, 220);
+  }
+
+  function goHash(hash, openAr, openPay) {
     if (hash) {
       if (location.hash !== hash) location.hash = hash;
       else {
@@ -914,6 +1054,77 @@
           if (body) body.classList.remove("ar-collapsed");
         }
       }, 220);
+    }
+    if (openPay) scrollToOnlinePay();
+  }
+
+  async function startConnectFromTour(btn) {
+    if (!session()) {
+      if (btn) {
+        btn.textContent = "Sign in first";
+        setTimeout(function () {
+          btn.textContent = "Enable online pay — ~2 min →";
+        }, 1800);
+      }
+      return;
+    }
+    var label = (btn && btn.textContent) || "Enable online pay — ~2 min →";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Opening Stripe…";
+    }
+    try {
+      var r = await fetch("/v1/array-operator/billing/payments/connect", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: "{}",
+      });
+      var d = {};
+      try {
+        d = await r.json();
+      } catch (e) {}
+      var detail = d && typeof d.detail === "object" ? d.detail : d;
+      if (r.ok && d.already_ready) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "✓ Already set up";
+        }
+        await probeLive();
+        softUpdate();
+        return;
+      }
+      if (r.ok && d.url) {
+        if (btn) btn.textContent = "Redirecting to Stripe…";
+        // Remember to resume this step after Stripe Account Link return
+        try {
+          sessionStorage.setItem("ao_ho_resume_step", "onlinepay");
+        } catch (e) {}
+        window.location = d.url;
+        return;
+      }
+      var errMsg =
+        (detail && detail.error) ||
+        (typeof d.detail === "string" ? d.detail : null) ||
+        d.error ||
+        "Couldn't open bank setup";
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = String(errMsg).slice(0, 42);
+        setTimeout(function () {
+          btn.textContent = label;
+        }, 2800);
+      }
+      // Fall back to Account pay card so they still have a path
+      goHash("#account", false, true);
+    } catch (e) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Network error — try again";
+        setTimeout(function () {
+          btn.textContent = label;
+        }, 2200);
+      }
+      goHash("#account", false, true);
     }
   }
 
@@ -1138,15 +1349,36 @@
           hardRender({ animate: false });
           return;
         }
+        if (act === "start-connect") {
+          if (state.mode === "modal") {
+            markModalSeen();
+            state.mode = "dock";
+            hardRender({ animate: true });
+            // Re-find button after re-render
+            setTimeout(function () {
+              var b = document.querySelector('#hoTour [data-ho="start-connect"]');
+              startConnectFromTour(b || btn);
+            }, 80);
+          } else {
+            startConnectFromTour(btn);
+          }
+          return;
+        }
         if (act === "cta") {
           var hash = btn.getAttribute("data-hash");
           var ar = btn.getAttribute("data-ar") === "1";
+          var pay = btn.getAttribute("data-pay") === "1";
           if (state.mode === "modal") {
             markModalSeen();
             state.mode = "dock";
             hardRender({ animate: true });
           }
-          goHash(hash, ar);
+          goHash(hash, ar, pay);
+          // Don't auto-advance on pay setup — they need to finish Stripe first
+          if (pay || ar) {
+            scheduleSoftProbe();
+            return;
+          }
           if (state.idx < STEPS.length - 1) {
             setTimeout(function () {
               state.idx++;
@@ -1203,7 +1435,31 @@
       state.mode = "modal";
     }
     if (opts.step != null) state.idx = opts.step;
-    else if (!state.open) state.idx = 0;
+    else if (!state.open) {
+      // Resume Online pay after Stripe Connect return
+      var resumeIdx = null;
+      try {
+        var resumeId = sessionStorage.getItem("ao_ho_resume_step");
+        if (resumeId) {
+          sessionStorage.removeItem("ao_ho_resume_step");
+          for (var ri = 0; ri < STEPS.length; ri++) {
+            if (STEPS[ri].id === resumeId) {
+              resumeIdx = ri;
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+      if (resumeIdx == null && queryConnectReturn()) {
+        for (var ci = 0; ci < STEPS.length; ci++) {
+          if (STEPS[ci].id === "onlinepay") {
+            resumeIdx = ci;
+            break;
+          }
+        }
+      }
+      state.idx = resumeIdx != null ? resumeIdx : 0;
+    }
 
     var firstPaint = !state.open;
     ensureRoot();
@@ -1211,6 +1467,19 @@
     await probeLive();
     hardRender({ animate: firstPaint });
     scheduleSoftProbe();
+    // After Connect return, poll a few times — charges_enabled can lag webhooks
+    if (opts.pollConnect || queryConnectReturn()) {
+      var polls = 0;
+      var pollT = setInterval(function () {
+        polls++;
+        probeLive().then(function () {
+          if (state.open) softUpdate();
+          else updatePill();
+          if (state.live && state.live.onlinePay) clearInterval(pollT);
+        });
+        if (polls >= 10) clearInterval(pollT);
+      }, 2500);
+    }
   }
 
   function tryAutoOpen(attempt) {
@@ -1228,13 +1497,14 @@
       }
       return;
     }
+    var fromConnect = queryConnectReturn();
     scrubTourParams();
     // Explicit tour= always opens; prefer modal first time, dock after
-    var forceModal = /[?&]tour=hands-off(&|$)/.test(location.search || "") || !modalAlreadySeen();
-    // After scrub, search is gone — use whether modal was seen
+    // After Stripe bank setup, always dock so they see the checklist update
     openTour({
       force: true,
-      mode: modalAlreadySeen() ? "dock" : "modal",
+      mode: fromConnect || modalAlreadySeen() ? "dock" : "modal",
+      pollConnect: fromConnect,
     });
   }
 
