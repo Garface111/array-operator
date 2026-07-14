@@ -222,8 +222,8 @@
     var head =
       '<div class="an-card">' +
       '  <div class="an-card-head">' +
-      '    <div><div class="an-card-title">Through time</div>' +
-      '    <span class="an-card-sub">Trailing months · vs last year · vs last 3 years</span></div>' +
+      '    <h3>Through time</h3>' +
+      '    <span class="an-card-sub">Trailing months · vs last year · vs last 3 years</span>' +
       '  </div>' +
       '  <div class="antt-body">';
 
