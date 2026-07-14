@@ -581,6 +581,19 @@ html:not(.sky) .ea-journey{ background: rgba(255,255,255,.04); }
   border: 1px solid rgba(14,165,233,.3); background: transparent; color: var(--ea-sky2);
 }
 .ea-j-actions #eaJReload{ background: var(--ea-sky2); border-color: var(--ea-sky2); color: #fff; }
+.ea-j-actions .ea-j-esc,
+.ea-j-actions #eaJEscalate{
+  background: rgba(251,191,36,.15);
+  border-color: rgba(245,158,11,.45);
+  color: #b45309;
+  font-weight: 720;
+}
+.ea-j-actions .ea-j-esc:hover{ background: rgba(251,191,36,.28); }
+
+/* Hide residual floating wish widget when EA is the improve entry */
+body.ea-shell-open #fsWrap,
+#eaOrb ~ #fsWrap,
+html.ea-merged #fsWrap{ display: none !important; }
 
 /* highlight driver */
 .ea-hl{

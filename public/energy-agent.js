@@ -361,10 +361,30 @@
   function watchBuild(id) {
     improve.activeId = id;
     improve.since = Date.now();
+    improve._toldFail = false;
+    improve._pendingEscalateId = null;
+    // Ensure dock is open so journey is visible (not the old floating card)
+    if (!state.open) {
+      state.open = true;
+      var panel = document.getElementById("eaPanel");
+      var orb = document.getElementById("eaOrb");
+      if (panel) panel.classList.add("open");
+      if (orb) { orb.classList.add("open", "active"); }
+      document.body.classList.add("ea-shell-open");
+    }
+    // Kill residual floating wish chrome
+    try {
+      var wrap = document.getElementById("fsWrap");
+      if (wrap) wrap.style.display = "none";
+      var fj = document.getElementById("fsJourney");
+      if (fj) fj.classList.remove("open");
+      var mini = document.getElementById("fsMini");
+      if (mini) mini.classList.remove("show");
+    } catch (e) {}
     renderEaJourney("new");
     if (improve.poll) clearInterval(improve.poll);
-    improve.poll = setInterval(tickBuildStatus, 5000);
-    setTimeout(tickBuildStatus, 1200);
+    improve.poll = setInterval(tickBuildStatus, 4000);
+    setTimeout(tickBuildStatus, 800);
   }
   window.__eaBuildWatch = watchBuild;
 
@@ -372,28 +392,46 @@
     if (!improve.activeId) return;
     fetch("/v1/feature-suggestion/" + encodeURIComponent(improve.activeId) + "/status")
       .then(function (r) {
-        if (r.status === 404) { renderEaJourney("reviewed", { failed: true }); stopBuildWatch(); return null; }
+        if (r.status === 404) {
+          renderEaJourney("reviewed", {
+            failed: true,
+            detail: "Request not found — it may have expired. Want me to escalate to the developer?",
+          });
+          stopBuildWatch();
+          return null;
+        }
         return r.ok ? r.json() : null;
       })
       .then(function (d) {
         if (!d || !d.status) { renderEaJourney("new"); return; }
         if (d.status === "shipped") {
-          renderEaJourney("shipped");
-          addMsg("agent", "Your site change is live — refresh to see it.");
+          renderEaJourney("shipped", { detail: d.detail });
+          addMsg("agent", d.detail || "Your site change is live — refresh to see it.");
           if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
         } else if (d.status === "reviewed") {
           var elapsed = Math.floor((Date.now() - improve.since) / 1000);
-          if (elapsed > 90) {
-            renderEaJourney("reviewed", { failed: true });
-            addMsg("agent",
-              "The judge didn't auto-ship this one (too large or needs a human). " +
-              "It's still logged for Ford — nothing was lost.");
+          // Surface held outcome as soon as the judge finishes (don't wait 90s)
+          var held = d.can_escalate || d.outcome === "passed" || d.outcome === "branched"
+            || d.outcome === "backlog" || d.outcome === "failed_ship" || d.outcome === "held";
+          if (held || elapsed > 25) {
+            var why = d.detail || "The judge did not auto-ship this change.";
+            renderEaJourney("reviewed", { failed: true, detail: why, canEscalate: true });
+            if (!improve._toldFail) {
+              improve._toldFail = true;
+              addMsg("agent",
+                "**Why this didn't auto-ship:** " + why + "\n\n" +
+                "A pure color/CSS tweak should usually go through — this may have been " +
+                "misclassified, the review agent may still be catching up, or the judge " +
+                "wanted a human look.\n\n" +
+                "Want me to **escalate this to the developer (Ford)** so it gets a human review?");
+              improve._pendingEscalateId = improve.activeId;
+            }
             if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
           } else {
-            renderEaJourney("reviewed");
+            renderEaJourney("reviewed", { detail: d.detail });
           }
         } else {
-          renderEaJourney(d.status);
+          renderEaJourney(d.status, { detail: d.detail });
         }
       })
       .catch(function () {});
@@ -429,14 +467,15 @@
     var elapsed = improve.since ? Math.floor((Date.now() - improve.since) / 1000) : 0;
     var stepIdx = mapBuildStep(st || "new", elapsed);
     var failed = !!opts.failed;
+    var detail = opts.detail || "";
     host.hidden = false;
-    var title = st === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your wish…";
+    var title = st === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your change…";
     var lead = st === "shipped"
-      ? "Your change is on the site. Refresh to see it."
+      ? (detail || "Your change is on the site. Refresh to see it.")
       : failed
-        ? "Judge held this for a human (too big, or not pure UI). Logged for Ford."
-        : "Same pipeline as the old Wish button — judge first, then build.";
-    var html = "<h4>" + title + "</h4><p class=\"ea-j-lead\">" + lead + "</p><ul class=\"ea-j-steps\">";
+        ? (detail || "Judge held this for a human look. Nothing was lost.")
+        : (detail || "Judge reviews first — pure UI (colors, layout, copy) usually ships live.");
+    var html = "<h4>" + esc(title) + "</h4><p class=\"ea-j-lead\">" + esc(lead) + "</p><ul class=\"ea-j-steps\">";
     JOURNEY_STEPS.forEach(function (s, i) {
       var cls = "";
       if (st === "shipped" || i < stepIdx) cls = "done";
@@ -448,10 +487,25 @@
     if (st === "shipped") {
       html += '<button type="button" id="eaJReload">Refresh page</button>';
     }
+    if (failed || opts.canEscalate) {
+      html += '<button type="button" id="eaJEscalate" class="ea-j-esc">Escalate to developer</button>';
+    }
     html += '<button type="button" id="eaJDismiss">' + (st === "shipped" || failed ? "Dismiss" : "Hide") + "</button></div>";
     host.innerHTML = html;
     var reload = document.getElementById("eaJReload");
     if (reload) reload.onclick = function () { location.reload(); };
+    var escBtn = document.getElementById("eaJEscalate");
+    if (escBtn) escBtn.onclick = function () {
+      addMsg("user", "Yes — escalate this site change to the developer.");
+      turn(
+        "Please escalate_to_ford: site improvement request #" +
+          (improve.activeId || improve._pendingEscalateId || "?") +
+          " was held by the judge. Detail: " + (detail || "not auto-shipped") +
+          ". User wants a human developer review.",
+        "text",
+        { userAlreadyShown: true }
+      );
+    };
     var dismiss = document.getElementById("eaJDismiss");
     if (dismiss) dismiss.onclick = function () {
       if (st === "shipped" || failed) {
@@ -880,6 +934,33 @@
       || /^(can you |please )?(improve|fix) (this|the) (site|page|ui)\??$/.test(t);
   }
 
+  function isEscalateYes(text) {
+    var t = String(text || "").toLowerCase().trim();
+    if (!t) return false;
+    if (improve._pendingEscalateId == null && !improve.activeId) return false;
+    return /^(yes|yep|yeah|please|do it|escalate|send it|tell ford|notify|go ahead)\b/.test(t)
+      || /\b(escalate|developer|ford)\b/.test(t);
+  }
+
+  function detectTourId(text) {
+    var t = String(text || "").toLowerCase();
+    if (!/\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through)\b/.test(t)
+        && !/\bexplain\b.*\btab\b/.test(t)) {
+      // "walk me through master account" OR "show me the master account tab"
+      if (!/\b(master\s*account|account\s+tab|invoices?\s+tab|arrays?\s+tab)\b/.test(t)) {
+        return null;
+      }
+      // allow "show me master account" without walkthrough verb
+      if (!/\b(show|open|explain|walk)\b/.test(t)) return null;
+    }
+    if (/\b(master\s*account|account\s+tab|#account)\b/.test(t) || /\baccount\b/.test(t) && /\b(walk|tour|show|explain)\b/.test(t)) {
+      return "master_account";
+    }
+    if (/\b(invoice|offtaker|reports?)\b/.test(t)) return "reports";
+    if (/\b(inverter|arrays?|fleet\s+canvas)\b/.test(t)) return "arrays";
+    return null;
+  }
+
   async function turn(text, source, opts) {
     opts = opts || {};
     if (!text) return;
@@ -893,6 +974,37 @@
       openImproveFlow({ markFirst: true });
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
+    }
+    // Show-and-tell tours: don't wait on the LLM to remember to navigate
+    var tourId = detectTourId(text);
+    if (tourId) {
+      setStatus("Walking you through…", "think");
+      try {
+        await runTour({ tour_id: tourId });
+        // Also pull live account data so narration is accurate
+        if (tourId === "master_account") {
+          // Let the LLM add a short summary with real numbers after the tour
+          text = (
+            "I just ran a ui_tour of master_account (navigate+highlight). " +
+            "Now call account_summary and give a short accurate wrap-up of company, email, plan, " +
+            "and card-on-file — do NOT say email is null if contact_email is set. Keep it brief."
+          );
+        } else {
+          setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+          return;
+        }
+      } catch (e) {
+        addMsg("agent", "Couldn't run the visual tour — I'll explain from data instead.");
+      }
+    }
+    // After a held ship, "yes escalate" → Ford without full LLM loop
+    if (isEscalateYes(text)) {
+      var eid = improve._pendingEscalateId || improve.activeId;
+      improve._pendingEscalateId = null;
+      // fall through to LLM with clear escalate instruction
+      text = "Call escalate_to_ford now. Summary: site improvement #" + eid +
+        " was held by the auto-ship judge; user wants developer review. " +
+        "Original user message about the UI change was recently submitted.";
     }
     state.thinking = true;
     setStatus("Thinking…", "think");
@@ -1002,8 +1114,15 @@
         detail = { hash: hash };
         addMsg("agent", "Opening " + hash + "…");
       } else if (cmd.type === "highlight") {
-        ok = highlight(cmd.args && cmd.args.selector);
+        ok = highlight(
+          cmd.args && cmd.args.selector,
+          (cmd.args && cmd.args.ms) || 4500,
+          cmd.args && cmd.args.say
+        );
         detail = { selector: cmd.args && cmd.args.selector };
+      } else if (cmd.type === "tour" || cmd.type === "walkthrough") {
+        ok = await runTour(cmd.args || {});
+        detail = { steps: ((cmd.args && cmd.args.steps) || []).length };
       } else if (cmd.type === "fill") {
         ok = fill(cmd.args && cmd.args.selector, cmd.args && cmd.args.value);
       } else if (cmd.type === "click") {
@@ -1048,14 +1167,122 @@
     } catch (e) {}
   }
 
-  function highlight(sel) {
+  function highlight(sel, ms, say) {
     if (!sel) return false;
-    var el = document.querySelector(sel);
+    // Support comma-separated selectors — first match wins
+    var el = null;
+    String(sel).split(",").some(function (part) {
+      try { el = document.querySelector(part.trim()); } catch (e) { el = null; }
+      return !!el;
+    });
     if (!el) return false;
     el.classList.add("ea-hl");
     try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-    setTimeout(function () { el.classList.remove("ea-hl"); }, 4000);
+    if (say) {
+      addMsg("agent", say);
+      try { speak(say); } catch (e) {}
+    }
+    setTimeout(function () { el.classList.remove("ea-hl"); }, ms || 4500);
     return true;
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  /** Show-and-tell: navigate + highlight + narrate steps in sequence. */
+  async function runTour(args) {
+    args = args || {};
+    var steps = args.steps || [];
+    if (!steps.length && args.tour_id) {
+      steps = presetTour(args.tour_id) || [];
+    }
+    if (!steps.length) return false;
+    addTool("ui.tour", (args.tour_id || steps.length + " steps"));
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i] || {};
+      var hash = s.hash || (s.navigate && s.navigate.hash);
+      if (hash || s.type === "navigate") {
+        await runCommand({
+          type: "navigate",
+          args: { hash: hash || (s.args && s.args.hash) || "#dashboard" },
+          id: "tour-nav-" + i,
+        });
+        await sleep(s.wait_ms || 500);
+      }
+      if (s.selector || s.type === "highlight") {
+        var okHl = highlight(s.selector, s.ms || 4200, s.say || s.label || null);
+        if (!okHl && s.say) {
+          // Still narrate even if selector missing (DOM not ready)
+          addMsg("agent", s.say);
+        }
+        await sleep((s.ms || 4200) + 200);
+      } else if (s.say && !hash) {
+        addMsg("agent", s.say);
+        try { speak(s.say); } catch (e) {}
+        await sleep(s.ms || 2200);
+      }
+    }
+    return true;
+  }
+
+  function presetTour(id) {
+    var key = String(id || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (key === "master_account" || key === "account") {
+      return [
+        { hash: "#account", say: "Opening **Master Account** — your profile, plan, and billing." },
+        {
+          selector: "#panelAccount, #acctList, .acct-list",
+          say: "This whole panel is Master Account — company, operator, email, plan, and utilities.",
+          ms: 3500,
+        },
+        {
+          selector: ".acct-edit[data-field='company'], .acct-row[data-field='company']",
+          say: "**Company** — the business name on invoices and the account card. Click to edit; it auto-saves.",
+          ms: 4000,
+        },
+        {
+          selector: ".acct-edit[data-field='name'], .acct-row[data-field='name']",
+          say: "**Operator name** — you, the human running this account.",
+          ms: 3500,
+        },
+        {
+          selector: ".acct-edit[data-field='email'], .acct-row[data-field='email']",
+          say: "**Email** — contact email for this tenant (`contact_email` in the system). This is what shows on the profile.",
+          ms: 4000,
+        },
+        {
+          selector: "#rowAutoRefresh, .ar-stack, #arBody",
+          say: "**Auto-refresh** — how we keep inverter and utility data fresh (cloud vs this computer).",
+          ms: 4200,
+        },
+        {
+          selector: "#aoPaySetup, .acct-pay-setup, #billManage, #payState",
+          say: "**Billing / card** — plan status and payment method for Array Operator itself (not offtaker invoices).",
+          ms: 4000,
+        },
+        {
+          selector: "#acctFilesBody, .acct-files-row, #acctFilesCount",
+          say: "**Your files** — templates, workbooks, and captured utility PDFs stored on the account.",
+          ms: 3800,
+        },
+        { say: "That's the Master Account tour. Ask about any section and I'll dig in — or say **Improve** to change the UI.", ms: 2500 },
+      ];
+    }
+    if (key === "arrays" || key === "inverters") {
+      return [
+        { hash: "#arrays", say: "Opening **Inverters** — your live fleet canvas." },
+        { selector: "#panelArrays, #sbWrap, .sb-wrap", say: "Each column is an array; the comb below is real inverters.", ms: 4000 },
+        { say: "Want health details on a specific site? Name it and I'll investigate.", ms: 2200 },
+      ];
+    }
+    if (key === "reports" || key === "invoices") {
+      return [
+        { hash: "#reports", say: "Opening **Invoices** — offtaker billing." },
+        { selector: "#panelReports, .rb-wrap, #rbRoot", say: "Offtakers, drafts, and send pipeline live here.", ms: 4000 },
+      ];
+    }
+    return null;
   }
   function fill(sel, value) {
     if (!sel) return false;
@@ -1544,6 +1771,13 @@
       if (r) r.style.display = "none";
       return;
     }
+    // Seamless merge: hide residual floating "Wish this was better" chrome —
+    // Improve lives entirely inside Energy Agent now.
+    try {
+      document.documentElement.classList.add("ea-merged");
+      var wrap = document.getElementById("fsWrap");
+      if (wrap && signedIn()) wrap.style.display = "none";
+    } catch (e) {}
     if (signedIn()) {
       // Don't call getUserMedia here — Chrome ignores it without a user gesture.
       // Show the clickable gate so the user can grant mic with one click.

@@ -1450,6 +1450,27 @@ document.documentElement.setAttribute("data-theme","day");
     ACTIVE_ID=id;
     ACTIVE_SINCE=Date.now();
     pendAdd(id);
+    // Energy Agent owns the journey UI when present — hide the residual floating card
+    if(typeof window.__eaBuildWatch==="function"){
+      try{
+        openJourney(false); showMini(false);
+        var wrap=document.getElementById("fsWrap");
+        if(wrap) wrap.style.display="none";
+      }catch(e){}
+      window.__eaBuildWatch(id);
+      // Still poll lightly so localStorage resume stays consistent; EA owns display
+      if(POLL_T) clearInterval(POLL_T);
+      POLL_T=setInterval(function(){
+        fetch("/v1/feature-suggestion/"+encodeURIComponent(id)+"/status")
+          .then(function(r){ return r.ok?r.json():null; })
+          .then(function(d){
+            if(d && (d.status==="shipped" || (d.status==="reviewed" && d.can_escalate))){
+              if(POLL_T){ clearInterval(POLL_T); POLL_T=null; }
+            }
+          }).catch(function(){});
+      }, 8000);
+      return;
+    }
     renderJourney("new");
     if(POLL_T) clearInterval(POLL_T);
     // Fast poll while the customer is watching — 5s feels alive.
@@ -1487,7 +1508,7 @@ document.documentElement.setAttribute("data-theme","day");
       .catch(function(){ /* keep current UI; next tick retries */ });
   }
 
-  // Resume a pending watch after reload
+  // Resume a pending watch after reload — prefer Energy Agent dock
   (function resume(){
     try{
       var pend=JSON.parse(localStorage.getItem("fsPending")||"[]");
@@ -1498,6 +1519,15 @@ document.documentElement.setAttribute("data-theme","day");
       localStorage.setItem("fsPending", JSON.stringify(pend));
       if(!pend.length) return;
       var last=pend[pend.length-1];
+      // Hide residual floating wish chrome for signed-in EA users
+      try{
+        var wrap=document.getElementById("fsWrap");
+        if(wrap && document.getElementById("eaOrb")) wrap.style.display="none";
+      }catch(e){}
+      if(typeof window.__eaBuildWatch==="function"){
+        setTimeout(function(){ window.__eaBuildWatch(last.id); }, 600);
+        return;
+      }
       ACTIVE_ID=last.id;
       ACTIVE_SINCE=last.ts||now;
       renderJourney("new");
