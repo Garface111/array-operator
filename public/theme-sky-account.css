@@ -221,19 +221,21 @@ html.sky .ar-toggle .ar-caret{
   color:var(--sky-primary,#2196F3) !important;
 }
 html.sky .ar-show-logins{
-  border:1px solid rgba(33,150,243,.35) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
   border-style:solid !important;
-  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(33,150,243,.08)) !important;
+  background:rgba(255,255,255,.72) !important;
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
   color:var(--sky-primary-deep,#1976D2) !important;
   border-radius:14px !important;
   padding:12px 16px !important;
   font-size:13px !important;
   font-weight:720 !important;
-  box-shadow:0 2px 8px -4px rgba(33,150,243,.25);
+  box-shadow:0 1px 4px rgba(20,60,120,.06);
 }
 html.sky .ar-show-logins:hover{
-  background:rgba(33,150,243,.12) !important;
-  border-color:var(--sky-primary,#2196F3) !important;
+  background:rgba(255,255,255,.88) !important;
+  border-color:rgba(33,150,243,.35) !important;
 }
 /* consent gate — the trust moment: calm sky-blue tint, unmistakably a choice */
 html.sky .ar-consent{

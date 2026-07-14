@@ -235,14 +235,14 @@
   .ar-toggle-lab{white-space:nowrap}
   .ar-show-logins{
     display:block;width:100%;box-sizing:border-box;margin:0;
-    border:1px solid rgba(33,150,243,.35);border-radius:14px;
-    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(33,150,243,.08));
+    border:1px solid rgba(15,23,42,.10);border-radius:14px;
+    background:#fff;
     padding:12px 16px;font:inherit;font-size:13px;font-weight:720;
     color:#1976D2;cursor:pointer;text-align:center;
-    box-shadow:0 2px 8px -4px rgba(33,150,243,.25);
+    box-shadow:0 1px 3px rgba(15,23,42,.04);
     transition:background .12s,border-color .12s,box-shadow .12s;
   }
-  .ar-show-logins:hover{background:rgba(33,150,243,.12);border-color:#2196F3}
+  .ar-show-logins:hover{background:#f8fafc;border-color:rgba(33,150,243,.35)}
   .ar-show-logins[hidden]{display:none !important}
   .ar-panel-hd h3 .ar-toggle{font-weight:700}
   .ar-list{margin-top:10px;display:flex;flex-direction:column;gap:9px}
