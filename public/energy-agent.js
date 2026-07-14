@@ -14,6 +14,11 @@
     transcript: "/v1/energy-agent/transcript",
     uiResult: "/v1/energy-agent/ui-result",
     budget: "/v1/energy-agent/budget",
+    // Operating mind — continuous cognition event stream
+    mind: "/v1/energy-agent/mind",
+    mindEvents: "/v1/energy-agent/mind/events",
+    mindConsume: "/v1/energy-agent/mind/events/consume",
+    mindTick: "/v1/energy-agent/mind/tick",
   };
 
   var state = {
@@ -27,6 +32,14 @@
     budget: null,
     brain: null,
     realtimeReady: false,
+    // Operating mind (one continuous mind, not agent swarm UI)
+    mindSinceId: 0,
+    mindPollTimer: null,
+    mindBusy: false,
+    mindOpenTasks: 0,
+    _lastMindSpeak: "",
+    _lastMindSpeakAt: 0,
+    _mindInjecting: false,
     // GPT Realtime WebRTC
     pc: null,
     dc: null,
@@ -221,11 +234,14 @@
     panel.innerHTML =
       '  <div class="ea-head">' +
       '    <div><h3>Energy Agent</h3>' +
-      '    <p>Your operator + site improver — marks up changes, judges them, ships small UI live.</p></div>' +
+      '    <p>One mind for your fleet — continuous awareness, not a pile of agents.</p></div>' +
       '    <button type="button" class="ea-x" id="eaClose" aria-label="Close">×</button>' +
       "  </div>" +
       '  <div class="ea-status"><i class="ea-dot" id="eaDot"></i>' +
       '    <span id="eaStatusText">Ready</span>' +
+      '    <span class="ea-mind" id="eaMind" hidden title="Background work — still one mind">' +
+      '      <i class="ea-mind-pulse" aria-hidden="true"></i>' +
+      '      <span id="eaMindText">Working…</span></span>' +
       '    <span class="ea-budget" id="eaBudget" aria-label="Weekly AI usage">' +
       '      <span class="ea-usage ea-usage-ok">' +
       '        <span class="ea-usage-label">Weekly</span>' +
@@ -895,9 +911,11 @@
     if (opts.skipIfDup && state._lastUserSaid === t && role === "user") return false;
     if (role === "user") state._lastUserSaid = t;
     var d = document.createElement("div");
-    d.className = "ea-msg " + (role === "user" ? "user" : "agent");
+    d.className = "ea-msg " + (role === "user" ? "user" : "agent") +
+      (opts.mindUpdate ? " mind-update" : "");
     d.setAttribute("data-role", role);
     d.setAttribute("data-raw", t);
+    if (opts.mindUpdate) d.setAttribute("data-mind", "1");
     // Agent replies get full markdown; user bubbles stay plain (they typed it)
     // unless they include obvious markdown markers.
     var rich = role === "agent" || /\*\*|__|`|^#\s|^\s*[-•]\s/m.test(t);
@@ -941,6 +959,153 @@
       '<button type="button" class="ea-no" id="eaNo">Cancel</button></div>';
     document.getElementById("eaYes").onclick = function () { confirmPending(true); };
     document.getElementById("eaNo").onclick = function () { confirmPending(false); };
+  }
+
+  // ── Operating mind stream (seamless updates, one voice) ──────────────────
+  function setMindActivity(on, label) {
+    state.mindBusy = !!on;
+    var el = document.getElementById("eaMind");
+    var txt = document.getElementById("eaMindText");
+    if (!el) return;
+    if (on) {
+      el.hidden = false;
+      el.classList.add("on");
+      if (txt) txt.textContent = label || "Working in background…";
+    } else {
+      el.hidden = true;
+      el.classList.remove("on");
+      if (txt) txt.textContent = "Working…";
+    }
+  }
+
+  function startMindAwareness() {
+    if (state.mindPollTimer) return;
+    // Soft poll — cheap event cursor; heavy work only on backend when tasks exist
+    state.mindPollTimer = setInterval(function () {
+      pollMindEvents().catch(function () {});
+    }, 8000);
+    // First pull soon after open / chat plan
+    setTimeout(function () { pollMindEvents().catch(function () {}); }, 1200);
+  }
+
+  function stopMindAwareness() {
+    if (state.mindPollTimer) {
+      clearInterval(state.mindPollTimer);
+      state.mindPollTimer = null;
+    }
+    setMindActivity(false);
+  }
+
+  /** Inject a same-mind spoken/text update (never "agent finished"). */
+  function injectMindSpeak(text, opts) {
+    opts = opts || {};
+    var t = String(text || "").trim();
+    if (!t) return false;
+    var now = Date.now();
+    // Rate-limit identical seamless updates
+    if (t === state._lastMindSpeak && (now - state._lastMindSpeakAt) < 60000) {
+      return false;
+    }
+    // Don't stomp while the user is mid-turn thinking
+    if (state.thinking && !opts.force) return false;
+    state._lastMindSpeak = t;
+    state._lastMindSpeakAt = now;
+    state._mindInjecting = true;
+    try {
+      var painted = addMsg("agent", t, { mindUpdate: true });
+      if (painted && !state.voiceMuted && !state.thinking) {
+        // Soft speak — skip if already talking so we don't barge mid-reply
+        if (!state.speaking) {
+          enqueueSpeak(t, { source: "mind" }).catch(function () {});
+        }
+      }
+      return painted;
+    } finally {
+      state._mindInjecting = false;
+    }
+  }
+
+  async function pollMindEvents() {
+    if (!signedIn() || !state.open) return;
+    var url = API.mindEvents + "?since_id=" + encodeURIComponent(state.mindSinceId || 0);
+    if (state.sessionId) {
+      url += "&session_id=" + encodeURIComponent(state.sessionId);
+    }
+    var r = await fetch(url, { headers: authHeaders() });
+    if (!r.ok) return;
+    var d = await r.json().catch(function () { return null; });
+    if (!d || !d.events) return;
+
+    var toConsume = [];
+    var openHint = false;
+    for (var i = 0; i < d.events.length; i++) {
+      var ev = d.events[i];
+      if (!ev || !ev.id) continue;
+      if (ev.id > state.mindSinceId) state.mindSinceId = ev.id;
+
+      if (ev.kind === "task_queued" || ev.kind === "plan_created") {
+        openHint = true;
+      }
+      if (ev.kind === "task_done" || ev.kind === "task_failed") {
+        // activity may clear after drain
+      }
+
+      // Seamless interrupt: same mind voice, rare high-signal only
+      if (
+        (ev.kind === "interrupt_candidate" || (ev.speak_as_mind && ev.kind === "task_done")) &&
+        ev.speak_as_mind &&
+        !ev.consumed
+      ) {
+        var said = injectMindSpeak(ev.speak_as_mind);
+        if (said || ev.kind === "interrupt_candidate") {
+          toConsume.push(ev.id);
+        }
+      }
+    }
+
+    if (toConsume.length) {
+      try {
+        await fetch(API.mindConsume, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ event_ids: toConsume }),
+        });
+      } catch (e) {}
+    }
+
+    // Refresh activity chip from snapshot (open tasks)
+    try {
+      var snap = await fetch(API.mind, { headers: authHeaders() });
+      if (snap.ok) {
+        var mind = await snap.json().catch(function () { return null; });
+        var n = (mind && mind.open_tasks && mind.open_tasks.length) || 0;
+        state.mindOpenTasks = n;
+        if (n > 0 || openHint) {
+          setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
+        } else {
+          setMindActivity(false);
+        }
+      }
+    } catch (e) {
+      if (openHint) setMindActivity(true, "Looking into it…");
+    }
+  }
+
+  /** After chat returns a mind plan, surface subtle awareness + accelerate poll. */
+  function onMindPlanFromChat(mind) {
+    if (!mind) return;
+    setMindActivity(true, "Looking into it…");
+    startMindAwareness();
+    // Drain-friendly: tick once client-side so events land sooner
+    setTimeout(function () {
+      fetch(API.mindTick, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ session_id: state.sessionId || null }),
+      }).then(function () {
+        return pollMindEvents();
+      }).catch(function () {});
+    }, 400);
   }
 
   // ── session ──────────────────────────────────────────────────────────────
@@ -1048,6 +1213,8 @@
     document.body.classList.toggle("ea-shell-open", state.open);
     if (state.open) {
       await ensureSession();
+      // Continuous mind awareness while the conversation window is open
+      if (signedIn()) startMindAwareness();
       // Voice usually already starting from toggle(); only start here if mic ready
       // and we aren't listening yet (e.g. re-open after close). Never when muted.
       if (signedIn() && !state.voiceMuted && !state.listening && state.micStream) {
@@ -1057,6 +1224,7 @@
       }
     } else {
       // Full teardown on panel close only (kills GPT voice pipe)
+      stopMindAwareness();
       stopVoice(true);
       state.greeted = false;
     }
@@ -1265,6 +1433,8 @@
       (d.tool_trace || []).forEach(function (t) {
         addTool(t.name, JSON.stringify(t.args || {}).slice(0, 80));
       });
+      // Operating mind: background plan started — same mind, quiet work
+      if (d.mind) onMindPlanFromChat(d.mind);
       // Run UI commands immediately (navigate has no confirm on server now)
       if (d.pending) showPending(d.pending);
       else showPending(null);
