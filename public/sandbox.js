@@ -6274,6 +6274,16 @@
               if(r.ok){
                 saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved";
                 saveBtn.classList.add("ar-saved-ok");
+                // Inverter portals can take 30–60s for first harvest — show Connecting… on Inverters
+                try {
+                  const invCodes = new Set(["chint","fronius","sma","solaredge","locus","alsoenergy"]);
+                  if(invCodes.has(String(saveCode||"").toLowerCase()) && window.__aoPendingFeeds){
+                    window.__aoPendingFeeds.mark(saveCode, {
+                      label: (BRAND[saveCode] || saveCode),
+                      note: "cloud harvest starting",
+                    });
+                  }
+                } catch(e){}
                 // Re-render so the row flips to the saved "On" state with a status line.
                 setTimeout(() => { wireAutoRefreshRow(); }, 700);
               } else {

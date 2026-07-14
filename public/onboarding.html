@@ -1288,7 +1288,13 @@ async function wireCloudVault(){
       saveBtn.textContent = isDup ? "Updating…" : "Saving…";
       const r = await cloudApi("set", { provider:saveCode, username:u, password:p, login_host:cloudHost, consent:true });
       passEl.value = "";
-      if(r.ok){ saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved"; setTimeout(()=>wireCloudVault(), 700); }
+      if(r.ok){
+        saveBtn.textContent = isDup ? "✓ Updated" : "✓ Saved";
+        // Inverter harvest can take 30–60s — dashboard shows Connecting… until arrays land
+        const inv = { chint:1, fronius:1, sma:1, solaredge:1, locus:1, alsoenergy:1 };
+        if(inv[saveCode]) markPendingVendor(saveCode, (CLOUD_INVERTERS.find(x=>x.id===saveCode)||{}).label || saveCode, "cloud harvest starting");
+        setTimeout(()=>wireCloudVault(), 700);
+      }
       else {
         const msg = (r.error==="http_403") ? "Not enabled yet"
           : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save — try again";
