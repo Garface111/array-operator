@@ -88,6 +88,32 @@
       }
     } catch (e) {}
     var hash = location.hash || "#dashboard";
+    // Live extension + capture-mode awareness (so the agent doesn't invent "cloud
+    // must have the SMA password" when arrays came from extension auto-capture).
+    var extPresent = false;
+    try {
+      extPresent = !!(window.__AO_EXT_PRESENT || window.__aoExtPresent);
+    } catch (e) {}
+    var captureMode = null;
+    try {
+      captureMode = localStorage.getItem("ao_ar_mode") || null;
+    } catch (e) {}
+    var fleetVendors = [];
+    try {
+      if (window.FleetStore && FleetStore.snapshot) {
+        var snap = FleetStore.snapshot() || {};
+        var seen = {};
+        (snap.arrays || []).forEach(function (a) {
+          var v = String((a && a.vendor) || "").toLowerCase();
+          if (v) seen[v] = true;
+          (a.inverters || []).forEach(function (inv) {
+            var iv = String((inv && inv.vendor) || "").toLowerCase();
+            if (iv) seen[iv] = true;
+          });
+        });
+        fleetVendors = Object.keys(seen);
+      }
+    } catch (e) {}
     return {
       hash: hash,
       tab_label: tabLabel(hash),
@@ -104,6 +130,18 @@
       title: document.title,
       selection: sel,
       viewport: { w: innerWidth, h: innerHeight },
+      // Capture / extension ground truth for this browser session
+      extension_present: extPresent,
+      extension_name: "EnergyAgent",
+      capture_mode_client: captureMode,
+      fleet_vendors_client: fleetVendors,
+      capture_paths_reminder: {
+        cloud: "Account Auto-refresh 'Store it with us' — server holds encrypted portal passwords, harvester 24/7",
+        device: "Account Auto-refresh 'Keep it on my computer' — passwords in extension vault",
+        extension_one_click:
+          "Log in with SMA/Fronius/Chint… arms the EnergyAgent extension, opens the vendor site, auto-captures after sign-in, POSTs arrays. Does NOT create a cloud vault login. Fleet SMA arrays with only a Chint cloud login almost always came this way.",
+        api_keys: "SolarEdge/Locus/AlsoEnergy API keys — server poll, not portal scrape",
+      },
     };
   }
 
