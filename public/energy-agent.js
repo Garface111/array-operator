@@ -41,9 +41,10 @@
     _speakQueue: Promise.resolve(),
     _speakSeq: 0,
     _lastSpokenPlain: "",
-    // Mic held closed while agent TTS plays so speakers don't re-enter as "user"
+    // Mic hold during TTS attack only (guarded barge-in after ~0.5s)
     _micHeldForSpeak: false,
     _unmuteAfterSpeakTimer: null,
+    _speakStartedAt: 0,
     // Debounce duplicate ghost transcripts
     _lastUserSaid: "",
     _lastUserSaidAt: 0,
@@ -1852,9 +1853,11 @@
   }
 
   /**
-   * While the agent speaks, mute the mic so speaker audio is not transcribed as
-   * the user (self-hearing interrupt). Does NOT flip state.listening — user still
-   * "has mic on"; we re-enable tracks after speech + a short settle delay.
+   * Guarded barge-in (GPT Live style):
+   * - Brief mic mute at TTS attack (~450ms) so the first syllable doesn't self-trigger.
+   * - Then re-open the mic so the user can interrupt with real speech.
+   * - Transcripts still pass echo / garbage / length filters (see acceptUserTranscript).
+   * Does NOT flip state.listening — user still shows as Live.
    */
   function holdMicWhileSpeaking(hold) {
     if (state._unmuteAfterSpeakTimer) {
@@ -1862,9 +1865,13 @@
       state._unmuteAfterSpeakTimer = null;
     }
     if (hold) {
-      // Only hold if the user intends to listen (Live mic)
-      if (!state.listening || !state.micStream) return;
+      if (!state.listening || !state.micStream) {
+        state._speakStartedAt = Date.now();
+        return;
+      }
+      state._speakStartedAt = Date.now();
       state._micHeldForSpeak = true;
+      // Attack mute only — clear residual buffer, then reopen for barge-in
       try {
         state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
       } catch (e) {}
@@ -1873,14 +1880,26 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
+      state._unmuteAfterSpeakTimer = setTimeout(function () {
+        state._unmuteAfterSpeakTimer = null;
+        state._micHeldForSpeak = false;
+        if (!state.listening || !state.micStream) return;
+        try {
+          state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
+        } catch (e) {}
+        // Clear again so attack-bleed buffered while muted doesn't fire a ghost turn
+        if (state.dc && state.dc.readyState === "open") {
+          try {
+            state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+          } catch (e) {}
+        }
+      }, 450);
       return;
     }
-    // Release hold after a tail so room echo / buffer drain doesn't fire VAD.
-    // Slightly longer than GPT Live defaults — speakers + room reverb linger.
-    if (!state._micHeldForSpeak) return;
+    // Speech finished — ensure mic is open after a short settle (room reverb)
+    state._micHeldForSpeak = false;
     state._unmuteAfterSpeakTimer = setTimeout(function () {
       state._unmuteAfterSpeakTimer = null;
-      state._micHeldForSpeak = false;
       if (!state.listening || !state.micStream) return;
       try {
         state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
@@ -1890,12 +1909,45 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
-    }, 750);
+    }, 280);
   }
 
-  /** True while agent audio is playing or mic is held closed for TTS. */
+  /** True while agent audio is playing (informational — does not alone block barge-in). */
   function isAgentMouthBusy() {
-    return !!(state.speaking || state.rtResponseActive || state._micHeldForSpeak);
+    return !!(state.speaking || state.rtResponseActive);
+  }
+
+  /**
+   * Whether a user transcript should start a turn (incl. mid-agent-speech barge-in).
+   * Harder bar while the agent is talking so speaker bleed / room noise don't cut it off.
+   */
+  function acceptUserTranscript(said) {
+    if (!said || !state.listening) return false;
+    if (state.thinking || state.touring) return false;
+    if (looksLikeEchoOfLastSpeech(said)) return false;
+    if (isGarbageTranscript(said)) return false;
+    var now = Date.now();
+    if (
+      state._lastUserSaid &&
+      said.toLowerCase() === state._lastUserSaid &&
+      now - (state._lastUserSaidAt || 0) < 1200
+    ) {
+      return false;
+    }
+    // Mid-speech barge-in: require grace period + a bit more substance than idle turns
+    if (isAgentMouthBusy() || state._micHeldForSpeak) {
+      // Still in attack mute window — ignore
+      if (state._micHeldForSpeak) return false;
+      var started = state._speakStartedAt || 0;
+      if (started && now - started < 500) return false;
+      var words = said.trim().split(/\s+/).filter(Boolean);
+      var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|stop|wait|cancel|go|please|hey)$/i.test(
+        said.trim().replace(/[.!?]+$/, "")
+      );
+      // Need a real interrupt phrase — single short noise words won't cut speech
+      if (!ack && words.length < 2 && said.trim().length < 10) return false;
+    }
+    return true;
   }
 
   /** Drop echo transcripts that closely match what we just spoke. */
@@ -2007,6 +2059,19 @@
     // Barge-in / new turn: cancel current audio only
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     state.speaking = false;
+    state.rtResponseActive = false;
+    state._speakStartedAt = 0;
+    // Release any attack-mute so mic is live for the next user turn
+    if (state._unmuteAfterSpeakTimer) {
+      try { clearTimeout(state._unmuteAfterSpeakTimer); } catch (e) {}
+      state._unmuteAfterSpeakTimer = null;
+    }
+    state._micHeldForSpeak = false;
+    if (state.listening && state.micStream) {
+      try {
+        state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
+      } catch (e) {}
+    }
     cancelRealtimeIfActive();
     var cb = state._onSpeakDone;
     state._onSpeakDone = null;
@@ -2119,15 +2184,14 @@
         state._onSpeakDone = null;
         state.speaking = false;
         state.rtResponseActive = false;
-        // Only re-open mic after the LAST chunk of a long explanation
+        // Only settle mic after the LAST chunk of a long explanation
         if (!opts.keepMicHeld) {
           holdMicWhileSpeaking(false);
           if (state.listening && !state.touring) {
             setStatus(state.voiceMuted ? "Listening (voice muted)" : "Listening…", "listen");
           }
         } else {
-          // Stay "speaking" for the next chunk — don't let ambient VAD barge in
-          holdMicWhileSpeaking(true);
+          // Next chunk will re-arm attack mute; keep status as speaking
           setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
         }
         resolve();
@@ -2168,7 +2232,7 @@
         prevDone();
       };
 
-      // Mute mic BEFORE audio so speaker output never becomes "user speech"
+      // Attack mute briefly, then reopen mic for barge-in (see holdMicWhileSpeaking)
       holdMicWhileSpeaking(true);
 
       // ── GPT Realtime mouth ────────────────────────────────────────────
@@ -2181,6 +2245,7 @@
           }
           state.rtResponseActive = true;
           state.speaking = true;
+          state._speakStartedAt = Date.now();
           // Full chunk text (chunks are already ≤ ~900 chars) — no 1200 hard truncate
           state.dc.send(JSON.stringify({
             type: "response.create",
@@ -2249,11 +2314,16 @@
       state.rtResponseActive = true;
     }
     // Model audio lifecycle
-    if (ev.type === "output_audio_buffer.started" || ev.type === "response.output_audio.delta") {
+    if (ev.type === "output_audio_buffer.started") {
       state.speaking = true;
       state.rtResponseActive = true;
-      holdMicWhileSpeaking(true);
+      // Mark speak start once; attack mute already armed in speakNow — don't re-mute forever
+      if (!state._speakStartedAt) state._speakStartedAt = Date.now();
       setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
+    }
+    if (ev.type === "response.output_audio.delta") {
+      state.speaking = true;
+      state.rtResponseActive = true;
     }
     // Prefer audio-buffer stopped (playback drained) — this is when the ear hears silence
     if (ev.type === "output_audio_buffer.stopped") {
@@ -2298,32 +2368,25 @@
         }, 1200);
       }
     }
-    // User finished speaking — ONE path: show once, then agent turn (tools + speak)
+    // User finished speaking — ONE path: show once, then agent turn (tools + speak).
+    // Guarded barge-in: while agent talks, accept real interrupts (not noise/echo).
     if (ev.type === "conversation.item.input_audio_transcription.completed") {
       var said = (ev.transcript || "").trim();
-      // Ignore barge-ins during guided tours so steps stay ordered
-      if (!said || state.thinking || state.touring) return;
-      // Ignore while mic is muted (ghost VAD / residual buffer)
-      if (!state.listening) return;
-      // CRITICAL: while the agent is talking (or mic held for TTS), ignore input.
-      // Speakers bleed into the mic and the agent "hears itself" → self-interrupt loop.
-      if (isAgentMouthBusy()) return;
-      if (looksLikeEchoOfLastSpeech(said)) return;
-      // Drop ghost/filler turns from over-sensitive VAD (keeps yes/no)
-      if (isGarbageTranscript(said)) return;
-      // Debounce double-fires (same line twice within 1.2s)
-      var now = Date.now();
-      if (
-        state._lastUserSaid &&
-        said.toLowerCase() === state._lastUserSaid &&
-        now - (state._lastUserSaidAt || 0) < 1200
-      ) {
-        return;
-      }
+      if (!acceptUserTranscript(said)) return;
+      var nowTs = Date.now();
       state._lastUserSaid = said.toLowerCase();
-      state._lastUserSaidAt = now;
-      // True barge-in only when mouth is idle (user spoke after agent finished)
+      state._lastUserSaidAt = nowTs;
+      var wasSpeaking = isAgentMouthBusy();
+      // Barge-in or idle: stop agent mouth, drop remaining speak queue chunks
       stopSpeak({ reason: "barge_in" });
+      if (state.dc && state.dc.readyState === "open") {
+        try {
+          state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+        } catch (e) {}
+      }
+      if (wasSpeaking) {
+        setStatus("Listening…", "listen");
+      }
       addMsg("user", said);
       if (state.sessionId) {
         fetch(API.transcript, {
