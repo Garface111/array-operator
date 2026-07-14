@@ -1,7 +1,10 @@
 /* Energy Agent — sky-themed voice orb + panel (2026-07-13) */
-/* Top-RIGHT — clears Alerts (bottom-right) and the wish pill / other bottom chrome. */
+/* Top-RIGHT — clears Alerts (bottom-right) and the wish pill / other bottom chrome.
+   Root is only as wide as the orb; panel anchors to its bottom-right and grows
+   down + left into the page. */
 #eaRoot{
   position:fixed; top:72px; right:18px; left:auto; bottom:auto; z-index:99980;
+  width:58px; height:58px;
   font-family:inherit; color:var(--ink,#0f172a);
   --ea-sky:#38bdf8; --ea-sky2:#0ea5e9; --ea-sun:#fbbf24; --ea-glow:rgba(56,189,248,.45);
 }
@@ -15,6 +18,7 @@
     radial-gradient(circle at 50% 55%, var(--ea-sky) 0%, var(--ea-sky2) 55%, #0369a1 100%);
   box-shadow:0 10px 28px -10px rgba(14,165,233,.65), 0 0 0 0 var(--ea-glow);
   position:relative; transition:transform .15s ease, box-shadow .2s ease;
+  display:block;
 }
 #eaOrb:hover{transform:translateY(-2px) scale(1.04);}
 #eaOrb:focus-visible{outline:3px solid rgba(14,165,233,.45); outline-offset:3px;}
@@ -33,7 +37,7 @@
 
 /* panel */
 #eaPanel{
-  display:none; position:absolute; left:0; right:auto; bottom:70px;
+  display:none; position:absolute; right:0; left:auto; top:66px; bottom:auto;
   width:min(380px, calc(100vw - 28px));
   max-height:min(560px, calc(100vh - 100px));
   background:linear-gradient(168deg, rgba(255,255,255,.97), rgba(240,249,255,.96));
@@ -147,6 +151,6 @@ html:not(.sky) .ea-compose textarea{background:var(--bg2,#0b1220); border-color:
 }
 
 @media (max-width:520px){
-  #eaRoot{left:12px; right:auto; bottom:12px;}
-  #eaPanel{width:calc(100vw - 24px);}
+  #eaRoot{top:64px; right:10px; left:auto; bottom:auto;}
+  #eaPanel{width:calc(100vw - 20px); max-height:min(520px, calc(100vh - 90px));}
 }
