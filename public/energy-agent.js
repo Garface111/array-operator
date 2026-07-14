@@ -76,6 +76,7 @@
     // Abort in-flight chat/LLM turns when user says "stop" (Ford 2026-07-14).
     _turnAbortGen: 0,
     _chatAbort: null,
+    _budgetPollTimer: null,
   };
 
   function token() {
@@ -744,8 +745,9 @@
   }
 
   /**
-   * Weekly AI usage meter ($5 thinking + voice combined).
-   * Fills 0→100% as spend approaches the cap — no cash countdown in the chrome.
+   * Weekly AI usage meter (thinking + voice combined).
+   * Fills 0→100% as spend approaches the cap. Must always reflect exhausted
+   * state (Ford 2026-07-14: bar stayed low while voice died on 402).
    */
   function setBudget(b) {
     state.budget = b;
@@ -758,42 +760,102 @@
       ? Number(b.pct_used)
       : Math.min(100, (spent / cap) * 100);
     if (!(pct >= 0)) pct = 0;
+    // Hard-exhausted: always paint full red, even if ledger rounding left pct at 99
+    if (b.ok === false) pct = Math.max(pct, 100);
     if (pct > 100) pct = 100;
-    var level = !b.ok || pct >= 99.5 ? "full" : (b.warn || pct >= 80) ? "warn" : "ok";
+    var exhausted = b.ok === false || pct >= 99.5;
+    var level = exhausted ? "full" : (b.warn || pct >= 80) ? "warn" : "ok";
     var bd = b.breakdown || {};
     var tip =
       "Weekly Energy Agent usage (thinking + voice) · " +
-      Math.round(pct) + "% of $" + cap.toFixed(0) + " · resets each week";
+      Math.round(pct) + "% · $" + spent.toFixed(2) + " of $" + cap.toFixed(0) +
+      " · resets each Monday UTC";
     if (bd.thinking_usd != null || bd.voice_usd != null) {
       tip +=
         " · Thinking ~$" + (Number(bd.thinking_usd) || 0).toFixed(2) +
         " · Voice ~$" + (Number(bd.voice_usd) || 0).toFixed(2);
     }
+    if (exhausted) {
+      tip = "Weekly limit reached — voice & thinking pause until next week. " + tip;
+    }
+    var label = exhausted
+      ? "Limit"
+      : pct >= 50
+        ? Math.round(pct) + "%"
+        : "Weekly";
     el.innerHTML =
       '<span class="ea-usage ea-usage-' + level + '" title="' + esc(tip) + '">' +
-      '<span class="ea-usage-label">Weekly</span>' +
+      '<span class="ea-usage-label">' + esc(label) + "</span>" +
       '<span class="ea-usage-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" ' +
       'aria-valuenow="' + Math.round(pct) + '" aria-label="Weekly usage ' + Math.round(pct) + ' percent">' +
       '<span class="ea-usage-fill" id="eaUsageFill" style="width:' + pct.toFixed(1) + '%"></span>' +
       "</span></span>";
     el.setAttribute(
       "aria-label",
-      "Weekly AI usage " + Math.round(pct) + " percent of " + cap.toFixed(0) + " dollar limit"
+      exhausted
+        ? "Weekly AI limit reached"
+        : "Weekly AI usage " + Math.round(pct) + " percent of " + cap.toFixed(0) + " dollar limit"
     );
+    el.classList.toggle("ea-budget-exhausted", exhausted);
     // One soft heads-up when crossing the warn line (not every refresh)
-    if (b.warn && !state._budgetWarned) {
+    if (b.warn && b.ok !== false && !state._budgetWarned) {
       state._budgetWarned = true;
       try {
         addMsg(
           "agent",
           "Heads up — you're past 80% of this week's Energy Agent allowance " +
-            "(thinking + voice). The meter fills up as you use it; at 100% I'll pause until next week."
+            "(thinking + voice). The meter in the header fills as you use it; " +
+            "at 100% voice and thinking pause until next week."
         );
       } catch (e) {}
     }
-    if (!b.ok && !state._budgetExhausted) {
+    if (exhausted && !state._budgetExhausted) {
       state._budgetExhausted = true;
       setStatus("Weekly limit reached", "warn");
+      try {
+        addMsg(
+          "agent",
+          "This week's Energy Agent allowance is used up " +
+            "($" + spent.toFixed(2) + " of $" + cap.toFixed(0) +
+            " for thinking + voice). The red meter is full. " +
+            "Text answers that don't need the brain still work; " +
+            "voice and deep thinking resume next week (or Ford can raise the cap)."
+        );
+      } catch (e) {}
+    }
+    if (!exhausted) {
+      // Cap raised mid-week — allow future exhaust messaging again
+      state._budgetExhausted = false;
+    }
+  }
+
+  async function refreshBudget() {
+    if (!signedIn()) return null;
+    try {
+      var r = await fetch(API.budget, { headers: authHeaders() });
+      if (!r.ok) return null;
+      var b = await r.json().catch(function () { return null; });
+      if (b && (b.weekly_budget_usd != null || b.spent_usd != null)) {
+        setBudget(b);
+        return b;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function startBudgetPoll() {
+    if (state._budgetPollTimer) return;
+    refreshBudget().catch(function () {});
+    state._budgetPollTimer = setInterval(function () {
+      if (!state.open || !signedIn()) return;
+      refreshBudget().catch(function () {});
+    }, 20000);
+  }
+
+  function stopBudgetPoll() {
+    if (state._budgetPollTimer) {
+      clearInterval(state._budgetPollTimer);
+      state._budgetPollTimer = null;
     }
   }
 
@@ -1424,6 +1486,7 @@
       // Continuous mind awareness while the conversation window is open
       if (signedIn()) {
         startMindAwareness();
+        startBudgetPoll();
         refreshMindMetrics().catch(function () {});
       }
       // Voice usually already starting from toggle(); only start here if mic ready
@@ -1436,6 +1499,7 @@
     } else {
       // Full teardown on panel close only (kills GPT voice pipe)
       stopMindAwareness();
+      stopBudgetPoll();
       stopVoice(true);
       state.greeted = false;
     }
@@ -1526,26 +1590,50 @@
     var t = String(text || "").toLowerCase();
     // "what are the tabs" is not a tour — LLM answers from persona map
     if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/.test(t)) return null;
-    if (!/\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through|walk\s+through)\b/.test(t)
-        && !/\bexplain\b.*\btab\b/.test(t)
-        && !/\bgive\s+me\s+a\s+(walkthrough|tour)\b/.test(t)) {
-      if (!/\b(master\s*account|account\s+tab|invoices?\s+tab|inverters?\s+tab|fleet\s+triage|arrays?\s+tab)\b/.test(t)) {
-        return null;
-      }
-      if (!/\b(show|open|explain|walk)\b/.test(t)) return null;
+    var wantsTour =
+      /\b(walk\s*me|walkthrough|show\s+me|tour|guide\s+me|take\s+me\s+through|walk\s+through)\b/.test(t)
+      || /\bexplain\b.*\btab\b/.test(t)
+      || /\bgive\s+me\s+a\s+(walkthrough|tour)\b/.test(t)
+      || /\bhow\s+does\s+(the\s+)?(account|invoices?|inverters?|analysis|resources|fleet\s+triage)\b/.test(t)
+      || /\borient\s+me\b/.test(t);
+    // Named tab + walk/show/explain intent
+    var tabHit =
+      /\b(master\s*account|account\s+tab|invoices?\s+tab|inverters?\s+tab|fleet\s+triage|arrays?\s+tab|resources?\s+tab|analysis\s+tab)\b/.test(t);
+    if (!wantsTour && !(tabHit && /\b(show|open|explain|walk|through)\b/.test(t))) {
+      return null;
+    }
+    // Prefer specific tab mentions (order matters when multiple words appear)
+    if (/\b(invoice|offtaker|billing\s+report|credit\s+invoice)\b/.test(t)
+        || (/\breports?\b/.test(t) && /\btab\b/.test(t))) {
+      return "reports";
     }
     if (/\b(master\s*account|account\s+tab|#account)\b/.test(t)
         || (/\baccount\b/.test(t) && /\b(walk|tour|show|explain|through)\b/.test(t))) {
       return "master_account";
     }
-    if (/\b(invoice|offtaker)\b/.test(t) || (/\breports?\b/.test(t) && /\btab\b/.test(t))) {
-      return "reports";
+    if (/\bfleet\s+triage\b/.test(t) || (/\btriage\b/.test(t) && /\b(walk|tour|show)\b/.test(t))) {
+      return "dashboard";
     }
-    if (/\b(inverter|fleet\s+triage|fleet\s+canvas)\b/.test(t)
-        || (/\barrays?\b/.test(t) && /\btab\b/.test(t))) {
+    if (/\b(inverter|spreadsheet|sandbox|fleet\s+canvas)\b/.test(t)
+        || (/\barrays?\b/.test(t) && /\b(tab|walk|tour|show)\b/.test(t))) {
       return "arrays";
     }
-    if (/\banalysis\b/.test(t) || /\btrends?\b/.test(t)) return "analysis";
+    if (/\banalysis\b/.test(t) || /\btrends?\b/.test(t) || /\bthrough\s+time\b/.test(t)) {
+      return "analysis";
+    }
+    if (/\bresources?\b/.test(t) || /\bnet.?meter|rates?\s+and\s+news|briefing\b/.test(t)) {
+      return "resources";
+    }
+    // Generic "walk me through this tab / the page" → current hash
+    if (wantsTour) {
+      var h = (location.hash || "").toLowerCase();
+      if (h === "#account") return "master_account";
+      if (h === "#reports") return "reports";
+      if (h === "#arrays" || h === "#sandbox") return "arrays";
+      if (h === "#analysis" || h === "#trends") return "analysis";
+      if (h === "#resources") return "resources";
+      if (h === "#dashboard") return "dashboard";
+    }
     return null;
   }
 
@@ -1599,19 +1687,23 @@
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
     }
-    // Show-and-tell tours: run fully client-side (top→bottom, voice lockstep).
-    // NEVER also call the LLM for highlights mid/after tour — that hallucinated
-    // boxes + desynced speech (Ford 2026-07-14 Account walkthrough).
+    // Show-and-tell tours: fully client-side, real DOM selectors, voice lockstep.
+    // NEVER call the LLM for freehand highlights (hallucinated boxes / desync).
     var tourId = detectTourId(text);
     if (tourId) {
       setStatus("Walking you through…", "think");
       try {
-        await runTour({ tour_id: tourId });
+        var okTour = await runTour({ tour_id: tourId });
+        if (!okTour) {
+          addMsg(
+            "agent",
+            "I don't have a guided walkthrough for that surface yet — open the tab and ask a specific question about a control you see."
+          );
+        }
       } catch (e) {
-        addMsg("agent", "Couldn't run the visual tour — I'll explain from data instead.");
-        // fall through to LLM for a text-only explanation only
+        addMsg("agent", "Couldn't run the visual tour — open the tab and ask about a section you see.");
       }
-      // Optional: one factual account_summary line AFTER the tour, with UI cmds stripped
+      // Optional short facts wrap-up for Account only (no UI driver commands)
       if (tourId === "master_account" || tourId === "account") {
         try {
           await postTourAccountFacts(sid);
@@ -1963,15 +2055,34 @@
     return el;
   }
 
+  /** True only for on-screen tour targets (never box [hidden] / display:none). */
+  function isTourVisible(el) {
+    if (!el || !el.isConnected) return false;
+    try {
+      if (el.hidden) return false;
+      if (el.getAttribute("aria-hidden") === "true") return false;
+      if (el.closest && el.closest("[hidden]")) return false;
+      var st = window.getComputedStyle(el);
+      if (!st || st.display === "none" || st.visibility === "hidden") return false;
+      var r = el.getBoundingClientRect();
+      // zero-size = not painted (e.g. display:none parent we missed)
+      if (r.width < 2 && r.height < 2) return false;
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
   async function waitForSelector(sel, timeoutMs) {
     var t0 = Date.now();
     var limit = timeoutMs || 4000;
     while (Date.now() - t0 < limit) {
       var el = queryFirst(sel);
-      if (el) return el;
+      if (el && isTourVisible(el)) return el;
       await sleep(120);
     }
-    return queryFirst(sel);
+    var last = queryFirst(sel);
+    return last && isTourVisible(last) ? last : null;
   }
 
   function highlight(sel, ms, say) {
@@ -2138,11 +2249,12 @@
         }
 
         if (s.selector || s.type === "highlight") {
-          // Scope wait to the active Account/Invoices panel when possible so we
-          // never box a random match elsewhere on the page.
-          var el = await waitForSelector(s.selector, 3500);
+          // Scope wait to the active panel; never box a random/hidden match.
+          var el = await waitForSelector(s.selector, s.waitMs || 4500);
           if (!el) {
-            // Skip missing sections honestly — don't highlight a wrong fallback
+            // optional steps (pipeline/KPIs that only appear with data) skip quietly
+            if (s.optional) continue;
+            // Skip missing sections honestly — don't invent a highlight
             if (s.say) {
               setTourCaption(s.say + " _(not on screen yet)_", nIdx, narrated.length);
               nIdx++;
@@ -3087,9 +3199,15 @@
           body: JSON.stringify({
             session_id: state.sessionId,
             lines: [{ role: "user", text: said }],
-            voice_seconds: Math.max(2, said.split(/\s+/).length * 0.4),
+            // Charge closer to real airtime (user speech + short pause); bar must move
+            voice_seconds: Math.max(4, said.split(/\s+/).length * 0.55 + 2),
           }),
-        }).catch(function () {});
+        })
+          .then(function (r) { return r.json().catch(function () { return null; }); })
+          .then(function (d) {
+            if (d && d.budget) setBudget(d.budget);
+          })
+          .catch(function () {});
       }
       // Hard stop — never start a new LLM monologue after "stop"
       if (isStopCommand(said)) {
@@ -3270,8 +3388,43 @@
     if (!sdpRes.ok) {
       var errText = await sdpRes.text();
       var detail = errText;
-      try { detail = JSON.parse(errText).detail || errText; } catch (e) {}
-      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      var parsed = null;
+      try { parsed = JSON.parse(errText); detail = parsed.detail || errText; } catch (e) {}
+      // Budget exhausted — paint the meter full + clear message (don't leave bar empty)
+      if (sdpRes.status === 402) {
+        var bud = parsed && parsed.detail && parsed.detail.budget
+          ? parsed.detail.budget
+          : null;
+        if (bud) setBudget(Object.assign({}, bud, { ok: false, pct_used: 100 }));
+        else {
+          try {
+            var rb = await refreshBudget();
+            if (rb) setBudget(Object.assign({}, rb, { ok: false, pct_used: 100 }));
+            else {
+              setBudget({
+                ok: false,
+                weekly_budget_usd: (state.budget && state.budget.weekly_budget_usd) || 50,
+                spent_usd: (state.budget && state.budget.weekly_budget_usd) || 50,
+                pct_used: 100,
+                warn: false,
+              });
+            }
+          } catch (e2) {}
+        }
+        throw new Error(
+          "Weekly Energy Agent limit reached — the red meter is full. " +
+          "Voice pauses until next week (or the cap is raised)."
+        );
+      }
+      // OpenAI org billing / key issues — distinct from our weekly meter
+      var dstr = typeof detail === "string" ? detail : JSON.stringify(detail || "");
+      if (/insufficient_quota|billing|credit|rate.?limit|exceeded/i.test(dstr)) {
+        throw new Error(
+          "GPT voice provider rejected the call (billing/quota on the OpenAI side). " +
+          "Our weekly meter is separate — Ford may need to top up the OpenAI account."
+        );
+      }
+      throw new Error(typeof detail === "string" ? detail : dstr);
     }
     var answerSdp = await sdpRes.text();
     if (_voiceConnectStale(gen) || state.pc !== pc) {

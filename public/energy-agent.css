@@ -318,6 +318,19 @@ html:not(.sky) .ea-mind-act.yes{ color: #a7f3d0; }
   background: rgba(239,68,68,.12);
   box-shadow: inset 0 0 0 1px rgba(239,68,68,.18);
 }
+/* Exhausted: pulse the red fill so "out of credits" is unmistakable */
+.ea-budget-exhausted .ea-usage-fill,
+.ea-usage-full .ea-usage-fill{
+  animation: eaBudgetPulse 1.6s ease-in-out infinite;
+}
+@keyframes eaBudgetPulse{
+  0%, 100%{ opacity: 1; filter: brightness(1); }
+  50%{ opacity: .85; filter: brightness(1.15); }
+}
+.ea-budget-exhausted .ea-usage-label{
+  font-weight: 800;
+  letter-spacing: .04em;
+}
 
 .ea-tools{
   /* Keep tool dump short so the conversation stays the scroll surface */
