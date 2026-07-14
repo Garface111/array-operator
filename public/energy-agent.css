@@ -1,6 +1,7 @@
 /* Energy Agent — sky-themed voice orb + panel (2026-07-13) */
+/* Bottom-LEFT so we never cover the Alerts pill (ao-al-fab sits bottom-right). */
 #eaRoot{
-  position:fixed; right:22px; bottom:22px; z-index:99980;
+  position:fixed; left:22px; right:auto; bottom:22px; z-index:99980;
   font-family:inherit; color:var(--ink,#0f172a);
   --ea-sky:#38bdf8; --ea-sky2:#0ea5e9; --ea-sun:#fbbf24; --ea-glow:rgba(56,189,248,.45);
 }
@@ -32,7 +33,7 @@
 
 /* panel */
 #eaPanel{
-  display:none; position:absolute; right:0; bottom:70px;
+  display:none; position:absolute; left:0; right:auto; bottom:70px;
   width:min(380px, calc(100vw - 28px));
   max-height:min(560px, calc(100vh - 100px));
   background:linear-gradient(168deg, rgba(255,255,255,.97), rgba(240,249,255,.96));
@@ -146,6 +147,6 @@ html:not(.sky) .ea-compose textarea{background:var(--bg2,#0b1220); border-color:
 }
 
 @media (max-width:520px){
-  #eaRoot{right:12px; bottom:12px;}
+  #eaRoot{left:12px; right:auto; bottom:12px;}
   #eaPanel{width:calc(100vw - 24px);}
 }

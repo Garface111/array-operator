@@ -501,6 +501,25 @@
     state.speaking = false;
   }
 
+  // ── mic permission on startup (Ford: request as soon as the app loads) ───
+  function requestMicOnStartup() {
+    if (!signedIn()) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    // Ask once per tab load so Chrome shows the prompt early, not after orb open.
+    // Stop tracks immediately — we only need the permission grant; SpeechRecognition
+    // opens its own stream when listening starts.
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      setStatus("Mic ready — click the sun to talk", "on");
+    }).catch(function (err) {
+      var name = (err && err.name) || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setStatus("Mic blocked — type or allow mic in the browser", "warn");
+      }
+      // Other errors (no device): stay quiet; text still works.
+    });
+  }
+
   // ── boot ─────────────────────────────────────────────────────────────────
   function boot() {
     // Only show for signed-in product surfaces (not marketing alone)
@@ -512,6 +531,11 @@
     if (/\/login/i.test(location.pathname) && !signedIn()) {
       var r = document.getElementById("eaRoot");
       if (r) r.style.display = "none";
+      return;
+    }
+    // Request mic as soon as the signed-in app is up (slight delay so UI paints first).
+    if (signedIn()) {
+      setTimeout(requestMicOnStartup, 600);
     }
   }
 
