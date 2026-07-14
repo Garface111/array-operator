@@ -1724,10 +1724,10 @@ html[data-theme="day"] .rep-fld.req > select{
 .ao-bill-trial-tx > span{ font-size:11px; color:#a16207; line-height:1.4; }
 .ao-bill-trial-badge{ margin-left:auto; flex:0 0 auto; font-size:9.5px; font-weight:800; letter-spacing:.06em;
   color:#b45309; background:#fef3c7; border:1px solid #fcd34d; border-radius:999px; padding:2px 8px; white-space:nowrap; }
-.ao-bill-trial--comp{ background:#f5f3ff; border-color:#ddd6fe; }
-.ao-bill-trial--comp .ao-bill-trial-tx b{ color:#5b21b6; }
-.ao-bill-trial--comp .ao-bill-trial-tx > span{ color:#7c3aed; }
-.ao-bill-trial--comp .ao-bill-trial-badge{ color:#6d28d9; background:#ede9fe; border-color:#c4b5fd; }
+.ao-bill-trial--comp{ background:rgba(33,150,243,.08); border-color:rgba(33,150,243,.28); }
+.ao-bill-trial--comp .ao-bill-trial-tx b{ color:#1565C0; }
+.ao-bill-trial--comp .ao-bill-trial-tx > span{ color:#2196F3; }
+.ao-bill-trial--comp .ao-bill-trial-badge{ color:#1565C0; background:rgba(33,150,243,.12); border-color:rgba(33,150,243,.32); }
 /* little click-to-sync button right next to "Last synced …" */
 .sb-fresh-sync{ display:inline-flex; align-items:center; justify-content:center; flex:none;
   padding:3px 7px; border:1px solid rgba(148,163,184,.42); border-radius:7px;
@@ -2941,24 +2941,34 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 
 
 
-/* V2 offtaker pay-links — Connect nudge on Reports */
+/* V2 offtaker pay-links — Connect nudge on Reports
+   Brand via var(--good): sky/day → blue primary; dark theme keeps its green.
+   Hardcoded emerald (#047857 / #059669) was off-brand under the sky theme. */
 .rb-pay-banner{
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   margin:0 0 14px; padding:12px 14px;
-  border-radius:10px;
-  background:linear-gradient(165deg, rgba(5,150,105,.10), rgba(5,150,105,.03));
-  border:1px solid rgba(5,150,105,.22);
+  border-radius:12px;
+  background:linear-gradient(165deg, color-mix(in srgb, var(--good,#2196F3) 12%, #fff), color-mix(in srgb, var(--good,#2196F3) 4%, #fff));
+  border:1px solid color-mix(in srgb, var(--good,#2196F3) 28%, transparent);
   color:var(--ink,#0f172a); font-size:13.5px; line-height:1.4;
 }
 .rb-pay-banner[hidden]{ display:none !important; }
 .rb-pay-banner-ic{ font-size:18px; flex:0 0 auto; }
 .rb-pay-banner-tx{ flex:1 1 200px; min-width:0; }
-.rb-pay-banner-tx b{ color:#047857; }
+.rb-pay-banner-tx b{ color:var(--good,#1976D2); }
 .rb-pay-banner-cta{
   flex:0 0 auto; font-weight:700; font-size:13px; text-decoration:none;
-  color:#fff; background:#047857; padding:8px 14px; border-radius:8px;
+  color:#fff;
+  background:linear-gradient(180deg, color-mix(in srgb, #fff 18%, var(--good,#2196F3)), var(--good,#2196F3));
+  padding:8px 14px; border-radius:10px;
+  box-shadow:0 6px 16px -6px color-mix(in srgb, var(--good,#2196F3) 55%, transparent);
+  transition:transform .14s ease, filter .14s ease, box-shadow .14s ease;
 }
-.rb-pay-banner-cta:hover{ filter:brightness(1.06); }
+.rb-pay-banner-cta:hover{
+  filter:brightness(1.05);
+  transform:translateY(-1px);
+  box-shadow:0 9px 22px -7px color-mix(in srgb, var(--good,#2196F3) 60%, transparent);
+}
 
 /* V2 hand-holding online-pay setup card (Master Account) */
 .acct-pay-setup{ display:block; padding:0; border:0; background:transparent; }
@@ -2967,13 +2977,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-card-load{ padding:18px 16px; color:var(--faint,#64748b); font-size:13.5px; }
 .ao-pay-inner{
   border-radius:14px; padding:16px 18px 14px;
-  border:1px solid rgba(5,150,105,.22);
-  background:linear-gradient(165deg, rgba(5,150,105,.10), rgba(255,255,255,.55));
+  border:1px solid color-mix(in srgb, var(--good,#2196F3) 28%, transparent);
+  background:linear-gradient(165deg, color-mix(in srgb, var(--good,#2196F3) 12%, #fff), rgba(255,255,255,.55));
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset;
 }
 .ao-pay-inner.is-ready{
-  border-color:rgba(5,150,105,.35);
-  background:linear-gradient(165deg, rgba(5,150,105,.16), rgba(255,255,255,.6));
+  border-color:color-mix(in srgb, var(--good,#2196F3) 40%, transparent);
+  background:linear-gradient(165deg, color-mix(in srgb, var(--good,#2196F3) 18%, #fff), rgba(255,255,255,.6));
 }
 .ao-pay-inner.is-almost{
   border-color:rgba(217,119,6,.3);
@@ -2986,7 +2996,7 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-head{ display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
 .ao-pay-badge{
   flex:0 0 auto; font-size:10px; font-weight:800; letter-spacing:.06em;
-  padding:4px 8px; border-radius:999px; background:#047857; color:#fff;
+  padding:4px 8px; border-radius:999px; background:var(--good,#2196F3); color:#fff;
 }
 .ao-pay-inner.is-off .ao-pay-badge{ background:#64748b; }
 .ao-pay-inner.is-almost .ao-pay-badge{ background:#d97706; }
@@ -2994,14 +3004,14 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-k{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--faint,#64748b); }
 .ao-pay-title{ font-size:16px; font-weight:800; color:var(--ink,#0f172a); line-height:1.25; margin-top:2px; }
 .ao-pay-body{ font-size:13.5px; line-height:1.45; color:var(--ink,#0f172a); opacity:.9; margin:0 0 12px; }
-.ao-pay-body b{ color:#047857; }
+.ao-pay-body b{ color:var(--good,#1976D2); }
 .ao-pay-steps{
   list-style:none; margin:0 0 14px; padding:0; display:grid; gap:8px;
 }
 .ao-pay-steps li{ display:flex; gap:10px; align-items:flex-start; }
 .ao-pay-step-n{
   flex:0 0 22px; height:22px; border-radius:50%;
-  background:#047857; color:#fff; font-size:11px; font-weight:800;
+  background:var(--good,#2196F3); color:#fff; font-size:11px; font-weight:800;
   display:flex; align-items:center; justify-content:center;
 }
 .ao-pay-inner.is-almost .ao-pay-step-n{ background:#d97706; }

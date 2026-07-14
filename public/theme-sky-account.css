@@ -104,15 +104,17 @@ html.sky .ao-bill-trial{
   border-color:rgba(217,119,6,.32);
   border-radius:12px;
 }
-/* complimentary banner: octarine = machine/comped signature, cooled for sky */
+/* complimentary banner — sky blue (matches tabs/CTAs; no purple) */
 html.sky .ao-bill-trial--comp{
-  background:rgba(99,80,224,.08);
-  border-color:rgba(99,80,224,.30);
+  background:rgba(33,150,243,.08);
+  border-color:rgba(33,150,243,.28);
 }
-html.sky .ao-bill-trial--comp .ao-bill-trial-tx b{color:#4938C9}
-html.sky .ao-bill-trial--comp .ao-bill-trial-tx > span{color:#6350E0}
+html.sky .ao-bill-trial--comp .ao-bill-trial-tx b{color:var(--sky-primary-deep,#1976D2)}
+html.sky .ao-bill-trial--comp .ao-bill-trial-tx > span{color:var(--sky-primary,#2196F3)}
 html.sky .ao-bill-trial--comp .ao-bill-trial-badge{
-  color:#5647D6;background:rgba(99,80,224,.12);border-color:rgba(99,80,224,.35);
+  color:var(--sky-primary-deep,#1976D2);
+  background:rgba(33,150,243,.12);
+  border-color:rgba(33,150,243,.32);
 }
 
 /* ── 4 · DANGER ZONE — theme-sky's blanket .acct-btn glass clobbered the
@@ -141,14 +143,12 @@ html.sky #cancelYes:hover{filter:brightness(1.05)}
 /* ═══════════════════════════════════════════════════════════════════════════
    5 · THE CREDENTIAL VAULT (.ar-*) — the trust surface.
    Multi-card stack (Ford 2026-07-13): separate glass cards with sky gaps
-   between them so the mountain bleeds through. Head stays the calmest /
-   most solid (passwords); body cards go more liquid. Octarine signature
-   COOLED for the sky: #7c3aed → #6350E0, re-pointed as a scoped token.
-   Green/amber/red stay strictly LIVE-state. ═══════════════════════════════ */
+   between them so the mountain bleeds through. Active chrome uses sky blue
+   (same as tab bar / primary CTAs) — no purple. ═══════════════════════════ */
 html.sky .ar-stack{
-  --ao-oct:#6350E0;
-  --ao-oct-soft:rgba(99,80,224,.09);
-  --ao-oct-line:rgba(99,80,224,.30);
+  --ao-oct:var(--sky-primary,#2196F3);
+  --ao-oct-soft:rgba(33,150,243,.10);
+  --ao-oct-line:rgba(33,150,243,.32);
   gap:16px;
   background:transparent;
   margin:2px 0 22px;
@@ -158,9 +158,9 @@ html.sky .ar-stack{
    height). The password INPUT fields stay solid white below for legibility. */
 html.sky .ar-stack .ar-card-head,
 html.sky .ar-panel{
-  --ao-oct:#6350E0;
-  --ao-oct-soft:rgba(99,80,224,.09);
-  --ao-oct-line:rgba(99,80,224,.30);
+  --ao-oct:var(--sky-primary,#2196F3);
+  --ao-oct-soft:rgba(33,150,243,.10);
+  --ao-oct-line:rgba(33,150,243,.32);
   background:var(--sky-glass-content) !important;
   -webkit-backdrop-filter:var(--sky-sheet-blur);
   backdrop-filter:var(--sky-sheet-blur);
@@ -181,22 +181,60 @@ html.sky .ar-stack .ar-card-group{background:rgba(255,255,255,.58) !important}
 html.sky .ar-panel-hd h3{color:var(--ink)}
 html.sky .ar-panel-hd p{color:var(--muted)}
 html.sky .ar-panel-hd p b{color:var(--ink)}
-/* device/cloud mode segmented control: glass options, octarine active */
+/* device/cloud mode segmented control: glass options, sky-blue active */
 html.sky .ar-mode-opt{
   background:rgba(255,255,255,.55);
   border:1px solid var(--line);
   border-radius:13px;
   box-shadow:0 1px 4px rgba(20,60,120,.05);
 }
-html.sky .ar-mode-opt:hover{border-color:var(--ao-oct-line);background:rgba(255,255,255,.82)}
+html.sky .ar-mode-opt:hover{
+  border-color:rgba(33,150,243,.40);
+  background:rgba(255,255,255,.88);
+}
 html.sky .ar-mode-opt.active{
-  border-color:var(--ao-oct);
-  background:var(--ao-oct-soft);
-  box-shadow:0 0 0 1px var(--ao-oct) inset, 0 4px 14px -6px rgba(99,80,224,.35);
+  border-color:var(--sky-primary,#2196F3);
+  background:rgba(33,150,243,.10);
+  box-shadow:0 0 0 1px var(--sky-primary,#2196F3) inset, 0 4px 14px -6px rgba(33,150,243,.35);
 }
 html.sky .ar-mode-opt b{color:var(--ink)}
 html.sky .ar-mode-opt span{color:var(--muted)}
-html.sky .ar-mode-opt.active b{color:var(--ao-oct)}
+html.sky .ar-mode-opt.active b{color:var(--sky-primary-deep,#1976D2)}
+/* Show/Hide logins — pill matches tab/CTA blue language */
+html.sky .ar-toggle{
+  border:1px solid rgba(33,150,243,.28) !important;
+  background:rgba(255,255,255,.82) !important;
+  color:var(--sky-primary-deep,#1976D2) !important;
+  border-radius:999px !important;
+  padding:5px 12px 5px 8px !important;
+  font-size:12px !important;
+  font-weight:720 !important;
+  box-shadow:0 1px 3px rgba(20,60,120,.06);
+}
+html.sky .ar-toggle:hover{
+  background:rgba(33,150,243,.10) !important;
+  border-color:var(--sky-primary,#2196F3) !important;
+  color:var(--sky-primary-deep,#1976D2) !important;
+}
+html.sky .ar-toggle .ar-caret{
+  background:rgba(33,150,243,.14) !important;
+  color:var(--sky-primary,#2196F3) !important;
+}
+html.sky .ar-show-logins{
+  border:1px solid rgba(33,150,243,.35) !important;
+  border-style:solid !important;
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(33,150,243,.08)) !important;
+  color:var(--sky-primary-deep,#1976D2) !important;
+  border-radius:14px !important;
+  padding:12px 16px !important;
+  font-size:13px !important;
+  font-weight:720 !important;
+  box-shadow:0 2px 8px -4px rgba(33,150,243,.25);
+}
+html.sky .ar-show-logins:hover{
+  background:rgba(33,150,243,.12) !important;
+  border-color:var(--sky-primary,#2196F3) !important;
+}
 /* consent gate — the trust moment: calm sky-blue tint, unmistakably a choice */
 html.sky .ar-consent{
   background:rgba(33,150,243,.06);
