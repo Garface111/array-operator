@@ -116,13 +116,43 @@
 .tr-table tr:last-child td{border-bottom:0}
 .tr-aname{font-weight:600} .tr-anum{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
 .tr-ayears{color:var(--muted)}
-/* year × array production matrix */
-.tr-ymatrix{margin-top:22px}
-.tr-ym-table th.tr-anum,.tr-ym-table td.tr-anum{min-width:4.5rem}
+/* year × array production matrix
+   Wide year grids must scroll inside the wrap — body uses overflow-x:clip/hidden,
+   so unconstrained tables get clipped on the right (Paul 2026-07-15). */
+.tr-ymatrix{margin-top:22px;min-width:0;max-width:100%}
+.tr-ym-table{
+  width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;
+  table-layout:auto;
+}
+.tr-ym-table th,.tr-ym-table td{padding:10px 10px;white-space:nowrap}
+.tr-ym-table th.tr-anum,.tr-ym-table td.tr-anum{min-width:3.6rem;padding-left:8px;padding-right:8px}
+.tr-ym-table th:first-child,.tr-ym-table td:first-child{
+  position:sticky;left:0;z-index:2;
+  background:var(--card,var(--bg,#0b1220));
+  box-shadow:4px 0 10px -6px rgba(0,0,0,.35);
+  min-width:9rem;max-width:14rem;
+  overflow:hidden;text-overflow:ellipsis;
+}
 .tr-ym-partial{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--good2,#3fd68a);vertical-align:super}
 .tr-ym-tot td{border-top:1px solid var(--line);background:color-mix(in srgb,var(--ink) 3%,transparent)}
+.tr-ym-tot td:first-child{background:color-mix(in srgb,var(--ink) 3%,var(--card,var(--bg,#0b1220)))}
 .tr-ym-life{font-weight:650;color:var(--ink)!important}
-.tr-tablewrap-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tr-tablewrap-scroll{
+  display:block;width:100%;max-width:100%;min-width:0;
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+}
+/* Right-edge fade: cues that more year columns exist beyond the clip */
+.tr-ymatrix .tr-tablewrap-scroll{
+  mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+.tr-ymatrix .tr-tablewrap-scroll:hover,
+.tr-ymatrix .tr-tablewrap-scroll:focus-within{
+  mask-image:none;-webkit-mask-image:none;
+}
 
 /* empty / error */
 .tr-empty{text-align:center;padding:40px 16px;color:var(--muted)}

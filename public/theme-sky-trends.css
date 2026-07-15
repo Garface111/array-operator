@@ -177,6 +177,25 @@ html.sky .tr-tablewrap{
   border-radius:var(--sky-r-card);
   box-shadow:var(--sky-shadow-card);
 }
+/* Production-by-year matrix: force horizontal scroll inside the glass wrap
+   (never clip against body overflow-x). Sticky Array col stays readable. */
+html.sky #trendsRoot{min-width:0;max-width:100%;box-sizing:border-box}
+html.sky .tr-ymatrix{min-width:0;max-width:100%}
+html.sky .tr-tablewrap-scroll{
+  display:block;width:100%;max-width:100%;min-width:0;
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+}
+html.sky .tr-ym-table th:first-child,
+html.sky .tr-ym-table td:first-child{
+  background:rgba(255,255,255,.96);
+  box-shadow:4px 0 12px -6px rgba(20,60,120,.28);
+}
+html.sky .tr-ym-tot td:first-child{
+  background:color-mix(in srgb,rgba(33,150,243,.06) 100%,rgba(255,255,255,.96));
+}
+html.sky .tr-ym-table thead th:first-child{
+  background:rgba(244,249,255,.98);
+}
 /* status chips: emerald tint → action-blue tint; "no data" well on white */
 html.sky .tr-astat-ok{background:rgba(33,150,243,.10)}
 html.sky .tr-astat-none{background:rgba(20,60,120,.06)}
