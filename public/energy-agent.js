@@ -1375,28 +1375,21 @@
         openHint = true;
       }
 
-      // Mind steers voice: interim/final directives + classic interrupt candidates
-      if (
-        (ev.kind === "interrupt_candidate" || ev.kind === "voice_steer") &&
+      // Mind events: interrupt candidates may speak; voice_steer is status-only
+      // (final mouth line comes once from /chat — speaking interim here caused double replies).
+      if (ev.kind === "voice_steer" && ev.speak_as_mind && !ev.consumed) {
+        if (state.thinking) setStatus(ev.speak_as_mind, "think");
+        toConsume.push(ev.id);
+      } else if (
+        ev.kind === "interrupt_candidate" &&
         ev.speak_as_mind &&
         !ev.consumed
       ) {
-        // Interim steers while thinking: mouth only (no second chat bubble spam)
-        if (ev.kind === "voice_steer" && state.thinking) {
-          setStatus(ev.speak_as_mind, "think");
-          // Respect speaker mute; force is only for injectMindSpeak thinking-gate
-          enqueueSpeak(ev.speak_as_mind, { source: "mind_steer" }).catch(function () {});
-          toConsume.push(ev.id);
-        } else {
-          var said = injectMindSpeak(ev.speak_as_mind, {
-            eventId: ev.id,
-            importance: ev.importance,
-            force: ev.kind === "voice_steer",
-          });
-          if (said || ev.kind === "voice_steer") {
-            toConsume.push(ev.id);
-          }
-        }
+        var said = injectMindSpeak(ev.speak_as_mind, {
+          eventId: ev.id,
+          importance: ev.importance,
+        });
+        if (said) toConsume.push(ev.id);
       }
     }
 
@@ -1946,10 +1939,16 @@
     }
     state._chatAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
 
-    // ── Mind steers voice immediately (parallel with deep chat) ───────────
-    // Realtime is only the mouth; background intelligence picks the interim line
-    // while tools run, then the final chat reply replaces/continues.
+    // ── Mind steers status immediately (parallel with deep chat) ──────────
+    // Realtime is the mouth; mind picks an interim STATUS line while tools run.
+    // Do NOT speak interim — that stacked with the final /chat speak ("twice").
+    // One spoken reply per turn: the final mind-steered answer only.
     var isVoice = (source || "") === "voice";
+    if (state._interimSteerTimer) {
+      try { clearTimeout(state._interimSteerTimer); } catch (e) {}
+      state._interimSteerTimer = null;
+    }
+    state._interimSpoken = false;
     if (isVoice) {
       try {
         fetch(API.mindVoiceSteer, {
@@ -1965,10 +1964,8 @@
           .then(function (sd) {
             if (turnGen !== (state._turnAbortGen || 0)) return;
             if (!sd || !sd.speak) return;
-            // Don't paint interim as a chat bubble — mouth only (or soft status)
+            // Status only while thinking — mouth waits for the real answer
             setStatus(sd.speak, "think");
-            // Mind steers the mouth while tools run; mute still wins
-            enqueueSpeak(sd.speak, { source: "mind_steer" }).catch(function () {});
             if (sd.mind) onMindPlanFromChat(sd.mind);
           })
           .catch(function () {});
@@ -2020,8 +2017,11 @@
       addMsg("agent", reply);
       clearTools();
 
-      // SPEAK FIRST — mind-directed final. Interim steer (if any) is already in the
-      // speak queue; final follows so the deep answer is heard in full.
+      // ONE spoken answer per turn (cancel any leftover queue from a prior turn)
+      if (state._interimSteerTimer) {
+        try { clearTimeout(state._interimSteerTimer); } catch (e) {}
+        state._interimSteerTimer = null;
+      }
       var speakP = enqueueSpeak(mouthLine, { source: "chat" });
 
       var cmds = d.ui_commands || [];
@@ -3354,6 +3354,10 @@
     if (state._chatAbort) {
       try { state._chatAbort.abort(); } catch (e) {}
       state._chatAbort = null;
+    }
+    if (state._interimSteerTimer) {
+      try { clearTimeout(state._interimSteerTimer); } catch (e) {}
+      state._interimSteerTimer = null;
     }
     state.thinking = false;
     if (state.touring) state.touring = false; // runTour checks this each step
