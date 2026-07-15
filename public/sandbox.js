@@ -7572,12 +7572,19 @@
  });
  const pSov = document.getElementById("panelSovereign");
  if(pSov){
- pSov.hidden = !isSov;
- pSov.classList.toggle("active", isSov);
  if(isSov){
+ pSov.hidden = false;
+ pSov.removeAttribute("hidden");
+ pSov.classList.add("active");
  try{
- if(window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
+ if(window.__aoSovereignDeskBoot) window.__aoSovereignDeskBoot().then(function(ok){
+ if(ok && window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
+ });
+ else if(window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
  }catch(_){}
+ } else {
+ pSov.classList.remove("active");
+ pSov.hidden = true;
  }
  }
  // Sibling Analysis sub-panels (not in TABS): hide when Analysis top-tab is off

@@ -1,5 +1,5 @@
 /* Sovereign Desk — private Ford ↔ Sovereign chat (not Energy Agent).
- * Visible only when GET /v1/sovereign/desk/access returns desk:true
+ * Visible when GET /v1/sovereign/desk/access returns desk:true
  * (ford.genereaux@gmail.com + allowlist). Hash: #sovereign
  */
 (function () {
@@ -17,6 +17,8 @@
     loading: false,
     sending: false,
     messages: [],
+    pollTimer: null,
+    booted: false,
   };
 
   function authHeaders() {
@@ -26,6 +28,14 @@
       if (s) h.Authorization = "Bearer " + s;
     } catch (e) {}
     return h;
+  }
+
+  function hasSession() {
+    try {
+      return !!localStorage.getItem("so_session");
+    } catch (e) {
+      return false;
+    }
   }
 
   function esc(s) {
@@ -47,26 +57,28 @@
       sec.setAttribute("aria-label", "Sovereign desk");
       wrap.appendChild(sec);
     }
-    if (sec.querySelector(".sov-desk")) return;
-    sec.hidden = false;
+    if (sec.querySelector(".sov-desk")) return sec;
     sec.innerHTML =
       '<div class="sov-desk">' +
       '  <header class="sov-desk-head">' +
       '    <div class="sov-desk-brand">' +
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
-      '      <div>' +
-      '        <h1>Sovereign</h1>' +
+      "      <div>" +
+      "        <h1>Sovereign</h1>" +
       '        <p class="sov-desk-sub">Array Operator leadership desk · private with Ford</p>' +
       "      </div>" +
       "    </div>" +
-      '    <div class="sov-desk-meta" id="sovDeskMeta">Developer only</div>' +
+      '    <div class="sov-desk-head-right">' +
+      '      <div class="sov-desk-meta" id="sovDeskMeta">Developer only</div>' +
+      '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh">↻</button>' +
+      "    </div>" +
       "  </header>" +
       '  <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
       '  <form class="sov-desk-compose" id="sovDeskForm">' +
       '    <textarea id="sovDeskInput" rows="2" placeholder="Talk to Sovereign…" autocomplete="off"></textarea>' +
       '    <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "  </form>" +
-      '  <p class="sov-desk-foot">Not Energy Agent. This is your direct line to the product mind.</p>' +
+      '  <p class="sov-desk-foot">Not Energy Agent. Direct line to the product leadership mind.</p>' +
       "</div>";
 
     var form = document.getElementById("sovDeskForm");
@@ -87,6 +99,14 @@
         }
       });
     }
+    var ref = document.getElementById("sovDeskRefresh");
+    if (ref && !ref._wired) {
+      ref._wired = true;
+      ref.onclick = function () {
+        loadHistory();
+      };
+    }
+    return sec;
   }
 
   function renderMessages() {
@@ -101,12 +121,15 @@
         "</div>";
       return;
     }
+    var nearBottom =
+      host.scrollHeight - host.scrollTop - host.clientHeight < 80;
     host.innerHTML = state.messages
       .map(function (m) {
-        var role = m.role === "ford" ? "ford" : m.role === "system" ? "system" : "sov";
+        var role =
+          m.role === "ford" ? "ford" : m.role === "system" ? "system" : "sov";
         var label =
           role === "ford" ? "You" : role === "system" ? "System" : "Sovereign";
-        var prov = m.provider ? ' · ' + esc(m.provider) : "";
+        var prov = m.provider ? " · " + esc(m.provider) : "";
         return (
           '<div class="sov-bubble sov-bubble--' +
           role +
@@ -122,15 +145,21 @@
         );
       })
       .join("");
-    host.scrollTop = host.scrollHeight;
+    if (nearBottom) host.scrollTop = host.scrollHeight;
   }
 
   async function checkAccess() {
+    if (!hasSession()) {
+      state.allowed = false;
+      return false;
+    }
     try {
       var r = await fetch(API.access, { headers: authHeaders() });
-      var d = await r.json();
+      var d = await r.json().catch(function () {
+        return {};
+      });
       state.allowed = !!(d && d.desk && d.ok);
-      state.email = d && d.email;
+      state.email = (d && d.email) || null;
       return state.allowed;
     } catch (e) {
       state.allowed = false;
@@ -140,13 +169,23 @@
 
   async function loadHistory() {
     var host = document.getElementById("sovDeskMsgs");
-    if (host) host.innerHTML = '<div class="sov-desk-empty">Loading…</div>';
+    if (!state.allowed) {
+      if (host)
+        host.innerHTML =
+          '<div class="sov-desk-empty"><b>Sign in as Ford</b>' +
+          "<p>Sovereign desk is only on the developer account.</p></div>";
+      return;
+    }
     try {
       var r = await fetch(API.history + "?limit=100", { headers: authHeaders() });
-      var d = await r.json();
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
       state.messages = (d && d.messages) || [];
       var meta = document.getElementById("sovDeskMeta");
-      if (meta) meta.textContent = (d.email || state.email || "desk") + " · private";
+      if (meta)
+        meta.textContent = (d.email || state.email || "desk") + " · private";
       renderMessages();
     } catch (e) {
       if (host)
@@ -158,7 +197,7 @@
   }
 
   async function send() {
-    if (state.sending) return;
+    if (state.sending || !state.allowed) return;
     var ta = document.getElementById("sovDeskInput");
     var text = ta ? String(ta.value || "").trim() : "";
     if (!text) return;
@@ -171,6 +210,8 @@
     if (ta) ta.value = "";
     state.messages.push({ role: "ford", content: text });
     renderMessages();
+    var host = document.getElementById("sovDeskMsgs");
+    if (host) host.scrollTop = host.scrollHeight;
     try {
       var r = await fetch(API.chat, {
         method: "POST",
@@ -180,21 +221,23 @@
       var d = await r.json().catch(function () {
         return {};
       });
-      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
-      if (d.message && d.message.content) {
+      if (!r.ok) {
+        var detail = d && d.detail;
+        if (typeof detail === "object")
+          detail = detail.message || JSON.stringify(detail);
+        throw new Error(detail || "HTTP " + r.status);
+      }
+      var reply =
+        (d.message && d.message.content) || d.reply || "";
+      if (reply) {
         state.messages.push({
           role: "sovereign",
-          content: d.message.content,
-          provider: d.provider,
-        });
-      } else if (d.reply) {
-        state.messages.push({
-          role: "sovereign",
-          content: d.reply,
+          content: reply,
           provider: d.provider,
         });
       }
       renderMessages();
+      if (host) host.scrollTop = host.scrollHeight;
     } catch (e) {
       state.messages.push({
         role: "system",
@@ -211,10 +254,19 @@
     }
   }
 
-  function openDesk() {
-    ensureShell();
-    if (location.hash !== "#sovereign") location.hash = "#sovereign";
-    else showPanel();
+  function startPoll() {
+    stopPoll();
+    state.pollTimer = setInterval(function () {
+      if (location.hash === "#sovereign" && state.allowed && !state.sending)
+        loadHistory();
+    }, 12000);
+  }
+
+  function stopPoll() {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+    }
   }
 
   function showPanel() {
@@ -225,11 +277,26 @@
     var p = document.getElementById("panelSovereign");
     if (p) {
       p.hidden = false;
+      p.removeAttribute("hidden");
       p.classList.add("active");
     }
     var acctTab = document.getElementById("tabAccount");
     if (acctTab) acctTab.classList.add("active");
     loadHistory();
+    startPoll();
+  }
+
+  function openDesk() {
+    ensureShell();
+    if (location.hash !== "#sovereign") {
+      location.hash = "#sovereign";
+      // applyView / hashchange will call showPanel
+      setTimeout(function () {
+        if (location.hash === "#sovereign") showPanel();
+      }, 50);
+    } else {
+      showPanel();
+    }
   }
 
   function mountEntry() {
@@ -240,7 +307,7 @@
       if (fab) fab.remove();
       return;
     }
-    // Account tab card
+    // Account tab card — re-insert after Account re-renders
     var list = document.getElementById("acctList");
     if (list && !document.getElementById("sovDeskEntry")) {
       var card = document.createElement("section");
@@ -259,7 +326,6 @@
       var b = document.getElementById("sovDeskOpenBtn");
       if (b) b.onclick = openDesk;
     }
-    // Floating fab (always available when allowed)
     if (!document.getElementById("sovDeskFab")) {
       var fab2 = document.createElement("button");
       fab2.type = "button";
@@ -275,33 +341,70 @@
 
   async function boot() {
     var ok = await checkAccess();
-    if (!ok) return;
+    if (!ok) {
+      mountEntry(); // removes UI
+      return false;
+    }
     ensureShell();
     mountEntry();
     if (location.hash === "#sovereign") showPanel();
+    state.booted = true;
+    return true;
   }
 
-  // Re-check after account loads (session ready)
   var _tries = 0;
   function bootWhenReady() {
-    boot();
-    if (!state.allowed && _tries < 8) {
-      _tries += 1;
-      setTimeout(bootWhenReady, 1500);
-    }
+    boot().then(function (ok) {
+      if (!ok && _tries < 12) {
+        _tries += 1;
+        setTimeout(bootWhenReady, 1200);
+      }
+    });
   }
 
   window.addEventListener("hashchange", function () {
-    if (location.hash === "#sovereign" && state.allowed) showPanel();
+    if (location.hash === "#sovereign") {
+      if (state.allowed) showPanel();
+      else
+        boot().then(function (ok) {
+          if (ok) showPanel();
+        });
+    } else {
+      stopPoll();
+      var p = document.getElementById("panelSovereign");
+      if (p) {
+        p.classList.remove("active");
+        p.hidden = true;
+      }
+    }
   });
 
-  // Hook applyView: when leaving sovereign, fine; when opening account remount entry
-  var _origApply = null;
-  function patchApplyView() {
-    if (typeof window.applyView === "function" && !_origApply) {
-      // applyView is not on window — sandbox keeps it local
+  // Remount Account card when Account re-renders
+  setTimeout(function () {
+    var list = document.getElementById("acctList");
+    if (!list) return;
+    var obs = new MutationObserver(function () {
+      if (state.allowed) mountEntry();
+    });
+    obs.observe(list, { childList: true });
+  }, 1500);
+
+  // Re-check access when session appears (login)
+  var _sess = null;
+  try {
+    _sess = localStorage.getItem("so_session");
+  } catch (e) {}
+  setInterval(function () {
+    var now = null;
+    try {
+      now = localStorage.getItem("so_session");
+    } catch (e) {}
+    if (now !== _sess) {
+      _sess = now;
+      _tries = 0;
+      bootWhenReady();
     }
-  }
+  }, 2000);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootWhenReady);
@@ -309,17 +412,9 @@
     bootWhenReady();
   }
 
-  // After account render, remount entry card
-  var _obs = new MutationObserver(function () {
-    if (state.allowed) mountEntry();
-  });
-  setTimeout(function () {
-    var list = document.getElementById("acctList");
-    if (list) _obs.observe(list, { childList: true });
-  }, 2000);
-
   window.__aoOpenSovereignDesk = openDesk;
   window.__aoSovereignDeskAllowed = function () {
     return state.allowed;
   };
+  window.__aoSovereignDeskBoot = boot;
 })();
