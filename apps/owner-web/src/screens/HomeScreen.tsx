@@ -2,12 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { StatCard } from "@/components/StatCard";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
-import { fetchFleetTree, fetchOverview, fetchSendPipeline } from "@/lib/api";
+import {
+  fetchAccount,
+  fetchFleetTree,
+  fetchOverview,
+  fetchSendPipeline,
+} from "@/lib/api";
+import { isDemoMode } from "@/lib/demoData";
 import { fmtKwh, fmtMoney, statusTone } from "@/lib/format";
-import type { FleetTree, Overview, SendPipeline } from "@/lib/types";
+import type { AccountMe, FleetTree, Overview, SendPipeline } from "@/lib/types";
 
 export function HomeScreen() {
   const { openAgent } = useOutletAgent();
+  const [account, setAccount] = useState<AccountMe | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [tree, setTree] = useState<FleetTree | null>(null);
   const [pipe, setPipe] = useState<SendPipeline | null>(null);
@@ -20,12 +27,14 @@ export function HomeScreen() {
       setLoading(true);
       setErr(null);
       try {
-        const [o, t, p] = await Promise.all([
+        const [a, o, t, p] = await Promise.all([
+          fetchAccount().catch(() => null),
           fetchOverview().catch(() => null),
           fetchFleetTree().catch(() => null),
           fetchSendPipeline().catch(() => null),
         ]);
         if (cancelled) return;
+        setAccount(a);
         setOverview(o);
         setTree(t);
         setPipe(p);
@@ -83,35 +92,48 @@ export function HomeScreen() {
       const name = String(a.name || "Array");
       const st = String(a.status || "");
       const tone = statusTone(st);
-      if (tone === "warn" || tone === "bad") rows.push({ name, status: st || "attention" });
-      (a as { inverters?: Array<{ name?: string; status?: string }> }).inverters?.forEach(
-        (inv) => {
-          const t = statusTone(inv.status);
-          if (t === "warn" || t === "bad")
-            rows.push({
-              name: `${name} · ${inv.name || "inverter"}`,
-              status: String(inv.status || "attention"),
-            });
-        }
-      );
+      if (tone === "warn" || tone === "bad")
+        rows.push({ name, status: st || "attention" });
+      (
+        a as { inverters?: Array<{ name?: string; status?: string }> }
+      ).inverters?.forEach((inv) => {
+        const t = statusTone(inv.status);
+        if (t === "warn" || t === "bad")
+          rows.push({
+            name: `${name} · ${inv.name || "inverter"}`,
+            status: String(inv.status || "attention"),
+          });
+      });
     });
-    return rows.slice(0, 5);
+    return rows.slice(0, 6);
   }, [tree, overview]);
 
   if (loading) {
     return (
-      <div className="space-y-3 py-6 text-center text-sm font-semibold text-muted">
+      <div className="space-y-3 py-8 text-center text-sm font-semibold text-muted">
         Loading your fleet…
       </div>
     );
   }
 
+  const company =
+    account?.company_name || account?.name || "Your fleet";
+
   return (
     <div className="space-y-4">
+      {isDemoMode() ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-950">
+          Demo data — sample fleet for UI review. Sign in for live numbers.
+        </div>
+      ) : null}
+
       <section>
-        <h1 className="text-lg font-extrabold tracking-tight">Overview</h1>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700">
+          Overview
+        </p>
+        <h1 className="text-lg font-extrabold tracking-tight">{company}</h1>
         <p className="text-sm text-muted">
-          Current state of production and offtaker delivery.
+          Production health and offtaker delivery at a glance.
         </p>
       </section>
 
@@ -132,7 +154,7 @@ export function HomeScreen() {
           value={fmtKwh(stats.todayKwh)}
           meta={
             stats.valueToday != null
-              ? `~${fmtMoney(stats.valueToday)} at stake`
+              ? `~${fmtMoney(stats.valueToday)} value`
               : "Production pulse"
           }
           tone={stats.dead ? "bad" : stats.attn ? "warn" : "good"}
@@ -150,7 +172,7 @@ export function HomeScreen() {
           tone={stats.dead ? "bad" : stats.attn ? "warn" : "good"}
           onClick={() =>
             openAgent(
-              "What needs attention on my fleet right now? Name arrays/inverters, why, and the next step. Use tools."
+              "What needs attention on my fleet right now? Name arrays/inverters, why, and the next step."
             )
           }
         />
@@ -171,28 +193,40 @@ export function HomeScreen() {
         />
       </div>
 
-      <section className="ao-card p-3.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-extrabold">Ask Energy Agent</h2>
+      <section className="ao-card overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-line bg-gradient-to-r from-sky-50 to-white px-3.5 py-3">
+          <div
+            className="h-10 w-10 shrink-0 rounded-full shadow"
+            style={{
+              background:
+                "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
+            }}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-extrabold">Energy Agent</div>
+            <div className="text-xs text-muted">
+              Small adjustments · fleet & invoices
+            </div>
+          </div>
           <button
             type="button"
-            className="text-xs font-bold text-sky-700"
+            className="ao-btn-primary !min-h-9 !px-3 !text-xs"
             onClick={() => openAgent()}
           >
-            Open chat →
+            Chat
           </button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 p-3">
           {[
             "What's left for hands-off setup?",
             "Brief me on fleet health.",
-            "How did offtaker invoices go last cycle?",
+            "How did offtaker invoices go?",
           ].map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => openAgent(q)}
-              className="rounded-full border border-line bg-sky-50 px-3 py-1.5 text-left text-[11px] font-semibold text-sky-900"
+              className="rounded-full border border-line bg-white px-3 py-1.5 text-left text-[11px] font-semibold text-sky-900 shadow-sm"
             >
               {q}
             </button>

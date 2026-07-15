@@ -43,6 +43,8 @@ export type FleetTree = {
     id?: number | string;
     name?: string;
     status?: string;
+    last_sync_at?: string | null;
+    synced_at?: string | null;
     inverters?: Array<{
       id?: number | string;
       name?: string;
@@ -66,6 +68,62 @@ export type SendPipeline = {
     [key: string]: unknown;
   };
   previous?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export type AccountMe = {
+  tenant_id?: string;
+  name?: string;
+  company_name?: string;
+  email?: string;
+  product?: string;
+  capture_mode?: string | null;
+  active?: boolean;
+  is_demo?: boolean;
+  plan_features?: {
+    plan?: string;
+    plan_chosen?: boolean;
+    vendor_data?: boolean;
+    invoicing?: boolean;
+  };
+  [key: string]: unknown;
+};
+
+export type CloudCredential = {
+  provider?: string;
+  username?: string;
+  enabled?: boolean;
+  last_harvest_at?: string | null;
+  last_harvest_ok?: boolean | null;
+  last_harvest_status?: string | null;
+  harvest_fails?: number;
+  [key: string]: unknown;
+};
+
+export type CloudStatus = {
+  encryption_ready?: boolean;
+  collection_enabled?: boolean;
+  harvesting_enabled?: boolean;
+  credentials?: CloudCredential[];
+  [key: string]: unknown;
+};
+
+export type Subscription = {
+  id?: number | string;
+  name?: string;
+  offtaker_name?: string;
+  email?: string;
+  to_email?: string;
+  share_pct?: number | null;
+  delivery_mode?: string | null;
+  enabled?: boolean;
+  utility_account_name?: string | null;
+  [key: string]: unknown;
+};
+
+export type SubscriptionsList = {
+  ok?: boolean;
+  subscriptions?: Subscription[];
   [key: string]: unknown;
 };
 

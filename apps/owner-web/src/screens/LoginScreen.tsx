@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { passwordLogin, requestMagicLink, rearmUnauthorized } from "@/lib/api";
+import { passwordLogin, rearmUnauthorized, requestMagicLink } from "@/lib/api";
+import { enableDemoMode } from "@/lib/demoData";
 import { setSession } from "@/lib/session";
 
 export function LoginScreen() {
@@ -26,6 +27,11 @@ export function LoginScreen() {
         if (!res.session_token) throw new Error("No session returned");
         setSession(res.session_token);
         rearmUnauthorized();
+        try {
+          localStorage.removeItem("ao_owner_demo");
+        } catch {
+          /* ignore */
+        }
         nav("/", { replace: true });
       }
     } catch (ex) {
@@ -33,6 +39,13 @@ export function LoginScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function enterDemo() {
+    enableDemoMode();
+    nav("/?demo=1", { replace: true });
+    // Force reload path so AuthGate sees demo flag
+    window.location.assign("/?demo=1");
   }
 
   return (
@@ -100,8 +113,22 @@ export function LoginScreen() {
         ) : null}
       </form>
 
+      <button
+        type="button"
+        onClick={enterDemo}
+        className="ao-card mt-4 w-full p-4 text-left transition active:scale-[0.99]"
+      >
+        <div className="text-sm font-extrabold text-sky-800">
+          Preview demo fleet →
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Explore the phone UI with sample arrays, offtakers, and Agent — no
+          account required. Production desktop site is unchanged.
+        </p>
+      </button>
+
       <p className="mt-6 text-center text-[11px] text-muted">
-        Same account as arrayoperator.com · does not replace the desktop site
+        Same account as arrayoperator.com · React app on feat/owner-react
       </p>
     </div>
   );

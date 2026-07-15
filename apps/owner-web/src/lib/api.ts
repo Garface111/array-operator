@@ -1,11 +1,23 @@
 import { clearSession, getSession, SESSION_KEY, UNAUTHORIZED_EVENT } from "./session";
+import {
+  demoAccount,
+  demoCloud,
+  demoFleet,
+  demoOverview,
+  demoPipeline,
+  demoSubs,
+  isDemoMode,
+} from "./demoData";
 import type {
+  AccountMe,
+  CloudStatus,
   EnergyAgentChatResponse,
   EnergyAgentSession,
   FleetTree,
   Overview,
   PasswordLoginResult,
   SendPipeline,
+  SubscriptionsList,
 } from "./types";
 
 export class UnauthorizedError extends Error {
@@ -98,35 +110,79 @@ export async function requestMagicLink(email: string): Promise<{ ok?: boolean }>
   });
 }
 
-// ── Fleet / offtakers ────────────────────────────────────────────────────
+// ── Fleet / offtakers / account ──────────────────────────────────────────
 
-export function fetchOverview(): Promise<Overview> {
+export async function fetchOverview(): Promise<Overview> {
+  if (isDemoMode()) return demoOverview;
   return apiFetch<Overview>("/v1/array-owners/overview");
 }
 
-export function fetchFleetTree(force = false): Promise<FleetTree> {
+export async function fetchFleetTree(force = false): Promise<FleetTree> {
+  if (isDemoMode()) return demoFleet;
   const q = force ? "?force=1" : "";
   return apiFetch<FleetTree>(`/v1/array-owners/fleet-tree${q}`);
 }
 
-export function fetchSendPipeline(): Promise<SendPipeline> {
+export async function fetchSendPipeline(): Promise<SendPipeline> {
+  if (isDemoMode()) return demoPipeline;
   return apiFetch<SendPipeline>("/v1/array-operator/billing/send-pipeline");
+}
+
+export async function fetchAccount(): Promise<AccountMe> {
+  if (isDemoMode()) return demoAccount;
+  return apiFetch<AccountMe>("/v1/account");
+}
+
+export async function fetchCloudStatus(): Promise<CloudStatus> {
+  if (isDemoMode()) return demoCloud;
+  return apiFetch<CloudStatus>("/v1/cloud-capture/status");
+}
+
+export async function fetchSubscriptions(): Promise<SubscriptionsList> {
+  if (isDemoMode()) return demoSubs;
+  return apiFetch<SubscriptionsList>("/v1/array-operator/billing/subscriptions");
 }
 
 // ── Energy Agent ─────────────────────────────────────────────────────────
 
-export function startAgentSession(context?: Record<string, unknown>): Promise<EnergyAgentSession> {
+export async function startAgentSession(
+  context?: Record<string, unknown>
+): Promise<EnergyAgentSession> {
+  if (isDemoMode()) {
+    return {
+      session_id: "demo_session",
+      intro:
+        "Hi — demo mode Energy Agent. I'm showing sample fleet data. Sign in with a real account for live tools.",
+      brain: "demo",
+    };
+  }
   return apiFetch<EnergyAgentSession>("/v1/energy-agent/session", {
     method: "POST",
     body: JSON.stringify({ context: context || { client: "owner-web" } }),
   });
 }
 
-export function agentChat(
+export async function agentChat(
   sessionId: string,
   message: string,
   context?: Record<string, unknown>
 ): Promise<EnergyAgentChatResponse> {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 450));
+    const m = message.toLowerCase();
+    let reply =
+      "In demo mode I summarize sample data: 3 arrays, Cover Rooftop underperforming, 13/14 offtaker invoices sent last cycle. Sign in for live actions.";
+    if (m.includes("attention") || m.includes("health"))
+      reply =
+        "Cover Rooftop is underperforming (peer ~0.78). Londonderry and West Glover look healthy. Next: check Cover’s inverter feed and shading/fault history.";
+    if (m.includes("invoice") || m.includes("offtaker"))
+      reply =
+        "Last cycle Jun 2026: 13 of 14 offtaker reports sent. Fleet default is approve-to-send. Town Library, Fire Station, and School District are on the sample roster.";
+    if (m.includes("hands-off") || m.includes("setup") || m.includes("connect"))
+      reply =
+        "Demo feeds look connected (Chint + GMP cloud logins). In a live account I’d check vault health, bill sources, send mode, and online pay.";
+    return { reply, session_id: sessionId };
+  }
   return apiFetch<EnergyAgentChatResponse>("/v1/energy-agent/chat", {
     method: "POST",
     body: JSON.stringify({

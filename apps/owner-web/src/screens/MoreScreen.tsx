@@ -1,7 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
+import { disableDemoMode, isDemoMode } from "@/lib/demoData";
 import { clearSession } from "@/lib/session";
-import { useNavigate } from "react-router-dom";
 
 export function MoreScreen() {
   const { openAgent } = useOutletAgent();
@@ -13,6 +13,11 @@ export function MoreScreen() {
         <h1 className="text-lg font-extrabold">More</h1>
         <p className="text-sm text-muted">Analysis, account, and sign-out.</p>
       </div>
+      {isDemoMode() ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-950">
+          You are in demo mode
+        </div>
+      ) : null}
       <ul className="ao-card divide-y divide-line overflow-hidden">
         <li>
           <button
@@ -55,10 +60,11 @@ export function MoreScreen() {
             className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-bold text-red-600"
             onClick={() => {
               clearSession();
+              disableDemoMode();
               nav("/login", { replace: true });
             }}
           >
-            Sign out
+            {isDemoMode() ? "Exit demo" : "Sign out"}
           </button>
         </li>
       </ul>
