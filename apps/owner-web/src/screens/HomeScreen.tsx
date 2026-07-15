@@ -448,15 +448,22 @@ export function HomeScreen() {
               : "Fleet looks clear"
           }
           action={
-            <Link to="/inverters" className="text-xs font-bold text-sky-800">
-              Inverters →
-            </Link>
+            <button
+              type="button"
+              className="text-xs font-bold text-sky-800"
+              onClick={() =>
+                openAgent(
+                  "Walk the full fleet: every array and inverter, peer index, and anything flagged."
+                )
+              }
+            >
+              Ask Agent →
+            </button>
           }
         />
         {attention.length === 0 ? (
           <EmptyCard>
-            Nothing flagged. Check Inverters for per-unit detail or ask Agent
-            for a deeper brief.
+            Nothing flagged. Ask Agent anytime for a deeper fleet brief.
           </EmptyCard>
         ) : (
           <ul className="space-y-2">
