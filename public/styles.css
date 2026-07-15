@@ -6,7 +6,7 @@
     --green-deep:#3fd68a;
     /* Octarine — the vault's bold signature (Ford's calibrated brand temperament);
        carries the panel's character. Green/amber/red stay reserved for LIVE state. */
-    --ao-oct:#9b6cff; --ao-oct-soft:rgba(155,108,255,.13); --ao-oct-line:rgba(155,108,255,.36);
+    --ao-oct:#3b82f6; --ao-oct-soft:rgba(59,130,246,.13); --ao-oct-line:rgba(59,130,246,.36);
     /* Live-state signal — an explicit green (day-mode --good is BLUE, so it can't
        double as "working"). This is the colour of the pulsing dots. */
     --ao-live:#2ee68a; --ao-live-glow:rgba(46,230,138,.55); --ao-live-ink:#34d399;
@@ -48,7 +48,4 @@
      control — primary CTAs (Open dashboard, Connect GMP, Add a card), modal close
      buttons, segment toggles, links — gets a consistent, visible focus indicator
      for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
-  :focus-visible{outline:2px solid rgba(94,194,255,.6);outline-offset:2px}
-  /* Feature #14: remove inner vertical scrollbar on All vendor data / fleet inverter tables
-     so page scrolls as single region (drop max-h/overflow-y pattern) */
-  .inverter-table,.fleet-list,.vendor-data{max-height:none!important;overflow:visible!important}
+  :focus-visible{outline:2px solid rgba(94,194,255,.6
