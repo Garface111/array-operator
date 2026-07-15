@@ -1370,11 +1370,11 @@
  title:"Not producing right now, but its peers aren't either, so nothing's wrong." };
  }
 
- // ── CONDENSED 4-STATE, one honest word per inverter (Ford's redesign) ──────
- // The NOW chip + the 14-day HEALTH badge collapse into ONE label, exactly four:
- // producing · error · sleeping · offline
- // Precedence ERROR → SLEEPING → PRODUCING → OFFLINE, so a daytime fault that
- // zeroes output stays "error" and never masquerades as "sleeping".
+ // ── CONDENSED state, one honest word per inverter (Ford's redesign) ──────
+ // HEALTH (14d peer) and NOW (live) must never contradict on the card.
+ // Precedence: health fault → live shortfall (when health ok) → sleeping →
+ // producing → offline. Never label "Error" while diagnosis says "pulling its
+ // weight" (Bruce / Chester #4, 2026-07-15).
  function fourState(inv, peers, isDaylight, statusCls, sleeping){
  // NO ENERGY DATA (backend no_energy_register, e.g. Tannery #7, S/N 191213319):
  // the vendor streams this unit's live POWER but its cumulative-energy register
@@ -1388,13 +1388,20 @@
  if(inv && inv.no_energy_register)
  return { key:"nometer", word:"No energy data", tone:"info",
  title:"This inverter reports live power but no cumulative energy, a metering issue at the vendor, not an outage. Its output can't be peer-graded until the energy register is fixed." };
- // ERROR: the 14-day peer verdict is flagged (underperforming/comm_gap → warn,
- // dead/fault → bad), OR a live anomaly, dark, or low vs peers, right now while
- // ≥2 daylight siblings produce. Either way it is making less than it should.
  const lv = liveVerdict(inv, peers, isDaylight);
- if(statusCls === "bad" || statusCls === "warn" || lv === "dark" || lv === "low")
+ // HEALTH fault only (14-day peer / fault / comm_gap). Word = Error.
+ // Live-only shortfalls use their own words so we never pair "Error" with a
+ // healthy "Pulling its weight" diagnosis (inconsistent facts bug).
+ if(statusCls === "bad" || statusCls === "warn")
  return { key:"error", word:"Error", tone:"bad",
  title: inv.diagnosis || "Flagged, producing less than it should." };
+ // Live shortfall while 14d health is OK — honest NOW labels, not Error.
+ if(lv === "low")
+ return { key:"low", word:"Low vs peers", tone:"warn",
+ title:"Producing well below its sibling inverters right now, even though its 14-day health looks fine." };
+ if(lv === "dark")
+ return { key:"dark", word:"Not producing", tone:"warn",
+ title:"Dark right now while sibling inverters are producing. 14-day health may still look fine." };
  // SLEEPING: sun-down rest (never an alarm).
  if(sleeping) return { key:"sleeping", word:"Sleeping", tone:"sleep",
  title:"Resting, the sun is down." };
@@ -1486,7 +1493,15 @@
  const tk = liveReadingMissing(inv) ? todayKwh(inv) : null;
  let sub;
  if(st.key === "sleeping") sub = (tk != null && tk > 0) ? `${tk.toFixed(1)} kWh produced today` : "resting until sunrise";
- else if(st.key === "error") sub = inv.diagnosis || (nowKw ? `only ${nowKw}` : "producing less than it should");
+ else if(st.key === "low") sub = nowKw ? `${nowKw} · lagging peers` : "lagging siblings right now";
+ else if(st.key === "dark") sub = nowKw ? `${nowKw} · peers still produce` : "peers are producing; this unit is dark";
+ else if(st.key === "error"){
+ // Never show a healthy 14d diagnosis under Error (contradiction Bruce hit).
+ const diag = String(inv.diagnosis || "");
+ const healthyDiag = /\bpulling its weight\b|\ball good\b|\bhealthy\b|\bok\b/i.test(diag);
+ sub = (!healthyDiag && diag) ? diag
+ : (nowKw ? `only ${nowKw}` : "producing less than it should");
+ }
  else sub = liveReadingMissing(inv) ? (tk != null && tk > 0 ? `${tk.toFixed(1)} kWh today · no live feed` : "no live feed from this inverter") : "no live signal right now";
  return `<div class="sb-perf ${st.tone}"><div class="sb-perf-sub sb-perf-sub--lone">${esc(sub)}</div></div>`;
  }
@@ -2196,6 +2211,7 @@
  // (a metering defect must not tint the card red even if its low live split
  // makes obTone bad); otherwise the calm live output tone.
  const cardTone = (st4.key === "error" || st4.key === "offline") ? "bad"
+ : (st4.key === "low" || st4.key === "dark") ? "warn"
  : st4.key === "nometer" ? "info" : obTone;
  // Cards are FIRM in place, not draggable until the owner picks "Move" from
  // the right-click menu (which sets draggable + .sb-movable). Re-locks on drop.
