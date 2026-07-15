@@ -253,7 +253,8 @@
       orb.title = "Energy Agent — click to talk";
       orb.innerHTML =
         '<span class="ea-tab-ic" aria-hidden="true"></span>' +
-        '<span class="ea-tab-label">Energy Agent</span>';
+        '<span class="ea-tab-label">Energy Agent</span>' +
+        '<span class="ea-pro-badge" id="eaProBadgeTab" hidden></span>';
       if (tabbar) {
         tabbar.insertBefore(orb, tabbar.firstChild);
       } else {
@@ -264,6 +265,12 @@
         rootF.appendChild(orb);
         document.body.appendChild(rootF);
       }
+    } else if (orb && !document.getElementById("eaProBadgeTab")) {
+      var b1 = document.createElement("span");
+      b1.className = "ea-pro-badge";
+      b1.id = "eaProBadgeTab";
+      b1.hidden = true;
+      orb.appendChild(b1);
     }
 
     // Mobile floating chat bubble — follows the user (position:fixed). Collapses
@@ -276,8 +283,15 @@
       fab.title = "Energy Agent — chat";
       fab.innerHTML =
         '<span class="ea-fab-ic" aria-hidden="true"></span>' +
-        '<span class="ea-fab-label">Energy Agent</span>';
+        '<span class="ea-fab-label">Energy Agent</span>' +
+        '<span class="ea-pro-badge" id="eaProBadgeFab" hidden></span>';
       document.body.appendChild(fab);
+    } else if (!document.getElementById("eaProBadgeFab")) {
+      var b2 = document.createElement("span");
+      b2.className = "ea-pro-badge";
+      b2.id = "eaProBadgeFab";
+      b2.hidden = true;
+      document.getElementById("eaFab").appendChild(b2);
     }
 
     // Dim page while chat sheet is open on mobile (tap to collapse)
@@ -908,6 +922,50 @@
   }
 
   /**
+   * Badge over the Energy Agent icon (top-left tab + mobile FAB).
+   * Free: "Go Pro" pill (opens Account billing checkout).
+   * Pro:  "Unlimited" calm badge.
+   */
+  function setProBadge(isPro) {
+    state._isPro = !!isPro;
+    function paint(id) {
+      var badge = document.getElementById(id);
+      if (!badge) return;
+      badge.hidden = false;
+      badge.classList.remove("ea-pro-badge--go", "ea-pro-badge--ok");
+      if (isPro) {
+        badge.textContent = "Unlimited";
+        badge.classList.add("ea-pro-badge--ok");
+        badge.setAttribute("aria-label", "Energy Agent Pro — unlimited");
+        badge.onclick = null;
+        badge.style.pointerEvents = "none";
+      } else {
+        badge.textContent = "Go Pro";
+        badge.classList.add("ea-pro-badge--go");
+        badge.setAttribute("aria-label", "Upgrade to Energy Agent Pro");
+        badge.style.pointerEvents = "auto";
+        badge.onclick = function (e) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          // Prefer Account Billing upgrade; fall back to hash
+          try {
+            if (window.location.hash !== "#account") {
+              window.location.hash = "#account";
+            }
+            setTimeout(function () {
+              var btn = document.getElementById("aoAiProUpgrade") ||
+                        document.getElementById("acctChangePlan");
+              if (btn) btn.click();
+            }, 280);
+          } catch (_) {}
+        };
+      }
+    }
+    paint("eaProBadgeTab");
+    paint("eaProBadgeFab");
+  }
+  window.__eaSetProState = setProBadge;
+
+  /**
    * Weekly AI usage meter (thinking + voice combined).
    * Fills 0→100% as spend approaches the cap. Must always reflect exhausted
    * state (Ford 2026-07-14: bar stayed low while voice died on 402).
@@ -929,8 +987,10 @@
       el.setAttribute("aria-label", "Energy Agent Pro — unlimited");
       el.classList.remove("ea-budget-exhausted");
       state._budgetExhausted = false;
+      try { setProBadge(true); } catch (_) {}
       return;
     }
+    try { setProBadge(false); } catch (_) {}
     var cap = Number(b.weekly_budget_usd);
     if (!(cap > 0)) cap = 2.5;
     var pct = b.pct_used != null
