@@ -48,4 +48,6 @@
      control — primary CTAs (Open dashboard, Connect GMP, Add a card), modal close
      buttons, segment toggles, links — gets a consistent, visible focus indicator
      for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
-  :focus-visible{outline:2px solid rgba(94,194,255,.6
+  :focus-visible{outline:2px solid rgba(94,194,255,.6);outline-offset:2px}
+  /* Feature #4: array fleet grouping styles (region/fuel/account) for non-alpha views */
+  .array-group { border-top: 1px solid var(--line); margin-top: .5rem; padding-top: .5rem; }
