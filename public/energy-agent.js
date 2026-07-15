@@ -333,7 +333,7 @@
       '    <div class="ea-improve-thumb" id="eaImproveThumb" hidden>' +
       '      <img id="eaImproveImg" alt="Your marked screenshot">' +
       '      <button type="button" id="eaImproveRemark">Re-circle</button></div>' +
-      '    <textarea id="eaImproveText" rows="2" maxlength="800" placeholder="e.g. Put a total kWh badge right here"></textarea>' +
+      '    <textarea id="eaImproveText" rows="3" maxlength="1600" placeholder="Describe the change — or let Energy Agent fill this from your ask"></textarea>' +
       '    <div class="ea-improve-row">' +
       '      <button type="button" class="ea-improve-mark" id="eaImproveMark">Circle the spot</button>' +
       '      <button type="button" class="ea-improve-send" id="eaImproveSend">Build this →</button>' +
@@ -440,7 +440,35 @@
     activeId: null,
     poll: null,
     since: 0,
-  };
+    prefilledPrompt: null, // agent-written Build-it text survives mark/recircle
+  }
+
+  /**
+   * Prefill the Improve compose box with an agent-written build prompt so the
+   * owner can circle the spot and hit Build it (Ford 2026-07-14).
+   */
+  function fillImprovePrompt(text, opts) {
+    opts = opts || {};
+    var ta = document.getElementById("eaImproveText");
+    if (!ta) return false;
+    var t = String(text || "").trim();
+    if (!t) return false;
+    // Don't clobber a longer user edit unless forced
+    if (!opts.force && ta.value && ta.value.trim().length > t.length + 20) {
+      return false;
+    }
+    ta.value = t.slice(0, 1600);
+    try {
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch (e) {}
+    improve.prefilledPrompt = t.slice(0, 1600);
+    var lead = document.getElementById("eaImproveLead");
+    if (lead && opts.updateLead !== false) {
+      lead.textContent = opts.lead ||
+        "Prompt ready — circle the spot, then tap Build it (edit the text anytime).";
+    }
+    return true;
+  }
 
   function openImproveFlow(opts) {
     opts = opts || {};
@@ -455,12 +483,28 @@
       document.body.classList.add("ea-shell-open");
     }
     showImproveCompose(true);
-    addMsg("agent",
-      "Let's improve the site. I'll freeze the page so you can circle the spot — " +
-      "then type one short sentence. An AI judge reviews it; small UI changes can ship live. " +
-      "Billing and money math never auto-ship.");
+    // Agent-written (or user-ask) prompt for the Build box
+    var prefill =
+      opts.hint || opts.prompt || opts.text || opts.build_prompt || "";
+    if (prefill) {
+      fillImprovePrompt(prefill, { force: true });
+      addMsg("agent",
+        "I filled the build prompt from what you asked. Circle the spot on the page, " +
+        "tweak the text if you want, then hit **Build it**. " +
+        "An AI judge reviews it; small UI ships live — billing math never auto-ships.");
+    } else {
+      addMsg("agent",
+        "Let's improve the site. I'll freeze the page so you can circle the spot — " +
+        "then type one short sentence. An AI judge reviews it; small UI changes can ship live. " +
+        "Billing and money math never auto-ship.");
+    }
     if (opts.markFirst !== false) {
       setTimeout(launchMarkCapture, 350);
+    } else {
+      setTimeout(function () {
+        var ta = document.getElementById("eaImproveText");
+        if (ta) ta.focus();
+      }, 80);
     }
   }
 
@@ -472,6 +516,7 @@
   function closeImproveCompose() {
     showImproveCompose(false);
     improve.shot = null;
+    improve.prefilledPrompt = null;
     var img = document.getElementById("eaImproveImg");
     var thumb = document.getElementById("eaImproveThumb");
     var ta = document.getElementById("eaImproveText");
@@ -515,18 +560,42 @@
     } else if (thumb) {
       thumb.hidden = true;
     }
+    // Keep agent prefilled prompt after mark — only nudge copy if empty
+    var ta0 = document.getElementById("eaImproveText");
+    var hasPrompt = !!(ta0 && ta0.value && ta0.value.trim()) || !!improve.prefilledPrompt;
+    if (hasPrompt && improve.prefilledPrompt && ta0 && !ta0.value.trim()) {
+      fillImprovePrompt(improve.prefilledPrompt, { force: true, updateLead: false });
+    }
     if (lead) {
-      lead.textContent = improve.shot
-        ? "Marked. One short sentence — what should be there?"
-        : (payload.skipped_mark
-          ? "No mark — describe the change in a sentence."
-          : "Describe the change (you can re-circle anytime).");
+      if (hasPrompt || (ta0 && ta0.value.trim())) {
+        lead.textContent = improve.shot
+          ? "Marked. Prompt is ready — tap Build it (edit first if you want)."
+          : (payload.skipped_mark
+            ? "Prompt ready — tap Build it, or re-circle a spot first."
+            : "Prompt ready — circle a spot or Build it as-is.");
+      } else {
+        lead.textContent = improve.shot
+          ? "Marked. One short sentence — what should be there?"
+          : (payload.skipped_mark
+            ? "No mark — describe the change in a sentence."
+            : "Describe the change (you can re-circle anytime).");
+      }
     }
     if (msg) msg.textContent = "";
-    setStatus("Describe the change…", "on");
+    setStatus(
+      (ta0 && ta0.value.trim()) ? "Ready to Build it…" : "Describe the change…",
+      "on"
+    );
     setTimeout(function () {
       var ta = document.getElementById("eaImproveText");
-      if (ta) ta.focus();
+      if (ta) {
+        // Focus Build path: select end of prefilled text so user can tweak
+        ta.focus();
+        try {
+          var len = ta.value.length;
+          ta.setSelectionRange(len, len);
+        } catch (e) {}
+      }
     }, 80);
   };
 
@@ -1739,9 +1808,12 @@
     if (!opts.userAlreadyShown) {
       addMsg("user", text);
     }
-    // Seamless merge: site-improve intent opens mark-up without waiting on the brain
+    // Seamless merge: site-improve intent opens mark-up with their ask prefilled
     if (isImproveIntent(text)) {
-      openImproveFlow({ markFirst: true });
+      openImproveFlow({
+        markFirst: true,
+        hint: craftImprovePrompt(text),
+      });
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
       return;
     }
@@ -1889,6 +1961,23 @@
     }
   }
 
+  /** Turn a casual user ask into a clear Build-it prompt for the judge. */
+  function craftImprovePrompt(userText) {
+    var t = String(userText || "").trim().replace(/\s+/g, " ");
+    if (!t) return "";
+    // Already imperative / design-spec-ish — use as-is
+    if (/^(add|put|make|change|move|upgrade|replace|show|hide|fix|redesign|create)\b/i.test(t)
+        && t.length > 20) {
+      return t.slice(0, 1600);
+    }
+    return (
+      "Build this UI improvement from the owner's request: " + t.slice(0, 1400) +
+      " Prefer a clear, scannable visual treatment that matches Array Operator " +
+      "(black/green energy aesthetic). Small pure-UI change that can auto-ship; " +
+      "do not alter billing math or Stripe."
+    ).slice(0, 1600);
+  }
+
   /**
    * Optional soft length hint for tours/acks only. Normal chat speaks FULL reply
    * (user can talk as long as needed — Ford 2026-07-14).
@@ -1964,13 +2053,11 @@
           await runCommand(cmds[i]);
         }
       } else {
-        // Offline fallback: open improve flow with their words as hint
-        openImproveFlow({ markFirst: false });
-        var ta = document.getElementById("eaImproveText");
-        if (ta) ta.value = String(text).slice(0, 800);
+        // Offline fallback: open improve flow with crafted build prompt
+        openImproveFlow({ markFirst: true, hint: craftImprovePrompt(text) });
       }
     } catch (e) {
-      openImproveFlow({ markFirst: false });
+      openImproveFlow({ markFirst: true, hint: craftImprovePrompt(text) });
     }
     if (turnGen !== (state._turnAbortGen || 0)) return;
     addMsg("agent", reply);
@@ -2144,13 +2231,18 @@
         ok = true;
         detail = cmd.args || {};
       } else if (cmd.type === "improve_site" || cmd.type === "site_improve") {
-        // Merge path: freeze → circle → describe → judge pipeline
-        openImproveFlow({ markFirst: cmd.args && cmd.args.mark_first !== false });
-        if (cmd.args && cmd.args.suggestion_id) {
-          watchBuild(cmd.args.suggestion_id);
+        // Freeze → circle → Build it. Prefill agent-written prompt from tool args.
+        var a = cmd.args || {};
+        openImproveFlow({
+          markFirst: a.mark_first !== false && a.markFirst !== false,
+          hint: a.hint || a.prompt || a.build_prompt || a.text || "",
+          prompt: a.build_prompt || a.prompt || a.hint || a.text || "",
+        });
+        if (a.suggestion_id) {
+          watchBuild(a.suggestion_id);
         }
         ok = true;
-        detail = cmd.args || {};
+        detail = a;
       } else if (cmd.type === "watch_build") {
         if (cmd.args && cmd.args.suggestion_id) watchBuild(cmd.args.suggestion_id);
         ok = true;
