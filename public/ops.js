@@ -68,7 +68,7 @@
     if (!el) return;
     if (!hasSession()) {
       el.innerHTML =
-        '<div class="ops-empty"><b>Sign in to run Ops</b>' +
+        '<div class="ops-empty"><b>Sign in to use Operations</b>' +
         "Track your O&M team, open repair tickets when sites go down, and check in by email, SMS, or phone.</div>";
       return;
     }
@@ -98,7 +98,7 @@
       render();
     } catch (e) {
       el.innerHTML =
-        '<div class="ops-empty"><b>Couldn\'t load Ops</b>' + esc(e.message || e) + "</div>";
+        '<div class="ops-empty"><b>Couldn\'t load Operations</b>' + esc(e.message || e) + "</div>";
     } finally {
       STATE.busy = false;
     }
@@ -118,7 +118,7 @@
     var html = "";
     html += '<div class="ops-wrap">';
     html += '<div class="ops-head"><div>';
-    html += "<h2>Ops</h2>";
+    html += "<h2>Operations</h2>";
     html += '<div class="ops-sub">O&amp;M team, field repairs, manufacturer claims</div>';
     html += '</div><div class="ops-kpis">';
     html += kpi(sum.open || 0, "Open tickets", sum.open ? "warn" : "good");
@@ -970,7 +970,7 @@
               auto_open: !!fd.get("auto_open"),
             }),
           });
-          toast("Ops settings saved");
+          toast("Operations settings saved");
           load(true);
         } catch (err) {
           toast(err.message || "Failed");

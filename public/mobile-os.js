@@ -289,13 +289,13 @@
     {
       id: "ops",
       story: "fleet",
-      label: "Ops",
+      label: "Operations",
       sub: "Team & repairs",
       why: "Your O&M contacts, field repair tickets, email/SMS/phone check-ins, and manufacturer warranty claims.",
       prompt:
-        "Walk me through the Ops tab: how to add my installer/O&M tech, open a repair ticket when a site is down, check in by email or SMS, and how warranty claims link to field repairs.",
+        "Walk me through the Operations tab: how to add my installer/O&M tech, open a repair ticket when a site is down, check in by email or SMS, and how warranty claims link to field repairs.",
       hash: "#ops",
-      openLabel: "Open Ops",
+      openLabel: "Open Operations",
     },
     {
       id: "account",

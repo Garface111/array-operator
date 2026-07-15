@@ -39,7 +39,7 @@
  { id: "tabArrays", short: "Arrays", ic: "arrays", primary: true },
  { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
  { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },
- { id: "tabOps", short: "Ops", ic: "ops", primary: true },
+ { id: "tabOps", short: "Ops", ic: "ops", primary: true }, // short "Ops" — full label is Operations
  { id: "tabAccount", short: "Account", ic: "account", primary: false },
  /* Trends is now a sub-view of Analysis (reached via the in-panel toggle). */
  { id: "tabResources", short: "Resources", ic: "resources", primary: false }

@@ -193,7 +193,7 @@
  { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
  { label: "Invoices", hash: "#reports" },
  { label: "Resources", hash: "#resources" },
- { label: "Ops", hash: "#ops", note: "O&M team, repairs, warranty claims" },
+ { label: "Operations", hash: "#ops", note: "O&M team, repairs, warranty claims" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
@@ -2478,7 +2478,7 @@
  reports: "#reports", invoices: "#reports",
  account: "#account", "master account": "#account",
  resources: "#resources",
- ops: "#ops", repairs: "#ops", claims: "#ops", om: "#ops",
+ ops: "#ops", operations: "#ops", repairs: "#ops", claims: "#ops", om: "#ops",
  };
  var rawName = String((cmd.args && (cmd.args.tab || cmd.args.name || cmd.args.label)) || "")
  .toLowerCase().trim();
@@ -2822,8 +2822,8 @@
  "#analysis": "Analysis",
  "#reports": "Invoices",
  "#resources": "Resources",
- "#ops": "Ops",
- "#claims": "Ops",
+ "#ops": "Operations",
+ "#claims": "Operations",
  "#account": "Account",
  };
  function tabLabel(hash) {
