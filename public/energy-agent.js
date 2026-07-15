@@ -85,6 +85,10 @@
  // Abort in-flight chat/LLM turns when user says "stop" (Ford 2026-07-14).
  _turnAbortGen: 0,
  _chatAbort: null,
+ // Serializes voice/text turns so double STT events can't start two replies
+ _turnBusy: false,
+ // True after we sent response.cancel until audio is confirmed stopped
+ _rtCancelPending: false,
  _budgetPollTimer: null,
  };
 
@@ -2070,12 +2074,29 @@
  } catch (e) {}
  }
 
+ /**
+ * Hard-stop the Realtime mouth. ALWAYS send cancel when the data channel is
+ * open — do not gate on rtResponseActive. stopSpeak used to clear that flag
+ * first, so cancel never ran → double speech + stuck barges (Ford 2026-07-15).
+ */
  function cancelRealtimeIfActive() {
- if (!state.rtResponseActive) return;
- if (!(state.dc && state.dc.readyState === "open")) return;
+ if (!(state.dc && state.dc.readyState === "open")) {
+ state.rtResponseActive = false;
+ state._rtCancelPending = false;
+ return false;
+ }
+ var sent = false;
  try {
  state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ sent = true;
  } catch (e) {}
+ // Drop any residual outbound audio so the ear hears silence immediately
+ try {
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ } catch (e2) {}
+ state.rtResponseActive = false;
+ state._rtCancelPending = sent;
+ return sent;
  }
 
  function isBenignVoiceError(msg) {
@@ -2084,8 +2105,30 @@
  s.indexOf("no active response") !== -1 ||
  s.indexOf("cancellation failed") !== -1 ||
  s.indexOf("response_cancel") !== -1 ||
- s.indexOf("already has an active response") !== -1
+ s.indexOf("already has an active response") !== -1 ||
+ s.indexOf("no active response to cancel") !== -1 ||
+ s.indexOf("output_audio_buffer") !== -1 ||
+ s.indexOf("buffer clear") !== -1
  );
+ }
+
+ /**
+ * Abort an in-flight LLM/voice turn without painting "Stopped." Used when the
+ * user barges in with a NEW question mid-think / mid-speech.
+ */
+ function abortInFlightTurn(reason) {
+ state._turnAbortGen = (state._turnAbortGen || 0) + 1;
+ if (state._chatAbort) {
+ try { state._chatAbort.abort(); } catch (e) {}
+ state._chatAbort = null;
+ }
+ cancelThinkingFiller();
+ state.thinking = false;
+ state._thinkingFillerActive = false;
+ state._interimSpoken = false;
+ state._turnBusy = false;
+ if (state.touring) state.touring = false;
+ stopSpeak({ reason: reason || "barge_in" });
  }
 
  // ── chat ─────────────────────────────────────────────────────────────────
@@ -2201,8 +2244,32 @@
  handleStopCommand();
  return;
  }
+ // If a prior turn is still running (or double STT fired), abort it so we
+ // never run two LLM replies / two mouths in parallel.
+ if (state.thinking || state._turnBusy) {
+ abortInFlightTurn("new_turn");
+ } else if (state._chatAbort) {
+ // Stale controller from a finished turn — don't treat as in-flight work
+ try { state._chatAbort.abort(); } catch (e) {}
+ state._chatAbort = null;
+ }
+ // Lock immediately (before any await) so a second transcript can't start
+ // another turn while we ensureSession().
+ state.thinking = true;
+ state._turnBusy = true;
+ var turnGen = state._turnAbortGen || 0;
+
  var sid = await ensureSession();
- if (!sid) return;
+ if (turnGen !== (state._turnAbortGen || 0)) {
+ state.thinking = false;
+ state._turnBusy = false;
+ return;
+ }
+ if (!sid) {
+ state.thinking = false;
+ state._turnBusy = false;
+ return;
+ }
  if (!opts.userAlreadyShown) {
  addMsg("user", text);
  }
@@ -2212,13 +2279,22 @@
  markFirst: true,
  hint: craftImprovePrompt(text),
  });
+ state.thinking = false;
+ state._turnBusy = false;
  setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
  return;
  }
  // Visual / color / button look-and-feel: short ack + quiet improve path.
  // Do NOT dump design-token lectures or multi-tool cascades (Ford 2026-07-14).
  if (isVisualFixIntent(text)) {
+ try {
  await handleVisualFixFast(text, sid, source);
+ } finally {
+ if (turnGen === (state._turnAbortGen || 0)) {
+ state.thinking = false;
+ state._turnBusy = false;
+ }
+ }
  return;
  }
  // Tab names must match the top bar, answer locally so the model can't invent Dashboard/Arrays/Reports
@@ -2226,7 +2302,14 @@
  || /\b(list|name|explain) (all )?(the )?tabs\b/i.test(text)
  || /\btabs (do i|are there|in (the )?(app|nav|bar))\b/i.test(text)) {
  addMsg("agent", tabsCheatSheet());
- try { speak("Those are the six tabs in the top bar, Fleet Triage, Inverters, Analysis, Invoices, Resources, and Account."); } catch (e) {}
+ try {
+ enqueueSpeak(
+ "Those are the six tabs in the top bar, Fleet Triage, Inverters, Analysis, Invoices, Resources, and Account.",
+ { source: "chat", force: true }
+ );
+ } catch (e) {}
+ state.thinking = false;
+ state._turnBusy = false;
  setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
  return;
  }
@@ -2237,6 +2320,11 @@
  setStatus("Walking you through…", "think");
  try {
  var okTour = await runTour({ tour_id: tourId });
+ if (turnGen !== (state._turnAbortGen || 0)) {
+ state.thinking = false;
+ state._turnBusy = false;
+ return;
+ }
  if (!okTour) {
  addMsg(
  "agent",
@@ -2252,6 +2340,8 @@
  await postTourAccountFacts(sid);
  } catch (e2) {}
  }
+ state.thinking = false;
+ state._turnBusy = false;
  setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
  return;
  }
@@ -2264,17 +2354,13 @@
  " was held by the auto-ship judge; user wants developer review. " +
  "Original user message about the UI change was recently submitted.";
  }
- state.thinking = true;
  setStatus("Thinking…", "think");
  // Fresh turn: drop prior tool dump so the answer has room
  clearTools();
- // Barge-in: user started a new turn, stop any leftover speech so we don't
- // double-talk. Do NOT cancel again later mid-turn (that caused self-interrupts).
+ // Barge-in: stop leftover speech so we don't double-talk (cancel now works)
  if (!state.touring) stopSpeak({ reason: "new_turn" });
- var turnGen = (state._turnAbortGen || 0);
- if (state._chatAbort) {
- try { state._chatAbort.abort(); } catch (e) {}
- }
+ // turnGen may have advanced via abortInFlightTurn at start — re-read
+ turnGen = state._turnAbortGen || 0;
  state._chatAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
 
  // GPT-Voice style: short interim line while the mind works, then hard-cut
@@ -2356,15 +2442,25 @@
  } catch (e) {
  cancelThinkingFiller();
  if (e && (e.name === "AbortError" || String(e.message || "").indexOf("abort") !== -1)) {
- // User said stop, handleStopCommand already painted "Stopped."
+ // User said stop / barged in — leave status to the interrupt path
  return;
  }
+ if (turnGen === (state._turnAbortGen || 0)) {
  addMsg("agent", "Network error, try again.");
  setStatus("Error", "warn");
+ }
  } finally {
  if (turnGen === (state._turnAbortGen || 0)) {
  state.thinking = false;
  state._thinkingFillerActive = false;
+ state._turnBusy = false;
+ state._chatAbort = null;
+ // After a finished reply, make sure mic is open for the next ask
+ if (state.listening && state.micStream && !state.speaking && !state._micHeldForSpeak) {
+ try {
+ state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
+ } catch (e) {}
+ }
  }
  }
  }
@@ -2485,17 +2581,18 @@
  /** Cut filler mid-sentence (like GPT Voice) and speak the real answer. */
  function finishThinkingAndSpeak(mouthLine, turnGen) {
  cancelThinkingFiller();
- // Hard-cut interim audio immediately
- if (
+ // Hard-cut interim audio immediately (cancel must run before the next create)
+ var hadMouth =
  state._thinkingFillerActive ||
  state.speaking ||
- state.rtResponseActive
- ) {
+ state.rtResponseActive ||
+ state._rtCancelPending;
  stopSpeak({ reason: "answer_ready" });
- }
  state._thinkingFillerActive = false;
  state._interimSpoken = false;
- // Micro-beat so Realtime cancel lands before the next response.create
+ // Settle so response.cancel lands; too short → "already has active response"
+ // and/or stacked audio (double speak).
+ var settleMs = hadMouth ? 180 : 60;
  return new Promise(function (resolve) {
  setTimeout(function () {
  if (turnGen !== (state._turnAbortGen || 0)) {
@@ -2505,7 +2602,7 @@
  enqueueSpeak(mouthLine, { source: "chat", force: true })
  .then(resolve)
  .catch(function () { resolve(); });
- }, 90);
+ }, settleMs);
  });
  }
 
@@ -3890,33 +3987,36 @@
  * the user can hear. Background mind tasks may still finish quietly.
  */
  function handleStopCommand() {
- state._turnAbortGen = (state._turnAbortGen || 0) + 1;
- if (state._chatAbort) {
- try { state._chatAbort.abort(); } catch (e) {}
- state._chatAbort = null;
- }
+ abortInFlightTurn("stop");
  if (state._interimSteerTimer) {
  try { clearTimeout(state._interimSteerTimer); } catch (e) {}
  state._interimSteerTimer = null;
  }
- state.thinking = false;
- if (state.touring) state.touring = false; // runTour checks this each step
- stopSpeak({ reason: "barge_in" });
  if (state.dc && state.dc.readyState === "open") {
  try {
  state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
  } catch (e) {}
  }
+ // Ensure mic is live after stop so the next ask is heard
+ if (state.listening && state.micStream) {
+ try {
+ state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
+ } catch (e) {}
+ }
+ state._micHeldForSpeak = false;
  addMsg("agent", "Stopped.");
  setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
- // Short ack only, never queue a long monologue after stop
+ // Short ack only — settle after cancel so we don't stack on residual audio
+ setTimeout(function () {
+ if ((state._turnAbortGen || 0) && state.speaking) return;
  enqueueSpeak("Okay, stopped.", { source: "stop", force: true }).catch(function () {});
+ }, 150);
  }
 
  /**
  * Whether a user transcript should start a turn (incl. mid-agent-speech barge-in).
  * Harder bar while the agent is talking so speaker bleed / room noise don't cut it off.
- * STOP always wins, even while thinking or touring.
+ * STOP always wins. Mid-think real questions also barge in (abort prior work).
  */
  function acceptUserTranscript(said) {
  if (!said || !state.listening) return false;
@@ -3924,38 +4024,49 @@
  if (isStopCommand(said)) return true;
  // First intro must finish, speaker bleed was cutting it every time
  if (state._greetingPlaying) return false;
- if (state.thinking) return false;
- // Mid-tour: allow barge-in with real speech (not just stop) so user can redirect
- if (state.touring) {
- var tw = said.trim().split(/\s+/).filter(Boolean);
- if (tw.length < 2 && said.trim().length < 12) return false;
- // Fall through to echo/garbage filters, then accept
- }
  if (looksLikeEchoOfLastSpeech(said)) return false;
  if (isGarbageTranscript(said)) return false;
  var now = Date.now();
+ var saidKey = said.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+ // Stronger dedupe: double STT events were starting two full replies
  if (
  state._lastUserSaid &&
- said.toLowerCase() === state._lastUserSaid &&
- now - (state._lastUserSaidAt || 0) < 1200
+ saidKey === state._lastUserSaid &&
+ now - (state._lastUserSaidAt || 0) < 2800
  ) {
  return false;
  }
+ var words = said.trim().split(/\s+/).filter(Boolean);
+ // Mid-think: allow a real multi-word redirect (not noise). Abort prior turn in handler.
+ if (state.thinking || state._turnBusy) {
+ if (words.length < 3 && said.trim().length < 16) return false;
+ return true;
+ }
+ // Mid-tour: allow barge-in with real speech so user can redirect
+ if (state.touring) {
+ if (words.length < 2 && said.trim().length < 12) return false;
+ return true;
+ }
  // Mid-speech barge-in: protect lead-in; require a real interrupt to cut long answers
  if (isAgentMouthBusy() || state._micHeldForSpeak) {
- // Attack mute: still allow explicit STOP
- if (state._micHeldForSpeak && !isStopCommand(said)) return false;
+ // Attack mute window: only STOP (already returned) or a clear multi-word cut-in
+ // after a short protect — was blocking ALL non-stop forever while _micHeldForSpeak
  var started = state._speakStartedAt || 0;
- // Protect opening; long answers need a real interrupt (stop still always works)
- if (started && now - started < 2500 && !isStopCommand(said)) return false;
- var words = said.trim().split(/\s+/).filter(Boolean);
- var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|stop|wait|cancel|go|please|hey)$/i.test(
+ var heldMs = started ? now - started : 0;
+ // First 1.2s of speech: only stop (prevent speaker bleed cancel)
+ if (state._micHeldForSpeak && heldMs < 1200) return false;
+ // Opening 2s of answer: need a clear phrase
+ if (started && heldMs < 2000 && (words.length < 4 || said.trim().length < 18)) {
+ return false;
+ }
+ var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|go|please|hey)$/i.test(
  said.trim().replace(/[.!?]+$/, "")
  );
  // While speaking, need a clear multi-word interrupt, not speaker bleed
- if (!ack && !isStopCommand(said) && (words.length < 5 || said.trim().length < 22)) {
+ if (!ack && (words.length < 4 || said.trim().length < 18)) {
  return false;
  }
+ return true;
  }
  return true;
  }
@@ -4078,7 +4189,9 @@
  ) {
  return;
  }
- // Barge-in / new turn / answer ready: cancel current audio only
+ // Cancel Realtime FIRST (while we still know audio may be live). Clearing
+ // rtResponseActive before cancel made cancel a no-op → double voice.
+ cancelRealtimeIfActive();
  try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
  state.speaking = false;
  state.rtResponseActive = false;
@@ -4106,11 +4219,9 @@
  state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
  } catch (e) {}
  }
- cancelRealtimeIfActive();
  var cb = state._onSpeakDone;
  state._onSpeakDone = null;
  // Bump seq so any in-flight enqueueSpeak step is abandoned
- // answer_ready: kill thinking filler so final answer owns the mouth
  if (
  opts.reason === "new_turn" ||
  opts.reason === "barge_in" ||
@@ -4119,6 +4230,7 @@
  ) {
  state._speakSeq++;
  }
+ // Resolve any waiter without restarting mic logic (already handled above)
  if (typeof cb === "function") {
  try { cb(); } catch (e) {}
  }
@@ -4318,15 +4430,6 @@
  // ── GPT Realtime mouth ────────────────────────────────────────────
  if (realtimeMouthOpen()) {
  try {
- // Only cancel a *stale* prior response, never cancel the one we're about
- // to start. A cancel race was clipping the first half of answers.
- // Never cancel during the first greeting unless forced supersede.
- if (state.rtResponseActive && !isGreeting) {
- cancelRealtimeIfActive();
- }
- state.rtResponseActive = true;
- state.speaking = true;
- state._speakStartedAt = Date.now();
  // Verbatim full read, do not summarize or stop early
  var speakScript =
  "Read the following aloud VERBATIM in natural English, starting from " +
@@ -4334,8 +4437,11 @@
  "Do not skip, summarize, reorder, or stop early. " +
  "Do not add greetings or questions. Take as long as you need:\n\n" +
  plain;
- // Wait for session.updated on first speak so response isn't dropped mid-stream
  var sendCreate = function () {
+ if (opts.speakSeq != null && opts.speakSeq !== state._speakSeq) {
+ done();
+ return;
+ }
  if (!state.dc || state.dc.readyState !== "open") {
  state.rtResponseActive = false;
  if (isGreeting) state._greetingPlaying = false;
@@ -4343,6 +4449,10 @@
  return;
  }
  try {
+ state.rtResponseActive = true;
+ state.speaking = true;
+ state._speakStartedAt = Date.now();
+ state._rtCancelPending = false;
  state.dc.send(JSON.stringify({
  type: "response.create",
  response: {
@@ -4355,20 +4465,39 @@
  done();
  }
  };
+ // Cancel any stale mouth first, then settle before create. Skipping cancel
+ // when flags were already cleared left residual audio playing under a new
+ // response (double speak). Greeting: never cancel mid-intro.
+ var needCancel = !isGreeting && (
+ state.rtResponseActive || state.speaking || state._rtCancelPending
+ );
+ if (needCancel) {
+ cancelRealtimeIfActive();
+ }
+ var armCreate = function () {
+ if (opts.speakSeq != null && opts.speakSeq !== state._speakSeq) {
+ done();
+ return;
+ }
  if (isGreeting && !state._sessionUpdated) {
  state._pendingGreetingSend = sendCreate;
  setTimeout(function () {
- // Failsafe if session.updated never arrives
  if (state._pendingGreetingSend) {
  var fn = state._pendingGreetingSend;
  state._pendingGreetingSend = null;
  fn();
  }
  }, 1000);
+ } else if (isGreeting) {
+ setTimeout(sendCreate, 180);
  } else {
- // Brief beat after session ready so first response isn't truncated
- if (isGreeting) setTimeout(sendCreate, 180);
- else sendCreate();
+ sendCreate();
+ }
+ };
+ if (needCancel) {
+ setTimeout(armCreate, 140);
+ } else {
+ armCreate();
  }
  setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
  return;
@@ -4436,6 +4565,7 @@
  if (ev.type === "output_audio_buffer.stopped") {
  state.speaking = false;
  state.rtResponseActive = false;
+ state._rtCancelPending = false;
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
  } else {
@@ -4448,10 +4578,20 @@
  if (ev.type === "response.cancelled" || ev.type === "response.failed") {
  state.speaking = false;
  state.rtResponseActive = false;
+ state._rtCancelPending = false;
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
  } else {
  holdMicWhileSpeaking(false);
+ // After cancel, make sure mic is open for the next ask
+ if (state.listening && state.micStream && !state._micHeldForSpeak) {
+ try {
+ state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
+ } catch (e) {}
+ }
+ if (state.listening && !state.touring && !state.thinking) {
+ setStatus("Listening…", "listen");
+ }
  }
  }
  if (ev.type === "response.done") {
@@ -4475,9 +4615,11 @@
  var said = (ev.transcript || "").trim();
  if (!acceptUserTranscript(said)) return;
  var nowTs = Date.now();
- state._lastUserSaid = said.toLowerCase();
+ var saidKey = said.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+ state._lastUserSaid = saidKey;
  state._lastUserSaidAt = nowTs;
  var wasSpeaking = isAgentMouthBusy();
+ var wasThinking = !!(state.thinking || state._turnBusy);
  // Barge-in or idle: stop agent mouth, drop remaining speak queue chunks
  stopSpeak({ reason: "barge_in" });
  if (state.dc && state.dc.readyState === "open") {
@@ -4488,6 +4630,18 @@
  if (wasSpeaking) {
  setStatus("Listening…", "listen");
  }
+ // Hard stop, never start a new LLM monologue after "stop"
+ if (isStopCommand(said)) {
+ addMsg("user", said);
+ handleStopCommand();
+ return;
+ }
+ // Mid-think / mid-speech redirect: abort prior work without "Stopped." ack
+ if (wasThinking || wasSpeaking) {
+ abortInFlightTurn("barge_in");
+ }
+ // Mid-tour redirect: cancel tour so we hear the new ask
+ if (state.touring) state.touring = false;
  addMsg("user", said);
  if (state.sessionId) {
  fetch(API.transcript, {
@@ -4506,15 +4660,8 @@
  })
  .catch(function () {});
  }
- // Hard stop, never start a new LLM monologue after "stop"
- if (isStopCommand(said)) {
- handleStopCommand();
- return;
- }
- // Mid-tour redirect: cancel tour so we hear the new ask
- if (state.touring) state.touring = false;
  // userAlreadyShown: do not paint the same user line again in turn()
- turn(said, "voice", { userAlreadyShown: true });
+ turn(said, "voice", { userAlreadyShown: true }).catch(function () {});
  }
  // Do NOT addMsg for assistant Realtime transcripts, agent bubble comes only from turn()
  if (ev.type === "error") {
@@ -4796,11 +4943,20 @@
  if (ev.results[i].isFinal) finalBuf += t + " ";
  else interim += t;
  }
- if (finalBuf.trim() && !state.thinking) {
+ if (finalBuf.trim()) {
  var said = finalBuf.trim();
  finalBuf = "";
- stopSpeak();
- turn(said, "voice");
+ if (!acceptUserTranscript(said)) return;
+ if (isStopCommand(said)) {
+ addMsg("user", said);
+ handleStopCommand();
+ return;
+ }
+ if (state.thinking || state._turnBusy) {
+ abortInFlightTurn("barge_in");
+ }
+ stopSpeak({ reason: "barge_in" });
+ turn(said, "voice").catch(function () {});
  } else if (interim) {
  setStatus("Hearing: " + interim.slice(0, 40), "listen");
  }
