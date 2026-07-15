@@ -765,6 +765,26 @@ html[data-theme="day"] .sb-array-plate .sb-inv-now{backdrop-filter:none !importa
 html[data-theme="day"] #sbWrap{
   background:linear-gradient(180deg,#ffffff,#f5f8fe) !important;border-color:var(--line) !important;
 }
+/* Ops sheet — same opaque day plate as Inverters (#sbWrap) */
+html[data-theme="day"] #panelOps .ops-wrap{
+  background:linear-gradient(180deg,#ffffff,#f5f8fe) !important;
+  border-color:var(--line) !important;
+  box-shadow:0 18px 44px -30px rgba(15,50,110,.18) !important;
+}
+html[data-theme="day"] #panelOps .ops-card,
+html[data-theme="day"] #panelOps .ops-kpi,
+html[data-theme="day"] #panelOps .ops-empty{
+  background:linear-gradient(180deg,#ffffff,#f8fafc) !important;
+  border-color:var(--line) !important;
+}
+html[data-theme="day"] #panelOps .ops-seg{
+  background:rgba(15,23,42,.06) !important;
+}
+html[data-theme="day"] #panelOps .ops-detail pre,
+html[data-theme="day"] #panelOps .ops-checkin{
+  background:rgba(15,23,42,.04) !important;
+  color:var(--ink) !important;
+}
 html[data-theme="day"] .sb-viewport{
   background-color:#f7faff !important;
   background-image:

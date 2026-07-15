@@ -303,13 +303,27 @@ html.sky ::selection{background:rgba(33,150,243,.22)}
 html.sky #sbWrap,
 html.sky #panelDashboard .dash-wrap,
 html.sky #sheetWrap,
-html.sky .acct-list{
+html.sky .acct-list,
+html.sky #panelOps .ops-wrap{
   background:var(--sky-glass-content) !important;
   -webkit-backdrop-filter:blur(16px) saturate(1.65);
   backdrop-filter:blur(16px) saturate(1.65);
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-sheet) !important;
   box-shadow:var(--sky-shadow-sheet) !important;
+}
+html.sky #panelOps .ops-wrap{
+  background-color: transparent !important;
+  background-image: none !important;
+  padding: 26px 28px 40px !important;
+  margin-top: 14px !important;
+}
+html.sky #panelOps .ops-card,
+html.sky #panelOps .ops-kpi,
+html.sky #panelOps .ops-empty{
+  background: rgba(255,255,255,.72) !important;
+  border-color: var(--sky-glass-edge, rgba(255,255,255,.55)) !important;
+  box-shadow: 0 8px 22px -16px rgba(15,50,110,.35);
 }
 html.sky #panelDashboard .dash-wrap{padding:30px 30px 60px !important;margin-top:14px !important}
 html.sky #sheetWrap{padding:26px 28px 48px;margin-top:14px}
@@ -632,6 +646,7 @@ html.sky .gmp-gate{border-radius:18px;box-shadow:var(--sky-shadow-card)}
   html.sky .tab,
   html.sky #sbWrap,
   html.sky #panelDashboard .dash-wrap,
+  html.sky #panelOps .ops-wrap,
   html.sky .acct-list,
   html.sky .sb-array,
   html.sky .sb-array--card,
