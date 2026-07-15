@@ -117,23 +117,32 @@
 .tr-aname{font-weight:600} .tr-anum{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
 .tr-ayears{color:var(--muted)}
 /* year × array production matrix
-   Wide year grids must scroll inside the wrap — body uses overflow-x:clip/hidden,
-   so unconstrained tables get clipped on the right (Paul 2026-07-15). */
+   Wide year grids scroll inside the wrap (body overflow-x:clip/hidden would
+   otherwise hard-cut Lifetime). Keep cell spacing roomy — scroll, don't cram. */
 .tr-ymatrix{margin-top:22px;min-width:0;max-width:100%}
 .tr-ym-table{
   width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;
-  table-layout:auto;
+  table-layout:auto;font-size:13.5px;
 }
-.tr-ym-table th,.tr-ym-table td{padding:10px 10px;white-space:nowrap}
-.tr-ym-table th.tr-anum,.tr-ym-table td.tr-anum{min-width:3.6rem;padding-left:8px;padding-right:8px}
+.tr-ym-table th,.tr-ym-table td{
+  padding:12px 16px;white-space:nowrap;vertical-align:middle;
+}
+.tr-ym-table th.tr-anum,.tr-ym-table td.tr-anum{
+  min-width:5.5rem;padding-left:14px;padding-right:14px;
+  font-variant-numeric:tabular-nums;
+}
 .tr-ym-table th:first-child,.tr-ym-table td:first-child{
   position:sticky;left:0;z-index:2;
   background:var(--card,var(--bg,#0b1220));
-  box-shadow:4px 0 10px -6px rgba(0,0,0,.35);
-  min-width:9rem;max-width:14rem;
-  overflow:hidden;text-overflow:ellipsis;
+  box-shadow:6px 0 14px -8px rgba(0,0,0,.28);
+  min-width:12rem;padding-right:18px;
+  /* full names — never ellipsize; horizontal scroll owns overflow */
+  overflow:visible;text-overflow:clip;
 }
-.tr-ym-partial{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--good2,#3fd68a);vertical-align:super}
+.tr-ym-table th.tr-ym-life,.tr-ym-table td.tr-ym-life{
+  min-width:6.5rem;padding-left:16px;padding-right:18px;
+}
+.tr-ym-partial{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--good2,#3fd68a);vertical-align:super}
 .tr-ym-tot td{border-top:1px solid var(--line);background:color-mix(in srgb,var(--ink) 3%,transparent)}
 .tr-ym-tot td:first-child{background:color-mix(in srgb,var(--ink) 3%,var(--card,var(--bg,#0b1220)))}
 .tr-ym-life{font-weight:650;color:var(--ink)!important}
@@ -142,10 +151,10 @@
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
   overscroll-behavior-x:contain;
   scrollbar-gutter:stable;
-  scrollbar-width:thin;
+  scrollbar-width:auto;
+  padding-bottom:4px; /* room under scrollbar so numbers don't feel jammed */
 }
-/* Visible thin scrollbar so year overflow isn't mistaken for a hard clip */
-.tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar{height:8px}
+.tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar{height:10px}
 .tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar-thumb{
   background:color-mix(in srgb, var(--ink) 22%, transparent);
   border-radius:999px;
