@@ -149,18 +149,10 @@
     var el = root();
     if (!el) return;
     if (!hasSession()) {
-      // Resources briefing is public; other Operations sub-tabs need auth
-      if (STATE.sub === "resources" || location.hash === "#resources") {
-        STATE.sub = "resources";
-        render();
-        return;
-      }
       el.innerHTML =
         '<div class="ops-empty"><b>Sign in to use Operations</b>' +
         "Track your O&M team, open repair tickets when sites go down, and check in by email, SMS, or phone. " +
-        'Rates &amp; news: open the <button type="button" class="ops-link" id="opsGoResources">Resources</button> sub-tab anytime.</div>';
-      var go = document.getElementById("opsGoResources");
-      if (go) go.onclick = function () { setSub("resources"); };
+        'Rates &amp; news: open the <a class="ops-link" href="#resources">Resources</a> sub-view anytime.</div>';
       return;
     }
 
@@ -208,12 +200,13 @@
     }
   }
 
-  var SUBS = ["repairs", "team", "claims", "resources", "settings"];
+  // Secondary segs under the Operations main sub-view (Resources is a sibling
+  // main sub-view on #panelResources — not nested here).
+  var SUBS = ["repairs", "team", "claims", "settings"];
   var SUB_LABELS = {
     repairs: "Repairs",
     team: "Team",
     claims: "Claims",
-    resources: "Resources",
     settings: "Settings",
   };
 
@@ -222,16 +215,10 @@
     STATE.sub = name;
     // Keep URL honest for deep-links / back button
     try {
-      var want =
-        name === "resources" ? "#resources"
-          : name === "claims" ? "#claims"
-            : name === "repairs" ? "#ops"
-              : "#ops";
-      if (name === "resources" || name === "claims") {
-        if (location.hash !== want) {
-          history.replaceState({}, "", want);
-        }
-      } else if (location.hash === "#resources" || location.hash === "#claims" || location.hash === "#repairs") {
+      var want = name === "claims" ? "#claims" : name === "repairs" ? "#ops" : "#ops";
+      if (name === "claims") {
+        if (location.hash !== want) history.replaceState({}, "", want);
+      } else if (location.hash === "#claims" || location.hash === "#repairs") {
         if (location.hash !== "#ops") history.replaceState({}, "", "#ops");
       }
     } catch (e) {}
@@ -244,10 +231,7 @@
       '<div class="ops-wrap">' +
       '<div id="opsChrome"></div>' +
       '<div id="opsBody"></div>' +
-      // Stable host for Resources — never wiped when other sub-tabs re-render
-      '<div id="opsResourcesPane" class="ops-resources-pane" hidden>' +
-      '<div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>' +
-      "</div></div>";
+      "</div>";
   }
 
   function renderChrome(d) {
@@ -259,7 +243,7 @@
     html += '<div class="ops-head"><div>';
     html += "<h2>Operations</h2>";
     html +=
-      '<div class="ops-sub">O&amp;M team, field repairs, manufacturer claims, rates &amp; news</div>';
+      '<div class="ops-sub">O&amp;M team, field repairs, manufacturer claims</div>';
     html += '</div><div class="ops-kpis" id="opsKpis">';
     if (d) {
       html += kpi(sum.open || 0, "Open tickets", sum.open ? "warn" : "good");
@@ -268,7 +252,7 @@
       html += kpi(csum.open || 0, "Open claims", csum.open ? "warn" : "");
     }
     html += "</div></div>";
-    html += '<div class="ops-seg" role="tablist">';
+    html += '<div class="ops-seg" role="tablist" aria-label="Operations sections">';
     SUBS.forEach(function (s) {
       html +=
         '<button type="button" class="ops-seg-btn' +
@@ -296,21 +280,7 @@
     renderChrome(d);
 
     var body = document.getElementById("opsBody");
-    var resPane = document.getElementById("opsResourcesPane");
-    if (!body || !resPane) return;
-
-    if (STATE.sub === "resources") {
-      body.hidden = true;
-      body.innerHTML = "";
-      resPane.hidden = false;
-      try {
-        if (window.__aoLoadResources) window.__aoLoadResources();
-      } catch (e) {}
-      return;
-    }
-
-    resPane.hidden = true;
-    body.hidden = false;
+    if (!body) return;
 
     if (!d) {
       body.innerHTML =
@@ -1367,27 +1337,27 @@
   }
 
   window.__aoLoadOps = function () {
-    // Resources deep-link can show without waiting on ops API
-    if (STATE.sub === "resources" || location.hash === "#resources") {
-      STATE.sub = "resources";
-      render();
-    }
+    // Hash → secondary sub (claims deep-link); resources is a sibling panel
+    if (location.hash === "#claims") STATE.sub = "claims";
+    else if (location.hash === "#repairs") STATE.sub = "repairs";
     load(false);
   };
 
   // Deep-link helpers for Energy Agent / other surfaces
   window.__aoOpsGoto = function (sub) {
+    // Resources is its own main sub-view (sibling panel), not a secondary seg
+    if (sub === "resources") {
+      if (location.hash !== "#resources") location.hash = "#resources";
+      else if (window.__aoLoadResources) window.__aoLoadResources();
+      return;
+    }
     if (sub && SUBS.indexOf(sub) >= 0) STATE.sub = sub;
-    var hash =
-      STATE.sub === "resources" ? "#resources"
-        : STATE.sub === "claims" ? "#claims"
-          : "#ops";
+    var hash = STATE.sub === "claims" ? "#claims" : "#ops";
     if (location.hash !== hash) {
       location.hash = hash;
     } else {
-      // Already on ops — render + ensure data
       render();
-      if (STATE.sub !== "resources") load(false);
+      load(false);
     }
   };
 })();

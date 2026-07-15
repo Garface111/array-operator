@@ -279,7 +279,7 @@
       id: "resources",
       story: "learn",
       label: "Resources",
-      sub: "Rates & rules · under Operations",
+      sub: "Rates & rules",
       why: "Net-metering rates and local context before you set credit rates (Operations → Resources).",
       prompt:
         "What does Operations → Resources help with for VT/New England operators, and when should I open it?",

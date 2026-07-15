@@ -7496,7 +7496,8 @@
  toggled manually inside the analysis branch of applyView, not via this map. */
  reports: { panel: "panelReports", tab: "tabReports" },
  ops: { panel: "panelOps", tab: "tabOps" },
- /* Resources is a SUB-VIEW of Operations (#resources → ops + resources sub). */
+ /* Resources is a MAIN sub-view under the Operations top tab (#resources →
+ panelResources; Operations top-nav stays active). Same pattern as Trends. */
  };
  function tabFromHash(){
  const h = location.hash;
@@ -7552,6 +7553,40 @@
  else location.hash = target;
  });
 
+ /* Operations ⇄ Resources main sub-views (Ford 2026-07-15). Both under the
+ Operations top tab. Resources restores the original #panelResources briefing
+ (not nested inside the Ops glass sheet). Primary switcher: .ops-main-seg. */
+ function opsMainFromHash(){ return location.hash === "#resources" ? "resources" : "ops"; }
+ function applyOpsMainSub(){
+ const res = opsMainFromHash() === "resources";
+ const pO = document.getElementById("panelOps");
+ const pR = document.getElementById("panelResources");
+ if(pO) pO.classList.toggle("active", !res);
+ if(pR) pR.classList.toggle("active", res);
+ document.querySelectorAll(".ops-main-seg [data-opsmain]").forEach(b => {
+ const on = (b.getAttribute("data-opsmain") === "resources") === res;
+ b.classList.toggle("on", on);
+ b.setAttribute("aria-pressed", on ? "true" : "false");
+ });
+ if(res){
+ if(window.__aoLoadResources) window.__aoLoadResources();
+ } else {
+ // Deep-links into secondary segs
+ try {
+ if(location.hash === "#claims" && window.__aoOpsGoto) window.__aoOpsGoto("claims");
+ else if(location.hash === "#repairs" && window.__aoOpsGoto) window.__aoOpsGoto("repairs");
+ else if(window.__aoLoadOps) window.__aoLoadOps();
+ } catch(_){ if(window.__aoLoadOps) window.__aoLoadOps(); }
+ }
+ }
+ document.addEventListener("click", function(e){
+ const b = e.target && e.target.closest ? e.target.closest(".ops-main-seg [data-opsmain]") : null;
+ if(!b) return;
+ const target = b.getAttribute("data-opsmain") === "resources" ? "#resources" : "#ops";
+ if(location.hash === target) applyOpsMainSub();
+ else location.hash = target;
+ });
+
  let _firstApply = true;
  function applyView(){
  const active = tabFromHash();
@@ -7562,10 +7597,14 @@
  if(panel) panel.classList.toggle("active", name === active);
  if(tab) tab.classList.toggle("active", name === active);
  });
- // Trends panel isn't in TABS (it's an Analysis sub-view); hide it on other tabs.
+ // Sibling sub-view panels (not in TABS): hide when their parent top-tab is off
  if(active !== "analysis"){
  const _pT = document.getElementById("panelTrends");
  if(_pT) _pT.classList.remove("active");
+ }
+ if(active !== "ops"){
+ const _pR = document.getElementById("panelResources");
+ if(_pR) _pR.classList.remove("active");
  }
 
  if(active === "dashboard"){
@@ -7587,13 +7626,8 @@
  } else if(active === "reports"){
  loadReports();
  } else if(active === "ops"){
- // Deep-links: #claims / #repairs / #resources → Operations sub-views
- try {
- if(location.hash === "#claims" && window.__aoOpsGoto) window.__aoOpsGoto("claims");
- else if(location.hash === "#repairs" && window.__aoOpsGoto) window.__aoOpsGoto("repairs");
- else if(location.hash === "#resources" && window.__aoOpsGoto) window.__aoOpsGoto("resources");
- else if(window.__aoLoadOps) window.__aoLoadOps();
- } catch(_){ if(window.__aoLoadOps) window.__aoLoadOps(); }
+ // Operations ⇄ Resources main sub-views (+ claims/repairs deep-links)
+ applyOpsMainSub();
  // Clear ops attention dot once opened
  try {
  var od = document.getElementById("opsDot");

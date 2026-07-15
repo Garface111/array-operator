@@ -145,8 +145,4 @@
 }
 
 /* Resources sub-tab (was top-level #panelResources) */
-.ops-resources-pane{ margin-top: 4px; }
-.ops-resources-pane #rsHost{ min-height: 200px; }
-/* resources.css scopes to #panelResources historically — also honor #rsHost under Ops */
-#panelOps #rsHost .ao-res-loading,
-#panelOps #rsHost .ao-res-error{ color: var(--muted); padding: 24px 8px; }
+
