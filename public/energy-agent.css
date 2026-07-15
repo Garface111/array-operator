@@ -995,15 +995,8 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 /* Legacy class hooks (no-op if unused) */
 .ea-mic{ /* mic styling lives on .ea-chip.ea-mic */ }
 
-.ea-legal{
-  padding: 8px 4px 0;
-  font-size: 10px;
-  color: var(--faint,#94a3b8);
-  line-height: 1.3;
-  text-align: center;
-  letter-spacing: .01em;
-  flex: 0 0 auto;
-}
+/* Footer metrics strip removed (Ford 2026-07-15). */
+.ea-legal{ display: none !important; }
 
 /* ── Improve-site compose (merged Wish this was better) ─────────────────── */
 .ea-improve{

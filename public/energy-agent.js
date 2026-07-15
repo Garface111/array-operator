@@ -407,7 +407,8 @@
  ' </div>' +
  ' </div>' +
  ' </div>' +
- ' <div class="ea-legal" id="eaLegal">Only your account · one mind · site changes are judge-gated · no billing edits</div>' +
+ // ea-legal footer removed (Ford 2026-07-15): "Only your account · one mind ·
+ // $0.45/win · tasks ok · updates useful" read as noise under the composer.
  ' </div>';
  document.body.appendChild(panel);
 
@@ -1827,29 +1828,9 @@
 
  /** Soft metrics line (Phase D), cost per win when available. */
  async function refreshMindMetrics() {
- if (!signedIn()) return;
- try {
- var r = await fetch(API.mindMetrics + "?days=30", { headers: authHeaders() });
- if (!r.ok) return;
- var m = await r.json().catch(function () { return null; });
- if (!m || !m.ok) return;
- var el = document.getElementById("eaLegal");
- if (!el) {
- el = document.querySelector(".ea-legal");
- }
- if (!el) return;
- var cpw = m.cost && m.cost.cost_per_successful_improvement_usd;
- var cpp = m.cost && m.cost.cost_per_proposal_usd;
- var sr = m.tasks && m.tasks.success_rate;
- var ar = m.interrupts && m.interrupts.accept_rate;
- var bits = ["Only your account · one mind"];
- if (cpw != null) bits.push("$" + Number(cpw).toFixed(2) + "/win");
- else if (cpp != null) bits.push("$" + Number(cpp).toFixed(2) + "/proposal");
- if (sr != null) bits.push(Math.round(sr * 100) + "% tasks ok");
- if (ar != null) bits.push(Math.round(ar * 100) + "% updates useful");
- el.textContent = bits.join(" · ");
- el.title = "Mind metrics (30d): worker cost and interrupt quality";
- } catch (e) {}
+ // Footer metrics strip removed (Ford 2026-07-15). Keep the hook as a no-op
+ // so callers of refreshMindMetrics() still resolve cleanly.
+ return;
  }
 
  /** After chat returns a mind plan, surface subtle awareness + accelerate poll. */
