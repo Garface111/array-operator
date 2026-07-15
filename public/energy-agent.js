@@ -44,6 +44,7 @@
  _lastMindSpeak: "",
  _lastMindSpeakAt: 0,
  _mindInjecting: false,
+ _mindIdleTimer: null,
  // GPT Realtime WebRTC
  pc: null,
  dc: null,
@@ -1285,8 +1286,35 @@
  }
  }
 
+ /** Clear sticky mind/status chips when no real turn or open mind task. */
+ function clearMindIdleUi() {
+ if (state.thinking || state.speaking) return;
+ if (state.mindOpenTasks > 0) return;
+ setMindActivity(false);
+ var st = document.getElementById("eaStatusText");
+ var cur = st ? String(st.textContent || "") : "";
+ // Only reset if status still looks like a background nag / looking-into-it line
+ if (
+ /need attention|money leak|fleet looks clear|looking into it|still working|caught early/i.test(cur)
+ ) {
+ setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
+ }
+ }
+
+ function scheduleMindIdleClear(ms) {
+ if (state._mindIdleTimer) {
+ try { clearTimeout(state._mindIdleTimer); } catch (e) {}
+ }
+ state._mindIdleTimer = setTimeout(function () {
+ state._mindIdleTimer = null;
+ clearMindIdleUi();
+ }, Math.max(800, ms || 4000));
+ }
+
  function startMindAwareness() {
  if (state.mindPollTimer) return;
+ // Drop any leftover sticky fleet-nag chip from a prior session paint
+ clearMindIdleUi();
  // Soft poll, cheap event cursor; heavy work only on backend when tasks exist
  // Lighter poll cadence, less background chatter while talking (was 8s)
  state.mindPollTimer = setInterval(function () {
@@ -1339,9 +1367,10 @@
  }
 
  /**
- * Seamless mind awareness, status chip only, NEVER the chat transcript.
- * Chat is reserved for real turns (user + agent replies). Fleet nags /
- * background insights used to dump into the thread (Ford 2026-07-14 screenshot).
+ * Seamless mind awareness, NEVER the chat transcript.
+ * Fleet nags are silent (Fleet Triage + asked turns cover them). Other
+ * insights may flash the mind chip briefly, then clear — never stick
+ * forever (Ford 2026-07-14: stuck "2 need attention · Tanny Brook…" chip).
  */
  function injectMindSpeak(text, opts) {
  opts = opts || {};
@@ -1375,16 +1404,16 @@
  if (isFleetNag) {
  state._lastFleetNagFp = fp;
  state._lastFleetNagAt = now;
+ // Silent: no sticky status / mind chip. Clears any already-stuck nag UI.
+ clearMindIdleUi();
+ return true;
  }
  state._mindInjecting = true;
  try {
- // Status / mind chip only, short headline, no chat bubble, no voice barge-in
+ // Mind chip only (not also status text — dual write looked stuck)
  var short = t.length > 72 ? t.slice(0, 69).replace(/\s+\S*$/, "") + "…" : t;
  setMindActivity(true, short);
- // Also soft-status so "Looking into it" carries the point without polluting chat
- if (!state.thinking && !state.speaking) {
- setStatus(short, "on");
- }
+ scheduleMindIdleClear(4500);
  // Never addMsg, never enqueueSpeak for background mind, chat stays clean
  return true;
  } finally {
@@ -1486,6 +1515,7 @@
  // so we don't stack network while the user is talking (Ford speed pass).
  if (openHint) {
  setMindActivity(true, "Looking into it…");
+ scheduleMindIdleClear(6000);
  }
  var now = Date.now();
  if (!state._lastMindSnapAt || now - state._lastMindSnapAt > 45000) {
@@ -1498,11 +1528,13 @@
  state.mindOpenTasks = n;
  if (n > 0) {
  setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
- } else if (!openHint) {
+ } else {
  setMindActivity(false);
+ clearMindIdleUi();
  }
  // Soft-surface latest proactive insight only for spikes / first notice
  // (importance >= 65 server-side). Client fleet-nag cool-down is 4h.
+ // Fleet nags are silent in injectMindSpeak (no sticky chip).
  var ins = mind && mind.insights && mind.insights[0];
  if (ins && ins.headline && ins.id && state._lastInsightId !== ins.id) {
  state._lastInsightId = ins.id;
