@@ -235,17 +235,18 @@
 .rp-log-v{ color: var(--ink); font-weight: 550; }
 .rp-log-t{ color: var(--faint); font-size: 11.5px; white-space: nowrap; }
 
-/* ── Sky theme: match Inverters (#sheetWrap / .vs-scroll) solid frosted cards ──
-   Translucent .78 white made agent-log text unreadable over the mountain
-   photo (Ford 2026-07-15). Sheet + cards are near-opaque like Analysis .an-card. */
+/* ── Sky theme: translucent content-glass sheet (matches #sheetWrap / tab bar) ──
+   Outer .rp-shell is the one blurred surface so the alpine photo bleeds through.
+   Nested case/log cards stay solid-glass (no per-card blur — GPU + legibility). */
 html.sky #panelOps .rp-shell{
-  background: rgba(255,255,255,.92) !important;
-  border: 1px solid rgba(255,255,255,.9) !important;
+  background: var(--sky-glass-content, rgba(255,255,255,.56)) !important;
+  border: 1px solid var(--sky-glass-edge, rgba(255,255,255,.5)) !important;
+  border-radius: var(--sky-r-sheet, 32px) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.95),
-    0 12px 36px -18px rgba(15,50,110,.35) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
+    inset 0 1px 0 rgba(255,255,255,.72),
+    var(--sky-shadow-sheet, 0 18px 50px -12px rgba(20,60,120,.16)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.65);
+  backdrop-filter: blur(20px) saturate(1.65);
 }
 html.sky #panelOps .rp-head h2,
 html.sky #panelOps .rp-case-site,
@@ -257,33 +258,36 @@ html.sky #panelOps .rp-status,
 html.sky #panelOps .rp-case-inv,
 html.sky #panelOps .rp-case-meta,
 html.sky #panelOps .rp-muted{
-  color: #475569 !important;
+  color: #334155 !important;
 }
 html.sky #panelOps .rp-working-label,
 html.sky #panelOps .rp-log-wrap h4,
 html.sky #panelOps .rp-log-t{
-  color: #64748b !important;
+  color: #475569 !important;
 }
+/* Nested cards: solid glass tier (no backdrop-filter) — readable over the photo */
 html.sky #panelOps .rp-empty,
 html.sky #panelOps .rp-case,
 html.sky #panelOps .rp-log-wrap{
-  background: rgba(255,255,255,.96) !important;
-  border-color: rgba(14,20,32,.1) !important;
+  background: var(--sky-glass-solid, rgba(255,255,255,.74)) !important;
+  border-color: rgba(20,60,120,.12) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.9),
-    0 8px 22px -16px rgba(15,50,110,.22) !important;
+    inset 0 1px 0 rgba(255,255,255,.85),
+    var(--sky-shadow-card, 0 8px 30px rgba(20,60,120,.08)) !important;
 }
 html.sky #panelOps .rp-log li{
-  border-bottom-color: rgba(14,20,32,.07) !important;
+  border-bottom-color: rgba(14,20,32,.08) !important;
 }
 html.sky #panelOps .rp-talk:not(.primary){
-  background: rgba(255,255,255,.95) !important;
-  border-color: rgba(14,20,32,.12) !important;
+  background: rgba(255,255,255,.72) !important;
+  border-color: rgba(20,60,120,.14) !important;
   color: #0f172a !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 html.sky #panelOps .rp-btn:not(.primary){
-  background: #fff !important;
-  border-color: rgba(14,20,32,.12) !important;
+  background: rgba(255,255,255,.78) !important;
+  border-color: rgba(20,60,120,.14) !important;
   color: #0f172a !important;
 }
 html.sky #panelOps .rp-talk.primary,
@@ -293,12 +297,12 @@ html.sky #panelOps .rp-btn.primary{
   box-shadow: 0 4px 14px -4px rgba(33,150,243,.45) !important;
 }
 html.sky #panelOps .rp-case-next{
-  background: rgba(33,150,243,.1) !important;
+  background: rgba(33,150,243,.12) !important;
   border-color: rgba(33,150,243,.22) !important;
   color: #0f172a !important;
 }
 html.sky #panelOps .rp-case-stage{
-  background: rgba(33,150,243,.12) !important;
+  background: rgba(33,150,243,.14) !important;
   color: #1565c0 !important;
   border-color: rgba(33,150,243,.28) !important;
 }

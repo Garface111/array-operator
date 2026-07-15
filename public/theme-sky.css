@@ -310,7 +310,8 @@ html.sky #sbWrap,
 html.sky #panelDashboard .dash-wrap,
 html.sky #sheetWrap,
 html.sky .acct-list,
-html.sky #panelOps .ops-wrap{
+html.sky #panelOps .ops-wrap,
+html.sky #panelOps .rp-shell{
   background:var(--sky-glass-content) !important;
   -webkit-backdrop-filter:blur(16px) saturate(1.65);
   backdrop-filter:blur(16px) saturate(1.65);
@@ -318,9 +319,8 @@ html.sky #panelOps .ops-wrap{
   border-radius:var(--sky-r-sheet) !important;
   box-shadow:var(--sky-shadow-sheet) !important;
 }
-/* Legacy .ops-wrap path (if still used) + solid cards like Inverters sheet */
+/* Legacy .ops-wrap path (if still used) — same content glass as other sheets */
 html.sky #panelOps .ops-wrap{
-  background: rgba(255,255,255,.92) !important;
   background-image: none !important;
   padding: 26px 28px 40px !important;
   margin-top: 14px !important;
@@ -328,9 +328,9 @@ html.sky #panelOps .ops-wrap{
 html.sky #panelOps .ops-card,
 html.sky #panelOps .ops-kpi,
 html.sky #panelOps .ops-empty{
-  background: rgba(255,255,255,.96) !important;
-  border-color: rgba(14,20,32,.1) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 8px 22px -16px rgba(15,50,110,.22);
+  background: var(--sky-glass-solid, rgba(255,255,255,.74)) !important;
+  border-color: rgba(20,60,120,.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85), var(--sky-shadow-card);
 }
 /* Ops sub-tabs: white glass track + solid sky-primary active pill (mirrors
    Invoices .rb2-subtabs). Prior muted/green-tint pills vanished into the
