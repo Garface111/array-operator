@@ -359,12 +359,11 @@ document.documentElement.setAttribute("data-theme","day");
  table, no sub-headers, just the at-a-glance health + the canvas. -->
  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverters">
 
- <!-- Sub-view toggle: SANDBOX (the spatial canvas) vs SPREADSHEET (every array
- as a row, grouped by vendor; expand a row to see its inverters). Both read
- the same FleetStore data; vendor-sheet.js flips between them. -->
+ <!-- Sub-view toggle: SPREADSHEET | SANDBOX (left→right). Same FleetStore data;
+ vendor-sheet.js flips between them. -->
  <div class="vs-seg" role="group" aria-label="Inverters view">
- <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
  <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Spreadsheet</button>
+ <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
  </div>
 
  <!-- SANDBOX, the live fleet tree, almost full-screen. The fleet commander
