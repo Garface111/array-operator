@@ -14,16 +14,20 @@ import type {
   BillingSummary,
   CloudStatus,
   EnergyAgentChatResponse,
+  EnergyAgentConfirmResponse,
   EnergyAgentSession,
+  FleetForecast,
   FleetTree,
   FleetTrends,
   LinkedSources,
+  ListBundle,
   OnboardingStatus,
   Overview,
   PasswordLoginResult,
   PaymentsConnectStatus,
   SendPipeline,
   SolarEdgeConnectResult,
+  Subscription,
   SubscriptionsList,
 } from "./types";
 
@@ -317,6 +321,161 @@ export async function fetchSubscriptions(): Promise<SubscriptionsList> {
   return apiFetch<SubscriptionsList>("/v1/array-operator/billing/subscriptions");
 }
 
+export async function fetchListBundle(): Promise<ListBundle> {
+  if (isDemoMode()) {
+    return {
+      ok: true,
+      subscriptions: demoSubs.subscriptions || [],
+      arrays: [
+        { id: 1, name: "Londonderry" },
+        { id: 2, name: "Cover Rooftop" },
+        { id: 3, name: "West Glover Barn" },
+      ],
+      utility_accounts: [
+        {
+          account_id: 11,
+          provider: "gmp",
+          nickname: "GMP master",
+          account_number: "12345",
+          bill_count: 12,
+        },
+      ],
+    };
+  }
+  return apiFetch<ListBundle>("/v1/array-operator/billing/list-bundle");
+}
+
+/** Manual offtaker create (multipart form, no workbook). */
+export async function createSubscription(fields: {
+  customer_name: string;
+  client_email?: string;
+  array_id?: number | null;
+  utility_account_id?: number | null;
+  allocation_pct?: number | null;
+  delivery_mode?: string;
+  send_mode?: string;
+  cadence?: string;
+  enabled?: boolean;
+}): Promise<{ ok?: boolean; subscription?: Subscription }> {
+  if (isDemoMode()) throw new ApiError(400, "Sign in to create offtakers");
+  const fd = new FormData();
+  fd.set("customer_name", fields.customer_name);
+  if (fields.client_email) fd.set("client_email", fields.client_email);
+  if (fields.array_id != null) fd.set("array_id", String(fields.array_id));
+  if (fields.utility_account_id != null)
+    fd.set("utility_account_id", String(fields.utility_account_id));
+  if (fields.allocation_pct != null)
+    fd.set("allocation_pct", String(fields.allocation_pct));
+  fd.set("delivery_mode", fields.delivery_mode || "approval");
+  fd.set("send_mode", fields.send_mode || "to_me");
+  fd.set("cadence", fields.cadence || "monthly");
+  fd.set("enabled", fields.enabled === false ? "false" : "true");
+
+  const headers = new Headers();
+  const token = getSession();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  // Do NOT set Content-Type — browser sets multipart boundary.
+  const res = await fetch("/v1/array-operator/billing/subscriptions", {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  if (res.status === 401) {
+    notifyUnauthorizedOnce();
+    throw new UnauthorizedError();
+  }
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  return (await res.json()) as { ok?: boolean; subscription?: Subscription };
+}
+
+export async function patchSubscription(
+  subId: number | string,
+  body: Record<string, unknown>
+): Promise<{ ok?: boolean; subscription?: Subscription }> {
+  if (isDemoMode()) throw new ApiError(400, "Sign in to edit offtakers");
+  return apiFetch(`/v1/array-operator/billing/subscriptions/${subId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Open invoice/summary PDF in a new tab (blob URL). */
+export async function openSubscriptionPreview(
+  subId: number | string,
+  kind: "invoice" | "summary" = "invoice",
+  fmt: "pdf" | "xlsx" = "pdf"
+): Promise<void> {
+  if (isDemoMode()) {
+    throw new ApiError(400, "PDF preview needs a live offtaker — sign in");
+  }
+  const token = getSession();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(
+    `/v1/array-operator/billing/subscriptions/${subId}/preview?kind=${kind}&fmt=${fmt}`,
+    { headers }
+  );
+  if (res.status === 401) {
+    notifyUnauthorizedOnce();
+    throw new UnauthorizedError();
+  }
+  if (!res.ok) throw new ApiError(res.status, await parseError(res));
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  // Revoke later so the tab still has time to load.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export async function fetchFleetForecast(
+  windowDays = 14
+): Promise<FleetForecast> {
+  if (isDemoMode()) {
+    return {
+      available: true,
+      window_days: windowDays,
+      expected_kwh: 18500,
+      actual_kwh: 17240,
+      expected_matched_kwh: 18500,
+      ratio: 0.932,
+      kwh_per_kw_day: 3.4,
+      arrays: [
+        {
+          array_id: 1,
+          array_name: "Londonderry",
+          available: true,
+          actual_kwh: 9800,
+          expected_kwh: 10200,
+          ratio: 0.96,
+          kwh_per_kw_day: 3.6,
+        },
+        {
+          array_id: 2,
+          array_name: "Cover Rooftop",
+          available: true,
+          actual_kwh: 4200,
+          expected_kwh: 5100,
+          ratio: 0.82,
+          kwh_per_kw_day: 2.9,
+        },
+        {
+          array_id: 3,
+          array_name: "West Glover Barn",
+          available: true,
+          actual_kwh: 3240,
+          expected_kwh: 3200,
+          ratio: 1.01,
+          kwh_per_kw_day: 3.5,
+        },
+      ],
+      skipped: [],
+    };
+  }
+  return apiFetch<FleetForecast>(
+    `/v1/array-owners/forecast-fleet?window_days=${windowDays}`
+  );
+}
+
 export async function fetchPaymentsConnect(): Promise<PaymentsConnectStatus> {
   if (isDemoMode()) {
     return { ok: true, enabled: true, connected: false, ready: false };
@@ -365,6 +524,7 @@ export async function agentChat(
     const m = message.toLowerCase();
     let reply =
       "In demo mode I summarize sample data: 3 arrays, Cover Rooftop underperforming, 13/14 offtaker invoices sent last cycle. Sign in for live actions.";
+    let pending: EnergyAgentChatResponse["pending"] = null;
     if (m.includes("attention") || m.includes("health"))
       reply =
         "Cover Rooftop is underperforming (peer ~0.78). Londonderry and West Glover look healthy. Next: check Cover’s inverter feed and shading/fault history.";
@@ -374,7 +534,22 @@ export async function agentChat(
     if (m.includes("hands-off") || m.includes("setup") || m.includes("connect"))
       reply =
         "Demo feeds look connected (Chint + GMP cloud logins). In a live account I’d check vault health, bill sources, send mode, and online pay.";
-    return { reply, session_id: sessionId };
+    // Demo confirm card so UI can be exercised without a live session.
+    if (m.includes("change") || m.includes("set ") || m.includes("update")) {
+      reply =
+        "Ready to update Town Library allocation to 15%. Confirm to apply (demo — no write).";
+      pending = {
+        id: "demo_pending",
+        type: "api_patch",
+        needs_confirm: true,
+        args: {
+          path: "/v1/array-operator/billing/subscriptions/1",
+          body: { allocation_pct: 0.15 },
+          reason: "Set Town Library to 15%",
+        },
+      };
+    }
+    return { reply, session_id: sessionId, pending };
   }
   return apiFetch<EnergyAgentChatResponse>("/v1/energy-agent/chat", {
     method: "POST",
@@ -382,6 +557,34 @@ export async function agentChat(
       session_id: sessionId,
       message,
       context: context || { client: "owner-web", surface: "mobile_home" },
+    }),
+  });
+}
+
+export async function agentConfirm(
+  sessionId: string,
+  confirm: boolean,
+  pendingId?: string | null
+): Promise<EnergyAgentConfirmResponse> {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      ok: true,
+      cancelled: !confirm,
+      command: confirm
+        ? {
+            type: "api_patch",
+            args: { body: { allocation_pct: 0.15 } },
+          }
+        : null,
+    };
+  }
+  return apiFetch<EnergyAgentConfirmResponse>("/v1/energy-agent/confirm", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      confirm,
+      pending_id: pendingId || undefined,
     }),
   });
 }

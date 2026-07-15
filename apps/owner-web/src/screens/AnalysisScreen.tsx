@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
-import { fetchFleetTrends, fetchOverview } from "@/lib/api";
+import {
+  fetchFleetForecast,
+  fetchFleetTrends,
+  fetchOverview,
+} from "@/lib/api";
 import { isDemoMode } from "@/lib/demoData";
 import { fmtKwh, fmtMoney } from "@/lib/format";
-import type { FleetTrends, Overview } from "@/lib/types";
+import type { FleetForecast, FleetTrends, Overview } from "@/lib/types";
 
 export function AnalysisScreen() {
   const { openAgent } = useOutletAgent();
   const [trends, setTrends] = useState<FleetTrends | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [forecast, setForecast] = useState<FleetForecast | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,10 +24,12 @@ export function AnalysisScreen() {
         throw e;
       }),
       fetchOverview().catch(() => null),
+      fetchFleetForecast(14).catch(() => null),
     ])
-      .then(([t, o]) => {
+      .then(([t, o, f]) => {
         setTrends(t);
         setOverview(o);
+        setForecast(f);
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Load failed"))
       .finally(() => setLoading(false));
@@ -30,6 +37,26 @@ export function AnalysisScreen() {
 
   const peer = overview?.peer_summary;
   const yoy = (trends?.seasonal_yoy || []).slice(0, 6);
+  const ratio =
+    forecast?.ratio != null ? Number(forecast.ratio) : null;
+  const ratioPct =
+    ratio != null && Number.isFinite(ratio)
+      ? `${(ratio * 100).toFixed(0)}%`
+      : null;
+  const ratioTone =
+    ratio == null
+      ? "muted"
+      : ratio >= 0.95
+        ? "good"
+        : ratio >= 0.85
+          ? "warn"
+          : "bad";
+
+  const rows = (forecast?.arrays || [])
+    .filter((a) => a.available !== false)
+    .slice()
+    .sort((a, b) => (Number(a.ratio) || 99) - (Number(b.ratio) || 99))
+    .slice(0, 12);
 
   return (
     <div className="space-y-4">
@@ -42,15 +69,151 @@ export function AnalysisScreen() {
       <div>
         <h1 className="text-lg font-extrabold">Analysis</h1>
         <p className="text-sm text-slate-800/75">
-          Portfolio production and peer health.
+          Production vs expected · trends · peer health.
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm font-semibold text-muted">Loading trends…</p>
+        <p className="text-sm font-semibold text-muted">Loading analysis…</p>
       ) : null}
       {err ? (
         <p className="text-xs font-semibold text-red-700">{err}</p>
+      ) : null}
+
+      {/* NOC: production vs expected */}
+      <section className="ao-card space-y-3 p-3.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-extrabold">Production vs expected</h2>
+          <span className="text-[10px] font-bold uppercase text-muted">
+            {forecast?.window_days || 14}d
+          </span>
+        </div>
+        {forecast?.available === false ||
+        (forecast &&
+          forecast.expected_kwh == null &&
+          !rows.length &&
+          (forecast.skipped || []).length > 0) ? (
+          <p className="text-xs text-muted">
+            Forecast not fully available yet — need nameplate + location (or
+            expected kWh/kW) on arrays.{" "}
+            <button
+              type="button"
+              className="font-bold text-sky-800"
+              onClick={() =>
+                openAgent(
+                  "Help me get production-vs-expected working. What's missing — location, nameplate, or expected ratio?"
+                )
+              }
+            >
+              Ask Agent →
+            </button>
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-[10px] font-extrabold uppercase text-muted">
+                  Actual
+                </div>
+                <div className="mt-0.5 text-sm font-extrabold">
+                  {fmtKwh(forecast?.actual_kwh)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-extrabold uppercase text-muted">
+                  Expected
+                </div>
+                <div className="mt-0.5 text-sm font-extrabold">
+                  {fmtKwh(
+                    forecast?.expected_matched_kwh ?? forecast?.expected_kwh
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-extrabold uppercase text-muted">
+                  Ratio
+                </div>
+                <div
+                  className={[
+                    "mt-0.5 text-sm font-extrabold",
+                    ratioTone === "good"
+                      ? "text-emerald-800"
+                      : ratioTone === "warn"
+                        ? "text-amber-800"
+                        : ratioTone === "bad"
+                          ? "text-red-800"
+                          : "",
+                  ].join(" ")}
+                >
+                  {ratioPct || "—"}
+                </div>
+              </div>
+            </div>
+            {forecast?.kwh_per_kw_day != null ? (
+              <p className="text-[11px] font-medium text-muted">
+                Fleet ~{Number(forecast.kwh_per_kw_day).toFixed(2)} kWh/kW/day
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
+
+      {rows.length ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-extrabold">Sites (worst first)</h2>
+          <ul className="space-y-2">
+            {rows.map((a) => {
+              const r = a.ratio != null ? Number(a.ratio) : null;
+              const tone =
+                r == null
+                  ? "muted"
+                  : r >= 0.95
+                    ? "good"
+                    : r >= 0.85
+                      ? "warn"
+                      : "bad";
+              return (
+                <li
+                  key={String(a.array_id || a.array_name)}
+                  className="ao-card flex items-center justify-between gap-2 px-3.5 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold">
+                      {a.array_name || "Array"}
+                    </div>
+                    <div className="text-[11px] text-muted">
+                      {fmtKwh(a.actual_kwh)} / {fmtKwh(a.expected_kwh)}
+                      {a.kwh_per_kw_day != null
+                        ? ` · ${Number(a.kwh_per_kw_day).toFixed(1)} kWh/kW`
+                        : ""}
+                    </div>
+                  </div>
+                  <span
+                    className={[
+                      "ao-chip shrink-0",
+                      tone === "good"
+                        ? "bg-emerald-100 text-emerald-900"
+                        : tone === "warn"
+                          ? "bg-amber-100 text-amber-950"
+                          : tone === "bad"
+                            ? "bg-red-100 text-red-900"
+                            : "bg-white/50 text-slate-700",
+                    ].join(" ")}
+                  >
+                    {r != null ? `${(r * 100).toFixed(0)}%` : "—"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {(forecast?.skipped || []).length > 0 ? (
+            <p className="text-[11px] text-muted">
+              {forecast!.skipped!.length} site
+              {forecast!.skipped!.length === 1 ? "" : "s"} skipped (no model
+              inputs).
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -140,7 +303,7 @@ export function AnalysisScreen() {
 
       {(trends?.by_array || []).length ? (
         <section className="space-y-2">
-          <h2 className="text-sm font-extrabold">By array</h2>
+          <h2 className="text-sm font-extrabold">Lifetime by array</h2>
           <ul className="space-y-2">
             {(trends?.by_array || []).slice(0, 12).map((a) => (
               <li
@@ -162,7 +325,7 @@ export function AnalysisScreen() {
         className="ao-btn-primary w-full"
         onClick={() =>
           openAgent(
-            "Brief me on fleet analysis: weather-expected vs actual if available, underperformers, and what to check first."
+            "Brief me on fleet analysis: production vs expected, underperformers, and what to check first."
           )
         }
       >

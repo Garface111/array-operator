@@ -214,19 +214,93 @@ export type PaymentsConnectStatus = {
 export type Subscription = {
   id?: number | string;
   name?: string;
+  customer_name?: string;
   offtaker_name?: string;
   email?: string;
+  client_email?: string;
   to_email?: string;
   share_pct?: number | null;
+  allocation_pct?: number | null;
+  array_share_pct?: number | null;
   delivery_mode?: string | null;
+  send_mode?: string | null;
+  cadence?: string | null;
   enabled?: boolean;
+  array_id?: number | null;
+  utility_account_id?: number | null;
   utility_account_name?: string | null;
+  rate_per_kwh?: number | null;
+  last_sent_at?: string | null;
+  next_send_at?: string | null;
   [key: string]: unknown;
 };
 
 export type SubscriptionsList = {
   ok?: boolean;
   subscriptions?: Subscription[];
+  crosscheck_threshold_default_pct?: number;
+  [key: string]: unknown;
+};
+
+export type OfftakerArrayOption = {
+  id?: number;
+  array_id?: number;
+  name?: string;
+  client_name?: string | null;
+};
+
+export type UtilityAccountOption = {
+  account_id?: number;
+  provider?: string;
+  account_number?: string | null;
+  nickname?: string | null;
+  linked_array_id?: number | null;
+  linked_array_name?: string | null;
+  bill_count?: number;
+};
+
+export type ListBundle = {
+  ok?: boolean;
+  subscriptions?: Subscription[];
+  arrays?: OfftakerArrayOption[];
+  utility_accounts?: UtilityAccountOption[];
+  crosscheck_threshold_default_pct?: number;
+};
+
+export type AgentPending = {
+  id?: string;
+  type?: string;
+  args?: Record<string, unknown>;
+  needs_confirm?: boolean;
+  message?: string;
+  [key: string]: unknown;
+};
+
+export type FleetForecast = {
+  available?: boolean;
+  window_days?: number;
+  expected_kwh?: number | null;
+  actual_kwh?: number | null;
+  expected_matched_kwh?: number | null;
+  ratio?: number | null;
+  kwh_per_kw_day?: number | null;
+  arrays?: Array<{
+    array_id?: number;
+    array_name?: string;
+    available?: boolean;
+    expected_kwh?: number | null;
+    actual_kwh?: number | null;
+    ratio?: number | null;
+    kwh_per_kw_day?: number | null;
+    reason?: string;
+    [key: string]: unknown;
+  }>;
+  skipped?: Array<{
+    array_id?: number;
+    array_name?: string;
+    reason?: string;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 };
 
@@ -265,7 +339,18 @@ export type EnergyAgentChatResponse = {
   message?: string;
   content?: string;
   session_id?: string;
-  pending?: unknown[];
+  pending?: AgentPending | null;
+  ui_commands?: Array<Record<string, unknown>>;
+  tool_trace?: unknown[];
+  [key: string]: unknown;
+};
+
+export type EnergyAgentConfirmResponse = {
+  ok?: boolean;
+  command?: Record<string, unknown> | null;
+  extra_commands?: Array<Record<string, unknown>>;
+  cancelled?: boolean;
+  note?: string;
   [key: string]: unknown;
 };
 

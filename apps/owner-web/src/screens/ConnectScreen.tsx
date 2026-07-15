@@ -227,14 +227,113 @@ export function ConnectScreen() {
         </form>
       </section>
 
-      {/* Cloud capture logins */}
+      {/* Portal vendors — mobile can't run Chrome extension */}
       <section className="ao-card space-y-3 p-3.5">
+        <div>
+          <h2 className="text-sm font-extrabold">
+            Fronius · SMA · Chint (portal)
+          </h2>
+          <p className="text-xs leading-relaxed text-muted">
+            Phone browsers can&apos;t run the EnergyAgent Chrome extension. For
+            these vendors, use{" "}
+            <strong className="text-ink">cloud auto-refresh</strong> below
+            (store the portal login with consent), or capture once on a desktop
+            Chrome session at arrayoperator.com.
+          </p>
+        </div>
+        <ul className="space-y-2">
+          {[
+            {
+              code: "fronius",
+              label: "Fronius Solar.web",
+              tip: "Save Solar.web email + password in cloud harvest.",
+            },
+            {
+              code: "sma",
+              label: "SMA ennexOS",
+              tip: "Cloud login, or SMA OAuth consent on desktop.",
+            },
+            {
+              code: "chint",
+              label: "Chint / CPS",
+              tip: "Cloud login — open each plant once so harvest can see inverters.",
+            },
+          ].map((v) => {
+            const saved = creds.find(
+              (c) => String(c.provider).toLowerCase() === v.code
+            );
+            return (
+              <li
+                key={v.code}
+                className="flex items-start justify-between gap-2 rounded-xl bg-white/40 px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-extrabold">{v.label}</div>
+                  <div className="text-[11px] text-muted">{v.tip}</div>
+                </div>
+                <span
+                  className={[
+                    "ao-chip shrink-0",
+                    saved?.enabled
+                      ? "bg-emerald-100 text-emerald-900"
+                      : "bg-slate-100 text-slate-600",
+                  ].join(" ")}
+                >
+                  {saved?.enabled
+                    ? "Cloud on"
+                    : saved
+                      ? "Saved · off"
+                      : "Not set"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="ao-btn-ghost !min-h-9 !px-3 !text-xs"
+            onClick={() => {
+              setCloudForm((f) => ({ ...f, provider: "chint" }));
+              document
+                .getElementById("cloud-login")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            Save cloud login ↓
+          </button>
+          <button
+            type="button"
+            className="text-xs font-bold text-sky-800"
+            onClick={() =>
+              openAgent(
+                "I need Fronius, SMA, or Chint connected from my phone. Guide me through cloud auto-refresh (no Chrome extension)."
+              )
+            }
+          >
+            Ask Agent →
+          </button>
+        </div>
+        {account?.tenant_key ? (
+          <p className="text-[11px] leading-relaxed text-muted">
+            Desktop path: open arrayoperator.com on Chrome → pair extension with
+            activation key from{" "}
+            <a href="/account" className="font-bold text-sky-800">
+              Account
+            </a>
+            → Log in with vendor.
+          </p>
+        ) : null}
+      </section>
+
+      {/* Cloud capture logins */}
+      <section id="cloud-login" className="ao-card space-y-3 p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-sm font-extrabold">Auto-refresh logins</h2>
             <p className="text-xs text-muted">
-              Server-side harvest (cloud mode). Requires consent to store
-              password.
+              Server-side harvest for portal vendors + utilities. Consent
+              required to store a password.
             </p>
           </div>
           {creds.length ? (
