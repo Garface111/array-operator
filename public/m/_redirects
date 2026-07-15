@@ -1,0 +1,5 @@
+# Same-origin API proxy (no CORS fight) — mirrors arrayoperator.com public/_redirects
+/v1/*  https://web-production-49c83.up.railway.app/v1/:splat  200
+
+# SPA fallback
+/*    /index.html   200

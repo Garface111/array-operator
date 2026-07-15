@@ -5,9 +5,10 @@ Phone-first React client for fleet + offtaker overview and **Energy Agent**.
 | | |
 |---|---|
 | **Path** | `apps/owner-web` |
-| **Branch** | `feat/owner-react` (do not merge to prod Netlify until ready) |
+| **Live URL** | **https://arrayoperator.com/m/** (mobile beta) |
+| **Publish** | `bash apps/owner-web/scripts/publish-to-public.sh` → `public/m/` then deploy `public/` |
 | **Backend** | Existing FastAPI (`/v1/*`) — same `so_session` auth as desktop |
-| **Desktop site** | Untouched — still `public/` on `main` → arrayoperator.com |
+| **Desktop site** | `public/` root — phones auto-redirect to `/m/` via `mobile-beta-gate.js` |
 
 ## Why this app exists
 
@@ -28,22 +29,26 @@ This app is the durable path: scalable React surface, same API.
 ```bash
 cd apps/owner-web
 npm install
-npm run dev     # http://localhost:5174  — proxies /v1 → arrayoperator.com
+npm run dev     # http://localhost:5174/m/  — proxies /v1 → arrayoperator.com
 ```
 
 Sign in with a real Array Operator account (prod API via proxy).
 
 ```bash
-npm run build   # outputs dist/ — never auto-deployed to arrayoperator.com
-npm run typecheck
+npm run build                              # base /m/
+VITE_BASE=/ npm run build                  # root base (preview Netlify only)
+bash apps/owner-web/scripts/publish-to-public.sh   # → public/m/
 ```
 
-## Deploy policy (important)
+## Live mobile beta (arrayoperator.com)
 
-- **Do not** point the production Netlify site (`966cb1f5-…` / `public/`) at this app.
-- When ready: create a **separate** Netlify site or path (e.g. `m.arrayoperator.com`
-  or `arrayoperator.com/app`) and add that origin to Railway `CORS_ALLOWED_ORIGINS`.
-- Keep `main` + `public/` shipping the desktop vanilla site until cutover is explicit.
+1. `bash apps/owner-web/scripts/publish-to-public.sh`
+2. Deploy `public/` to Netlify site `966cb1f5-…` (arrayoperator.com)
+3. Phones (≤960px) hitting `/` or `/login` → `/m/` via `public/mobile-beta-gate.js`
+4. Escape hatch: `?desktop=1` sticks desktop (`localStorage ao_force_desktop`)
+5. Force mobile again: `?mobile=1`
+
+Desktop canvas remains at site root. Same `so_session` and `/v1/*` proxy.
 
 ## Architecture
 

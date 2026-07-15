@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
 import {
   connectSolarEdgeAccount,
@@ -318,9 +319,9 @@ export function ConnectScreen() {
           <p className="text-[11px] leading-relaxed text-muted">
             Desktop path: open arrayoperator.com on Chrome → pair extension with
             activation key from{" "}
-            <a href="/account" className="font-bold text-sky-800">
+            <Link to="/account" className="font-bold text-sky-800">
               Account
-            </a>
+            </Link>
             → Log in with vendor.
           </p>
         ) : null}

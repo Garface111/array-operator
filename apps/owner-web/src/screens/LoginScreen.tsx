@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { passwordLogin, rearmUnauthorized, requestMagicLink } from "@/lib/api";
+import { appPath } from "@/lib/base";
 import { enableDemoMode } from "@/lib/demoData";
 import { setSession } from "@/lib/session";
 
@@ -43,9 +44,8 @@ export function LoginScreen() {
 
   function enterDemo() {
     enableDemoMode();
-    nav("/?demo=1", { replace: true });
-    // Force reload path so AuthGate sees demo flag
-    window.location.assign("/?demo=1");
+    // Full navigation so AuthGate re-reads demo flag under /m base
+    window.location.assign(appPath("/?demo=1"));
   }
 
   return (

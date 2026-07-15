@@ -3,13 +3,17 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 /**
- * Dev server proxies /v1/* to prod API via arrayoperator.com (same-origin path
- * shape as Netlify _redirects). Never points at local public/ desktop site.
+ * Production: served at arrayoperator.com/m/ (mobile beta).
+ * Dev: same /m base so paths match; proxy /v1 → prod API.
+ * Desktop vanilla site remains public/ at site root.
  *
- * Preview / future Netlify site for this app: deploy apps/owner-web/dist only.
- * Stable arrayoperator.com continues to publish public/ from main.
+ * Preview site (ao-owner-web-preview) can still deploy dist/ at root by
+ * overriding: VITE_BASE=/ npm run build
  */
+const base = process.env.VITE_BASE || "/m/";
+
 export default defineConfig({
+  base,
   plugins: [react()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
@@ -33,3 +37,4 @@ export default defineConfig({
     sourcemap: true,
   },
 });
+

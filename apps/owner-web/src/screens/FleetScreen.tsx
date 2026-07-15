@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
 import { fetchFleetTree, fetchOverview } from "@/lib/api";
 import { isDemoMode } from "@/lib/demoData";
@@ -162,9 +163,9 @@ export function FleetScreen() {
       {arrays.length === 0 && !err && !loading ? (
         <div className="ao-card p-4 text-sm text-muted">
           No arrays yet.{" "}
-          <a href="/connect" className="font-bold text-sky-800">
+          <Link to="/connect" className="font-bold text-sky-800">
             Connect a feed →
-          </a>
+          </Link>
         </div>
       ) : null}
 

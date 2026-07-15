@@ -28,8 +28,16 @@
 # Inline email+password sign-in (also exchanges a magic-link ?token=). Calls
 # the same-origin /v1/* proxy above. The EnergyAgent landing page's "Log in to
 # Array Operator" button points here.
+# Phones are gated to /m/login via mobile-beta-gate.js before this page paints.
 /login                /login.html        200
 /signin               /login.html        301
+
+# ── Mobile React app (beta) ─────────────────────────────────────────────
+# Built from apps/owner-web → public/m/. SPA fallback; real files
+# (assets/*, sky-mobile.png) win when present. Same /v1/* proxy above.
+/m                    /m/index.html      200
+/m/                   /m/index.html      200
+/m/*                  /m/index.html      200
 
 # ── Offtaker invoice pay return (Stripe Checkout) ───────────────────────
 # After an offtaker pays (or cancels), Stripe sends them here — a PUBLIC

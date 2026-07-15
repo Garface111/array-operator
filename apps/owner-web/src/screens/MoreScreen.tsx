@@ -63,6 +63,17 @@ export function MoreScreen() {
           </button>
         </li>
         <li>
+          <a
+            href="/?desktop=1"
+            className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-bold"
+          >
+            Desktop site
+            <span className="text-[11px] font-semibold text-muted">
+              Full canvas
+            </span>
+          </a>
+        </li>
+        <li>
           <button
             type="button"
             className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-bold text-red-700"
@@ -76,6 +87,10 @@ export function MoreScreen() {
           </button>
         </li>
       </ul>
+      <p className="text-[11px] leading-relaxed text-muted">
+        Mobile beta at <code className="font-mono">/m</code>. Same account and
+        API as desktop.
+      </p>
     </div>
   );
 }

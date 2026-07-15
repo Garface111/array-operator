@@ -15,6 +15,7 @@ import type {
 export function isPreviewHost(): boolean {
   try {
     const h = location.hostname || "";
+    // Standalone preview site only — NOT arrayoperator.com/m (beta uses real auth).
     return (
       h === "ao-owner-web-preview.netlify.app" ||
       h.endsWith("--ao-owner-web-preview.netlify.app")
