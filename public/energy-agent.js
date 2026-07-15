@@ -916,9 +916,23 @@
     state.budget = b;
     var el = document.getElementById("eaBudget");
     if (!el || !b) return;
-    var cap = Number(b.weekly_budget_usd);
-    if (!(cap > 0)) cap = 5;
     var spent = Number(b.spent_usd) || 0;
+    var proUsd = Number(b.pro_monthly_usd) || 50;
+    // Pro / unlimited — calm green meter, no paywall
+    if (b.unlimited || b.tier === "pro" || b.weekly_budget_usd == null) {
+      el.innerHTML =
+        '<span class="ea-usage ea-usage-ok" title="Energy Agent Pro — unlimited thinking + voice">' +
+        '<span class="ea-usage-label">Pro</span>' +
+        '<span class="ea-usage-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
+        '<span class="ea-usage-fill" id="eaUsageFill" style="width:8%"></span>' +
+        "</span></span>";
+      el.setAttribute("aria-label", "Energy Agent Pro — unlimited");
+      el.classList.remove("ea-budget-exhausted");
+      state._budgetExhausted = false;
+      return;
+    }
+    var cap = Number(b.weekly_budget_usd);
+    if (!(cap > 0)) cap = 2.5;
     var pct = b.pct_used != null
       ? Number(b.pct_used)
       : Math.min(100, (spent / cap) * 100);
@@ -930,64 +944,63 @@
     var level = exhausted ? "full" : (b.warn || pct >= 80) ? "warn" : "ok";
     var bd = b.breakdown || {};
     var tip =
-      "Weekly Energy Agent usage (thinking + voice) · " +
-      Math.round(pct) + "% · $" + spent.toFixed(2) + " of $" + cap.toFixed(0) +
-      " · resets each Monday UTC";
+      "Free weekly sample (thinking + voice) · " +
+      Math.round(pct) + "% · $" + spent.toFixed(2) + " of $" + cap.toFixed(2) +
+      " · resets each Monday UTC · Pro $" + proUsd.toFixed(0) + "/mo unlimited";
     if (bd.thinking_usd != null || bd.voice_usd != null) {
       tip +=
         " · Thinking ~$" + (Number(bd.thinking_usd) || 0).toFixed(2) +
         " · Voice ~$" + (Number(bd.voice_usd) || 0).toFixed(2);
     }
     if (exhausted) {
-      tip = "Weekly limit reached — voice & thinking pause until next week. " + tip;
+      tip = "Free sample used up — upgrade to Pro on Account for unlimited AI. " + tip;
     }
     var label = exhausted
       ? "Limit"
       : pct >= 50
         ? Math.round(pct) + "%"
-        : "Weekly";
+        : "Sample";
     el.innerHTML =
       '<span class="ea-usage ea-usage-' + level + '" title="' + esc(tip) + '">' +
       '<span class="ea-usage-label">' + esc(label) + "</span>" +
       '<span class="ea-usage-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" ' +
-      'aria-valuenow="' + Math.round(pct) + '" aria-label="Weekly usage ' + Math.round(pct) + ' percent">' +
+      'aria-valuenow="' + Math.round(pct) + '" aria-label="Weekly sample ' + Math.round(pct) + ' percent">' +
       '<span class="ea-usage-fill" id="eaUsageFill" style="width:' + pct.toFixed(1) + '%"></span>' +
       "</span></span>";
     el.setAttribute(
       "aria-label",
       exhausted
-        ? "Weekly AI limit reached"
-        : "Weekly AI usage " + Math.round(pct) + " percent of " + cap.toFixed(0) + " dollar limit"
+        ? "Free weekly AI sample used up"
+        : "Weekly AI sample " + Math.round(pct) + " percent of $" + cap.toFixed(2)
     );
     el.classList.toggle("ea-budget-exhausted", exhausted);
-    // One soft heads-up when crossing the warn line (not every refresh)
     if (b.warn && b.ok !== false && !state._budgetWarned) {
       state._budgetWarned = true;
       try {
         addMsg(
           "agent",
-          "Heads up — you're past 80% of this week's Energy Agent allowance " +
-            "(thinking + voice). The meter in the header fills as you use it; " +
-            "at 100% voice and thinking pause until next week."
+          "Heads up — you're past 80% of this week's free Energy Agent sample " +
+            "($" + cap.toFixed(2) + " for thinking + voice). " +
+            "At 100% deep AI pauses until next week, or upgrade to Pro " +
+            "($" + proUsd.toFixed(0) + "/mo unlimited) on Account → Billing."
         );
       } catch (e) {}
     }
     if (exhausted && !state._budgetExhausted) {
       state._budgetExhausted = true;
-      setStatus("Weekly limit reached", "warn");
+      setStatus("Free sample used up", "warn");
       try {
         addMsg(
           "agent",
-          "This week's Energy Agent allowance is used up " +
-            "($" + spent.toFixed(2) + " of $" + cap.toFixed(0) +
-            " for thinking + voice). The red meter is full. " +
-            "Text answers that don't need the brain still work; " +
-            "voice and deep thinking resume next week (or Ford can raise the cap)."
+          "This week's free Energy Agent sample is used up " +
+            "($" + spent.toFixed(2) + " of $" + cap.toFixed(2) +
+            "). Voice and deep thinking pause until next Monday UTC. " +
+            "For unlimited AI, open Account → Billing and upgrade to " +
+            "Energy Agent Pro ($" + proUsd.toFixed(0) + "/mo)."
         );
       } catch (e) {}
     }
     if (!exhausted) {
-      // Cap raised mid-week — allow future exhaust messaging again
       state._budgetExhausted = false;
     }
   }

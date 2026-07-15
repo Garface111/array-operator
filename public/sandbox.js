@@ -7024,28 +7024,78 @@
     const onTrial = (_account && (_account.on_trial === true || _account.trial === true)) || /trial/i.test(String(status));
     const trialEnds = _account ? pick(_account, ["trial_ends_at","trial_end","trial_expires_at"], null) : null;
 
-    // ── Itemized monthly bill. Array Operator = the DUAL model: a Generation line
-    // (kWh × rate) and/or an Offtaker line (N × $20), each shown, then SUMMED into a
-    // highlighted total. Which lines appear is driven by the plan's entitlements
-    // (so a "both" tenant sees both). NEPOOL keeps a single per-array line.
+    // ── Unified monthly bill (Account Billing section).
+    // Array Operator: monitoring (kW) + offtaker invoices (count) + optional AI Pro.
+    // Prefer server `unified` block; fall back to legacy dual-model fields.
     const feats = (_account && _account.plan_features) || {};
-    const isAO = (basis === "kwh" || basis === "invoicing" || basis === "both");
+    const isAO = (basis === "kwh" || basis === "invoicing" || basis === "both" || (summary && summary.unified));
     const billLine = (kind, calc, amt, desc) =>
       `<div class="ao-bill-line"><span class="bl-k"><b>${esc(kind)}</b><span class="bl-calc">${calc}</span>${desc?`<span class="bl-desc">${esc(desc)}</span>`:""}</span><span class="bl-v">${amt}</span></div>`;
     const periodStart = pick(summary, ["period_start"], null);
     const sinceTxt = periodStart ? ` (since ${fmtDate(periodStart)})` : "";
-    let lines = "", total = 0;
-    if(summary && isAO){
-      // Use the entitlement when a plan's chosen; else infer from the active basis.
+    let lines = "", total = 0, aiUpgradeHtml = "";
+    if(summary && isAO && summary.unified && Array.isArray(summary.unified.lines)){
+      const u = summary.unified;
+      if(u.plan_label){
+        lines += `<div class="ao-bill-plan-tag">Plan · ${esc(u.plan_label)}</div>`;
+      }
+      u.lines.forEach(ln => {
+        if(!ln) return;
+        if(ln.id === "ai_pro" && !ln.included){
+          // Free AI sample — show as a soft row + upgrade CTA, not a $0 charge line
+          const freeW = (u.ai && u.ai.free_weekly_usd) || 2.5;
+          const proMo = (u.ai && u.ai.monthly_usd) || 50;
+          lines += billLine("Energy Agent",
+            `Free sample · $${Number(freeW).toFixed(2)}/week`,
+            `<span class="ao-bill-soft">included</span>`,
+            `Integrated AI (chat + voice) with a small weekly sample so you can try it. Upgrade for unlimited.`);
+          aiUpgradeHtml =
+            `<div class="ao-bill-ai">` +
+              `<div class="ao-bill-ai-h"><b>Energy Agent Pro</b> · $${Number(proMo).toFixed(0)}/mo</div>` +
+              `<div class="ao-bill-ai-s">Unlimited thinking + voice. The rest of the site stays simple until you need deeper AI help.</div>` +
+              `<button type="button" class="ao-btn ao-btn-primary ao-bill-ai-btn" id="aoAiProUpgrade">Upgrade to Pro →</button>` +
+            `</div>`;
+          return;
+        }
+        if(ln.id === "ai_pro" && ln.included){
+          total += Number(ln.amount_cents || 0);
+          lines += billLine(ln.kind || "Energy Agent Pro",
+            "Unlimited AI",
+            usdFromCents(ln.amount_cents),
+            ln.desc || "Unlimited integrated AI this month.");
+          return;
+        }
+        const amt = Number(ln.amount_cents || 0);
+        total += amt;
+        let calc = "";
+        if(ln.basis === "nameplate_kw"){
+          const q = Number(ln.quantity || 0);
+          const rate = Number(ln.unit_cents || 15);
+          const full = Number(ln.full_unit_cents || rate);
+          const disc = full > 0 && rate < full - 0.001;
+          calc = `${q.toLocaleString(undefined,{maximumFractionDigits:0})} kW × ${disc?"≈ ":""}${usdFromCents(rate)}/kW`;
+        } else if(ln.basis === "offtaker_count"){
+          const q = Number(ln.quantity || 0);
+          const rate = Number(ln.unit_cents || 2000);
+          const full = Number(ln.full_unit_cents || rate);
+          const disc = full > 0 && rate < full - 0.001;
+          calc = `${q} offtaker${q===1?"":"s"} × ${disc?"≈ ":""}${usdFromCents(rate)}`;
+        } else {
+          calc = ln.unit_label || "";
+        }
+        lines += billLine(ln.kind || "Charge", calc, usdFromCents(amt), ln.desc || "");
+      });
+      if(u.model_note){
+        lines += `<div class="ao-bill-model-note">${esc(u.model_note)}</div>`;
+      }
+    } else if(summary && isAO){
+      // Legacy dual-model fallback when unified block missing
       const showMon = feats.plan_chosen ? !!feats.vendor_data : (basis === "kwh");
       const showInv = feats.plan_chosen ? !!feats.invoicing  : (basis === "invoicing");
       if(showMon){
         const c    = Number(pick(summary, ["monitoring_total_cents"], 0));
         total += c;
         if(pick(summary, ["monitoring_basis"], "kwh") === "nameplate"){
-          // Per-kW NAMEPLATE, GRADUATED volume discount: rate_cents_per_kw is the
-          // BLENDED rate (total/kW) so "kW × rate" always reproduces the real
-          // charge, even once the fleet has crossed into a discounted tier.
           const kw     = Number(pick(summary, ["nameplate_kw"], 0));
           const rate   = Number(pick(summary, ["rate_cents_per_kw"], 15));
           const full   = Number(pick(summary, ["full_rate_cents_per_kw"], rate));
@@ -7066,9 +7116,6 @@
         }
       }
       if(showInv){
-        // Per-offtaker, GRADUATED volume discount: invoicing_blended_cents_per_offtaker
-        // is the BLENDED rate (total/count) so "N × rate" always reproduces the real
-        // charge, even once the portfolio has crossed into a discounted tier.
         const n     = Number(pick(summary, ["offtaker_count"], 0));
         const full  = Number(pick(summary, ["invoicing_per_offtaker_cents"], 2000));
         const per   = Number(pick(summary, ["invoicing_blended_cents_per_offtaker"], full));
@@ -7147,7 +7194,38 @@
       trialBanner +
       (lines || `<div class="ao-bill-empty">No charges yet.</div>`) +
       `<div class="ao-bill-total"><span>Monthly bill</span><span class="ao-bill-tot-v">${usdFromCents(total)}<small>/mo</small></span></div>` +
-      (ctx.length ? `<div class="ao-bill-ctx">${ctx.join(" · ")}</div>` : "");
+      (ctx.length ? `<div class="ao-bill-ctx">${ctx.join(" · ")}</div>` : "") +
+      (aiUpgradeHtml || "");
+
+    // Energy Agent Pro upgrade (Account Billing section)
+    const aiBtn = box.querySelector("#aoAiProUpgrade");
+    if(aiBtn){
+      aiBtn.onclick = async () => {
+        aiBtn.disabled = true;
+        aiBtn.textContent = "Opening…";
+        try {
+          const r = await fetch("/v1/account/ai-pro/checkout", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, h || {}),
+          });
+          const d = await r.json().catch(() => ({}));
+          if(d && d.checkout_url){ window.location.href = d.checkout_url; return; }
+          if(d && d.already_pro){
+            aiBtn.textContent = "Already on Pro";
+            return;
+          }
+          // Stripe price not minted yet — honest message, no fake charge
+          const msg = (d && d.message) || "Pro checkout isn't live yet — contact us to enable unlimited AI.";
+          aiBtn.disabled = false;
+          aiBtn.textContent = "Upgrade to Pro →";
+          try { if(window.toast) toast(msg, "ok"); else alert(msg); } catch(_){ alert(msg); }
+        } catch(e){
+          aiBtn.disabled = false;
+          aiBtn.textContent = "Upgrade to Pro →";
+          try { if(window.toast) toast("Couldn't start checkout — try again.", "err"); } catch(_){}
+        }
+      };
+    }
 
     // Payment state + button. A card exists only on a real paid/active status or an
     // explicit flag — a bare trial does NOT mean a card is on file (that's why the
@@ -7513,7 +7591,7 @@
         <div class="ao-plan-cards">
           ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","from $20 per offtaker / mo")}
           ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","from $0.15 / kW · mo")}
-          ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together.","Both plans")}
+          ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together. AI sample included; Pro unlimited is an add-on.","Both plans")}
         </div>
         ${opts.change ? `<button type="button" class="ao-plan-close" id="aoPlanClose">Keep my current plan</button>` : ""}
         <div class="ao-plan-msg" id="aoPlanMsg"></div>
