@@ -48,8 +48,7 @@
      control — primary CTAs (Open dashboard, Connect GMP, Add a card), modal close
      buttons, segment toggles, links — gets a consistent, visible focus indicator
      for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
-  :focus-visible{outline:2px solid rgba(94,194,255,.6)}
-
-/* Feature #14: remove inner vertical scrollbar on All vendor data / inverter tables
-   (drop max-height + overflow so page scrolls as one; keep header sticky if needed) */
-.ao-table,.inverter-list,.fleet-table,.vendor-data{max-height:none!important;overflow-y:visible!important}
+  :focus-visible{outline:2px solid rgba(94,194,255,.6);outline-offset:2px}
+  /* Feature #14: remove inner vertical scrollbar on All vendor data / fleet inverter tables
+     so page scrolls as single region (drop max-h/overflow-y pattern) */
+  .inverter-table,.fleet-list,.vendor-data{max-height:none!important;overflow:visible!important}
