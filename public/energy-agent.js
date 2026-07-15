@@ -193,6 +193,7 @@
  { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
  { label: "Invoices", hash: "#reports" },
  { label: "Resources", hash: "#resources" },
+ { label: "Ops", hash: "#ops", note: "O&M team, repairs, warranty claims" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
@@ -2465,6 +2466,7 @@
  "#master": "#account", "#settings": "#account",
  "#masteraccount": "#account", "#master-account": "#account",
  "#trends": "#analysis", "#trend": "#analysis", "#through-time": "#analysis",
+ "#om": "#ops", "#repair": "#ops", "#repairs": "#ops", "#claims": "#ops",
  };
  var h = hash.toLowerCase().replace(/\s+/g, "");
  if (aliases[h]) hash = aliases[h];
@@ -2476,6 +2478,7 @@
  reports: "#reports", invoices: "#reports",
  account: "#account", "master account": "#account",
  resources: "#resources",
+ ops: "#ops", repairs: "#ops", claims: "#ops", om: "#ops",
  };
  var rawName = String((cmd.args && (cmd.args.tab || cmd.args.name || cmd.args.label)) || "")
  .toLowerCase().trim();
@@ -2819,6 +2822,8 @@
  "#analysis": "Analysis",
  "#reports": "Invoices",
  "#resources": "Resources",
+ "#ops": "Ops",
+ "#claims": "Ops",
  "#account": "Account",
  };
  function tabLabel(hash) {
@@ -2834,6 +2839,8 @@
  "#analysis": "#panelAnalysis",
  "#reports": "#panelReports",
  "#resources": "#panelResources",
+ "#ops": "#panelOps",
+ "#claims": "#panelOps",
  "#account": "#panelAccount",
  };
  var h = String(hash || "").toLowerCase();

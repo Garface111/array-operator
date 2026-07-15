@@ -24,6 +24,7 @@
  account: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/>',
  trends: '<path d="M4 16l5-5 4 4 7-7"/><path d="M15 8h5v5"/>',
  resources: '<path d="M4 5a2 2 0 0 1 2-2h9v18H6a2 2 0 0 1-2-2z"/><path d="M15 3l5 2v16l-5-2"/>',
+ ops: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'
  };
  function svg(name) {
@@ -38,7 +39,8 @@
  { id: "tabArrays", short: "Arrays", ic: "arrays", primary: true },
  { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
  { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },
- { id: "tabAccount", short: "Account", ic: "account", primary: true },
+ { id: "tabOps", short: "Ops", ic: "ops", primary: true },
+ { id: "tabAccount", short: "Account", ic: "account", primary: false },
  /* Trends is now a sub-view of Analysis (reached via the in-panel toggle). */
  { id: "tabResources", short: "Resources", ic: "resources", primary: false }
  ];

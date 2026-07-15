@@ -7496,10 +7496,12 @@
  toggled manually inside the analysis branch of applyView, not via this map. */
  reports: { panel: "panelReports", tab: "tabReports" },
  resources:{ panel: "panelResources", tab: "tabResources" },
+ ops: { panel: "panelOps", tab: "tabOps" },
  };
  function tabFromHash(){
  const h = location.hash;
  if(h === "#account") return "account";
+ if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
  if(h === "#arrays" || h === "#sandbox") return "arrays";
  if(h === "#analysis") return "analysis";
  if(h === "#trends") return "analysis"; // Trends is a sub-view of Analysis now
@@ -7587,6 +7589,19 @@
  loadReports();
  } else if(active === "resources"){
  if(window.__aoLoadResources) window.__aoLoadResources();
+ } else if(active === "ops"){
+ // Deep-links: #claims → Claims sub-view, #repairs → Repairs
+ try {
+ if(location.hash === "#claims" && window.__aoOpsGoto) window.__aoOpsGoto("claims");
+ else if(location.hash === "#repairs" && window.__aoOpsGoto) window.__aoOpsGoto("repairs");
+ else if(window.__aoLoadOps) window.__aoLoadOps();
+ } catch(_){ if(window.__aoLoadOps) window.__aoLoadOps(); }
+ // Clear ops attention dot once opened
+ try {
+ var od = document.getElementById("opsDot");
+ if(od) od.classList.remove("tab-dot--on");
+ localStorage.setItem("ao_seen_ops", "1");
+ } catch(_){}
  }
  applyTabGating(); // keep tab locks fresh + bounce off a tab the plan doesn't include
  _firstApply = false;

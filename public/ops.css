@@ -1,0 +1,114 @@
+/* Ops tab — O&M team, repair tickets, manufacturer claims */
+#panelOps{ padding: 18px 0 48px; }
+.ops-wrap{ max-width: min(1100px, 96vw); margin: 0 auto; padding: 0 4px; }
+.ops-head{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.ops-head h2{ font-size:22px; font-weight:720; letter-spacing:-.02em; margin:0; }
+.ops-head .ops-sub{ color:var(--muted); font-size:13px; margin-top:4px; }
+.ops-kpis{ display:flex; flex-wrap:wrap; gap:8px; }
+.ops-kpi{
+  background: linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  border:1px solid var(--line); border-radius:12px; padding:10px 14px; min-width:92px;
+}
+.ops-kpi b{ display:block; font-size:20px; font-variant-numeric:tabular-nums; color:var(--ink); }
+.ops-kpi span{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.ops-kpi.warn b{ color:var(--warn); }
+.ops-kpi.bad b{ color:var(--bad); }
+.ops-kpi.good b{ color:var(--good); }
+
+.ops-seg{
+  display:inline-flex; gap:2px; padding:3px; border-radius:12px;
+  background:rgba(0,0,0,.28); border:1px solid var(--line); margin-bottom:16px;
+}
+.ops-seg-btn{
+  appearance:none; border:0; background:transparent; color:var(--muted);
+  font:600 13px/1.2 inherit; padding:8px 14px; border-radius:9px; cursor:pointer;
+}
+.ops-seg-btn.on{ background:rgba(63,214,138,.14); color:var(--good2); box-shadow:0 0 0 1px rgba(63,214,138,.25); }
+.ops-seg-btn:hover{ color:var(--ink); }
+
+.ops-toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+.ops-toolbar input, .ops-toolbar select, .ops-field input, .ops-field select, .ops-field textarea{
+  background:rgba(0,0,0,.35); border:1px solid var(--line); color:var(--ink);
+  border-radius:10px; padding:8px 11px; font:13px/1.35 inherit;
+}
+.ops-toolbar input:focus, .ops-field input:focus, .ops-field select:focus, .ops-field textarea:focus{
+  outline:none; border-color:rgba(63,214,138,.45); box-shadow:0 0 0 3px rgba(63,214,138,.12);
+}
+.ops-btn{
+  appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.04);
+  color:var(--ink); border-radius:10px; padding:8px 12px; font:600 12.5px/1.2 inherit; cursor:pointer;
+}
+.ops-btn:hover{ border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.07); }
+.ops-btn.primary{
+  background:linear-gradient(180deg,var(--good2),var(--good)); color:#06140d; border-color:transparent;
+  box-shadow:0 6px 18px rgba(63,214,138,.22);
+}
+.ops-btn.primary:hover{ filter:brightness(1.05); }
+.ops-btn.ghost{ background:transparent; }
+.ops-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+.ops-grid{ display:grid; gap:10px; }
+.ops-card{
+  background: linear-gradient(165deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+  border:1px solid var(--line); border-radius:14px; padding:14px 16px;
+}
+.ops-card.open{ border-color:rgba(255,180,84,.28); }
+.ops-card.critical{ border-color:rgba(255,107,107,.32); }
+.ops-card.waiting_reply{ border-color:rgba(94,194,255,.28); }
+.ops-card.resolved{ opacity:.78; }
+.ops-card-top{ display:flex; flex-wrap:wrap; gap:8px 14px; align-items:flex-start; justify-content:space-between; }
+.ops-card h3{ font-size:15px; font-weight:680; margin:0 0 4px; }
+.ops-meta{ font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px 12px; }
+.ops-pill{
+  display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:650;
+  padding:3px 8px; border-radius:999px; background:rgba(255,255,255,.05); border:1px solid var(--line);
+  text-transform:uppercase; letter-spacing:.03em;
+}
+.ops-pill.critical, .ops-pill.dead, .ops-pill.fault{ color:var(--bad); border-color:rgba(255,107,107,.3); }
+.ops-pill.waiting_reply, .ops-pill.sent{ color:var(--sky); border-color:rgba(94,194,255,.3); }
+.ops-pill.scheduled, .ops-pill.queued{ color:var(--warn); border-color:rgba(255,180,84,.3); }
+.ops-pill.resolved, .ops-pill.ok, .ops-pill.ready{ color:var(--good); border-color:rgba(63,214,138,.28); }
+.ops-pill.in_progress{ color:var(--gold2); border-color:rgba(245,185,66,.3); }
+
+.ops-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.ops-detail{ margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+.ops-detail pre{
+  white-space:pre-wrap; font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;
+  background:rgba(0,0,0,.28); border-radius:10px; padding:10px 12px; color:var(--ink); max-height:220px; overflow:auto;
+}
+.ops-checkins{ margin-top:10px; display:grid; gap:6px; }
+.ops-checkin{
+  font-size:12px; color:var(--muted); padding:8px 10px; border-radius:10px;
+  background:rgba(0,0,0,.2); border:1px solid rgba(255,255,255,.05);
+}
+.ops-checkin b{ color:var(--ink); font-weight:650; }
+.ops-checkin.inbound{ border-left:3px solid var(--sky); }
+.ops-checkin.sms{ border-left:3px solid var(--good); }
+.ops-checkin.phone_note{ border-left:3px solid var(--gold); }
+
+.ops-form{ display:grid; gap:10px; max-width:520px; }
+.ops-field{ display:grid; gap:4px; }
+.ops-field label{ font-size:11px; font-weight:650; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.ops-field textarea{ min-height:88px; resize:vertical; }
+.ops-row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:640px){ .ops-row2{ grid-template-columns:1fr; } }
+
+.ops-empty{
+  text-align:center; padding:36px 16px; color:var(--muted); border:1px dashed var(--line);
+  border-radius:14px; background:rgba(255,255,255,.015);
+}
+.ops-empty b{ display:block; color:var(--ink); margin-bottom:6px; font-size:15px; }
+.ops-link{ color:var(--good2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+.ops-toast{
+  position:fixed; bottom:22px; right:22px; z-index:80; max-width:320px;
+  background:#122018; border:1px solid rgba(63,214,138,.35); color:var(--ink);
+  padding:12px 14px; border-radius:12px; font-size:13px; box-shadow:0 12px 40px rgba(0,0,0,.4);
+  opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s; pointer-events:none;
+}
+.ops-toast.on{ opacity:1; transform:none; }
+.ops-assign-list{ font-size:12px; color:var(--muted); margin-top:6px; }
+.ops-claim-link{
+  display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-size:12px;
+  padding:6px 10px; border-radius:10px; background:rgba(155,108,255,.1); border:1px solid rgba(155,108,255,.28);
+  color:#d4c4ff;
+}
