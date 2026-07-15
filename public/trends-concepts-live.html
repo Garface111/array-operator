@@ -1,30 +1,30 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Trends — live multi-view harness</title>
+<title>Trends, live multi-view harness</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="trends.css">
 <style>
-  body{padding:0} .wrap{max-width:min(1180px,94vw);margin:0 auto;padding:26px 22px 80px}
-  h1.t{font-size:24px;font-weight:740;margin:6px 0 2px;
-    background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .sub{color:var(--muted);font-size:13px;margin-bottom:6px}
-  .ds{display:inline-flex;gap:6px;margin:10px 0 4px}
-  .ds button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);
-    font:600 12px inherit;padding:6px 11px;border-radius:9px}
-  .ds button.on{color:var(--ink);border-color:var(--good);background:rgba(63,214,138,.1)}
+ body{padding:0} .wrap{max-width:min(1180px,94vw);margin:0 auto;padding:26px 22px 80px}
+ h1.t{font-size:24px;font-weight:740;margin:6px 0 2px;
+ background:linear-gradient(180deg,#fff,#b9c6d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+ .sub{color:var(--muted);font-size:13px;margin-bottom:6px}
+ .ds{display:inline-flex;gap:6px;margin:10px 0 4px}
+ .ds button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);
+ font:600 12px inherit;padding:6px 11px;border-radius:9px}
+ .ds button.on{color:var(--ink);border-color:var(--good);background:rgba(63,214,138,.1)}
 </style></head>
 <body><div class="wrap">
-  <div class="eyebrow" style="color:var(--good);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700">Trends · live harness</div>
-  <h1 class="t">Multi-view Trends — real core + view files</h1>
-  <p class="sub">Loads the SAME trends-core.js + trends-view-*.js the live app uses, against a mock <code>/fleet-trends</code> payload. Use the dataset toggles to test edge cases.</p>
-  <div class="ds" id="ds">
-    <button data-ds="full" class="on">3 full+partial years</button>
-    <button data-ds="one">single year</button>
-    <button data-ds="thin">2 thin months</button>
-    <button data-ds="gap">down-month gap</button>
-  </div>
-  <div id="trendsRoot"></div>
+ <div class="eyebrow" style="color:var(--good);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700">Trends · live harness</div>
+ <h1 class="t">Multi-view Trends, real core + view files</h1>
+ <p class="sub">Loads the SAME trends-core.js + trends-view-*.js the live app uses, against a mock <code>/fleet-trends</code> payload. Use the dataset toggles to test edge cases.</p>
+ <div class="ds" id="ds">
+ <button data-ds="full" class="on">3 full+partial years</button>
+ <button data-ds="one">single year</button>
+ <button data-ds="thin">2 thin months</button>
+ <button data-ds="gap">down-month gap</button>
+ </div>
+ <div id="trendsRoot"></div>
 </div>
 
 <script>
@@ -32,38 +32,38 @@
 const SEASON=[0.34,0.46,0.66,0.84,0.97,1.0,0.99,0.92,0.74,0.55,0.36,0.29];
 const M3=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function yr(base,n,opts){opts=opts||{};const out=[];for(let m=1;m<=n;m++){
-  if(opts.gap&&opts.gap.includes(m)){out.push({month:m,kwh:Math.round(base*SEASON[m-1]*0.12)});continue;}
-  const j=0.94+0.12*Math.sin(m*1.7+base/1000);out.push({month:m,kwh:Math.round(base*SEASON[m-1]*j)});}return out;}
+ if(opts.gap&&opts.gap.includes(m)){out.push({month:m,kwh:Math.round(base*SEASON[m-1]*0.12)});continue;}
+ const j=0.94+0.12*Math.sin(m*1.7+base/1000);out.push({month:m,kwh:Math.round(base*SEASON[m-1]*j)});}return out;}
 function seasonal(mby,years){const out=[];for(let m=1;m<=12;m++){const by={};let present=[];
-  years.forEach(y=>{const f=(mby[String(y)]||[]).find(p=>p.month===m);if(f){by[String(y)]=f.kwh;present.push(y);}});
-  if(!present.length)continue;present.sort((a,b)=>a-b);let d=null;
-  if(present.length>=2){const pv=by[String(present[present.length-2])];if(pv)d=Math.round(1000*(by[String(present[present.length-1])]-pv)/pv)/10;}
-  out.push({month:m,label:M3[m-1],by_year:by,latest_delta_pct:d});}return out;}
+ years.forEach(y=>{const f=(mby[String(y)]||[]).find(p=>p.month===m);if(f){by[String(y)]=f.kwh;present.push(y);}});
+ if(!present.length)continue;present.sort((a,b)=>a-b);let d=null;
+ if(present.length>=2){const pv=by[String(present[present.length-2])];if(pv)d=Math.round(1000*(by[String(present[present.length-1])]-pv)/pv)/10;}
+ out.push({month:m,label:M3[m-1],by_year:by,latest_delta_pct:d});}return out;}
 function build(mby,years,byArray){const life=Object.values(mby).flat().reduce((s,p)=>s+p.kwh,0);
-  return{years,monthly_by_year:mby,seasonal_yoy:seasonal(mby,years),
-    ttm_kwh:Math.round(life*0.36),lifetime_kwh:Math.round(life),ttm_savings_usd:Math.round(life*0.36*0.185),
-    by_array:byArray};}
+ return{years,monthly_by_year:mby,seasonal_yoy:seasonal(mby,years),
+ ttm_kwh:Math.round(life*0.36),lifetime_kwh:Math.round(life),ttm_savings_usd:Math.round(life*0.36*0.185),
+ by_array:byArray};}
 const ARRAYS=[{array_id:1,name:"Starlake",lifetime_kwh:121000,years:[2024,2025,2026]},
-  {array_id:2,name:"Bozuwa Field",lifetime_kwh:98000,years:[2024,2025,2026]},
-  {array_id:3,name:"Hilltop B",lifetime_kwh:54000,years:[2025,2026]}];
+ {array_id:2,name:"Bozuwa Field",lifetime_kwh:98000,years:[2024,2025,2026]},
+ {array_id:3,name:"Hilltop B",lifetime_kwh:54000,years:[2025,2026]}];
 const DS={
-  full:()=>build({"2024":yr(8200,12),"2025":yr(9450,12),"2026":yr(10600,7)},[2024,2025,2026],ARRAYS),
-  one:()=>build({"2026":yr(9800,7)},[2026],[ARRAYS[0]]),
-  thin:()=>build({"2026":yr(9800,2)},[2026],[ARRAYS[0]]),
-  gap:()=>build({"2024":yr(8200,12),"2025":yr(9450,12,{gap:[6,7]}),"2026":yr(10600,7)},[2024,2025,2026],ARRAYS),
+ full:()=>build({"2024":yr(8200,12),"2025":yr(9450,12),"2026":yr(10600,7)},[2024,2025,2026],ARRAYS),
+ one:()=>build({"2026":yr(9800,7)},[2026],[ARRAYS[0]]),
+ thin:()=>build({"2026":yr(9800,2)},[2026],[ARRAYS[0]]),
+ gap:()=>build({"2024":yr(8200,12),"2025":yr(9450,12,{gap:[6,7]}),"2026":yr(10600,7)},[2024,2025,2026],ARRAYS),
 };
 /* stub session + fetch so trends.js load() path works unchanged */
 try{localStorage.setItem("so_session","harness");}catch(e){}
 let CURRENT="full";
 const _fetch=window.fetch;
 window.fetch=function(url,opts){
-  if(String(url).indexOf("/v1/array-owners/fleet-trends")>=0)
-    return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(DS[CURRENT]())});
-  return _fetch(url,opts);
+ if(String(url).indexOf("/v1/array-owners/fleet-trends")>=0)
+ return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(DS[CURRENT]())});
+ return _fetch(url,opts);
 };
 document.querySelectorAll("#ds button").forEach(b=>b.addEventListener("click",()=>{
-  document.querySelectorAll("#ds button").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on");CURRENT=b.getAttribute("data-ds");window.__aoLoadTrends();
+ document.querySelectorAll("#ds button").forEach(x=>x.classList.remove("on"));
+ b.classList.add("on");CURRENT=b.getAttribute("data-ds");window.__aoLoadTrends();
 }));
 </script>
 <script src="trends-core.js"></script>

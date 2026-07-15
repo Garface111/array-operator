@@ -5,147 +5,147 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in · Array Operator</title>
 <meta name="theme-color" content="#56B4F0">
-<!-- Per-tab auth session shim — MUST be the very first script so it patches the
-     so_session localStorage routing before anything reads/writes it. See session-tabscope.js. -->
+<!-- Per-tab auth session shim, MUST be the very first script so it patches the
+ so_session localStorage routing before anything reads/writes it. See session-tabscope.js. -->
 <script src="/session-tabscope.js?v=1"></script>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
-  /* ── Array Operator sign-in — the SKY world (2026-07-13). Matches the app's
-     theme-sky.css: the alpine-solar photo IS the background, the sign-in card
-     is frosted liquid glass floating in front of it, Plus Jakarta Sans, the
-     sky-blue palette. (Night mode retired — the app is day/sky only.) ── */
-  @font-face{
-    font-family:"Plus Jakarta Sans";
-    src:url("/fonts/PlusJakartaSans-latin.woff2") format("woff2");
-    font-weight:200 800; font-style:normal; font-display:swap;
-  }
-  :root{
-    --sky-top:#1E90E8; --sky-mid:#56B4F0; --sky-horizon:#BEE3FA;
-    --primary:#2196F3; --primary-deep:#1976D2;
-    --ink:#0E1420; --muted:#4C596B; --faint:#6B7789;
-    --good:#2196F3; --bad:#dc2626;
-    --glass:rgba(255,255,255,.62);
-    --glass-edge:rgba(255,255,255,.6);
-    --line:rgba(20,60,120,.14);
-  }
-  *{box-sizing:border-box} html,body{height:100%}
-  html{scrollbar-width:none} html::-webkit-scrollbar{display:none}
-  body{
-    margin:0; min-height:100%; color:var(--ink);
-    font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
-    background:var(--sky-mid);
-  }
-  /* the sky world — fixed photo plate + instant-paint gradient underlay */
-  body::before{
-    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background-image:
-      url("/img/sky/world-zo6-2560.jpg"),
-      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
-    background-image:
-      image-set(url("/img/sky/world-zo6-2560.webp") type("image/webp"),
-                url("/img/sky/world-zo6-2560.jpg") type("image/jpeg")),
-      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
-    background-size:cover, auto;
-    background-position:center 50%, center;
-    background-repeat:no-repeat;
-  }
-  @media (max-width:1600px){
-    body::before{
-      background-image:
-        url("/img/sky/world-zo6-2560.jpg"),
-        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
-      background-image:
-        image-set(url("/img/sky/world-zo6-1600.webp") type("image/webp"),
-                  url("/img/sky/world-zo6-2560.jpg") type("image/jpeg")),
-        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
-    }
-  }
-  a{color:inherit}
-  .top{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;font-size:16px;
-       padding:1.5rem 1.75rem;color:#fff;text-shadow:0 1px 3px rgba(8,44,90,.4)}
-  .logo{height:2.1rem;width:2.1rem;border-radius:9px;flex:none;display:block;
-        box-shadow:0 6px 18px -4px rgba(15,50,110,.4)}
-  .top small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.85);letter-spacing:.04em;margin-top:-2px;text-shadow:0 1px 2px rgba(8,44,90,.4)}
-  main{flex:1;display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4rem}
-  /* the sign-in card — frosted liquid glass, the app's signature material */
-  .card{width:100%;max-width:25rem;
-        background:var(--glass);
-        -webkit-backdrop-filter:blur(18px) saturate(1.7); backdrop-filter:blur(18px) saturate(1.7);
-        border:1px solid var(--glass-edge);border-radius:26px;padding:2rem;
-        box-shadow:0 24px 60px -16px rgba(15,50,110,.35), 0 2px 10px rgba(20,60,120,.10)}
-  @supports (corner-shape: squircle){ .card{corner-shape:squircle} }
-  h1{margin:0;font-size:1.6rem;line-height:1.18;font-weight:780;letter-spacing:-.025em;color:var(--ink)}
-  .sub{margin-top:.5rem;font-size:.9rem;color:var(--muted)}
-  .tabs{display:flex;gap:.35rem;background:rgba(20,60,120,.07);border:1px solid var(--line);
-        border-radius:999px;padding:.3rem;margin:1.5rem 0 .5rem}
-  .tab{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:650;font-size:.85rem;
-       padding:.55rem;border-radius:999px;cursor:pointer;transition:.15s}
-  .tab.on{background:var(--primary);color:#fff;box-shadow:0 4px 14px -4px rgba(33,150,243,.6)}
-  label.fld{display:block;margin-top:1.25rem}
-  label.fld .lab{font-size:.85rem;font-weight:700;color:var(--ink)}
-  input{width:100%;margin-top:.5rem;padding:.72rem .9rem;background:#fff;
-    border:1px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);transition:.15s}
-  input::placeholder{color:var(--faint)}
-  input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(33,150,243,.18)}
-  .btn{display:inline-flex;width:100%;align-items:center;justify-content:center;gap:.5rem;border-radius:12px;
-       padding:.82rem 1.5rem;font-size:.95rem;font-weight:700;border:0;cursor:pointer;transition:.15s;margin-top:1.4rem}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 18px -6px rgba(33,150,243,.6)}
-  .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 24px -8px rgba(33,150,243,.7)}
-  .msg{margin-top:1rem;font-size:.82rem;line-height:1.5;border-radius:12px;padding:.7rem .9rem;display:none}
-  .msg.show{display:block}
-  .msg.err{background:rgba(220,38,38,.09);border:1px solid rgba(220,38,38,.28);color:#b42318}
-  .msg.ok{background:rgba(33,150,243,.09);border:1px solid rgba(33,150,243,.3);color:var(--primary-deep)}
-  .foot{margin-top:1.5rem;font-size:.82rem;color:var(--muted);text-align:center}
-  .foot a{color:var(--primary-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px}
-  .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .hide{display:none!important}
+ /* ── Array Operator sign-in, the SKY world (2026-07-13). Matches the app's
+ theme-sky.css: the alpine-solar photo IS the background, the sign-in card
+ is frosted liquid glass floating in front of it, Plus Jakarta Sans, the
+ sky-blue palette. (Night mode retired, the app is day/sky only.) ── */
+ @font-face{
+ font-family:"Plus Jakarta Sans";
+ src:url("/fonts/PlusJakartaSans-latin.woff2") format("woff2");
+ font-weight:200 800; font-style:normal; font-display:swap;
+ }
+ :root{
+ --sky-top:#1E90E8; --sky-mid:#56B4F0; --sky-horizon:#BEE3FA;
+ --primary:#2196F3; --primary-deep:#1976D2;
+ --ink:#0E1420; --muted:#4C596B; --faint:#6B7789;
+ --good:#2196F3; --bad:#dc2626;
+ --glass:rgba(255,255,255,.62);
+ --glass-edge:rgba(255,255,255,.6);
+ --line:rgba(20,60,120,.14);
+ }
+ *{box-sizing:border-box} html,body{height:100%}
+ html{scrollbar-width:none} html::-webkit-scrollbar{display:none}
+ body{
+ margin:0; min-height:100%; color:var(--ink);
+ font:15px/1.55 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+ -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+ background:var(--sky-mid);
+ }
+ /* the sky world, fixed photo plate + instant-paint gradient underlay */
+ body::before{
+ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+ background-image:
+ url("/img/sky/world-zo6-2560.jpg"),
+ linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+ background-image:
+ image-set(url("/img/sky/world-zo6-2560.webp") type("image/webp"),
+ url("/img/sky/world-zo6-2560.jpg") type("image/jpeg")),
+ linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+ background-size:cover, auto;
+ background-position:center 50%, center;
+ background-repeat:no-repeat;
+ }
+ @media (max-width:1600px){
+ body::before{
+ background-image:
+ url("/img/sky/world-zo6-2560.jpg"),
+ linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+ background-image:
+ image-set(url("/img/sky/world-zo6-1600.webp") type("image/webp"),
+ url("/img/sky/world-zo6-2560.jpg") type("image/jpeg")),
+ linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+ }
+ }
+ a{color:inherit}
+ .top{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;font-size:16px;
+ padding:1.5rem 1.75rem;color:#fff;text-shadow:0 1px 3px rgba(8,44,90,.4)}
+ .logo{height:2.1rem;width:2.1rem;border-radius:9px;flex:none;display:block;
+ box-shadow:0 6px 18px -4px rgba(15,50,110,.4)}
+ .top small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.85);letter-spacing:.04em;margin-top:-2px;text-shadow:0 1px 2px rgba(8,44,90,.4)}
+ main{flex:1;display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4rem}
+ /* the sign-in card, frosted liquid glass, the app's signature material */
+ .card{width:100%;max-width:25rem;
+ background:var(--glass);
+ -webkit-backdrop-filter:blur(18px) saturate(1.7); backdrop-filter:blur(18px) saturate(1.7);
+ border:1px solid var(--glass-edge);border-radius:26px;padding:2rem;
+ box-shadow:0 24px 60px -16px rgba(15,50,110,.35), 0 2px 10px rgba(20,60,120,.10)}
+ @supports (corner-shape: squircle){ .card{corner-shape:squircle} }
+ h1{margin:0;font-size:1.6rem;line-height:1.18;font-weight:780;letter-spacing:-.025em;color:var(--ink)}
+ .sub{margin-top:.5rem;font-size:.9rem;color:var(--muted)}
+ .tabs{display:flex;gap:.35rem;background:rgba(20,60,120,.07);border:1px solid var(--line);
+ border-radius:999px;padding:.3rem;margin:1.5rem 0 .5rem}
+ .tab{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:650;font-size:.85rem;
+ padding:.55rem;border-radius:999px;cursor:pointer;transition:.15s}
+ .tab.on{background:var(--primary);color:#fff;box-shadow:0 4px 14px -4px rgba(33,150,243,.6)}
+ label.fld{display:block;margin-top:1.25rem}
+ label.fld .lab{font-size:.85rem;font-weight:700;color:var(--ink)}
+ input{width:100%;margin-top:.5rem;padding:.72rem .9rem;background:#fff;
+ border:1px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);transition:.15s}
+ input::placeholder{color:var(--faint)}
+ input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(33,150,243,.18)}
+ .btn{display:inline-flex;width:100%;align-items:center;justify-content:center;gap:.5rem;border-radius:12px;
+ padding:.82rem 1.5rem;font-size:.95rem;font-weight:700;border:0;cursor:pointer;transition:.15s;margin-top:1.4rem}
+ .btn:disabled{opacity:.5;cursor:not-allowed}
+ .btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 18px -6px rgba(33,150,243,.6)}
+ .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 24px -8px rgba(33,150,243,.7)}
+ .msg{margin-top:1rem;font-size:.82rem;line-height:1.5;border-radius:12px;padding:.7rem .9rem;display:none}
+ .msg.show{display:block}
+ .msg.err{background:rgba(220,38,38,.09);border:1px solid rgba(220,38,38,.28);color:#b42318}
+ .msg.ok{background:rgba(33,150,243,.09);border:1px solid rgba(33,150,243,.3);color:var(--primary-deep)}
+ .foot{margin-top:1.5rem;font-size:.82rem;color:var(--muted);text-align:center}
+ .foot a{color:var(--primary-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+ .ring{height:1rem;width:1rem;border-radius:999px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
+ @keyframes spin{to{transform:rotate(360deg)}}
+ .hide{display:none!important}
 </style>
 </head>
 <body>
-  <div class="top">
-    <img class="logo" src="/favicon-day.svg" alt="" aria-hidden="true">
-    <span>Array Operator<small>by EnergyAgent</small></span>
-  </div>
-  <main>
-    <div class="card">
-      <h1>Welcome back.</h1>
-      <p class="sub">Sign in to your array dashboard.</p>
+ <div class="top">
+ <img class="logo" src="/favicon-day.svg" alt="" aria-hidden="true">
+ <span>Array Operator<small>by EnergyAgent</small></span>
+ </div>
+ <main>
+ <div class="card">
+ <h1>Welcome back.</h1>
+ <p class="sub">Sign in to your array dashboard.</p>
 
-      <div class="tabs" role="tablist">
-        <button class="tab on" id="tabPw" role="tab" onclick="setMode('pw')">Password</button>
-        <button class="tab" id="tabMagic" role="tab" onclick="setMode('magic')">Email me a link</button>
-      </div>
+ <div class="tabs" role="tablist">
+ <button class="tab on" id="tabPw" role="tab" onclick="setMode('pw')">Password</button>
+ <button class="tab" id="tabMagic" role="tab" onclick="setMode('magic')">Email me a link</button>
+ </div>
 
-      <!-- PASSWORD -->
-      <form id="formPw" onsubmit="return doPassword(event)">
-        <label class="fld"><span class="lab">Email</span>
-          <input type="email" id="pwEmail" autocomplete="username" placeholder="you@example.com" required></label>
-        <label class="fld"><span class="lab">Password</span>
-          <input type="password" id="pwPass" autocomplete="current-password" placeholder="Your password" required></label>
-        <button class="btn btn-primary" id="pwBtn" type="submit">Sign in →</button>
-      </form>
+ <!-- PASSWORD -->
+ <form id="formPw" onsubmit="return doPassword(event)">
+ <label class="fld"><span class="lab">Email</span>
+ <input type="email" id="pwEmail" autocomplete="username" placeholder="you@example.com" required></label>
+ <label class="fld"><span class="lab">Password</span>
+ <input type="password" id="pwPass" autocomplete="current-password" placeholder="Your password" required></label>
+ <button class="btn btn-primary" id="pwBtn" type="submit">Sign in →</button>
+ </form>
 
-      <!-- MAGIC -->
-      <form id="formMagic" class="hide" onsubmit="return doMagic(event)">
-        <label class="fld"><span class="lab">Email</span>
-          <input type="email" id="magicEmail" autocomplete="username" placeholder="you@example.com" required></label>
-        <button class="btn btn-primary" id="magicBtn" type="submit">Email me a sign-in link →</button>
-      </form>
+ <!-- MAGIC -->
+ <form id="formMagic" class="hide" onsubmit="return doMagic(event)">
+ <label class="fld"><span class="lab">Email</span>
+ <input type="email" id="magicEmail" autocomplete="username" placeholder="you@example.com" required></label>
+ <button class="btn btn-primary" id="magicBtn" type="submit">Email me a sign-in link →</button>
+ </form>
 
-      <div class="msg" id="msg"></div>
+ <div class="msg" id="msg"></div>
 
-      <p class="foot">New here? <a href="/onboarding">Start your free trial →</a></p>
-    </div>
-  </main>
+ <p class="foot">New here? <a href="/onboarding">Start your free trial →</a></p>
+ </div>
+ </main>
 
 <script>
 // Same-origin on arrayoperator.com (/v1/* proxies to Railway via _redirects).
 // On a local static preview, hit the Railway backend directly (CORS allows it).
 const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
-  ? "https://web-production-49c83.up.railway.app" : "";
+ ? "https://web-production-49c83.up.railway.app" : "";
 const NEPOOL_LOGIN = "https://nepooloperator.com/accounts";
 
 const msg = document.getElementById("msg");
@@ -153,95 +153,95 @@ function showMsg(text, kind){ msg.className = "msg show " + kind; msg.innerHTML 
 function clearMsg(){ msg.className = "msg"; }
 
 function setMode(m){
-  const pw = m === "pw";
-  document.getElementById("tabPw").classList.toggle("on", pw);
-  document.getElementById("tabMagic").classList.toggle("on", !pw);
-  document.getElementById("formPw").classList.toggle("hide", !pw);
-  document.getElementById("formMagic").classList.toggle("hide", pw);
-  clearMsg();
+ const pw = m === "pw";
+ document.getElementById("tabPw").classList.toggle("on", pw);
+ document.getElementById("tabMagic").classList.toggle("on", !pw);
+ document.getElementById("formPw").classList.toggle("hide", !pw);
+ document.getElementById("formMagic").classList.toggle("hide", pw);
+ clearMsg();
 }
 
 function go(url){ window.location.assign(url); }
 function enterDashboard(){ go("/?fresh=1&t=" + Date.now()); }
 
 async function doPassword(e){
-  e.preventDefault();
-  const btn = document.getElementById("pwBtn");
-  const email = document.getElementById("pwEmail").value.trim().toLowerCase();
-  const password = document.getElementById("pwPass").value;
-  if(!email || !password) return false;
-  btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Signing in…'; clearMsg();
-  try{
-    const r = await fetch(`${API_BASE}/v1/auth/password-login`, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ email, password, product: "array_operator" })
-    });
-    if(r.status === 401){
-      showMsg("That email or password didn't match. Try again, or use the sign-in link instead.", "err");
-      btn.disabled = false; btn.textContent = "Sign in →"; return false;
-    }
-    const d = await r.json().catch(()=>({}));
-    if(!r.ok || !d.session_token){
-      showMsg(d.detail || "Sign-in failed. Please try again in a moment.", "err");
-      btn.disabled = false; btn.textContent = "Sign in →"; return false;
-    }
-    // Wrong product? Send them to their real home rather than a confusing dashboard.
-    if(d.product && d.product !== "array_operator"){
-      showMsg("That's a NEPOOL Operator account — taking you there…", "ok");
-      setTimeout(()=>go(NEPOOL_LOGIN), 900); return false;
-    }
-    try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
-    enterDashboard();
-  }catch(err){
-    showMsg("Couldn't reach the server. Check your connection and try again.", "err");
-    btn.disabled = false; btn.textContent = "Sign in →";
-  }
-  return false;
+ e.preventDefault();
+ const btn = document.getElementById("pwBtn");
+ const email = document.getElementById("pwEmail").value.trim().toLowerCase();
+ const password = document.getElementById("pwPass").value;
+ if(!email || !password) return false;
+ btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Signing in…'; clearMsg();
+ try{
+ const r = await fetch(`${API_BASE}/v1/auth/password-login`, {
+ method:"POST", headers:{"Content-Type":"application/json"},
+ body: JSON.stringify({ email, password, product: "array_operator" })
+ });
+ if(r.status === 401){
+ showMsg("That email or password didn't match. Try again, or use the sign-in link instead.", "err");
+ btn.disabled = false; btn.textContent = "Sign in →"; return false;
+ }
+ const d = await r.json().catch(()=>({}));
+ if(!r.ok || !d.session_token){
+ showMsg(d.detail || "Sign-in failed. Please try again in a moment.", "err");
+ btn.disabled = false; btn.textContent = "Sign in →"; return false;
+ }
+ // Wrong product? Send them to their real home rather than a confusing dashboard.
+ if(d.product && d.product !== "array_operator"){
+ showMsg("That's a NEPOOL Operator account, taking you there…", "ok");
+ setTimeout(()=>go(NEPOOL_LOGIN), 900); return false;
+ }
+ try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
+ enterDashboard();
+ }catch(err){
+ showMsg("Couldn't reach the server. Check your connection and try again.", "err");
+ btn.disabled = false; btn.textContent = "Sign in →";
+ }
+ return false;
 }
 
 async function doMagic(e){
-  e.preventDefault();
-  const btn = document.getElementById("magicBtn");
-  const email = document.getElementById("magicEmail").value.trim().toLowerCase();
-  if(!email) return false;
-  btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Sending…'; clearMsg();
-  try{
-    await fetch(`${API_BASE}/v1/auth/request`, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ email, product: "array_operator" })
-    });
-    // Always succeed-looking to avoid leaking which emails exist.
-    showMsg("If that email has an account, a secure sign-in link is on its way. It expires in 15 minutes.", "ok");
-    btn.textContent = "Link sent ✓";
-  }catch(err){
-    showMsg("Couldn't send the link. Check your connection and try again.", "err");
-    btn.disabled = false; btn.textContent = "Email me a sign-in link →";
-  }
-  return false;
+ e.preventDefault();
+ const btn = document.getElementById("magicBtn");
+ const email = document.getElementById("magicEmail").value.trim().toLowerCase();
+ if(!email) return false;
+ btn.disabled = true; btn.innerHTML = '<span class="ring"></span> Sending…'; clearMsg();
+ try{
+ await fetch(`${API_BASE}/v1/auth/request`, {
+ method:"POST", headers:{"Content-Type":"application/json"},
+ body: JSON.stringify({ email, product: "array_operator" })
+ });
+ // Always succeed-looking to avoid leaking which emails exist.
+ showMsg("If that email has an account, a secure sign-in link is on its way. It expires in 15 minutes.", "ok");
+ btn.textContent = "Link sent ✓";
+ }catch(err){
+ showMsg("Couldn't send the link. Check your connection and try again.", "err");
+ btn.disabled = false; btn.textContent = "Email me a sign-in link →";
+ }
+ return false;
 }
 
 // If a magic-link dropped us here with ?token=, exchange it for a session and
 // go straight in. (?error= comes from a failed exchange elsewhere.)
 (async function bootstrap(){
-  const params = new URLSearchParams(location.search);
-  const token = params.get("token");
-  if(params.get("email")) document.getElementById("pwEmail").value = params.get("email");
-  if(!token) return;
-  showMsg("Signing you in…", "ok");
-  try{
-    const r = await fetch(`${API_BASE}/v1/auth/verify`, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ token })
-    });
-    const d = await r.json().catch(()=>({}));
-    if(r.ok && d.session_token){
-      try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
-      enterDashboard(); return;
-    }
-    showMsg("That sign-in link is invalid or expired — request a fresh one below.", "err");
-  }catch(_){
-    showMsg("Couldn't verify that sign-in link. Try signing in below.", "err");
-  }
+ const params = new URLSearchParams(location.search);
+ const token = params.get("token");
+ if(params.get("email")) document.getElementById("pwEmail").value = params.get("email");
+ if(!token) return;
+ showMsg("Signing you in…", "ok");
+ try{
+ const r = await fetch(`${API_BASE}/v1/auth/verify`, {
+ method:"POST", headers:{"Content-Type":"application/json"},
+ body: JSON.stringify({ token })
+ });
+ const d = await r.json().catch(()=>({}));
+ if(r.ok && d.session_token){
+ try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
+ enterDashboard(); return;
+ }
+ showMsg("That sign-in link is invalid or expired, request a fresh one below.", "err");
+ }catch(_){
+ showMsg("Couldn't verify that sign-in link. Try signing in below.", "err");
+ }
 })();
 </script>
 </body>

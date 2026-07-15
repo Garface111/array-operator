@@ -1,5 +1,5 @@
 /* ============================================================================
- * Pending feeds — optimistic "Connecting…" state after ANY inverter vendor connect.
+ * Pending feeds, optimistic "Connecting…" state after ANY inverter vendor connect.
  * Survives the onboarding → dashboard hop via localStorage, paints a loading
  * card on Inverters so a 30–60s portal walk / cloud harvest doesn't look like a
  * failure, and polls fleet-tree until arrays for that vendor appear (or we time out).
@@ -7,7 +7,7 @@
  * Covered vendors: SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy.
  *
  * Stability: mark() is idempotent. write() only notifies when the vendor set OR
- * status changes. NEVER silently vanish a pending card — after long wait we mark
+ * status changes. NEVER silently vanish a pending card, after long wait we mark
  * status=stuck/failed so the operator sees an honest outcome.
  * ========================================================================== */
 (function () {
@@ -246,7 +246,7 @@
     }
   }
 
-  /** Enrich pending cards from cloud harvest health — login_failed etc. */
+  /** Enrich pending cards from cloud harvest health, login_failed etc. */
   async function enrichFromCloudStatus() {
     var tok = session();
     if (!tok) return;
@@ -284,18 +284,18 @@
           if (p.status !== "failed") {
             p.status = "failed";
             p.stuckMsg =
-              "Login failed — check username/password for this portal, then save again.";
+              "Login failed, check username/password for this portal, then save again.";
             changed = true;
           }
         } else if (st === "scrape_failed" || st === "error") {
           if (p.status !== "stuck") {
             p.status = "stuck";
             p.stuckMsg =
-              "Signed in, but we couldn’t read sites yet. Retrying automatically — large fleets can take a few minutes.";
+              "Signed in, but we couldn’t read sites yet. Retrying automatically, large fleets can take a few minutes.";
             changed = true;
           }
         } else if (c.last_harvest_ok === true && p.status !== "connecting") {
-          // Harvest said ok but arrays not in fleet yet — keep connecting copy
+          // Harvest said ok but arrays not in fleet yet, keep connecting copy
           p.status = "connecting";
           p.stuckMsg = null;
           changed = true;
@@ -306,7 +306,7 @@
         ) {
           p.status = "stuck";
           p.stuckMsg =
-            "Queued for cloud harvest — first pull usually lands within a couple minutes.";
+            "Queued for cloud harvest, first pull usually lands within a couple minutes.";
           changed = true;
         }
       });
@@ -329,7 +329,7 @@
         if (p.status === "connecting") {
           p.status = "stuck";
           p.stuckMsg =
-            "Taking longer than usual. Your login is saved — open Account → Auto-refresh to check harvest status, or save the login again to retry.";
+            "Taking longer than usual. Your login is saved, open Account → Auto-refresh to check harvest status, or save the login again to retry.";
           ch = true;
         }
       });

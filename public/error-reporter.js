@@ -1,9 +1,9 @@
-/* error-reporter.js — whole-system browser error capture (Array Operator).
+/* error-reporter.js, whole-system browser error capture (Array Operator).
  *
  * Catches uncaught errors + unhandled promise rejections and POSTs a compact,
  * capped report to the shared backend /v1/client-error, which routes it through
  * the same Sentry + internal-alert pipeline as server errors. One backend DSN
- * covers the whole EnergyAgent system — no separate frontend Sentry project.
+ * covers the whole EnergyAgent system, no separate frontend Sentry project.
  *
  * Defensive: never throws, dedupes repeats, throttles, and silently no-ops if
  * the network call fails (an error reporter must never cause errors).

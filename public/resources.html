@@ -3,89 +3,89 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Resources — Array Operator</title>
-<meta name="description" content="The New England solar operator's briefing: net-metering rates by state, REC market data, active rate cases, and the regulatory changes that move your credits — updated daily.">
+<title>Resources, Array Operator</title>
+<meta name="description" content="The New England solar operator's briefing: net-metering rates by state, REC market data, active rate cases, and the regulatory changes that move your credits, updated daily.">
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg">
 <style>
-  :root{ --ink:#0f172a; --muted:#475569; --faint:#94a3b8; --line:#e2e8f0; --bg:#f6f8fb;
-         --card:#fff; --good:#2563eb; --tint:#eff6ff; --tintln:#bfdbfe;
-         --amber:#b45309; --amberbg:#fff7ed; --amberln:#fed7aa;
-         --live:#059669; --livebg:#ecfdf5; }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  a{color:var(--good);text-decoration:none} a:hover{text-decoration:underline}
-  .wrap{max-width:920px;margin:0 auto;padding:22px 22px 90px}
-  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;
-    font-size:13.5px}
-  .top .r{display:flex;gap:18px;align-items:center}
-  .hero{margin:6px 0 30px}
-  .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--good)}
-  h1{font-size:34px;font-weight:820;letter-spacing:-.02em;margin:.28em 0 .12em;line-height:1.1}
-  .lede{color:var(--muted);font-size:16px;max-width:64ch;margin:0}
-  h2{font-size:12px;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
-    margin:0 0 14px;display:flex;align-items:center;gap:10px}
-  h2::after{content:"";flex:1;height:1px;background:var(--line)}
-  section{margin:38px 0 0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:12px 0}
-  h3{font-size:16px;font-weight:720;margin:0 0 6px;color:var(--ink)}
-  p{color:var(--muted);margin:.4em 0}
-  strong{color:var(--ink);font-weight:650}
-  .muted{color:var(--faint);font-size:13px}
-  /* live news */
-  .newshead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-  .livedot{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
-    letter-spacing:.06em;text-transform:uppercase;color:var(--live);background:var(--livebg);
-    border:1px solid #a7f3d0;border-radius:999px;padding:3px 9px}
-  .livedot i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.8s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .feed{display:flex;flex-direction:column;gap:0;margin-top:6px}
-  .item{display:grid;grid-template-columns:112px 1fr;gap:16px;padding:15px 4px;border-top:1px solid var(--line)}
-  .item:first-child{border-top:0}
-  .item .when{color:var(--faint);font-size:12.5px;white-space:nowrap;padding-top:2px}
-  .item .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-    padding:2px 8px;border-radius:6px;margin-top:6px;background:var(--tint);color:var(--good);border:1px solid var(--tintln)}
-  .item .tag.alert{background:var(--amberbg);color:var(--amber);border-color:var(--amberln)}
-  .item h4{font-size:15px;font-weight:650;margin:0 0 3px;color:var(--ink);line-height:1.35}
-  .item p{margin:0;font-size:13.5px}
-  .item .src{font-size:12.5px;margin-top:5px}
-  @media(max-width:560px){ .item{grid-template-columns:1fr;gap:4px} .item .when{padding-top:0} }
-  .srcs{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px}
-  .disc{background:var(--tint);border:1px solid var(--tintln);border-radius:12px;padding:12px 16px;
-    font-size:13px;color:var(--muted);margin:14px 0}
-  .foot{margin-top:52px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--faint)}
+ :root{ --ink:#0f172a; --muted:#475569; --faint:#94a3b8; --line:#e2e8f0; --bg:#f6f8fb;
+ --card:#fff; --good:#2563eb; --tint:#eff6ff; --tintln:#bfdbfe;
+ --amber:#b45309; --amberbg:#fff7ed; --amberln:#fed7aa;
+ --live:#059669; --livebg:#ecfdf5; }
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--ink);
+ font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+ a{color:var(--good);text-decoration:none} a:hover{text-decoration:underline}
+ .wrap{max-width:920px;margin:0 auto;padding:22px 22px 90px}
+ .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;
+ font-size:13.5px}
+ .top .r{display:flex;gap:18px;align-items:center}
+ .hero{margin:6px 0 30px}
+ .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--good)}
+ h1{font-size:34px;font-weight:820;letter-spacing:-.02em;margin:.28em 0 .12em;line-height:1.1}
+ .lede{color:var(--muted);font-size:16px;max-width:64ch;margin:0}
+ h2{font-size:12px;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+ margin:0 0 14px;display:flex;align-items:center;gap:10px}
+ h2::after{content:"";flex:1;height:1px;background:var(--line)}
+ section{margin:38px 0 0}
+ .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:12px 0}
+ h3{font-size:16px;font-weight:720;margin:0 0 6px;color:var(--ink)}
+ p{color:var(--muted);margin:.4em 0}
+ strong{color:var(--ink);font-weight:650}
+ .muted{color:var(--faint);font-size:13px}
+ /* live news */
+ .newshead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+ .livedot{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+ letter-spacing:.06em;text-transform:uppercase;color:var(--live);background:var(--livebg);
+ border:1px solid #a7f3d0;border-radius:999px;padding:3px 9px}
+ .livedot i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.8s infinite}
+ @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+ .feed{display:flex;flex-direction:column;gap:0;margin-top:6px}
+ .item{display:grid;grid-template-columns:112px 1fr;gap:16px;padding:15px 4px;border-top:1px solid var(--line)}
+ .item:first-child{border-top:0}
+ .item .when{color:var(--faint);font-size:12.5px;white-space:nowrap;padding-top:2px}
+ .item .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+ padding:2px 8px;border-radius:6px;margin-top:6px;background:var(--tint);color:var(--good);border:1px solid var(--tintln)}
+ .item .tag.alert{background:var(--amberbg);color:var(--amber);border-color:var(--amberln)}
+ .item h4{font-size:15px;font-weight:650;margin:0 0 3px;color:var(--ink);line-height:1.35}
+ .item p{margin:0;font-size:13.5px}
+ .item .src{font-size:12.5px;margin-top:5px}
+ @media(max-width:560px){ .item{grid-template-columns:1fr;gap:4px} .item .when{padding-top:0} }
+ .srcs{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px}
+ .disc{background:var(--tint);border:1px solid var(--tintln);border-radius:12px;padding:12px 16px;
+ font-size:13px;color:var(--muted);margin:14px 0}
+ .foot{margin-top:52px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--faint)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
-    <a href="/">← Array Operator</a>
-    <span class="r"><a href="/#reports">Offtaker invoicing</a><a href="/onboarding">Start free</a></span>
-  </div>
+ <div class="top">
+ <a href="/">← Array Operator</a>
+ <span class="r"><a href="/#reports">Offtaker invoicing</a><a href="/onboarding">Start free</a></span>
+ </div>
 
-  <div class="hero">
-    <span class="eyebrow" id="resEyebrow">The New England solar operator's briefing</span>
-    <h1>Know the rules that move your credits.</h1>
-    <p class="lede">Net-metering rates, Renewable Energy Credit (REC) market prices, active rate cases,
-      and the regulatory changes that decide what your arrays earn across New England — tracked in one
-      place and refreshed daily, so you never bill on a stale rate or miss a decision that affects your
-      offtakers.</p>
-  </div>
+ <div class="hero">
+ <span class="eyebrow" id="resEyebrow">The New England solar operator's briefing</span>
+ <h1>Know the rules that move your credits.</h1>
+ <p class="lede">Net-metering rates, Renewable Energy Credit (REC) market prices, active rate cases,
+ and the regulatory changes that decide what your arrays earn across New England, tracked in one
+ place and refreshed daily, so you never bill on a stale rate or miss a decision that affects your
+ offtakers.</p>
+ </div>
 
-  <div id="resApp"><p class="muted">Loading your state briefing…</p></div>
+ <div id="resApp"><p class="muted">Loading your state briefing…</p></div>
 
-  <div class="foot">
-    Array Operator, from Dyson Swarm Technologies. Reference figures are compiled from public
-    utility-commission filings and reporting and dated — always verify against the linked official
-    sources before relying on them. Questions:
-    <a href="mailto:admin@solaroperator.org">admin@solaroperator.org</a>.
-  </div>
+ <div class="foot">
+ Array Operator, from Dyson Swarm Technologies. Reference figures are compiled from public
+ utility-commission filings and reporting and dated, always verify against the linked official
+ sources before relying on them. Questions:
+ <a href="mailto:admin@solaroperator.org">admin@solaroperator.org</a>.
+ </div>
 </div>
 <script src="resources.js?v=20260713rec"></script>
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    if (window.AOResources) window.AOResources.mount(document.querySelector(".wrap"));
-  });
+ document.addEventListener("DOMContentLoaded", function () {
+ if (window.AOResources) window.AOResources.mount(document.querySelector(".wrap"));
+ });
 </script>
 </body>
 </html>

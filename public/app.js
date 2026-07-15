@@ -1,48 +1,48 @@
 /* ============================================================================
- * Array Operator — interactivity layer (app.js)
+ * Array Operator, interactivity layer (app.js)
  *
  * NEW DOM injected from JS (appended to <body>) for the design agent to style.
  * All new UI lives inside a single overlay container so it never collides with
  * the index.html structure. New class names introduced here:
  *
- *   .ao-overlay        full-screen modal backdrop (fixed, dim)
- *   .ao-modal          the modal card itself
- *   .ao-modal-head     header row (title + close button)
- *   .ao-modal-title    modal heading
- *   .ao-modal-close    the × close button
- *   .ao-modal-body     scrollable body region
- *   .ao-modal-foot     footer / action-button row
- *   .ao-field          wrapper for a labelled input/textarea
- *   .ao-label          field label
- *   .ao-input          single-line text input (e.g. TO / SUBJECT / API key)
- *   .ao-textarea       multi-line editable email body
- *   .ao-btn            generic button
- *   .ao-btn-primary    primary action button
- *   .ao-btn-ghost      secondary / ghost button
- *   .ao-note           small helper / status note
- *   .ao-note.ok        success state note
- *   .ao-note.err       error state note
- *   .ao-evidence       evidence summary block in the claim modal
- *   .ao-diag-grid      diagnosis stat grid
- *   .ao-diag-stat      one stat tile in the diagnosis modal
- *   .ao-diag-num       big number in a diag stat tile
- *   .ao-diag-cap       caption under a diag number
- *   .ao-causes         likely-causes list
- *   .ao-sites          discovered-sites list
- *   .ao-site           one discovered site row (checkbox + label)
- *   .ao-spark-lg       larger sparkline wrapper inside the diagnosis modal
+ * .ao-overlay full-screen modal backdrop (fixed, dim)
+ * .ao-modal the modal card itself
+ * .ao-modal-head header row (title + close button)
+ * .ao-modal-title modal heading
+ * .ao-modal-close the × close button
+ * .ao-modal-body scrollable body region
+ * .ao-modal-foot footer / action-button row
+ * .ao-field wrapper for a labelled input/textarea
+ * .ao-label field label
+ * .ao-input single-line text input (e.g. TO / SUBJECT / API key)
+ * .ao-textarea multi-line editable email body
+ * .ao-btn generic button
+ * .ao-btn-primary primary action button
+ * .ao-btn-ghost secondary / ghost button
+ * .ao-note small helper / status note
+ * .ao-note.ok success state note
+ * .ao-note.err error state note
+ * .ao-evidence evidence summary block in the claim modal
+ * .ao-diag-grid diagnosis stat grid
+ * .ao-diag-stat one stat tile in the diagnosis modal
+ * .ao-diag-num big number in a diag stat tile
+ * .ao-diag-cap caption under a diag number
+ * .ao-causes likely-causes list
+ * .ao-sites discovered-sites list
+ * .ao-site one discovered site row (checkbox + label)
+ * .ao-spark-lg larger sparkline wrapper inside the diagnosis modal
  *
  * Existing render() data flow + value math (ENERGY_RATE, REC_PER_MWH, val(),
  * invLostKwh(), spark(), STATUS_LABEL, FIX) are preserved unchanged. We only
  * add data-* hooks to the CTAs and wire click handlers via event delegation.
  * ==========================================================================*/
 
-// ---- value model (transparent estimate; backend _value_model is source of truth) ----
-// $/kWh comes from FleetStore.energyRate() — the owner's REAL billed rate when
-// signed in — so the warranty-email lost-value figure matches what they invoice,
+// ---- value model (transparent estimate; backend _value_model is billing basis) ----
+// $/kWh comes from FleetStore.energyRate(), the owner's REAL billed rate when
+// signed in, so the warranty-email lost-value figure matches what they invoice,
 // not a hardcoded $0.21. Falls back to 0.21 for the demo/anon fleet.
-const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh blended residential offset (VT-ish)
-const REC_PER_MWH = (window.FleetStore && window.FleetStore.REC_PER_MWH) || 38;  // $/MWh REC value
+const ENERGY_RATE_FALLBACK = 0.21; // $/kWh blended residential offset (VT-ish)
+const REC_PER_MWH = (window.FleetStore && window.FleetStore.REC_PER_MWH) || 38; // $/MWh REC value
 const energyRate = () => (window.FleetStore && window.FleetStore.energyRate) ? window.FleetStore.energyRate() : ENERGY_RATE_FALLBACK;
 const val = kwh => kwh*energyRate() + (kwh/1000)*REC_PER_MWH;
 const usd = n => n==null ? "—" : "$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -50,247 +50,247 @@ const usd0 = n => "$"+Number(n).toLocaleString(undefined,{maximumFractionDigits:
 const fmt = n => n==null ? "—" : Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
 
 function spark(daily, color){
-  if(!daily || !daily.length) return "";
-  const w=300,h=40,max=Math.max(...daily.map(d=>d.kwh),0.001);
-  // With a single day of history, daily.length-1 is 0 → x would be 0/0 = NaN (broken SVG).
-  // Spread points across the full width, but pin a lone point to the left edge.
-  const xAt=(i)=> daily.length>1 ? (i/(daily.length-1))*w : 0;
-  const pts=daily.map((d,i)=>`${xAt(i)},${h-3-(d.kwh/max)*(h-8)}`).join(" ");
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
-    ${daily.map((d,i)=>d.kwh===0?`<circle cx="${xAt(i)}" cy="${h-3}" r="2.2" fill="var(--bad)"/>`:"").join("")}
-  </svg>`;
+ if(!daily || !daily.length) return "";
+ const w=300,h=40,max=Math.max(...daily.map(d=>d.kwh),0.001);
+ // With a single day of history, daily.length-1 is 0 → x would be 0/0 = NaN (broken SVG).
+ // Spread points across the full width, but pin a lone point to the left edge.
+ const xAt=(i)=> daily.length>1 ? (i/(daily.length-1))*w : 0;
+ const pts=daily.map((d,i)=>`${xAt(i)},${h-3-(d.kwh/max)*(h-8)}`).join(" ");
+ return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+ <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
+ ${daily.map((d,i)=>d.kwh===0?`<circle cx="${xAt(i)}" cy="${h-3}" r="2.2" fill="var(--bad)"/>`:"").join("")}
+ </svg>`;
 }
 
 // estimate per-inverter window $ lost: how far below its fair share it ran
 function invLostKwh(inv, fleetWindowKwh, totalNameplate){
-  if(!inv.peer_index || inv.peer_index>=0.85 || inv.nameplate_kw==null) {
-    if(inv.status==="dead"||inv.status==="fault"){ // dead: lost ~ what a healthy peer share would've made
-      const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
-      return Math.max(0, fair - (inv.window_kwh||0));
-    }
-    return 0;
-  }
-  const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
-  return Math.max(0, fair/Math.max(inv.peer_index,0.01) - (inv.window_kwh||0));
+ if(!inv.peer_index || inv.peer_index>=0.85 || inv.nameplate_kw==null) {
+ if(inv.status==="dead"||inv.status==="fault"){ // dead: lost ~ what a healthy peer share would've made
+ const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
+ return Math.max(0, fair - (inv.window_kwh||0));
+ }
+ return 0;
+ }
+ const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
+ return Math.max(0, fair/Math.max(inv.peer_index,0.01) - (inv.window_kwh||0));
 }
 
 // ---- keep last-rendered data so click handlers can look up inverters ----
 let CURRENT = null;
 
 function render(data){
-  // The below-sandbox dashboard UI (hero, value cards, agent actions, inverter
-  // grid, footer) was removed in the sandbox.js refactor — those DOM nodes
-  // (#grid, #title, #meta, #todayValue, #actions, #foot, …) no longer exist.
-  // We keep this entry point (and CURRENT) only so the data-loading flow can
-  // stash the live fleet for the claim/diagnosis modals' fleetContext(). The
-  // old render body was dead code (guarded by `if(!#grid) return;`) and has
-  // been deleted; the helpers it shared (spark, invLostKwh, val…) live on for
-  // the modals.
-  CURRENT = data;
+ // The below-sandbox dashboard UI (hero, value cards, agent actions, inverter
+ // grid, footer) was removed in the sandbox.js refactor, those DOM nodes
+ // (#grid, #title, #meta, #todayValue, #actions, #foot, …) no longer exist.
+ // We keep this entry point (and CURRENT) only so the data-loading flow can
+ // stash the live fleet for the claim/diagnosis modals' fleetContext(). The
+ // old render body was dead code (guarded by `if(!#grid) return;`) and has
+ // been deleted; the helpers it shared (spark, invLostKwh, val…) live on for
+ // the modals.
+ CURRENT = data;
 }
 
 /* ===========================================================================
- * Reusable modal helper — overlay, Esc + backdrop close, focus restore.
+ * Reusable modal helper, overlay, Esc + backdrop close, focus restore.
  * openModal({title, bodyHTML, footHTML, onMount}) returns a controller with
  * { close, root } so callers can wire buttons inside onMount.
  * ==========================================================================*/
-let _ovl = null;        // shared overlay node
+let _ovl = null; // shared overlay node
 let _escHandler = null;
 let _lastFocus = null;
-let _modalOnClose = null;   // fires once whenever the modal closes, however it closes
+let _modalOnClose = null; // fires once whenever the modal closes, however it closes
 
 function ensureOverlay(){
-  if(_ovl) return _ovl;
-  _ovl = document.createElement("div");
-  _ovl.className = "ao-overlay";
-  _ovl.style.display = "none";
-  // minimal inline layout so it's usable even before the designer styles it
-  _ovl.setAttribute("style",
-    "display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,16,24,.62);"+
-    "backdrop-filter:blur(2px);overflow:auto;padding:5vh 16px;");
-  document.body.appendChild(_ovl);
-  return _ovl;
+ if(_ovl) return _ovl;
+ _ovl = document.createElement("div");
+ _ovl.className = "ao-overlay";
+ _ovl.style.display = "none";
+ // minimal inline layout so it's usable even before the designer styles it
+ _ovl.setAttribute("style",
+ "display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,16,24,.62);"+
+ "backdrop-filter:blur(2px);overflow:auto;padding:5vh 16px;");
+ document.body.appendChild(_ovl);
+ return _ovl;
 }
 
 function closeModal(){
-  if(!_ovl) return;
-  _ovl.style.display = "none";
-  _ovl.innerHTML = "";
-  if(_escHandler){ document.removeEventListener("keydown", _escHandler); _escHandler=null; }
-  if(_lastFocus && _lastFocus.focus){ try{ _lastFocus.focus(); }catch(e){} }
-  // Fires exactly once per open→close cycle, however the modal closed (×, backdrop,
-  // Esc, or a caller's own close() call) — AODialog below uses this as its single
-  // resolve path so a dismissed dialog behaves like a cancelled native confirm/prompt.
-  if(_modalOnClose){ const cb = _modalOnClose; _modalOnClose = null; cb(); }
+ if(!_ovl) return;
+ _ovl.style.display = "none";
+ _ovl.innerHTML = "";
+ if(_escHandler){ document.removeEventListener("keydown", _escHandler); _escHandler=null; }
+ if(_lastFocus && _lastFocus.focus){ try{ _lastFocus.focus(); }catch(e){} }
+ // Fires exactly once per open→close cycle, however the modal closed (×, backdrop,
+ // Esc, or a caller's own close() call), AODialog below uses this as its single
+ // resolve path so a dismissed dialog behaves like a cancelled native confirm/prompt.
+ if(_modalOnClose){ const cb = _modalOnClose; _modalOnClose = null; cb(); }
 }
 
 function openModal({title, bodyHTML, footHTML, onMount, onClose}){
-  _modalOnClose = onClose || null;
-  _lastFocus = document.activeElement;
-  const ovl = ensureOverlay();
-  ovl.innerHTML =
-    `<div class="ao-modal" role="dialog" aria-modal="true" aria-label="${(title||"").replace(/"/g,'&quot;')}"
-        style="max-width:680px;margin:0 auto;background:#fff;color:#16202b;border-radius:14px;
-               box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden;">
-      <div class="ao-modal-head" style="display:flex;align-items:center;justify-content:space-between;
-           padding:16px 20px;border-bottom:1px solid rgba(0,0,0,.08);">
-        <div class="ao-modal-title" style="font-weight:700;font-size:18px;">${title||""}</div>
-        <button class="ao-modal-close" aria-label="Close" type="button"
-           style="border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#5a6b7b;">&times;</button>
-      </div>
-      <div class="ao-modal-body" style="padding:20px;max-height:64vh;overflow:auto;">${bodyHTML||""}</div>
-      ${footHTML?`<div class="ao-modal-foot" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;
-           padding:14px 20px;border-top:1px solid rgba(0,0,0,.08);background:#f7f9fb;">${footHTML}</div>`:""}
-    </div>`;
-  ovl.style.display = "block";
+ _modalOnClose = onClose || null;
+ _lastFocus = document.activeElement;
+ const ovl = ensureOverlay();
+ ovl.innerHTML =
+ `<div class="ao-modal" role="dialog" aria-modal="true" aria-label="${(title||"").replace(/"/g,'&quot;')}"
+ style="max-width:680px;margin:0 auto;background:#fff;color:#16202b;border-radius:14px;
+ box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden;">
+ <div class="ao-modal-head" style="display:flex;align-items:center;justify-content:space-between;
+ padding:16px 20px;border-bottom:1px solid rgba(0,0,0,.08);">
+ <div class="ao-modal-title" style="font-weight:700;font-size:18px;">${title||""}</div>
+ <button class="ao-modal-close" aria-label="Close" type="button"
+ style="border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#5a6b7b;">&times;</button>
+ </div>
+ <div class="ao-modal-body" style="padding:20px;max-height:64vh;overflow:auto;">${bodyHTML||""}</div>
+ ${footHTML?`<div class="ao-modal-foot" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;
+ padding:14px 20px;border-top:1px solid rgba(0,0,0,.08);background:#f7f9fb;">${footHTML}</div>`:""}
+ </div>`;
+ ovl.style.display = "block";
 
-  // close wiring: × button, backdrop click, Esc
-  ovl.querySelector(".ao-modal-close").onclick = closeModal;
-  ovl.onclick = e => { if(e.target === ovl) closeModal(); };
-  _escHandler = e => { if(e.key === "Escape") closeModal(); };
-  document.addEventListener("keydown", _escHandler);
+ // close wiring: × button, backdrop click, Esc
+ ovl.querySelector(".ao-modal-close").onclick = closeModal;
+ ovl.onclick = e => { if(e.target === ovl) closeModal(); };
+ _escHandler = e => { if(e.key === "Escape") closeModal(); };
+ document.addEventListener("keydown", _escHandler);
 
-  const root = ovl.querySelector(".ao-modal");
-  if(onMount) onMount(root, closeModal);
-  // focus the first sensible control
-  const firstFocus = root.querySelector("input,textarea,button.ao-btn-primary,.ao-modal-close");
-  if(firstFocus) try{ firstFocus.focus(); }catch(e){}
-  return { close: closeModal, root };
+ const root = ovl.querySelector(".ao-modal");
+ if(onMount) onMount(root, closeModal);
+ // focus the first sensible control
+ const firstFocus = root.querySelector("input,textarea,button.ao-btn-primary,.ao-modal-close");
+ if(firstFocus) try{ firstFocus.focus(); }catch(e){}
+ return { close: closeModal, root };
 }
 
 /* ===========================================================================
- * AODialog — confirm/alert/prompt, styled as our own card (never the unstylable
+ * AODialog, confirm/alert/prompt, styled as our own card (never the unstylable
  * native Chrome dialogs). Built on openModal(), so it automatically matches the
  * app's skin (day theme + the dark defaults) with zero extra CSS wiring.
  *
- *   const ok  = await AODialog.confirm("This can't be undone.", {title:"Delete X?", danger:true});
- *   const val = await AODialog.prompt("Leave blank to clear.", current, {title:"Set a note"});
- *   await AODialog.alert("Couldn't save — try again.", {title:"Network error"});
+ * const ok = await AODialog.confirm("This can't be undone.", {title:"Delete X?", danger:true});
+ * const val = await AODialog.prompt("Leave blank to clear.", current, {title:"Set a note"});
+ * await AODialog.alert("Couldn't save, try again.", {title:"Network error"});
  *
  * Splitting a native dialog's one-line message into a short TITLE (the decision)
- * + a body (the consequence) is the point, not just a skin — read clearer than a
+ * + a body (the consequence) is the point, not just a skin, read clearer than a
  * wall of text. Esc / backdrop click / Cancel all resolve exactly like a native
  * dialog's cancel path: false for confirm, null for prompt, undefined for alert.
  * ==========================================================================*/
 function _aodEsc(s){
-  return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 let _aodSeq = 0;
 function _aodOpen({ kind, title, message, confirmLabel, cancelLabel, danger, value, placeholder }){
-  return new Promise(resolve => {
-    const id = "aod" + (++_aodSeq);
-    const isPrompt = kind === "prompt", isAlert = kind === "alert";
-    const msgHTML = _aodEsc(message).replace(/\n/g, "<br>");
-    const fieldHTML = isPrompt
-      ? `<div class="ao-field" style="margin-top:12px;">
-           <input class="ao-input ao-dialog-input" id="${id}" type="text" value="${_aodEsc(value||"")}"
-             placeholder="${_aodEsc(placeholder||"")}"
-             style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:9px;font-size:14px;">
-         </div>`
-      : "";
-    const footHTML = isAlert
-      ? `<button type="button" class="ao-btn ao-btn-primary" data-act="ok"
-           style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||"OK")}</button>`
-      : `<button type="button" class="ao-btn ao-btn-ghost" data-act="cancel"
-           style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:9px;background:#fff;cursor:pointer;font-weight:650;">${_aodEsc(cancelLabel||"Cancel")}</button>
-         <button type="button" class="ao-btn ao-btn-primary${danger?" ao-btn-danger":""}" data-act="confirm"
-           style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||(isPrompt?"Save":"Confirm"))}</button>`;
+ return new Promise(resolve => {
+ const id = "aod" + (++_aodSeq);
+ const isPrompt = kind === "prompt", isAlert = kind === "alert";
+ const msgHTML = _aodEsc(message).replace(/\n/g, "<br>");
+ const fieldHTML = isPrompt
+ ? `<div class="ao-field" style="margin-top:12px;">
+ <input class="ao-input ao-dialog-input" id="${id}" type="text" value="${_aodEsc(value||"")}"
+ placeholder="${_aodEsc(placeholder||"")}"
+ style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:9px;font-size:14px;">
+ </div>`
+ : "";
+ const footHTML = isAlert
+ ? `<button type="button" class="ao-btn ao-btn-primary" data-act="ok"
+ style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||"OK")}</button>`
+ : `<button type="button" class="ao-btn ao-btn-ghost" data-act="cancel"
+ style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:9px;background:#fff;cursor:pointer;font-weight:650;">${_aodEsc(cancelLabel||"Cancel")}</button>
+ <button type="button" class="ao-btn ao-btn-primary${danger?" ao-btn-danger":""}" data-act="confirm"
+ style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">${_aodEsc(confirmLabel||(isPrompt?"Save":"Confirm"))}</button>`;
 
-    let settled = false;
-    const fallback = isAlert ? undefined : (isPrompt ? null : false);
-    const settle = v => { if(settled) return; settled = true; resolve(v); };
+ let settled = false;
+ const fallback = isAlert ? undefined : (isPrompt ? null : false);
+ const settle = v => { if(settled) return; settled = true; resolve(v); };
 
-    openModal({
-      title: title || "",
-      bodyHTML: `<p class="ao-dialog-msg" style="margin:0;font-size:14px;line-height:1.55;">${msgHTML}</p>${fieldHTML}`,
-      footHTML,
-      onClose: () => settle(fallback),
-      onMount(root, close){
-        const input = root.querySelector(".ao-dialog-input");
-        const cancelBtn = root.querySelector('[data-act="cancel"]');
-        const okBtn = root.querySelector('[data-act="confirm"]') || root.querySelector('[data-act="ok"]');
-        if(input){
-          setTimeout(() => { try{ input.focus(); input.select(); }catch(e){} }, 30);
-          input.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); okBtn && okBtn.click(); } });
-        }
-        if(cancelBtn) cancelBtn.onclick = () => { settle(fallback); close(); };
-        if(okBtn) okBtn.onclick = () => {
-          const v = isPrompt ? (input ? input.value : "") : (isAlert ? undefined : true);
-          settle(v); close();
-        };
-      }
-    });
-  });
+ openModal({
+ title: title || "",
+ bodyHTML: `<p class="ao-dialog-msg" style="margin:0;font-size:14px;line-height:1.55;">${msgHTML}</p>${fieldHTML}`,
+ footHTML,
+ onClose: () => settle(fallback),
+ onMount(root, close){
+ const input = root.querySelector(".ao-dialog-input");
+ const cancelBtn = root.querySelector('[data-act="cancel"]');
+ const okBtn = root.querySelector('[data-act="confirm"]') || root.querySelector('[data-act="ok"]');
+ if(input){
+ setTimeout(() => { try{ input.focus(); input.select(); }catch(e){} }, 30);
+ input.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); okBtn && okBtn.click(); } });
+ }
+ if(cancelBtn) cancelBtn.onclick = () => { settle(fallback); close(); };
+ if(okBtn) okBtn.onclick = () => {
+ const v = isPrompt ? (input ? input.value : "") : (isAlert ? undefined : true);
+ settle(v); close();
+ };
+ }
+ });
+ });
 }
 window.AODialog = {
-  confirm(message, opts){ return _aodOpen(Object.assign({ kind:"confirm", message }, opts||{})); },
-  alert(message, opts){ return _aodOpen(Object.assign({ kind:"alert", message }, opts||{})); },
-  prompt(message, value, opts){ return _aodOpen(Object.assign({ kind:"prompt", message, value }, opts||{})); },
+ confirm(message, opts){ return _aodOpen(Object.assign({ kind:"confirm", message }, opts||{})); },
+ alert(message, opts){ return _aodOpen(Object.assign({ kind:"alert", message }, opts||{})); },
+ prompt(message, value, opts){ return _aodOpen(Object.assign({ kind:"prompt", message, value }, opts||{})); },
 };
 
 const esc = s => String(s==null?"":s)
-  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-  .replace(/"/g,"&quot;");
+ .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+ .replace(/"/g,"&quot;");
 
 // ---- helper math shared by the action modals ----
 function fleetContext(){
-  const s=CURRENT.summary, invs=CURRENT.inverters;
-  const totalNameplate = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
-  return {s, invs, totalNameplate};
+ const s=CURRENT.summary, invs=CURRENT.inverters;
+ const totalNameplate = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0)||1;
+ return {s, invs, totalNameplate};
 }
 // count trailing zero-production days in the daily series (the down-streak)
 function zeroStreak(daily){
-  if(!daily||!daily.length) return 0;
-  let n=0;
-  for(let i=daily.length-1;i>=0;i--){ if((daily[i].kwh||0)===0) n++; else break; }
-  return n;
+ if(!daily||!daily.length) return 0;
+ let n=0;
+ for(let i=daily.length-1;i>=0;i--){ if((daily[i].kwh||0)===0) n++; else break; }
+ return n;
 }
 
 /* ---- 1. WARRANTY / SERVICE CLAIM MODAL ---- */
 function openClaimModal(inv){
-  const {s, totalNameplate} = fleetContext();
-  const lostK = invLostKwh(inv, s.window_kwh, totalNameplate);
-  const lostUsd = val(lostK);
-  const streak = zeroStreak(inv.daily);
-  const hours = inv.stale_hours!=null ? inv.stale_hours : null;
-  const daysDown = streak>0 ? streak : (hours!=null ? Math.round(hours/24) : null);
-  const isFault = inv.status==="fault";
-  const vendorTitle = (inv.vendor||"manufacturer").replace(/\b\w/g,c=>c.toUpperCase());
-  const today = new Date().toISOString().slice(0,10);
+ const {s, totalNameplate} = fleetContext();
+ const lostK = invLostKwh(inv, s.window_kwh, totalNameplate);
+ const lostUsd = val(lostK);
+ const streak = zeroStreak(inv.daily);
+ const hours = inv.stale_hours!=null ? inv.stale_hours : null;
+ const daysDown = streak>0 ? streak : (hours!=null ? Math.round(hours/24) : null);
+ const isFault = inv.status==="fault";
+ const vendorTitle = (inv.vendor||"manufacturer").replace(/\b\w/g,c=>c.toUpperCase());
+ const today = new Date().toISOString().slice(0,10);
 
-  // Real manufacturer support inboxes for the vendors we capture; fall back to a
-  // sanitized slug guess for anything else (no injectable chars survive the strip).
-  const VENDOR_SUPPORT = { solaredge:"support@solaredge.com", fronius:"pv-support-usa@fronius.com", sma:"service@sma-america.com", enphase:"support@enphase.com", chint:"service@chintpower.com" };
-  const vKey = (inv.vendor||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-  const to = VENDOR_SUPPORT[vKey] || `support@${vKey||"installer"}.com`;
-  // Subject is a single header line — strip CR/LF/tabs from backend fields.
-  const subject = `${isFault?"Service request":"Warranty claim"} — ${inv.model} ${inv.serial}${inv.error_code?` (fault ${inv.error_code})`:""}`.replace(/[\r\n\t]+/g," ").trim();
+ // Real manufacturer support inboxes for the vendors we capture; fall back to a
+ // sanitized slug guess for anything else (no injectable chars survive the strip).
+ const VENDOR_SUPPORT = { solaredge:"support@solaredge.com", fronius:"pv-support-usa@fronius.com", sma:"service@sma-america.com", enphase:"support@enphase.com", chint:"service@chintpower.com" };
+ const vKey = (inv.vendor||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+ const to = VENDOR_SUPPORT[vKey] || `support@${vKey||"installer"}.com`;
+ // Subject is a single header line, strip CR/LF/tabs from backend fields.
+ const subject = `${isFault?"Service request":"Warranty claim"}, ${inv.model} ${inv.serial}${inv.error_code?` (fault ${inv.error_code})`:""}`.replace(/[\r\n\t]+/g," ").trim();
 
-  const downLine = daysDown!=null
-    ? `It has produced ZERO output for ${streak>0?`${streak} consecutive days`:`approximately ${daysDown} day(s)`}${hours!=null?` (last telemetry ${fmt(hours)} hours ago)`:""}.`
-    : `It has stopped producing.`;
+ const downLine = daysDown!=null
+ ? `It has produced ZERO output for ${streak>0?`${streak} consecutive days`:`approximately ${daysDown} day(s)`}${hours!=null?` (last telemetry ${fmt(hours)} hours ago)`:""}.`
+ : `It has stopped producing.`;
 
-  const body =
+ const body =
 `To whom it may concern,
 
 I am writing to ${isFault?"request service for":"file a warranty claim on"} the following inverter on my solar array "${CURRENT.array.name}":
 
-  • Serial number:   ${inv.serial}
-  • Model:           ${inv.model}
-  • Manufacturer:    ${vendorTitle}
-  • Nameplate:       ${inv.nameplate_kw!=null?inv.nameplate_kw+" kW":"—"}
-  • Reported status: ${isFault?"FAULT":"DEAD / not reporting"}${inv.error_code?`\n  • Fault code:      ${inv.error_code}`:""}
+ • Serial number: ${inv.serial}
+ • Model: ${inv.model}
+ • Manufacturer: ${vendorTitle}
+ • Nameplate: ${inv.nameplate_kw!=null?inv.nameplate_kw+" kW":"—"}
+ • Reported status: ${isFault?"FAULT":"DEAD / not reporting"}${inv.error_code?`\n • Fault code: ${inv.error_code}`:""}
 
 Issue:
 ${inv.diagnosis||"The inverter has stopped producing."}
 ${downLine}
 
 Evidence (independently measured against ${s.inverters_total-1} peer inverters on the same array, under identical weather):
-  • Peer index:            ${inv.peer_index!=null?inv.peer_index.toFixed(2):"—"} (1.00 = fair share; this unit is below par)
-  • Production this window: ${fmt(inv.window_kwh)} kWh over ${s.window_days} days
-  • Estimated lost output:  ${fmt(lostK)} kWh so far
-  • Estimated lost value:   ${usd(lostUsd)} (at ${usd(energyRate())}/kWh offset + ${usd0(REC_PER_MWH)}/MWh RECs)
+ • Peer index: ${inv.peer_index!=null?inv.peer_index.toFixed(2):"—"} (1.00 = fair share; this unit is below par)
+ • Production this window: ${fmt(inv.window_kwh)} kWh over ${s.window_days} days
+ • Estimated lost output: ${fmt(lostK)} kWh so far
+ • Estimated lost value: ${usd(lostUsd)} (at ${usd(energyRate())}/kWh offset + ${usd0(REC_PER_MWH)}/MWh RECs)
 
 The neighboring inverters continued to produce normally over the same period, which rules out weather or shading as the cause. Please advise on next steps for repair or replacement under warranty.
 
@@ -301,166 +301,166 @@ Thank you,
 [Site address / system ID]
 [Phone]`;
 
-  const evidence =
-    `<div class="ao-evidence" style="background:#f3f6f9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;">
-      <b>${esc(inv.serial)}</b> · ${esc(inv.model)} · ${esc(vendorTitle)}<br>
-      Status <b>${isFault?"FAULT":"DEAD"}</b>${inv.error_code?` · code <b>${esc(inv.error_code)}</b>`:""}
-      ${daysDown!=null?` · down ~<b>${daysDown} day(s)</b>`:""}
-      · est. loss so far <b>${usd(lostUsd)}</b>
-    </div>`;
+ const evidence =
+ `<div class="ao-evidence" style="background:#f3f6f9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;">
+ <b>${esc(inv.serial)}</b> · ${esc(inv.model)} · ${esc(vendorTitle)}<br>
+ Status <b>${isFault?"FAULT":"DEAD"}</b>${inv.error_code?` · code <b>${esc(inv.error_code)}</b>`:""}
+ ${daysDown!=null?` · down ~<b>${daysDown} day(s)</b>`:""}
+ · est. loss so far <b>${usd(lostUsd)}</b>
+ </div>`;
 
-  openModal({
-    title: isFault ? "Service request — ready to send" : "Warranty claim — ready to send",
-    bodyHTML:
-      evidence +
-      `<div class="ao-field" style="margin-bottom:12px;">
-        <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">To (manufacturer / installer)</label>
-        <input class="ao-input" id="ao-to" type="text" value="${esc(to)}"
-          style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cdd7e0;border-radius:8px;font-size:14px;">
-      </div>
-      <div class="ao-field" style="margin-bottom:12px;">
-        <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">Subject</label>
-        <input class="ao-input" id="ao-subj" type="text" value="${esc(subject)}"
-          style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cdd7e0;border-radius:8px;font-size:14px;">
-      </div>
-      <div class="ao-field">
-        <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">Body (editable)</label>
-        <textarea class="ao-textarea" id="ao-body" rows="16"
-          style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cdd7e0;border-radius:8px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;">${esc(body)}</textarea>
-      </div>
-      <div class="ao-note" id="ao-claim-note" style="font-size:12px;color:#5a6b7b;margin-top:8px;min-height:16px;"></div>`,
-    footHTML:
-      `<button class="ao-btn ao-btn-ghost" id="ao-copy" type="button"
-         style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:8px;background:#fff;cursor:pointer;font-weight:600;">Copy to clipboard</button>
-       <button class="ao-btn ao-btn-primary" id="ao-mail" type="button"
-         style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Open in email</button>`,
-    onMount(root, close){
-      const note = root.querySelector("#ao-claim-note");
-      const getVals = () => ({
-        to: root.querySelector("#ao-to").value,
-        subj: root.querySelector("#ao-subj").value,
-        body: root.querySelector("#ao-body").value
-      });
-      root.querySelector("#ao-copy").onclick = async () => {
-        const v = getVals();
-        const text = `To: ${v.to}\nSubject: ${v.subj}\n\n${v.body}`;
-        try{
-          await navigator.clipboard.writeText(text);
-          note.textContent = "Copied — paste it into your email client.";
-          note.className = "ao-note ok";
-        }catch(e){
-          // fallback: select the textarea contents (guard — the node may be gone
-          // if the modal was torn down or the DOM changed under us)
-          const ta = root.querySelector("#ao-body");
-          if(ta){ ta.focus(); ta.select(); }
-          note.textContent = "Couldn't auto-copy — the draft is selected, press ⌘/Ctrl-C.";
-          note.className = "ao-note err";
-        }
-      };
-      root.querySelector("#ao-mail").onclick = async () => {
-        const v = getVals();
-        const href = `mailto:${encodeURIComponent(v.to)}`+
-          `?subject=${encodeURIComponent(v.subj)}`+
-          `&body=${encodeURIComponent(v.body)}`;
-        // Browsers silently drop overly-long mailto: URLs — exactly the dead/fault
-        // inverters that matter most produce the longest drafts. When the href is
-        // too long to open reliably, copy the full draft instead so it's never
-        // lost, and keep the modal open so the user sees what happened.
-        if(href.length > 1800){
-          const text = `To: ${v.to}\nSubject: ${v.subj}\n\n${v.body}`;
-          try{
-            await navigator.clipboard.writeText(text);
-            note.textContent = "This draft was too long to open in your email automatically — we copied it instead. Paste it into a new email.";
-            note.className = "ao-note ok";
-          }catch(e){
-            const ta = root.querySelector("#ao-body");
-            if(ta){ ta.focus(); ta.select(); }
-            note.textContent = "This draft is too long to open automatically — it's selected, press ⌘/Ctrl-C to copy it.";
-            note.className = "ao-note err";
-          }
-          return;
-        }
-        window.location.href = href;
-        note.textContent = "Opening your email client…";
-        note.className = "ao-note ok";
-        // Hand off to the email client, then close the overlay so it doesn't sit
-        // stuck on top blocking the page while the user finishes the email.
-        setTimeout(() => { try{ close(); }catch(e){} }, 400);
-      };
-    }
-  });
+ openModal({
+ title: isFault ? "Service request, ready to send" : "Warranty claim, ready to send",
+ bodyHTML:
+ evidence +
+ `<div class="ao-field" style="margin-bottom:12px;">
+ <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">To (manufacturer / installer)</label>
+ <input class="ao-input" id="ao-to" type="text" value="${esc(to)}"
+ style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cdd7e0;border-radius:8px;font-size:14px;">
+ </div>
+ <div class="ao-field" style="margin-bottom:12px;">
+ <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">Subject</label>
+ <input class="ao-input" id="ao-subj" type="text" value="${esc(subject)}"
+ style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cdd7e0;border-radius:8px;font-size:14px;">
+ </div>
+ <div class="ao-field">
+ <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">Body (editable)</label>
+ <textarea class="ao-textarea" id="ao-body" rows="16"
+ style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cdd7e0;border-radius:8px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical;">${esc(body)}</textarea>
+ </div>
+ <div class="ao-note" id="ao-claim-note" style="font-size:12px;color:#5a6b7b;margin-top:8px;min-height:16px;"></div>`,
+ footHTML:
+ `<button class="ao-btn ao-btn-ghost" id="ao-copy" type="button"
+ style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:8px;background:#fff;cursor:pointer;font-weight:600;">Copy to clipboard</button>
+ <button class="ao-btn ao-btn-primary" id="ao-mail" type="button"
+ style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Open in email</button>`,
+ onMount(root, close){
+ const note = root.querySelector("#ao-claim-note");
+ const getVals = () => ({
+ to: root.querySelector("#ao-to").value,
+ subj: root.querySelector("#ao-subj").value,
+ body: root.querySelector("#ao-body").value
+ });
+ root.querySelector("#ao-copy").onclick = async () => {
+ const v = getVals();
+ const text = `To: ${v.to}\nSubject: ${v.subj}\n\n${v.body}`;
+ try{
+ await navigator.clipboard.writeText(text);
+ note.textContent = "Copied, paste it into your email client.";
+ note.className = "ao-note ok";
+ }catch(e){
+ // fallback: select the textarea contents (guard, the node may be gone
+ // if the modal was torn down or the DOM changed under us)
+ const ta = root.querySelector("#ao-body");
+ if(ta){ ta.focus(); ta.select(); }
+ note.textContent = "Couldn't auto-copy, the draft is selected, press ⌘/Ctrl-C.";
+ note.className = "ao-note err";
+ }
+ };
+ root.querySelector("#ao-mail").onclick = async () => {
+ const v = getVals();
+ const href = `mailto:${encodeURIComponent(v.to)}`+
+ `?subject=${encodeURIComponent(v.subj)}`+
+ `&body=${encodeURIComponent(v.body)}`;
+ // Browsers silently drop overly-long mailto: URLs, exactly the dead/fault
+ // inverters that matter most produce the longest drafts. When the href is
+ // too long to open reliably, copy the full draft instead so it's never
+ // lost, and keep the modal open so the user sees what happened.
+ if(href.length > 1800){
+ const text = `To: ${v.to}\nSubject: ${v.subj}\n\n${v.body}`;
+ try{
+ await navigator.clipboard.writeText(text);
+ note.textContent = "This draft was too long to open in your email automatically, we copied it instead. Paste it into a new email.";
+ note.className = "ao-note ok";
+ }catch(e){
+ const ta = root.querySelector("#ao-body");
+ if(ta){ ta.focus(); ta.select(); }
+ note.textContent = "This draft is too long to open automatically, it's selected, press ⌘/Ctrl-C to copy it.";
+ note.className = "ao-note err";
+ }
+ return;
+ }
+ window.location.href = href;
+ note.textContent = "Opening your email client…";
+ note.className = "ao-note ok";
+ // Hand off to the email client, then close the overlay so it doesn't sit
+ // stuck on top blocking the page while the user finishes the email.
+ setTimeout(() => { try{ close(); }catch(e){} }, 400);
+ };
+ }
+ });
 }
 
 /* ---- 2. DIAGNOSIS MODAL (underperforming / comm_gap) ---- */
 function openDiagModal(inv){
-  const {s, invs, totalNameplate} = fleetContext();
-  const peers = invs.filter(i=>i!==inv && i.status==="ok").length || (invs.length-1);
-  const pi = inv.peer_index;
-  const pct = pi!=null ? Math.round(pi*100) : null;
-  const shortfall = pi!=null ? Math.round((1-pi)*100) : null;
-  const lostK = invLostKwh(inv, s.window_kwh, totalNameplate);
-  const yrLost = lostK/(s.window_days||14)*365;
+ const {s, invs, totalNameplate} = fleetContext();
+ const peers = invs.filter(i=>i!==inv && i.status==="ok").length || (invs.length-1);
+ const pi = inv.peer_index;
+ const pct = pi!=null ? Math.round(pi*100) : null;
+ const shortfall = pi!=null ? Math.round((1-pi)*100) : null;
+ const lostK = invLostKwh(inv, s.window_kwh, totalNameplate);
+ const yrLost = lostK/(s.window_days||14)*365;
 
-  const isComm = inv.status==="comm_gap";
-  const causes = isComm
-    ? ["Gateway / Wi-Fi dropout (most common — power may be fine)",
-       "Logger or revenue meter offline",
-       "Router or ISP outage at the site"]
-    : ["Partial shading creeping across the string (tree growth, new structure)",
-       "Soiling — dust, pollen, or snow on the modules",
-       "A failed module or string pulling the whole inverter down"];
-  const nextAction = isComm
-    ? "Power-cycle the inverter's gateway / data logger and confirm it rejoins the network. If telemetry doesn't return within a day, we escalate to a site visit."
-    : "Schedule a quick visual + IV-curve check on this inverter's strings. If a module/string has failed, it's typically a warranty or cleaning fix that pays for itself fast.";
+ const isComm = inv.status==="comm_gap";
+ const causes = isComm
+ ? ["Gateway / Wi-Fi dropout (most common, power may be fine)",
+ "Logger or revenue meter offline",
+ "Router or ISP outage at the site"]
+ : ["Partial shading creeping across the string (tree growth, new structure)",
+ "Soiling, dust, pollen, or snow on the modules",
+ "A failed module or string pulling the whole inverter down"];
+ const nextAction = isComm
+ ? "Power-cycle the inverter's gateway / data logger and confirm it rejoins the network. If telemetry doesn't return within a day, we escalate to a site visit."
+ : "Schedule a quick visual + IV-curve check on this inverter's strings. If a module/string has failed, it's typically a warranty or cleaning fix that pays for itself fast.";
 
-  const plain = isComm
-    ? `We've had no telemetry from <b>${esc(inv.serial)}</b> for <b>${fmt(inv.stale_hours)} hours</b>. Its neighbors are still reporting, so this looks like a communications dropout rather than a power fault — but we can't confirm production until it checks back in.`
-    : `Over the last <b>${s.window_days} days</b>, <b>${esc(inv.serial)}</b> made only <b>${pct}%</b> of its fair share compared with <b>${peers} healthy peer inverter${peers===1?"":"s"}</b> under the same sky. Because weather hits every inverter equally, that <b>${shortfall}% shortfall</b> is the unit itself — not a cloudy stretch.`;
+ const plain = isComm
+ ? `We've had no telemetry from <b>${esc(inv.serial)}</b> for <b>${fmt(inv.stale_hours)} hours</b>. Its neighbors are still reporting, so this looks like a communications dropout rather than a power fault, but we can't confirm production until it checks back in.`
+ : `Over the last <b>${s.window_days} days</b>, <b>${esc(inv.serial)}</b> made only <b>${pct}%</b> of its fair share compared with <b>${peers} healthy peer inverter${peers===1?"":"s"}</b> under the same sky. Because weather hits every inverter equally, that <b>${shortfall}% shortfall</b> is the unit itself, not a cloudy stretch.`;
 
-  const statGrid = isComm
-    ? `<div class="ao-diag-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0;">
-         <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
-           <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${fmt(inv.stale_hours)}h</div>
-           <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">since last telemetry</div></div>
-         <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
-           <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${peers}</div>
-           <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">peers still reporting</div></div>
-       </div>`
-    : `<div class="ao-diag-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;">
-         <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
-           <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${pct}%</div>
-           <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">of fair share</div></div>
-         <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
-           <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${peers}</div>
-           <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">peers compared</div></div>
-         <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
-           <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${usd0(yrLost)}</div>
-           <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">slipping away / yr</div></div>
-       </div>`;
+ const statGrid = isComm
+ ? `<div class="ao-diag-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0;">
+ <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
+ <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${fmt(inv.stale_hours)}h</div>
+ <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">since last telemetry</div></div>
+ <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
+ <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${peers}</div>
+ <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">peers still reporting</div></div>
+ </div>`
+ : `<div class="ao-diag-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;">
+ <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
+ <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${pct}%</div>
+ <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">of fair share</div></div>
+ <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
+ <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${peers}</div>
+ <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">peers compared</div></div>
+ <div class="ao-diag-stat" style="background:#f3f6f9;border-radius:10px;padding:12px;">
+ <div class="ao-diag-num" style="font-size:22px;font-weight:700;">${usd0(yrLost)}</div>
+ <div class="ao-diag-cap" style="font-size:12px;color:#5a6b7b;">slipping away / yr</div></div>
+ </div>`;
 
-  openModal({
-    title: `${esc(inv.serial)} — ${isComm?"why it's gone quiet":"what's dragging it down"}`,
-    bodyHTML:
-      `<p style="margin:0 0 6px;line-height:1.55;">${plain}</p>
-       ${statGrid}
-       <div class="ao-spark-lg" style="background:#0e1620;border-radius:10px;padding:12px 8px;margin:12px 0;">
-         ${spark(inv.daily, isComm?"#5ab0ff":"#ffb454")}
-         <div style="font-size:11px;color:#8aa;text-align:center;margin-top:4px;">${s.window_days}-day production trend (kWh/day)</div>
-       </div>
-       <h4 style="margin:14px 0 6px;font-size:14px;">Likely cause${causes.length>1?"s":""}</h4>
-       <ul class="ao-causes" style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:14px;">
-         ${causes.map(c=>`<li>${esc(c)}</li>`).join("")}
-       </ul>
-       <div class="ao-note" style="background:#eef6ff;border-left:3px solid #1f6feb;border-radius:6px;padding:10px 12px;font-size:13px;line-height:1.5;">
-         <b>Suggested next action:</b> ${esc(nextAction)}
-       </div>`,
-    footHTML:
-      `<button class="ao-btn ao-btn-primary" id="ao-diag-ok" type="button"
-         style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Got it</button>`,
-    onMount(root, close){
-      root.querySelector("#ao-diag-ok").onclick = close;
-    }
-  });
+ openModal({
+ title: `${esc(inv.serial)}, ${isComm?"why it's gone quiet":"what's dragging it down"}`,
+ bodyHTML:
+ `<p style="margin:0 0 6px;line-height:1.55;">${plain}</p>
+ ${statGrid}
+ <div class="ao-spark-lg" style="background:#0e1620;border-radius:10px;padding:12px 8px;margin:12px 0;">
+ ${spark(inv.daily, isComm?"#5ab0ff":"#ffb454")}
+ <div style="font-size:11px;color:#8aa;text-align:center;margin-top:4px;">${s.window_days}-day production trend (kWh/day)</div>
+ </div>
+ <h4 style="margin:14px 0 6px;font-size:14px;">Likely cause${causes.length>1?"s":""}</h4>
+ <ul class="ao-causes" style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:14px;">
+ ${causes.map(c=>`<li>${esc(c)}</li>`).join("")}
+ </ul>
+ <div class="ao-note" style="background:#eef6ff;border-left:3px solid #1f6feb;border-radius:6px;padding:10px 12px;font-size:13px;line-height:1.5;">
+ <b>Suggested next action:</b> ${esc(nextAction)}
+ </div>`,
+ footHTML:
+ `<button class="ao-btn ao-btn-primary" id="ao-diag-ok" type="button"
+ style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Got it</button>`,
+ onMount(root, close){
+ root.querySelector("#ao-diag-ok").onclick = close;
+ }
+ });
 }
 
 /* ---- 3. ADD AN ARRAY / SolarEdge discover MODAL ---- */
@@ -468,77 +468,77 @@ function openDiagModal(inv){
 const DISCOVER_URL = "/v1/array-owners/solaredge/discover";
 
 function openAddArrayModal(){
-  openModal({
-    title: "Add an array — connect SolarEdge",
-    bodyHTML:
-      `<p style="margin:0 0 12px;line-height:1.55;font-size:14px;">
-         Paste <b>one</b> SolarEdge <b>account-level API key</b> and we'll discover <b>every site on the account</b> at once —
-         no per-site setup. You can find it in the SolarEdge monitoring portal under
-         <i>Admin → Site Access → API Access</i>.
-       </p>
-       <div class="ao-field" style="margin-bottom:10px;">
-         <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">SolarEdge account API key</label>
-         <input class="ao-input" id="ao-key" type="text" autocomplete="off" spellcheck="false"
-            placeholder="e.g. ABCD1234EFGH5678IJKL9012MNOP3456"
-            style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:8px;font:14px ui-monospace,Menlo,monospace;">
-       </div>
-       <div class="ao-note" id="ao-disc-note" style="font-size:13px;color:#5a6b7b;min-height:18px;"></div>
-       <div class="ao-sites" id="ao-sites" style="margin-top:8px;"></div>`,
-    footHTML:
-      `<button class="ao-btn ao-btn-primary" id="ao-discover" type="button"
-         style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Discover my arrays</button>`,
-    onMount(root){
-      const btn = root.querySelector("#ao-discover");
-      const note = root.querySelector("#ao-disc-note");
-      const sites = root.querySelector("#ao-sites");
-      btn.onclick = async () => {
-        const key = root.querySelector("#ao-key").value.trim();
-        sites.innerHTML = "";
-        if(!key){
-          note.textContent = "Paste your account API key first.";
-          note.className = "ao-note err";
-          return;
-        }
-        note.textContent = "Discovering sites on this account…";
-        note.className = "ao-note";
-        btn.disabled = true;
-        try{
-          const r = await fetch(DISCOVER_URL, {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({api_key: key})
-          });
-          let data = {};
-          try{ data = await r.json(); }catch(e){ data = {}; }
-          if(r.ok && data.ok && Array.isArray(data.sites) && data.sites.length){
-            note.textContent = `Found ${data.sites.length} site${data.sites.length>1?"s":""} on this account — pick the ones to add:`;
-            note.className = "ao-note ok";
-            sites.innerHTML = data.sites.map((st,i)=>{
-              const name = esc(st.name || st.site_name || st.id || ("Site "+(i+1)));
-              const sub = esc([st.id?("#"+st.id):"", st.capacity_kw?(st.capacity_kw+" kW"):"", st.location||""].filter(Boolean).join(" · "));
-              return `<label class="ao-site" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid #e1e8ef;border-radius:8px;margin-bottom:6px;cursor:pointer;">
-                  <input type="checkbox" checked value="${esc(st.id||name)}">
-                  <span><b>${name}</b>${sub?`<br><small style="color:#5a6b7b;">${sub}</small>`:""}</span>
-                </label>`;
-            }).join("");
-          } else if(r.ok && data.ok){
-            note.textContent = "Connected, but no SolarEdge sites were found on this account.";
-            note.className = "ao-note err";
-          } else {
-            note.textContent = (data && data.message) ? data.message : `That key was rejected (HTTP ${r.status}). Double-check it's an account-level key.`;
-            note.className = "ao-note err";
-          }
-        }catch(err){
-          // CORS / network / offline — fail gracefully, never crash
-          note.innerHTML = "We couldn't reach the discovery service from this preview "+
-            "(that's expected from a static demo origin). <b>We'll connect this automatically when you sign in</b> — your key was not stored.";
-          note.className = "ao-note err";
-        }finally{
-          btn.disabled = false;
-        }
-      };
-    }
-  });
+ openModal({
+ title: "Add an array, connect SolarEdge",
+ bodyHTML:
+ `<p style="margin:0 0 12px;line-height:1.55;font-size:14px;">
+ Paste <b>one</b> SolarEdge <b>account-level API key</b> and we'll discover <b>every site on the account</b> at once —
+ no per-site setup. You can find it in the SolarEdge monitoring portal under
+ <i>Admin → Site Access → API Access</i>.
+ </p>
+ <div class="ao-field" style="margin-bottom:10px;">
+ <label class="ao-label" style="display:block;font-size:12px;font-weight:600;color:#5a6b7b;margin-bottom:4px;">SolarEdge account API key</label>
+ <input class="ao-input" id="ao-key" type="text" autocomplete="off" spellcheck="false"
+ placeholder="e.g. ABCD1234EFGH5678IJKL9012MNOP3456"
+ style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:8px;font:14px ui-monospace,Menlo,monospace;">
+ </div>
+ <div class="ao-note" id="ao-disc-note" style="font-size:13px;color:#5a6b7b;min-height:18px;"></div>
+ <div class="ao-sites" id="ao-sites" style="margin-top:8px;"></div>`,
+ footHTML:
+ `<button class="ao-btn ao-btn-primary" id="ao-discover" type="button"
+ style="padding:10px 16px;border:0;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font-weight:600;">Discover my arrays</button>`,
+ onMount(root){
+ const btn = root.querySelector("#ao-discover");
+ const note = root.querySelector("#ao-disc-note");
+ const sites = root.querySelector("#ao-sites");
+ btn.onclick = async () => {
+ const key = root.querySelector("#ao-key").value.trim();
+ sites.innerHTML = "";
+ if(!key){
+ note.textContent = "Paste your account API key first.";
+ note.className = "ao-note err";
+ return;
+ }
+ note.textContent = "Discovering sites on this account…";
+ note.className = "ao-note";
+ btn.disabled = true;
+ try{
+ const r = await fetch(DISCOVER_URL, {
+ method: "POST",
+ headers: {"Content-Type":"application/json"},
+ body: JSON.stringify({api_key: key})
+ });
+ let data = {};
+ try{ data = await r.json(); }catch(e){ data = {}; }
+ if(r.ok && data.ok && Array.isArray(data.sites) && data.sites.length){
+ note.textContent = `Found ${data.sites.length} site${data.sites.length>1?"s":""} on this account, pick the ones to add:`;
+ note.className = "ao-note ok";
+ sites.innerHTML = data.sites.map((st,i)=>{
+ const name = esc(st.name || st.site_name || st.id || ("Site "+(i+1)));
+ const sub = esc([st.id?("#"+st.id):"", st.capacity_kw?(st.capacity_kw+" kW"):"", st.location||""].filter(Boolean).join(" · "));
+ return `<label class="ao-site" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid #e1e8ef;border-radius:8px;margin-bottom:6px;cursor:pointer;">
+ <input type="checkbox" checked value="${esc(st.id||name)}">
+ <span><b>${name}</b>${sub?`<br><small style="color:#5a6b7b;">${sub}</small>`:""}</span>
+ </label>`;
+ }).join("");
+ } else if(r.ok && data.ok){
+ note.textContent = "Connected, but no SolarEdge sites were found on this account.";
+ note.className = "ao-note err";
+ } else {
+ note.textContent = (data && data.message) ? data.message : `That key was rejected (HTTP ${r.status}). Double-check it's an account-level key.`;
+ note.className = "ao-note err";
+ }
+ }catch(err){
+ // CORS / network / offline, fail gracefully, never crash
+ note.innerHTML = "We couldn't reach the discovery service from this preview "+
+ "(that's expected from a static demo origin). <b>We'll connect this automatically when you sign in</b>, your key was not stored.";
+ note.className = "ao-note err";
+ }finally{
+ btn.disabled = false;
+ }
+ };
+ }
+ });
 }
 
 /* ---- 4. comm_gap inline helper (reuses the diagnosis modal) ---- */
@@ -547,14 +547,14 @@ function openAddArrayModal(){
 function findInv(serial){ return CURRENT && CURRENT.inverters.find(i=>i.serial===serial); }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act]");
-  if(!t) return;
-  const act = t.getAttribute("data-act");
-  if(!act) return;
-  const serial = t.getAttribute("data-serial");
-  const inv = serial ? findInv(serial) : null;
-  if(act==="claim" && inv){ e.preventDefault(); openClaimModal(inv); }
-  else if((act==="diag"||act==="comm") && inv){ e.preventDefault(); openDiagModal(inv); }
+ const t = e.target.closest("[data-act]");
+ if(!t) return;
+ const act = t.getAttribute("data-act");
+ if(!act) return;
+ const serial = t.getAttribute("data-serial");
+ const inv = serial ? findInv(serial) : null;
+ if(act==="claim" && inv){ e.preventDefault(); openClaimModal(inv); }
+ else if((act==="diag"||act==="comm") && inv){ e.preventDefault(); openDiagModal(inv); }
 });
 
 // ---- '+ Add an array' nav link (only present on the in-app dashboard view) ----
@@ -572,707 +572,707 @@ if(_addArray) _addArray.onclick = e => { e.preventDefault(); openAddArrayModal()
 // Map a peer-status + health block from /overview onto the dashboard's inverter
 // status vocabulary (ok | underperforming | comm_gap | dead | fault).
 function _statusFromOverview(a){
-  const peer = a.peer || {};
-  if(peer.status === "dead") return "dead";
-  if(peer.status === "underperforming") return "underperforming";
-  const h = (a.health && (a.health.state || a.health.status)) || "";
-  if(h === "stale" || h === "comm_gap") return "comm_gap";
-  if(h === "no_source") return "comm_gap";
-  return "ok";
+ const peer = a.peer || {};
+ if(peer.status === "dead") return "dead";
+ if(peer.status === "underperforming") return "underperforming";
+ const h = (a.health && (a.health.state || a.health.status)) || "";
+ if(h === "stale" || h === "comm_gap") return "comm_gap";
+ if(h === "no_source") return "comm_gap";
+ return "ok";
 }
 
 // Adapt /v1/array-owners/overview → the {summary, array, inverters, thresholds}
 // object render() consumes. Each array becomes one "inverter" card (per-array is
 // the live resolution today; per-inverter capture lights up later).
 function adaptOverview(o){
-  const arrays = o.arrays || [];
-  const t = o.totals || {};
-  const ps = o.peer_summary || {};
-  const inverters = arrays.map(a => {
-    const peer = a.peer || {};
-    const daily = (a._daily || []).map(d => ({kwh: d.kwh}));
-    return {
-      serial: a.name || ("Array " + a.array_id),
-      model: a.client_name ? a.client_name : (a.fuel_type || "solar"),
-      vendor: (a.live && a.live.source) ? a.live.source : "",
-      nameplate_kw: null,
-      ac_power_w: a.live ? a.live.current_power_w : null,
-      status: _statusFromOverview(a),
-      peer_index: peer.peer_index != null ? peer.peer_index : null,
-      panel_resolution: "string",
-      daily: daily,
-      diagnosis: peer.diagnosis || (a.health && a.health.message) || "",
-      stale_hours: (a.health && a.health.stale_hours != null) ? a.health.stale_hours : null,
-      window_kwh: peer.window_kwh != null ? peer.window_kwh : null,
-    };
-  });
-  const windowDays = ps.window_days || 14;
-  // window_kwh for the value blurbs: prefer the summed peer window, else month.
-  const windowKwh = inverters.reduce((s,i)=>s+(i.window_kwh||0),0) || (t.month_kwh || 0);
-  const anyLive = arrays.some(a => a.live && a.live.source);
-  return {
-    source: anyLive ? "live" : "demo",
-    generated_at: o.generated_at || new Date().toISOString(),
-    array: {
-      name: arrays.length === 1 ? arrays[0].name : "Your fleet",
-      capacity_kw: null,
-      vendor_mix: [...new Set(arrays.map(a => a.live && a.live.source).filter(Boolean))].join(" + "),
-      module_count: null,
-    },
-    summary: {
-      today_kwh: t.today_kwh || 0,
-      window_kwh: windowKwh,
-      window_days: windowDays,
-      inverters_total: inverters.length,
-      inverters_attention: ps.arrays_attention || 0,
-    },
-    inverters: inverters,
-    thresholds: { underperform_peer_index: 0.85, dead_days: 3, comm_gap_hours: 36 },
-  };
+ const arrays = o.arrays || [];
+ const t = o.totals || {};
+ const ps = o.peer_summary || {};
+ const inverters = arrays.map(a => {
+ const peer = a.peer || {};
+ const daily = (a._daily || []).map(d => ({kwh: d.kwh}));
+ return {
+ serial: a.name || ("Array " + a.array_id),
+ model: a.client_name ? a.client_name : (a.fuel_type || "solar"),
+ vendor: (a.live && a.live.source) ? a.live.source : "",
+ nameplate_kw: null,
+ ac_power_w: a.live ? a.live.current_power_w : null,
+ status: _statusFromOverview(a),
+ peer_index: peer.peer_index != null ? peer.peer_index : null,
+ panel_resolution: "string",
+ daily: daily,
+ diagnosis: peer.diagnosis || (a.health && a.health.message) || "",
+ stale_hours: (a.health && a.health.stale_hours != null) ? a.health.stale_hours : null,
+ window_kwh: peer.window_kwh != null ? peer.window_kwh : null,
+ };
+ });
+ const windowDays = ps.window_days || 14;
+ // window_kwh for the value blurbs: prefer the summed peer window, else month.
+ const windowKwh = inverters.reduce((s,i)=>s+(i.window_kwh||0),0) || (t.month_kwh || 0);
+ const anyLive = arrays.some(a => a.live && a.live.source);
+ return {
+ source: anyLive ? "live" : "demo",
+ generated_at: o.generated_at || new Date().toISOString(),
+ array: {
+ name: arrays.length === 1 ? arrays[0].name : "Your fleet",
+ capacity_kw: null,
+ vendor_mix: [...new Set(arrays.map(a => a.live && a.live.source).filter(Boolean))].join(" + "),
+ module_count: null,
+ },
+ summary: {
+ today_kwh: t.today_kwh || 0,
+ window_kwh: windowKwh,
+ window_days: windowDays,
+ inverters_total: inverters.length,
+ inverters_attention: ps.arrays_attention || 0,
+ },
+ inverters: inverters,
+ thresholds: { underperform_peer_index: 0.85, dead_days: 3, comm_gap_hours: 36 },
+ };
 }
 
 function loadDashboard(){
-  // Stripe checkout return (?card_added=1 / ?reactivated=1 …): parse + scrub
-  // FIRST — before sandbox.js parses and before any /v1/account read — so a
-  // reactivation return suppresses the cancelled gate with no race. No-op
-  // after the first call.
-  try { handleCheckoutReturn(); } catch(e){}
-  // A magic-link (or hand-off) may drop a ONE-TIME login token in the URL as
-  // ?token=. Exchange it for a real session via /v1/auth/verify (it is NOT a
-  // ready session — storing it raw would 401), scrub it from the address bar,
-  // then render. Password sign-in (login.html) stores so_session directly.
-  let u = null;
-  try { u = new URL(window.location.href); } catch(e){}
-  const urlTok = u && u.searchParams.get("token");
-  if(urlTok){
-    try {
-      u.searchParams.delete("token");
-      window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
-    } catch(e){}
-    fetch("/v1/auth/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ token: urlTok }) })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if(d && d.session_token){ try { localStorage.setItem("so_session", d.session_token); } catch(e){} } })
-      .finally(renderFromSession);
-    return;
-  }
-  renderFromSession();
+ // Stripe checkout return (?card_added=1 / ?reactivated=1 …): parse + scrub
+ // FIRST, before sandbox.js parses and before any /v1/account read, so a
+ // reactivation return suppresses the cancelled gate with no race. No-op
+ // after the first call.
+ try { handleCheckoutReturn(); } catch(e){}
+ // A magic-link (or hand-off) may drop a ONE-TIME login token in the URL as
+ // ?token=. Exchange it for a real session via /v1/auth/verify (it is NOT a
+ // ready session, storing it raw would 401), scrub it from the address bar,
+ // then render. Password sign-in (login.html) stores so_session directly.
+ let u = null;
+ try { u = new URL(window.location.href); } catch(e){}
+ const urlTok = u && u.searchParams.get("token");
+ if(urlTok){
+ try {
+ u.searchParams.delete("token");
+ window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
+ } catch(e){}
+ fetch("/v1/auth/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ token: urlTok }) })
+ .then(r => r.ok ? r.json() : null)
+ .then(d => { if(d && d.session_token){ try { localStorage.setItem("so_session", d.session_token); } catch(e){} } })
+ .finally(renderFromSession);
+ return;
+ }
+ renderFromSession();
 }
 // The GMP-onboarding gate is a BILLING/invoicing nag ("can't audit, reconcile, or
 // bill until GMP bills are connected"), so it belongs ONLY on the Offtaker Invoice
-// Generator tab (#reports) — never on the Inverter Dashboard / Arrays / Analysis /
+// Generator tab (#reports), never on the Inverter Dashboard / Arrays / Analysis /
 // Trends (Ford). We split the two questions: updateGmpGate() decides "should it show
 // at all" (onboarding incomplete, async), and applyGmpGateVisibility() applies "is
 // the invoicing tab active" on every tab change with no re-fetch.
 let _gmpGateWanted = false;
 function aoOnReportsTab(){ return location.hash === "#reports"; }
 function applyGmpGateVisibility(){
-  const gate = document.getElementById("gmpGate");
-  if(!gate) return;
-  gate.hidden = !(_gmpGateWanted && aoOnReportsTab());
+ const gate = document.getElementById("gmpGate");
+ if(!gate) return;
+ gate.hidden = !(_gmpGateWanted && aoOnReportsTab());
 }
 try { window.addEventListener("hashchange", applyGmpGateVisibility); } catch(e){}
 
 // Drive the GMP-onboarding gate banner. A signed-in owner is NOT done until
 // GMP is connected AND ≥1 array is linked. next_step from the backend:
-//   connect_gmp   → amber "Connect GMP to finish setting up"
-//   link_accounts → green "almost there — link your captured GMP accounts"
-//   done          → hide the bar entirely.
+// connect_gmp → amber "Connect GMP to finish setting up"
+// link_accounts → green "almost there, link your captured GMP accounts"
+// done → hide the bar entirely.
 function updateGmpGate(session){
-  const gate = document.getElementById("gmpGate");
-  if(!gate) return;
-  if(!session){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
-  fetch("/v1/array-owners/onboarding-status", { headers: { Authorization: "Bearer " + session } })
-    .then(r => r.ok ? r.json() : null)
-    .then(s => {
-      if(!s || !s.ok || s.complete){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
-      const title = document.getElementById("gmpGateTitle");
-      const sub   = document.getElementById("gmpGateSub");
-      const badge = document.getElementById("gmpGateBadge");
-      const cta   = document.getElementById("gmpGateCta");
-      if(s.next_step === "link_accounts"){
-        gate.classList.add("almost");
-        badge.textContent = "ALMOST DONE";
-        title.textContent = "Link your GMP accounts to finish";
-        sub.innerHTML = "We captured " + s.unlinked_accounts + " GMP account" +
-          (s.unlinked_accounts === 1 ? "" : "s") + " but " +
-          (s.unlinked_accounts === 1 ? "it isn't" : "they aren't") +
-          " linked to an array yet — so their bills can't flow in. <b>You're not done yet.</b>";
-        cta.textContent = "Link accounts →";
-        // cta is a <button> now — navigate to #account in JS (no href to set).
-        cta.onclick = () => { location.hash = "#account"; };
-      } else {
-        gate.classList.remove("almost");
-        badge.textContent = "FINISH SETUP";
-        title.textContent = "Connect GMP to finish setting up";
-        sub.innerHTML = "Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b>";
-        cta.textContent = "Connect GMP →";
-        // Launch the REAL connect flow: opens greenmountainpower.com in a new tab
-        // and the extension grabs the bills. NO detour back to onboarding.
-        cta.onclick = (e) => {
-          e.preventDefault();
-          // Make sure we're on the Arrays tab (where the sandbox + modal live).
-          if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
-          if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
-          else { location.href = "/onboarding#connect-gmp"; }  // defensive fallback
-        };
-      }
-      _gmpGateWanted = true;
-      applyGmpGateVisibility();   // only actually visible on the #reports tab
-    })
-    .catch(() => { /* never block the dashboard on the gate */ });
+ const gate = document.getElementById("gmpGate");
+ if(!gate) return;
+ if(!session){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
+ fetch("/v1/array-owners/onboarding-status", { headers: { Authorization: "Bearer " + session } })
+ .then(r => r.ok ? r.json() : null)
+ .then(s => {
+ if(!s || !s.ok || s.complete){ _gmpGateWanted = false; applyGmpGateVisibility(); return; }
+ const title = document.getElementById("gmpGateTitle");
+ const sub = document.getElementById("gmpGateSub");
+ const badge = document.getElementById("gmpGateBadge");
+ const cta = document.getElementById("gmpGateCta");
+ if(s.next_step === "link_accounts"){
+ gate.classList.add("almost");
+ badge.textContent = "ALMOST DONE";
+ title.textContent = "Link your GMP accounts to finish";
+ sub.innerHTML = "We captured " + s.unlinked_accounts + " GMP account" +
+ (s.unlinked_accounts === 1 ? "" : "s") + " but " +
+ (s.unlinked_accounts === 1 ? "it isn't" : "they aren't") +
+ " linked to an array yet, so their bills can't flow in. <b>You're not done yet.</b>";
+ cta.textContent = "Link accounts →";
+ // cta is a <button> now, navigate to #account in JS (no href to set).
+ cta.onclick = () => { location.hash = "#account"; };
+ } else {
+ gate.classList.remove("almost");
+ badge.textContent = "FINISH SETUP";
+ title.textContent = "Connect GMP to finish setting up";
+ sub.innerHTML = "Your arrays are in, but Array Operator can't audit, reconcile, or bill them until your Green Mountain Power bills are connected. <b>You're not done yet.</b>";
+ cta.textContent = "Connect GMP →";
+ // Launch the REAL connect flow: opens greenmountainpower.com in a new tab
+ // and the extension grabs the bills. NO detour back to onboarding.
+ cta.onclick = (e) => {
+ e.preventDefault();
+ // Make sure we're on the Arrays tab (where the sandbox + modal live).
+ if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
+ if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
+ else { location.href = "/onboarding#connect-gmp"; } // defensive fallback
+ };
+ }
+ _gmpGateWanted = true;
+ applyGmpGateVisibility(); // only actually visible on the #reports tab
+ })
+ .catch(() => { /* never block the dashboard on the gate */ });
 }
 // Expose for sandbox.js to re-check the gate after a GMP capture lands.
 try {
-  window.updateGmpGate = updateGmpGate;
-  window.__aoRefreshGmpGate = function(){
-    let s = null; try { s = localStorage.getItem("so_session"); } catch(e){}
-    updateGmpGate(s);
-  };
+ window.updateGmpGate = updateGmpGate;
+ window.__aoRefreshGmpGate = function(){
+ let s = null; try { s = localStorage.getItem("so_session"); } catch(e){}
+ updateGmpGate(s);
+ };
 } catch(e){}
 
 // -- Trial card-capture nudge + Stripe checkout return -----------------------
 // One quiet bar (#trialNudge) owns the whole card-capture conversation:
-//   • VALUE-ANCHORED ask: once the fleet is live (real kW / kWh / offtakers),
-//     the bar quotes the fleet's actual monthly price from /v1/account/
-//     billing-summary — the same math as the Master Account "Your bill" row —
-//     instead of a vague "add a card". Three dismissible tiers: early (value
-//     reached, >7d left), soft (≤7d), urgent (≤2d); each dismissal holds until
-//     the next tier. Never nags daily.
-//   • CHECKOUT RETURN: landing back from Stripe (?card_added=1&session_id=…)
-//     confirms the card SYNCHRONOUSLY via POST /v1/account/confirm-setup (no
-//     webhook race) and flips the same bar into a success confirmation.
+// • VALUE-ANCHORED ask: once the fleet is live (real kW / kWh / offtakers),
+// the bar quotes the fleet's actual monthly price from /v1/account/
+// billing-summary, the same math as the Master Account "Your bill" row —
+// instead of a vague "add a card". Three dismissible tiers: early (value
+// reached, >7d left), soft (≤7d), urgent (≤2d); each dismissal holds until
+// the next tier. Never nags daily.
+// • CHECKOUT RETURN: landing back from Stripe (?card_added=1&session_id=…)
+// confirms the card SYNCHRONOUSLY via POST /v1/account/confirm-setup (no
+// webhook race) and flips the same bar into a success confirmation.
 function aoFmtNudgeDate(d){
-  try { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
-  catch(e){ return ""; }
+ try { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+ catch(e){ return ""; }
 }
 function aoUsd(cents){
-  if(cents == null || isNaN(Number(cents))) return null;
-  return "$" + (Number(cents) / 100).toLocaleString(undefined,
-    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+ if(cents == null || isNaN(Number(cents))) return null;
+ return "$" + (Number(cents) / 100).toLocaleString(undefined,
+ { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 // The plan's monthly total from a billing-summary payload (AO shapes only).
 function aoBillTotalCents(s){
-  if(!s) return null;
-  const b = s.billing_basis;
-  if(b === "both")      return Number(s.monitoring_total_cents || 0) + Number(s.invoicing_total_cents || 0);
-  if(b === "invoicing") return Number(s.invoicing_total_cents || 0);
-  if(b === "kwh")       return Number(s.monitoring_total_cents || 0);
-  return null;
+ if(!s) return null;
+ const b = s.billing_basis;
+ if(b === "both") return Number(s.monitoring_total_cents || 0) + Number(s.invoicing_total_cents || 0);
+ if(b === "invoicing") return Number(s.invoicing_total_cents || 0);
+ if(b === "kwh") return Number(s.monitoring_total_cents || 0);
+ return null;
 }
 // "Fleet is live" = the value moment: anything real is connected/billed.
 function aoValueReached(s){
-  if(!s) return false;
-  return Number(s.nameplate_kw || 0) > 0 || Number(s.mtd_kwh || 0) > 0
-      || Number(s.offtaker_count || 0) > 0;
+ if(!s) return false;
+ return Number(s.nameplate_kw || 0) > 0 || Number(s.mtd_kwh || 0) > 0
+ || Number(s.offtaker_count || 0) > 0;
 }
-// Launch Stripe Checkout (setup mode) from any CTA — shared by every bar state.
+// Launch Stripe Checkout (setup mode) from any CTA, shared by every bar state.
 function wireAddCardCta(cta, session){
-  cta.style.display = "";
-  cta.removeAttribute("href");
-  cta.onclick = function(e){
-    e.preventDefault();
-    const orig = cta.textContent;
-    cta.textContent = "Opening…";
-    fetch("/v1/account/add-payment-method", { method:"POST",
-      headers: { "Content-Type":"application/json", Authorization: "Bearer " + session }, body: "{}" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { const u = d && (d.checkout_url || d.url); if(u){ window.location = u; } else { cta.textContent = orig; } })
-      .catch(() => { cta.textContent = orig; });
-  };
+ cta.style.display = "";
+ cta.removeAttribute("href");
+ cta.onclick = function(e){
+ e.preventDefault();
+ const orig = cta.textContent;
+ cta.textContent = "Opening…";
+ fetch("/v1/account/add-payment-method", { method:"POST",
+ headers: { "Content-Type":"application/json", Authorization: "Bearer " + session }, body: "{}" })
+ .then(r => r.ok ? r.json() : null)
+ .then(d => { const u = d && (d.checkout_url || d.url); if(u){ window.location = u; } else { cta.textContent = orig; } })
+ .catch(() => { cta.textContent = orig; });
+ };
 }
 
 // ── Stripe checkout return ──────────────────────────────────────────────────
 // Parse + scrub the return params ONCE at load (before sandbox.js parses, so
 // ?reactivated=1 suppresses the cancelled gate before any /v1/account read).
 function handleCheckoutReturn(){
-  if(window.__aoCheckoutReturn !== undefined) return;
-  window.__aoCheckoutReturn = null;
-  let u = null;
-  try { u = new URL(window.location.href); } catch(e){ return; }
-  const kinds = ["card_added", "card_cancelled", "reactivated", "reactivate_cancelled"];
-  const kind = kinds.find(k => u.searchParams.get(k) === "1");
-  if(!kind) return;
-  const sessionId = u.searchParams.get("session_id") || null;
-  try {
-    kinds.forEach(k => u.searchParams.delete(k));
-    u.searchParams.delete("session_id");
-    window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
-  } catch(e){}
-  window.__aoCheckoutReturn = { kind: kind, sessionId: sessionId, rendered: false };
-  // Suppress the cancelled-account gate while the reactivation webhook lands —
-  // the one thing a just-paid owner must never see is "your subscription is
-  // cancelled".
-  if(kind === "reactivated") window.__aoReactivatePending = true;
+ if(window.__aoCheckoutReturn !== undefined) return;
+ window.__aoCheckoutReturn = null;
+ let u = null;
+ try { u = new URL(window.location.href); } catch(e){ return; }
+ const kinds = ["card_added", "card_cancelled", "reactivated", "reactivate_cancelled"];
+ const kind = kinds.find(k => u.searchParams.get(k) === "1");
+ if(!kind) return;
+ const sessionId = u.searchParams.get("session_id") || null;
+ try {
+ kinds.forEach(k => u.searchParams.delete(k));
+ u.searchParams.delete("session_id");
+ window.history.replaceState({}, "", u.pathname + (u.search || "") + u.hash);
+ } catch(e){}
+ window.__aoCheckoutReturn = { kind: kind, sessionId: sessionId, rendered: false };
+ // Suppress the cancelled-account gate while the reactivation webhook lands —
+ // the one thing a just-paid owner must never see is "your subscription is
+ // cancelled".
+ if(kind === "reactivated") window.__aoReactivatePending = true;
 }
 function renderCheckoutReturn(session){
-  const ret = window.__aoCheckoutReturn;
-  if(!ret || ret.rendered) return;
-  const bar = document.getElementById("trialNudge");
-  const copy = document.getElementById("trialNudgeCopy");
-  const cta = document.getElementById("trialNudgeCta");
-  const x = document.getElementById("trialNudgeX");
-  if(!bar || !copy) return;
-  ret.rendered = true;
-  const show = (cls, html) => {
-    bar.classList.remove("success", "neutral", "urgent");
-    if(cls) bar.classList.add(cls);
-    copy.innerHTML = html;
-    if(cta) cta.style.display = "none";
-    if(x) x.onclick = function(){ bar.hidden = true; };
-    bar.hidden = false;
-  };
-  const cardSavedCopy = (d) => {
-    const brandRaw = d && d.card_brand ? String(d.card_brand) : "";
-    const brand = brandRaw ? brandRaw.charAt(0).toUpperCase() + brandRaw.slice(1).toLowerCase() : "";
-    const last4 = d && d.card_last4 ? String(d.card_last4).replace(/\D/g, "") : "";
-    const brief = brand ? (brand + (last4 ? " ···· " + last4 : "")) : "";
-    const ends = d && d.trial_ends_at ? new Date(d.trial_ends_at) : null;
-    let msg = "<b>Card saved" + (brief ? " — " + brief : "") + ".</b> ";
-    if(ends && !isNaN(ends.getTime()) && ends.getTime() > Date.now()){
-      msg += "Your subscription starts automatically when your free trial ends on " +
-             aoFmtNudgeDate(ends) + " — nothing else to do.";
-    } else {
-      msg += "You're all set — billing picks up automatically.";
-    }
-    return msg;
-  };
-  const pollAccount = (pred, tries, delayMs, done, giveUp) => {
-    const tick = (left) => {
-      fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
-        .then(r => r.ok ? r.json() : null)
-        .then(a => {
-          if(a && pred(a)){ done(a); return; }
-          if(left <= 1){ giveUp(); return; }
-          setTimeout(() => tick(left - 1), delayMs);
-        })
-        .catch(() => { if(left <= 1){ giveUp(); } else { setTimeout(() => tick(left - 1), delayMs); } });
-    };
-    tick(tries);
-  };
+ const ret = window.__aoCheckoutReturn;
+ if(!ret || ret.rendered) return;
+ const bar = document.getElementById("trialNudge");
+ const copy = document.getElementById("trialNudgeCopy");
+ const cta = document.getElementById("trialNudgeCta");
+ const x = document.getElementById("trialNudgeX");
+ if(!bar || !copy) return;
+ ret.rendered = true;
+ const show = (cls, html) => {
+ bar.classList.remove("success", "neutral", "urgent");
+ if(cls) bar.classList.add(cls);
+ copy.innerHTML = html;
+ if(cta) cta.style.display = "none";
+ if(x) x.onclick = function(){ bar.hidden = true; };
+ bar.hidden = false;
+ };
+ const cardSavedCopy = (d) => {
+ const brandRaw = d && d.card_brand ? String(d.card_brand) : "";
+ const brand = brandRaw ? brandRaw.charAt(0).toUpperCase() + brandRaw.slice(1).toLowerCase() : "";
+ const last4 = d && d.card_last4 ? String(d.card_last4).replace(/\D/g, "") : "";
+ const brief = brand ? (brand + (last4 ? " ···· " + last4 : "")) : "";
+ const ends = d && d.trial_ends_at ? new Date(d.trial_ends_at) : null;
+ let msg = "<b>Card saved" + (brief ? ", " + brief : "") + ".</b> ";
+ if(ends && !isNaN(ends.getTime()) && ends.getTime() > Date.now()){
+ msg += "Your subscription starts automatically when your free trial ends on " +
+ aoFmtNudgeDate(ends) + ", nothing else to do.";
+ } else {
+ msg += "You're all set, billing picks up automatically.";
+ }
+ return msg;
+ };
+ const pollAccount = (pred, tries, delayMs, done, giveUp) => {
+ const tick = (left) => {
+ fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+ .then(r => r.ok ? r.json() : null)
+ .then(a => {
+ if(a && pred(a)){ done(a); return; }
+ if(left <= 1){ giveUp(); return; }
+ setTimeout(() => tick(left - 1), delayMs);
+ })
+ .catch(() => { if(left <= 1){ giveUp(); } else { setTimeout(() => tick(left - 1), delayMs); } });
+ };
+ tick(tries);
+ };
 
-  if(ret.kind === "card_added"){
-    if(!session){
-      show("success", "<b>Card saved.</b> Sign in to see it on your account.");
-      if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
-      return;
-    }
-    show("success", "Confirming your card…");
-    const fallbackPoll = () => pollAccount(
-      a => a.has_payment_method === true, 6, 2000,
-      () => show("success", cardSavedCopy(null)),
-      () => show("success", "<b>Your card was saved with Stripe.</b> It can take a minute to appear here — check Account shortly."));
-    if(ret.sessionId){
-      fetch("/v1/account/confirm-setup", { method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
-        body: JSON.stringify({ session_id: ret.sessionId }) })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if(d && d.card_saved){ show("success", cardSavedCopy(d)); }
-          else { fallbackPoll(); }
-        })
-        .catch(fallbackPoll);
-    } else {
-      fallbackPoll();
-    }
-  } else if(ret.kind === "card_cancelled"){
-    show("neutral", "Checkout closed — no card was added and nothing was charged." +
-      (session ? " Add one anytime; your trial keeps running." : ""));
-    if(cta && session){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
-  } else if(ret.kind === "reactivated"){
-    if(!session){
-      show("success", "<b>Card saved.</b> Sign in to finish restarting your subscription.");
-      if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
-      return;
-    }
-    show("success", "Card saved — restarting your subscription…");
-    // Best-effort synchronous card attribution; the WEBHOOK creates the
-    // subscription (deliberately — billing state changes in exactly one place).
-    if(ret.sessionId){
-      fetch("/v1/account/confirm-setup", { method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
-        body: JSON.stringify({ session_id: ret.sessionId }) }).catch(() => {});
-    }
-    pollAccount(
-      a => a.active === true && !(window.aoIsCancelled && window.aoIsCancelled(a)), 15, 2000,
-      () => {
-        window.__aoReactivatePending = false;
-        show("success", "<b>Your subscription is active again.</b> Welcome back — everything is where you left it.");
-        try { renderFromSession(); } catch(e){}
-      },
-      () => show("success", "<b>Card saved.</b> Your subscription is restarting — this can take a minute; refresh to check."));
-  }
-  // reactivate_cancelled: params scrubbed, nothing to show — the cancelled gate
-  // reappears on its own, which is the honest state.
+ if(ret.kind === "card_added"){
+ if(!session){
+ show("success", "<b>Card saved.</b> Sign in to see it on your account.");
+ if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
+ return;
+ }
+ show("success", "Confirming your card…");
+ const fallbackPoll = () => pollAccount(
+ a => a.has_payment_method === true, 6, 2000,
+ () => show("success", cardSavedCopy(null)),
+ () => show("success", "<b>Your card was saved with Stripe.</b> It can take a minute to appear here, check Account shortly."));
+ if(ret.sessionId){
+ fetch("/v1/account/confirm-setup", { method: "POST",
+ headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
+ body: JSON.stringify({ session_id: ret.sessionId }) })
+ .then(r => r.ok ? r.json() : null)
+ .then(d => {
+ if(d && d.card_saved){ show("success", cardSavedCopy(d)); }
+ else { fallbackPoll(); }
+ })
+ .catch(fallbackPoll);
+ } else {
+ fallbackPoll();
+ }
+ } else if(ret.kind === "card_cancelled"){
+ show("neutral", "Checkout closed, no card was added and nothing was charged." +
+ (session ? " Add one anytime; your trial keeps running." : ""));
+ if(cta && session){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
+ } else if(ret.kind === "reactivated"){
+ if(!session){
+ show("success", "<b>Card saved.</b> Sign in to finish restarting your subscription.");
+ if(cta){ cta.style.display = ""; cta.textContent = "Sign in"; cta.onclick = null; cta.setAttribute("href", "/login"); }
+ return;
+ }
+ show("success", "Card saved, restarting your subscription…");
+ // Best-effort synchronous card attribution; the WEBHOOK creates the
+ // subscription (deliberately, billing state changes in exactly one place).
+ if(ret.sessionId){
+ fetch("/v1/account/confirm-setup", { method: "POST",
+ headers: { "Content-Type": "application/json", Authorization: "Bearer " + session },
+ body: JSON.stringify({ session_id: ret.sessionId }) }).catch(() => {});
+ }
+ pollAccount(
+ a => a.active === true && !(window.aoIsCancelled && window.aoIsCancelled(a)), 15, 2000,
+ () => {
+ window.__aoReactivatePending = false;
+ show("success", "<b>Your subscription is active again.</b> Welcome back, everything is where you left it.");
+ try { renderFromSession(); } catch(e){}
+ },
+ () => show("success", "<b>Card saved.</b> Your subscription is restarting, this can take a minute; refresh to check."));
+ }
+ // reactivate_cancelled: params scrubbed, nothing to show, the cancelled gate
+ // reappears on its own, which is the honest state.
 }
 try {
-  window.__aoHandleCheckoutReturn = handleCheckoutReturn;
-  window.__aoRenderCheckoutReturn = renderCheckoutReturn;
+ window.__aoHandleCheckoutReturn = handleCheckoutReturn;
+ window.__aoRenderCheckoutReturn = renderCheckoutReturn;
 } catch(e){}
 
 function updateTrialNudge(session){
-  const bar = document.getElementById("trialNudge");
-  if(!bar) return;
-  // Landing back from Stripe checkout? The return flow owns the bar.
-  if(window.__aoCheckoutReturn) return;
-  if(!session){ bar.hidden = true; return; }
-  fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
-    .then(r => r.ok ? r.json() : null)
-    .then(a => {
-      if(!a){ bar.hidden = true; return; }
-      // Server is authoritative for the auto-refresh capture mode. Sync it early (this runs
-      // on load for signed-in owners, any tab) so a Cloud Capture owner's dashboard reflects
-      // their choice + never shows the "keep a tab open" nudge (Ford 2026-07-12).
-      try {
-        if((a.capture_mode === "cloud" || a.capture_mode === "device")
-           && localStorage.getItem("ao_ar_mode") !== a.capture_mode){
-          localStorage.setItem("ao_ar_mode", a.capture_mode);
-          if(window.updateExtLiveNudge) window.updateExtLiveNudge();
-        }
-      } catch(e){}
-      try { if(window.aoIsCancelled && window.aoIsCancelled(a)){ bar.hidden = true; return; } } catch(e){}
-      const hasCard = a.has_payment_method === true;
-      const ends = a.trial_ends_at ? new Date(a.trial_ends_at) : null;
-      if(hasCard || !ends || isNaN(ends.getTime())){ bar.hidden = true; return; }
-      const days = Math.ceil((ends.getTime() - Date.now()) / 86400000);
-      if(days < 0){ bar.hidden = true; return; }
-      const tier = days <= 2 ? "urgent" : (days <= 7 ? "soft" : "early");
-      let dis = null;
-      const rawDismiss = localStorage.getItem("ao_trialnudge_dismiss");
-      try {
-        const parsed = JSON.parse(rawDismiss || "null");
-        // Only accept the exact shape we wrote ({ends, tier}); localStorage is same-origin
-        // writable, so a poisoned/wrong-typed value (array, primitive, hostile object) must
-        // not slip past the property reads below — coerce or discard.
-        if(parsed && typeof parsed === "object" && !Array.isArray(parsed)
-           && typeof parsed.ends === "string" && typeof parsed.tier === "string"){
-          dis = { ends: parsed.ends, tier: parsed.tier };
-        } else if(rawDismiss != null && rawDismiss !== "null"){
-          // Wrong shape but valid JSON — the user's dismissal is being silently lost.
-          // Log it and clear the bad value so the nudge re-arms cleanly next time.
-          console.warn("[trial-nudge] discarding malformed dismissal state:", rawDismiss);
-          try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
-        }
-      } catch(e){
-        // Corrupt (non-JSON) value — surface it and self-heal so a dismissal isn't lost
-        // forever to a stale bad write.
-        console.warn("[trial-nudge] corrupt dismissal state in localStorage, resetting:", e && e.message);
-        try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
-      }
-      // A dismissal holds through its own tier and every quieter one; the bar
-      // only returns when the ask escalates (early → soft → urgent). Legacy
-      // stored tiers ("soft"/"urgent") rank naturally.
-      const RANK = { early: 0, soft: 1, urgent: 2 };
-      const curRank = RANK[tier];
-      if(dis && dis.ends === a.trial_ends_at){
-        const disRank = (RANK[dis.tier] != null) ? RANK[dis.tier] : 1;
-        if(curRank <= disRank){ bar.hidden = true; return; }
-      }
-      // Value-anchor the ask: quote the fleet's REAL monthly price (same math
-      // as the Master Account "Your bill" row). The early tier only exists
-      // once the fleet is live — the card-ask follows the value moment, it
-      // never precedes it.
-      fetch("/v1/account/billing-summary", { headers: { Authorization: "Bearer " + session } })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null)
-        .then(s => {
-          const total = aoBillTotalCents(s);
-          const price = (total != null && total > 0) ? aoUsd(total) : null;
-          if(tier === "early" && (!aoValueReached(s) || !price)){ bar.hidden = true; return; }
-          const when = days <= 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
-          const onDate = aoFmtNudgeDate(ends);
-          const copy = document.getElementById("trialNudgeCopy");
-          if(copy){
-            if(tier === "urgent"){
-              copy.innerHTML = "<b>Your free trial ends " + when + ".</b> Add a card to keep your fleet monitored" +
-                (price ? " — " + price + "/mo" : "") + ".";
-            } else if(tier === "soft"){
-              copy.innerHTML = price
-                ? "Your free trial ends " + when + ". Keep everything running for <b>" + price + "/mo</b> — nothing is charged until " + onDate + "."
-                : "Your free trial ends " + when + ". Add a card whenever you're ready to keep your reports running after it.";
-            } else {
-              copy.innerHTML = "Your fleet is live — after your free trial ends on " + onDate +
-                ", Array Operator runs <b>" + price + "/mo</b> for this fleet. Add a card once and you're set.";
-            }
-          }
-          bar.classList.remove("success", "neutral");
-          bar.classList.toggle("urgent", tier === "urgent");
-          const cta = document.getElementById("trialNudgeCta");
-          if(cta){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
-          const x = document.getElementById("trialNudgeX");
-          if(x){
-            x.onclick = function(){
-              try { localStorage.setItem("ao_trialnudge_dismiss", JSON.stringify({ ends: a.trial_ends_at, tier: tier })); } catch(e){}
-              bar.hidden = true;
-            };
-          }
-          bar.hidden = false;
-        });
-    })
-    .catch(() => { /* never block the dashboard on the nudge */ });
+ const bar = document.getElementById("trialNudge");
+ if(!bar) return;
+ // Landing back from Stripe checkout? The return flow owns the bar.
+ if(window.__aoCheckoutReturn) return;
+ if(!session){ bar.hidden = true; return; }
+ fetch("/v1/account", { headers: { Authorization: "Bearer " + session } })
+ .then(r => r.ok ? r.json() : null)
+ .then(a => {
+ if(!a){ bar.hidden = true; return; }
+ // Server is authoritative for the auto-refresh capture mode. Sync it early (this runs
+ // on load for signed-in owners, any tab) so a Cloud Capture owner's dashboard reflects
+ // their choice + never shows the "keep a tab open" nudge (Ford 2026-07-12).
+ try {
+ if((a.capture_mode === "cloud" || a.capture_mode === "device")
+ && localStorage.getItem("ao_ar_mode") !== a.capture_mode){
+ localStorage.setItem("ao_ar_mode", a.capture_mode);
+ if(window.updateExtLiveNudge) window.updateExtLiveNudge();
+ }
+ } catch(e){}
+ try { if(window.aoIsCancelled && window.aoIsCancelled(a)){ bar.hidden = true; return; } } catch(e){}
+ const hasCard = a.has_payment_method === true;
+ const ends = a.trial_ends_at ? new Date(a.trial_ends_at) : null;
+ if(hasCard || !ends || isNaN(ends.getTime())){ bar.hidden = true; return; }
+ const days = Math.ceil((ends.getTime() - Date.now()) / 86400000);
+ if(days < 0){ bar.hidden = true; return; }
+ const tier = days <= 2 ? "urgent" : (days <= 7 ? "soft" : "early");
+ let dis = null;
+ const rawDismiss = localStorage.getItem("ao_trialnudge_dismiss");
+ try {
+ const parsed = JSON.parse(rawDismiss || "null");
+ // Only accept the exact shape we wrote ({ends, tier}); localStorage is same-origin
+ // writable, so a poisoned/wrong-typed value (array, primitive, hostile object) must
+ // not slip past the property reads below, coerce or discard.
+ if(parsed && typeof parsed === "object" && !Array.isArray(parsed)
+ && typeof parsed.ends === "string" && typeof parsed.tier === "string"){
+ dis = { ends: parsed.ends, tier: parsed.tier };
+ } else if(rawDismiss != null && rawDismiss !== "null"){
+ // Wrong shape but valid JSON, the user's dismissal is being silently lost.
+ // Log it and clear the bad value so the nudge re-arms cleanly next time.
+ console.warn("[trial-nudge] discarding malformed dismissal state:", rawDismiss);
+ try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
+ }
+ } catch(e){
+ // Corrupt (non-JSON) value, surface it and self-heal so a dismissal isn't lost
+ // forever to a stale bad write.
+ console.warn("[trial-nudge] corrupt dismissal state in localStorage, resetting:", e && e.message);
+ try { localStorage.removeItem("ao_trialnudge_dismiss"); } catch(_){}
+ }
+ // A dismissal holds through its own tier and every quieter one; the bar
+ // only returns when the ask escalates (early → soft → urgent). Legacy
+ // stored tiers ("soft"/"urgent") rank naturally.
+ const RANK = { early: 0, soft: 1, urgent: 2 };
+ const curRank = RANK[tier];
+ if(dis && dis.ends === a.trial_ends_at){
+ const disRank = (RANK[dis.tier] != null) ? RANK[dis.tier] : 1;
+ if(curRank <= disRank){ bar.hidden = true; return; }
+ }
+ // Value-anchor the ask: quote the fleet's REAL monthly price (same math
+ // as the Master Account "Your bill" row). The early tier only exists
+ // once the fleet is live, the card-ask follows the value moment, it
+ // never precedes it.
+ fetch("/v1/account/billing-summary", { headers: { Authorization: "Bearer " + session } })
+ .then(r => r.ok ? r.json() : null)
+ .catch(() => null)
+ .then(s => {
+ const total = aoBillTotalCents(s);
+ const price = (total != null && total > 0) ? aoUsd(total) : null;
+ if(tier === "early" && (!aoValueReached(s) || !price)){ bar.hidden = true; return; }
+ const when = days <= 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
+ const onDate = aoFmtNudgeDate(ends);
+ const copy = document.getElementById("trialNudgeCopy");
+ if(copy){
+ if(tier === "urgent"){
+ copy.innerHTML = "<b>Your free trial ends " + when + ".</b> Add a card to keep your fleet monitored" +
+ (price ? ", " + price + "/mo" : "") + ".";
+ } else if(tier === "soft"){
+ copy.innerHTML = price
+ ? "Your free trial ends " + when + ". Keep everything running for <b>" + price + "/mo</b>, nothing is charged until " + onDate + "."
+ : "Your free trial ends " + when + ". Add a card whenever you're ready to keep your reports running after it.";
+ } else {
+ copy.innerHTML = "Your fleet is live, after your free trial ends on " + onDate +
+ ", Array Operator runs <b>" + price + "/mo</b> for this fleet. Add a card once and you're set.";
+ }
+ }
+ bar.classList.remove("success", "neutral");
+ bar.classList.toggle("urgent", tier === "urgent");
+ const cta = document.getElementById("trialNudgeCta");
+ if(cta){ cta.textContent = "Add a card"; wireAddCardCta(cta, session); }
+ const x = document.getElementById("trialNudgeX");
+ if(x){
+ x.onclick = function(){
+ try { localStorage.setItem("ao_trialnudge_dismiss", JSON.stringify({ ends: a.trial_ends_at, tier: tier })); } catch(e){}
+ bar.hidden = true;
+ };
+ }
+ bar.hidden = false;
+ });
+ })
+ .catch(() => { /* never block the dashboard on the nudge */ });
 }
 try { window.updateTrialNudge = updateTrialNudge; } catch(e){}
 
 // ── Extension-live-data note ────────────────────────────────────────────────
 // Fronius/SMA/Chint have no official cloud API we can poll server-side yet
-// (SolarEdge already does — it never needs this), so their data only refreshes
+// (SolarEdge already does, it never needs this), so their data only refreshes
 // while a signed-in browser with the EnergyAgent extension is open. Ford,
-// 2026-07-08: tell owners plainly, once, quietly — not an urgent/red warning,
+// 2026-07-08: tell owners plainly, once, quietly, not an urgent/red warning,
 // just context so a closed laptop doesn't read as "the product stopped
 // working." Driven by FleetStore (not a fetch) so it reacts the instant a
 // Fronius/SMA/Chint array is connected, no reload needed.
 const _EXT_LIVE_VENDORS = new Set(["fronius", "sma", "chint"]);
 // Group the fleet's extension-refreshed arrays by vendor so the note can state a
-// per-vendor "last refreshed" FACT instead of a vague warning — staleness visible
+// per-vendor "last refreshed" FACT instead of a vague warning, staleness visible
 // as data, not implied. Empty map → no such array connected → the note stays hidden.
 function _extLiveArraysByVendor(){
-  const by = {};
-  try {
-    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()) return by;
-    const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
-    for(const a of arrays){
-      if(!_EXT_LIVE_VENDORS.has(a.vendor)) continue;
-      (by[a.vendor] = by[a.vendor] || []).push(a);
-    }
-  } catch(e){}
-  return by;
+ const by = {};
+ try {
+ if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()) return by;
+ const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
+ for(const a of arrays){
+ if(!_EXT_LIVE_VENDORS.has(a.vendor)) continue;
+ (by[a.vendor] = by[a.vendor] || []).push(a);
+ }
+ } catch(e){}
+ return by;
 }
 // Honest source-data freshness for one vendor's arrays. Reuses the spreadsheet's
-// canonical VendorSheet.freshness (a single source of truth for "how old is this
+// canonical VendorSheet.freshness (a single billing basis for "how old is this
 // reading") on the OLDEST array in the group, so a lagging feed surfaces rather
 // than hiding behind a fresh peer. Returns "live" / "3h ago" / "" (unknown).
 function _extVendorFreshness(arrays){
-  if(!window.VendorSheet || !VendorSheet.freshness) return "";
-  let worst = null, worstAge = null;
-  for(const a of arrays){
-    const ah = (a.source_status || {}).age_hours;
-    if(ah == null) continue;
-    if(worstAge == null || ah > worstAge){ worstAge = ah; worst = a; }
-  }
-  return worst ? (VendorSheet.freshness(worst) || "") : "";
+ if(!window.VendorSheet || !VendorSheet.freshness) return "";
+ let worst = null, worstAge = null;
+ for(const a of arrays){
+ const ah = (a.source_status || {}).age_hours;
+ if(ah == null) continue;
+ if(worstAge == null || ah > worstAge){ worstAge = ah; worst = a; }
+ }
+ return worst ? (VendorSheet.freshness(worst) || "") : "";
 }
 function _extJoinAnd(list){
-  if(list.length <= 1) return list[0] || "";
-  if(list.length === 2) return list[0] + " and " + list[1];
-  return list.slice(0, -1).join(", ") + " and " + list[list.length - 1];
+ if(list.length <= 1) return list[0] || "";
+ if(list.length === 2) return list[0] + " and " + list[1];
+ return list.slice(0, -1).join(", ") + " and " + list[list.length - 1];
 }
-// Calm, factual copy — no hype, no fear, no "resolved soon". Desktop states the
+// Calm, factual copy, no hype, no fear, no "resolved soon". Desktop states the
 // mechanism, the per-vendor freshness, and the ONE instruction that only makes
 // sense on a computer ("keep a tab open"). The mobile chip shows just the freshness
 // facts: "leave your browser open" is meaningless on a phone, so it's dropped there.
 function _extLiveNudgeCopy(by, isNarrow){
-  const keys = Object.keys(by);
-  const facts = keys.map(v => {
-    const f = _extVendorFreshness(by[v]);
-    const label = _EXT_VENDOR_LABEL[v] || v;
-    return f ? (label + " <b>" + f + "</b>") : null;
-  }).filter(Boolean).join(" · ");
-  const names = _extJoinAnd(keys.map(v => _EXT_VENDOR_LABEL[v] || v));
-  if(isNarrow){
-    return facts || (names + " refresh in-browser");
-  }
-  let s = names + " refresh through your browser extension while you're signed in.";
-  if(facts) s += " " + facts + ".";
-  s += " Keep a tab open and they stay current.";
-  return s;
+ const keys = Object.keys(by);
+ const facts = keys.map(v => {
+ const f = _extVendorFreshness(by[v]);
+ const label = _EXT_VENDOR_LABEL[v] || v;
+ return f ? (label + " <b>" + f + "</b>") : null;
+ }).filter(Boolean).join(" · ");
+ const names = _extJoinAnd(keys.map(v => _EXT_VENDOR_LABEL[v] || v));
+ if(isNarrow){
+ return facts || (names + " refresh in-browser");
+ }
+ let s = names + " refresh through your browser extension while you're signed in.";
+ if(facts) s += " " + facts + ".";
+ s += " Keep a tab open and they stay current.";
+ return s;
 }
 function updateExtLiveNudge(){
-  const bar = document.getElementById("extLiveNudge");
-  if(!bar) return;
-  // localStorage guard → once dismissed, stays dismissed for this session (and
-  // beyond, matching the sibling trial/vault nudges). Checked before anything else.
-  if(localStorage.getItem("ao_extlivenudge_dismiss") === "1"){ bar.hidden = true; return; }
-  // Cloud Capture ("Store it with us") refreshes these vendors SERVER-SIDE — so the whole
-  // "keep a browser tab open" instruction is wrong for those owners. Suppress it entirely
-  // when they're on cloud mode (Ford 2026-07-12). The device/extension owners still get it.
-  try { if(localStorage.getItem("ao_ar_mode") === "cloud"){ bar.hidden = true; return; } } catch(e){}
-  const by = _extLiveArraysByVendor();
-  if(!Object.keys(by).length){ bar.hidden = true; return; }   // only relevant when a Fronius/SMA/Chint array is present
-  const isNarrow = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
-  bar.classList.toggle("is-chip", isNarrow);                  // slim, non-sticky pill on a phone (mobile.css)
-  const copy = document.getElementById("extLiveNudgeCopy");
-  if(copy){ copy.innerHTML = _extLiveNudgeCopy(by, isNarrow); }
-  const x = document.getElementById("extLiveNudgeX");
-  if(x){
-    x.onclick = function(){
-      try { localStorage.setItem("ao_extlivenudge_dismiss", "1"); } catch(e){}
-      bar.hidden = true;
-    };
-  }
-  bar.hidden = false;
+ const bar = document.getElementById("extLiveNudge");
+ if(!bar) return;
+ // localStorage guard → once dismissed, stays dismissed for this session (and
+ // beyond, matching the sibling trial/vault nudges). Checked before anything else.
+ if(localStorage.getItem("ao_extlivenudge_dismiss") === "1"){ bar.hidden = true; return; }
+ // Cloud Capture ("Store it with us") refreshes these vendors SERVER-SIDE, so the whole
+ // "keep a browser tab open" instruction is wrong for those owners. Suppress it entirely
+ // when they're on cloud mode (Ford 2026-07-12). The device/extension owners still get it.
+ try { if(localStorage.getItem("ao_ar_mode") === "cloud"){ bar.hidden = true; return; } } catch(e){}
+ const by = _extLiveArraysByVendor();
+ if(!Object.keys(by).length){ bar.hidden = true; return; } // only relevant when a Fronius/SMA/Chint array is present
+ const isNarrow = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+ bar.classList.toggle("is-chip", isNarrow); // slim, non-sticky pill on a phone (mobile.css)
+ const copy = document.getElementById("extLiveNudgeCopy");
+ if(copy){ copy.innerHTML = _extLiveNudgeCopy(by, isNarrow); }
+ const x = document.getElementById("extLiveNudgeX");
+ if(x){
+ x.onclick = function(){
+ try { localStorage.setItem("ao_extlivenudge_dismiss", "1"); } catch(e){}
+ bar.hidden = true;
+ };
+ }
+ bar.hidden = false;
 }
 try {
-  window.updateExtLiveNudge = updateExtLiveNudge;
-  if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(updateExtLiveNudge); }
-  // Re-render across the phone breakpoint so the chip form + desktop-only instruction
-  // follow the real layout on rotate/resize (FleetStore events don't fire on resize).
-  if(window.matchMedia){
-    const _extMq = window.matchMedia("(max-width: 600px)");
-    if(_extMq.addEventListener) _extMq.addEventListener("change", updateExtLiveNudge);
-    else if(_extMq.addListener) _extMq.addListener(updateExtLiveNudge);
-  }
+ window.updateExtLiveNudge = updateExtLiveNudge;
+ if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(updateExtLiveNudge); }
+ // Re-render across the phone breakpoint so the chip form + desktop-only instruction
+ // follow the real layout on rotate/resize (FleetStore events don't fire on resize).
+ if(window.matchMedia){
+ const _extMq = window.matchMedia("(max-width: 600px)");
+ if(_extMq.addEventListener) _extMq.addEventListener("change", updateExtLiveNudge);
+ else if(_extMq.addListener) _extMq.addListener(updateExtLiveNudge);
+ }
 } catch(e){}
 
-// Vault-login reminder — quiet, dismissible, same shape as extLiveNudge/trialNudge.
+// Vault-login reminder, quiet, dismissible, same shape as extLiveNudge/trialNudge.
 // Ford, 2026-07-08: "another toast to pop up that reminds users to enter their
 // logins in the auto refresh in the extension... have it link them to that page
 // in the master account tab." Fires when a connected Fronius/SMA/Chint array's
-// portal login hasn't been saved into the extension's vault yet — exactly the gap
+// portal login hasn't been saved into the extension's vault yet, exactly the gap
 // that left a real customer's array stuck reporting "last live capture: never"
 // (Lester/Brattleboro Solar, GMP Middlebury, 2026-07-08). Reuses the same
 // window.__aoVaultStatus() cache sandbox.js's per-card hints already query, so
 // this costs no extra vault round trip.
 const _EXT_VENDOR_LABEL = { fronius: "Fronius", sma: "SMA", chint: "Chint" };
 async function updateVaultLoginNudge(){
-  const bar = document.getElementById("vaultLoginNudge");
-  if(!bar) return;
-  // Auth gate: __aoVaultStatus reads the extension's LOCAL vault (browser-scoped,
-  // not tied to so_session) and FleetStore.isLoaded() is true even for the
-  // anonymous demo fleet — so without this check a signed-out visitor (or a
-  // stale bfcache restore) could see a real "Save your Fronius login" prompt
-  // over demo chrome. Same phantom-signed-in class as the pageshow guard in
-  // index.html; this closes the non-bfcache half of that gap.
-  let session = null;
-  try { session = localStorage.getItem("so_session"); } catch(e){}
-  if(!session){ bar.hidden = true; return; }
-  if(localStorage.getItem("ao_vaultnudge_dismiss") === "1"){ bar.hidden = true; return; }
-  if(!window.__AO_EXT_PRESENT || !window.__aoVaultStatus){ bar.hidden = true; return; }
-  let connected = [];
-  try {
-    if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()){ bar.hidden = true; return; }
-    const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
-    connected = [...new Set(arrays.map(a => a.vendor).filter(v => _EXT_LIVE_VENDORS.has(v)))];
-  } catch(e){ bar.hidden = true; return; }
-  if(!connected.length){ bar.hidden = true; return; }
-  let status = null;
-  try { status = await window.__aoVaultStatus(); } catch(e){ status = null; }
-  if(!status){ bar.hidden = true; return; }
-  const missing = connected.filter(v => !(status[v] && status[v].hasCreds));
-  if(!missing.length){ bar.hidden = true; return; }
-  const copy = document.getElementById("vaultLoginNudgeCopy");
-  if(copy){
-    const label = missing.map(v => _EXT_VENDOR_LABEL[v] || v).join(" / ");
-    copy.innerHTML = `Save your <b>${label}</b> login in Auto-refresh so it updates itself — ` +
-      "right now it only refreshes while you have that portal open in Chrome.";
-  }
-  const cta = document.getElementById("vaultLoginNudgeCta");
-  if(cta){
-    cta.onclick = function(){
-      location.hash = "#account";
-      setTimeout(() => {
-        const row = document.getElementById("rowAutoRefresh");
-        if(row) row.scrollIntoView({ behavior:"smooth", block:"center" });
-      }, 120);
-    };
-  }
-  const x = document.getElementById("vaultLoginNudgeX");
-  if(x){
-    x.onclick = function(){
-      try { localStorage.setItem("ao_vaultnudge_dismiss", "1"); } catch(e){}
-      bar.hidden = true;
-    };
-  }
-  bar.hidden = false;
+ const bar = document.getElementById("vaultLoginNudge");
+ if(!bar) return;
+ // Auth gate: __aoVaultStatus reads the extension's LOCAL vault (browser-scoped,
+ // not tied to so_session) and FleetStore.isLoaded() is true even for the
+ // anonymous demo fleet, so without this check a signed-out visitor (or a
+ // stale bfcache restore) could see a real "Save your Fronius login" prompt
+ // over demo chrome. Same phantom-signed-in class as the pageshow guard in
+ // index.html; this closes the non-bfcache half of that gap.
+ let session = null;
+ try { session = localStorage.getItem("so_session"); } catch(e){}
+ if(!session){ bar.hidden = true; return; }
+ if(localStorage.getItem("ao_vaultnudge_dismiss") === "1"){ bar.hidden = true; return; }
+ if(!window.__AO_EXT_PRESENT || !window.__aoVaultStatus){ bar.hidden = true; return; }
+ let connected = [];
+ try {
+ if(!window.FleetStore || !FleetStore.isLoaded || !FleetStore.isLoaded()){ bar.hidden = true; return; }
+ const arrays = (FleetStore.snapshot && FleetStore.snapshot().arrays) || [];
+ connected = [...new Set(arrays.map(a => a.vendor).filter(v => _EXT_LIVE_VENDORS.has(v)))];
+ } catch(e){ bar.hidden = true; return; }
+ if(!connected.length){ bar.hidden = true; return; }
+ let status = null;
+ try { status = await window.__aoVaultStatus(); } catch(e){ status = null; }
+ if(!status){ bar.hidden = true; return; }
+ const missing = connected.filter(v => !(status[v] && status[v].hasCreds));
+ if(!missing.length){ bar.hidden = true; return; }
+ const copy = document.getElementById("vaultLoginNudgeCopy");
+ if(copy){
+ const label = missing.map(v => _EXT_VENDOR_LABEL[v] || v).join(" / ");
+ copy.innerHTML = `Save your <b>${label}</b> login in Auto-refresh so it updates itself, ` +
+ "right now it only refreshes while you have that portal open in Chrome.";
+ }
+ const cta = document.getElementById("vaultLoginNudgeCta");
+ if(cta){
+ cta.onclick = function(){
+ location.hash = "#account";
+ setTimeout(() => {
+ const row = document.getElementById("rowAutoRefresh");
+ if(row) row.scrollIntoView({ behavior:"smooth", block:"center" });
+ }, 120);
+ };
+ }
+ const x = document.getElementById("vaultLoginNudgeX");
+ if(x){
+ x.onclick = function(){
+ try { localStorage.setItem("ao_vaultnudge_dismiss", "1"); } catch(e){}
+ bar.hidden = true;
+ };
+ }
+ bar.hidden = false;
 }
 try {
-  window.updateVaultLoginNudge = updateVaultLoginNudge;
-  if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(() => { updateVaultLoginNudge(); }); }
+ window.updateVaultLoginNudge = updateVaultLoginNudge;
+ if(window.FleetStore && FleetStore.subscribe){ FleetStore.subscribe(() => { updateVaultLoginNudge(); }); }
 } catch(e){}
 
 // ── Cancelled-account lockout ──────────────────────────────────────────────
 // A cancelled account (subscription_status "cancelled"/"canceled" + active===false)
-// must NOT be able to use the dashboard — otherwise cancelling appears to do
+// must NOT be able to use the dashboard, otherwise cancelling appears to do
 // nothing. This renders a full-viewport overlay that covers EVERY tab/panel and
 // blocks interaction. Data is preserved server-side; reactivation is a human step.
 // Mirrors the NEPOOL Operator React SPA's CancelledGate for product parity.
 function aoIsCancelled(a){
-  if(!a) return false;
-  const st = String(a.subscription_status || a.status || "").toLowerCase();
-  return a.active === false && (st === "cancelled" || st === "canceled");
+ if(!a) return false;
+ const st = String(a.subscription_status || a.status || "").toLowerCase();
+ return a.active === false && (st === "cancelled" || st === "canceled");
 }
 function aoShowCancelledGate(){
-  // Landing back from reactivation checkout: the webhook that flips the tenant
-  // active can lag this page-load by seconds — never greet a just-paid owner
-  // with "your subscription is cancelled". renderCheckoutReturn owns the state.
-  if(window.__aoReactivatePending) return;
-  if(document.getElementById("aoCancelledGate")) return;   // already shown
-  const el = document.createElement("div");
-  el.id = "aoCancelledGate";
-  el.setAttribute("role", "dialog");
-  el.setAttribute("aria-modal", "true");
-  el.setAttribute("aria-label", "Subscription cancelled");
-  el.style.cssText =
-    "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
-    "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
-    "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
-  el.innerHTML =
-    '<div style="width:100%;max-width:440px;background:#fff;color:#16202b;' +
-      'border-radius:18px;padding:34px 30px;text-align:center;' +
-      'box-shadow:0 30px 90px rgba(0,0,0,.5);font-family:inherit;">' +
-      '<div style="margin:0 auto 18px;width:56px;height:56px;border-radius:999px;' +
-        'background:#eef1f4;display:flex;align-items:center;justify-content:center;">' +
-        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6b7785" ' +
-          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
-          '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
-      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
-        'Your subscription is cancelled</h1>' +
-      '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
-        "Your dashboard and automatic data pulls are turned off. Start your " +
-        "subscription again to pick up right where you left off.</p>" +
-      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
-        "Your data is safe — we haven't deleted anything.</p>" +
-      '<button type="button" id="aoReactivateBtn" ' +
-        'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;border:none;' +
-        'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
-        'cursor:pointer;">Start my subscription →</button>' +
-      '<div id="aoReactivateMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
-      '<p style="margin:14px 0 0;font-size:12px;color:#9aa6b2;">' +
-        "Billing starts today — your free trial has already been used. Cancel anytime.</p>" +
-      '<button type="button" id="aoCancelledSignOut" ' +
-        'style="margin-top:16px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
-        'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
-    '</div>';
-  document.body.appendChild(el);
-  // Kill scrolling/interaction with anything behind the gate.
-  try { document.body.style.overflow = "hidden"; } catch(e){}
-  const out = document.getElementById("aoCancelledSignOut");
-  if(out) out.addEventListener("click", () => { aoSignOut(); });
-  // Reactivate: start a fresh PAID subscription (no trial). POST /v1/account/reactivate
-  // returns a Stripe Checkout (setup) URL; the webhook then creates the subscription
-  // and flips the tenant back to active.
-  const reBtn = document.getElementById("aoReactivateBtn");
-  const reMsg = document.getElementById("aoReactivateMsg");
-  if(reBtn) reBtn.addEventListener("click", async () => {
-    let session = null;
-    try { session = localStorage.getItem("so_session"); } catch(e){}
-    if(!session){ if(reMsg) reMsg.textContent = "Please sign in again."; return; }
-    reBtn.disabled = true; reBtn.textContent = "Opening secure checkout…";
-    if(reMsg) reMsg.textContent = "";
-    try{
-      const r = await fetch("/v1/account/reactivate", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + session },
-      });
-      const d = await r.json().catch(() => ({}));
-      if(r.ok && d.checkout_url){ location.href = d.checkout_url; return; }
-      if(reMsg) reMsg.textContent = (d && d.detail) ? d.detail : ("Couldn't start checkout (HTTP " + r.status + ").");
-      reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
-    }catch(e){
-      if(reMsg) reMsg.textContent = "Couldn't reach the server — try again.";
-      reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
-    }
-  });
+ // Landing back from reactivation checkout: the webhook that flips the tenant
+ // active can lag this page-load by seconds, never greet a just-paid owner
+ // with "your subscription is cancelled". renderCheckoutReturn owns the state.
+ if(window.__aoReactivatePending) return;
+ if(document.getElementById("aoCancelledGate")) return; // already shown
+ const el = document.createElement("div");
+ el.id = "aoCancelledGate";
+ el.setAttribute("role", "dialog");
+ el.setAttribute("aria-modal", "true");
+ el.setAttribute("aria-label", "Subscription cancelled");
+ el.style.cssText =
+ "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
+ "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
+ "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+ el.innerHTML =
+ '<div style="width:100%;max-width:440px;background:#fff;color:#16202b;' +
+ 'border-radius:18px;padding:34px 30px;text-align:center;' +
+ 'box-shadow:0 30px 90px rgba(0,0,0,.5);font-family:inherit;">' +
+ '<div style="margin:0 auto 18px;width:56px;height:56px;border-radius:999px;' +
+ 'background:#eef1f4;display:flex;align-items:center;justify-content:center;">' +
+ '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6b7785" ' +
+ 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+ '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
+ '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
+ '<h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#101820;">' +
+ 'Your subscription is cancelled</h1>' +
+ '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
+ "Your dashboard and automatic data pulls are turned off. Start your " +
+ "subscription again to pick up right where you left off.</p>" +
+ '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:600;color:#137a4a;">' +
+ "Your data is safe, we haven't deleted anything.</p>" +
+ '<button type="button" id="aoReactivateBtn" ' +
+ 'style="display:block;width:100%;box-sizing:border-box;padding:13px 16px;border:none;' +
+ 'border-radius:12px;background:#137a4a;color:#fff;font-size:14px;font-weight:700;' +
+ 'cursor:pointer;">Start my subscription →</button>' +
+ '<div id="aoReactivateMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
+ '<p style="margin:14px 0 0;font-size:12px;color:#9aa6b2;">' +
+ "Billing starts today, your free trial has already been used. Cancel anytime.</p>" +
+ '<button type="button" id="aoCancelledSignOut" ' +
+ 'style="margin-top:16px;background:none;border:none;color:#9aa6b2;font-size:12px;' +
+ 'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
+ '</div>';
+ document.body.appendChild(el);
+ // Kill scrolling/interaction with anything behind the gate.
+ try { document.body.style.overflow = "hidden"; } catch(e){}
+ const out = document.getElementById("aoCancelledSignOut");
+ if(out) out.addEventListener("click", () => { aoSignOut(); });
+ // Reactivate: start a fresh PAID subscription (no trial). POST /v1/account/reactivate
+ // returns a Stripe Checkout (setup) URL; the webhook then creates the subscription
+ // and flips the tenant back to active.
+ const reBtn = document.getElementById("aoReactivateBtn");
+ const reMsg = document.getElementById("aoReactivateMsg");
+ if(reBtn) reBtn.addEventListener("click", async () => {
+ let session = null;
+ try { session = localStorage.getItem("so_session"); } catch(e){}
+ if(!session){ if(reMsg) reMsg.textContent = "Please sign in again."; return; }
+ reBtn.disabled = true; reBtn.textContent = "Opening secure checkout…";
+ if(reMsg) reMsg.textContent = "";
+ try{
+ const r = await fetch("/v1/account/reactivate", {
+ method: "POST",
+ headers: { Authorization: "Bearer " + session },
+ });
+ const d = await r.json().catch(() => ({}));
+ if(r.ok && d.checkout_url){ location.href = d.checkout_url; return; }
+ if(reMsg) reMsg.textContent = (d && d.detail) ? d.detail : ("Couldn't start checkout (HTTP " + r.status + ").");
+ reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
+ }catch(e){
+ if(reMsg) reMsg.textContent = "Couldn't reach the server, try again.";
+ reBtn.disabled = false; reBtn.textContent = "Start my subscription →";
+ }
+ });
 }
 // Expose so sandbox.js (the #account tab) and any other surface can trigger it
 // from their own /v1/account reads without duplicating the logic.
 try {
-  window.aoIsCancelled = aoIsCancelled;
-  window.aoShowCancelledGate = aoShowCancelledGate;
+ window.aoIsCancelled = aoIsCancelled;
+ window.aoShowCancelledGate = aoShowCancelledGate;
 } catch(e){}
 
 // ── Trial-expired freeze gate (paused_no_card) ─────────────────────────────
 // Ford's paywall model (2026-07-07): the product runs FULLY through the trial —
-// no pricing wall, no nag beyond the soft nudge — then, at expiry with no card,
+// no pricing wall, no nag beyond the soft nudge, then, at expiry with no card,
 // it hard-prompts for a card and freezes. The backend already does the state
 // half: finalize_expired_trials flips an expired card-less trial (that has
 // arrays) to subscription_status "paused_no_card" + active=false, pausing
@@ -1283,237 +1283,237 @@ try {
 // un-pause path) → Stripe checkout; the webhook un-pauses, so the gate is gone
 // on the next load. Mirrors aoShowCancelledGate exactly for product parity.
 function aoIsPausedNoCard(a){
-  if(!a) return false;
-  const st = String(a.subscription_status || a.status || "").toLowerCase();
-  return a.active === false && st === "paused_no_card";
+ if(!a) return false;
+ const st = String(a.subscription_status || a.status || "").toLowerCase();
+ return a.active === false && st === "paused_no_card";
 }
 function aoShowFrozenGate(session){
-  // Just paid? Don't greet a card-adding owner with "your trial ended" while the
-  // un-pause webhook lands — the checkout-return flow owns the screen.
-  if(window.__aoCheckoutReturn && window.__aoCheckoutReturn.kind === "card_added") return;
-  if(document.getElementById("aoFrozenGate")) return;    // already shown
-  if(document.getElementById("aoCancelledGate")) return; // cancelled gate wins if somehow both
-  if(!session){ try { session = localStorage.getItem("so_session"); } catch(e){} }
-  const el = document.createElement("div");
-  el.id = "aoFrozenGate";
-  el.setAttribute("role", "dialog");
-  el.setAttribute("aria-modal", "true");
-  el.setAttribute("aria-label", "Free trial ended");
-  el.style.cssText =
-    "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
-    "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
-    "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
-  el.innerHTML =
-    // Solarpunk palette (Ford 2026-07-07: "#137a4a is too dark"): warm cream card,
-    // mint lock badge, vibrant emerald-600 accents + a punchy emerald CTA that
-    // brightens to emerald-500 on hover. Matches the app's redesigned surfaces.
-    '<style>#aoFrozenAddCard{transition:transform .12s ease,box-shadow .12s ease,background .12s ease}' +
-    '#aoFrozenAddCard:hover{transform:translateY(-1px);background:#10b981;' +
-    'box-shadow:0 16px 36px -10px rgba(16,185,129,.62)}</style>' +
-    '<div style="width:100%;max-width:440px;background:#faf8f5;color:#16202b;' +
-      'border:1px solid #e8e2d9;border-radius:20px;padding:34px 30px;text-align:center;' +
-      'box-shadow:0 30px 90px rgba(6,20,14,.5);font-family:inherit;">' +
-      '<div style="margin:0 auto 18px;width:58px;height:58px;border-radius:999px;' +
-        'background:#d1fae5;display:flex;align-items:center;justify-content:center;">' +
-        '<svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#059669" ' +
-          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
-          '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
-      '<h1 style="margin:0 0 8px;font-size:20px;font-weight:750;color:#0f2a1e;">' +
-        'Your free trial has ended</h1>' +
-      '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
-        "Fleet monitoring and offtaker invoices are paused. Add a card to pick up " +
-        "exactly where you left off — nothing to set up again.</p>" +
-      '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:650;color:#059669;">' +
-        "Your data is safe — we haven't deleted anything.</p>" +
-      '<button type="button" id="aoFrozenAddCard" ' +
-        'style="display:block;width:100%;box-sizing:border-box;padding:14px 16px;border:none;' +
-        'border-radius:13px;background:#059669;color:#fff;font-size:14.5px;font-weight:700;' +
-        'cursor:pointer;box-shadow:0 10px 26px -8px rgba(16,185,129,.5);">Add a card to continue →</button>' +
-      '<div id="aoFrozenMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
-      '<p style="margin:14px 0 0;font-size:12px;color:#8a9a90;">' +
-        "You're only billed for what you use, monthly — no setup fee, no contract. Cancel anytime.</p>" +
-      '<button type="button" id="aoFrozenSignOut" ' +
-        'style="margin-top:16px;background:none;border:none;color:#8a9a90;font-size:12px;' +
-        'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
-    '</div>';
-  document.body.appendChild(el);
-  try { document.body.style.overflow = "hidden"; } catch(e){}
-  const out = document.getElementById("aoFrozenSignOut");
-  if(out) out.addEventListener("click", () => { aoSignOut(); });
-  // The one way out: add a card. wireAddCardCta POSTs /v1/account/add-payment-method
-  // and redirects to Stripe Checkout (setup mode); the webhook un-pauses the tenant.
-  const btn = document.getElementById("aoFrozenAddCard");
-  if(btn) wireAddCardCta(btn, session);
+ // Just paid? Don't greet a card-adding owner with "your trial ended" while the
+ // un-pause webhook lands, the checkout-return flow owns the screen.
+ if(window.__aoCheckoutReturn && window.__aoCheckoutReturn.kind === "card_added") return;
+ if(document.getElementById("aoFrozenGate")) return; // already shown
+ if(document.getElementById("aoCancelledGate")) return; // cancelled gate wins if somehow both
+ if(!session){ try { session = localStorage.getItem("so_session"); } catch(e){} }
+ const el = document.createElement("div");
+ el.id = "aoFrozenGate";
+ el.setAttribute("role", "dialog");
+ el.setAttribute("aria-modal", "true");
+ el.setAttribute("aria-label", "Free trial ended");
+ el.style.cssText =
+ "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;" +
+ "justify-content:center;padding:24px;background:rgba(8,12,18,.86);" +
+ "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+ el.innerHTML =
+ // Solarpunk palette (Ford 2026-07-07: "#137a4a is too dark"): warm cream card,
+ // mint lock badge, vibrant emerald-600 accents + a punchy emerald CTA that
+ // brightens to emerald-500 on hover. Matches the app's redesigned surfaces.
+ '<style>#aoFrozenAddCard{transition:transform .12s ease,box-shadow .12s ease,background .12s ease}' +
+ '#aoFrozenAddCard:hover{transform:translateY(-1px);background:#10b981;' +
+ 'box-shadow:0 16px 36px -10px rgba(16,185,129,.62)}</style>' +
+ '<div style="width:100%;max-width:440px;background:#faf8f5;color:#16202b;' +
+ 'border:1px solid #e8e2d9;border-radius:20px;padding:34px 30px;text-align:center;' +
+ 'box-shadow:0 30px 90px rgba(6,20,14,.5);font-family:inherit;">' +
+ '<div style="margin:0 auto 18px;width:58px;height:58px;border-radius:999px;' +
+ 'background:#d1fae5;display:flex;align-items:center;justify-content:center;">' +
+ '<svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#059669" ' +
+ 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+ '<rect x="3" y="11" width="18" height="11" rx="2"></rect>' +
+ '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>' +
+ '<h1 style="margin:0 0 8px;font-size:20px;font-weight:750;color:#0f2a1e;">' +
+ 'Your free trial has ended</h1>' +
+ '<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#4a5663;">' +
+ "Fleet monitoring and offtaker invoices are paused. Add a card to pick up " +
+ "exactly where you left off, nothing to set up again.</p>" +
+ '<p style="margin:0 0 22px;font-size:14px;line-height:1.5;font-weight:650;color:#059669;">' +
+ "Your data is safe, we haven't deleted anything.</p>" +
+ '<button type="button" id="aoFrozenAddCard" ' +
+ 'style="display:block;width:100%;box-sizing:border-box;padding:14px 16px;border:none;' +
+ 'border-radius:13px;background:#059669;color:#fff;font-size:14.5px;font-weight:700;' +
+ 'cursor:pointer;box-shadow:0 10px 26px -8px rgba(16,185,129,.5);">Add a card to continue →</button>' +
+ '<div id="aoFrozenMsg" style="margin-top:10px;font-size:12px;color:#b4361f;min-height:14px;"></div>' +
+ '<p style="margin:14px 0 0;font-size:12px;color:#8a9a90;">' +
+ "You're only billed for what you use, monthly, no setup fee, no contract. Cancel anytime.</p>" +
+ '<button type="button" id="aoFrozenSignOut" ' +
+ 'style="margin-top:16px;background:none;border:none;color:#8a9a90;font-size:12px;' +
+ 'cursor:pointer;text-decoration:underline;text-underline-offset:2px;">Sign out</button>' +
+ '</div>';
+ document.body.appendChild(el);
+ try { document.body.style.overflow = "hidden"; } catch(e){}
+ const out = document.getElementById("aoFrozenSignOut");
+ if(out) out.addEventListener("click", () => { aoSignOut(); });
+ // The one way out: add a card. wireAddCardCta POSTs /v1/account/add-payment-method
+ // and redirects to Stripe Checkout (setup mode); the webhook un-pauses the tenant.
+ const btn = document.getElementById("aoFrozenAddCard");
+ if(btn) wireAddCardCta(btn, session);
 }
 try {
-  window.aoIsPausedNoCard = aoIsPausedNoCard;
-  window.aoShowFrozenGate = aoShowFrozenGate;
+ window.aoIsPausedNoCard = aoIsPausedNoCard;
+ window.aoShowFrozenGate = aoShowFrozenGate;
 } catch(e){}
 
-// Canonical sign-out — clear the session token AND this session's cached fleet
+// Canonical sign-out, clear the session token AND this session's cached fleet
 // tree (so a shared browser never shows the previous owner's arrays after
 // logout), then return to /login. Exposed on window so every surface (the header
 // chip, the #account tab in sandbox.js, the cancelled gate) tears down the SAME
 // way instead of a partial localStorage.removeItem that leaves cached data behind.
 function aoSignOut(){
-  let s = null;
-  try { s = localStorage.getItem("so_session"); } catch(e){}
-  try { localStorage.removeItem("so_session"); } catch(e){}
-  try {
-    if(s) localStorage.removeItem("ao_fleet_cache:" + s.slice(0, 12));
-    // Sweep any stray fleet-cache entries (other sessions on this browser) so no
-    // signed-in fleet data lingers in localStorage after logout.
-    for(let i = localStorage.length - 1; i >= 0; i--){
-      const k = localStorage.key(i);
-      if(k && k.indexOf("ao_fleet_cache:") === 0) localStorage.removeItem(k);
-    }
-  } catch(e){}
-  location.href = "/login";
+ let s = null;
+ try { s = localStorage.getItem("so_session"); } catch(e){}
+ try { localStorage.removeItem("so_session"); } catch(e){}
+ try {
+ if(s) localStorage.removeItem("ao_fleet_cache:" + s.slice(0, 12));
+ // Sweep any stray fleet-cache entries (other sessions on this browser) so no
+ // signed-in fleet data lingers in localStorage after logout.
+ for(let i = localStorage.length - 1; i >= 0; i--){
+ const k = localStorage.key(i);
+ if(k && k.indexOf("ao_fleet_cache:") === 0) localStorage.removeItem(k);
+ }
+ } catch(e){}
+ location.href = "/login";
 }
 try { window.aoSignOut = aoSignOut; } catch(e){}
 
 function renderFromSession(){
-  let session = null;
-  try { session = localStorage.getItem("so_session"); } catch(e){}
-  // Surface a "Sign in" link to signed-out visitors (hidden once authed).
-  try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
-  // Big demo→signup conversion banner: shown ONLY to anonymous visitors, hidden
-  // the instant a session exists so signed-in owners never see it.
-  try { const db = document.getElementById("demoBanner"); if(db) db.hidden = !!session; } catch(e){}
-  // GMP-onboarding gate: a signed-in owner isn't DONE until GMP is connected.
-  // Poll the onboarding-status endpoint and show the "you're not done" bar until
-  // GMP is connected + at least one array is linked. Signed-out → always hidden.
-  try { updateGmpGate(session); } catch(e){}
-  try { updateTrialNudge(session); } catch(e){}
-  // Landing back from Stripe checkout → confirmation state in the same bar.
-  try { renderCheckoutReturn(session); } catch(e){}
-  // Onboarding GMP handoff: an owner who chose 'Log in with Green Mountain
-  // Power' in onboarding lands here signed in; auto-open the proven GMP connect.
-  try {
-    if(session && localStorage.getItem("ao_pending_gmp_connect") === "1"){
-      localStorage.removeItem("ao_pending_gmp_connect");
-      if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
-      let _t = 0;
-      const _launchGmp = () => {
-        if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
-        else if(_t++ < 20){ setTimeout(_launchGmp, 300); }
-      };
-      setTimeout(_launchGmp, 600);
-    }
-  } catch(e){}
-  // Signed-in identity chip (top-right): show which account this session is in.
-  // Shared painter so Master Account's /v1/account load can fill the chip too
-  // (if this first fetch is slow/fails, we still paint the email when account lands).
-  function paintWhoami(a){
-    try {
-      const who = document.getElementById("tabWhoami");
-      const whoEmail = document.getElementById("whoamiEmail");
-      if(!who) return;
-      const email = a && (a.email || a.contact_email || a.operator_email);
-      if(email && whoEmail){
-        who.style.display = "";
-        whoEmail.textContent = email;
-        whoEmail.dataset.real = "1";
-        who.title = "Signed in as " + email + " — view your account";
-      } else if(!whoEmail || whoEmail.dataset.real !== "1"){
-        // Only hide if we never successfully painted an email this session.
-        who.style.display = "none";
-      }
-    } catch(e){}
-  }
-  try { window.__aoPaintWhoami = paintWhoami; } catch(e){}
-  try {
-    const who = document.getElementById("tabWhoami");
-    const whoEmail = document.getElementById("whoamiEmail");
-    if(who){
-      if(session){
-        who.style.display = "";
-        if(whoEmail && !whoEmail.dataset.real) whoEmail.textContent = "…";
-        const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-        const t = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 12000) : null;
-        fetch("/v1/account", {
-          headers: { Authorization: "Bearer " + session },
-          signal: ctrl ? ctrl.signal : undefined,
-        })
-          .then(r => r.ok ? r.json() : null)
-          .then(a => {
-            if(t) clearTimeout(t);
-            try { if(a && aoIsCancelled(a)) aoShowCancelledGate(); } catch(e){}
-            try { if(a && aoIsPausedNoCard(a)) aoShowFrozenGate(session); } catch(e){}
-            paintWhoami(a);
-          })
-          .catch(() => {
-            if(t) clearTimeout(t);
-            // Keep the chip visible with a soft placeholder if we already showed "…";
-            // Master Account / loadEntitlement may still fill the real email.
-            if(whoEmail && whoEmail.dataset.real !== "1"){
-              whoEmail.textContent = "Account";
-              who.title = "Signed in — open Account";
-            }
-          });
-      } else {
-        who.style.display = "none";
-      }
-    }
-  } catch(e){}
-  // Sign-out control (top-right, just past the identity chip): visible whenever a
-  // session token exists — you can always sign out, even if the token turns out
-  // stale. Wired ONCE to the canonical aoSignOut (clears token + cached tree).
-  try {
-    const so = document.getElementById("tabSignOut");
-    if(so){
-      so.style.display = session ? "" : "none";
-      if(!so._wired){
-        so._wired = 1;
-        so.addEventListener("click", (e) => { e.preventDefault(); aoSignOut(); });
-      }
-    }
-  } catch(e){}
-  const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
-    `<div class="empty">No array data yet — connect an inverter to see your live numbers.</div>`; };
-  // Session expired / invalid → DON'T silently show demo (that made owners think
-  // their real arrays were "forgotten" when in fact they were just logged out by a
-  // server-side session-secret rotation). Clear the dead token and prompt re-auth.
-  const reauth = () => {
-    try { localStorage.removeItem("so_session"); } catch(e){}
-    const g = document.getElementById("grid");
-    if(g) g.innerHTML =
-      `<div class="empty">Your session expired — <a href="/login">sign back in</a> to see your arrays. ` +
-      `Your data is safe; you've just been signed out.</div>`;
-    try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = ""; } catch(e){}
-    try { const who = document.getElementById("tabWhoami"); if(who) who.style.display = "none"; } catch(e){}
-    try { const db = document.getElementById("demoBanner"); if(db) db.hidden = true; } catch(e){}
-  };
+ let session = null;
+ try { session = localStorage.getItem("so_session"); } catch(e){}
+ // Surface a "Sign in" link to signed-out visitors (hidden once authed).
+ try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
+ // Big demo→signup conversion banner: shown ONLY to anonymous visitors, hidden
+ // the instant a session exists so signed-in owners never see it.
+ try { const db = document.getElementById("demoBanner"); if(db) db.hidden = !!session; } catch(e){}
+ // GMP-onboarding gate: a signed-in owner isn't DONE until GMP is connected.
+ // Poll the onboarding-status endpoint and show the "you're not done" bar until
+ // GMP is connected + at least one array is linked. Signed-out → always hidden.
+ try { updateGmpGate(session); } catch(e){}
+ try { updateTrialNudge(session); } catch(e){}
+ // Landing back from Stripe checkout → confirmation state in the same bar.
+ try { renderCheckoutReturn(session); } catch(e){}
+ // Onboarding GMP handoff: an owner who chose 'Log in with Green Mountain
+ // Power' in onboarding lands here signed in; auto-open the proven GMP connect.
+ try {
+ if(session && localStorage.getItem("ao_pending_gmp_connect") === "1"){
+ localStorage.removeItem("ao_pending_gmp_connect");
+ if(location.hash !== "#arrays"){ location.hash = "#arrays"; }
+ let _t = 0;
+ const _launchGmp = () => {
+ if(window.__aoConnectGmp){ window.__aoConnectGmp(); }
+ else if(_t++ < 20){ setTimeout(_launchGmp, 300); }
+ };
+ setTimeout(_launchGmp, 600);
+ }
+ } catch(e){}
+ // Signed-in identity chip (top-right): show which account this session is in.
+ // Shared painter so Master Account's /v1/account load can fill the chip too
+ // (if this first fetch is slow/fails, we still paint the email when account lands).
+ function paintWhoami(a){
+ try {
+ const who = document.getElementById("tabWhoami");
+ const whoEmail = document.getElementById("whoamiEmail");
+ if(!who) return;
+ const email = a && (a.email || a.contact_email || a.operator_email);
+ if(email && whoEmail){
+ who.style.display = "";
+ whoEmail.textContent = email;
+ whoEmail.dataset.real = "1";
+ who.title = "Signed in as " + email + ", view your account";
+ } else if(!whoEmail || whoEmail.dataset.real !== "1"){
+ // Only hide if we never successfully painted an email this session.
+ who.style.display = "none";
+ }
+ } catch(e){}
+ }
+ try { window.__aoPaintWhoami = paintWhoami; } catch(e){}
+ try {
+ const who = document.getElementById("tabWhoami");
+ const whoEmail = document.getElementById("whoamiEmail");
+ if(who){
+ if(session){
+ who.style.display = "";
+ if(whoEmail && !whoEmail.dataset.real) whoEmail.textContent = "…";
+ const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+ const t = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 12000) : null;
+ fetch("/v1/account", {
+ headers: { Authorization: "Bearer " + session },
+ signal: ctrl ? ctrl.signal : undefined,
+ })
+ .then(r => r.ok ? r.json() : null)
+ .then(a => {
+ if(t) clearTimeout(t);
+ try { if(a && aoIsCancelled(a)) aoShowCancelledGate(); } catch(e){}
+ try { if(a && aoIsPausedNoCard(a)) aoShowFrozenGate(session); } catch(e){}
+ paintWhoami(a);
+ })
+ .catch(() => {
+ if(t) clearTimeout(t);
+ // Keep the chip visible with a soft placeholder if we already showed "…";
+ // Master Account / loadEntitlement may still fill the real email.
+ if(whoEmail && whoEmail.dataset.real !== "1"){
+ whoEmail.textContent = "Account";
+ who.title = "Signed in, open Account";
+ }
+ });
+ } else {
+ who.style.display = "none";
+ }
+ }
+ } catch(e){}
+ // Sign-out control (top-right, just past the identity chip): visible whenever a
+ // session token exists, you can always sign out, even if the token turns out
+ // stale. Wired ONCE to the canonical aoSignOut (clears token + cached tree).
+ try {
+ const so = document.getElementById("tabSignOut");
+ if(so){
+ so.style.display = session ? "" : "none";
+ if(!so._wired){
+ so._wired = 1;
+ so.addEventListener("click", (e) => { e.preventDefault(); aoSignOut(); });
+ }
+ }
+ } catch(e){}
+ const empty = () => { const g = document.getElementById("grid"); if(g) g.innerHTML =
+ `<div class="empty">No array data yet, connect an inverter to see your live numbers.</div>`; };
+ // Session expired / invalid → DON'T silently show demo (that made owners think
+ // their real arrays were "forgotten" when in fact they were just logged out by a
+ // server-side session-secret rotation). Clear the dead token and prompt re-auth.
+ const reauth = () => {
+ try { localStorage.removeItem("so_session"); } catch(e){}
+ const g = document.getElementById("grid");
+ if(g) g.innerHTML =
+ `<div class="empty">Your session expired, <a href="/login">sign back in</a> to see your arrays. ` +
+ `Your data is safe; you've just been signed out.</div>`;
+ try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = ""; } catch(e){}
+ try { const who = document.getElementById("tabWhoami"); if(who) who.style.display = "none"; } catch(e){}
+ try { const db = document.getElementById("demoBanner"); if(db) db.hidden = true; } catch(e){}
+ };
 
-  if(session){
-    fetch("/v1/array-owners/overview", { headers: { Authorization: "Bearer " + session } })
-      .then(r => {
-        // An invalid/expired session is an AUTH failure (401/403), not a data
-        // outage — handle it distinctly so we never paint demo over a logout.
-        if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
-        if(!r.ok) throw new Error("overview " + r.status);
-        return r.json();
-      })
-      .then(o => {
-        const arrays = o.arrays || [];
-        if(!arrays.length){
-          // Signed in, genuinely nothing connected yet — show the honest empty
-          // state, NOT demo (demo numbers on a real account read as fake data).
-          return empty();
-        }
-        render(adaptOverview(o));
-      })
-      .catch((err) => {
-        if(err && err.auth){ reauth(); return; }   // expired session → re-auth prompt
-        // Transient (network / 5xx) — keep the page useful with demo rather than a
-        // blank panel, but only for NON-auth errors so a logout never shows demo.
-        fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
-      });
-  } else {
-    // Anonymous visitor (marketing view) — static demo data.
-    fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
-  }
+ if(session){
+ fetch("/v1/array-owners/overview", { headers: { Authorization: "Bearer " + session } })
+ .then(r => {
+ // An invalid/expired session is an AUTH failure (401/403), not a data
+ // outage, handle it distinctly so we never paint demo over a logout.
+ if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
+ if(!r.ok) throw new Error("overview " + r.status);
+ return r.json();
+ })
+ .then(o => {
+ const arrays = o.arrays || [];
+ if(!arrays.length){
+ // Signed in, genuinely nothing connected yet, show the honest empty
+ // state, NOT demo (demo numbers on a real account read as fake data).
+ return empty();
+ }
+ render(adaptOverview(o));
+ })
+ .catch((err) => {
+ if(err && err.auth){ reauth(); return; } // expired session → re-auth prompt
+ // Transient (network / 5xx), keep the page useful with demo rather than a
+ // blank panel, but only for NON-auth errors so a logout never shows demo.
+ fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
+ });
+ } else {
+ // Anonymous visitor (marketing view), static demo data.
+ fetch("inverter-truth.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(empty);
+ }
 }
 
 // Expose for the tab system (sandbox.js) so switching back to the Arrays tab can

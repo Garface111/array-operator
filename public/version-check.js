@@ -1,8 +1,8 @@
-// version-check.js — surface a fresh deploy so nobody is stuck on a cached old bundle.
+// version-check.js, surface a fresh deploy so nobody is stuck on a cached old bundle.
 // Ford 2026-07-09: a soft refresh kept serving a STALE reports.js, so shipped fixes
 // looked "not applied" until a manual hard-refresh. This polls the LIVE app-shell for a
 // newer reports.js cache-bust version than the one THIS page loaded, and offers a
-// one-click reload. It NEVER auto-reloads — an operator may be mid-edit / mid-approval,
+// one-click reload. It NEVER auto-reloads, an operator may be mid-edit / mid-approval,
 // so the reload is always the user's explicit click (dismissible).
 (function () {
   "use strict";
@@ -67,7 +67,7 @@
         var live = m ? m[1] : null;
         if (live && live !== MINE) showBanner();
       })
-      .catch(function () { /* offline / transient — try again next tick */ });
+      .catch(function () { /* offline / transient, try again next tick */ });
   }
 
   // Poll gently, and opportunistically when the tab regains attention (deploys often land

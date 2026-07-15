@@ -1,11 +1,11 @@
 /* ============================================================================
- * Array Operator — FleetStore (fleet-store.js)
+ * Array Operator, FleetStore (fleet-store.js)
  *
  * THE single source of truth for the whole Arrays tab. Both the per-site fleet
  * tree (sandbox.js) and the portfolio command center (command-center.js) read
  * the SAME canonical fleet from here and route EVERY mutation through here, so a
  * change in one view (drag an inverter, create an array, mark a claim) updates
- * the other instantly — no second fetch, no drift.
+ * the other instantly, no second fetch, no drift.
  *
  * Canonical shape:
  *   array = { id, name, region, host, vendor, inverters:[ inv ] }
@@ -33,17 +33,17 @@ window.FleetStore = (function(){
   // siblings have no history) can never be peer-judged, so without this it would
   // read "All clear"/"monitoring" forever even while sagging badly. For those units
   // we fall back to an ABSOLUTE model: compare real production to what this nameplate
-  // typically makes here. Deliberately conservative — a single unit has no weather
+  // typically makes here. Deliberately conservative, a single unit has no weather
   // control group, so we only flag a CLEAR, LARGE shortfall (well past normal model
   // + weather noise), never a marginal dip.
   //
   // Typical Northeast-US fixed-tilt PV AC capacity factor by month (NREL PVWatts-
   // class: ~13-14% annual, summer peak ~18%, winter trough ~7%). A MODEL, not a
-  // measurement — hence the wide shortfall band below.
+  // measurement, hence the wide shortfall band below.
   const CF_BY_MONTH = [0.072,0.095,0.135,0.160,0.175,0.182,0.180,0.168,0.145,0.110,0.072,0.060];
   const seasonalCF = () => CF_BY_MONTH[new Date().getMonth()] || 0.14;
   // Solo units get a much wider tolerance than the peer path (0.85): only below ~55%
-  // of the modeled target — a ~45% shortfall no cloudy fortnight explains — trips it.
+  // of the modeled target, a ~45% shortfall no cloudy fortnight explains, trips it.
   const SOLO_TARGET_RATIO = 0.55;
   // Live (instantaneous) absolute floor for a peerless unit: below ~20% of nameplate
   // at solar noon is a clear sag; we gate it to mid-day (see liveVerdict) so morning/
@@ -65,7 +65,7 @@ window.FleetStore = (function(){
       localStorage.setItem(cacheKeyFor(s), JSON.stringify({
         v: 1, at: Date.now(), recovered: recovered||0, arrays: arrays
       }));
-    } catch(e){ /* quota/serialise — non-fatal, just lose the fast path */ }
+    } catch(e){ /* quota/serialise, non-fatal, just lose the fast path */ }
   }
   // Sanitize a single inverter object from the cache. localStorage is same-origin
   // writable, so a hijacked/XSS-poisoned entry could carry hostile shapes; coerce to
@@ -155,7 +155,7 @@ window.FleetStore = (function(){
   // $0.21/kWh, overstating recoverable dollars ~14% for a typical ~$0.184 rate.
   // We fetch the real rate once per signed-in load and expose it via energyRate();
   // consumers fall back to ENERGY_RATE_FALLBACK so demo/anon math is unchanged.
-  const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh — blended VT-ish offset (demo + pre-fetch)
+  const ENERGY_RATE_FALLBACK = 0.21;   // $/kWh, blended VT-ish offset (demo + pre-fetch)
   function energyRate(){ return state.energyRate != null ? state.energyRate : ENERGY_RATE_FALLBACK; }
   function fetchEnergyRate(){
     const s = getSession(); if(!s) return;                 // demo/anon keeps the fallback
@@ -167,12 +167,12 @@ window.FleetStore = (function(){
           if(state.energyRate !== n){ state.energyRate = n; notify("rate"); }
         }
       })
-      .catch(()=>{ /* transient — keep fallback, retried on next load/refetch */ });
+      .catch(()=>{ /* transient, keep fallback, retried on next load/refetch */ });
   }
   let _invSeq = 1;             // unique inverter id allocator (demo + new)
 
   const subs = new Set();
-  // kind ∈ "load" | "fleet" | "triage" | "focus" | "history" — lets a subscriber
+  // kind ∈ "load" | "fleet" | "triage" | "focus" | "history", lets a subscriber
   // ignore changes it doesn't care about (e.g. the fleet tree skips triage-only).
   function subscribe(fn){ subs.add(fn); if(state.loaded){ try{ fn(state,"load"); }catch(e){} } return () => subs.delete(fn); }
   function notify(kind){ subs.forEach(fn => { try{ fn(state, kind||"fleet"); }catch(e){} }); }
@@ -181,8 +181,8 @@ window.FleetStore = (function(){
    * Command-inverse history for the DRAG operations (reassign + reorder). These
    * invert exactly (stable inverter/array ids) and their inverses call the same
    * store mutators, so the backend stays in sync (each replays the real endpoint).
-   * Structural commits — createArray, deleteArray, resetLayout, and any fresh
-   * load/ingest — are BARRIERS that clear history, so we never offer a broken
+   * Structural commits, createArray, deleteArray, resetLayout, and any fresh
+   * load/ingest, are BARRIERS that clear history, so we never offer a broken
    * undo across an add/delete/reset. Each entry = { undo(), redo() } closures. */
   const HISTORY_LIMIT = 100;
   let _undoStack = [], _redoStack = [], _applyingHistory = false;
@@ -220,18 +220,18 @@ window.FleetStore = (function(){
   function saveTriage(){ try { localStorage.setItem(TRIAGE_KEY, JSON.stringify(state.triage)); } catch(e){} }
 
   /* ===========================================================================
-   * DERIVED HELPERS — peer-index recompute + per-array alert rollup
+   * DERIVED HELPERS, peer-index recompute + per-array alert rollup
    * ==========================================================================*/
 
   // Recompute each producing inverter's peer_index (share of harvest vs share of
   // hardware) against its CURRENT array cohort, and refresh ok/underperforming.
-  // Intrinsic states (dead/fault/comm_gap) are hardware/comms facts — left as-is.
+  // Intrinsic states (dead/fault/comm_gap) are hardware/comms facts, left as-is.
   //
   // EVIDENCE GUARD: a peer verdict ("Below its neighbors") is only honest when we
   // actually have the history to back it. When an inverter has no usable 14-day
   // window (freshly connected, no daily history yet) OR there are fewer than 2
   // producing peers with history to compare against (degenerate cohort), we can't
-  // judge it — so it gets the neutral "monitoring" status instead of a green/amber
+  // judge it, so it gets the neutral "monitoring" status instead of a green/amber
   // verdict it hasn't earned. This is what fixes cards reading "Below its
   // neighbors" while showing "no history yet" and a healthy live output %.
   function recompute(a){
@@ -245,26 +245,26 @@ window.FleetStore = (function(){
     producing.forEach(i => {
       const hasHistory = i.nameplate_kw>0 && i.window_kwh!=null && i.window_kwh>0;
       if(!hasHistory){
-        // No usable window at all — show neutral, claim nothing.
+        // No usable window at all, show neutral, claim nothing.
         i.status = "monitoring";
         i.peer_index = null;
-        i.diagnosis = "Gathering data — not enough history yet to compare against its neighbors.";
+        i.diagnosis = "Gathering data, not enough history yet to compare against its neighbors.";
         return;
       }
       if(!haveCohort){
         // We have THIS unit's history but no peer cohort (lone inverter, or siblings
-        // with no history) — peer analysis can't run. Instead of leaving it
+        // with no history), peer analysis can't run. Instead of leaving it
         // "monitoring" forever (blind to a real sag), judge it against an ABSOLUTE
         // modeled target. Conservative by design: only a clear, large shortfall flags.
         const target = i.nameplate_kw * 24 * WINDOW_DAYS * seasonalCF();  // typical kWh over the window
-        i.peer_index = null;   // no peer index — this is a model verdict, not a peer one
+        i.peer_index = null;   // no peer index, this is a model verdict, not a peer one
         if(target > 0 && i.window_kwh < target * SOLO_TARGET_RATIO){
           const short = Math.round((1 - i.window_kwh/target) * 100);
           i.status = "underperforming";
-          i.diagnosis = `Producing ~${short}% below what a ${i.nameplate_kw} kW system typically makes here this month — with no sibling inverter to compare against, this is measured vs a seasonal model. Worth a look: shading, soiling, snow, or a tired string.`;
+          i.diagnosis = `Producing ~${short}% below what a ${i.nameplate_kw} kW system typically makes here this month, with no sibling inverter to compare against, this is measured vs a seasonal model. Worth a look: shading, soiling, snow, or a tired string.`;
         } else {
           i.status = "ok";
-          i.diagnosis = "Pulling its weight (measured against a seasonal model — no sibling inverter to compare against).";
+          i.diagnosis = "Pulling its weight (measured against a seasonal model, no sibling inverter to compare against).";
         }
         return;
       }
@@ -273,7 +273,7 @@ window.FleetStore = (function(){
       i.status = pi >= UNDERPERF_PI ? "ok" : "underperforming";
       i.diagnosis = i.status==="ok"
         ? "Pulling its weight."
-        : `Running ~${Math.round((1-pi)*100)}% below its neighbors under the same sky — likely shading, soiling, or a tired string.`;
+        : `Running ~${Math.round((1-pi)*100)}% below its neighbors under the same sky, likely shading, soiling, or a tired string.`;
     });
   }
 
@@ -282,7 +282,7 @@ window.FleetStore = (function(){
     const dead = f.some(i => i.status==="dead" || i.status==="fault");
     const under = f.filter(i => i.status==="underperforming").length;
     const quiet = f.some(i => i.status==="comm_gap");
-    // "monitoring" is neutral (not enough evidence) — it is NOT a flag.
+    // "monitoring" is neutral (not enough evidence), it is NOT a flag.
     const flagged = f.filter(i => i.status!=="ok" && i.status!=="monitoring").length;
     if(dead)  return { level:"critical", count:flagged, status:"dead",            headline:"An inverter stopped earning" };
     if(under) return { level:"warn",     count:flagged, status:"underperforming", headline:"A money leak caught early" };
@@ -291,7 +291,7 @@ window.FleetStore = (function(){
   }
 
   /* ===========================================================================
-   * LIVE LIVENESS — the SINGLE shared classifier for "is this inverter dark
+   * LIVE LIVENESS, the SINGLE shared classifier for "is this inverter dark
    * right now?". The fleet tree (sandbox.js), the overview grid, and the command
    * center ALL call this, so the three surfaces can never again disagree about a
    * live anomaly the way they did when each derived health from inv.status alone.
@@ -299,11 +299,11 @@ window.FleetStore = (function(){
    * This is deliberately SEPARATE from inv.status (the 14-day peer_analysis
    * verdict). status answers "healthy over the window?"; liveVerdict answers
    * "producing this instant, vs its daylight peers?". An inverter that just
-   * stalled reads status:"ok" for up to ~2 days — liveVerdict catches it now.
+   * stalled reads status:"ok" for up to ~2 days, liveVerdict catches it now.
    *   "ok"    producing at a healthy level, OR calmly idle (night / peers idle / <2 lit peers)
-   *   "low"   producing but >15% below its live peers' output-per-nameplate — a peer-level gap
-   *   "dark"  fresh reading ~0 W while >=2 daylight peers produce — a real anomaly
-   *   "stale" NO live reading while peers produce — unknown, not a confirmed fault
+   *   "low"   producing but >15% below its live peers' output-per-nameplate, a peer-level gap
+   *   "dark"  fresh reading ~0 W while >=2 daylight peers produce, a real anomaly
+   *   "stale" NO live reading while peers produce, unknown, not a confirmed fault
    * ==========================================================================*/
   const LIVE_FLOOR_W = 25;   // below this (or 1% of rated) = idle, not "producing"
   const LOW_PEER_GAP = 0.15; // >15% below the peer median pct-of-max = "low" (Ford's threshold)
@@ -313,7 +313,7 @@ window.FleetStore = (function(){
   function isProducing(inv){
     return inv && inv.current_power_w!=null && inv.current_power_w > _liveFloor(inv);
   }
-  // Live output as a fraction of nameplate (W ÷ rated W) — the peer-comparable
+  // Live output as a fraction of nameplate (W ÷ rated W), the peer-comparable
   // "how hard is it working" figure. Null when we can't compute it.
   function _pctOfMax(inv){
     return (inv && inv.nameplate_kw && inv.current_power_w!=null)
@@ -330,7 +330,7 @@ window.FleetStore = (function(){
   // we trust is: it reads a fresh ~0 W in daylight while its OWN history proves it's
   // normally a real producer (a healthy daily peak). That's a clear "stopped at
   // noon", not weather (which never zeroes a working array in daylight). We do NOT
-  // attempt a solo "low" verdict live — a partly-cloudy dip on one unit with no
+  // attempt a solo "low" verdict live, a partly-cloudy dip on one unit with no
   // control group is exactly the false alarm to avoid; the 14-day absolute check in
   // recompute() catches a sustained solo sag instead.
   function _provenProducer(inv){
@@ -338,7 +338,7 @@ window.FleetStore = (function(){
     if(!vals.length || inv.nameplate_kw == null) return false;
     const peak = Math.max.apply(null, vals);
     // A day that reached even a quarter of a typical full day (nameplate*~4.6 kWh/kW)
-    // proves the hardware works — so a current hard zero in daylight is anomalous.
+    // proves the hardware works, so a current hard zero in daylight is anomalous.
     return peak >= inv.nameplate_kw * 4.6 * 0.25;
   }
   function liveVerdict(inv, peers, isDaylight){
@@ -346,12 +346,12 @@ window.FleetStore = (function(){
     // streams live power but has a dead cumulative-energy register, so it has no
     // gradeable history AND its per-inverter power is a bogus energy-share split
     // (zero energy → zero/low share). Neither basis is trustworthy, so we make NO
-    // live verdict on it — a metering defect must never masquerade as a dark/low
+    // live verdict on it, a metering defect must never masquerade as a dark/low
     // FAULT. Surfaces render its own honest "no energy data" state instead.
     if(inv && inv.no_energy_register) return "ok";
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
     if(isProducing(inv)){
-      // Producing — but is it keeping pace with its array peers? An inverter running
+      // Producing, but is it keeping pace with its array peers? An inverter running
       // far below its neighbors (Ford: >15% under) is underperforming even if it's on.
       const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p));
       if(lit.length < 2) return "ok";              // not enough peer signal to judge live "low" (solo sag → recompute's window check)
@@ -378,7 +378,7 @@ window.FleetStore = (function(){
   }
 
   /* ===========================================================================
-   * SELECTORS — shape the canonical fleet for each consumer
+   * SELECTORS, shape the canonical fleet for each consumer
    * ==========================================================================*/
 
   // sandbox shape: { columns:[…], summary:{…} }. `ids` optional → focus subset.
@@ -407,7 +407,7 @@ window.FleetStore = (function(){
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
         window_kwh: i.window_kwh, produced_today_kwh: i.produced_today_kwh, current_power_w: i.current_power_w,
         daily: i.daily || [], min_kwh: i.min_kwh, peak_kwh: i.peak_kwh,
-        // Dead-energy-register flag (live power, no cumulative energy) — MUST ride
+        // Dead-energy-register flag (live power, no cumulative energy), MUST ride
         // through or every surface loses the honest "no energy data" state and #7
         // falls back to Error/Offline (the bug). Carried like status/peer_index.
         no_energy_register: !!i.no_energy_register,
@@ -427,7 +427,7 @@ window.FleetStore = (function(){
 
   function focusColumns(){
     const out = toColumns(state.focus.length ? state.focus : defaultFocusIds());
-    // Never blank the tree while arrays exist — if a stale/empty focus filtered
+    // Never blank the tree while arrays exist, if a stale/empty focus filtered
     // everything out, fall back to the default focus so the sandbox always shows
     // something (mirrors the command center, which renders all arrays).
     if(!out.columns.length && state.arrays.length) return toColumns(defaultFocusIds());
@@ -435,7 +435,7 @@ window.FleetStore = (function(){
   }
   function focusIds(){ return state.focus.length ? state.focus.slice() : defaultFocusIds(); }
   // True when the tree is showing a NARROWED subset (owner drilled into one/few
-  // arrays from the overview grid) rather than the full default focus — drives the
+  // arrays from the overview grid) rather than the full default focus, drives the
   // sandbox "Show all arrays" button.
   function focusIsNarrowed(){
     if(!state.focus.length) return false;          // empty focus = default (all/worst-few)
@@ -444,7 +444,7 @@ window.FleetStore = (function(){
   function clearFocus(){ state.focus = []; notify("focus"); }
 
   // Default sandbox focus.
-  // A REAL signed-in owner ALWAYS sees EVERY array — never a subset. Hiding any of
+  // A REAL signed-in owner ALWAYS sees EVERY array, never a subset. Hiding any of
   // an owner's real arrays reads as "the app forgot my arrays" (it never lost them;
   // the data is persisted server-side). This is a hard product invariant.
   // The "worst few" narrowing exists ONLY to keep the ANONYMOUS 100-array SIMULATED
@@ -462,12 +462,12 @@ window.FleetStore = (function(){
   }
 
   /* ===========================================================================
-   * MUTATIONS — update in-memory, notify SYNC, persist async when live
+   * MUTATIONS, update in-memory, notify SYNC, persist async when live
    * ==========================================================================*/
   const isLive = () => !!getSession();
   // In-flight write tracking. A background refetch (auto-refresh, tab refocus)
   // or a closely-following drag must NEVER re-ingest the server tree while a
-  // mutation (reassign/reorder/create/delete) is still in flight — doing so
+  // mutation (reassign/reorder/create/delete) is still in flight, doing so
   // pulls STALE state and clobbers the optimistic local move, which is exactly
   // the "inverters jump back to the wrong array" glitch. Every write bumps this;
   // refetch() bails (and self-reschedules) while it's > 0.
@@ -558,7 +558,7 @@ window.FleetStore = (function(){
   // update + notify (so the OTHER view repaints the new name instantly), records
   // an undoable inverse, then persists to the backend; a refetch reconciles to
   // the authoritative name. No-op when empty or unchanged. Mirrors the backend's
-  // per-tenant name-uniqueness — a 409 clash reverts via the catch→refetch.
+  // per-tenant name-uniqueness, a 409 clash reverts via the catch→refetch.
   function renameArray(id, name){
     const a = findArray(id); if(!a) return;
     const next = String(name == null ? "" : name).trim();
@@ -634,7 +634,7 @@ window.FleetStore = (function(){
     const id = "new-" + (_invSeq++);
     state.arrays.push({ id, name, region:"—", host:"", vendor:"", inverters:[] });
     notify();
-    clearHistory();   // structural commit — a barrier (drag history doesn't cross it)
+    clearHistory();   // structural commit, a barrier (drag history doesn't cross it)
     if(isLive()){ apiPost("/v1/array-owners/arrays", { name }).then(()=>refetch()).catch(()=>refetch()); }
     return id;
   }
@@ -684,7 +684,7 @@ window.FleetStore = (function(){
   // deleteArray: optimistic local removal + backend DELETE, recorded as an UNDOABLE
   // command (undo re-inserts locally at its old spot AND revives it server-side via
   // the restore endpoint; redo re-deletes). Unlike createArray/deleteArray this is
-  // NOT a structural barrier — a single-inverter remove inverts exactly by stable
+  // NOT a structural barrier, a single-inverter remove inverts exactly by stable
   // id, so it can sit in the same history stack as drag moves.
   function deleteInverter(invId){
     const hit = findInv(invId);
@@ -729,7 +729,7 @@ window.FleetStore = (function(){
   }
 
   function resetLayout(){
-    clearHistory();   // server regroups everything — a barrier
+    clearHistory();   // server regroups everything, a barrier
     if(isLive()){ apiPost("/v1/array-owners/layout/reset").then(()=>refetch()).catch(()=>refetch()); }
     else { notify(); }   // demo has no server grouping to snap back to
   }
@@ -747,7 +747,7 @@ window.FleetStore = (function(){
   function setFocus(ids){ state.focus = (ids||[]).map(x=>x); notify("focus"); }
 
   /* ===========================================================================
-   * LOAD — one fetch (live) or one simulated fleet (demo), shared by both views
+   * LOAD, one fetch (live) or one simulated fleet (demo), shared by both views
    * ==========================================================================*/
   let _lastUpdate = 0;
   function ingest(arrays, opts){
@@ -757,7 +757,7 @@ window.FleetStore = (function(){
     state.arrays.forEach(recompute);
     // Reconcile the sandbox focus against the NEW array set. Drop any focused ids
     // that no longer exist (demo→live swap, or arrays the extension added after a
-    // prior load) — otherwise a stale focus filters every real array out and the
+    // prior load), otherwise a stale focus filters every real array out and the
     // fleet tree renders blank while the command center (which reads ALL arrays)
     // shows them. If nothing valid remains, fall back to the default focus.
     const liveIds = new Set(state.arrays.map(a => a.id));
@@ -778,7 +778,7 @@ window.FleetStore = (function(){
    * Real data → poll the backend every ~45s and re-ingest. Simulated demo →
    * gently evolve the fleet so the KPIs visibly breathe. Either way we stamp
    * _lastUpdate and emit "live" (a lightweight beat the command center repaints
-   * in place; the fleet tree ignores it — its own kW ticker handles motion). */
+   * in place; the fleet tree ignores it, its own kW ticker handles motion). */
   let _hb = null, _beat = 0;
   function startHeartbeat(){
     if(_hb) return;
@@ -812,7 +812,7 @@ window.FleetStore = (function(){
 
   function refetch(){
     const s = getSession(); if(!s) return Promise.resolve();
-    // Never overwrite local state while a write is in flight — defer until the
+    // Never overwrite local state while a write is in flight, defer until the
     // last one settles (see _trackWrite). This is what stops a background pull
     // from clobbering an optimistic reassign and snapping inverters back.
     if(_pendingWrites > 0){ _refetchQueued = true; return Promise.resolve(); }
@@ -822,7 +822,7 @@ window.FleetStore = (function(){
         if(!r.ok) throw 0;
         return r.json();
       })
-      // A signed-in owner's REAL tree — ingest it even when empty (no columns),
+      // A signed-in owner's REAL tree, ingest it even when empty (no columns),
       // so a freshly-added-but-still-empty array is reflected, NOT masked by demo.
       .then(t => { ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 }); })
       .catch((err)=>{ if(err && err.auth) onAuthExpired(); /* transient: keep current state */ });
@@ -844,12 +844,12 @@ window.FleetStore = (function(){
   // ── background auto-refresh ────────────────────────────────────────────────
   // Without this, an open sandbox NEVER re-pulls the tree, so a source-outage
   // banner (source_status.state === "stale") would linger forever after the
-  // vendor's feed comes back — the data is fresh server-side but the page still
+  // vendor's feed comes back, the data is fresh server-side but the page still
   // shows the old snapshot. A gentle periodic refetch re-ingests the authoritative
   // tree, flipping source_status back to "ok" and clearing the banner on its own.
   // Guards: only when live + tab visible + the user isn't mid-drag / mid-edit
   // (so a refresh-driven re-render never yanks the canvas out from under them).
-  const AUTO_REFRESH_MS = 5 * 60 * 1000;   // 5 min — well under the 6h stale window
+  const AUTO_REFRESH_MS = 5 * 60 * 1000;   // 5 min, well under the 6h stale window
   let _autoTimer = null;
   function _userBusy(){
     try {
@@ -862,7 +862,7 @@ window.FleetStore = (function(){
     if(_autoTimer) return;                 // already running
     _autoTimer = setInterval(() => {
       if(!isLive()) return;                // demo/anon: nothing to refresh
-      if(document.hidden) return;          // tab backgrounded — skip, refresh on return
+      if(document.hidden) return;          // tab backgrounded, skip, refresh on return
       if(_userBusy()) return;              // don't interrupt a drag/edit
       refetch();                           // re-ingest → notify → views re-render
     }, AUTO_REFRESH_MS);
@@ -875,7 +875,7 @@ window.FleetStore = (function(){
     } catch(e){}
   }
   function load(){
-    if(state.loaded || _loading) return;     // single shared bootstrap — both views may call it
+    if(state.loaded || _loading) return;     // single shared bootstrap, both views may call it
     _loading = true;
     if(getSession()){
       fetchEnergyRate();   // pull the owner's real billed $/kWh so loss math is honest
@@ -898,7 +898,7 @@ window.FleetStore = (function(){
         .then(t => {
           // Signed in → always show the owner's REAL tree, even if it's empty.
           // Empty means "you haven't connected/added anything yet" (honest empty
-          // state), NEVER the fake 100-array demo — that's only for anon visitors.
+          // state), NEVER the fake 100-array demo, that's only for anon visitors.
           ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
           startAutoRefresh();   // keep the open tree fresh (clears recovered-source banners)
         })
@@ -909,7 +909,7 @@ window.FleetStore = (function(){
           if(!cached) ingest([], {});
         });
     } else {
-      // Anonymous visitor (marketing/preview) — the simulated fleet tells the story.
+      // Anonymous visitor (marketing/preview), the simulated fleet tells the story.
       // Big-operator demo: ~20 sites / 200 inverters; recovered_ytd is a
       // narrative KPI for the command-center hero (not a real ledger figure).
       ingest(simulateFleet(), { simulated:true, recovered:248600 });
@@ -922,7 +922,7 @@ window.FleetStore = (function(){
       id: c.array_id, name: c.array_name, region:"—", host: c.client_name||"",
       // Honest unknown, never a guessed vendor: a freshly-connected array with
       // no inverters polled yet (fleet-tree derives `vendor` from the inverter
-      // rows) reports null here — defaulting that to "solaredge" mislabeled
+      // rows) reports null here, defaulting that to "solaredge" mislabeled
       // every non-SolarEdge connection's portal link ("Open in SolarEdge ↗")
       // until its first poll populated real inverters. Found 2026-07-08 while
       // verifying the Fronius account-connect flow live.
@@ -932,17 +932,17 @@ window.FleetStore = (function(){
       // toColumns expose it without a second fetch.
       portfolio_name: c.portfolio_name || null,
       reminder: c.reminder || null,   // Analysis Sites O&M "Reminder" note
-      // Array-level production history (backend DailyGeneration) — used by the
+      // Array-level production history (backend DailyGeneration), used by the
       // array graph when inverters carry site-level history but no per-inverter
       // series (e.g. Chint weekETrend backfill).
       daily: c.daily || [],
-      // Server-computed sun-up flag (real solar elevation) — gates the card's
+      // Server-computed sun-up flag (real solar elevation), gates the card's
       // calm "Sleeping" night state on (night AND zero output), never zero alone.
       is_daylight: c.is_daylight !== false,
       // Source-data freshness {state:ok|stale|none,last_report,age_hours}. Carried
       // through so the card can flag a VENDOR-side reporting outage (not ours).
       source_status: c.source_status || null,
-      // OUR capture recency {synced_at, age_min} — advances every successful capture
+      // OUR capture recency {synced_at, age_min}, advances every successful capture
       // (incl. overnight) so the freshness column shows "synced Xm" distinct from the
       // vendor source age. Forwarded from the backend; FleetStore must carry it through
       // or vendor-sheet falls back to source age and never shows "synced".
@@ -966,7 +966,7 @@ window.FleetStore = (function(){
         current_power_w: inv.current_power_w, stale_hours: inv.stale_hours,
         daily: inv.daily || [], min_kwh: inv.min_kwh, peak_kwh: inv.peak_kwh,
         // Dead-energy-register flag from the backend (live power but no cumulative
-        // energy) — carry it through so the card/spreadsheet/command-center all
+        // energy), carry it through so the card/spreadsheet/command-center all
         // render the honest "no energy data" state instead of Error/Offline.
         no_energy_register: !!inv.no_energy_register,
         diagnosis: inv.diagnosis || "",
@@ -1008,7 +1008,7 @@ window.FleetStore = (function(){
     }[vendor] || `SE${np}K`); };
     const arrays = [];
     // One deliberate "story" site with a live issue so Analysis isn't all green
-    const storyIdx = 7; // West Glover — underperforming Chint site
+    const storyIdx = 7; // West Glover, underperforming Chint site
     DEMO_SITES.forEach((site, n) => {
       const invCount = site.inv;
       const vendor = site.vendor;
@@ -1021,7 +1021,7 @@ window.FleetStore = (function(){
         else if(r<0.012) status="underperforming";
         else if(r<0.018) status="comm_gap";
         else if(r<0.022) status="fault";
-        // nameplate per inverter — site total ~ site.np * invCount
+        // nameplate per inverter, site total ~ site.np * invCount
         const np = site.np;
         const fair = np * 4.6 * WINDOW_DAYS;
         let pi=1+(rng()-0.5)*0.05, win=fair*pi, power=np*1000*(0.55+rng()*0.28);
@@ -1045,7 +1045,7 @@ window.FleetStore = (function(){
           current_power_w: power==null?null:Math.round(power),
           daily, min_kwh: Math.round(Math.min(...kwhVals)*10)/10, peak_kwh: Math.round(Math.max(...kwhVals)*10)/10,
           stale_hours: status==="comm_gap" ? Math.round(8+rng()*40) : null,
-          diagnosis: status==="underperforming" ? "Pulling below peer cohort — check DC string / soiling." : "",
+          diagnosis: status==="underperforming" ? "Pulling below peer cohort, check DC string / soiling." : "",
         });
       }
       arrays.push({
@@ -1071,7 +1071,7 @@ window.FleetStore = (function(){
     isSimulated: () => !!state.simulated,
     lastUpdate: () => _lastUpdate,
     energyRate,             // effective $/kWh for loss/value math (real billed rate when signed in, else fallback)
-    REC_PER_MWH: 38,        // $/MWh REC value — shared so consumers don't drift
+    REC_PER_MWH: 38,        // $/MWh REC value, shared so consumers don't drift
     WINDOW_DAYS,
   };
 })();
