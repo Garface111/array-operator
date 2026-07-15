@@ -1,71 +1,186 @@
 /* ============================================================================
- * Hands-Off Walkthrough — post-onboarding product tour
+ * Hands-Off Walkthrough — full product guided tour
  * Shows after first onboarding lands on the real site (?fresh=1 / ?tour=hands-off).
- * Goal: make "set and forget" concrete — cloud auto-refresh, utility bills,
- * offtakers — with a beautiful sky-glass UI and live completion chips.
+ * Goal: walk every major surface (Fleet Triage → Inverters → Analysis → Invoices
+ * → Resources → Account → Alerts → Energy Agent) while still completing the
+ * hands-off pillars (auto-refresh, utility, offtakers, send mode, online pay).
  * ========================================================================== */
 (function () {
   "use strict";
 
   var STORAGE_KEY = "ao_hands_off_tour"; // "done" when fully finished
   var MODAL_SEEN_KEY = "ao_hands_off_modal_seen"; // first-time modal shown/closed
+  var VISITED_KEY = "ao_ho_visited"; // JSON string[] of step ids the operator has walked
+  var DELIVERY_CHOSEN_KEY = "ao_ho_delivery_chosen"; // "auto" | "approval" once operator decides in tour
 
+  /**
+   * Full product tour. `statusKey` steps are live pillars (green when real data
+   * is connected). Guide/dream steps complete when visited (Continue or CTA).
+   * `cta` navigates the real UI behind the dock; Continue advances the guide.
+   */
   var STEPS = [
     {
       id: "welcome",
       rail: "Welcome",
-      railSub: "Why hands-off",
-      kicker: "Your first hour",
-      title: "Build a hands-off Array Operator",
+      railSub: "The whole product",
+      kicker: "Full guided tour",
+      title: "We’ll walk every corner of Array Operator",
       lede:
-        "You made it past setup. Next is the only checklist that matters: connect the feeds once — then we’ll show you one offtaker invoice with its bill lined up and ask how you want reports to leave. After that, the machine runs.",
+        "Two jobs: <b>watch the fleet</b> and <b>invoice offtakers</b>. This guide opens each tab with you — Inverters, Fleet Triage, Analysis, Invoices, Resources, Account, Alerts, and the Energy Agent — then locks in the hands-off switches so the machine can run.",
       kind: "welcome",
     },
+    // ── Fleet ──────────────────────────────────────────────────────────────
     {
       id: "arrays",
-      rail: "Arrays live",
-      railSub: "Production feed",
-      kicker: "Step 1 of 6 · Hardware",
-      title: "Get every array talking",
+      rail: "Inverters",
+      railSub: "Sandbox map",
+      kicker: "1 · Fleet · Inverters",
+      title: "Your equipment map — every array & inverter",
       lede:
-        "Hands-off starts with a live production feed. SolarEdge/Locus poll server-side; Fronius, SMA, and Chint need a portal login so we can keep reading them.",
+        "Default home is <b>Inverters</b>. The Sandbox is Tenant → Array → Inverter made visible: drag to regroup, read health bars, open a vendor portal when you need a live sync.",
       kind: "step",
       bullets: [
-        "Open <b>Inverters</b> and confirm every site you care about is listed.",
-        "Missing a vendor? Use <b>Add array</b> or Account → Auto-refresh to attach the portal.",
-        "Healthy cards mean we can detect downtime and write offtaker invoices from real generation context.",
+        "Confirm every site you care about is listed with healthy cards.",
+        "Use <b>Overview</b> for the whole fleet grid, <b>Tree</b> to drill one array.",
+        "Missing hardware? We’ll cover <b>+ Add array</b> in a moment.",
       ],
-      cta: { label: "Open Inverters →", hash: "#arrays" },
+      cta: { label: "Open Inverters Sandbox →", hash: "#arrays", openSandbox: true },
       statusKey: "arrays",
+      autoNav: true,
     },
+    {
+      id: "spreadsheet",
+      rail: "Spreadsheet",
+      railSub: "Vendor table",
+      kicker: "2 · Fleet · Spreadsheet",
+      title: "Same fleet, as a vendor spreadsheet",
+      lede:
+        "Toggle <b>Spreadsheet</b> under Inverters when you want rows, not cards — every vendor, live now, today kWh, status pills, and “synced ago” without panning a canvas.",
+      kind: "guide",
+      bullets: [
+        "Segment control: <b>Sandbox | Spreadsheet</b> (same data as the map).",
+        "Expand a vendor row to see its arrays and inverters.",
+        "Use search when the book is large; <b>Sync all</b> when capture needs a nudge.",
+      ],
+      cta: { label: "Open Spreadsheet view →", hash: "#arrays", openSheet: true },
+      autoNav: true,
+    },
+    {
+      id: "addarray",
+      rail: "Add array",
+      railSub: "Connect more sites",
+      kicker: "3 · Fleet · Connect",
+      title: "Add another array or vendor login",
+      lede:
+        "Growth path: <b>+ Add array</b> on Inverters. Prefer one-click portal login (extension) over pasting keys — keys stay available behind “Enter manually.”",
+      kind: "guide",
+      bullets: [
+        "SolarEdge / Locus can discover multiple sites from one credential.",
+        "Fronius, SMA, Chint often use portal capture via the EnergyAgent helper.",
+        "Utility-only connect is for meters that feed invoices, not inverter telemetry.",
+      ],
+      cta: { label: "Open Add array →", hash: "#arrays", openAddArray: true },
+      autoNav: true,
+    },
+    {
+      id: "triage",
+      rail: "Fleet Triage",
+      railSub: "Who needs me now",
+      kicker: "4 · Fleet · Triage",
+      title: "Fleet Triage — the morning glance",
+      lede:
+        "Top bar <b>Fleet Triage</b> answers “who needs me right now?” — production pulse, health commander card, and a Needs attention queue. Drill a tile into Inverters when something looks off.",
+      kind: "guide",
+      bullets: [
+        "Commander card = whole-fleet health at a glance.",
+        "Attention queue sorts worst-first (underperforming, dark, vendor issues).",
+        "This is the daily check; Inverters is the deep equipment map.",
+      ],
+      cta: { label: "Open Fleet Triage →", hash: "#dashboard" },
+      autoNav: true,
+    },
+    {
+      id: "alerts",
+      rail: "Alerts",
+      railSub: "Email when it slips",
+      kicker: "5 · Fleet · Alerts",
+      title: "Alerts — email when an inverter slips",
+      lede:
+        "Bottom-right <b>Alerts</b> bell (or Triage Monitoring → Alerts): recipients, on/off, and how aggressively we notify. Hands-off means you don’t have to stare at Triage — the alert finds you.",
+      kind: "guide",
+      bullets: [
+        "Add every inbox that should hear about downtime.",
+        "Grace window avoids noise on brief blips; recovery quiets the chain.",
+        "Keep Setup (this guide) bottom-left and Alerts bottom-right as your chrome.",
+      ],
+      cta: { label: "Open Alerts panel →", hash: "#dashboard", openAlerts: true },
+      autoNav: true,
+    },
+    // ── Intelligence ───────────────────────────────────────────────────────
+    {
+      id: "analysis",
+      rail: "Analysis",
+      railSub: "Fleet NOC",
+      kicker: "6 · Intelligence · Analysis",
+      title: "Analysis — weather, yield, hardware NOC",
+      lede:
+        "<b>Analysis</b> is the operations center: production vs weather-expected, sites grid, performance, health, hardware list. When yield feels off, start here — not in a vendor portal tab soup.",
+      kind: "guide",
+      bullets: [
+        "Portfolio strip first, then Sites / Performance / Health / Hardware.",
+        "Specific yield (kWh/kW) compares arrays fairly across different sizes.",
+        "Operations alarms roll up the same attention story as Triage, with more depth.",
+      ],
+      cta: { label: "Open Analysis →", hash: "#analysis" },
+      autoNav: true,
+    },
+    {
+      id: "trends",
+      rail: "Trends",
+      railSub: "Through time",
+      kicker: "7 · Intelligence · Trends",
+      title: "Trends — the same energy, drawn six ways",
+      lede:
+        "Under Analysis, open <b>Trends</b> (not a top tab). Daily bars, monthly production, liquid energy, spiral, ridgeline, heat-field — different lenses on real generation history.",
+      kind: "guide",
+      bullets: [
+        "Segment: <b>Fleet analysis | Trends</b> (same Analysis tab).",
+        "Art views need enough history (~2 years) or they say so honestly.",
+        "Use Trends when a board or offtaker wants a story, not a raw CSV.",
+      ],
+      cta: { label: "Open Trends →", hash: "#trends" },
+      autoNav: true,
+    },
+    // ── Capture / settlement pillars ───────────────────────────────────────
     {
       id: "autorefresh",
       rail: "Auto-refresh",
       railSub: "The hands-off switch",
-      kicker: "Step 2 of 6 · Capture",
-      title: "Save a portal login here",
+      kicker: "8 · Hands-off · Capture",
+      title: "Save a portal login — live data 24/7",
       lede:
-        "This is the hands-off switch. Drop a monitoring login below — we store it encrypted and refresh your data around the clock. No hunting through Account.",
+        "This is the hands-off switch. Drop a monitoring login below — encrypted, harvested around the clock. Full vault lives on <b>Account → Auto-refresh</b>.",
       kind: "step",
       loginForm: "inverter",
       bullets: [
-        "Add every inverter portal you use (Chint, Fronius, SMA…). SolarEdge can use an API key later in Account if you prefer.",
+        "Add every inverter portal you use (Chint, Fronius, SMA…). SolarEdge can use an API key in Account if you prefer.",
         "We switch you to <b>Store it with us</b> automatically when you save here.",
-        "You can add more logins anytime from Account → Auto-refresh — or right here.",
+        "Device vault is the alternate: passwords stay on your computer; still set-and-forget if that machine stays online.",
       ],
       callout:
         "<b>Hands-off rule:</b> if a login isn’t saved, that feed only updates when someone opens the portal manually.",
       cta: { label: "Open full Auto-refresh →", hash: "#account", openAr: true },
       statusKey: "autorefresh",
+      autoNav: true,
     },
     {
       id: "utility",
       rail: "Utility bills",
       railSub: "Invoice source of truth",
-      kicker: "Step 3 of 6 · Settlement",
+      kicker: "9 · Hands-off · Settlement",
       title: "Save your utility login",
       lede:
-        "Offtaker invoices use utility bills as source of truth. Save GMP or your co-op login here so bills keep landing without a portal tab.",
+        "Offtaker invoices use <b>utility bills</b> as source of truth — never raw inverter kWh alone. Save GMP or your co-op login so bills keep landing without a portal tab.",
       kind: "step",
       loginForm: "utility",
       bullets: [
@@ -73,81 +188,169 @@
         "After the first successful harvest you’ll see bill sources on Invoices.",
         "Need a utility we don’t list? Tell us from Account — we’ll wire it.",
       ],
-      cta: { label: "Open Invoices →", hash: "#reports" },
+      cta: { label: "Open Invoices (bill sources) →", hash: "#reports" },
       statusKey: "utility",
+      autoNav: true,
     },
+    // ── Invoicing ──────────────────────────────────────────────────────────
     {
       id: "offtakers",
       rail: "Offtakers",
       railSub: "Who you bill",
-      kicker: "Step 4 of 6 · Customers",
+      kicker: "10 · Invoices · Roster",
       title: "Add offtakers (if you invoice)",
       lede:
-        "Each offtaker is a customer who gets a share of solar credits. Bind their share and bill source once — next we’ll line up a real invoice preview with its bill and ask how you want drafts to leave.",
+        "Each offtaker is a customer who gets a share of solar credits. Bind share % and bill source once — drafts appear monthly for approval or auto-send.",
       kind: "step",
       bullets: [
         "Invoices → <b>Add an offtaker</b>: name, email, share %, master/sub utility.",
-        "Set master solar credit rate only if you want one fleet override; blank uses each bill’s own rate.",
-        "After this: preview one offtaker with the bill, then choose <b>approve-to-send</b> or <b>auto-send</b>.",
+        "Master solar credit rate is optional fleet override; blank uses each bill’s rate.",
+        "Next: bulk import if you have a spreadsheet, then bill audit + send mode.",
       ],
-      cta: { label: "Set up offtakers →", hash: "#reports" },
+      cta: { label: "Open Offtakers →", hash: "#reports", openOfftakers: true },
       secondary: { label: "I only monitor — skip", skip: true },
       statusKey: "offtakers",
+      autoNav: true,
+    },
+    {
+      id: "bulkimport",
+      rail: "Bulk import",
+      railSub: "Whole roster at once",
+      kicker: "11 · Invoices · Import",
+      title: "Bulk import — any offtaker spreadsheet",
+      lede:
+        "Almost nobody types 40 offtakers by hand. <b>⬆ Bulk import</b> accepts utility membership exports, Excel, or Google Sheets — we detect columns; you review before create.",
+      kind: "guide",
+      bullets: [
+        "Works with messy headers: name, email, share %, account numbers.",
+        "Multi-sheet workbooks: we skip Instructions / SAMPLE tabs.",
+        "Deep link later: open Invoices with bulk setup anytime from Account help.",
+      ],
+      cta: { label: "Open Bulk import →", hash: "#reports", openBulk: true },
+      autoNav: true,
+    },
+    {
+      id: "billaudit",
+      rail: "Bill audit",
+      railSub: "GMP share check",
+      kicker: "12 · Invoices · Audit",
+      title: "Bill audit — does the utility match your shares?",
+      lede:
+        "On Invoices, switch to <b>Bill audit</b>. We compare GMP’s credited allocation against the share you entered — flag mismatches (and the ~$25/error stakes when applicable).",
+      kind: "guide",
+      bullets: [
+        "Segment: <b>Offtakers | Bill audit</b> at the top of Invoices.",
+        "Needs master + offtaker bills on file for a real cross-check.",
+        "Fix shares or chase the utility with evidence — don’t invent kWh.",
+      ],
+      cta: { label: "Open Bill audit →", hash: "#reports", openAudit: true },
+      autoNav: true,
     },
     {
       id: "autosend",
       rail: "Send mode",
       railSub: "Preview + approve",
-      kicker: "Step 5 of 6 · The payoff",
+      kicker: "13 · Invoices · The payoff",
       title: "Peek one offtaker invoice — then approve how reports leave",
       lede:
-        "This is the dream: draft + utility bill + amount due, all lined up. Open the full preview on Invoices, then choose whether each report waits for your OK — or auto-sends when the bill settles.",
+        "Dream moment: draft + utility bill + amount due, lined up. Open the full offtaker card, then choose <b>Approve to send</b> or <b>Auto-send</b> as your fleet default.",
       kind: "dream",
       bullets: [
-        "Open <b>one offtaker</b> on Invoices to see the draft email, math, and source bill together.",
-        "Pick a fleet default: <b>Approve to send</b> (you OK each cycle) or <b>Auto-send</b> (hands-off).",
-        "You can still override any single offtaker later — this is the starting posture, not a lock.",
+        "Open <b>one offtaker</b> to see draft email, math, and source bill together.",
+        "Fleet default: approve each cycle, or auto-send when the bill settles.",
+        "Per-offtaker overrides still work — this is the starting posture.",
       ],
       callout:
-        "<b>Nothing emails a customer until a draft exists and send mode allows it.</b> Demo/fake figures never leave your account.",
+        "<b>Nothing emails a customer until a draft exists and send mode allows it.</b> Demo figures never leave your account.",
       cta: { label: "Open offtaker preview →", hash: "#reports", openPreview: true },
       secondary: { label: "I’ll decide later — continue", skip: true },
       statusKey: "autosend",
+      autoNav: true,
     },
     {
       id: "onlinepay",
       rail: "Online pay",
       railSub: "Collect without chasing",
-      kicker: "Step 6 of 6 · Payouts",
+      kicker: "14 · Invoices · Pay",
       title: "Enable online pay for offtakers",
       lede:
-        "Hands-off invoicing isn’t finished until offtakers can pay from the email. One ~2‑minute Stripe bank setup — then every invoice gets a secure <b>Pay</b> button and money lands in your bank.",
+        "Hands-off invoicing finishes when offtakers can pay from the email. ~2 minutes on Stripe Connect Express — secure <b>Pay</b> button, money to your bank.",
       kind: "step",
       bullets: [
-        "We use Stripe Connect Express — you type bank (or debit) details once on Stripe’s secure page. We never see your bank login.",
-        "After you’re live, every offtaker invoice email can include a pay link automatically.",
-        "Platform fee is a small % per payment (shown on Account). The rest is yours.",
+        "Bank (or debit) details stay on Stripe — we never see your bank login.",
+        "Platform fee is a small % per payment (shown on Account).",
+        "Without online pay, drafts still need you to collect offline.",
       ],
       callout:
-        "<b>Hands-off rule:</b> offtakers without online pay still need you to collect — drafts alone aren’t set-and-forget.",
+        "<b>Hands-off rule:</b> offtakers without online pay still need manual collection.",
       cta: { label: "Enable online pay — ~2 min →", action: "start-connect" },
       secondaryCta: { label: "Open Account pay setup →", hash: "#account", openPay: true },
       secondary: { label: "I only monitor / collect offline — skip", skip: true },
       statusKey: "onlinepay",
     },
+    // ── Supporting ─────────────────────────────────────────────────────────
+    {
+      id: "resources",
+      rail: "Resources",
+      railSub: "Rates & rules",
+      kicker: "15 · Support · Resources",
+      title: "Resources — rates, RECs, and local rules",
+      lede:
+        "<b>Resources</b> is the briefing tab: net-metering rates, REC context, and news filtered for operators — so you’re not hunting PDFs when a offtaker asks “what’s the credit rate?”",
+      kind: "guide",
+      bullets: [
+        "Pick your state / utility context when offered.",
+        "Use this before setting a master solar credit rate on Invoices.",
+        "Opens in-app (same shell) — no separate product to learn.",
+      ],
+      cta: { label: "Open Resources →", hash: "#resources" },
+      autoNav: true,
+    },
+    {
+      id: "account",
+      rail: "Account",
+      railSub: "Plan, card, vault",
+      kicker: "16 · Support · Account",
+      title: "Account — plan, billing, Auto-refresh home",
+      lede:
+        "<b>Account</b> holds company profile, plan (monitoring / invoicing / both), card, unified bill lines, online-pay Connect status, and the full Auto-refresh vault. It’s the control room for the business relationship with us.",
+      kind: "guide",
+      bullets: [
+        "Plan gates tabs: monitoring → fleet tools; invoicing → Invoices; both → everything.",
+        "Trial has no card; add one before the trial ends from Billing.",
+        "Energy Agent Pro (optional) unlocks unlimited AI on Account when you want it.",
+      ],
+      cta: { label: "Open Account →", hash: "#account" },
+      autoNav: true,
+    },
+    {
+      id: "agent",
+      rail: "Energy Agent",
+      railSub: "Ask anything",
+      kicker: "17 · Support · Agent",
+      title: "Energy Agent — your co-pilot on every tab",
+      lede:
+        "The orb opens a voice/chat operator that knows this product: tours lockstep to real controls, answers “what still needs hands-off setup?”, and can navigate you. Prefer plain language — never raw tech IDs.",
+      kind: "guide",
+      bullets: [
+        "Try: “Walk me through Invoices” or “What’s still red for hands-off?”",
+        "Voice can fill with a short “one second…” then answer when ready.",
+        "Setup FAB (this tour) and Agent are complementary — checklist vs freeform.",
+      ],
+      cta: { label: "Open Energy Agent →", openAgent: true },
+      autoNav: true,
+    },
     {
       id: "done",
-      rail: "Hands-off",
-      railSub: "You’re set",
-      kicker: "You’re ready",
-      title: "Set it once. Let it run.",
+      rail: "You’re set",
+      railSub: "Run the machine",
+      kicker: "Tour complete",
+      title: "You know the map. Now let it run.",
       lede:
-        "When arrays, auto-refresh, utility bills, send mode, and (if you invoice) online pay are green, Array Operator can keep production fresh and offtaker invoices collect without daily login theatre.",
+        "You’ve touched every major surface. Keep the hands-off pillars green — arrays, auto-refresh, utility bills, send mode, online pay if you invoice — and use Triage + Alerts + Agent for the exceptions.",
       kind: "done",
     },
   ];
-
-  var DELIVERY_CHOSEN_KEY = "ao_ho_delivery_chosen"; // "auto" | "approval" once operator decides in tour
 
   var state = {
     open: false,
@@ -244,6 +447,31 @@
     try {
       localStorage.setItem(STORAGE_KEY, "done");
       localStorage.setItem(MODAL_SEEN_KEY, "1");
+    } catch (e) {}
+  }
+
+  function getVisited() {
+    try {
+      var raw = localStorage.getItem(VISITED_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function isVisited(id) {
+    return getVisited().indexOf(id) >= 0;
+  }
+
+  function markVisited(id) {
+    if (!id || id === "welcome" || id === "done") return;
+    try {
+      var v = getVisited();
+      if (v.indexOf(id) < 0) {
+        v.push(id);
+        localStorage.setItem(VISITED_KEY, JSON.stringify(v));
+      }
     } catch (e) {}
   }
 
@@ -530,33 +758,48 @@
   }
 
   function stepComplete(step, live) {
-    if (!step.statusKey) return false;
+    if (!step) return false;
+    // Live pillars
     if (step.statusKey === "arrays") return !!live.arrays;
     if (step.statusKey === "autorefresh") return !!live.cloud;
-    if (step.statusKey === "utility") return !!(live.utilities && (live.utilWithBills > 0 || live.utilCount > 0));
+    if (step.statusKey === "utility")
+      return !!(live.utilities && (live.utilWithBills > 0 || live.utilCount > 0));
     if (step.statusKey === "offtakers") return !!live.offtakers;
-    // Autosend is complete once they've made a posture choice (or skipped).
-    // Without offtakers it's optional — mark done so the rail doesn't stall.
     if (step.statusKey === "autosend") {
       if (!live.offtakers) return true;
       return !!live.deliveryChosen;
     }
     if (step.statusKey === "onlinepay") return !!live.onlinePay;
+    // Guide surfaces: complete once walked
+    if (step.kind === "guide" || (step.kind === "step" && !step.statusKey)) {
+      return isVisited(step.id);
+    }
+    if (step.id === "done") return requiredRemaining(live) === 0;
     return false;
   }
 
   function progressPct(live) {
-    var keys = ["arrays", "autorefresh", "utility", "offtakers", "autosend", "onlinepay"];
-    var done = 0;
-    keys.forEach(function (k) {
-      if (k === "arrays" && live.arrays) done++;
-      if (k === "autorefresh" && live.cloud) done++;
-      if (k === "utility" && live.utilities) done++;
-      if (k === "offtakers" && live.offtakers) done++;
-      if (k === "autosend" && (live.deliveryChosen || !live.offtakers)) done++;
-      if (k === "onlinepay" && live.onlinePay) done++;
+    // Whole-tour progress: every step except welcome/done
+    var walkable = STEPS.filter(function (s) {
+      return s.id !== "welcome" && s.id !== "done";
     });
-    return Math.round((done / keys.length) * 100);
+    if (!walkable.length) return 0;
+    var done = 0;
+    walkable.forEach(function (s) {
+      if (stepComplete(s, live) || isVisited(s.id)) done++;
+    });
+    return Math.round((done / walkable.length) * 100);
+  }
+
+  /** Guide steps that are still unvisited (for score line). */
+  function guidesRemaining() {
+    var n = 0;
+    STEPS.forEach(function (s) {
+      if (s.id === "welcome" || s.id === "done") return;
+      if (s.statusKey) return; // pillars counted separately
+      if (!isVisited(s.id)) n++;
+    });
+    return n;
   }
 
   // ── DOM ──────────────────────────────────────────────────────────────────
@@ -655,13 +898,15 @@
     } catch (e) {}
   }
 
-  /** Compact horizontal stepper (was a tall vertical checklist that crushed the form). */
+  /** Compact horizontal stepper — scrolls the active pill into view after paint. */
   function buildStepsHtml(live) {
     var cur = STEPS[state.idx] || STEPS[0];
+    var walkableCount = STEPS.length - 2; // exclude welcome + done for display index
     var pills = STEPS.map(function (s, i) {
-      var done = stepComplete(s, live) || (s.id === "done" && requiredRemaining(live) === 0);
+      var done = stepComplete(s, live) || isVisited(s.id) || (s.id === "done" && requiredRemaining(live) === 0);
       var active = i === state.idx;
-      var num = s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(i);
+      var num =
+        s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(Math.min(i, walkableCount));
       if (done && s.id !== "welcome" && !active) num = "✓";
       return (
         '<button type="button" class="ho-sp' +
@@ -691,24 +936,86 @@
       "<span>" +
       esc(cur.railSub) +
       "</span>" +
-      "</div>"
+      '<em class="ho-stepper-pct">' +
+      progressPct(live) +
+      "%</em></div>"
     );
+  }
+
+  function scrollActiveStepPill() {
+    try {
+      var root = document.getElementById("hoTour");
+      var active = root && root.querySelector(".ho-sp.is-active");
+      if (active && active.scrollIntoView) {
+        active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }
+    } catch (e) {}
+  }
+
+  /** Apply a step's surface navigation (real UI behind the dock). */
+  function navigateStepSurface(step) {
+    if (!step) return;
+    var cta = step.cta || {};
+    if (cta.action === "start-connect") return;
+    if (
+      cta.hash ||
+      cta.openAr ||
+      cta.openPay ||
+      cta.openPreview ||
+      cta.openSheet ||
+      cta.openSandbox ||
+      cta.openAddArray ||
+      cta.openAlerts ||
+      cta.openBulk ||
+      cta.openAudit ||
+      cta.openOfftakers ||
+      cta.openAgent
+    ) {
+      goHash(
+        cta.hash || "",
+        !!cta.openAr,
+        !!cta.openPay,
+        !!cta.openPreview,
+        {
+          openSheet: !!cta.openSheet,
+          openSandbox: !!cta.openSandbox,
+          openAddArray: !!cta.openAddArray,
+          openAlerts: !!cta.openAlerts,
+          openBulk: !!cta.openBulk,
+          openAudit: !!cta.openAudit,
+          openOfftakers: !!cta.openOfftakers,
+          openAgent: !!cta.openAgent,
+        }
+      );
+    }
   }
 
   function scoreLine(live) {
     live = live || {};
     var left = requiredRemaining(live);
-    if (left === 0) {
-      if (live.offtakers && live.onlinePay) return "Invoicing is hands-off ready";
-      return "Core feeds look good";
+    var guides = guidesRemaining();
+    var pct = progressPct(live);
+    if (left === 0 && guides === 0) {
+      if (live.offtakers && live.onlinePay) return "Full tour + invoicing hands-off ready";
+      return "Full tour complete · core feeds good";
     }
-    if (live.offtakers && !live.deliveryChosen && left >= 1) {
+    if (left === 0 && guides > 0) {
+      return pct + "% of tour · " + guides + " surface" + (guides === 1 ? "" : "s") + " left";
+    }
+    if (live.offtakers && !live.deliveryChosen) {
       return "Approve how offtaker reports leave";
     }
     if (live.offtakers && !live.onlinePay && left === 1) {
       return "Enable online pay to finish offtaker setup";
     }
-    return left + " required step" + (left === 1 ? "" : "s") + " left";
+    return (
+      pct +
+      "% toured · " +
+      left +
+      " required pillar" +
+      (left === 1 ? "" : "s") +
+      " open"
+    );
   }
 
   /** Soft update: progress + step states + body — no full remount, no re-animation. */
@@ -802,6 +1109,14 @@
     setShellOpen(mode === "dock");
     updatePill();
     wire(root);
+    // Keep the long stepper centered on the active stop
+    setTimeout(scrollActiveStepPill, 40);
+    // Dock mode: whisk the real UI to this step's surface (behind the rail)
+    if (mode === "dock" && step.autoNav) {
+      setTimeout(function () {
+        navigateStepSurface(step);
+      }, 120);
+    }
   }
 
   function statusChips(step, live) {
@@ -1262,13 +1577,36 @@
     html += '<p class="ho-lede">' + step.lede + "</p>";
 
     if (step.kind === "welcome") {
-      // Three benefit cards — tease the invoice dream moment
       html +=
         '<div class="ho-hero ho-hero-3">' +
-        '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Live data 24/7</b><p>Cloud auto-refresh keeps production fresh.</p></div>' +
-        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">▤</div><b>Bill + invoice lined up</b><p>See one offtaker draft with its utility bill.</p></div>' +
-        '<div class="ho-hero-card"><div class="ho-hero-ic">✓</div><b>Send on rails</b><p>Approve each draft — or auto-send when ready.</p></div>' +
-        "</div>";
+        '<div class="ho-hero-card"><div class="ho-hero-ic">▣</div><b>Watch the fleet</b><p>Inverters, Triage, Alerts, Analysis, Trends.</p></div>' +
+        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">▤</div><b>Invoice offtakers</b><p>Roster, bill audit, preview, auto-send, pay.</p></div>' +
+        '<div class="ho-hero-card"><div class="ho-hero-ic">◎</div><b>Keep it running</b><p>Auto-refresh, Account, Resources, Agent.</p></div>' +
+        "</div>" +
+        '<div class="ho-callout"><b>How this works:</b> each stop docks this guide and opens the real tab behind it. Explore freely — Continue moves you to the next surface. Required pillars light green when data is truly connected.</div>';
+    }
+
+    if (step.kind === "guide") {
+      html += statusChips(step, live);
+      if (step.bullets && step.bullets.length) {
+        html +=
+          '<ul class="ho-bullets ho-bullets-open">' +
+          step.bullets
+            .map(function (b) {
+              return "<li><span>" + b + "</span></li>";
+            })
+            .join("") +
+          "</ul>";
+      }
+      if (step.callout) {
+        html += '<div class="ho-callout">' + step.callout + "</div>";
+      }
+      if (isVisited(step.id)) {
+        html +=
+          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)">' +
+          "<b>You’ve been here.</b> Re-open anytime from the pills above, or Continue to the next stop." +
+          "</div>";
+      }
     }
 
     if (step.kind === "dream") {
@@ -1377,21 +1715,26 @@
             ? "Needed — enable so offtakers can pay"
             : "Optional until you invoice offtakers") +
         "</span></div>" +
+        '<div class="ho-done-card"><b>Surfaces toured</b><span>✓ ' +
+        progressPct(live) +
+        "% of full product guide</span></div>" +
         "</div>";
       html +=
-        '<div class="ho-callout"><b>Tip:</b> open the Energy Agent orb anytime and ask “what still needs setup for hands-off?” — it can walk the live UI with you.</div>';
+        '<div class="ho-callout"><b>Tip:</b> Setup FAB (bottom-left) replays this tour anytime. Energy Agent orb answers freeform — try “what still needs hands-off setup?”</div>';
     }
 
     // actions
     html += '<div class="ho-actions">';
     if (step.kind === "welcome") {
       html +=
-        '<button type="button" class="ho-btn ho-btn-primary" data-ho="next">Start hands-off setup →</button>';
+        '<button type="button" class="ho-btn ho-btn-primary" data-ho="next">Start full product tour →</button>';
       html +=
-        '<button type="button" class="ho-btn ho-btn-text" data-ho="minimize">Explore site — keep checklist</button>';
+        '<button type="button" class="ho-btn ho-btn-text" data-ho="minimize">Explore freely — keep Setup FAB</button>';
     } else if (step.kind === "done") {
       html +=
         '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Done — enter dashboard →</button>';
+      html +=
+        '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#dashboard">Open Fleet Triage</button>';
       html +=
         '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Review Auto-refresh</button>';
     } else {
@@ -1403,12 +1746,19 @@
             "</button>";
         } else {
           html +=
-            '<button type="button" class="ho-btn ho-btn-primary" data-ho="cta" data-hash="' +
-            esc(step.cta.hash || "") +
-            '"' +
+            '<button type="button" class="ho-btn ho-btn-primary" data-ho="cta"' +
+            (step.cta.hash ? ' data-hash="' + esc(step.cta.hash) + '"' : "") +
             (step.cta.openAr ? ' data-ar="1"' : "") +
             (step.cta.openPay ? ' data-pay="1"' : "") +
             (step.cta.openPreview ? ' data-preview="1"' : "") +
+            (step.cta.openSheet ? ' data-sheet="1"' : "") +
+            (step.cta.openSandbox ? ' data-sandbox="1"' : "") +
+            (step.cta.openAddArray ? ' data-addarray="1"' : "") +
+            (step.cta.openAlerts ? ' data-alerts="1"' : "") +
+            (step.cta.openBulk ? ' data-bulk="1"' : "") +
+            (step.cta.openAudit ? ' data-audit="1"' : "") +
+            (step.cta.openOfftakers ? ' data-offtakers="1"' : "") +
+            (step.cta.openAgent ? ' data-agent="1"' : "") +
             ">" +
             esc(step.cta.label) +
             "</button>";
@@ -1476,10 +1826,7 @@
 
   function openOfftakerPreview() {
     var live = state.live || {};
-    var sid =
-      (live.samplePreview && live.samplePreview.id) ||
-      null;
-    // Prefer the reports helper (expands accordion + flashes card)
+    var sid = (live.samplePreview && live.samplePreview.id) || null;
     setTimeout(function () {
       try {
         if (typeof window.__aoOpenOfftakerPreview === "function") {
@@ -1487,30 +1834,32 @@
           return;
         }
       } catch (e) {}
-      // Fallback: scroll list + try deep-link style open
       var list =
         document.getElementById("rbList") ||
         document.querySelector(".rb2-listwrap");
       if (list) list.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (sid) {
-        var acc = document.querySelector(
-          '.rb-acc[data-id="' + String(sid).replace(/"/g, "") + '"]'
-        );
-        if (acc) {
-          var head = acc.querySelector(".rb-acc-head");
-          if (head) head.click();
-          try {
-            acc.classList.add("rb-acc-flash");
-            setTimeout(function () {
-              acc.classList.remove("rb-acc-flash");
-            }, 2600);
-          } catch (e2) {}
-        }
-      }
     }, 380);
   }
 
-  function goHash(hash, openAr, openPay, openPreview) {
+  function clickWhenReady(selector, tries) {
+    tries = tries == null ? 20 : tries;
+    var el = document.querySelector(selector);
+    if (el) {
+      try {
+        el.click();
+      } catch (e) {}
+      return true;
+    }
+    if (tries > 0) {
+      setTimeout(function () {
+        clickWhenReady(selector, tries - 1);
+      }, 160);
+    }
+    return false;
+  }
+
+  function goHash(hash, openAr, openPay, openPreview, extras) {
+    extras = extras || {};
     if (hash) {
       if (location.hash !== hash) location.hash = hash;
       else {
@@ -1537,6 +1886,71 @@
     }
     if (openPay) scrollToOnlinePay();
     if (openPreview) openOfftakerPreview();
+
+    if (extras.openSandbox) {
+      setTimeout(function () {
+        clickWhenReady("#vsSegSandbox", 12);
+      }, 280);
+    }
+    if (extras.openSheet) {
+      setTimeout(function () {
+        clickWhenReady("#vsSegSheet", 18);
+      }, 320);
+    }
+    if (extras.openAddArray) {
+      setTimeout(function () {
+        try {
+          if (typeof window.__aoAddArray === "function") {
+            window.__aoAddArray();
+            return;
+          }
+        } catch (e) {}
+        clickWhenReady("#sbAddArray", 18);
+      }, 400);
+    }
+    if (extras.openAlerts) {
+      setTimeout(function () {
+        try {
+          if (typeof window.__sbOpenAlerts === "function") {
+            window.__sbOpenAlerts();
+            return;
+          }
+        } catch (e) {}
+        clickWhenReady("#aoAlertsFab, .ao-alerts-fab, [data-ao-alerts]", 12);
+      }, 350);
+    }
+    if (extras.openBulk) {
+      setTimeout(function () {
+        try {
+          if (typeof window.__aoOpenBulkImport === "function") {
+            window.__aoOpenBulkImport();
+            return;
+          }
+        } catch (e) {}
+        clickWhenReady("#rbBulkImport", 22);
+      }, 480);
+    }
+    if (extras.openAudit) {
+      setTimeout(function () {
+        clickWhenReady('#rbGenTabs [data-gentab="audit"]', 22);
+      }, 480);
+    }
+    if (extras.openOfftakers) {
+      setTimeout(function () {
+        clickWhenReady('#rbGenTabs [data-gentab="offtakers"]', 18);
+      }, 420);
+    }
+    if (extras.openAgent) {
+      setTimeout(function () {
+        try {
+          if (typeof window.__eaOpen === "function") {
+            window.__eaOpen();
+            return;
+          }
+        } catch (e) {}
+        clickWhenReady("#eaFab, #eaOrb, .ea-fab", 12);
+      }, 280);
+    }
   }
 
   function markDeliveryChosen(mode) {
@@ -1989,9 +2403,16 @@
           return;
         }
         if (act === "next") {
+          var cur = STEPS[state.idx];
+          if (cur) markVisited(cur.id);
           var markMode = btn.getAttribute("data-mark-mode");
           if (markMode && !(state.live && state.live.deliveryChosen)) {
             markDeliveryChosen(markMode);
+          }
+          // After welcome, dock so the product UI is visible beside the guide
+          if (state.mode === "modal" && cur && cur.id === "welcome") {
+            markModalSeen();
+            state.mode = "dock";
           }
           if (state.idx < STEPS.length - 1) state.idx++;
           hardRender({ animate: false });
@@ -2003,11 +2424,12 @@
           return;
         }
         if (act === "start-connect") {
+          var curPay = STEPS[state.idx];
+          if (curPay) markVisited(curPay.id);
           if (state.mode === "modal") {
             markModalSeen();
             state.mode = "dock";
             hardRender({ animate: true });
-            // Re-find button after re-render
             setTimeout(function () {
               var b = document.querySelector('#hoTour [data-ho="start-connect"]');
               startConnectFromTour(b || btn);
@@ -2018,32 +2440,31 @@
           return;
         }
         if (act === "cta") {
+          var curCta = STEPS[state.idx];
+          if (curCta) markVisited(curCta.id);
           var hash = btn.getAttribute("data-hash");
           var ar = btn.getAttribute("data-ar") === "1";
           var pay = btn.getAttribute("data-pay") === "1";
           var preview = btn.getAttribute("data-preview") === "1";
+          var extras = {
+            openSheet: btn.getAttribute("data-sheet") === "1",
+            openSandbox: btn.getAttribute("data-sandbox") === "1",
+            openAddArray: btn.getAttribute("data-addarray") === "1",
+            openAlerts: btn.getAttribute("data-alerts") === "1",
+            openBulk: btn.getAttribute("data-bulk") === "1",
+            openAudit: btn.getAttribute("data-audit") === "1",
+            openOfftakers: btn.getAttribute("data-offtakers") === "1",
+            openAgent: btn.getAttribute("data-agent") === "1",
+          };
           if (state.mode === "modal") {
             markModalSeen();
             state.mode = "dock";
             hardRender({ animate: true });
           }
-          goHash(hash, ar, pay, preview);
-          // Preview CTA: stay on dream step so they can still pick send mode
-          // Pay/AR: stay so they finish those surfaces
-          if (pay || ar || preview) {
-            scheduleSoftProbe();
-            return;
-          }
-          if (state.idx < STEPS.length - 1) {
-            setTimeout(function () {
-              state.idx++;
-              probeLive().then(function () {
-                hardRender({ animate: false });
-              });
-            }, 350);
-          } else {
-            scheduleSoftProbe();
-          }
+          goHash(hash, ar, pay, preview, extras);
+          // Stay on this step so they can explore the surface, then Continue
+          softUpdate();
+          scheduleSoftProbe();
         }
       });
     });
