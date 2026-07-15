@@ -8,15 +8,28 @@ export type PasswordLoginResult = {
   detail?: string;
 };
 
+export type AuthVerifyResult = {
+  ok?: boolean;
+  session_token?: string;
+  expires_in?: number;
+};
+
 export type OverviewArray = {
   id?: number | string;
   name?: string;
   status?: string;
   peer_index?: number | null;
+  peer?: {
+    peer_index?: number | null;
+    status?: string | null;
+    diagnosis?: string | null;
+    [key: string]: unknown;
+  };
   today_kwh?: number | null;
   current_power_w?: number | null;
   nameplate_kw?: number | null;
   diagnosis?: string | null;
+  value_today?: number | null;
   [key: string]: unknown;
 };
 
@@ -32,28 +45,46 @@ export type Overview = {
     ok?: number;
     underperforming?: number;
     dead?: number;
+    arrays_attention?: number;
     [key: string]: unknown;
   };
   source?: string;
   [key: string]: unknown;
 };
 
+export type FleetInverter = {
+  id?: number | string;
+  inverter_id?: number | string;
+  name?: string;
+  status?: string;
+  peer_index?: number | null;
+  current_power_w?: number | null;
+  nameplate_kw?: number | null;
+  today_kwh?: number | null;
+  vendor?: string | null;
+  model?: string | null;
+  diagnosis?: string | null;
+  [key: string]: unknown;
+};
+
+export type FleetArray = {
+  id?: number | string;
+  name?: string;
+  status?: string;
+  last_sync_at?: string | null;
+  synced_at?: string | null;
+  today_kwh?: number | null;
+  current_power_w?: number | null;
+  nameplate_kw?: number | null;
+  peer_index?: number | null;
+  diagnosis?: string | null;
+  vendor?: string | null;
+  inverters?: FleetInverter[];
+  [key: string]: unknown;
+};
+
 export type FleetTree = {
-  arrays?: Array<{
-    id?: number | string;
-    name?: string;
-    status?: string;
-    last_sync_at?: string | null;
-    synced_at?: string | null;
-    inverters?: Array<{
-      id?: number | string;
-      name?: string;
-      status?: string;
-      peer_index?: number | null;
-      [key: string]: unknown;
-    }>;
-    [key: string]: unknown;
-  }>;
+  arrays?: FleetArray[];
   [key: string]: unknown;
 };
 
@@ -73,19 +104,48 @@ export type SendPipeline = {
 
 export type AccountMe = {
   tenant_id?: string;
+  tenant_key?: string;
   name?: string;
   company_name?: string;
+  operator_name?: string;
   email?: string;
   product?: string;
   capture_mode?: string | null;
   active?: boolean;
   is_demo?: boolean;
+  billing_plan?: string | null;
+  subscription_status?: string | null;
+  has_payment_method?: boolean;
+  has_password?: boolean;
+  trial_ends_at?: string | null;
+  ai_pro?: boolean;
   plan_features?: {
     plan?: string;
     plan_chosen?: boolean;
     vendor_data?: boolean;
     invoicing?: boolean;
   };
+  accounts_count?: number;
+  bills_count?: number;
+  clients_count?: number;
+  connected_providers?: string[];
+  extension_heartbeat_at?: string | null;
+  last_pull_at?: string | null;
+  [key: string]: unknown;
+};
+
+export type BillingSummary = {
+  billing_basis?: "kwh" | "array" | string;
+  billable_arrays?: number;
+  mtd_kwh?: number;
+  estimated_cents?: number;
+  total_cents?: number;
+  price_cents?: number;
+  currency?: string;
+  has_payment_method?: boolean;
+  card_brand?: string | null;
+  card_last4?: string | null;
+  card_exp?: string | null;
   [key: string]: unknown;
 };
 
@@ -93,10 +153,12 @@ export type CloudCredential = {
   provider?: string;
   username?: string;
   enabled?: boolean;
+  login_host?: string | null;
   last_harvest_at?: string | null;
   last_harvest_ok?: boolean | null;
   last_harvest_status?: string | null;
   harvest_fails?: number;
+  has_session?: boolean;
   [key: string]: unknown;
 };
 
@@ -105,6 +167,47 @@ export type CloudStatus = {
   collection_enabled?: boolean;
   harvesting_enabled?: boolean;
   credentials?: CloudCredential[];
+  [key: string]: unknown;
+};
+
+export type OnboardingStatus = {
+  ok?: boolean;
+  connected?: boolean;
+  complete?: boolean;
+  next_step?: string;
+  has_inverter?: boolean;
+  has_utility_accounts?: boolean;
+  gmp_connected?: boolean;
+  arrays_total?: number;
+  linked_arrays?: number;
+  unlinked_accounts?: number;
+  [key: string]: unknown;
+};
+
+export type LinkedSources = {
+  sources?: Array<{
+    code?: string;
+    kind?: string;
+    vendor?: string;
+    label?: string;
+    count?: number;
+    detail?: string;
+    site_count?: number;
+    last_synced_at?: string | null;
+    [key: string]: unknown;
+  }>;
+  count?: number;
+  [key: string]: unknown;
+};
+
+export type PaymentsConnectStatus = {
+  ok?: boolean;
+  enabled?: boolean;
+  connected?: boolean;
+  charges_enabled?: boolean;
+  ready?: boolean;
+  fee_percent?: number;
+  url?: string;
   [key: string]: unknown;
 };
 
@@ -127,6 +230,26 @@ export type SubscriptionsList = {
   [key: string]: unknown;
 };
 
+export type FleetTrends = {
+  years?: number[];
+  ttm_kwh?: number | null;
+  ttm_savings_usd?: number | null;
+  lifetime_kwh?: number | null;
+  by_array?: Array<{
+    array_id?: number;
+    name?: string;
+    lifetime_kwh?: number | null;
+    [key: string]: unknown;
+  }>;
+  seasonal_yoy?: Array<{
+    month?: number;
+    label?: string;
+    latest_delta_pct?: number | null;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+};
+
 export type EnergyAgentSession = {
   session_id?: string;
   intro?: string;
@@ -143,5 +266,15 @@ export type EnergyAgentChatResponse = {
   content?: string;
   session_id?: string;
   pending?: unknown[];
+  [key: string]: unknown;
+};
+
+export type SolarEdgeConnectResult = {
+  connected?: number;
+  created?: number;
+  matched?: number;
+  arrays?: unknown[];
+  detail?: string;
+  message?: string;
   [key: string]: unknown;
 };

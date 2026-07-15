@@ -57,6 +57,7 @@ export function disableDemoMode(): void {
 
 export const demoAccount: AccountMe = {
   tenant_id: "ten_demo_owner_web",
+  tenant_key: "sol_live_demo_preview_only",
   name: "Green Mountain Community Solar",
   company_name: "Green Mountain Community Solar",
   email: "demo@arrayoperator.com",
@@ -64,6 +65,8 @@ export const demoAccount: AccountMe = {
   capture_mode: "cloud",
   active: true,
   is_demo: true,
+  has_payment_method: true,
+  subscription_status: "active",
   plan_features: {
     plan: "both",
     plan_chosen: true,

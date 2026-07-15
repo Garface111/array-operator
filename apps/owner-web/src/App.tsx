@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthGate } from "@/auth/AuthGate";
 import { AppShell } from "@/components/AppShell";
+import { AccountScreen } from "@/screens/AccountScreen";
+import { AnalysisScreen } from "@/screens/AnalysisScreen";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { FleetScreen } from "@/screens/FleetScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="fleet" element={<FleetScreen />} />
           <Route path="invoices" element={<InvoicesScreen />} />
           <Route path="connect" element={<ConnectScreen />} />
+          <Route path="analysis" element={<AnalysisScreen />} />
+          <Route path="account" element={<AccountScreen />} />
           <Route path="more" element={<MoreScreen />} />
         </Route>
       </Route>

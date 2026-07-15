@@ -60,12 +60,22 @@ apps/owner-web/
 
 API client mirrors NEPOOL SPA conventions (`Authorization: Bearer`, 401 → login).
 
-## Next slices (scalable backlog)
+## Live now (backend-wired)
 
-1. Live status probes for Connect (cloud vault / utility / pay)
-2. Offtaker list + draft preview (read-only then edit)
-3. Agent tool-result UI (confirm writes)
-4. Analysis summary cards
+- Auth: password, magic-link (`/v1/auth/verify` on `?token=`), demo mode
+- Home / Fleet: overview + fleet-tree (+ force refresh)
+- Connect: SolarEdge connect-account, cloud-capture save/toggle/harvest, Stripe Connect status
+- Invoices: send-pipeline + subscriptions roster
+- Analysis: fleet-trends + peer rollup
+- Account: profile, company name, billing summary, add card / portal, capture mode, extension key
+- Energy Agent sheet → `/v1/energy-agent/*`
+
+## Next slices
+
+1. Offtaker create/edit + invoice preview PDF
+2. Agent tool-result UI (confirm writes)
+3. Full Analysis NOC (forecast / weather expected)
+4. Extension deep-link handoff for portal vendors on mobile browsers
 5. PWA install + offline shell
 
 ## Safety

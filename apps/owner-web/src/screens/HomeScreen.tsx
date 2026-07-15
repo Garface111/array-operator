@@ -5,12 +5,19 @@ import { useOutletAgent } from "@/hooks/useOutletAgent";
 import {
   fetchAccount,
   fetchFleetTree,
+  fetchOnboardingStatus,
   fetchOverview,
   fetchSendPipeline,
 } from "@/lib/api";
 import { isDemoMode } from "@/lib/demoData";
 import { fmtKwh, fmtMoney, statusTone } from "@/lib/format";
-import type { AccountMe, FleetTree, Overview, SendPipeline } from "@/lib/types";
+import type {
+  AccountMe,
+  FleetTree,
+  OnboardingStatus,
+  Overview,
+  SendPipeline,
+} from "@/lib/types";
 
 export function HomeScreen() {
   const { openAgent } = useOutletAgent();
@@ -18,6 +25,7 @@ export function HomeScreen() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [tree, setTree] = useState<FleetTree | null>(null);
   const [pipe, setPipe] = useState<SendPipeline | null>(null);
+  const [onb, setOnb] = useState<OnboardingStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,17 +35,19 @@ export function HomeScreen() {
       setLoading(true);
       setErr(null);
       try {
-        const [a, o, t, p] = await Promise.all([
+        const [a, o, t, p, ob] = await Promise.all([
           fetchAccount().catch(() => null),
           fetchOverview().catch(() => null),
           fetchFleetTree().catch(() => null),
           fetchSendPipeline().catch(() => null),
+          fetchOnboardingStatus().catch(() => null),
         ]);
         if (cancelled) return;
         setAccount(a);
         setOverview(o);
         setTree(t);
         setPipe(p);
+        setOnb(ob);
       } catch (e) {
         if (!cancelled)
           setErr(e instanceof Error ? e.message : "Could not load home");
@@ -123,8 +133,21 @@ export function HomeScreen() {
     <div className="space-y-4">
       {isDemoMode() ? (
         <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2.5 text-xs font-semibold text-amber-950 shadow-sm backdrop-blur-md">
-          Demo data — sample fleet for UI review. Sign in for live numbers.
+          Demo data —{" "}
+          <Link to="/login" className="underline">
+            sign in
+          </Link>{" "}
+          for live fleet, invoices, and Agent tools.
         </div>
+      ) : null}
+
+      {!isDemoMode() && onb && !onb.complete ? (
+        <Link
+          to="/connect"
+          className="block rounded-2xl border border-sky-300/60 bg-sky-50/60 px-3.5 py-2.5 text-xs font-semibold text-sky-950 shadow-sm backdrop-blur-md"
+        >
+          Finish setup — next: {onb.next_step || "connect a feed"} →
+        </Link>
       ) : null}
 
       <section className="drop-shadow-sm">

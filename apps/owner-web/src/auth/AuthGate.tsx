@@ -9,13 +9,19 @@ import {
 
 export function AuthGate() {
   const loc = useLocation();
-  const [session, setSessionState] = useState<string | null>(() => {
-    captureTokenFromUrl();
-    if (isDemoMode()) return "demo";
-    return getSession();
-  });
+  const [ready, setReady] = useState(false);
+  const [session, setSessionState] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await captureTokenFromUrl();
+      if (cancelled) return;
+      if (isDemoMode()) setSessionState("demo");
+      else setSessionState(getSession());
+      setReady(true);
+    })();
+
     const onUnauthorized = () => {
       if (isDemoMode()) {
         setSessionState("demo");
@@ -27,13 +33,20 @@ export function AuthGate() {
       setSessionState(isDemoMode() ? "demo" : getSession());
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     window.addEventListener("storage", onStorage);
-    // ?demo=1 on any deep link
-    if (isDemoMode()) setSessionState("demo");
     return () => {
+      cancelled = true;
       window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-full items-center justify-center px-4 py-16 text-sm font-semibold text-slate-800/80">
+        Signing you in…
+      </div>
+    );
+  }
 
   if (!session) {
     return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
