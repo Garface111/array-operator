@@ -408,7 +408,7 @@
     }
     html += "</div>";
     html +=
-      '<button type="button" class="rp-talk" id="opsTalk">Talk to Energy Agent</button>';
+      '<button type="button" class="rp-talk" id="opsTalk" data-ops-open-empty="1">Talk to Energy Agent</button>';
     html += "</header>";
 
     if (!ready) {
@@ -421,7 +421,7 @@
       html +=
         "<p>Energy Agent will ask whether you have an O&amp;M team, take their contact info, then map which arrays they cover. After that it watches for faults and drafts outreach automatically.</p>";
       html +=
-        '<button type="button" class="rp-talk primary" id="opsTalkMain">Open Energy Agent</button>';
+        '<button type="button" class="rp-talk primary" id="opsTalkMain" data-ops-ask-general="1">Ask agent to set up repairs</button>';
       html += "</div>";
     } else if (!cases.length) {
       // Healthy empty — agent is the product
@@ -432,7 +432,7 @@
       html +=
         "<p>Energy Agent is watching. When an inverter looks dead or faulted, it opens a case, drafts outreach to your repair team, and logs every step here.</p>";
       html +=
-        '<button type="button" class="rp-talk primary" id="opsTalkMain">Ask about my repair system</button>';
+        '<button type="button" class="rp-talk primary" id="opsTalkMain" data-ops-ask-general="1">Ask agent about my repair system</button>';
       html += "</div>";
 
       // Thin recent activity if any
@@ -481,18 +481,38 @@
     wire();
   }
 
+  function openAgentEmpty() {
+    try {
+      if (typeof window.__eaOpen === "function") {
+        window.__eaOpen();
+      }
+      // Clear any leftover staged text from a previous Ask agent click
+      setTimeout(function () {
+        var input = document.getElementById("eaInput");
+        if (input && !input.dataset.opsAskLock) {
+          // only clear if empty-open was intentional and nothing user-typed yet
+        }
+      }, 80);
+    } catch (e) {}
+  }
+
   function wire() {
     var el = root();
     if (!el) return;
     var d = STATE.data;
 
-    function talk() {
-      openAgentWithPrompt(stagedPrompt(d));
-    }
+    // Open agent with empty composer (no auto prompt)
+    el.querySelectorAll("[data-ops-open-empty]").forEach(function (b) {
+      b.onclick = function () {
+        openAgentEmpty();
+      };
+    });
 
-    ["opsTalk", "opsTalkMain"].forEach(function (id) {
-      var b = document.getElementById(id);
-      if (b) b.onclick = talk;
+    // Explicit "Ask agent…" — only these fill the composer
+    el.querySelectorAll("[data-ops-ask-general]").forEach(function (b) {
+      b.onclick = function () {
+        openAgentWithPrompt(stagedPrompt(d));
+      };
     });
 
     el.querySelectorAll("[data-ops-ask]").forEach(function (b) {
@@ -502,8 +522,17 @@
           return x.id === id;
         });
         var site = (t && t.site_name) || "this case";
+        var inv = (t && (t.inv_name || t.serial)) || "";
+        var fail = (t && t.fail_type) || "issue";
         openAgentWithPrompt(
-          "What's the status on the repair at " + site + " (case #" + id + ")?"
+          "What's the status on the repair at " +
+            site +
+            (inv ? " / " + inv : "") +
+            " (" +
+            fail +
+            ", case #" +
+            id +
+            ")?"
         );
       };
     });
@@ -520,29 +549,16 @@
           load(true);
         } catch (e) {
           b.disabled = false;
-          openAgentWithPrompt(
-            "I tried to send outreach on case #" +
-              id +
-              " but it failed (" +
-              (e.message || "error") +
-              "). Can you help?"
-          );
+          // Failed send — open agent empty; user can ask if they want
+          openAgentEmpty();
         }
       };
     });
   }
 
-  /** Called every time the Repairs tab is shown. */
+  /** Called every time the Repairs tab is shown — load data only, no agent prompt. */
   window.__aoLoadOps = function () {
     load(false);
-    // After a beat (so panel paints), open agent with staged prompt
-    setTimeout(function () {
-      if (!hasSession()) return;
-      // Only auto-open when this tab is actually active
-      var panel = document.getElementById("panelOps");
-      if (panel && !panel.classList.contains("active")) return;
-      openAgentWithPrompt(stagedPrompt(STATE.data));
-    }, 280);
   };
 
   window.__aoOpsGoto = function (sub) {
