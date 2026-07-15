@@ -155,7 +155,11 @@
     var cases = activeCases(d);
     var contacts = (d && d.contacts) || [];
     if (!setupComplete(d) || !contacts.length) {
-      return "Set up my repair system — do I have an O&M team, and which arrays should they cover?";
+      return (
+        "Set up my repair system. Check whether I have any O&M contacts, then help me " +
+        "build a full roster — name, email, phone, and which arrays each person covers — " +
+        "so you can email them the moment hardware faults."
+      );
     }
     if (cases.length === 1) {
       var t = cases[0];

@@ -175,7 +175,7 @@
  },
  "#ops": {
  macro: "Automated O&M: detect faults, draft outreach, coordinate tech, close on recovery.",
- meso: "Setup and team mapping happen in THIS chat. No forms — gather contact + arrays via conversation, then watch open cases.",
+ meso: "HUNGRY for a complete O&M roster in THIS chat. Call list_service_contacts first. On any name/email scrap, upsert_service_contact immediately (needs_confirm=false). Never reply Done. while phone/arrays/extra teammates still unknown — always ask the next missing field.",
  surface_topic: "surface_repairs",
  },
  "#account": {
@@ -197,7 +197,7 @@
  { label: "Inverters", hash: "#arrays" },
  { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
  { label: "Invoices", hash: "#reports" },
- { label: "Repairs", hash: "#ops", note: "Chat-first O&M — setup team + arrays here; agent watches faults" },
+ { label: "Repairs", hash: "#ops", note: "Chat-first O&M — hunger for full repair roster; agent watches faults" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
@@ -205,7 +205,22 @@
  product_jobs: [
  "Watch the fleet (Triage + Inverters + Analysis)",
  "Invoice offtakers (Invoices; utility bills × share)",
+ "Complete O&M roster + heal down sites (Repairs)",
  ],
+ // Extra steer when owner is on Repairs: agent must fill the contact sheet
+ repair_roster_drive: (function () {
+ var h = String(hash || location.hash || "").toLowerCase();
+ if (h.indexOf("#ops") === 0 || h === "#repairs" || h === "#claims") {
+ return {
+ priority: "high",
+ rule:
+ "You want a complete O&M roster (name, email, phone, array coverage, other teammates). " +
+ "Call list_service_contacts first. Save scraps immediately with upsert_service_contact. " +
+ "Never end a turn with only 'Done.' while the roster is incomplete — always ask the next missing field.",
+ };
+ }
+ return null;
+ })(),
  path: location.pathname,
  title: document.title,
  selection: sel,
