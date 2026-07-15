@@ -7496,20 +7496,16 @@
  toggled manually inside the analysis branch of applyView, not via this map. */
  reports: { panel: "panelReports", tab: "tabReports" },
  ops: { panel: "panelOps", tab: "tabOps" },
- /* Resources is a MAIN sub-view under the Operations top tab (#resources →
- panelResources; Operations top-nav stays active). Same pattern as Trends. */
+ /* Resources is a sub-view of Analysis (#resources → panelResources). */
  };
  function tabFromHash(){
  const h = location.hash;
  if(h === "#account") return "account";
- if(h === "#ops" || h === "#claims" || h === "#repairs" || h === "#resources") return "ops";
+ if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
  if(h === "#arrays" || h === "#sandbox") return "arrays";
- if(h === "#analysis") return "analysis";
- if(h === "#trends") return "analysis"; // Trends is a sub-view of Analysis now
+ if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports") return "reports";
- if(h === "#dashboard") return "dashboard"; // explicit deep-link → owner health home
- // Empty/legacy hash → land on the Inverter Dashboard (Spreadsheet sub-view) per Ford,
- // not Fleet Health. applyTabGating() bounces a plan that can't use it to an allowed tab.
+ if(h === "#dashboard") return "dashboard";
  return "arrays";
  }
 
@@ -7526,64 +7522,37 @@
  }
  try { window.__aoUpdateAccountDot = updateAccountDot; } catch(_){}
 
- /* Analysis ⇄ Trends sub-view (Ford 2026-07-13). #analysis shows the fleet NOC,
- #trends shows Paul's multi-year trends, both under the Analysis top tab, via
- the .an-sub-seg segmented control duplicated in each panel. */
- function subFromHash(){ return location.hash === "#trends" ? "trends" : "analysis"; }
+ /* Analysis ⇄ Trends ⇄ Resources (Ford 2026-07-15). Three sub-views under the
+ Analysis top tab via .an-sub-seg on each panel. */
+ function analysisSubFromHash(){
+ const h = location.hash;
+ if(h === "#trends") return "trends";
+ if(h === "#resources") return "resources";
+ return "analysis";
+ }
  function applyAnalysisSub(){
- const trendsSub = subFromHash() === "trends";
+ const sub = analysisSubFromHash();
  const pA = document.getElementById("panelAnalysis");
  const pT = document.getElementById("panelTrends");
- if(pA) pA.classList.toggle("active", !trendsSub);
- if(pT) pT.classList.toggle("active", trendsSub);
+ const pR = document.getElementById("panelResources");
+ if(pA) pA.classList.toggle("active", sub === "analysis");
+ if(pT) pT.classList.toggle("active", sub === "trends");
+ if(pR) pR.classList.toggle("active", sub === "resources");
  document.querySelectorAll(".an-sub-seg [data-ansub]").forEach(b => {
- const on = (b.getAttribute("data-ansub") === "trends") === trendsSub;
+ const on = b.getAttribute("data-ansub") === sub;
  b.classList.toggle("on", on);
  b.setAttribute("aria-pressed", on ? "true" : "false");
  });
- if(trendsSub){ if(window.__aoLoadTrends) window.__aoLoadTrends(); }
+ if(sub === "trends"){ if(window.__aoLoadTrends) window.__aoLoadTrends(); }
+ else if(sub === "resources"){ if(window.__aoLoadResources) window.__aoLoadResources(); }
  else { if(window.__aoLoadAnalysis) window.__aoLoadAnalysis(); }
  }
- // The segmented buttons just set the hash; hashchange → applyView → applyAnalysisSub.
  document.addEventListener("click", function(e){
  const b = e.target && e.target.closest ? e.target.closest(".an-sub-seg [data-ansub]") : null;
  if(!b) return;
- const target = b.getAttribute("data-ansub") === "trends" ? "#trends" : "#analysis";
- if(location.hash === target) applyAnalysisSub(); // same hash → still (re)apply
- else location.hash = target;
- });
-
- /* Operations ⇄ Resources main sub-views (Ford 2026-07-15). Both under the
- Operations top tab. Resources restores the original #panelResources briefing
- (not nested inside the Ops glass sheet). Primary switcher: .ops-main-seg. */
- function opsMainFromHash(){ return location.hash === "#resources" ? "resources" : "ops"; }
- function applyOpsMainSub(){
- const res = opsMainFromHash() === "resources";
- const pO = document.getElementById("panelOps");
- const pR = document.getElementById("panelResources");
- if(pO) pO.classList.toggle("active", !res);
- if(pR) pR.classList.toggle("active", res);
- document.querySelectorAll(".ops-main-seg [data-opsmain]").forEach(b => {
- const on = (b.getAttribute("data-opsmain") === "resources") === res;
- b.classList.toggle("on", on);
- b.setAttribute("aria-pressed", on ? "true" : "false");
- });
- if(res){
- if(window.__aoLoadResources) window.__aoLoadResources();
- } else {
- // Deep-links into secondary segs
- try {
- if(location.hash === "#claims" && window.__aoOpsGoto) window.__aoOpsGoto("claims");
- else if(location.hash === "#repairs" && window.__aoOpsGoto) window.__aoOpsGoto("repairs");
- else if(window.__aoLoadOps) window.__aoLoadOps();
- } catch(_){ if(window.__aoLoadOps) window.__aoLoadOps(); }
- }
- }
- document.addEventListener("click", function(e){
- const b = e.target && e.target.closest ? e.target.closest(".ops-main-seg [data-opsmain]") : null;
- if(!b) return;
- const target = b.getAttribute("data-opsmain") === "resources" ? "#resources" : "#ops";
- if(location.hash === target) applyOpsMainSub();
+ const k = b.getAttribute("data-ansub");
+ const target = k === "trends" ? "#trends" : k === "resources" ? "#resources" : "#analysis";
+ if(location.hash === target) applyAnalysisSub();
  else location.hash = target;
  });
 
@@ -7597,45 +7566,37 @@
  if(panel) panel.classList.toggle("active", name === active);
  if(tab) tab.classList.toggle("active", name === active);
  });
- // Sibling sub-view panels (not in TABS): hide when their parent top-tab is off
+ // Sibling Analysis sub-panels (not in TABS): hide when Analysis top-tab is off
  if(active !== "analysis"){
- const _pT = document.getElementById("panelTrends");
- if(_pT) _pT.classList.remove("active");
- }
- if(active !== "ops"){
- const _pR = document.getElementById("panelResources");
- if(_pR) _pR.classList.remove("active");
+ ["panelTrends", "panelResources"].forEach(function(id){
+ const p = document.getElementById(id);
+ if(p) p.classList.remove("active");
+ });
  }
 
  if(active === "dashboard"){
- // Owner health home, command-center.js fills #fleetCommander + #ccQueue + the
- // production strip (#dashProd) from the shared FleetStore.
  if(window.FleetStore) FleetStore.load();
  if(window.__ccRender) window.__ccRender();
  } else if(active === "arrays"){
- load(); // sandbox fleet tree
- // app.js auto-runs loadDashboard() once on parse; only re-run on later switches.
+ load();
  if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
  } else if(active === "account"){
  loadAccount();
- // They've now seen Master Account, clear the "something to do here" dot.
  try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
  updateAccountDot();
  } else if(active === "analysis"){
- applyAnalysisSub(); // shows the Fleet-analysis OR Trends sub-view + loads it
+ applyAnalysisSub();
  } else if(active === "reports"){
  loadReports();
  } else if(active === "ops"){
- // Operations ⇄ Resources main sub-views (+ claims/repairs deep-links)
- applyOpsMainSub();
- // Clear ops attention dot once opened
+ try { if(window.__aoLoadOps) window.__aoLoadOps(); } catch(_){}
  try {
  var od = document.getElementById("opsDot");
  if(od) od.classList.remove("tab-dot--on");
  localStorage.setItem("ao_seen_ops", "1");
  } catch(_){}
  }
- applyTabGating(); // keep tab locks fresh + bounce off a tab the plan doesn't include
+ applyTabGating();
  _firstApply = false;
  }
  /* ==========================================================================

@@ -70,7 +70,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260715whoamiClip1">
 <link rel="stylesheet" href="command-center.css?v=20260715vaultLogin1">
-<link rel="stylesheet" href="ops.css?v=20260715cmd1">
+<link rel="stylesheet" href="ops.css?v=20260715agent1">
 <link rel="stylesheet" href="theme-day.css?v=20260715opsSeg1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
@@ -385,59 +385,45 @@ document.documentElement.setAttribute("data-theme","day");
  from self-contained section modules (analysis-*.js) that register on
  window.AnalysisSections; analysis.js (window.__aoLoadAnalysis) builds the
  shared ctx (FleetStore + /v1/array-owners/forecast-fleet) and renders them. -->
- <!-- Analysis has two sub-views (Ford 2026-07-13): the fleet NOC + Trends. The
- segmented control (reuses the Inverters .vs-seg styling) switches between the
- two PANELS below, kept SEPARATE so analysis's #panelAnalysis .an-* styling
- never bleeds onto trends' .an-* (a known collision, see the frontend map).
- sandbox.js routes #analysis→this panel, #trends→panelTrends, both under the
- Analysis top tab. -->
+ <!-- Analysis sub-views (Ford 2026-07-15): Fleet analysis | Trends | Resources.
+ Three panels, one top tab. sandbox.js applyAnalysisSub routes the hash. -->
  <section class="panel" id="panelAnalysis" role="tabpanel" aria-label="Analysis">
  <div class="vs-seg an-sub-seg" role="group" aria-label="Analysis view" style="margin:14px auto 6px">
  <button class="vs-seg-btn on" type="button" data-ansub="analysis" aria-pressed="true">Fleet analysis</button>
  <button class="vs-seg-btn" type="button" data-ansub="trends" aria-pressed="false">Trends</button>
+ <button class="vs-seg-btn" type="button" data-ansub="resources" aria-pressed="false">Resources</button>
  </div>
  <div id="analysisRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading analysis…</div></div>
  </section>
 
- <!-- ===================== ANALYSIS SUB-VIEW: TRENDS ===================== -->
- <!-- Paul's portfolio-wide multi-year trend lines. Rendered by trends.js
- (window.__aoLoadTrends) into #trendsRoot. Reached via the Analysis tab's
- "Trends" segmented button (or a #trends deep-link). -->
  <section class="panel" id="panelTrends" role="tabpanel" aria-label="Trends">
  <div class="vs-seg an-sub-seg" role="group" aria-label="Analysis view" style="margin:14px auto 6px">
  <button class="vs-seg-btn" type="button" data-ansub="analysis" aria-pressed="false">Fleet analysis</button>
  <button class="vs-seg-btn on" type="button" data-ansub="trends" aria-pressed="true">Trends</button>
+ <button class="vs-seg-btn" type="button" data-ansub="resources" aria-pressed="false">Resources</button>
  </div>
  <div id="trendsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading trends…</div></div>
  </section>
 
+ <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
+ <div class="vs-seg an-sub-seg" role="group" aria-label="Analysis view" style="margin:14px auto 6px">
+ <button class="vs-seg-btn" type="button" data-ansub="analysis" aria-pressed="false">Fleet analysis</button>
+ <button class="vs-seg-btn" type="button" data-ansub="trends" aria-pressed="false">Trends</button>
+ <button class="vs-seg-btn on" type="button" data-ansub="resources" aria-pressed="true">Resources</button>
+ </div>
+ <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
+ </section>
+
  <!-- ============================ TAB: REPORTS ============================ -->
  <section class="panel" id="panelReports" role="tabpanel" aria-label="Reports">
- <!-- Filled by reports.js (window.__aoLoadReports): upload → match preview →
- schedule + recipient slider + format choice → subscriptions list. -->
  <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
  </section>
 
- <!-- ============================ TAB: OPERATIONS ============================ -->
- <!-- Two main sub-views under the Repairs top tab (mirrors Analysis ⇄ Trends):
- Repairs = command center (battle cards); Resources = briefing page.
- Both panels share .ops-main-seg (Repairs | Resources). -->
+ <!-- ============================ TAB: REPAIRS ============================ -->
+ <!-- Full-bleed agent-centric surface. No nested sub-tabs. Energy Agent opens
+ with a staged prompt; setup (team + array map) happens in chat. -->
  <section class="panel" id="panelOps" role="tabpanel" aria-label="Repairs">
- <div class="vs-seg ops-main-seg" role="group" aria-label="Repairs view" style="margin:14px auto 6px">
- <button class="vs-seg-btn on" type="button" data-opsmain="ops" aria-pressed="true">Repairs</button>
- <button class="vs-seg-btn" type="button" data-opsmain="resources" aria-pressed="false">Resources</button>
- </div>
- <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading command center…</div></div>
- </section>
-
- <!-- ============================ TAB: RESOURCES (sub of Repairs) ============================ -->
- <!-- Original Resources briefing. #resources deep-link; top-nav Repairs stays active. -->
- <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
- <div class="vs-seg ops-main-seg" role="group" aria-label="Repairs view" style="margin:14px auto 6px">
- <button class="vs-seg-btn" type="button" data-opsmain="ops" aria-pressed="false">Repairs</button>
- <button class="vs-seg-btn on" type="button" data-opsmain="resources" aria-pressed="true">Resources</button>
- </div>
- <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
+ <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading…</div></div>
  </section>
 
  <!-- ============================ TAB: AUDIT (removed) ============================ -->
@@ -452,14 +438,14 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260715opsRes1"></script>
+<script src="sandbox.js?v=20260715agent1"></script>
 <script src="vendor-sheet.js?v=20260714nodash1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260715offGain1"></script>
-<script src="ops.js?v=20260715cmd1"></script>
+<script src="ops.js?v=20260715agent1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260715cmd1" defer></script>
+<script src="mobile-nav.js?v=20260715agent1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>
@@ -524,12 +510,12 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
 <link rel="stylesheet" href="energy-agent.css?v=20260715eaModal2">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260715cmd1"></script>
+<script src="energy-agent.js?v=20260715agent1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">
 <script src="hands-off-tour.js?v=20260715vaultLogin1"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
-<script src="mobile-os.js?v=20260715cmd1"></script>
+<script src="mobile-os.js?v=20260715agent1"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */

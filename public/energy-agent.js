@@ -169,9 +169,14 @@
  surface_topic: "surface_invoices",
  },
  "#resources": {
- macro: "Regulatory/market context for credits and rates by state.",
+ macro: "Regulatory/market context for credits and rates by state (Analysis sub-view).",
  meso: "Pick state; scan news + REC; open sources.",
  surface_topic: "surface_resources",
+ },
+ "#ops": {
+ macro: "Automated O&M: detect faults, draft outreach, coordinate tech, close on recovery.",
+ meso: "Setup and team mapping happen in THIS chat. No forms — gather contact + arrays via conversation, then watch open cases.",
+ surface_topic: "surface_repairs",
  },
  "#account": {
  macro: "Identity, AO subscription bill, and Auto-refresh data plumbing.",
@@ -190,9 +195,9 @@
  nav_tabs: [
  { label: "Fleet Triage", hash: "#dashboard" },
  { label: "Inverters", hash: "#arrays" },
- { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
+ { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
  { label: "Invoices", hash: "#reports" },
- { label: "Repairs", hash: "#ops", note: "O&M, repairs, claims; Resources is a main sub-view (#resources)" },
+ { label: "Repairs", hash: "#ops", note: "Chat-first O&M — setup team + arrays here; agent watches faults" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
@@ -1808,6 +1813,12 @@
  }
  } catch (e) {}
  try {
+ // Repairs panel data only — never re-stage the composer prompt here
+ if (typeof window.__aoRefreshRepairs === "function") {
+ window.__aoRefreshRepairs();
+ }
+ } catch (e) {}
+ try {
  if (window.FleetStore && typeof window.FleetStore.refetch === "function") {
  window.FleetStore.refetch();
  }
@@ -3242,7 +3253,7 @@
  },
  {
  selector: "#panelAnalysis .an-sub-seg, #panelAnalysis .vs-seg",
- say: "Segmented control: **Fleet analysis** (the NOC view) and **Trends** (multi-year portfolio lines).",
+ say: "Segmented control: **Fleet analysis** (NOC), **Trends** (multi-year), and **Resources** (rates & news).",
  },
  {
  selector: "#analysisRoot .an-head, #analysisRoot .an-wrap",
@@ -3324,16 +3335,16 @@
  ];
  }
 
- // ── Resources (#resources), main sub-view under Operations top tab ────
+ // ── Resources (#resources), Analysis third sub-view ──────────────────
  if (key === "resources" || key === "briefing" || key === "rates") {
  return [
  {
  hash: "#resources",
- say: "Resources is under **Operations** → **Resources**, net-metering context, REC market, and regulatory news for your state.",
+ say: "Resources lives under **Analysis** — net-metering context, REC market, and regulatory news for your state.",
  },
  {
- selector: '#tabOps, .ops-main-seg [data-opsmain="resources"]',
- say: "Open **Operations**, then switch the top control to **Resources**.",
+ selector: '#tabAnalysis, .an-sub-seg [data-ansub="resources"]',
+ say: "Open **Analysis**, then the **Resources** segment.",
  },
  {
  selector: "#panelResources #rsHost, #resApp",
@@ -3366,7 +3377,7 @@
  optional: true,
  },
  {
- say: "That's Resources under Operations. Change the state chip anytime to re-scope the briefing.",
+ say: "That's Analysis → Resources. Change the state chip anytime to re-scope the briefing.",
  },
  ];
  }
@@ -4748,6 +4759,38 @@
 
  window.__eaOpen = function () { setOpen(true); };
  window.__eaClose = function () { setOpen(false); };
+ /**
+ * Open the agent and put text in the composer WITHOUT sending.
+ * Used by Repairs tab: staged "tell me about my repair system" prompt.
+ */
+ window.__eaStagePrompt = function (text) {
+ text = String(text || "");
+ return setOpen(true).then(function () {
+ return new Promise(function (resolve) {
+ // Wait a frame so #eaInput exists after ensureUi
+ requestAnimationFrame(function () {
+ setTimeout(function () {
+ try {
+ var input = document.getElementById("eaInput");
+ if (input) {
+ input.value = text;
+ try {
+ input.dispatchEvent(new Event("input", { bubbles: true }));
+ } catch (e) {}
+ try {
+ input.focus();
+ // Place caret at end
+ var n = input.value.length;
+ input.setSelectionRange(n, n);
+ } catch (e2) {}
+ }
+ } catch (e3) {}
+ resolve();
+ }, 40);
+ });
+ });
+ });
+ };
  /** Programmatic user turn (mobile OS chips, quick actions). */
  window.__eaSendText = function (text, opts) {
  opts = opts || {};
