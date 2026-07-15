@@ -182,11 +182,16 @@ html.sky .ar-panel-hd h3{color:var(--ink)}
 html.sky .ar-panel-hd p{color:var(--muted)}
 html.sky .ar-panel-hd p b{color:var(--ink)}
 /* device/cloud mode segmented control: glass options, sky-blue active */
+html.sky .ar-mode{
+  width:100%;
+}
 html.sky .ar-mode-opt{
   background:rgba(255,255,255,.55);
   border:1px solid var(--line);
   border-radius:13px;
   box-shadow:0 1px 4px rgba(20,60,120,.05);
+  width:100%;
+  min-width:0;
 }
 html.sky .ar-mode-opt:hover{
   border-color:rgba(33,150,243,.40);

@@ -253,18 +253,21 @@
     padding:18px 20px 20px;margin:0 0 22px}
   /* Multi-card vault stack (Ford 2026-07-13): head + live + consent + portal
      groups as separate cards so sky/gaps show between them. */
-  .ar-stack{display:flex;flex-direction:column;gap:14px;margin:0 0 22px}
+  .ar-stack{display:flex;flex-direction:column;gap:14px;margin:0 0 22px;width:100%;box-sizing:border-box}
   .ar-stack > .ar-panel,
-  .ar-stack .ar-card{margin:0}
+  .ar-stack .ar-card{margin:0;width:100%;box-sizing:border-box}
   .ar-card{background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;
     padding:16px 18px}
-  .ar-list{display:flex;flex-direction:column;gap:14px}
+  /* LIVE board fills its card edge-to-edge (no padded empty frame) */
+  .ar-card.ar-card-live{padding:0;overflow:hidden}
+  .ar-card.ar-card-live .ar-live{border:0;border-radius:inherit;background:transparent}
+  .ar-list{display:flex;flex-direction:column;gap:14px;width:100%}
   .ar-stack .ar-list{gap:14px}
   /* One-shot "you're here — add your logins" cue when arriving from onboarding skip. */
   #rowAutoRefresh.ar-flash .ar-panel,
   #rowAutoRefresh.ar-flash .ar-card-head{animation:arFlash 2.6s ease-out 1}
   @keyframes arFlash{0%,55%{box-shadow:0 0 0 2px var(--good,#34d896),0 0 22px -2px var(--good,#34d896)}100%{box-shadow:0 0 0 0 transparent}}
-  .ar-panel-head{display:flex;gap:14px;align-items:flex-start}
+  .ar-panel-head{display:flex;gap:14px;align-items:flex-start;width:100%;box-sizing:border-box}
   .ar-panel-ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
     font-size:21px;color:var(--ao-oct);background:var(--ao-oct-soft);border:1px solid var(--ao-oct-line);
     padding:0;font-family:inherit;cursor:pointer;line-height:1;-webkit-appearance:none;appearance:none;
@@ -275,21 +278,25 @@
   /* Spins while a status pull is in flight — slow load reads as "working" (Ford 2026-07-11). */
   .ar-panel-ic.ar-spinning{animation:ar-icspin .7s linear infinite;pointer-events:none}
   @keyframes ar-icspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .ar-panel-hd{min-width:0}
+  /* Head copy + mode toggle fill the card (no dead glass on the right) */
+  .ar-panel-hd{min-width:0;flex:1 1 auto;width:100%}
   .ar-panel-hd h3{margin:0;font-size:19px;font-weight:820;letter-spacing:-.015em;color:var(--ink);
     display:flex;align-items:center;gap:11px;flex-wrap:wrap}
-  .ar-panel-hd p{margin:5px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5;max-width:82ch}
+  .ar-panel-hd p{margin:5px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5;max-width:none}
   .ar-panel-hd p b{color:var(--ink);font-weight:650}
-  /* Device vs. cloud capture: a two-option segmented control under the header copy. */
-  .ar-mode{display:flex;gap:8px;margin:11px 0 0;flex-wrap:wrap}
-  .ar-mode-opt{flex:1 1 210px;text-align:left;cursor:pointer;border:1px solid var(--line,#e2e8f0);
-    background:var(--card,#fff);border-radius:11px;padding:9px 12px;transition:border-color .12s,background .12s,box-shadow .12s}
+  /* Device vs. cloud: always two equal columns spanning the full card */
+  .ar-mode{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 0;width:100%;box-sizing:border-box}
+  .ar-mode-opt{min-width:0;width:100%;text-align:left;cursor:pointer;border:1px solid var(--line,#e2e8f0);
+    background:var(--card,#fff);border-radius:11px;padding:12px 14px;transition:border-color .12s,background .12s,box-shadow .12s}
   .ar-mode-opt b{display:block;font-size:12.5px;font-weight:720;color:var(--ink);letter-spacing:-.01em}
-  .ar-mode-opt span{display:block;margin-top:2px;font-size:11px;color:var(--muted);line-height:1.4}
+  .ar-mode-opt span{display:block;margin-top:3px;font-size:11px;color:var(--muted);line-height:1.4}
   .ar-mode-opt:hover{border-color:rgba(33,150,243,.40)}
   .ar-mode-opt.active{border-color:#2196F3;background:rgba(33,150,243,.10);
     box-shadow:0 0 0 1px #2196F3 inset}
   .ar-mode-opt.active b{color:#1976D2}
+  @media(max-width:560px){
+    .ar-mode{grid-template-columns:1fr}
+  }
   /* Cloud-mode opt-in consent gate — no password is stored server-side until ticked. */
   .ar-consent{display:flex;gap:9px;align-items:flex-start;margin:0 0 14px;padding:11px 13px;
     border:1px solid var(--line,#e2e8f0);border-radius:11px;background:rgba(37,99,235,.04);
