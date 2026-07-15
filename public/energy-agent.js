@@ -55,6 +55,9 @@
     _greetingPlaying: false, // protect intro voice from barge-in / mind interrupts
     _sessionUpdated: false, // Realtime session.update applied
     _pendingGreetingText: null,
+    _thinkingFillerActive: false, // interim "one second" voice while mind works
+    _interimSpoken: false,
+    _interimSteerTimer: null,
     touring: false,
     // Speech pipeline — one mouth at a time
     _onSpeakDone: null,
@@ -311,19 +314,6 @@
       '    <p>One mind for your fleet — continuous awareness, not a pile of agents.</p></div>' +
       '    <button type="button" class="ea-x" id="eaClose" aria-label="Close">×</button>' +
       "  </div>" +
-      '  <div class="ea-status"><i class="ea-dot" id="eaDot"></i>' +
-      '    <span id="eaStatusText">Ready</span>' +
-      '    <span class="ea-mind" id="eaMind" hidden title="Background work — still one mind">' +
-      '      <i class="ea-mind-pulse" aria-hidden="true"></i>' +
-      '      <span id="eaMindText">Working…</span></span>' +
-      '    <span class="ea-budget" id="eaBudget" aria-label="Weekly AI usage">' +
-      '      <span class="ea-usage ea-usage-ok">' +
-      '        <span class="ea-usage-label">Weekly</span>' +
-      '        <span class="ea-usage-track" aria-hidden="true">' +
-      '          <span class="ea-usage-fill" id="eaUsageFill" style="width:0%"></span>' +
-      '        </span>' +
-      '      </span>' +
-      '    </span></div>' +
       '  <div class="ea-tools" id="eaTools" hidden aria-hidden="true"></div>' +
       '  <div class="ea-tour-cap" id="eaTourCap" hidden>' +
       '    <span class="ea-tour-kicker" id="eaTourKicker">Tour</span>' +
@@ -347,6 +337,22 @@
       "  </div>" +
       '  <div class="ea-journey" id="eaJourney" hidden role="status" aria-live="polite"></div>' +
       '  <div class="ea-footer">' +
+      // Status sits ABOVE the input so voice-off / thinking / mind is always in view
+      '    <div class="ea-status ea-status-dock" role="status" aria-live="polite">' +
+      '      <i class="ea-dot" id="eaDot"></i>' +
+      '      <span id="eaStatusText">Ready</span>' +
+      '      <span class="ea-mind" id="eaMind" hidden title="Background work — still one mind">' +
+      '        <i class="ea-mind-pulse" aria-hidden="true"></i>' +
+      '        <span id="eaMindText">Working…</span></span>' +
+      '      <span class="ea-budget" id="eaBudget" aria-label="Weekly AI usage">' +
+      '        <span class="ea-usage ea-usage-ok">' +
+      '          <span class="ea-usage-label">Weekly</span>' +
+      '          <span class="ea-usage-track" aria-hidden="true">' +
+      '            <span class="ea-usage-fill" id="eaUsageFill" style="width:0%"></span>' +
+      '          </span>' +
+      '        </span>' +
+      '      </span>' +
+      '    </div>' +
       '    <div class="ea-compose" id="eaCompose">' +
       '      <div class="ea-compose-shell">' +
       '        <textarea id="eaInput" rows="2" placeholder="Message Energy Agent…"></textarea>' +
@@ -1969,38 +1975,10 @@
     }
     state._chatAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
 
-    // ── Mind steers status immediately (parallel with deep chat) ──────────
-    // Realtime is the mouth; mind picks an interim STATUS line while tools run.
-    // Do NOT speak interim — that stacked with the final /chat speak ("twice").
-    // One spoken reply per turn: the final mind-steered answer only.
+    // GPT-Voice style: short interim line while the mind works, then hard-cut
+    // when the real answer lands (self-interrupt). Voice turns only.
     var isVoice = (source || "") === "voice";
-    if (state._interimSteerTimer) {
-      try { clearTimeout(state._interimSteerTimer); } catch (e) {}
-      state._interimSteerTimer = null;
-    }
-    state._interimSpoken = false;
-    if (isVoice) {
-      try {
-        fetch(API.mindVoiceSteer, {
-          method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({
-            session_id: sid,
-            message: text,
-            context: packContext(),
-          }),
-        })
-          .then(function (sr) { return sr.ok ? sr.json() : null; })
-          .then(function (sd) {
-            if (turnGen !== (state._turnAbortGen || 0)) return;
-            if (!sd || !sd.speak) return;
-            // Status only while thinking — mouth waits for the real answer
-            setStatus(sd.speak, "think");
-            if (sd.mind) onMindPlanFromChat(sd.mind);
-          })
-          .catch(function () {});
-      } catch (e) {}
-    }
+    startThinkingFiller(text, turnGen, isVoice);
 
     try {
       var fetchOpts = {
@@ -2047,12 +2025,8 @@
       addMsg("agent", reply);
       clearTools();
 
-      // ONE spoken answer per turn (cancel any leftover queue from a prior turn)
-      if (state._interimSteerTimer) {
-        try { clearTimeout(state._interimSteerTimer); } catch (e) {}
-        state._interimSteerTimer = null;
-      }
-      var speakP = enqueueSpeak(mouthLine, { source: "chat" });
+      // Cut interim "one second…" filler, then deliver the real answer immediately
+      var speakP = finishThinkingAndSpeak(mouthLine, turnGen);
 
       var cmds = d.ui_commands || [];
       // Kill freehand multi-highlight "tours" from the LLM — replace with a real
@@ -2076,6 +2050,7 @@
       if (turnGen !== (state._turnAbortGen || 0)) return;
       setStatus(state.listening ? "Listening…" : "Ready", state.listening ? "listen" : "on");
     } catch (e) {
+      cancelThinkingFiller();
       if (e && (e.name === "AbortError" || String(e.message || "").indexOf("abort") !== -1)) {
         // User said stop — handleStopCommand already painted "Stopped."
         return;
@@ -2085,8 +2060,149 @@
     } finally {
       if (turnGen === (state._turnAbortGen || 0)) {
         state.thinking = false;
+        state._thinkingFillerActive = false;
       }
     }
+  }
+
+  /**
+   * GPT-Voice style thinking fillers: short mouth line while tools run, then
+   * hard-cut when the real answer is ready. Audio only — never a chat bubble.
+   */
+  function pickThinkingFiller(userText) {
+    var t = String(userText || "").toLowerCase();
+    if (/\b(rate|bill|invoice|\$|kwh|price|credit)\b/.test(t)) {
+      return "Pulling that up — one second.";
+    }
+    if (/\b(fleet|inverter|attention|health|underperform|fault|dead)\b/.test(t)) {
+      return "Checking the fleet — one second.";
+    }
+    if (/\b(improve|fix|change|button|layout|ugly|look)\b/.test(t)) {
+      return "Got it — one second.";
+    }
+    if (/\b(walk|tour|show me|how does)\b/.test(t)) {
+      return "Okay — one second.";
+    }
+    var pool = [
+      "One second.",
+      "Okay.",
+      "One moment.",
+      "On it.",
+      "Looking into that.",
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function cancelThinkingFiller() {
+    if (state._interimSteerTimer) {
+      try { clearTimeout(state._interimSteerTimer); } catch (e) {}
+      state._interimSteerTimer = null;
+    }
+  }
+
+  function startThinkingFiller(userText, turnGen, isVoice) {
+    cancelThinkingFiller();
+    state._interimSpoken = false;
+    state._thinkingFillerActive = false;
+    if (!isVoice || state.voiceMuted) return;
+
+    // Local filler fast — GPT Voice feel without waiting on the network
+    state._interimSteerTimer = setTimeout(function () {
+      state._interimSteerTimer = null;
+      if (turnGen !== (state._turnAbortGen || 0)) return;
+      if (!state.thinking || state.voiceMuted) return;
+      if (state._interimSpoken) return;
+      var line = pickThinkingFiller(userText);
+      state._interimSpoken = true;
+      state._thinkingFillerActive = true;
+      setStatus(line, "think");
+      enqueueSpeak(line, {
+        source: "thinking_filler",
+        force: true,
+        holdMicFull: true,
+      })
+        .then(function () {
+          // Filler finished before answer — still thinking
+          if (state.thinking && turnGen === (state._turnAbortGen || 0)) {
+            state._thinkingFillerActive = false;
+            setStatus("Thinking…", "think");
+          }
+        })
+        .catch(function () {
+          state._thinkingFillerActive = false;
+        });
+    }, 420);
+
+    // Optional smarter line from mind (replaces local if it arrives first)
+    try {
+      fetch(API.mindVoiceSteer, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          session_id: state.sessionId,
+          message: userText,
+          context: packContext(),
+        }),
+      })
+        .then(function (sr) { return sr.ok ? sr.json() : null; })
+        .then(function (sd) {
+          if (turnGen !== (state._turnAbortGen || 0)) return;
+          if (!sd || !sd.speak) return;
+          if (sd.mind) onMindPlanFromChat(sd.mind);
+          // Only use mind line if we haven't started a filler yet
+          if (!state.thinking || state.voiceMuted) return;
+          if (state._interimSpoken || state._thinkingFillerActive) {
+            setStatus(sd.speak, "think");
+            return;
+          }
+          cancelThinkingFiller();
+          state._interimSpoken = true;
+          state._thinkingFillerActive = true;
+          setStatus(sd.speak, "think");
+          enqueueSpeak(String(sd.speak).trim(), {
+            source: "thinking_filler",
+            force: true,
+            holdMicFull: true,
+          })
+            .then(function () {
+              if (state.thinking && turnGen === (state._turnAbortGen || 0)) {
+                state._thinkingFillerActive = false;
+                setStatus("Thinking…", "think");
+              }
+            })
+            .catch(function () {
+              state._thinkingFillerActive = false;
+            });
+        })
+        .catch(function () {});
+    } catch (e) {}
+  }
+
+  /** Cut filler mid-sentence (like GPT Voice) and speak the real answer. */
+  function finishThinkingAndSpeak(mouthLine, turnGen) {
+    cancelThinkingFiller();
+    // Hard-cut interim audio immediately
+    if (
+      state._thinkingFillerActive ||
+      state.speaking ||
+      state.rtResponseActive
+    ) {
+      stopSpeak({ reason: "answer_ready" });
+    }
+    state._thinkingFillerActive = false;
+    state._interimSpoken = false;
+    // Micro-beat so Realtime cancel lands before the next response.create
+    return new Promise(function (resolve) {
+      setTimeout(function () {
+        if (turnGen !== (state._turnAbortGen || 0)) {
+          resolve();
+          return;
+        }
+        enqueueSpeak(mouthLine, { source: "chat", force: true })
+          .then(resolve)
+          .catch(function () { resolve(); });
+      }, 90);
+    });
   }
 
   /** Turn a casual user ask into a clear Build-it prompt for the judge. */
@@ -3569,13 +3685,20 @@
     ) {
       return;
     }
-    // Barge-in / new turn: cancel current audio only
+    // Barge-in / new turn / answer ready: cancel current audio only
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     state.speaking = false;
     state.rtResponseActive = false;
     state._speakStartedAt = 0;
-    if (opts.reason === "barge_in" || opts.reason === "new_turn" || opts.reason === "stop") {
+    if (
+      opts.reason === "barge_in" ||
+      opts.reason === "new_turn" ||
+      opts.reason === "stop"
+    ) {
       state._greetingPlaying = false;
+    }
+    if (opts.reason === "answer_ready") {
+      state._thinkingFillerActive = false;
     }
     // Release any attack-mute so mic is live for the next user turn
     if (state._unmuteAfterSpeakTimer) {
@@ -3583,7 +3706,9 @@
       state._unmuteAfterSpeakTimer = null;
     }
     state._micHeldForSpeak = false;
-    if (state.listening && state.micStream && !state._greetingPlaying) {
+    // Keep mic muted if cutting filler to answer — next speakNow re-arms
+    var keepMicDown = opts.reason === "answer_ready";
+    if (state.listening && state.micStream && !state._greetingPlaying && !keepMicDown) {
       try {
         state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
       } catch (e) {}
@@ -3592,7 +3717,13 @@
     var cb = state._onSpeakDone;
     state._onSpeakDone = null;
     // Bump seq so any in-flight enqueueSpeak step is abandoned
-    if (opts.reason === "new_turn" || opts.reason === "barge_in") {
+    // answer_ready: kill thinking filler so final answer owns the mouth
+    if (
+      opts.reason === "new_turn" ||
+      opts.reason === "barge_in" ||
+      opts.reason === "answer_ready" ||
+      opts.reason === "stop"
+    ) {
       state._speakSeq++;
     }
     if (typeof cb === "function") {
@@ -3781,11 +3912,12 @@
         state._speakEarlyDoneTimer = earlyDoneTimer;
       };
 
-      // Attack mute — full hold for greeting so intro never gets cut by bleed
+      // Attack mute — full hold for greeting / short fillers so bleed doesn't barge-in
       var isGreeting = opts.source === "greeting";
+      var isFiller = opts.source === "thinking_filler";
       if (isGreeting) state._greetingPlaying = true;
       holdMicWhileSpeaking(true, {
-        holdMicFull: isGreeting || opts.holdMicFull,
+        holdMicFull: isGreeting || isFiller || opts.holdMicFull,
         source: opts.source,
       });
 
