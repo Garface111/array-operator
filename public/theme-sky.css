@@ -716,17 +716,48 @@ html.sky .gmp-gate{border-radius:18px;box-shadow:var(--sky-shadow-card)}
   }
 }
 
-/* the inverter-detail zoom modal floats its verdict + stat chips directly on
-   the dim scrim (not on a card) — they need near-solid white to read as glass
-   instead of gray. Verdict left-rail colors (blue/amber/red) are semantic. */
-html.sky .sb-dc-diag{background:rgba(255,255,255,.92) !important;border-radius:14px}
-html.sky .sb-dc-stat{
-  background:rgba(255,255,255,.92) !important;
-  border:1px solid rgba(255,255,255,.9) !important;
-  border-radius:14px !important;
-  box-shadow:var(--sky-shadow-card) !important;
+/* Inverter detail zoom — unified glass shell (not free-floating chips on scrim). */
+html.sky .sb-dc-shell{
+  background:linear-gradient(165deg,rgba(255,255,255,.94),rgba(240,248,255,.9)) !important;
+  border:1px solid rgba(255,255,255,.85) !important;
+  box-shadow:
+    0 36px 90px -28px rgba(20,50,100,.45),
+    0 0 0 1px rgba(14,165,233,.1) !important;
 }
-html.sky .sb-dc-array{background:rgba(255,255,255,.92) !important;border-radius:14px}
+html.sky .sb-dc-left{
+  background:
+    radial-gradient(400px 260px at 30% 0%,rgba(14,165,233,.1),transparent 60%),
+    rgba(233,243,253,.55) !important;
+  border-right-color:rgba(14,100,180,.1) !important;
+}
+html.sky .sb-dc-right{background:transparent !important}
+html.sky .sb-dc-title{color:#0f2744 !important}
+html.sky .sb-dc-array{color:#0284c7 !important;background:transparent !important}
+html.sky .sb-dc-diag{
+  background:rgba(255,255,255,.75) !important;border-radius:14px;
+  border-color:rgba(14,100,180,.1) !important;color:#0f2744 !important;
+}
+html.sky .sb-dc-stat{
+  background:rgba(255,255,255,.82) !important;
+  border:1px solid rgba(255,255,255,.95) !important;
+  border-radius:14px !important;
+  box-shadow:var(--sky-shadow-card, 0 8px 20px -14px rgba(20,60,120,.25)) !important;
+}
+html.sky .sb-dc-sk{color:#5a7196 !important}
+html.sky .sb-dc-sv{color:#0f2744 !important}
+html.sky .sb-dc-sv.ok{color:#0d9488 !important}
+html.sky .sb-dc-modal .sb-dc-x{
+  background:rgba(255,255,255,.9);border-color:rgba(14,100,180,.18);color:#0f2744;
+}
+html.sky .sb-dc-actions .sb-dc-origin{
+  background:linear-gradient(180deg,#38bdf8,#0ea5e9);color:#fff;
+  border-color:transparent;box-shadow:0 8px 18px -12px rgba(14,165,233,.55);
+}
+html.sky .sb-dc-bigcard .sb-inv-plate{
+  background:rgba(255,255,255,.88) !important;
+  border-color:rgba(14,100,180,.1) !important;
+}
+html.sky .sb-dc-backdrop{background:rgba(8,28,56,.45) !important}
 
 /* ── 11 · SMALL WORLD-COHESION TOUCHES ────────────────────────────────────── */
 /* empty-state text sits right on the sky in some views — keep it readable */

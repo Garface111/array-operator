@@ -220,14 +220,16 @@ body.ea-shell-open{
    otherwise win over a plain left: rule and keep the modal under the EA rail. */
 body.ea-shell-open .ao-overlay,
 body.ea-shell-open .sb-ov,
-body.ea-shell-open .cl-modal-back{
+body.ea-shell-open .cl-modal-back,
+body.ea-shell-open .sb-detail-host.sb-dc-open{
   left: var(--ea-rail, 360px) !important;
   right: 0 !important;
   width: auto !important;
 }
 body.ho-shell-open:not(.ea-shell-open) .ao-overlay,
 body.ho-shell-open:not(.ea-shell-open) .sb-ov,
-body.ho-shell-open:not(.ea-shell-open) .cl-modal-back{
+body.ho-shell-open:not(.ea-shell-open) .cl-modal-back,
+body.ho-shell-open:not(.ea-shell-open) .sb-detail-host.sb-dc-open{
   left: var(--ho-rail, 380px) !important;
   right: 0 !important;
   width: auto !important;
@@ -235,9 +237,11 @@ body.ho-shell-open:not(.ea-shell-open) .cl-modal-back{
 body.ho-shell-open.ea-shell-open .ao-overlay,
 body.ho-shell-open.ea-shell-open .sb-ov,
 body.ho-shell-open.ea-shell-open .cl-modal-back,
+body.ho-shell-open.ea-shell-open .sb-detail-host.sb-dc-open,
 body.ho-ea-sidebyside.ea-shell-open .ao-overlay,
 body.ho-ea-sidebyside.ea-shell-open .sb-ov,
-body.ho-ea-sidebyside.ea-shell-open .cl-modal-back{
+body.ho-ea-sidebyside.ea-shell-open .cl-modal-back,
+body.ho-ea-sidebyside.ea-shell-open .sb-detail-host.sb-dc-open{
   left: calc(var(--ho-rail, 380px) + var(--ea-rail, 360px) + 18px) !important;
   right: 0 !important;
   width: auto !important;
@@ -247,13 +251,17 @@ body.ho-ea-sidebyside.ea-shell-open .cl-modal-back{
   body.ea-shell-open .ao-overlay,
   body.ea-shell-open .sb-ov,
   body.ea-shell-open .cl-modal-back,
+  body.ea-shell-open .sb-detail-host.sb-dc-open,
   body.ho-shell-open .ao-overlay,
   body.ho-shell-open .sb-ov,
   body.ho-shell-open .cl-modal-back,
+  body.ho-shell-open .sb-detail-host.sb-dc-open,
   body.ho-shell-open.ea-shell-open .ao-overlay,
   body.ho-shell-open.ea-shell-open .sb-ov,
   body.ho-shell-open.ea-shell-open .cl-modal-back,
-  body.ho-ea-sidebyside.ea-shell-open .ao-overlay{
+  body.ho-shell-open.ea-shell-open .sb-detail-host.sb-dc-open,
+  body.ho-ea-sidebyside.ea-shell-open .ao-overlay,
+  body.ho-ea-sidebyside.ea-shell-open .sb-detail-host.sb-dc-open{
     left: 0 !important;
   }
 }

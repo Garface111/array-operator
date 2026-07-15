@@ -2803,65 +2803,69 @@
  ? `<div class="sb-dc-diag ${sCls}">${esc(d.diag)}</div>` : "";
  const arrayTag = arrayName
  ? `<div class="sb-dc-array">${esc(arrayName)}</div>` : "";
+ const invTitle = d.name || (node.querySelector(".sb-inv-name") || {}).textContent || "Inverter";
 
- // BLOWN-UP CARD = an exact clone of the small inverter card, just bigger.
- // Cloning the live .sb-inv node guarantees identical data + styling (name,
- // size, spark, output bar, alert line, brand), no separate layout to drift.
+ // BLOWN-UP CARD = clone of the small inverter card (same fields / styling).
  const clone = node.cloneNode(true);
- clone.classList.remove("sel", "inv-dragging");
+ clone.classList.remove("sel", "inv-dragging", "sb-movable");
  clone.removeAttribute("draggable");
  clone.removeAttribute("tabindex");
  clone.removeAttribute("style");
 
+ // Unified glass shell: left = card, right = facts. Close X always visible.
  const card = el(`
  <div class="sb-dc-modal" role="dialog" aria-modal="true" aria-label="Inverter detail">
+ <button type="button" class="sb-dc-x" aria-label="Close">×</button>
+ <div class="sb-dc-shell">
+ <div class="sb-dc-left"><div class="sb-dc-bigcard"></div></div>
+ <div class="sb-dc-right">
  ${arrayTag}
- <div class="sb-dc-bigcard"></div>
+ <h2 class="sb-dc-title">${esc(invTitle)}</h2>
  ${diagHTML}
  <div class="sb-dc-stats">${statsHTML}</div>
  ${originRow ? `<div class="sb-dc-actions">${originRow}</div>` : ""}
+ </div>
+ </div>
  </div>`);
  card.querySelector(".sb-dc-bigcard").appendChild(clone);
 
  const close = () => {
- _detailInvId = null; // stop live updates for this card
+ _detailInvId = null;
  document.querySelectorAll("#sandbox .sb-inv.sel").forEach(n => n.classList.remove("sel"));
  host.classList.remove("sb-dc-open");
- host.removeEventListener("click", close); // don't stack listeners across opens
+ host.removeEventListener("click", onHostClick);
  host.innerHTML = "";
+ // Return host to #sbWrap so default corner panel still anchors correctly
+ const wrap = document.getElementById("sbWrap");
+ if(wrap && host.parentElement !== wrap) wrap.appendChild(host);
  document.removeEventListener("keydown", onKey);
  setDefaultFoot();
  };
  const onKey = (e) => { if(e.key === "Escape") close(); };
 
- // Click anywhere that ISN'T the card's actual content closes it. The host
- // (.sb-dc-open) is a full-viewport flex layer. We DON'T blanket-stop clicks on
- // the modal, because its grid cells stretch, the empty space under the left
- // card (where the bigcard cell is taller than its content) is part of the modal
- // and was a dead zone. Instead: keep open ONLY when the click lands on real
- // content (the card clone, stats, diagnosis, array tag, or actions); otherwise
- // close. Backdrop + host clicks also close.
- const CONTENT_SEL = ".sb-inv, .sb-dc-stats, .sb-dc-diag, .sb-dc-array, .sb-dc-actions";
- const backdrop = el(`<div class="sb-dc-backdrop"></div>`);
+ // Keep open on real content; close on backdrop / empty shell area.
+ const CONTENT_SEL = ".sb-dc-shell, .sb-dc-x";
+ const onHostClick = (e) => {
+ if(e.target.closest(CONTENT_SEL)) return;
+ close();
+ };
+ const backdrop = el(`<div class="sb-dc-backdrop" aria-hidden="true"></div>`);
  backdrop.addEventListener("click", close);
- card.addEventListener("click", e => {
- if(e.target.closest(CONTENT_SEL)) e.stopPropagation(); // real content → keep open
- else close(); // empty modal area → close
+ card.querySelector(".sb-dc-x").addEventListener("click", (e) => {
+ e.stopPropagation();
+ close();
  });
- host.addEventListener("click", close);
+ card.addEventListener("click", e => e.stopPropagation());
 
  host.innerHTML = "";
- // #sbWrap has a CSS transform (translateX(-50%)), which would make the modal's
- // position:fixed center relative to #sbWrap instead of the viewport. Reparent
- // the host to <body> while open so the backdrop + card center to the real
- // viewport; close() puts it back so the default corner panel still anchors right.
+ // #sbWrap has a CSS transform — reparent to <body> so fixed centers on viewport.
  if(host.parentElement !== document.body) document.body.appendChild(host);
- host.classList.add("sb-dc-open"); // switches host to full-screen centering layer
+ host.classList.add("sb-dc-open");
  host.appendChild(backdrop);
  host.appendChild(card);
+ host.addEventListener("click", onHostClick);
  document.addEventListener("keydown", onKey);
- // The blown-up card is a static snapshot clone, so there's nothing for the
- // live ticker to update in here, unbind it so refreshDetailCard() no-ops.
+ // Snapshot clone — no live ticker binding
  _detailInvId = null;
  }
 
