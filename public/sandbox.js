@@ -7065,7 +7065,24 @@
             ln.desc || "Unlimited integrated AI this month.");
           return;
         }
+        // Collection skim — transparency only, never in monthly total
+        if(ln.id === "collection_fee" || ln.basis === "percent_of_collected"){
+          const pct = (ln.fee_percent != null)
+            ? Number(ln.fee_percent)
+            : (Number(ln.fee_bps || 50) / 100);
+          const pctTxt = (Math.round(pct * 100) / 100) + "%";
+          lines +=
+            `<div class="ao-bill-line ao-bill-collect">` +
+              `<span class="bl-k"><b>${esc(ln.kind || "Online offtaker payments")}</b>` +
+              `<span class="bl-calc">${esc(pctTxt)} of each online payment</span>` +
+              `<span class="bl-desc">${esc(ln.desc || ("When offtakers pay an invoice online, we keep " + pctTxt + ". Not part of your monthly bill. Offline/check payments: no fee."))}</span></span>` +
+              `<span class="bl-v ao-bill-collect-v"><span class="ao-bill-soft">not monthly</span></span>` +
+            `</div>`;
+          return;
+        }
         const amt = Number(ln.amount_cents || 0);
+        // Skip null amount lines (shouldn't reach here)
+        if(ln.amount_cents == null && ln.included_in_monthly_total === false) return;
         total += amt;
         let calc = "";
         if(ln.basis === "nameplate_kw"){
@@ -7076,7 +7093,7 @@
           calc = `${q.toLocaleString(undefined,{maximumFractionDigits:0})} kW × ${disc?"≈ ":""}${usdFromCents(rate)}/kW`;
         } else if(ln.basis === "offtaker_count"){
           const q = Number(ln.quantity || 0);
-          const rate = Number(ln.unit_cents || 2000);
+          const rate = Number(ln.unit_cents || 1500);
           const full = Number(ln.full_unit_cents || rate);
           const disc = full > 0 && rate < full - 0.001;
           calc = `${q} offtaker${q===1?"":"s"} × ${disc?"≈ ":""}${usdFromCents(rate)}`;
@@ -7117,7 +7134,7 @@
       }
       if(showInv){
         const n     = Number(pick(summary, ["offtaker_count"], 0));
-        const full  = Number(pick(summary, ["invoicing_per_offtaker_cents"], 2000));
+        const full  = Number(pick(summary, ["invoicing_per_offtaker_cents"], 1500));
         const per   = Number(pick(summary, ["invoicing_blended_cents_per_offtaker"], full));
         const c     = Number(pick(summary, ["invoicing_total_cents"], 0));
         const discounted = full > 0 && per < full - 0.001;
@@ -7127,6 +7144,19 @@
           discounted
             ? `Volume discount applied (headline rate ${usdFromCents(full)}/offtaker). Charged monthly to your card.`
             : `${usdFromCents(full)} per offtaker you invoice. Charged monthly to your card.`);
+        // Collection fee transparency (legacy path)
+        const cf = summary.collection_fee || (summary.unified && summary.unified.collection_fee);
+        if(cf || true){
+          const pct = cf && cf.fee_percent != null ? Number(cf.fee_percent) : 0.5;
+          const pctTxt = (Math.round(pct * 100) / 100) + "%";
+          lines +=
+            `<div class="ao-bill-line ao-bill-collect">` +
+              `<span class="bl-k"><b>Online offtaker payments</b>` +
+              `<span class="bl-calc">${esc(pctTxt)} of each online payment</span>` +
+              `<span class="bl-desc">When offtakers pay an invoice online, we keep ${esc(pctTxt)}. Not part of your monthly bill. Offline/check: no fee.</span></span>` +
+              `<span class="bl-v ao-bill-collect-v"><span class="ao-bill-soft">not monthly</span></span>` +
+            `</div>`;
+        }
       }
     } else if(summary){
       // NEPOOL — per array.
@@ -7589,7 +7619,7 @@
           <p>Pick what you need. You can change or upgrade anytime in Account.</p>
         </div>
         <div class="ao-plan-cards">
-          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","from $20 per offtaker / mo")}
+          ${planCard("invoicing","🧾","Offtaker invoices","Automatic offtaker invoices, generated &amp; sent for you.","from $15 per offtaker / mo")}
           ${planCard("monitoring","📈","Live vendor data","Real-time fleet health &amp; lost-production alerts.","from $0.15 / kW · mo")}
           ${planCard("both","✨","Both","Invoicing + live vendor monitoring, together. AI sample included; Pro unlimited is an add-on.","Both plans")}
         </div>

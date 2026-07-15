@@ -329,7 +329,7 @@
   var TOTAL_NAMEPLATE = ARRAY_DEFS.reduce(function (s, a) { return s + a.kw; }, 0);
   var MTD_KWH = Math.round(TOTAL_NAMEPLATE * 4.6 * 22); // MTD ~22 days into month
   var MONITORING_CENTS = Math.round(MTD_KWH * RATE_CENTS_PER_KWH);
-  var PER_OFFTAKER_CENTS = 2000;
+  var PER_OFFTAKER_CENTS = 1500;
   var INVOICING_CENTS = offtakers.length * PER_OFFTAKER_CENTS;
   var TOTAL_CENTS = MONITORING_CENTS + INVOICING_CENTS;
 

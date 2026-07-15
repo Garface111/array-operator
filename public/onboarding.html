@@ -1368,7 +1368,7 @@ function cloudDoneScreen(){
     <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
       <button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
       <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
-      <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$20 a month for each offtaker</b> you invoice (volume discounts kick in automatically for large fleets/portfolios). Never until the trial ends.</div>
+      <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$15 a month for each offtaker</b> you invoice (volume discounts for larger rosters). When offtakers pay online, a <b>0.5%</b> platform fee applies to that payment only. Never until the trial ends.</div>
     </div>
   </div></div>`;
 }
@@ -1816,10 +1816,10 @@ function doneScreen(){
     // Same-origin session is stashed — go straight in (no new tab, no magic link).
     cardCta = `<button class="btn btn-primary btn-lg" onclick="goDashboard()">${state.gmpPath ? "Open dashboard &amp; connect GMP →" : "Open my dashboard →"}</button>
        <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
-       <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$20 a month for each offtaker</b> you invoice (volume discounts kick in automatically for large fleets/portfolios). Never until the trial ends.</div>`;
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$15 a month for each offtaker</b> you invoice (volume discounts for larger rosters). When offtakers pay online, a <b>0.5%</b> platform fee applies to that payment only. Never until the trial ends.</div>`;
   } else {
     cardCta = `<button class="btn btn-primary btn-lg" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial →</button>
-       <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$20 a month for each offtaker</b> you invoice (volume discounts kick in automatically for large fleets/portfolios). Never until the trial ends.</div>`;
+       <div class="helper" id="cardNote" style="text-align:center">Optional now — after the trial it's <b>$0.15 per kW of array</b> a month for monitoring, plus <b>$15 a month for each offtaker</b> you invoice (volume discounts for larger rosters). When offtakers pay online, a <b>0.5%</b> platform fee applies to that payment only. Never until the trial ends.</div>`;
   }
   return `<div class="card animate"><div class="center">
     <div class="seal">🌿</div>

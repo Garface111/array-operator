@@ -1734,6 +1734,11 @@ html[data-theme="day"] .rep-fld.req > select{
   color:#64748b; margin:0 0 6px; }
 .ao-bill-soft{ font-size:12px; font-weight:650; color:#059669; }
 .ao-bill-model-note{ font-size:10.5px; color:#94a3b8; line-height:1.45; margin:8px 0 2px; max-width:52ch; }
+/* Collection skim — not part of monthly total (transparency row) */
+.ao-bill-collect{ margin-top:6px; padding:8px 0 4px; border-top:1px dashed rgba(14,165,233,.22); }
+.ao-bill-collect .bl-k b{ color:#0c4a6e; }
+.ao-bill-collect .bl-calc{ color:#0369a1; font-weight:650; }
+.ao-bill-collect-v .ao-bill-soft{ color:#0369a1; font-size:11px; letter-spacing:.02em; }
 .ao-bill-ai{ margin-top:12px; padding:12px 14px; border-radius:12px;
   background:linear-gradient(165deg, rgba(16,185,129,.1), rgba(16,185,129,.04));
   border:1px solid rgba(16,185,129,.28); display:flex; flex-direction:column; gap:6px; }
