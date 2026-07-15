@@ -1,0 +1,15 @@
+# Dedicated preview site only — NEVER point production arrayoperator.com here.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/v1/*"
+  to = "https://web-production-49c83.up.railway.app/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -11,11 +11,28 @@ import type {
   SubscriptionsList,
 } from "./types";
 
+/** True on the dedicated preview host so testers land in the app without a login. */
+export function isPreviewHost(): boolean {
+  try {
+    const h = location.hostname || "";
+    return (
+      h === "ao-owner-web-preview.netlify.app" ||
+      h.endsWith("--ao-owner-web-preview.netlify.app")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isDemoMode(): boolean {
   try {
-    if (localStorage.getItem("ao_owner_demo") === "1") return true;
     if (localStorage.getItem("ao_owner_demo") === "0") return false;
-    return /[?&]demo=1(&|$)/.test(location.search || "");
+    if (localStorage.getItem("ao_owner_demo") === "1") return true;
+    if (/[?&]demo=1(&|$)/.test(location.search || "")) return true;
+    // Preview site defaults to demo so Ford can open the URL and test immediately.
+    // Real sign-in still works and clears demo (see LoginScreen).
+    if (isPreviewHost() && !localStorage.getItem("so_session")) return true;
+    return false;
   } catch {
     return false;
   }
