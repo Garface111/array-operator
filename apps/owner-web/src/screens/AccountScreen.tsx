@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   fetchAccount,
   fetchAddPaymentUrl,
@@ -7,11 +8,13 @@ import {
   setCaptureMode,
   updateCompanyName,
 } from "@/lib/api";
-import { isDemoMode } from "@/lib/demoData";
+import { disableDemoMode, isDemoMode } from "@/lib/demoData";
 import { fmtKwh, relTime } from "@/lib/format";
+import { clearSession } from "@/lib/session";
 import type { AccountMe, BillingSummary } from "@/lib/types";
 
 export function AccountScreen() {
+  const nav = useNavigate();
   const [account, setAccount] = useState<AccountMe | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [company, setCompany] = useState("");
@@ -291,6 +294,42 @@ export function AccountScreen() {
           </button>
         </section>
       ) : null}
+
+      {/* Desktop Account also hosts connect / auto-refresh surfaces */}
+      <section className="ao-card space-y-2 p-3.5">
+        <h2 className="text-sm font-extrabold">Connect feeds</h2>
+        <p className="text-xs text-muted">
+          SolarEdge API, cloud harvest, utility, online pay — same as desktop
+          Account / Connect.
+        </p>
+        <Link
+          to="/connect"
+          className="ao-btn-primary flex w-full !min-h-10 !text-xs"
+        >
+          Open connect →
+        </Link>
+      </section>
+
+      <section className="ao-card divide-y divide-white/40 overflow-hidden">
+        <a
+          href="/?desktop=1"
+          className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-bold"
+        >
+          Desktop site
+          <span className="text-[11px] font-semibold text-muted">Full canvas</span>
+        </a>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm font-bold text-red-700"
+          onClick={() => {
+            clearSession();
+            disableDemoMode();
+            nav("/login", { replace: true });
+          }}
+        >
+          {isDemoMode() ? "Exit demo" : "Sign out"}
+        </button>
+      </section>
     </div>
   );
 }

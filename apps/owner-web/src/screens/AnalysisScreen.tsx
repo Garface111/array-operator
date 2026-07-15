@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
 import {
   fetchFleetForecast,
@@ -12,6 +12,8 @@ import type { FleetForecast, FleetTrends, Overview } from "@/lib/types";
 
 export function AnalysisScreen() {
   const { openAgent } = useOutletAgent();
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "trends" ? "trends" : "analysis";
   const [trends, setTrends] = useState<FleetTrends | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [forecast, setForecast] = useState<FleetForecast | null>(null);
@@ -34,6 +36,11 @@ export function AnalysisScreen() {
       .catch((e) => setErr(e instanceof Error ? e.message : "Load failed"))
       .finally(() => setLoading(false));
   }, []);
+
+  function setView(v: "analysis" | "trends") {
+    if (v === "trends") setParams({ view: "trends" });
+    else setParams({});
+  }
 
   const peer = overview?.peer_summary;
   const yoy = (trends?.seasonal_yoy || []).slice(0, 6);
@@ -73,6 +80,38 @@ export function AnalysisScreen() {
         </p>
       </div>
 
+      {/* Desktop-style sub-view: Fleet analysis | Trends */}
+      <div
+        className="ao-card grid grid-cols-2 gap-1 p-1"
+        role="group"
+        aria-label="Analysis view"
+      >
+        <button
+          type="button"
+          onClick={() => setView("analysis")}
+          className={[
+            "rounded-xl py-2 text-xs font-extrabold",
+            view === "analysis"
+              ? "bg-sky-500 text-white shadow"
+              : "text-slate-700",
+          ].join(" ")}
+        >
+          Fleet analysis
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("trends")}
+          className={[
+            "rounded-xl py-2 text-xs font-extrabold",
+            view === "trends"
+              ? "bg-sky-500 text-white shadow"
+              : "text-slate-700",
+          ].join(" ")}
+        >
+          Trends
+        </button>
+      </div>
+
       {loading ? (
         <p className="text-sm font-semibold text-muted">Loading analysis…</p>
       ) : null}
@@ -80,6 +119,8 @@ export function AnalysisScreen() {
         <p className="text-xs font-semibold text-red-700">{err}</p>
       ) : null}
 
+      {view === "analysis" ? (
+      <>
       {/* NOC: production vs expected */}
       <section className="ao-card space-y-3 p-3.5">
         <div className="flex items-center justify-between">
@@ -216,33 +257,6 @@ export function AnalysisScreen() {
         </section>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="ao-card p-3.5">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800">
-            Trailing 12 mo
-          </div>
-          <div className="mt-1 text-[15px] font-extrabold">
-            {fmtKwh(trends?.ttm_kwh)}
-          </div>
-          <div className="mt-0.5 text-xs text-muted">
-            {trends?.ttm_savings_usd != null
-              ? `~${fmtMoney(trends.ttm_savings_usd)} value`
-              : "Production"}
-          </div>
-        </div>
-        <div className="ao-card p-3.5">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800">
-            Lifetime
-          </div>
-          <div className="mt-1 text-[15px] font-extrabold">
-            {fmtKwh(trends?.lifetime_kwh)}
-          </div>
-          <div className="mt-0.5 text-xs text-muted">
-            {(trends?.years || []).join(" · ") || "Years of data"}
-          </div>
-        </div>
-      </div>
-
       <section className="ao-card space-y-2 p-3.5">
         <h2 className="text-sm font-extrabold">Peer health</h2>
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -269,10 +283,39 @@ export function AnalysisScreen() {
             </div>
           </div>
         </div>
-        <Link to="/fleet" className="block text-xs font-bold text-sky-800">
-          Open fleet →
+        <Link to="/inverters" className="block text-xs font-bold text-sky-800">
+          Open inverters →
         </Link>
       </section>
+      </>
+      ) : (
+      <>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="ao-card p-3.5">
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800">
+            Trailing 12 mo
+          </div>
+          <div className="mt-1 text-[15px] font-extrabold">
+            {fmtKwh(trends?.ttm_kwh)}
+          </div>
+          <div className="mt-0.5 text-xs text-muted">
+            {trends?.ttm_savings_usd != null
+              ? `~${fmtMoney(trends.ttm_savings_usd)} value`
+              : "Production"}
+          </div>
+        </div>
+        <div className="ao-card p-3.5">
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800">
+            Lifetime
+          </div>
+          <div className="mt-1 text-[15px] font-extrabold">
+            {fmtKwh(trends?.lifetime_kwh)}
+          </div>
+          <div className="mt-0.5 text-xs text-muted">
+            {(trends?.years || []).join(" · ") || "Years of data"}
+          </div>
+        </div>
+      </div>
 
       {yoy.length ? (
         <section className="ao-card p-3.5">
@@ -318,14 +361,22 @@ export function AnalysisScreen() {
             ))}
           </ul>
         </section>
-      ) : null}
+      ) : (
+        <div className="ao-card p-4 text-sm text-muted">
+          No multi-year trend history yet — it builds as daily generation lands.
+        </div>
+      )}
+      </>
+      )}
 
       <button
         type="button"
         className="ao-btn-primary w-full"
         onClick={() =>
           openAgent(
-            "Brief me on fleet analysis: production vs expected, underperformers, and what to check first."
+            view === "trends"
+              ? "Brief me on portfolio trends: YoY and trailing production."
+              : "Brief me on fleet analysis: production vs expected, underperformers, and what to check first."
           )
         }
       >

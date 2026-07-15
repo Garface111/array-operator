@@ -103,9 +103,9 @@ export function FleetScreen() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-extrabold text-slate-900">Fleet</h1>
+          <h1 className="text-lg font-extrabold text-slate-900">Inverters</h1>
           <p className="text-sm text-slate-800/75">
-            Live arrays and inverter health.
+            Arrays and inverter health — desktop Sandbox, mobile list.
           </p>
         </div>
         <button

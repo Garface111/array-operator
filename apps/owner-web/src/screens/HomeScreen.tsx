@@ -152,13 +152,13 @@ export function HomeScreen() {
 
       <section className="drop-shadow-sm">
         <p className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
-          Overview
+          Fleet triage
         </p>
         <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
           {company}
         </h1>
         <p className="text-sm font-medium text-slate-800/75">
-          Production health and offtaker delivery at a glance.
+          Whole-fleet health, production pulse, and needs-attention queue.
         </p>
       </section>
 
@@ -262,8 +262,8 @@ export function HomeScreen() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-extrabold">Attention queue</h2>
-          <Link to="/fleet" className="text-xs font-bold text-sky-700">
-            Fleet →
+          <Link to="/inverters" className="text-xs font-bold text-sky-700">
+            Inverters →
           </Link>
         </div>
         {attention.length === 0 ? (
@@ -295,8 +295,8 @@ export function HomeScreen() {
       </section>
 
       <div className="grid grid-cols-2 gap-2 pb-2">
-        <Link to="/connect" className="ao-btn-ghost text-center text-xs">
-          Connect feeds
+        <Link to="/inverters" className="ao-btn-ghost text-center text-xs">
+          Inverters
         </Link>
         <Link to="/invoices" className="ao-btn-ghost text-center text-xs">
           Invoices
