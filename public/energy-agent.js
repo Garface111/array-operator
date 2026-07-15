@@ -1102,14 +1102,97 @@
  }
 
  /**
+ * Pre-normalize model prose so list rendering is consistent.
+ * Models often emit * bullets, unicode markers, (1)/(2), or inline "1) a 2) b".
+ */
+ function normalizeChatMarkdown(raw) {
+ var s = String(raw == null ? "" : raw);
+ // Line endings + fancy quotes
+ s = s.replace(/\r\n?/g, "\n");
+ s = s.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
+ // Collapse 3+ blank lines
+ s = s.replace(/\n{3,}/g, "\n\n");
+
+ var lines = s.split("\n");
+ var out = [];
+ for (var i = 0; i < lines.length; i++) {
+ var line = lines[i];
+ var trimmed = line.replace(/[ \t]+$/g, "");
+
+ // Skip restructuring inside fenced blocks (handled later; keep as-is)
+ // Bullet chars → "- "  (• ● ○ ▪ ▸ ► ◆ ► and en/em dashes used as bullets)
+ trimmed = trimmed.replace(
+ /^(\s*)([-*+]|[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25CF\u25CB\u25A0\u25B8\u25B6\u25C6]|[–—])\s+/,
+ "$1- "
+ );
+ // Asterisk bullet already covered by [-*+]; ensure "*item" without space stays non-list
+
+ // (1) item / (12) item at line start → "1. item"
+ trimmed = trimmed.replace(/^(\s*)\((\d{1,3})\)\s+/, "$1$2. ");
+ // "1 - item" / "1 – item" → "1. item"
+ trimmed = trimmed.replace(/^(\s*)(\d{1,3})\s*[-–—]\s+/, "$1$2. ");
+ // "Step 1:" / "Step 1." at line start → keep as bold-friendly heading-ish list
+ trimmed = trimmed.replace(/^(\s*)Step\s+(\d{1,3})\s*[:.\-–—]\s+/i, "$1$2. ");
+
+ // Inline multi-item: "…: 1) foo 2) bar 3) baz" or "1. foo 2. bar" on ONE line
+ // Split into real list lines when ≥2 numbered markers appear.
+ var inlineNum = trimmed.match(/(?:^|[\s:;])\d{1,3}[.)]\s+\S/);
+ if (inlineNum) {
+ var markers = trimmed.match(/\d{1,3}[.)]\s+/g);
+ if (markers && markers.length >= 2) {
+ // Optional lead-in before first number
+ var firstIdx = trimmed.search(/\d{1,3}[.)]\s+/);
+ var lead = firstIdx > 0 ? trimmed.slice(0, firstIdx).trim() : "";
+ // Drop trailing ":" from lead ("Here are three:" → own paragraph)
+ if (lead) {
+ lead = lead.replace(/[:：]\s*$/, "");
+ if (lead) out.push(lead);
+ }
+ var rest = trimmed.slice(firstIdx);
+ var parts = rest.split(/(?=\d{1,3}[.)]\s+)/);
+ for (var p = 0; p < parts.length; p++) {
+ var part = parts[p].trim();
+ if (!part) continue;
+ part = part.replace(/^(\d{1,3})[.)]\s+/, "$1. ");
+ // Strip trailing separators often left between inline items
+ part = part.replace(/[;·|]\s*$/, "").trim();
+ if (part) out.push(part);
+ }
+ continue;
+ }
+ }
+
+ // Inline multi-bullet with " • " / " · " / " | " as item separators when dense
+ // Only when the line has 3+ separator-delimited chunks and no existing list mark.
+ if (
+ !/^\s*(-|\d+[.)])\s+/.test(trimmed) &&
+ /(?:\s[•·|]\s.+){2,}/.test(trimmed)
+ ) {
+ var chunks = trimmed.split(/\s+[•·|]\s+/).map(function (c) {
+ return c.trim();
+ }).filter(Boolean);
+ if (chunks.length >= 3 && chunks.every(function (c) { return c.length < 80; })) {
+ for (var c = 0; c < chunks.length; c++) {
+ out.push("- " + chunks[c].replace(/^[-–—]\s+/, ""));
+ }
+ continue;
+ }
+ }
+
+ out.push(trimmed);
+ }
+ return out.join("\n");
+ }
+
+ /**
  * Safe lightweight markdown for chat bubbles.
- * Supports: **bold**, *italic*, `code`, ```blocks```, # headers, - lists,
- * [links](https://…), line breaks. Escapes HTML first so model output can't inject tags.
+ * Supports: bold, italic, code, fenced blocks, headers, nested bullet/numbered
+ * lists, blockquotes, hr, links, line breaks. Escapes HTML first so model
+ * output cannot inject tags. Pre-normalizes messy model patterns (unicode
+ * bullets, "(1)" markers, inline "1) 2) 3)" runs).
  */
  function formatMsg(text) {
- var raw = String(text == null ? "" : text);
- // Normalize fancy quotes/asterisks models sometimes emit
- raw = raw.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
+ var raw = normalizeChatMarkdown(text);
 
  // Protect fenced code blocks before escaping line structure
  var blocks = [];
@@ -1144,18 +1227,22 @@
  s = s.replace(/^##\s+(.+)$/gm, '<div class="ea-h ea-h2">$1</div>');
  s = s.replace(/^#\s+(.+)$/gm, '<div class="ea-h ea-h1">$1</div>');
 
+ // Horizontal rules
+ s = s.replace(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/gm, '<hr class="ea-hr">');
+
+ // Blockquotes (simple single-line)
+ s = s.replace(/^&gt;\s?(.+)$/gm, '<div class="ea-quote">$1</div>');
+
  // Bold then italic (** before *)
  s = s.replace(/\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*/g, "<strong>$1</strong>");
  s = s.replace(/__([^_\n][\s\S]*?[^_\n]|\S)__/g, "<strong>$1</strong>");
- // Single-asterisk italic, avoid matching inside already-processed strong tags
  s = s.replace(/(^|[^*\\])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
 
- // Links, markdown [label](https://...) then bare https URLs
+ // Links
  s = s.replace(
  /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
  '<a class="ea-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
  );
- // Bare URLs not already inside an href="..."
  s = s.replace(
  /(^|[^"'>=])(https?:\/\/[^\s<]+[^\s<.,);:'"!])/g,
  function (_, pre, url) {
@@ -1168,58 +1255,143 @@
  return inlines[Number(i)] || "";
  });
 
- // Line-based lists & paragraphs
+ // Line-based lists (valid nested HTML: sublists live inside parent <li>)
  var lines = s.split("\n");
  var out = [];
- var inUl = false;
- var inOl = false;
- function closeLists() {
- if (inUl) { out.push("</ul>"); inUl = false; }
- if (inOl) { out.push("</ol>"); inOl = false; }
+ // stack entries: { type: 'ul'|'ol', indent: n }
+ var stack = [];
+ var openLi = false; // true while an <li> is open at the current list depth
+
+ function openList(type, indent) {
+ var cls = type === "ol" ? "ea-ol" : "ea-ul";
+ var depth = stack.length;
+ var tag = type === "ol" ? "ol" : "ul";
+ out.push(
+ "<" + tag + ' class="' + cls + (depth ? " ea-nested" : "") +
+ '" data-depth="' + depth + '">'
+ );
+ stack.push({ type: type, indent: indent });
  }
+ function closeLiIfOpen() {
+ if (openLi) {
+ out.push("</li>");
+ openLi = false;
+ }
+ }
+ function closeOneList() {
+ if (!stack.length) return;
+ closeLiIfOpen();
+ var top = stack.pop();
+ out.push(top.type === "ol" ? "</ol>" : "</ul>");
+ // After closing a nested list, parent <li> is still open
+ if (stack.length) openLi = true;
+ }
+ function closeToIndent(indent) {
+ // Close lists strictly deeper than indent
+ while (stack.length && stack[stack.length - 1].indent > indent) {
+ closeOneList();
+ }
+ }
+ function closeAllLists() {
+ while (stack.length) closeOneList();
+ openLi = false;
+ }
+ function ensureList(type, indent) {
+ if (!stack.length) {
+ openList(type, indent);
+ return;
+ }
+ var top = stack[stack.length - 1];
+ if (indent > top.indent) {
+ // Nest inside current open <li>
+ if (!openLi) {
+ // No open li to nest under — open sibling list instead
+ closeLiIfOpen();
+ if (top.type !== type) {
+ closeOneList();
+ openList(type, indent);
+ }
+ return;
+ }
+ openList(type, indent);
+ openLi = false;
+ return;
+ }
+ if (indent < top.indent) {
+ closeToIndent(indent);
+ top = stack[stack.length - 1];
+ if (!top) {
+ openList(type, indent);
+ return;
+ }
+ // Same indent as remaining top?
+ if (top.indent === indent) {
+ closeLiIfOpen();
+ if (top.type !== type) {
+ closeOneList();
+ openList(type, indent);
+ }
+ return;
+ }
+ openList(type, indent);
+ return;
+ }
+ // Same indent
+ closeLiIfOpen();
+ if (top.type !== type) {
+ closeOneList();
+ openList(type, indent);
+ }
+ }
+
+ var liReTyped = /^(\s*)(?:([-+•])|(\d+)[.)])\s+(.+)$/;
+
  for (var i = 0; i < lines.length; i++) {
  var line = lines[i];
- // Restored code-block placeholders are whole lines
+
  var blockM = line.match(/^%%EA_BLOCK_(\d+)%%$/);
  if (blockM) {
- closeLists();
+ closeAllLists();
  out.push(blocks[Number(blockM[1])] || "");
  continue;
  }
- // Heading already a div, flush lists
- if (/^<div class="ea-h/.test(line)) {
- closeLists();
+ if (/^<div class="ea-h/.test(line) || /^<div class="ea-quote">/.test(line) || /^<hr class="ea-hr">/.test(line)) {
+ closeAllLists();
  out.push(line);
  continue;
  }
- var ul = line.match(/^\s*[-•]\s+(.+)$/);
- var ol = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
- if (ul) {
- if (inOl) { out.push("</ol>"); inOl = false; }
- if (!inUl) { out.push('<ul class="ea-ul">'); inUl = true; }
- out.push("<li>" + ul[1] + "</li>");
+
+ var m = line.match(liReTyped);
+ if (m) {
+ var indent = m[1].replace(/\t/g, "  ").length;
+ var type = m[2] ? "ul" : "ol";
+ var body = m[4];
+ ensureList(type, indent);
+ out.push("<li>" + body);
+ openLi = true;
  continue;
  }
- if (ol) {
- if (inUl) { out.push("</ul>"); inUl = false; }
- if (!inOl) { out.push('<ol class="ea-ol">'); inOl = true; }
- out.push("<li>" + ol[2] + "</li>");
+
+ // Continuation line: indented prose while a list item is open
+ if (stack.length && openLi && /^\s+\S/.test(line) && !liReTyped.test(line)) {
+ out.push(" " + line.trim());
  continue;
  }
- closeLists();
+
+ closeAllLists();
  if (/^\s*$/.test(line)) {
  out.push('<div class="ea-sp"></div>');
  } else {
  out.push('<p class="ea-p">' + line + "</p>");
  }
  }
- closeLists();
+ closeAllLists();
 
- // Restore any leftover block tokens
  var html = out.join("");
- html = html.replace(/%%EA_BLOCK_(\d+)%%/g, function (_, i) {
- return blocks[Number(i)] || "";
+ html = html.replace(/%%EA_BLOCK_(\d+)%%/g, function (_, idx) {
+ return blocks[Number(idx)] || "";
  });
+ html = html.replace(/<\/(ul|ol)><div class="ea-sp"><\/div><(ul|ol)/g, "</$1><$2");
  return html || "";
  }
 
@@ -1259,8 +1431,9 @@
  if (opts.mindUpdate) d.setAttribute("data-mind", "1");
  if (isSovereign) d.setAttribute("data-origin", "sovereign");
  // Agent replies get full markdown; user bubbles stay plain (they typed it)
- // unless they include obvious markdown markers.
- var rich = role === "agent" || isSovereign || /\*\*|__|`|^#\s|^\s*[-•]\s/m.test(t);
+ // unless they include obvious markdown markers (lists, bold, code, headers).
+ var rich = role === "agent" || isSovereign ||
+ /\*\*|__|`|^#\s|^\s*[-*+•]\s|^\s*\d+[.)]\s|^\s*\(\d+\)\s/m.test(t);
  if (isSovereign) {
  // Label so it's obvious the product mind is talking
  var label = document.createElement("div");
@@ -2007,14 +2180,14 @@
  /** Local answer when user asks what the tabs are, never invent old names. */
  function tabsCheatSheet() {
  return (
- "**Array Operator tabs** (exactly as labeled in the top bar):\n\n" +
- "1. **Fleet Triage**, fleet health at a glance; who needs attention\n" +
- "2. **Inverters**, live canvas of every inverter (columns = sites)\n" +
- "3. **Analysis**, deeper digs; *Through time* / trends live here as a sub-view " +
- "(there is no separate Trends tab)\n" +
- "4. **Invoices**, offtaker invoices, drafts, send pipeline\n" +
- "5. **Resources**, net-metering rates and regulatory news\n" +
- "6. **Account**, company, email, plan, card, auto-refresh, files\n\n" +
+ "**Array Operator tabs** — exactly as labeled in the top bar:\n\n" +
+ "1. **Fleet Triage** — fleet health at a glance; who needs attention\n" +
+ "2. **Inverters** — live canvas of every inverter; columns are sites\n" +
+ "3. **Analysis** — deeper digs; *Through time* / trends live here as a sub-view. " +
+ "There is no separate Trends tab.\n" +
+ "4. **Invoices** — offtaker invoices, drafts, send pipeline\n" +
+ "5. **Resources** — net-metering rates and regulatory news\n" +
+ "6. **Account** — company, email, plan, card, auto-refresh, files\n\n" +
  "Want me to open one and walk you through it?"
  );
  }
@@ -2750,7 +2923,11 @@
  .replace(/\*([^*]+)\*/g, "$1")
  .replace(/`([^`]+)`/g, "$1")
  .replace(/#{1,6}\s+/g, "")
+ .replace(/^\s*[-*+•]\s+/gm, "")
+ .replace(/^\s*\d+[.)]\s+/gm, "")
+ .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1")
  .replace(/\n+/g, " ")
+ .replace(/\s{2,}/g, " ")
  .trim();
  }
 
