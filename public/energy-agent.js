@@ -2019,9 +2019,11 @@
       if (d.pending) showPending(d.pending);
       else showPending(null);
 
-      var reply = d.reply || "…";
-      // Mind-steered mouth line (prefer speak); full reply always in the chat bubble
-      var mouthLine = (d.speak && String(d.speak).trim()) || reply;
+      var reply = ownerFacingText(d.reply || "…");
+      // Mind-steered mouth line (prefer speak); never speak raw #selectors
+      var mouthLine = ownerFacingSpeak(
+        (d.speak && String(d.speak).trim()) || reply
+      );
       addMsg("agent", reply);
       clearTools();
 
@@ -2605,6 +2607,69 @@
       .replace(/#{1,6}\s+/g, "")
       .replace(/\n+/g, " ")
       .trim();
+  }
+
+  /**
+   * Owner-facing copy must not expose CSS/DOM selectors (#reports, #rbBulkImport).
+   * Voice was reading them as "hash reports" / "hash rb bulk import" — weird flow.
+   * Map known hashes to tab/control labels; drop the rest.
+   */
+  var HASH_LABELS = {
+    "#dashboard": "Fleet Triage",
+    "#arrays": "Inverters",
+    "#sandbox": "Inverters",
+    "#analysis": "Analysis",
+    "#trends": "Trends",
+    "#reports": "Invoices",
+    "#resources": "Resources",
+    "#account": "Account",
+    "#rbbulkimport": "Bulk import",
+    "#rbcustadd": "Add an offtaker",
+    "#rb2exportbtn": "Export",
+    "#rblinkutility": "Link utility bills",
+    "#rbemailstudio": "Customize email",
+    "#rbgentabs": "Offtakers",
+    "#vssegsandbox": "Sandbox",
+    "#vssegsheet": "Spreadsheet",
+    "#sbaddarray": "Add array",
+    "#fleetcommander": "fleet health tiles",
+    "#ccqueue": "attention queue",
+  };
+
+  function stripTechIds(text) {
+    var s = String(text || "");
+    // Parenthetical selectors: ( #rbBulkImport ) or (#reports)
+    s = s.replace(/\s*[\(（]\s*#[a-zA-Z][\w-]*\s*[\)）]/g, "");
+    // Markdown-ish **#foo** leftovers
+    s = s.replace(/\*\*#(reports|arrays|dashboard|analysis|resources|account|trends)\*\*/gi, function (_, t) {
+      var key = "#" + String(t).toLowerCase();
+      return HASH_LABELS[key] || t;
+    });
+    // Bare #id tokens
+    s = s.replace(/#[a-zA-Z][\w-]*/g, function (m) {
+      var key = m.toLowerCase();
+      if (HASH_LABELS[key]) return HASH_LABELS[key];
+      // camelCase / snake id → human-ish drop (don't invent jargon)
+      return "";
+    });
+    // Clean gaps left by removals
+    s = s
+      .replace(/\s+([,.;:!?])/g, "$1")
+      .replace(/\(\s*\)/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+via the\s+/gi, " via the ")
+      .trim();
+    return s;
+  }
+
+  /** Text for chat bubble: friendly, no raw selectors. */
+  function ownerFacingText(text) {
+    return stripTechIds(String(text || ""));
+  }
+
+  /** Text for TTS: no markdown, no selectors. */
+  function ownerFacingSpeak(text) {
+    return stripTechIds(stripMd(text));
   }
 
   function setTourCaption(text, stepIdx, total) {
@@ -3787,7 +3852,8 @@
    */
   function enqueueSpeak(text, opts) {
     opts = opts || {};
-    var plain = stripMd(text);
+    // Always strip DOM ids / #hashes so the mouth never says "hash reports"
+    var plain = ownerFacingSpeak(text);
     if (!plain) return Promise.resolve();
     // Speaker mute: text already on screen; resolve immediately so tours don't stall.
     if (state.voiceMuted && !opts.force) {
