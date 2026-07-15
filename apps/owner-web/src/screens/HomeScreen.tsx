@@ -122,23 +122,25 @@ export function HomeScreen() {
   return (
     <div className="space-y-4">
       {isDemoMode() ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-950">
+        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2.5 text-xs font-semibold text-amber-950 shadow-sm backdrop-blur-md">
           Demo data — sample fleet for UI review. Sign in for live numbers.
         </div>
       ) : null}
 
-      <section>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700">
+      <section className="drop-shadow-sm">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
           Overview
         </p>
-        <h1 className="text-lg font-extrabold tracking-tight">{company}</h1>
-        <p className="text-sm text-muted">
+        <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
+          {company}
+        </h1>
+        <p className="text-sm font-medium text-slate-800/75">
           Production health and offtaker delivery at a glance.
         </p>
       </section>
 
       {err ? (
-        <div className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+        <div className="rounded-xl border border-red-200/60 bg-red-50/80 px-3 py-2 text-xs font-semibold text-red-700 backdrop-blur-sm">
           {err}
         </div>
       ) : null}
@@ -194,9 +196,9 @@ export function HomeScreen() {
       </div>
 
       <section className="ao-card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-line bg-gradient-to-r from-sky-50 to-white px-3.5 py-3">
+        <div className="flex items-center gap-3 border-b border-white/45 bg-white/25 px-3.5 py-3">
           <div
-            className="h-10 w-10 shrink-0 rounded-full shadow"
+            className="h-10 w-10 shrink-0 rounded-full shadow-md ring-2 ring-white/50"
             style={{
               background:
                 "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
@@ -226,7 +228,7 @@ export function HomeScreen() {
               key={q}
               type="button"
               onClick={() => openAgent(q)}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-left text-[11px] font-semibold text-sky-900 shadow-sm"
+              className="rounded-full border border-white/55 bg-white/45 px-3 py-1.5 text-left text-[11px] font-semibold text-sky-950 shadow-sm backdrop-blur-md"
             >
               {q}
             </button>

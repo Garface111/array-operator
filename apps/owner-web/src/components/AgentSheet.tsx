@@ -103,17 +103,20 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/25"
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]"
         aria-label="Close Energy Agent"
         onClick={onClose}
       />
       <section
         role="dialog"
         aria-label="Energy Agent"
-        className="relative z-10 mx-auto flex max-h-[min(72vh,560px)] w-full max-w-lg flex-col rounded-t-sheet border border-line bg-white shadow-sheet"
-        style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}
+        className="relative z-10 mx-auto flex max-h-[min(72vh,560px)] w-full max-w-lg flex-col rounded-t-sheet border border-white/50 bg-white/55 shadow-sheet backdrop-blur-2xl backdrop-saturate-150"
+        style={{
+          paddingBottom: "max(10px, env(safe-area-inset-bottom))",
+          WebkitBackdropFilter: "blur(28px) saturate(1.45)",
+        }}
       >
-        <div className="flex items-center gap-2 border-b border-line px-4 pb-3 pt-4">
+        <div className="flex items-center gap-2 border-b border-white/40 px-4 pb-3 pt-4">
           <div
             className="h-9 w-9 shrink-0 rounded-full shadow-md"
             style={{
@@ -148,8 +151,8 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
               className={[
                 "max-w-[92%] rounded-2xl px-3 py-2.5 text-[13.5px] leading-relaxed",
                 m.role === "user"
-                  ? "ml-auto bg-sky-500 text-white"
-                  : "bg-sky-50 text-ink",
+                  ? "ml-auto bg-sky-500 text-white shadow-md shadow-sky-500/25"
+                  : "border border-white/50 bg-white/55 text-ink backdrop-blur-md",
               ].join(" ")}
             >
               {m.text}
@@ -159,19 +162,19 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
             <div className="text-xs font-semibold text-muted">Thinking…</div>
           ) : null}
           {err ? (
-            <div className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            <div className="rounded-xl border border-red-200/60 bg-red-50/80 px-3 py-2 text-xs font-semibold text-red-700 backdrop-blur-sm">
               {err}
             </div>
           ) : null}
         </div>
 
-        <form onSubmit={onSubmit} className="border-t border-line px-3 pt-2">
-          <div className="flex gap-2 rounded-2xl border border-line bg-sky-50/50 p-1.5">
+        <form onSubmit={onSubmit} className="border-t border-white/40 px-3 pt-2">
+          <div className="flex gap-2 rounded-2xl border border-white/50 bg-white/45 p-1.5 backdrop-blur-md">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask or adjust something…"
-              className="min-w-0 flex-1 bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted"
+              className="min-w-0 flex-1 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-500"
               autoComplete="off"
             />
             <button

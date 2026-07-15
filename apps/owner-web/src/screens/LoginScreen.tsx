@@ -50,16 +50,18 @@ export function LoginScreen() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-5 py-10">
-      <div className="mb-8 text-center">
+      <div className="mb-8 text-center drop-shadow-sm">
         <div
-          className="mx-auto mb-4 h-14 w-14 rounded-full shadow-lg"
+          className="mx-auto mb-4 h-14 w-14 rounded-full shadow-lg ring-2 ring-white/50"
           style={{
             background:
               "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
           }}
         />
-        <h1 className="text-xl font-extrabold tracking-tight">Array Operator</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
+          Array Operator
+        </h1>
+        <p className="mt-1 text-sm font-medium text-slate-800/80">
           Phone-first fleet & offtaker ops · Energy Agent
         </p>
       </div>
@@ -73,7 +75,7 @@ export function LoginScreen() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
+            className="ao-input mt-1"
           />
         </label>
         {mode === "password" ? (
@@ -85,7 +87,7 @@ export function LoginScreen() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
+              className="ao-input mt-1"
             />
           </label>
         ) : null}

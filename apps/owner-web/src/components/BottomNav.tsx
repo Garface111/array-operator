@@ -11,8 +11,11 @@ const ITEMS: Array<{ to: string; label: string; icon: string; end?: boolean }> =
 export function BottomNav() {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-2 pt-1 backdrop-blur-md"
-      style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/45 bg-white/40 px-2 pt-1 shadow-[0_-8px_32px_-16px_rgba(15,50,110,0.35)] backdrop-blur-xl backdrop-saturate-150"
+      style={{
+        paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+        WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+      }}
       aria-label="Primary"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
@@ -24,7 +27,9 @@ export function BottomNav() {
               className={({ isActive }) =>
                 [
                   "flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-bold",
-                  isActive ? "bg-sky-50 text-sky-700" : "text-muted",
+                  isActive
+                    ? "bg-white/55 text-sky-800 shadow-sm ring-1 ring-white/60"
+                    : "text-slate-700/85",
                 ].join(" ")
               }
             >

@@ -7,10 +7,10 @@ type Props = {
 };
 
 const TONE: Record<NonNullable<Props["tone"]>, string> = {
-  default: "border-line",
-  good: "border-emerald-200 bg-emerald-50/50",
-  warn: "border-amber-200 bg-amber-50/50",
-  bad: "border-red-200 bg-red-50/50",
+  default: "",
+  good: "!border-emerald-200/70 !bg-emerald-50/45",
+  warn: "!border-amber-200/70 !bg-amber-50/45",
+  bad: "!border-red-200/70 !bg-red-50/45",
 };
 
 export function StatCard({ label, value, meta, tone = "default", onClick }: Props) {
