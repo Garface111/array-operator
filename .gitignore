@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 .netlify/
 node_modules/
+apps/owner-web/dist

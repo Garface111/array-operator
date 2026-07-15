@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 64px;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 420px at 80% -10%, #dbeafe 0%, transparent 55%),
+    #f0f9ff;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: clip;
+}
+
+/* iOS: avoid focus zoom on form fields */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@layer components {
+  .ao-card {
+    @apply rounded-2xl border border-line bg-white/90 shadow-card backdrop-blur-sm;
+  }
+  .ao-btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition active:scale-[0.98];
+  }
+  .ao-btn-primary {
+    @apply ao-btn bg-sky-500 text-white shadow-md shadow-sky-500/30;
+  }
+  .ao-btn-ghost {
+    @apply ao-btn border border-line bg-white text-ink;
+  }
+  .ao-chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold;
+  }
+}
