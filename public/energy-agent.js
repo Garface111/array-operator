@@ -1427,18 +1427,31 @@
  if (role === "user" && !opts.history) state._lastUserSaid = t;
  var d = document.createElement("div");
  var isSovereign = !!(opts.sovereign || opts.origin === "sovereign");
+ var isRepairEmail = !!(
+ opts.origin === "repair" ||
+ opts.channel === "email" ||
+ opts.repairEmail
+ );
  d.className = "ea-msg " + (role === "user" ? "user" : "agent") +
  (opts.mindUpdate ? " mind-update" : "") +
+ (isRepairEmail ? " repair-email" : "") +
  (isSovereign ? " sovereign" : "") +
  (opts.history ? " history" : "");
  d.setAttribute("data-role", role);
  d.setAttribute("data-raw", t);
  if (opts.mindUpdate) d.setAttribute("data-mind", "1");
  if (isSovereign) d.setAttribute("data-origin", "sovereign");
+ else if (isRepairEmail) d.setAttribute("data-origin", "repair");
  // Agent replies get full markdown; user bubbles stay plain (they typed it)
  // unless they include obvious markdown markers (lists, bold, code, headers).
  var rich = role === "agent" || isSovereign ||
  /\*\*|__|`|^#\s|^\s*[-*+•]\s|^\s*\d+[.)]\s|^\s*\(\d+\)\s/m.test(t);
+ if (isRepairEmail && role !== "user") {
+ var elab = document.createElement("div");
+ elab.className = "ea-email-label";
+ elab.textContent = opts.kind === "repair_inbound" ? "Email · tech replied" : "Email · Energy Agent";
+ d.appendChild(elab);
+ }
  if (isSovereign) {
  // Label so it's obvious the product mind is talking
  var label = document.createElement("div");
@@ -1450,6 +1463,13 @@
  if (rich) body.innerHTML = formatMsg(t);
  else body.textContent = t;
  d.appendChild(body);
+ } else if (isRepairEmail) {
+ // Append body without wiping the Email · label
+ var rbody = document.createElement("div");
+ rbody.className = "ea-email-body";
+ if (rich) rbody.innerHTML = formatMsg(t);
+ else rbody.textContent = t;
+ d.appendChild(rbody);
  } else if (rich) {
  d.innerHTML = formatMsg(t);
  } else {
@@ -1594,6 +1614,9 @@
  addMsg("agent", t, {
  mindUpdate: true,
  origin: "repair",
+ channel: "email",
+ repairEmail: true,
+ kind: opts.kind || "repair_outbound",
  skipDedup: true,
  });
  setMindActivity(true, opts.kind === "repair_inbound" ? "Tech replied…" : "Emailed tech…");
@@ -1871,8 +1894,18 @@
  (messages || []).forEach(function (m) {
  if (!m || !m.content) return;
  var role = m.role === "user" ? "user" : "agent";
+ // Email-channel turns (repair mailbox) are the same mind surface as chat
+ var fromEmail = m.channel === "email" || m.origin === "repair" || !!m.mindUpdate;
  // skipDedup + history: every server turn is kept
- if (addMsg(role, m.content, { history: true, skipDedup: true })) n += 1;
+ if (addMsg(role, m.content, {
+ history: true,
+ skipDedup: true,
+ mindUpdate: !!fromEmail,
+ origin: m.origin || (fromEmail ? "repair" : undefined),
+ channel: m.channel || (fromEmail ? "email" : undefined),
+ repairEmail: fromEmail,
+ kind: m.kind,
+ })) n += 1;
  });
  // Land on newest; user can scroll up for earlier turns / screenshots context
  requestAnimationFrame(function () {
