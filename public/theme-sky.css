@@ -429,13 +429,16 @@ html.sky .sb-legend{
   border-radius:var(--sky-r-pill);
 }
 
-/* modals + toasts + detail cards: chrome-tier frosted sheets (blur allowed) */
+/* modals + toasts + detail cards: chrome-tier frosted sheets (blur allowed).
+   Alpha ≥.92 so dense underlay (Ops KPIs, tabbar) never bleeds through the
+   dialog body — .72 frosted looked "overlapped" with Open tickets under
+   Open-repair-ticket when Energy Agent was open. */
 html.sky .ao-modal,
 html.sky .sb-modal,
 html.sky .cl-modal,
 html.sky .sb-detail-card,
 html.sky .sb-toast{
-  background:rgba(255,255,255,.72) !important;
+  background:rgba(255,255,255,.94) !important;
   -webkit-backdrop-filter:blur(24px) saturate(1.65);
   backdrop-filter:blur(24px) saturate(1.65);
   border:1px solid var(--sky-glass-edge) !important;

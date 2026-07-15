@@ -211,6 +211,51 @@ body.ea-shell-open{
 }
 .wrap{ transition: margin-left .22s ease; min-width: 0; }
 
+/* App modals (openModal / AODialog / claim) center on the FULL viewport by
+   default. With the EA rail open that lands the card under/over the agent on
+   ~1280px widths ("Open repair ticket" × Open tickets KPIs bleeding through
+   the frosted card into the Energy Agent panel). Pin scrims to the content
+   column so dialogs center in the remaining width only. */
+body.ea-shell-open .ao-overlay,
+body.ea-shell-open .sb-ov,
+body.ea-shell-open .cl-modal-back{
+  left: var(--ea-rail, 360px);
+  right: 0;
+  width: auto;
+}
+body.ho-shell-open:not(.ea-shell-open) .ao-overlay,
+body.ho-shell-open:not(.ea-shell-open) .sb-ov,
+body.ho-shell-open:not(.ea-shell-open) .cl-modal-back{
+  left: var(--ho-rail, 380px);
+  right: 0;
+  width: auto;
+}
+body.ho-shell-open.ea-shell-open .ao-overlay,
+body.ho-shell-open.ea-shell-open .sb-ov,
+body.ho-shell-open.ea-shell-open .cl-modal-back,
+body.ho-ea-sidebyside.ea-shell-open .ao-overlay,
+body.ho-ea-sidebyside.ea-shell-open .sb-ov,
+body.ho-ea-sidebyside.ea-shell-open .cl-modal-back{
+  left: calc(var(--ho-rail, 380px) + var(--ea-rail, 360px) + 18px);
+  right: 0;
+  width: auto;
+}
+@media (max-width: 900px){
+  /* Mobile EA is a bottom sheet (rail width → 0); keep full-bleed scrims. */
+  body.ea-shell-open .ao-overlay,
+  body.ea-shell-open .sb-ov,
+  body.ea-shell-open .cl-modal-back,
+  body.ho-shell-open .ao-overlay,
+  body.ho-shell-open .sb-ov,
+  body.ho-shell-open .cl-modal-back,
+  body.ho-shell-open.ea-shell-open .ao-overlay,
+  body.ho-shell-open.ea-shell-open .sb-ov,
+  body.ho-shell-open.ea-shell-open .cl-modal-back,
+  body.ho-ea-sidebyside.ea-shell-open .ao-overlay{
+    left: 0;
+  }
+}
+
 /* When EA rail is open, tighten the tabbar so labels + identity chip all fit
    inside the narrowed .wrap without clipping the account email mid-character. */
 body.ea-shell-open .tabbar{
