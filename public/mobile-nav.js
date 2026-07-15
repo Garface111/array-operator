@@ -39,9 +39,9 @@
  { id: "tabArrays", short: "Arrays", ic: "arrays", primary: true },
  { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
  { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },
- { id: "tabOps", short: "Ops", ic: "ops", primary: true }, // short "Ops" — full label is Operations
+ { id: "tabOps", short: "Repairs", ic: "ops", primary: true }, // Repairs command center
  { id: "tabAccount", short: "Account", ic: "account", primary: false },
- /* Resources is now a sub-view of Operations (#resources). Trends → Analysis. */
+ /* Resources is a sub-view under Repairs (#resources). Trends → Analysis. */
  ];
 
  MAP.forEach(function (m) {

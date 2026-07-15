@@ -70,7 +70,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260715whoamiClip1">
 <link rel="stylesheet" href="command-center.css?v=20260715vaultLogin1">
-<link rel="stylesheet" href="ops.css?v=20260715opsRes1">
+<link rel="stylesheet" href="ops.css?v=20260715cmd1">
 <link rel="stylesheet" href="theme-day.css?v=20260715opsSeg1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
@@ -251,9 +251,9 @@ document.documentElement.setAttribute("data-theme","day");
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
  <a class="tab" id="tabReports" href="#reports" role="tab" title="Invoice offtakers for their share of solar credits">Invoices</a>
- <!-- Operations: O&M team, repair tickets, manufacturer claims + Resources sub-tab. -->
+ <!-- Repairs: command center for parallel repair pipelines + Resources sub-view. -->
  <a class="tab" id="tabOps" href="#ops" role="tab"
- title="O&amp;M team, field repairs, warranty claims, rates &amp; news">Operations<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
+ title="Repair command center — detect, draft outreach, coordinate, verify">Repairs<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
  <!-- Account tab (was "Master Account"; shortened 2026-07-13). -->
  <a class="tab" id="tabAccount" href="#account" role="tab">Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
  <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
@@ -419,23 +419,22 @@ document.documentElement.setAttribute("data-theme","day");
  </section>
 
  <!-- ============================ TAB: OPERATIONS ============================ -->
- <!-- Two main sub-views under the Operations top tab (mirrors Analysis ⇄ Trends):
- Operations = O&M / repairs / claims; Resources = original briefing page.
- Both panels share .ops-main-seg (Operations | Resources). -->
- <section class="panel" id="panelOps" role="tabpanel" aria-label="Operations">
- <div class="vs-seg ops-main-seg" role="group" aria-label="Operations view" style="margin:14px auto 6px">
- <button class="vs-seg-btn on" type="button" data-opsmain="ops" aria-pressed="true">Operations</button>
+ <!-- Two main sub-views under the Repairs top tab (mirrors Analysis ⇄ Trends):
+ Repairs = command center (battle cards); Resources = briefing page.
+ Both panels share .ops-main-seg (Repairs | Resources). -->
+ <section class="panel" id="panelOps" role="tabpanel" aria-label="Repairs">
+ <div class="vs-seg ops-main-seg" role="group" aria-label="Repairs view" style="margin:14px auto 6px">
+ <button class="vs-seg-btn on" type="button" data-opsmain="ops" aria-pressed="true">Repairs</button>
  <button class="vs-seg-btn" type="button" data-opsmain="resources" aria-pressed="false">Resources</button>
  </div>
- <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading operations…</div></div>
+ <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading command center…</div></div>
  </section>
 
- <!-- ============================ TAB: RESOURCES (sub of Operations) ============================ -->
- <!-- Original Resources briefing look (pre-nesting). #resources deep-link lands
- here; top-nav Operations stays active. __aoLoadResources injects resources.html. -->
+ <!-- ============================ TAB: RESOURCES (sub of Repairs) ============================ -->
+ <!-- Original Resources briefing. #resources deep-link; top-nav Repairs stays active. -->
  <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
- <div class="vs-seg ops-main-seg" role="group" aria-label="Operations view" style="margin:14px auto 6px">
- <button class="vs-seg-btn" type="button" data-opsmain="ops" aria-pressed="false">Operations</button>
+ <div class="vs-seg ops-main-seg" role="group" aria-label="Repairs view" style="margin:14px auto 6px">
+ <button class="vs-seg-btn" type="button" data-opsmain="ops" aria-pressed="false">Repairs</button>
  <button class="vs-seg-btn on" type="button" data-opsmain="resources" aria-pressed="true">Resources</button>
  </div>
  <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
@@ -457,10 +456,10 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="vendor-sheet.js?v=20260714nodash1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260715offGain1"></script>
-<script src="ops.js?v=20260715opsRes1"></script>
+<script src="ops.js?v=20260715cmd1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260715opsRes1" defer></script>
+<script src="mobile-nav.js?v=20260715cmd1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>
@@ -525,12 +524,12 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
 <link rel="stylesheet" href="energy-agent.css?v=20260715eaModal2">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260715opsRes1"></script>
+<script src="energy-agent.js?v=20260715cmd1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">
 <script src="hands-off-tour.js?v=20260715vaultLogin1"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
-<script src="mobile-os.js?v=20260715opsRes1"></script>
+<script src="mobile-os.js?v=20260715cmd1"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */
