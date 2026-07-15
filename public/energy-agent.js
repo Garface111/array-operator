@@ -1475,14 +1475,16 @@
  if (state.thinking) setStatus(ev.speak_as_mind, "think");
  toConsume.push(ev.id);
  } else if (
- ev.kind === "interrupt_candidate" &&
+ (ev.kind === "interrupt_candidate" || ev.kind === "sovereign_interrupt") &&
  ev.speak_as_mind &&
  !ev.consumed
  ) {
  // Status-only (not chat). Always consume so we don't re-fire forever.
+ // sovereign_interrupt: product mind injects as the same Energy Agent voice.
  injectMindSpeak(ev.speak_as_mind, {
  eventId: ev.id,
  importance: ev.importance,
+ origin: ev.origin || (ev.kind === "sovereign_interrupt" ? "sovereign" : "mind"),
  });
  toConsume.push(ev.id);
  }
