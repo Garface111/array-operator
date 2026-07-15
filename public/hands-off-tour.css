@@ -103,7 +103,12 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
   /* No fade — instant open (Ford 2026-07-14) */
   transition:none;
 }
-#hoTour.ho-open{ pointer-events:auto; opacity:1; }
+/* Modal: full-screen shell receives events (backdrop + card).
+   Dock: shell is click-through so the main site stays interactive — only
+   .ho-sheet captures events (Ford 2026-07-14: click around without dismiss). */
+#hoTour.ho-open{ opacity:1; }
+#hoTour.ho-open.ho-mode-modal{ pointer-events:auto; }
+#hoTour.ho-open.ho-mode-dock{ pointer-events:none; }
 #hoTour[hidden]{ display:none !important; }
 
 .ho-backdrop{
@@ -114,16 +119,14 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
 #hoTour.ho-mode-dock{
   align-items:stretch; justify-content:flex-start;
   padding:0;
-  /* Keep the shell receiving events so the dock is never "dead" */
-  pointer-events:auto;
+  pointer-events:none; /* pass clicks to .wrap / tabs / canvas */
 }
 #hoTour.ho-mode-dock .ho-backdrop{
-  display:block;
-  background:rgba(10,18,32,.18);
-  pointer-events:auto; /* click outside → close (wired as data-ho=backdrop) */
+  display:none; /* no scrim — site must feel fully clickable */
+  pointer-events:none;
 }
 #hoTour.ho-mode-dock .ho-sheet{
-  pointer-events:auto;
+  pointer-events:auto; /* only the rail is interactive */
   position:relative;
   z-index:1;
   width:var(--ho-rail);

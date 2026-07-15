@@ -1081,17 +1081,21 @@
     // Instant show — no entrance animation (Ford: load instantly on Setup click)
     root.className = "ho-mode-" + mode + " ho-open";
     root.setAttribute("aria-modal", mode === "modal" ? "true" : "false");
-    // Clean header: brand + close only (100% ring removed — cramped next to ×,
-    // readiness already reads in the subtitle + step pills; Ford 2026-07-14).
+    // Header: brand + explicit close (×). Dock mode does NOT close on outside
+    // click — the main site must stay clickable (Ford 2026-07-14).
     root.innerHTML =
-      '<div class="ho-backdrop" data-ho="backdrop"></div>' +
+      '<div class="ho-backdrop" data-ho="backdrop"' +
+      (mode === "dock" ? ' hidden' : "") +
+      "></div>" +
       '<div class="ho-sheet">' +
       '<header class="ho-top">' +
       '<div class="ho-brand"><div class="ho-brand-mark" aria-hidden="true"></div>' +
       "<div><b>Hands-off setup</b><span>" +
       esc(scoreLine(live)) +
       "</span></div></div>" +
-      "</header>" +
+      '<div class="ho-top-right">' +
+      '<button type="button" class="ho-close" data-ho="minimize" aria-label="Close setup (keeps progress)" title="Close setup — reopen anytime from Setup">×</button>' +
+      "</div></header>" +
       '<div class="ho-steps">' +
       buildStepsHtml(live) +
       "</div>" +
@@ -1103,7 +1107,8 @@
     try {
       root.style.display = "flex";
       root.style.opacity = "1";
-      root.style.pointerEvents = "auto";
+      // Dock: click-through shell (CSS pointer-events:none); modal: capture all
+      root.style.pointerEvents = mode === "dock" ? "none" : "auto";
     } catch (e) {}
     state.open = true;
     setShellOpen(mode === "dock");
@@ -2389,7 +2394,8 @@
           return;
         }
         if (act === "backdrop") {
-          // Modal + dock: dimmed overlay click closes (dock now shows a light scrim)
+          // Modal only: scrim dismiss. Dock must stay open while they click the site.
+          if (state.mode === "dock") return;
           minimizeTour();
           return;
         }
