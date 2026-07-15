@@ -144,14 +144,15 @@
   scrollbar-gutter:stable;
   scrollbar-width:thin;
 }
-/* Right-edge fade: cues that more year columns exist beyond the clip */
-.tr-ymatrix .tr-tablewrap-scroll{
-  mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
-  -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+/* Visible thin scrollbar so year overflow isn't mistaken for a hard clip */
+.tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar{height:8px}
+.tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius:999px;
 }
-.tr-ymatrix .tr-tablewrap-scroll:hover,
-.tr-ymatrix .tr-tablewrap-scroll:focus-within{
-  mask-image:none;-webkit-mask-image:none;
+.tr-ymatrix .tr-tablewrap-scroll::-webkit-scrollbar-track{
+  background:color-mix(in srgb, var(--ink) 6%, transparent);
+  border-radius:999px;
 }
 
 /* empty / error */
