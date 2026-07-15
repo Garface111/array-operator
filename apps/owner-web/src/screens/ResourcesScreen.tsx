@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { siteUrl } from "@/lib/base";
 import { isDemoMode } from "@/lib/demoData";
 
 type StateBrief = {
@@ -59,10 +60,10 @@ export function ResourcesScreen() {
       setErr(null);
       try {
         const [rd, nw] = await Promise.all([
-          fetch("/resources-data.json")
+          fetch(siteUrl("/resources-data.json"))
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null),
-          fetch("/news.json")
+          fetch(siteUrl("/news.json"))
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null),
         ]);

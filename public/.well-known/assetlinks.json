@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.arrayoperator.app",
+      "sha256_cert_fingerprints": [
+        "4C:5E:AA:E5:D6:43:AA:B5:23:65:91:82:F4:85:40:7C:BB:CA:F8:DB:9C:CD:34:E3:FF:AC:80:4E:78:F1:74:99"
+      ]
+    }
+  }
+]

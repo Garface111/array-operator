@@ -3,12 +3,9 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 /**
- * Production: served at arrayoperator.com/m/ (mobile beta).
- * Dev: same /m base so paths match; proxy /v1 → prod API.
- * Desktop vanilla site remains public/ at site root.
- *
- * Preview site (ao-owner-web-preview) can still deploy dist/ at root by
- * overriding: VITE_BASE=/ npm run build
+ * Production web: arrayoperator.com/m/ (mobile beta) — VITE_BASE=/m/
+ * Native store: Capacitor webDir — VITE_BASE=./ + VITE_API_BASE=https://arrayoperator.com
+ * Preview: VITE_BASE=/
  */
 const base = process.env.VITE_BASE || "/m/";
 
@@ -17,6 +14,15 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
+  },
+  define: {
+    // Ensure env is string-replaced for Capacitor builds
+    "import.meta.env.VITE_API_BASE": JSON.stringify(
+      process.env.VITE_API_BASE || ""
+    ),
+    "import.meta.env.VITE_SITE_ORIGIN": JSON.stringify(
+      process.env.VITE_SITE_ORIGIN || process.env.VITE_API_BASE || ""
+    ),
   },
   server: {
     port: 5174,

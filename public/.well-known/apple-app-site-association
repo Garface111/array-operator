@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.arrayoperator.app",
+        "paths": ["/m/*", "/m", "/login", "/login/*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.com.arrayoperator.app"]
+  }
+}

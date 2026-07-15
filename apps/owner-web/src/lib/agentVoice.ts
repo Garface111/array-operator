@@ -9,6 +9,7 @@
  *  - First time: OS/browser permission prompt. Deny → site must re-allow in settings.
  *  - Mute mic while agent speaks so speaker bleed doesn't trip VAD / cut speech.
  */
+import { apiUrl } from "./base";
 import { getSession } from "./session";
 
 export type VoiceStatus =
@@ -306,7 +307,7 @@ export class AgentVoice {
     }
     await pc.setLocalDescription(offer);
 
-    const sdpRes = await fetch("/v1/energy-agent/realtime-call", {
+    const sdpRes = await fetch(apiUrl("/v1/energy-agent/realtime-call"), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

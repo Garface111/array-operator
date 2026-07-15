@@ -1,4 +1,6 @@
 /** Same key as vanilla Array Operator + NEPOOL SPA — shared backend sessions. */
+import { apiUrl } from "./base";
+
 export const SESSION_KEY = "so_session";
 export const UNAUTHORIZED_EVENT = "ao-owner-unauthorized";
 
@@ -38,7 +40,7 @@ export async function captureTokenFromUrl(): Promise<string | null> {
     window.history.replaceState(null, "", next);
 
     try {
-      const res = await fetch("/v1/auth/verify", {
+      const res = await fetch(apiUrl("/v1/auth/verify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -63,7 +65,7 @@ export async function captureTokenFromUrl(): Promise<string | null> {
     // If verify fails, try using the token as a session (probe /v1/account).
     setSession(token);
     try {
-      const probe = await fetch("/v1/account", {
+      const probe = await fetch(apiUrl("/v1/account"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (probe.ok) {

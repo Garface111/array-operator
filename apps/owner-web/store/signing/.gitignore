@@ -1,0 +1,11 @@
+# NEVER commit Android signing secrets
+*.jks
+*.pass
+*.keystore
+*.p12
+*.pem
+KEYSTORE.pass
+local.properties
+**/release/*.jks
+**/release/*.keystore
+keystore.properties

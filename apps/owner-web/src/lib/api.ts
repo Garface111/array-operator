@@ -1,3 +1,4 @@
+import { apiUrl } from "./base";
 import { clearSession, getSession, SESSION_KEY, UNAUTHORIZED_EVENT } from "./session";
 import {
   demoAccount,
@@ -88,7 +89,7 @@ export async function apiFetch<T = unknown>(
   const token = getSession();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (res.status === 401) {
     notifyUnauthorizedOnce();
     throw new UnauthorizedError();
@@ -466,7 +467,7 @@ export async function createSubscription(fields: {
   const token = getSession();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   // Do NOT set Content-Type — browser sets multipart boundary.
-  const res = await fetch("/v1/array-operator/billing/subscriptions", {
+  const res = await fetch(apiUrl("/v1/array-operator/billing/subscriptions"), {
     method: "POST",
     headers,
     body: fd,
@@ -540,7 +541,9 @@ h1{font-size:1.25rem} .muted{color:#64748b;font-size:.875rem} .box{border:1px so
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(
-    `/v1/array-operator/billing/subscriptions/${subId}/preview?kind=${kind}&fmt=${fmt}`,
+    apiUrl(
+      `/v1/array-operator/billing/subscriptions/${subId}/preview?kind=${kind}&fmt=${fmt}`
+    ),
     { headers }
   );
   if (res.status === 401) {

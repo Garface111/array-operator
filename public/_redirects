@@ -44,3 +44,7 @@
 # thank-you page with NO owner SPA and NO session. Never / or /#reports.
 /paid                 /paid.html         200
 /paid.html            /paid.html         200
+
+# Privacy (store listings + in-app)
+/privacy  /privacy.html  200
+/.well-known/*  /.well-known/:splat  200

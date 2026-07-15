@@ -10,3 +10,24 @@ coverage
 *.tsbuildinfo
 preview-shots/
 .netlify-site-id
+
+# Capacitor native build outputs
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+ios/App/Pods/
+ios/DerivedData/
+
+# Store signing secrets (NEVER commit)
+store/signing/*.jks
+store/signing/*.pass
+store/signing/keystore.properties
+store/signing/*.keystore
+
+# Built AABs (regenerate with scripts/store/build-android-release.sh)
+store/artifacts/*.aab
+store/artifacts/*.apk
+
+# Dogfood
+dogfood-output/
