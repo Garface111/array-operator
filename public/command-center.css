@@ -1143,6 +1143,59 @@ body.sb-fs-lock{ overflow:hidden; }
   .rb2-moderow .rb2-modeslider button{flex:1 1 0;min-width:0;padding:11px 10px}
 }
 .rb2-pipe-row{display:flex;align-items:stretch}
+/* Live energy balls — credits flowing through the send pipeline to offtakers */
+.rb2-energychip{
+  font:700 9.5px/1 inherit;letter-spacing:.06em;text-transform:uppercase;
+  color:#047857;background:rgba(4,120,87,.12);border:1px solid rgba(4,120,87,.28);
+  border-radius:999px;padding:4px 9px;
+}
+.rb2-energy-link{
+  flex:0 0 22px;position:relative;align-self:stretch;min-width:18px;
+  display:flex;align-items:center;justify-content:center;overflow:visible;
+}
+.rb2-energy-rail{
+  position:absolute;left:40%;right:40%;top:18%;bottom:18%;
+  width:3px;margin:0 auto;border-radius:99px;
+  background:linear-gradient(180deg, rgba(63,214,138,.15), rgba(63,214,138,.55), rgba(63,214,138,.15));
+  box-shadow:0 0 10px rgba(63,214,138,.25);
+}
+.rb2-energy-link.from-done .rb2-energy-rail,
+.rb2-energy-link.from-now .rb2-energy-rail,
+.rb2-energy-link.to-sched .rb2-energy-rail{
+  left:0;right:0;top:48%;bottom:auto;width:100%;height:3px;
+  background:linear-gradient(90deg, rgba(63,214,138,.1), rgba(63,214,138,.65), rgba(63,214,138,.1));
+}
+.rb2-eball{
+  position:absolute;width:9px;height:9px;border-radius:50%;
+  left:0;top:50%;margin-top:-4.5px;
+  background:radial-gradient(circle at 32% 28%, #b8ffd9, #3fd68a 52%, #0f7a4a 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.35), 0 0 12px rgba(63,214,138,.85), 0 0 22px rgba(63,214,138,.35);
+  animation:rb2EnergyFlow 2.6s linear infinite;
+  pointer-events:none;
+  will-change:left, opacity, transform;
+}
+.rb2-eball.static{
+  position:relative;left:auto;top:auto;margin:0;animation:none;
+  display:inline-block;vertical-align:middle;width:8px;height:8px;
+}
+.rb2-energy-link.is-paused .rb2-eball{animation-play-state:paused;opacity:.35;filter:grayscale(.4)}
+.rb2-energy-link.is-paused .rb2-energy-rail{opacity:.35}
+@keyframes rb2EnergyFlow{
+  0%{ left:-4%; opacity:0; transform:scale(.45); }
+  12%{ opacity:1; transform:scale(1); }
+  88%{ opacity:1; transform:scale(1); }
+  100%{ left:104%; opacity:0; transform:scale(.55); }
+}
+.rb2-energy-legend{
+  display:flex;align-items:center;gap:8px;margin-top:10px;
+  font:600 11px/1.3 inherit;color:var(--muted,#64748b);
+}
+.rb2-energy-legend .rb2-eball.static{box-shadow:0 0 8px rgba(63,214,138,.55)}
+@media (prefers-reduced-motion: reduce){
+  .rb2-eball{animation:none;left:42%;opacity:.85}
+}
+html:not(.sky) .rb2-energychip{color:#7ff0bb;background:rgba(63,214,138,.12);border-color:rgba(63,214,138,.28)}
+html:not(.sky) .rb2-energy-legend{color:var(--muted,rgba(226,232,240,.65))}
 .rb2-pcell{flex:1 1 0;min-width:160px;border:1px solid var(--line,#e2e8f0);background:var(--card,#fff);
   padding:11px 14px 10px;position:relative;transition:background .13s}
 .rb2-pcell:first-child{border-radius:10px 0 0 10px}

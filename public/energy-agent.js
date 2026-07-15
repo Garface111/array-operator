@@ -443,6 +443,26 @@
     prefilledPrompt: null, // agent-written Build-it text survives mark/recircle
   }
 
+  function stashImprovePrompt(t) {
+    t = String(t || "").trim().slice(0, 1600);
+    if (!t) return "";
+    improve.prefilledPrompt = t;
+    try { sessionStorage.setItem("ea_improve_prompt", t); } catch (e) {}
+    return t;
+  }
+  function readStashedImprovePrompt() {
+    if (improve.prefilledPrompt) return improve.prefilledPrompt;
+    try { return sessionStorage.getItem("ea_improve_prompt") || ""; } catch (e) { return ""; }
+  }
+  function lastUserAsk() {
+    var host = document.getElementById("eaMsgs");
+    if (!host) return "";
+    var nodes = host.querySelectorAll(".ea-msg.user");
+    if (!nodes.length) return "";
+    var el = nodes[nodes.length - 1];
+    return (el.getAttribute("data-raw") || el.textContent || "").trim();
+  }
+
   /**
    * Prefill the Improve compose box with an agent-written build prompt so the
    * owner can circle the spot and hit Build it (Ford 2026-07-14).
@@ -461,7 +481,7 @@
     try {
       ta.dispatchEvent(new Event("input", { bubbles: true }));
     } catch (e) {}
-    improve.prefilledPrompt = t.slice(0, 1600);
+    stashImprovePrompt(t);
     var lead = document.getElementById("eaImproveLead");
     if (lead && opts.updateLead !== false) {
       lead.textContent = opts.lead ||
@@ -483,21 +503,34 @@
       document.body.classList.add("ea-shell-open");
     }
     showImproveCompose(true);
-    // Agent-written (or user-ask) prompt for the Build box
+    // Agent-written (or user-ask) prompt for the Build box — never leave empty
+    // when we know what they asked for.
     var prefill =
-      opts.hint || opts.prompt || opts.text || opts.build_prompt || "";
+      opts.hint || opts.prompt || opts.text || opts.build_prompt ||
+      readStashedImprovePrompt() || "";
+    if (!prefill && lastUserAsk()) {
+      prefill = craftImprovePrompt(lastUserAsk());
+    }
     if (prefill) {
       fillImprovePrompt(prefill, { force: true });
-      addMsg("agent",
-        "I filled the build prompt from what you asked. Circle the spot on the page, " +
-        "tweak the text if you want, then hit **Build it**. " +
-        "An AI judge reviews it; small UI ships live — billing math never auto-ships.");
-    } else {
+      if (!opts.silentMsg) {
+        addMsg("agent",
+          "I filled the build prompt from what you asked. Circle the spot on the page, " +
+          "tweak the text if you want, then hit **Build it**. " +
+          "An AI judge reviews it; small UI ships live — billing math never auto-ships.");
+      }
+    } else if (!opts.silentMsg) {
       addMsg("agent",
         "Let's improve the site. I'll freeze the page so you can circle the spot — " +
         "then type one short sentence. An AI judge reviews it; small UI changes can ship live. " +
         "Billing and money math never auto-ship.");
     }
+    // Re-apply after mark overlay paints (markup path can remount focus)
+    setTimeout(function () {
+      var st = readStashedImprovePrompt();
+      var ta = document.getElementById("eaImproveText");
+      if (st && ta && !ta.value.trim()) fillImprovePrompt(st, { force: true, updateLead: false });
+    }, 500);
     if (opts.markFirst !== false) {
       setTimeout(launchMarkCapture, 350);
     } else {
@@ -560,12 +593,13 @@
     } else if (thumb) {
       thumb.hidden = true;
     }
-    // Keep agent prefilled prompt after mark — only nudge copy if empty
+    // Keep agent prefilled prompt after mark — restore from memory/session if empty
     var ta0 = document.getElementById("eaImproveText");
-    var hasPrompt = !!(ta0 && ta0.value && ta0.value.trim()) || !!improve.prefilledPrompt;
-    if (hasPrompt && improve.prefilledPrompt && ta0 && !ta0.value.trim()) {
-      fillImprovePrompt(improve.prefilledPrompt, { force: true, updateLead: false });
+    var stashed = readStashedImprovePrompt();
+    if (stashed && ta0 && !String(ta0.value || "").trim()) {
+      fillImprovePrompt(stashed, { force: true, updateLead: false });
     }
+    var hasPrompt = !!(ta0 && ta0.value && ta0.value.trim()) || !!stashed;
     if (lead) {
       if (hasPrompt || (ta0 && ta0.value.trim())) {
         lead.textContent = improve.shot

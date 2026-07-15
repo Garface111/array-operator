@@ -1874,10 +1874,23 @@
     const todayLabel = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
     host.hidden = false;
     host.className = "rb2-pipe" + (paused ? " paused" : "");
+    // Live energy flow intensity from pipeline activity (auto-sending / delivered)
+    const flowN = Math.min(7, Math.max(3,
+      Math.ceil(((inf.pending_auto || 0) + (last.delivered || 0) + (monthly.auto || 0)) / 8) || 4
+    ));
+    const energyLink = (cls) => {
+      let balls = "";
+      for (let i = 0; i < flowN; i++) {
+        balls += `<span class="rb2-eball" style="animation-delay:${(i * 0.38).toFixed(2)}s"></span>`;
+      }
+      return `<div class="rb2-energy-link ${cls || ""}${paused ? " is-paused" : ""}" aria-hidden="true">
+        <span class="rb2-energy-rail"></span>${balls}
+      </div>`;
+    };
     host.innerHTML = `
       <div class="rb2-pipe-label">
         <h2>Send pipeline</h2>
-        ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : ""}
+        ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : '<span class="rb2-energychip" title="Live energy credits flowing to offtakers">⚡ live energy</span>'}
         <small class="rb2-rules">monthly invoices fire the 1st · an invoice only generates once its utility bill settles</small>
         <span class="rb2-sp"></span>
         <span class="rb2-draftstat" id="rb2DraftStatus" hidden></span>
@@ -1899,7 +1912,9 @@
           <div class="rb2-big">${fmt0(last.delivered || 0)} <span>of ${fmt0(p.total_enabled || 0)}${last.dollars ? " · " + money0(last.dollars) : ""}</span></div>
           <div class="rb2-chips"><span class="rb2-pc g">✓ ${fmt0(last.delivered || 0)} sent</span></div>
         </div>
+        ${energyLink("from-done")}
         <div class="rb2-nowmark" aria-hidden="true"><span class="rb2-now-pill"><em>Today</em><b>${esc(todayLabel)}</b></span></div>
+        ${energyLink("from-now")}
         <div class="rb2-pcell now">
           <div class="rb2-when"><b>This cycle</b><small>drafted from settled bills</small></div>
           ${(() => {
@@ -1922,12 +1937,17 @@
               <div class="rb2-chips">${chips || '<span class="rb2-pc g">✓ all caught up</span>'}</div>`;
           })()}
         </div>
+        ${energyLink("to-sched")}
         <div class="rb2-pcell sched">
           <div class="rb2-when"><b>${esc(_fireLabel(monthly.fires_at))} · next run</b><small>${paused ? "paused" : (days != null ? "fires in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</small></div>
           <div class="rb2-big">${fmt0(monthly.scheduled || 0)} <span>scheduled</span></div>
           <div class="rb2-chips"><span class="rb2-pc b">${fmt0(monthly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(monthly.approval || 0)} draft for approval</span></div>
           ${paused ? `<div class="rb2-pausednote">⏸ Paused. This run won't fire until you resume. Manual sends still work.</div>` : ""}
         </div>
+      </div>
+      <div class="rb2-energy-legend" aria-hidden="true">
+        <span class="rb2-eball static"></span>
+        Live energy credits flow to offtakers as bills settle and invoices send
       </div>`;
 
     // Keep the header promise HONEST against the visible auto-send counts (sim #5):
