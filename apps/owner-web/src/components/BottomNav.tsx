@@ -70,14 +70,14 @@ function TabLink({
 export function BottomNav({ onAgent, agentOpen }: Props) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/45 bg-white/50 px-1.5 pt-1 shadow-[0_-8px_32px_-16px_rgba(15,50,110,0.35)] backdrop-blur-xl backdrop-saturate-150"
+      className="ao-app-nav border-t border-white/45 bg-white/55 px-1.5 pt-1 shadow-[0_-8px_32px_-16px_rgba(15,50,110,0.35)] backdrop-blur-xl backdrop-saturate-150"
       style={{
-        paddingBottom: "max(6px, env(safe-area-inset-bottom))",
+        paddingBottom: "max(8px, env(safe-area-inset-bottom))",
         WebkitBackdropFilter: "blur(24px) saturate(1.4)",
       }}
       aria-label="Primary"
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
+      <div className="flex w-full items-stretch justify-between gap-0.5">
         {LEFT.map((item) => (
           <TabLink key={item.to} {...item} />
         ))}

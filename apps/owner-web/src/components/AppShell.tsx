@@ -13,22 +13,19 @@ export function AppShell() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-lg flex-col">
+    <div className="ao-app-shell">
+      {/* Only this region scrolls — dock stays put on iOS */}
       <main
-        className="flex-1 px-4 pt-3"
+        className="ao-app-main px-4"
         style={{
           paddingTop: "max(12px, env(safe-area-inset-top))",
-          paddingBottom:
-            "calc(var(--nav-h) + 28px + env(safe-area-inset-bottom))",
+          paddingBottom: 16,
         }}
       >
         <Outlet context={{ openAgent }} />
       </main>
 
-      <BottomNav
-        onAgent={() => openAgent()}
-        agentOpen={agentOpen}
-      />
+      <BottomNav onAgent={() => openAgent()} agentOpen={agentOpen} />
       <AgentSheet
         open={agentOpen}
         onClose={() => setAgentOpen(false)}

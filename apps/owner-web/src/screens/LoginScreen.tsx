@@ -49,7 +49,14 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-5 py-10">
+    <div
+      className="mx-auto flex h-full max-w-md flex-col justify-center overflow-y-auto px-5 py-10"
+      style={{
+        WebkitOverflowScrolling: "touch",
+        paddingTop: "max(24px, env(safe-area-inset-top))",
+        paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+      }}
+    >
       <div className="mb-8 text-center drop-shadow-sm">
         <div
           className="mx-auto mb-4 h-14 w-14 rounded-full shadow-lg ring-2 ring-white/50"

@@ -10,35 +10,57 @@
   --glass-strong: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.72);
   --glass-edge: rgba(33, 150, 243, 0.18);
+  /* iOS dynamic viewport — avoids 100vh chrome bounce */
+  --app-height: 100dvh;
 }
 
-html,
-body,
-#root {
-  min-height: 100%;
+@supports not (height: 100dvh) {
+  :root {
+    --app-height: 100vh;
+  }
+}
+
+html {
   height: 100%;
+  height: var(--app-height);
+  overflow: hidden;
+  /* Kill rubber-band scroll that drags fixed UI on iPhone */
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
+  height: 100%;
+  height: var(--app-height);
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background-color: #7eb8e8;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  overflow-x: clip;
   color: #0f172a;
+  /* Prevent iOS from scrolling the document under the app shell */
+  position: fixed;
+  inset: 0;
+  touch-action: manipulation;
 }
 
-/* Fixed sky layer — soft/blurred so UI stays readable (iOS-safe fixed pseudo) */
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Fixed sky layer (iOS-safe — not on the scrolling element) */
 body::before {
   content: "";
   position: fixed;
-  /* Overflow + scale so blur doesn't clip hard edges */
   inset: -24px;
   z-index: -1;
   pointer-events: none;
   background-color: #8ec4ef;
   background-image:
-    /* Heavier frost wash so the photo reads foggy, not sharp */
     linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.42) 0%,
@@ -62,6 +84,35 @@ textarea {
 }
 
 @layer components {
+  .ao-app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 32rem; /* max-w-lg */
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
+  }
+
+  .ao-app-main {
+    flex: 1 1 auto;
+    min-height: 0; /* critical for flex child scroll */
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    /* Stop scroll chaining to body on iOS */
+    overscroll-behavior: contain;
+  }
+
+  .ao-app-nav {
+    flex: 0 0 auto;
+    /* Docked — not position:fixed — so it never rubber-bands with page scroll */
+    position: relative;
+    z-index: 40;
+  }
+
   .ao-glass {
     background: var(--glass);
     border: 1px solid var(--glass-border);
