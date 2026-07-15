@@ -84,7 +84,10 @@ export function InvoicesScreen() {
     ]);
     if (bundle) {
       setSubs(bundle.subscriptions || []);
+      // Arrays for offtaker allocation: light id/name from list-bundle only
+      // (never fleet-tree / inverter telemetry — vendor data stays on Fleet).
       setArrays(bundle.arrays || []);
+      // Bill sources: utility accounts from billing list-bundle only.
       setUtilities(
         (bundle.utility_accounts as UtilityAccountOption[]) || []
       );
@@ -233,7 +236,10 @@ export function InvoicesScreen() {
         <div>
           <h1 className="text-lg font-extrabold">Invoices</h1>
           <p className="text-sm text-slate-800/75">
-            Offtaker roster · send pulse · PDF preview
+            Offtakers · utility bill sources · PDF preview
+            <span className="block text-[11px] font-medium text-muted">
+              Separate from vendor inverter data on Fleet
+            </span>
           </p>
         </div>
         <button
@@ -380,7 +386,7 @@ export function InvoicesScreen() {
             </select>
           </label>
           <label className="block text-xs font-bold text-muted">
-            Utility bill
+            Utility bill source
             <select
               className="ao-input mt-1"
               value={form.utility_account_id}
@@ -391,7 +397,7 @@ export function InvoicesScreen() {
                 }))
               }
             >
-              <option value="">— optional —</option>
+              <option value="">— optional (GMP / co-op) —</option>
               {utilities.map((u) => (
                 <option key={u.account_id} value={u.account_id}>
                   {u.nickname ||
@@ -399,6 +405,9 @@ export function InvoicesScreen() {
                 </option>
               ))}
             </select>
+            <span className="mt-1 block text-[10px] font-medium text-muted">
+              Invoice math uses utility bills, not inverter kWh.
+            </span>
           </label>
           <label className="block text-xs font-bold text-muted">
             Delivery

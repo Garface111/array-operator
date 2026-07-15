@@ -17,6 +17,7 @@ import {
   fetchOverview,
   fetchSendPipeline,
 } from "@/lib/api";
+import { countOnFile } from "@/lib/dataDomains";
 import { readFleetCache, writeFleetCache } from "@/lib/fleetCache";
 import { isDemoMode } from "@/lib/demoData";
 import {
@@ -159,15 +160,24 @@ export function HomeScreen() {
     }
   }
 
+  // Vendor-monitored only — never utility-meter-only rows in Fleet / sheet
   const sheetArrays = useMemo(
     () => mergeSheetArrays(tree?.arrays, overview?.arrays),
     [tree, overview]
   );
 
+  /** All arrays on file (vendor + utility) for "N of M" honesty, not for KPIs. */
+  const onFileCount = useMemo(() => {
+    const fromTree = countOnFile(tree?.arrays);
+    const fromOv =
+      overview?.totals?.array_count ?? countOnFile(overview?.arrays);
+    return Math.max(fromTree, fromOv, sheetArrays.length);
+  }, [tree, overview, sheetArrays.length]);
+
   const kpis = useMemo(() => {
+    // Health / power / flags: vendor units only (desktop Fleet Health + Vendor Data)
     const arrays = sheetArrays;
-    const nArrays =
-      overview?.totals?.array_count ?? arrays.length;
+    const nArrays = arrays.length;
     let inv = 0;
     let bad = 0;
     let warn = 0;
@@ -224,8 +234,15 @@ export function HomeScreen() {
     const last = pipe?.last;
     const delivered = last?.delivered ?? last?.sent;
 
+    // Today kWh for VENDOR arrays only — don't smear utility bill estimates into fleet health
+    const vendorToday = arrays.reduce(
+      (s, a) => s + (Number(a.today_kwh) || 0),
+      0
+    );
+
     return {
       nArrays,
+      onFile: onFileCount,
       inv: inv || gradeable,
       bad,
       warn,
@@ -234,7 +251,8 @@ export function HomeScreen() {
       healthyN,
       power: totPower,
       nameplate,
-      todayKwh: overview?.totals?.today_kwh,
+      // Prefer sum of monitored arrays; fall back to overview total only if sheet empty
+      todayKwh: arrays.length ? vendorToday : overview?.totals?.today_kwh,
       valueToday: overview?.totals?.value_today as number | undefined,
       delivered,
       enabled: pipe?.total_enabled,
@@ -242,9 +260,10 @@ export function HomeScreen() {
       period: last?.period_label || last?.period_month || null,
       source: overview?.source,
     };
-  }, [overview, sheetArrays, pipe]);
+  }, [overview, sheetArrays, pipe, onFileCount]);
 
   const attention = useMemo(() => {
+    // Attention queue is vendor/inverter only — utility offtaker issues live on Invoices
     const rows: AttnRow[] = [];
     sheetArrays.forEach((a) => {
       const name = String(a.name || "Array");
@@ -422,14 +441,22 @@ export function HomeScreen() {
             </div>
           ) : null}
         </div>
-        <KpiTile label="Arrays" value={String(kpis.nArrays)} meta="on file" />
+        <KpiTile
+          label="Monitored"
+          value={String(kpis.nArrays)}
+          meta={
+            kpis.onFile > kpis.nArrays
+              ? `${kpis.nArrays} vendor · ${kpis.onFile} on file`
+              : "vendor arrays only"
+          }
+        />
         <KpiTile
           label="Inverters"
           value={String(kpis.inv)}
           meta={
             sheetLoading && !tree
               ? "Loading sheet…"
-              : `across ${kpis.nArrays} array${kpis.nArrays === 1 ? "" : "s"}`
+              : `across ${kpis.nArrays} vendor array${kpis.nArrays === 1 ? "" : "s"}`
           }
         />
         <KpiTile

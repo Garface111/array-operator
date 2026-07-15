@@ -13,6 +13,7 @@ import {
   statusTone,
   toneClasses,
 } from "@/lib/format";
+import { filterVendorMonitored } from "@/lib/dataDomains";
 import type { FleetArray, FleetInverter, OverviewArray } from "@/lib/types";
 import { StatusPill } from "./ui";
 
@@ -133,8 +134,9 @@ export function FleetSheet({ arrays, loading, onAsk }: Props) {
             Vendor data
           </h2>
           <p className="text-[11px] font-medium text-muted">
-            {arrays.length} array{arrays.length === 1 ? "" : "s"} · {invTotal}{" "}
-            inverter{invTotal === 1 ? "" : "s"} · same fields as desktop sheet
+            {arrays.length} monitored array{arrays.length === 1 ? "" : "s"} ·{" "}
+            {invTotal} inverter{invTotal === 1 ? "" : "s"} · vendor data only
+            (utility bills stay on Invoices)
           </p>
         </div>
         <button
@@ -355,7 +357,11 @@ export function FleetSheet({ arrays, loading, onAsk }: Props) {
   );
 }
 
-/** Merge overview array metrics onto fleet-tree rows for the sheet. */
+/**
+ * Merge overview metrics onto fleet-tree rows, then KEEP VENDOR-MONITORED
+ * arrays only (same filter as desktop vendor-sheet `_monitoredCols`).
+ * Utility-meter-only arrays never enter the inverter sheet.
+ */
 export function mergeSheetArrays(
   treeArrays: FleetArray[] | undefined,
   overviewArrays: OverviewArray[] | undefined
@@ -382,13 +388,17 @@ export function mergeSheetArrays(
       peer_index:
         a.peer_index ?? ov?.peer_index ?? ov?.peer?.peer_index ?? null,
       diagnosis: a.diagnosis ?? ov?.diagnosis ?? ov?.peer?.diagnosis,
+      // Prefer tree vendor; overview may carry utility labels — keep tree first
+      vendor: a.vendor || (ov as { vendor?: string })?.vendor || null,
     } as SheetArray;
   });
   const seen = new Set(fromTree.map((a) => String(a.id || a.name)));
+  // Only add overview rows that are already vendor-monitored (never invent
+  // utility-only rows into the vendor sheet just because overview listed them).
   (overviewArrays || []).forEach((a) => {
     const key = String(a.id || a.name);
     if (seen.has(key)) return;
-    fromTree.push({
+    const row: SheetArray = {
       id: a.id,
       name: a.name,
       status: a.status,
@@ -397,8 +407,12 @@ export function mergeSheetArrays(
       nameplate_kw: a.nameplate_kw,
       peer_index: a.peer_index ?? a.peer?.peer_index,
       diagnosis: a.diagnosis ?? a.peer?.diagnosis,
+      vendor: (a as { vendor?: string }).vendor || null,
       inverters: [],
-    });
+    };
+    if (filterVendorMonitored([row]).length) {
+      fromTree.push(row);
+    }
   });
-  return fromTree;
+  return filterVendorMonitored(fromTree);
 }
