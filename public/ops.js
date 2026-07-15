@@ -235,18 +235,42 @@
     // inverters open as real cases immediately).
     if (!force && now - (STATE.bgReconcileAt || 0) < 60 * 1000) return;
     STATE.bgReconcileAt = now;
-    api("/v1/array-owners/ops/reconcile", { method: "POST", timeoutMs: 90000 })
-      .then(function (r) {
-        // Always re-fetch after reconcile so fleet-linked cases replace orphans
+    // Pull Resend inbound first so tech replies show up even if webhooks lag
+    var inboundP = api("/v1/array-owners/ops/inbound-sync", {
+      method: "POST",
+      body: "{}",
+      timeoutMs: 45000,
+    }).catch(function () {
+      return null;
+    });
+    var reconP = api("/v1/array-owners/ops/reconcile", {
+      method: "POST",
+      timeoutMs: 90000,
+    }).catch(function () {
+      return null;
+    });
+    Promise.all([inboundP, reconP])
+      .then(function (pair) {
+        var inbound = pair[0];
+        // Always re-fetch after reconcile / inbound so UI + mind see new check-ins
         return api("/v1/array-owners/ops?reconcile_first=0", {
           timeoutMs: FETCH_MS,
         }).then(function (d) {
-          return { tally: r, data: d };
+          return { inbound: inbound, data: d };
         });
       })
       .then(function (pack) {
         var d = pack && pack.data;
         if (d && (d.tickets || d.active_cases || d.contacts)) applyData(d);
+        // Nudge mind poll so chat picks up repair_inbound events quickly
+        try {
+          if (pack && pack.inbound && pack.inbound.matched_new > 0) {
+            // open agent only if already open; chat inject is via mind poll
+            if (window.__eaOpen && document.body.classList.contains("ea-shell-open")) {
+              /* mind poll handles bubbles */
+            }
+          }
+        } catch (e) {}
       })
       .catch(function () {});
   }
