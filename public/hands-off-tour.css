@@ -298,8 +298,208 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
   font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px;
   border:1px solid var(--ho-line); background:rgba(255,255,255,.8); color:var(--ho-muted);
 }
-.ho-chip.is-on{ background:var(--ho-green-soft); color:var(--ho-green); border-color:rgba(23,138,78,.3) }
-.ho-chip.is-off{ background:rgba(148,163,184,.12); color:var(--ho-faint) }
+.ho-chip.is-on,
+.ho-chip.is-ok{ background:var(--ho-green-soft); color:var(--ho-green); border-color:rgba(23,138,78,.3) }
+.ho-chip.is-off,
+.ho-chip.is-miss{ background:rgba(148,163,184,.12); color:var(--ho-faint) }
+.ho-chip-dot{
+  width:6px; height:6px; border-radius:50%;
+  background:currentColor; opacity:.85; flex:0 0 auto;
+}
+
+/* text / link-style buttons used in actions */
+.ho-btn-text{
+  background:transparent; color:var(--ho-muted);
+  border:0; padding:8px 6px; font-weight:650;
+}
+.ho-btn-text:hover{ color:var(--ho-ink) }
+
+/* hero icon alias + 3-up welcome */
+.ho-hero-ic,
+.ho-hero-card .ho-hc-ic{
+  width:32px; height:32px; border-radius:10px;
+  display:grid; place-items:center; margin-bottom:8px;
+  background:rgba(33,150,243,.1); color:var(--ho-blue-deep); font-size:15px;
+}
+.ho-hero-card.ho-accent-green .ho-hero-ic{
+  background:var(--ho-green-soft); color:var(--ho-green);
+}
+.ho-hero-3{ grid-template-columns:1fr 1fr 1fr }
+#hoTour.ho-mode-dock .ho-hero-3{ grid-template-columns:1fr }
+@media(max-width:560px){
+  #hoTour.ho-mode-modal .ho-hero-3{ grid-template-columns:1fr }
+}
+
+/* done cards (JS uses .ho-done-card) */
+.ho-done-card{
+  border:1px solid var(--ho-line); border-radius:12px;
+  padding:10px 12px; background:rgba(255,255,255,.75);
+  font-size:12.5px; font-weight:650;
+}
+.ho-done-card b{
+  display:block; font-size:11px; color:var(--ho-muted); font-weight:700; margin-bottom:2px;
+}
+.ho-done-card span{ color:var(--ho-ink); font-weight:650 }
+
+/* collapsible tips */
+.ho-details{
+  margin:0 0 12px; border-radius:12px;
+  border:1px solid var(--ho-line); background:rgba(255,255,255,.55);
+  padding:2px 12px 4px;
+}
+.ho-details summary{
+  cursor:pointer; font-size:12.5px; font-weight:720; color:var(--ho-muted);
+  padding:8px 2px; list-style:none;
+}
+.ho-details summary::-webkit-details-marker{ display:none }
+.ho-details[open] summary{ color:var(--ho-ink) }
+.ho-details .ho-bullets{ margin-top:2px }
+
+/* ── Dream step: offtaker invoice + bill lined up ───────────────────────── */
+.ho-dream{
+  position:relative; margin:0 0 14px; padding:2px;
+}
+.ho-dream-glow{
+  position:absolute; inset:-8px -4px -4px;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(33,150,243,.18), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(63,214,138,.16), transparent 50%);
+  pointer-events:none; border-radius:20px; filter:blur(2px);
+}
+.ho-dream-paper{
+  position:relative;
+  border-radius:16px;
+  border:1px solid rgba(33,150,243,.18);
+  background:
+    linear-gradient(165deg, rgba(255,255,255,.96), rgba(248,252,255,.9));
+  box-shadow:
+    0 18px 40px -18px rgba(30,100,180,.35),
+    0 1px 0 rgba(255,255,255,.9) inset;
+  padding:16px 16px 14px;
+}
+#hoTour.ho-mode-dock .ho-dream-paper{ padding:14px 12px 12px }
+.ho-dream-badge{
+  display:inline-flex; align-items:center;
+  font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--ho-blue-deep);
+  background:rgba(33,150,243,.1);
+  border:1px solid rgba(33,150,243,.18);
+  border-radius:999px; padding:3px 9px; margin:0 0 10px;
+}
+.ho-dream-from{
+  font-size:11px; font-weight:700; color:var(--ho-muted); letter-spacing:.02em;
+}
+.ho-dream-name{
+  font-size:18px; font-weight:780; letter-spacing:-.02em; line-height:1.2;
+  margin:2px 0 2px; color:var(--ho-ink);
+}
+#hoTour.ho-mode-dock .ho-dream-name{ font-size:16px }
+.ho-dream-email{
+  font-size:12px; color:var(--ho-faint); font-weight:600; margin:0 0 12px;
+}
+.ho-dream-row{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  font-size:12.5px; padding:5px 0;
+  border-bottom:1px dashed rgba(15,23,42,.08);
+}
+.ho-dream-row span{ color:var(--ho-muted); font-weight:600 }
+.ho-dream-row b{ color:var(--ho-ink); font-weight:720; text-align:right }
+.ho-dream-total{
+  display:flex; justify-content:space-between; align-items:baseline;
+  margin:10px 0 12px; padding:10px 12px;
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(63,214,138,.12), rgba(63,214,138,.06));
+  border:1px solid rgba(23,138,78,.18);
+}
+.ho-dream-total span{ font-size:12px; font-weight:700; color:var(--ho-green) }
+.ho-dream-total strong{
+  font-size:20px; font-weight:800; letter-spacing:-.02em; color:var(--ho-green);
+}
+.ho-dream-bill{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:10px 12px; border-radius:12px;
+  background:rgba(33,150,243,.06);
+  border:1px solid rgba(33,150,243,.14);
+}
+.ho-dream-bill-ic{
+  width:28px; height:28px; border-radius:8px; flex:0 0 auto;
+  display:grid; place-items:center;
+  background:rgba(33,150,243,.12); color:var(--ho-blue-deep);
+  font-size:13px; font-weight:800;
+}
+.ho-dream-bill b{
+  display:block; font-size:12.5px; font-weight:750; color:var(--ho-ink); margin-bottom:2px;
+}
+.ho-dream-bill span{
+  display:block; font-size:11.5px; color:var(--ho-muted); font-weight:600; line-height:1.35;
+}
+
+/* Mode picker (approve vs auto-send) */
+.ho-mode-pick{ margin:0 0 14px }
+.ho-mode-pick-lab{
+  font-size:12px; font-weight:750; color:var(--ho-ink); margin:0 0 8px;
+}
+.ho-mode-cards{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px;
+}
+#hoTour.ho-mode-dock .ho-mode-cards{ grid-template-columns:1fr }
+@media(max-width:560px){
+  .ho-mode-cards{ grid-template-columns:1fr }
+}
+.ho-mode-card{
+  appearance:none; cursor:pointer; text-align:left;
+  border:1px solid var(--ho-line); border-radius:14px;
+  background:rgba(255,255,255,.78);
+  padding:12px 12px 11px;
+  transition:border-color .12s, box-shadow .12s, background .12s, transform .12s;
+  font:inherit; color:inherit;
+}
+.ho-mode-card:hover{
+  border-color:rgba(33,150,243,.35);
+  box-shadow:0 8px 20px -12px rgba(30,100,180,.4);
+}
+.ho-mode-card:active{ transform:scale(.99) }
+.ho-mode-card.is-on{
+  border-color:rgba(33,150,243,.45);
+  background:rgba(33,150,243,.07);
+  box-shadow:0 0 0 3px rgba(33,150,243,.12);
+}
+.ho-mode-card.ho-mode-dream.is-on{
+  border-color:rgba(23,138,78,.4);
+  background:linear-gradient(165deg, rgba(63,214,138,.12), rgba(255,255,255,.85));
+  box-shadow:0 0 0 3px rgba(23,138,78,.12);
+}
+.ho-mode-card.is-chosen{
+  position:relative;
+}
+.ho-mode-card.is-chosen::after{
+  content:"✓";
+  position:absolute; top:10px; right:12px;
+  font-size:13px; font-weight:800; color:var(--ho-green);
+}
+.ho-mode-tag{
+  display:inline-block;
+  font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--ho-muted);
+  background:rgba(148,163,184,.12);
+  border-radius:999px; padding:2px 7px; margin:0 0 6px;
+}
+.ho-mode-tag.is-rec{
+  color:var(--ho-green);
+  background:var(--ho-green-soft);
+}
+.ho-mode-card b{
+  display:block; font-size:13.5px; font-weight:760; margin:0 0 4px; color:var(--ho-ink);
+}
+.ho-mode-card p{
+  margin:0; font-size:11.5px; line-height:1.4; color:var(--ho-muted); font-weight:550;
+}
+.ho-mode-confirm{
+  margin:8px 0 0; font-size:12px; line-height:1.4; color:var(--ho-muted); font-weight:600;
+}
+.ho-mode-confirm.is-ok{ color:var(--ho-green) }
+.ho-mode-confirm b{ font-weight:750 }
+.ho-mode-card.is-busy{ opacity:.7; pointer-events:none }
 
 .ho-actions{
   display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:6px;

@@ -869,6 +869,41 @@
     }
   }
   window.__aoLoadReports = load;
+  // Hands-off tour: open Invoices and expand a specific offtaker (bill + draft lined up).
+  window.__aoOpenOfftakerPreview = function (subId) {
+    try {
+      if (location.hash !== "#reports") location.hash = "#reports";
+      else if (typeof load === "function") load();
+    } catch (_) { /* hash navigate */ }
+    const sid = subId != null && subId !== "" ? String(subId) : null;
+    // Prefer explicit id; otherwise first accordion offtaker on the list.
+    const openFirst = () => {
+      if (sid) { deepLinkOpen(sid, 30); return; }
+      const first = document.querySelector("#rbList .rb-acc[data-id]");
+      if (first) {
+        const id = first.getAttribute("data-id");
+        if (id) deepLinkOpen(id, 30);
+        else {
+          const el = document.getElementById("rbList") || document.querySelector(".rb2-listwrap");
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      } else {
+        const el = document.getElementById("rbList") || document.querySelector(".rb2-listwrap");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    setTimeout(openFirst, 420);
+  };
+  // Hands-off tour: flip fleet delivery mode (approve vs auto) from the dream step.
+  window.__aoSetDeliveryMode = function (mode) {
+    try {
+      if (typeof setDeliveryModeAll === "function") setDeliveryModeAll(mode === "auto" ? "auto" : "approval");
+      else if (PIPE) {
+        PIPE.default_delivery_mode = mode === "auto" ? "auto" : "approval";
+        try { renderPipeline(); } catch (_) {}
+      }
+    } catch (_) { /* reports not mounted yet */ }
+  };
 
   // Warm the tab during browser idle so the FIRST open is instant too: prebuild
   // the shell + prefetch the data into the (hidden) panel ahead of any click.

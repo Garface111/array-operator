@@ -18,14 +18,14 @@
       kicker: "Your first hour",
       title: "Build a hands-off Array Operator",
       lede:
-        "You made it past setup. Next is the only checklist that matters: connect the feeds once, so production and invoices keep moving without you babysitting a browser tab.",
+        "You made it past setup. Next is the only checklist that matters: connect the feeds once — then we’ll show you one offtaker invoice with its bill lined up and ask how you want reports to leave. After that, the machine runs.",
       kind: "welcome",
     },
     {
       id: "arrays",
       rail: "Arrays live",
       railSub: "Production feed",
-      kicker: "Step 1 of 5 · Hardware",
+      kicker: "Step 1 of 6 · Hardware",
       title: "Get every array talking",
       lede:
         "Hands-off starts with a live production feed. SolarEdge/Locus poll server-side; Fronius, SMA, and Chint need a portal login so we can keep reading them.",
@@ -42,7 +42,7 @@
       id: "autorefresh",
       rail: "Auto-refresh",
       railSub: "The hands-off switch",
-      kicker: "Step 2 of 5 · Capture",
+      kicker: "Step 2 of 6 · Capture",
       title: "Save a portal login here",
       lede:
         "This is the hands-off switch. Drop a monitoring login below — we store it encrypted and refresh your data around the clock. No hunting through Account.",
@@ -62,7 +62,7 @@
       id: "utility",
       rail: "Utility bills",
       railSub: "Invoice source of truth",
-      kicker: "Step 3 of 5 · Settlement",
+      kicker: "Step 3 of 6 · Settlement",
       title: "Save your utility login",
       lede:
         "Offtaker invoices use utility bills as source of truth. Save GMP or your co-op login here so bills keep landing without a portal tab.",
@@ -80,25 +80,45 @@
       id: "offtakers",
       rail: "Offtakers",
       railSub: "Who you bill",
-      kicker: "Step 4 of 5 · Customers",
+      kicker: "Step 4 of 6 · Customers",
       title: "Add offtakers (if you invoice)",
       lede:
-        "Each offtaker is a customer who gets a share of solar credits. Bind their share and bill source once; monthly drafts appear for your approval — or auto-send if you trust the path.",
+        "Each offtaker is a customer who gets a share of solar credits. Bind their share and bill source once — next we’ll line up a real invoice preview with its bill and ask how you want drafts to leave.",
       kind: "step",
       bullets: [
         "Invoices → <b>Add an offtaker</b>: name, email, share %, master/sub utility.",
         "Set master solar credit rate only if you want one fleet override; blank uses each bill’s own rate.",
-        "Next step turns on <b>online pay</b> so those invoices can collect money without you chasing checks.",
+        "After this: preview one offtaker with the bill, then choose <b>approve-to-send</b> or <b>auto-send</b>.",
       ],
       cta: { label: "Set up offtakers →", hash: "#reports" },
       secondary: { label: "I only monitor — skip", skip: true },
       statusKey: "offtakers",
     },
     {
+      id: "autosend",
+      rail: "Send mode",
+      railSub: "Preview + approve",
+      kicker: "Step 5 of 6 · The payoff",
+      title: "Peek one offtaker invoice — then approve how reports leave",
+      lede:
+        "This is the dream: draft + utility bill + amount due, all lined up. Open the full preview on Invoices, then choose whether each report waits for your OK — or auto-sends when the bill settles.",
+      kind: "dream",
+      bullets: [
+        "Open <b>one offtaker</b> on Invoices to see the draft email, math, and source bill together.",
+        "Pick a fleet default: <b>Approve to send</b> (you OK each cycle) or <b>Auto-send</b> (hands-off).",
+        "You can still override any single offtaker later — this is the starting posture, not a lock.",
+      ],
+      callout:
+        "<b>Nothing emails a customer until a draft exists and send mode allows it.</b> Demo/fake figures never leave your account.",
+      cta: { label: "Open offtaker preview →", hash: "#reports", openPreview: true },
+      secondary: { label: "I’ll decide later — continue", skip: true },
+      statusKey: "autosend",
+    },
+    {
       id: "onlinepay",
       rail: "Online pay",
       railSub: "Collect without chasing",
-      kicker: "Step 5 of 5 · Payouts",
+      kicker: "Step 6 of 6 · Payouts",
       title: "Enable online pay for offtakers",
       lede:
         "Hands-off invoicing isn’t finished until offtakers can pay from the email. One ~2‑minute Stripe bank setup — then every invoice gets a secure <b>Pay</b> button and money lands in your bank.",
@@ -122,10 +142,12 @@
       kicker: "You’re ready",
       title: "Set it once. Let it run.",
       lede:
-        "When arrays, auto-refresh, utility bills, and (if you invoice) online pay are green, Array Operator can keep production fresh and offtaker invoices collect without daily login theatre.",
+        "When arrays, auto-refresh, utility bills, send mode, and (if you invoice) online pay are green, Array Operator can keep production fresh and offtaker invoices collect without daily login theatre.",
       kind: "done",
     },
   ];
+
+  var DELIVERY_CHOSEN_KEY = "ao_ho_delivery_chosen"; // "auto" | "approval" once operator decides in tour
 
   var state = {
     open: false,
@@ -227,8 +249,9 @@
 
   /**
    * Required pillars for “hands-off”.
-   * Offtakers alone are optional — but once you have offtakers, online pay is required
-   * (otherwise invoices still need manual collection).
+   * Offtakers alone are optional — but once you have offtakers:
+   *   · send-mode must be chosen (approve vs auto-send)
+   *   · online pay is required (otherwise invoices still need manual collection)
    */
   function requiredRemaining(live) {
     live = live || state.live || {};
@@ -236,6 +259,7 @@
     if (!live.arrays) n++;
     if (!live.cloud) n++;
     if (!(live.utilWithBills > 0 || live.utilCount > 0)) n++;
+    if (live.offtakers && !live.deliveryChosen) n++;
     if (live.offtakers && !live.onlinePay) n++;
     return n;
   }
@@ -261,11 +285,22 @@
       utilWithBills: 0,
       offtakers: null,
       offtakerCount: 0,
+      deliveryMode: "approval",
+      deliveryChosen: false,
+      modeSplit: { auto: 0, approval: 0 },
+      samplePreview: null,
       onlinePay: null,
       onlinePayConnected: false,
       onlinePayFee: null,
       cloudLogins: [],
     };
+    try {
+      var chosen = localStorage.getItem(DELIVERY_CHOSEN_KEY);
+      if (chosen === "auto" || chosen === "approval") {
+        live.deliveryChosen = true;
+        live.deliveryMode = chosen;
+      }
+    } catch (e) {}
     // arrays via FleetStore if ready
     try {
       if (window.FleetStore && FleetStore.isLoaded && FleetStore.isLoaded()) {
@@ -365,8 +400,101 @@
         var subs = sd.subscriptions || [];
         live.offtakerCount = subs.length;
         live.offtakers = subs.length > 0;
+        // Sample offtaker for the dream step — first enabled with a name
+        if (subs.length) {
+          var sample =
+            subs.find(function (s) {
+              return s && s.enabled !== false && (s.customer_name || s.name);
+            }) || subs[0];
+          if (sample) {
+            live.samplePreview = {
+              id: sample.id,
+              name: sample.customer_name || sample.name || "Offtaker",
+              email: sample.client_email || sample.email || "",
+              // allocation_pct is 0–100 on the API (or already a fraction in rare paths)
+              share:
+                sample.allocation_pct != null
+                  ? sample.allocation_pct
+                  : sample.array_share_pct != null
+                    ? sample.array_share_pct
+                    : null,
+              amount: null,
+              kwh: null,
+              rate: null,
+              period: null,
+              billLabel: null,
+              hasMath: false,
+            };
+            // Per-offtaker mode is a useful hint before pipeline load
+            if (!live.deliveryChosen && sample.delivery_mode) {
+              live.deliveryMode =
+                sample.delivery_mode === "auto" ? "auto" : "approval";
+            }
+          }
+        }
       }
     } catch (e) {}
+
+    // Send-pipeline posture + enrich sample with real bill math when possible
+    try {
+      var pipeR = await fetch("/v1/array-operator/billing/send-pipeline", {
+        headers: authHeaders(),
+      });
+      if (pipeR.ok) {
+        var pipe = await pipeR.json();
+        if (pipe && pipe.default_delivery_mode) {
+          // Prefer explicit tour choice; otherwise mirror fleet dominant mode
+          if (!live.deliveryChosen) {
+            live.deliveryMode =
+              pipe.default_delivery_mode === "auto" ? "auto" : "approval";
+          }
+        }
+        if (pipe && pipe.mode_split) {
+          live.modeSplit = {
+            auto: pipe.mode_split.auto || 0,
+            approval: pipe.mode_split.approval || 0,
+          };
+        }
+      }
+    } catch (e) {}
+
+    if (live.samplePreview && live.samplePreview.id) {
+      try {
+        var mathR = await fetch(
+          "/v1/array-operator/billing/subscriptions/" +
+            encodeURIComponent(live.samplePreview.id) +
+            "/preview-math",
+          { headers: authHeaders() }
+        );
+        if (mathR.ok) {
+          var math = await mathR.json();
+          if (math && math.has_data) {
+            live.samplePreview.hasMath = true;
+            live.samplePreview.amount = math.amount_usd;
+            live.samplePreview.kwh = math.customer_kwh;
+            live.samplePreview.rate = math.rate;
+            live.samplePreview.period =
+              (math.period_start || "") +
+              (math.period_start && math.period_end ? " → " : "") +
+              (math.period_end || "");
+            live.samplePreview.billLabel =
+              math.kwh_source === "gmp_api"
+                ? "GMP metered"
+                : math.kwh_source === "utility_bill"
+                  ? "Utility bill"
+                  : math.kwh_source === "bill_prorate"
+                    ? "Bill (prorated)"
+                    : math.kwh_source === "daily_csv"
+                      ? "Metered series"
+                      : "Best available";
+          } else if (math) {
+            live.samplePreview.period =
+              (math.period_start || math.period_label || "") || null;
+            live.samplePreview.billLabel = "Waiting on settled bill";
+          }
+        }
+      } catch (e) {}
+    }
 
     try {
       var pr = await fetch("/v1/array-operator/billing/payments/connect", {
@@ -407,18 +535,25 @@
     if (step.statusKey === "autorefresh") return !!live.cloud;
     if (step.statusKey === "utility") return !!(live.utilities && (live.utilWithBills > 0 || live.utilCount > 0));
     if (step.statusKey === "offtakers") return !!live.offtakers;
+    // Autosend is complete once they've made a posture choice (or skipped).
+    // Without offtakers it's optional — mark done so the rail doesn't stall.
+    if (step.statusKey === "autosend") {
+      if (!live.offtakers) return true;
+      return !!live.deliveryChosen;
+    }
     if (step.statusKey === "onlinepay") return !!live.onlinePay;
     return false;
   }
 
   function progressPct(live) {
-    var keys = ["arrays", "autorefresh", "utility", "offtakers", "onlinepay"];
+    var keys = ["arrays", "autorefresh", "utility", "offtakers", "autosend", "onlinepay"];
     var done = 0;
     keys.forEach(function (k) {
       if (k === "arrays" && live.arrays) done++;
       if (k === "autorefresh" && live.cloud) done++;
       if (k === "utility" && live.utilities) done++;
       if (k === "offtakers" && live.offtakers) done++;
+      if (k === "autosend" && (live.deliveryChosen || !live.offtakers)) done++;
       if (k === "onlinepay" && live.onlinePay) done++;
     });
     return Math.round((done / keys.length) * 100);
@@ -567,6 +702,9 @@
       if (live.offtakers && live.onlinePay) return "Invoicing is hands-off ready";
       return "Core feeds look good";
     }
+    if (live.offtakers && !live.deliveryChosen && left >= 1) {
+      return "Approve how offtaker reports leave";
+    }
     if (live.offtakers && !live.onlinePay && left === 1) {
       return "Enable online pay to finish offtaker setup";
     }
@@ -710,6 +848,32 @@
             : "No offtakers yet (optional)"
         )
       );
+    }
+    if (step.statusKey === "autosend") {
+      if (!live.offtakers) {
+        chips.push(chip(true, "Optional until you invoice offtakers"));
+      } else if (live.deliveryChosen) {
+        chips.push(
+          chip(
+            true,
+            live.deliveryMode === "auto"
+              ? "Auto-send approved"
+              : "Approve-to-send chosen"
+          )
+        );
+      } else {
+        chips.push(chip(false, "Choose how reports leave"));
+      }
+      if (live.samplePreview && live.samplePreview.name) {
+        chips.push(
+          chip(
+            !!live.samplePreview.hasMath,
+            live.samplePreview.hasMath
+              ? "Preview ready · " + String(live.samplePreview.name).slice(0, 22)
+              : "Preview · " + String(live.samplePreview.name).slice(0, 22)
+          )
+        );
+      }
     }
     if (step.statusKey === "onlinepay") {
       if (live.onlinePay) {
@@ -950,6 +1114,144 @@
     );
   }
 
+  function moneyFmt(n) {
+    if (n == null || n === "" || isNaN(Number(n))) return "—";
+    try {
+      return (
+        "$" +
+        Number(n).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      );
+    } catch (e) {
+      return "$" + Number(n).toFixed(2);
+    }
+  }
+
+  function kwhFmt(n) {
+    if (n == null || n === "" || isNaN(Number(n))) return "—";
+    try {
+      return Math.round(Number(n)).toLocaleString() + " kWh";
+    } catch (e) {
+      return Math.round(Number(n)) + " kWh";
+    }
+  }
+
+  function shareFmt(frac) {
+    if (frac == null || frac === "" || isNaN(Number(frac))) return "—";
+    var n = Number(frac);
+    // Accept either 0–1 fraction or already 0–100 percent
+    if (n > 0 && n <= 1) n = n * 100;
+    return (Math.round(n * 10) / 10) + "%";
+  }
+
+  /** Mini offtaker invoice + bill strip — the dreamland payoff card. */
+  function renderDreamPreview(live) {
+    var p = live.samplePreview;
+    var hasReal = !!(p && p.name);
+    var name = hasReal ? p.name : "Sample offtaker";
+    var email = hasReal && p.email ? p.email : "customer@example.com";
+    var share = hasReal ? shareFmt(p.share) : "12.5%";
+    var period =
+      hasReal && p.period
+        ? p.period
+        : "Latest settled bill";
+    var amount = hasReal && p.hasMath ? moneyFmt(p.amount) : hasReal ? "—" : "$184.20";
+    var kwh = hasReal && p.hasMath ? kwhFmt(p.kwh) : hasReal ? "—" : "1,228 kWh";
+    var rate =
+      hasReal && p.rate != null
+        ? "$" + Number(p.rate).toFixed(3) + "/kWh"
+        : hasReal
+          ? "bill rate"
+          : "$0.150/kWh";
+    var bill =
+      hasReal && p.billLabel
+        ? p.billLabel
+        : hasReal
+          ? "Utility bill"
+          : "GMP bill · Jun 2026";
+    var badge = hasReal
+      ? p.hasMath
+        ? "Live draft math"
+        : "Your offtaker · waiting on bill"
+      : "Example layout";
+    return (
+      '<div class="ho-dream">' +
+      '<div class="ho-dream-glow" aria-hidden="true"></div>' +
+      '<div class="ho-dream-paper">' +
+      '<div class="ho-dream-badge">' +
+      esc(badge) +
+      "</div>" +
+      '<div class="ho-dream-from">Invoice for</div>' +
+      '<div class="ho-dream-name">' +
+      esc(name) +
+      "</div>" +
+      '<div class="ho-dream-email">' +
+      esc(email) +
+      "</div>" +
+      '<div class="ho-dream-row">' +
+      "<span>Period</span><b>" +
+      esc(period) +
+      "</b></div>" +
+      '<div class="ho-dream-row"><span>Your share</span><b>' +
+      esc(share) +
+      "</b></div>" +
+      '<div class="ho-dream-row"><span>Production</span><b>' +
+      esc(kwh) +
+      "</b></div>" +
+      '<div class="ho-dream-row"><span>Rate</span><b>' +
+      esc(rate) +
+      "</b></div>" +
+      '<div class="ho-dream-total"><span>Amount due</span><strong>' +
+      esc(amount) +
+      "</strong></div>" +
+      '<div class="ho-dream-bill">' +
+      '<span class="ho-dream-bill-ic" aria-hidden="true">☰</span>' +
+      "<div><b>Source bill lined up</b><span>" +
+      esc(bill) +
+      " · used for kWh &amp; rate</span></div></div>" +
+      "</div></div>"
+    );
+  }
+
+  function renderModePicker(live) {
+    var mode = live.deliveryMode === "auto" ? "auto" : "approval";
+    var chosen = !!live.deliveryChosen;
+    return (
+      '<div class="ho-mode-pick" role="group" aria-label="How offtaker reports leave">' +
+      '<div class="ho-mode-pick-lab">How should drafts leave once a bill settles?</div>' +
+      '<div class="ho-mode-cards">' +
+      '<button type="button" class="ho-mode-card' +
+      (mode === "approval" ? " is-on" : "") +
+      (chosen && mode === "approval" ? " is-chosen" : "") +
+      '" data-ho="set-mode" data-mode="approval">' +
+      '<span class="ho-mode-tag">Trust anchor</span>' +
+      "<b>Approve to send</b>" +
+      "<p>Each draft waits for your OK. Best while you’re still verifying shares and bills.</p>" +
+      "</button>" +
+      '<button type="button" class="ho-mode-card ho-mode-dream' +
+      (mode === "auto" ? " is-on" : "") +
+      (chosen && mode === "auto" ? " is-chosen" : "") +
+      '" data-ho="set-mode" data-mode="auto">' +
+      '<span class="ho-mode-tag is-rec">Hands-off · recommended</span>' +
+      "<b>Auto-send</b>" +
+      "<p>When the utility bill settles, drafts email themselves. You stay in control of the pause switch.</p>" +
+      "</button>" +
+      "</div>" +
+      (chosen
+        ? '<div class="ho-mode-confirm is-ok">' +
+          (mode === "auto"
+            ? "<b>Auto-send is on</b> for enabled offtakers. Per-offtaker overrides still work on Invoices."
+            : "<b>Approve to send</b> is set. Open Invoices anytime to flip the fleet to auto-send.") +
+          "</div>"
+        : live.offtakers
+          ? '<div class="ho-mode-confirm">Tap a card to lock in your fleet default — you can change it later on Invoices.</div>'
+          : '<div class="ho-mode-confirm">No offtakers yet — pick a default now so you’re ready when the first one lands.</div>') +
+      "</div>"
+    );
+  }
+
   function renderBody(step, live) {
     var html = "";
     html +=
@@ -960,12 +1262,42 @@
     html += '<p class="ho-lede">' + step.lede + "</p>";
 
     if (step.kind === "welcome") {
-      // Two benefit cards only — no extra "promise" callout (Ford 2026-07-14)
+      // Three benefit cards — tease the invoice dream moment
       html +=
-        '<div class="ho-hero">' +
-        '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Cloud auto-refresh</b><p>Live data 24/7.</p></div>' +
-        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">✓</div><b>Invoices on rails</b><p>Offtaker drafts send automatically or at your approval.</p></div>' +
+        '<div class="ho-hero ho-hero-3">' +
+        '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Live data 24/7</b><p>Cloud auto-refresh keeps production fresh.</p></div>' +
+        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">▤</div><b>Bill + invoice lined up</b><p>See one offtaker draft with its utility bill.</p></div>' +
+        '<div class="ho-hero-card"><div class="ho-hero-ic">✓</div><b>Send on rails</b><p>Approve each draft — or auto-send when ready.</p></div>' +
         "</div>";
+    }
+
+    if (step.kind === "dream") {
+      html += statusChips(step, live);
+      html += renderDreamPreview(live);
+      html += renderModePicker(live);
+      if (step.bullets && step.bullets.length) {
+        html +=
+          '<details class="ho-details">' +
+          "<summary>What you’re looking at</summary>" +
+          '<ul class="ho-bullets">' +
+          step.bullets
+            .map(function (b) {
+              return "<li><span>" + b + "</span></li>";
+            })
+            .join("") +
+          "</ul></details>";
+      }
+      if (step.callout) {
+        html += '<div class="ho-callout">' + step.callout + "</div>";
+      }
+      if (stepComplete(step, live) && live.offtakers && live.deliveryChosen) {
+        html +=
+          '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)">' +
+          (live.deliveryMode === "auto"
+            ? "<b>You’re in dreamland.</b> Drafts will auto-send when bills settle — open the full preview anytime."
+            : "<b>Approve mode locked in.</b> Open the offtaker preview, then flip to auto-send when you trust the path.") +
+          "</div>";
+      }
     }
 
     if (step.kind === "step") {
@@ -1028,6 +1360,15 @@
           ? "✓ " + live.offtakerCount + " ready"
           : "Optional — for credit invoices") +
         "</span></div>" +
+        '<div class="ho-done-card"><b>Send mode</b><span>' +
+        (live.deliveryChosen
+          ? live.deliveryMode === "auto"
+            ? "✓ Auto-send"
+            : "✓ Approve to send"
+          : live.offtakers
+            ? "Choose approve vs auto-send"
+            : "Optional until you invoice") +
+        "</span></div>" +
         '<div class="ho-done-card"><b>Online pay</b><span>' +
         (live.onlinePay
           ? "✓ Pay links on invoices" +
@@ -1067,6 +1408,7 @@
             '"' +
             (step.cta.openAr ? ' data-ar="1"' : "") +
             (step.cta.openPay ? ' data-pay="1"' : "") +
+            (step.cta.openPreview ? ' data-preview="1"' : "") +
             ">" +
             esc(step.cta.label) +
             "</button>";
@@ -1083,11 +1425,19 @@
           esc(step.secondaryCta.label) +
           "</button>";
       }
-      html +=
-        '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next">Continue</button>';
+      // Dream step: Continue advances only after a mode choice (or skip)
+      if (step.kind === "dream" && live.offtakers && !live.deliveryChosen) {
+        html +=
+          '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next" data-mark-mode="approval">Continue with approve-to-send</button>';
+      } else {
+        html +=
+          '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next">Continue</button>';
+      }
       if (step.secondary && step.secondary.skip) {
         html +=
-          '<button type="button" class="ho-btn ho-btn-text" data-ho="next">' +
+          '<button type="button" class="ho-btn ho-btn-text" data-ho="next"' +
+          (step.kind === "dream" ? ' data-mark-mode="approval"' : "") +
+          ">" +
           esc(step.secondary.label) +
           "</button>";
       }
@@ -1124,7 +1474,43 @@
     setTimeout(attempt, 220);
   }
 
-  function goHash(hash, openAr, openPay) {
+  function openOfftakerPreview() {
+    var live = state.live || {};
+    var sid =
+      (live.samplePreview && live.samplePreview.id) ||
+      null;
+    // Prefer the reports helper (expands accordion + flashes card)
+    setTimeout(function () {
+      try {
+        if (typeof window.__aoOpenOfftakerPreview === "function") {
+          window.__aoOpenOfftakerPreview(sid);
+          return;
+        }
+      } catch (e) {}
+      // Fallback: scroll list + try deep-link style open
+      var list =
+        document.getElementById("rbList") ||
+        document.querySelector(".rb2-listwrap");
+      if (list) list.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (sid) {
+        var acc = document.querySelector(
+          '.rb-acc[data-id="' + String(sid).replace(/"/g, "") + '"]'
+        );
+        if (acc) {
+          var head = acc.querySelector(".rb-acc-head");
+          if (head) head.click();
+          try {
+            acc.classList.add("rb-acc-flash");
+            setTimeout(function () {
+              acc.classList.remove("rb-acc-flash");
+            }, 2600);
+          } catch (e2) {}
+        }
+      }
+    }, 380);
+  }
+
+  function goHash(hash, openAr, openPay, openPreview) {
     if (hash) {
       if (location.hash !== hash) location.hash = hash;
       else {
@@ -1150,6 +1536,57 @@
       }, 220);
     }
     if (openPay) scrollToOnlinePay();
+    if (openPreview) openOfftakerPreview();
+  }
+
+  function markDeliveryChosen(mode) {
+    mode = mode === "auto" ? "auto" : "approval";
+    try {
+      localStorage.setItem(DELIVERY_CHOSEN_KEY, mode);
+    } catch (e) {}
+    state.live = state.live || {};
+    state.live.deliveryMode = mode;
+    state.live.deliveryChosen = true;
+  }
+
+  async function setTourDeliveryMode(mode, btn) {
+    mode = mode === "auto" ? "auto" : "approval";
+    markDeliveryChosen(mode);
+    // Optimistic UI
+    softUpdate();
+    if (btn) {
+      try {
+        btn.classList.add("is-busy");
+      } catch (e) {}
+    }
+    if (!session()) return;
+    try {
+      var r = await fetch(
+        "/v1/array-operator/billing/subscriptions/bulk-delivery-mode",
+        {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            authHeaders()
+          ),
+          body: JSON.stringify({ mode: mode }),
+        }
+      );
+      // Also nudge reports UI if it's already painted
+      try {
+        if (typeof window.__aoSetDeliveryMode === "function") {
+          window.__aoSetDeliveryMode(mode);
+        }
+      } catch (e) {}
+      if (!r.ok) {
+        // Still keep local choice — operator intent is recorded; reports slider may re-sync
+        console.warn("[hands-off] bulk-delivery-mode", r.status);
+      }
+    } catch (e) {
+      console.warn("[hands-off] bulk-delivery-mode network", e);
+    }
+    await probeLive();
+    softUpdate();
   }
 
   async function startConnectFromTour(btn) {
@@ -1546,7 +1983,16 @@
           closeTourFinished();
           return;
         }
+        if (act === "set-mode") {
+          var mode = btn.getAttribute("data-mode") || "approval";
+          setTourDeliveryMode(mode, btn);
+          return;
+        }
         if (act === "next") {
+          var markMode = btn.getAttribute("data-mark-mode");
+          if (markMode && !(state.live && state.live.deliveryChosen)) {
+            markDeliveryChosen(markMode);
+          }
           if (state.idx < STEPS.length - 1) state.idx++;
           hardRender({ animate: false });
           return;
@@ -1575,14 +2021,16 @@
           var hash = btn.getAttribute("data-hash");
           var ar = btn.getAttribute("data-ar") === "1";
           var pay = btn.getAttribute("data-pay") === "1";
+          var preview = btn.getAttribute("data-preview") === "1";
           if (state.mode === "modal") {
             markModalSeen();
             state.mode = "dock";
             hardRender({ animate: true });
           }
-          goHash(hash, ar, pay);
-          // Don't auto-advance on pay setup — they need to finish Stripe first
-          if (pay || ar) {
+          goHash(hash, ar, pay, preview);
+          // Preview CTA: stay on dream step so they can still pick send mode
+          // Pay/AR: stay so they finish those surfaces
+          if (pay || ar || preview) {
             scheduleSoftProbe();
             return;
           }
