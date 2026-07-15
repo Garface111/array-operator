@@ -5,7 +5,7 @@
 :root {
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --nav-h: 68px;
+  --nav-h: 58px;
   --glass: rgba(255, 255, 255, 0.68);
   --glass-strong: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.72);
