@@ -7497,6 +7497,7 @@
  reports: { panel: "panelReports", tab: "tabReports" },
  ops: { panel: "panelOps", tab: "tabOps" },
  /* Resources is a sub-view of Analysis (#resources → panelResources). */
+ /* Sovereign desk is developer-only (#sovereign) — panel toggled separately. */
  };
  function tabFromHash(){
  const h = location.hash;
@@ -7506,6 +7507,7 @@
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports") return "reports";
  if(h === "#dashboard") return "dashboard";
+ if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
  return "arrays";
  }
 
@@ -7559,15 +7561,27 @@
  let _firstApply = true;
  function applyView(){
  const active = tabFromHash();
+ const isSov = location.hash === "#sovereign";
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
  const tab = document.getElementById(t.tab);
- if(panel) panel.classList.toggle("active", name === active);
- if(tab) tab.classList.toggle("active", name === active);
+ // Sovereign desk takes over the main stage (Account tab stays highlighted)
+ if(panel) panel.classList.toggle("active", !isSov && name === active);
+ if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
  });
+ const pSov = document.getElementById("panelSovereign");
+ if(pSov){
+ pSov.hidden = !isSov;
+ pSov.classList.toggle("active", isSov);
+ if(isSov){
+ try{
+ if(window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
+ }catch(_){}
+ }
+ }
  // Sibling Analysis sub-panels (not in TABS): hide when Analysis top-tab is off
- if(active !== "analysis"){
+ if(active !== "analysis" || isSov){
  ["panelTrends", "panelResources"].forEach(function(id){
  const p = document.getElementById(id);
  if(p) p.classList.remove("active");

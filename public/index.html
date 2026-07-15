@@ -350,6 +350,9 @@ document.documentElement.setAttribute("data-theme","day");
  <div class="acct-list" id="acctList"><div class="empty">Loading your account…</div></div>
  </section>
 
+ <!-- Sovereign desk (Ford developer only) — injected active by sovereign-desk.js -->
+ <section class="panel" id="panelSovereign" role="tabpanel" aria-label="Sovereign desk" hidden></section>
+
  <!-- ============================ TAB: ARRAYS (default) ============================ -->
  <!-- One job: the sandbox, almost full-screen, with a single pinned COMMANDER
  card that gives whole-fleet health at a glance. No KPI strip, no triage
@@ -438,7 +441,7 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260715agent1"></script>
+<script src="sandbox.js?v=20260715sovDesk1"></script>
 <script src="vendor-sheet.js?v=20260714nodash1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260715offGain1"></script>
@@ -508,9 +511,11 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js?v=20260715live1"></script>
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
-<link rel="stylesheet" href="energy-agent.css?v=20260715sovLead1">
+<link rel="stylesheet" href="energy-agent.css?v=20260715sovDesk1">
+<link rel="stylesheet" href="sovereign-desk.css?v=20260715sovDesk1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260715sovLead1"></script>
+<script src="energy-agent.js?v=20260715sovDesk1"></script>
+<script src="sovereign-desk.js?v=20260715sovDesk1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">
 <script src="hands-off-tour.js?v=20260715vaultLogin1"></script>

@@ -1762,17 +1762,23 @@
  } catch (e) {}
  toConsume.push(ev.id);
  } else if (
- (ev.kind === "interrupt_candidate" || ev.kind === "sovereign_interrupt") &&
+ ev.kind === "interrupt_candidate" &&
  ev.speak_as_mind &&
- !ev.consumed
+ !ev.consumed &&
+ ev.origin !== "sovereign"
  ) {
- // Status-only (not chat). Always consume so we don't re-fire forever.
- // sovereign_interrupt: product mind injects as the same Energy Agent voice.
+ // Tenant mind only — status chip. Sovereign never uses EA chat (desk instead).
  injectMindSpeak(ev.speak_as_mind, {
  eventId: ev.id,
  importance: ev.importance,
- origin: ev.origin || (ev.kind === "sovereign_interrupt" ? "sovereign" : "mind"),
+ origin: "mind",
  });
+ toConsume.push(ev.id);
+ } else if (
+ (ev.kind === "sovereign_interrupt" || ev.origin === "sovereign") &&
+ !ev.consumed
+ ) {
+ // Swallow leftover sovereign EA injects — conversation lives on #sovereign desk
  toConsume.push(ev.id);
  }
  }
