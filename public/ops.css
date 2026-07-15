@@ -111,12 +111,9 @@
   text-align:center; padding:36px 16px; color:var(--muted); border:1px dashed var(--line);
   border-radius:14px; background:linear-gradient(165deg,#10161f,#0b0f17);
 }
-.ops-seg{
-  background: rgba(0,0,0,.45);
-}
 .ops-detail pre,
 .ops-checkin{
-  background: rgba(0,0,0,.4);
+  background: rgba(0,0,0,.45);
 }
 .ops-empty b{ display:block; color:var(--ink); margin-bottom:6px; font-size:15px; }
 .ops-link{ color:var(--good2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
