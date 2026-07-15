@@ -192,8 +192,7 @@
  { label: "Inverters", hash: "#arrays" },
  { label: "Analysis", hash: "#analysis", note: "Trends is a sub-view here" },
  { label: "Invoices", hash: "#reports" },
- { label: "Resources", hash: "#resources" },
- { label: "Operations", hash: "#ops", note: "O&M team, repairs, warranty claims" },
+ { label: "Operations", hash: "#ops", note: "O&M, repairs, claims; Resources is a sub-tab (#resources)" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
@@ -2702,7 +2701,7 @@
  "#analysis": "Analysis",
  "#trends": "Trends",
  "#reports": "Invoices",
- "#resources": "Resources",
+ "#resources": "Operations",
  "#account": "Account",
  "#rbbulkimport": "Bulk import",
  "#rbcustadd": "Add an offtaker",
@@ -2824,6 +2823,7 @@
  "#resources": "Resources",
  "#ops": "Operations",
  "#claims": "Operations",
+ "#resources": "Operations",
  "#account": "Account",
  };
  function tabLabel(hash) {
@@ -2841,6 +2841,7 @@
  "#resources": "#panelResources",
  "#ops": "#panelOps",
  "#claims": "#panelOps",
+ "#resources": "#panelOps",
  "#account": "#panelAccount",
  };
  var h = String(hash || "").toLowerCase();
@@ -3323,16 +3324,16 @@
  ];
  }
 
- // ── Resources (#resources), resources.js via #rsHost ──────────────────
+ // ── Resources (#resources), sub-tab of Operations via #rsHost ──────────
  if (key === "resources" || key === "briefing" || key === "rates") {
  return [
  {
  hash: "#resources",
- say: "Resources, net-metering context, REC market, and regulatory news for your state.",
+ say: "Resources lives under **Operations**, net-metering context, REC market, and regulatory news for your state.",
  },
  {
- selector: "#tabResources",
- say: "You're on **Resources** in the top bar.",
+ selector: '#tabOps, .ops-seg-btn[data-ops-sub="resources"]',
+ say: "Open **Operations**, then the **Resources** sub-tab.",
  },
  {
  selector: "#rsHost, #resApp",
@@ -3345,27 +3346,27 @@
  optional: true,
  },
  {
- selector: "#panelResources .res-picker, #rsHost .res-picker",
+ selector: "#panelOps #rsHost .res-picker, #rsHost .res-picker",
  say: "**Your state**, pick Vermont, New Hampshire, and the other New England states. News and rates follow that choice.",
  optional: true,
  },
  {
- selector: "#resFeed, #resNewsMeta, #panelResources .newshead",
+ selector: "#resFeed, #resNewsMeta, #panelOps #rsHost .newshead",
  say: "**Latest and live**, commission dockets, rate cases, and REC moves for *your* state, refreshed daily.",
  optional: true,
  },
  {
- selector: "#panelResources .res-rec-sec, #rsHost .res-rec-card",
+ selector: "#panelOps #rsHost .res-rec-sec, #rsHost .res-rec-card",
  say: "**REC market**, indicative Class I pricing and how certificates work in your state. Reference only, confirm before counting dollars.",
  optional: true,
  },
  {
- selector: "#panelResources .card, #rsHost .card",
+ selector: "#panelOps #rsHost .card, #rsHost .card",
  say: "Reference cards cover compensation style, key utilities, regulatory status, and links to primary sources.",
  optional: true,
  },
  {
- say: "That's Resources. Change the state chip anytime to re-scope the briefing.",
+ say: "That's Resources under Operations. Change the state chip anytime to re-scope the briefing.",
  },
  ];
  }

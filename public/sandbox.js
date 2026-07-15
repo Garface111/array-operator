@@ -7495,18 +7495,17 @@
  /* Trends is a SUB-VIEW of Analysis now (Ford 2026-07-13), panelTrends is
  toggled manually inside the analysis branch of applyView, not via this map. */
  reports: { panel: "panelReports", tab: "tabReports" },
- resources:{ panel: "panelResources", tab: "tabResources" },
  ops: { panel: "panelOps", tab: "tabOps" },
+ /* Resources is a SUB-VIEW of Operations (#resources → ops + resources sub). */
  };
  function tabFromHash(){
  const h = location.hash;
  if(h === "#account") return "account";
- if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
+ if(h === "#ops" || h === "#claims" || h === "#repairs" || h === "#resources") return "ops";
  if(h === "#arrays" || h === "#sandbox") return "arrays";
  if(h === "#analysis") return "analysis";
  if(h === "#trends") return "analysis"; // Trends is a sub-view of Analysis now
  if(h === "#reports") return "reports";
- if(h === "#resources") return "resources"; // in-app Vermont operator briefing
  if(h === "#dashboard") return "dashboard"; // explicit deep-link → owner health home
  // Empty/legacy hash → land on the Inverter Dashboard (Spreadsheet sub-view) per Ford,
  // not Fleet Health. applyTabGating() bounces a plan that can't use it to an allowed tab.
@@ -7587,13 +7586,12 @@
  applyAnalysisSub(); // shows the Fleet-analysis OR Trends sub-view + loads it
  } else if(active === "reports"){
  loadReports();
- } else if(active === "resources"){
- if(window.__aoLoadResources) window.__aoLoadResources();
  } else if(active === "ops"){
- // Deep-links: #claims → Claims sub-view, #repairs → Repairs
+ // Deep-links: #claims / #repairs / #resources → Operations sub-views
  try {
  if(location.hash === "#claims" && window.__aoOpsGoto) window.__aoOpsGoto("claims");
  else if(location.hash === "#repairs" && window.__aoOpsGoto) window.__aoOpsGoto("repairs");
+ else if(location.hash === "#resources" && window.__aoOpsGoto) window.__aoOpsGoto("resources");
  else if(window.__aoLoadOps) window.__aoLoadOps();
  } catch(_){ if(window.__aoLoadOps) window.__aoLoadOps(); }
  // Clear ops attention dot once opened

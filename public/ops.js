@@ -149,9 +149,18 @@
     var el = root();
     if (!el) return;
     if (!hasSession()) {
+      // Resources briefing is public; other Operations sub-tabs need auth
+      if (STATE.sub === "resources" || location.hash === "#resources") {
+        STATE.sub = "resources";
+        render();
+        return;
+      }
       el.innerHTML =
         '<div class="ops-empty"><b>Sign in to use Operations</b>' +
-        "Track your O&M team, open repair tickets when sites go down, and check in by email, SMS, or phone.</div>";
+        "Track your O&M team, open repair tickets when sites go down, and check in by email, SMS, or phone. " +
+        'Rates &amp; news: open the <button type="button" class="ops-link" id="opsGoResources">Resources</button> sub-tab anytime.</div>';
+      var go = document.getElementById("opsGoResources");
+      if (go) go.onclick = function () { setSub("resources"); };
       return;
     }
 
@@ -199,49 +208,123 @@
     }
   }
 
+  var SUBS = ["repairs", "team", "claims", "resources", "settings"];
+  var SUB_LABELS = {
+    repairs: "Repairs",
+    team: "Team",
+    claims: "Claims",
+    resources: "Resources",
+    settings: "Settings",
+  };
+
   function setSub(name) {
+    if (SUBS.indexOf(name) < 0) name = "repairs";
     STATE.sub = name;
+    // Keep URL honest for deep-links / back button
+    try {
+      var want =
+        name === "resources" ? "#resources"
+          : name === "claims" ? "#claims"
+            : name === "repairs" ? "#ops"
+              : "#ops";
+      if (name === "resources" || name === "claims") {
+        if (location.hash !== want) {
+          history.replaceState({}, "", want);
+        }
+      } else if (location.hash === "#resources" || location.hash === "#claims" || location.hash === "#repairs") {
+        if (location.hash !== "#ops") history.replaceState({}, "", "#ops");
+      }
+    } catch (e) {}
     render();
   }
 
-  function render() {
-    var el = root();
-    if (!el || !STATE.data) return;
-    var d = STATE.data;
-    var sum = d.summary || {};
-    var csum = (d.warranty_claims && d.warranty_claims.summary) || {};
+  function ensureShell(el) {
+    if (el.querySelector(".ops-wrap")) return;
+    el.innerHTML =
+      '<div class="ops-wrap">' +
+      '<div id="opsChrome"></div>' +
+      '<div id="opsBody"></div>' +
+      // Stable host for Resources — never wiped when other sub-tabs re-render
+      '<div id="opsResourcesPane" class="ops-resources-pane" hidden>' +
+      '<div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>' +
+      "</div></div>";
+  }
+
+  function renderChrome(d) {
+    var chrome = document.getElementById("opsChrome");
+    if (!chrome) return;
+    var sum = (d && d.summary) || {};
+    var csum = (d && d.warranty_claims && d.warranty_claims.summary) || {};
     var html = "";
-    html += '<div class="ops-wrap">';
     html += '<div class="ops-head"><div>';
     html += "<h2>Operations</h2>";
-    html += '<div class="ops-sub">O&amp;M team, field repairs, manufacturer claims</div>';
-    html += '</div><div class="ops-kpis">';
-    html += kpi(sum.open || 0, "Open tickets", sum.open ? "warn" : "good");
-    html += kpi(sum.awaiting_reply || 0, "Awaiting reply", sum.awaiting_reply ? "warn" : "");
-    html += kpi(sum.overdue_checkin || 0, "Overdue", sum.overdue_checkin ? "bad" : "");
-    html += kpi(csum.open || 0, "Open claims", csum.open ? "warn" : "");
+    html +=
+      '<div class="ops-sub">O&amp;M team, field repairs, manufacturer claims, rates &amp; news</div>';
+    html += '</div><div class="ops-kpis" id="opsKpis">';
+    if (d) {
+      html += kpi(sum.open || 0, "Open tickets", sum.open ? "warn" : "good");
+      html += kpi(sum.awaiting_reply || 0, "Awaiting reply", sum.awaiting_reply ? "warn" : "");
+      html += kpi(sum.overdue_checkin || 0, "Overdue", sum.overdue_checkin ? "bad" : "");
+      html += kpi(csum.open || 0, "Open claims", csum.open ? "warn" : "");
+    }
     html += "</div></div>";
-
     html += '<div class="ops-seg" role="tablist">';
-    ["repairs", "team", "claims", "settings"].forEach(function (s) {
-      var label = { repairs: "Repairs", team: "Team", claims: "Claims", settings: "Settings" }[s];
+    SUBS.forEach(function (s) {
       html +=
         '<button type="button" class="ops-seg-btn' +
         (STATE.sub === s ? " on" : "") +
         '" data-ops-sub="' +
         s +
         '">' +
-        label +
+        SUB_LABELS[s] +
         "</button>";
     });
     html += "</div>";
+    chrome.innerHTML = html;
+    chrome.querySelectorAll("[data-ops-sub]").forEach(function (b) {
+      b.onclick = function () {
+        setSub(b.getAttribute("data-ops-sub"));
+      };
+    });
+  }
 
-    if (STATE.sub === "repairs") html += renderRepairs(d);
-    else if (STATE.sub === "team") html += renderTeam(d);
-    else if (STATE.sub === "claims") html += renderClaims(d);
-    else html += renderSettings(d);
+  function render() {
+    var el = root();
+    if (!el) return;
+    ensureShell(el);
+    var d = STATE.data;
+    renderChrome(d);
 
-    el.innerHTML = html;
+    var body = document.getElementById("opsBody");
+    var resPane = document.getElementById("opsResourcesPane");
+    if (!body || !resPane) return;
+
+    if (STATE.sub === "resources") {
+      body.hidden = true;
+      body.innerHTML = "";
+      resPane.hidden = false;
+      try {
+        if (window.__aoLoadResources) window.__aoLoadResources();
+      } catch (e) {}
+      return;
+    }
+
+    resPane.hidden = true;
+    body.hidden = false;
+
+    if (!d) {
+      body.innerHTML =
+        '<div class="empty" style="padding:28px 0;color:var(--faint)">Loading operations…</div>';
+      return;
+    }
+
+    var html = "";
+    if (STATE.sub === "repairs") html = renderRepairs(d);
+    else if (STATE.sub === "team") html = renderTeam(d);
+    else if (STATE.sub === "claims") html = renderClaims(d);
+    else html = renderSettings(d);
+
+    body.innerHTML = html;
     wire();
   }
 
@@ -1095,13 +1178,27 @@
   }
 
   window.__aoLoadOps = function () {
+    // Resources deep-link can show without waiting on ops API
+    if (STATE.sub === "resources" || location.hash === "#resources") {
+      STATE.sub = "resources";
+      render();
+    }
     load(false);
   };
 
   // Deep-link helpers for Energy Agent / other surfaces
   window.__aoOpsGoto = function (sub) {
-    if (sub) STATE.sub = sub;
-    if (location.hash !== "#ops") location.hash = "#ops";
-    else load(true);
+    if (sub && SUBS.indexOf(sub) >= 0) STATE.sub = sub;
+    var hash =
+      STATE.sub === "resources" ? "#resources"
+        : STATE.sub === "claims" ? "#claims"
+          : "#ops";
+    if (location.hash !== hash) {
+      location.hash = hash;
+    } else {
+      // Already on ops — render + ensure data
+      render();
+      if (STATE.sub !== "resources") load(false);
+    }
   };
 })();

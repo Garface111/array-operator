@@ -279,12 +279,12 @@
       id: "resources",
       story: "learn",
       label: "Resources",
-      sub: "Rates & rules",
-      why: "Net-metering rates and local context before you set credit rates.",
+      sub: "Rates & rules · under Operations",
+      why: "Net-metering rates and local context before you set credit rates (Operations → Resources).",
       prompt:
-        "What does the Resources tab help with for VT/New England operators, and when should I open it?",
+        "What does Operations → Resources help with for VT/New England operators, and when should I open it?",
       hash: "#resources",
-      openLabel: "Resources",
+      openLabel: "Open Resources",
     },
     {
       id: "ops",

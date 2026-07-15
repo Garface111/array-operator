@@ -130,3 +130,10 @@
   padding:6px 10px; border-radius:10px; background:rgba(155,108,255,.1); border:1px solid rgba(155,108,255,.28);
   color:#d4c4ff;
 }
+
+/* Resources sub-tab (was top-level #panelResources) */
+.ops-resources-pane{ margin-top: 4px; }
+.ops-resources-pane #rsHost{ min-height: 200px; }
+/* resources.css scopes to #panelResources historically — also honor #rsHost under Ops */
+#panelOps #rsHost .ao-res-loading,
+#panelOps #rsHost .ao-res-error{ color: var(--muted); padding: 24px 8px; }

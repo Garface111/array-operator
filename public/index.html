@@ -70,11 +70,11 @@ document.documentElement.setAttribute("data-theme","day");
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260715arFullWidth1">
 <link rel="stylesheet" href="command-center.css?v=20260715vaultLogin1">
-<link rel="stylesheet" href="ops.css?v=20260715ops2">
+<link rel="stylesheet" href="ops.css?v=20260715ops5">
 <link rel="stylesheet" href="theme-day.css?v=20260715ops2"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
-<link rel="stylesheet" href="resources.css?v=20260710a"><!-- Resources tab (in-app briefing); scoped to #panelResources -->
+<link rel="stylesheet" href="resources.css?v=20260715ops5"><!-- Resources briefing; scoped to #panelOps #rsHost -->
 <link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
 <!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
@@ -251,15 +251,9 @@ document.documentElement.setAttribute("data-theme","day");
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
  <a class="tab" id="tabReports" href="#reports" role="tab" title="Invoice offtakers for their share of solar credits">Invoices</a>
- <!-- Expert resource + live-news hub (Paul Bozawa's idea): net-metering rates, rate
- cases, regulatory changes. In-app view (Ford 2026-07-10), switches like every
- other tab instead of opening a separate page; #panelResources loads its content
- from resources.html at runtime (still a standalone page for external/deep links). -->
- <a class="tab" id="tabResources" href="#resources" role="tab"
- title="Net-metering rates, rate cases, and regulatory news">Resources</a>
- <!-- Operations: O&M team, repair tickets, manufacturer claims (left of Account). -->
+ <!-- Operations: O&M team, repair tickets, manufacturer claims + Resources sub-tab. -->
  <a class="tab" id="tabOps" href="#ops" role="tab"
- title="O&amp;M team, field repairs, warranty claims">Operations<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
+ title="O&amp;M team, field repairs, warranty claims, rates &amp; news">Operations<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
  <!-- Account tab (was "Master Account"; shortened 2026-07-13). -->
  <a class="tab" id="tabAccount" href="#account" role="tab">Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
  <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
@@ -424,19 +418,12 @@ document.documentElement.setAttribute("data-theme","day");
  <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
  </section>
 
- <!-- ============================ TAB: RESOURCES ============================ -->
- <!-- The Vermont operator's briefing, in-app. __aoLoadResources (inline script below)
- injects resources.html's article here on first open and refreshes the live news
- feed on every open. Styles are scoped to #panelResources in resources.css. -->
- <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
- <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
- </section>
-
- <!-- ============================ TAB: OPS ============================ -->
- <!-- O&M team directory, field repair tickets (email/SMS/phone check-ins), and
- manufacturer warranty claims with ticket↔claim linking. ops.js. -->
+ <!-- ============================ TAB: OPERATIONS ============================ -->
+ <!-- O&M team, repair tickets, warranty claims, and Resources (rates/news) as a
+ sub-tab. Resources content mounts into #rsHost (ops.js keeps that node stable).
+ styles: ops.css + resources.css (scoped). -->
  <section class="panel" id="panelOps" role="tabpanel" aria-label="Operations">
- <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading ops…</div></div>
+ <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading operations…</div></div>
  </section>
 
  <!-- ============================ TAB: AUDIT (removed) ============================ -->
@@ -451,22 +438,21 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260714pro1"></script>
-<script src="sandbox.js?v=20260715ops1"></script>
+<script src="sandbox.js?v=20260715ops5"></script>
 <script src="vendor-sheet.js?v=20260714nodash1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260715offGain1"></script>
-<script src="ops.js?v=20260715ops4"></script>
+<script src="ops.js?v=20260715ops5"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260715ops3" defer></script>
+<script src="mobile-nav.js?v=20260715ops5" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>
-<!-- Resources tab loader (Ford 2026-07-10): the Resources view now lives inside the SPA
- instead of opening /resources.html in a new page. First open fetches that page ONCE
- and injects its article (minus its own top nav) so the briefing has one source of
- truth; every open refreshes the live news feed from /news.json. Called by
- sandbox.js applyView() when #resources is active. -->
+<!-- Resources loader: mounts the rates/news briefing into #rsHost (now under the
+ Operations → Resources sub-tab). First open fetches resources.html once; every
+ open refreshes the feed. Called by ops.js when the Resources sub-tab is active.
+ Deep-link #resources still works (routes to Operations + Resources sub). -->
 <script>
 (function(){
  var LOADED = false;
@@ -562,12 +548,12 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
 <link rel="stylesheet" href="energy-agent.css?v=20260715aiCompact1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260715ops3"></script>
+<script src="energy-agent.js?v=20260715ops5"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">
 <script src="hands-off-tour.js?v=20260715vaultLogin1"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
-<script src="mobile-os.js?v=20260715ops3"></script>
+<script src="mobile-os.js?v=20260715ops5"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */
