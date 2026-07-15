@@ -18,6 +18,7 @@ import type {
   EnergyAgentChatResponse,
   EnergyAgentConfirmResponse,
   EnergyAgentSession,
+  FleetArray,
   FleetForecast,
   FleetTree,
   FleetTrends,
@@ -135,6 +136,88 @@ export async function verifyLoginToken(
 
 // ── Fleet / offtakers / account ──────────────────────────────────────────
 
+/**
+ * Live fleet-tree is sandbox-shaped: `{ columns: [{ array_id, array_name, … }] }`.
+ * Mobile UI (and demo fixtures) expect `{ arrays: [{ id, name, … }] }` — same
+ * adapt as desktop `fleet-store.js` `adaptTree`. Without this, signed-in Fleet
+ * paints empty KPIs/sheet even when the API returns a full tree.
+ */
+export function normalizeFleetTree(raw: FleetTree | null | undefined): FleetTree {
+  if (!raw || typeof raw !== "object") return { arrays: [] };
+  const cols = (raw as { columns?: unknown[] }).columns;
+  if (!Array.isArray(cols) || !cols.length) {
+    // Already arrays-shaped (demo) or empty
+    if (Array.isArray(raw.arrays)) return raw;
+    return { ...raw, arrays: raw.arrays || [] };
+  }
+
+  const arrays: FleetArray[] = cols.map((c) => {
+    const col = c as Record<string, unknown>;
+    const alert = (col.alert || {}) as Record<string, unknown>;
+    const sync = (col.sync_status || {}) as Record<string, unknown>;
+    const invs = Array.isArray(col.inverters) ? col.inverters : [];
+    return {
+      id: (col.array_id ?? col.id) as number | string | undefined,
+      name: String(col.array_name ?? col.name ?? "Array"),
+      vendor: (col.vendor as string | null) ?? null,
+      vendors: col.vendors as string[] | undefined,
+      status: String(alert.status || col.status || "ok"),
+      diagnosis: String(alert.headline || col.diagnosis || "") || null,
+      current_power_w:
+        col.current_power_w != null ? Number(col.current_power_w) : null,
+      today_kwh:
+        col.produced_today_kwh != null
+          ? Number(col.produced_today_kwh)
+          : col.today_kwh != null
+            ? Number(col.today_kwh)
+            : null,
+      nameplate_kw:
+        col.nameplate_kw != null ? Number(col.nameplate_kw) : null,
+      peer_index:
+        col.peer_index != null ? Number(col.peer_index) : null,
+      last_sync_at:
+        (sync.synced_at as string | null) ||
+        (col.last_sync_at as string | null) ||
+        null,
+      synced_at: (sync.synced_at as string | null) || null,
+      daily_split: col.daily_split as FleetArray["daily_split"],
+      source_status: col.source_status,
+      portfolio_name: col.portfolio_name,
+      inverters: invs.map((inv) => {
+        const i = inv as Record<string, unknown>;
+        return {
+          id: (i.inverter_id ?? i.id) as number | string | undefined,
+          inverter_id: i.inverter_id as number | string | undefined,
+          name: String(i.name || "Inverter"),
+          model: (i.model as string) || null,
+          status: String(i.status || "ok"),
+          peer_index: i.peer_index != null ? Number(i.peer_index) : null,
+          current_power_w:
+            i.current_power_w != null ? Number(i.current_power_w) : null,
+          nameplate_kw:
+            i.nameplate_kw != null ? Number(i.nameplate_kw) : null,
+          today_kwh:
+            i.today_kwh != null
+              ? Number(i.today_kwh)
+              : i.window_kwh != null
+                ? Number(i.window_kwh)
+                : null,
+          diagnosis: (i.diagnosis as string) || null,
+          vendor: (i.vendor as string) || null,
+          stale_hours: i.stale_hours,
+          no_energy_register: !!i.no_energy_register,
+        };
+      }),
+    } as FleetArray;
+  });
+
+  return {
+    ...raw,
+    arrays,
+    summary: (raw as FleetTree).summary,
+  };
+}
+
 export async function fetchOverview(): Promise<Overview> {
   if (isDemoMode()) return demoOverview;
   return apiFetch<Overview>("/v1/array-owners/overview");
@@ -143,7 +226,8 @@ export async function fetchOverview(): Promise<Overview> {
 export async function fetchFleetTree(force = false): Promise<FleetTree> {
   if (isDemoMode()) return demoFleet;
   const q = force ? "?force=1" : "";
-  return apiFetch<FleetTree>(`/v1/array-owners/fleet-tree${q}`);
+  const raw = await apiFetch<FleetTree>(`/v1/array-owners/fleet-tree${q}`);
+  return normalizeFleetTree(raw);
 }
 
 export async function fetchFleetTrends(): Promise<FleetTrends> {

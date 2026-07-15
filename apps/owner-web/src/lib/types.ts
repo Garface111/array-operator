@@ -81,12 +81,23 @@ export type FleetArray = {
   peer_index?: number | null;
   diagnosis?: string | null;
   vendor?: string | null;
+  vendors?: string[] | null;
+  daily_split?: { has_vendor?: boolean; has_utility?: boolean } | null;
   inverters?: FleetInverter[];
   [key: string]: unknown;
 };
 
 export type FleetTree = {
+  /** Normalized mobile shape (from columns or demo). */
   arrays?: FleetArray[];
+  /** Raw sandbox shape from GET /v1/array-owners/fleet-tree. */
+  columns?: Array<Record<string, unknown>>;
+  summary?: {
+    arrays_total?: number;
+    inverters_total?: number;
+    attention?: number;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 };
 
