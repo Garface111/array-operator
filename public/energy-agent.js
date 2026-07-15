@@ -1263,14 +1263,32 @@
     var t = String(text || "").trim();
     if (!t) return false;
     var now = Date.now();
-    // Rate-limit identical seamless updates
-    if (t === state._lastMindSpeak && (now - state._lastMindSpeakAt) < 60000) {
+    // Rate-limit identical / near-identical seamless updates (fleet nags)
+    var fp = t.slice(0, 96).toLowerCase().replace(/\s+/g, " ");
+    var isFleetNag = /\bneed attention\b|\bfleet looks clear\b|\bmoney leak\b/i.test(t);
+    var coolMs = isFleetNag ? 4 * 3600 * 1000 : 90 * 1000;
+    if (
+      state._lastMindSpeakFp === fp &&
+      (now - (state._lastMindSpeakAt || 0)) < coolMs
+    ) {
+      return false;
+    }
+    if (
+      isFleetNag &&
+      state._lastFleetNagFp === fp &&
+      (now - (state._lastFleetNagAt || 0)) < coolMs
+    ) {
       return false;
     }
     // Don't stomp while the user is mid-turn thinking
     if (state.thinking && !opts.force) return false;
     state._lastMindSpeak = t;
+    state._lastMindSpeakFp = fp;
     state._lastMindSpeakAt = now;
+    if (isFleetNag) {
+      state._lastFleetNagFp = fp;
+      state._lastFleetNagAt = now;
+    }
     state._mindInjecting = true;
     try {
       var painted = addMsg("agent", t, { mindUpdate: true });
@@ -1393,11 +1411,12 @@
           } else if (!openHint) {
             setMindActivity(false);
           }
-          // Soft-surface latest proactive insight once per open (same mind)
+          // Soft-surface latest proactive insight only for spikes / first notice
+          // (importance >= 65 server-side). Client fleet-nag cool-down is 4h.
           var ins = mind && mind.insights && mind.insights[0];
           if (ins && ins.headline && ins.id && state._lastInsightId !== ins.id) {
             state._lastInsightId = ins.id;
-            if (Number(ins.importance || 0) >= 60 && !state.thinking) {
+            if (Number(ins.importance || 0) >= 65 && !state.thinking) {
               var line = ins.headline + (ins.detail ? " — " + String(ins.detail).slice(0, 160) : "");
               injectMindSpeak(line, { force: false });
             }
