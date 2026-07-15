@@ -7146,7 +7146,7 @@
             : `${usdFromCents(full)} per offtaker you invoice. Charged monthly to your card.`);
         // Collection fee transparency (legacy path)
         const cf = summary.collection_fee || (summary.unified && summary.unified.collection_fee);
-        if(cf || true){
+        {
           const pct = cf && cf.fee_percent != null ? Number(cf.fee_percent) : 0.5;
           const pctTxt = (Math.round(pct * 100) / 100) + "%";
           lines +=
