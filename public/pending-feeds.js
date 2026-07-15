@@ -284,14 +284,14 @@
           if (p.status !== "failed") {
             p.status = "failed";
             p.stuckMsg =
-              "Login failed, check username/password for this portal, then save again.";
+              "Sign-in failed. Check username and password, then save again.";
             changed = true;
           }
         } else if (st === "scrape_failed" || st === "error") {
           if (p.status !== "stuck") {
             p.status = "stuck";
             p.stuckMsg =
-              "Signed in, but we couldn’t read sites yet. Retrying automatically, large fleets can take a few minutes.";
+              "Signed in. Site discovery is still running; large fleets can take a few minutes.";
             changed = true;
           }
         } else if (c.last_harvest_ok === true && p.status !== "connecting") {
@@ -306,7 +306,7 @@
         ) {
           p.status = "stuck";
           p.stuckMsg =
-            "Queued for cloud harvest, first pull usually lands within a couple minutes.";
+            "Queued for harvest. First pull typically completes within a few minutes.";
           changed = true;
         }
       });
@@ -329,7 +329,7 @@
         if (p.status === "connecting") {
           p.status = "stuck";
           p.stuckMsg =
-            "Taking longer than usual. Your login is saved, open Account → Auto-refresh to check harvest status, or save the login again to retry.";
+            "Still running. Credentials are saved. Check Account → Auto-refresh, or save again to retry.";
           ch = true;
         }
       });

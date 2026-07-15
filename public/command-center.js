@@ -213,10 +213,10 @@
  : k.flagged
  ? `<div class="fcg-k">To check</div>
  <div class="fcg-v" data-kpi="watch"><b>${num(k.flagged)}</b></div>
- <div class="fcg-s">live anomalies, no $ lost yet</div>`
+ <div class="fcg-s">Live anomalies · no priced loss yet</div>`
  : `<div class="fcg-k">Recoverable</div>
  <div class="fcg-v"><b data-kpi="risk">$0</b><span class="fcg-u">/mo</span></div>
- <div class="fcg-s">nothing leaking, all clear 🌞</div>`;
+ <div class="fcg-s">No issues detected 🌞</div>`;
  }
 
  function render(){
@@ -231,7 +231,7 @@
  const healthCls = gathering ? "neutral" : (k.healthyPct > 80 ? "ok" : "warn");
  const riskMo = Math.round(MODEL.kpis.riskMo || 0);
  const simNote = MODEL.simulated
- ? `Demo fleet, sign in to load yours`
+ ? `Demo fleet · sign in for your data`
  : `Live from your connected arrays`;
 
  // KPI TILE GRID, the old single hero bar broken out (Ford, 2026-07-01):
@@ -245,7 +245,7 @@
  <div class="fcg-tile fcg-tile--health ${healthCls}" role="listitem">
  <div class="fcg-k">Fleet healthy</div>
  <div class="fcg-v"><b data-kpi="healthy">${gathering ? "—" : k.healthyPct}</b>${gathering ? "" : `<span class="fcg-u">%</span>`}</div>
- <div class="fcg-s">${gathering ? "gathering data, no history yet" : `${num(invHealthy)} of ${num(k.inverters)} inverters`}</div>
+ <div class="fcg-s">${gathering ? "Collecting history" : `${num(invHealthy)} of ${num(k.inverters)} inverters`}</div>
  <div class="fcg-meter" aria-hidden="true"><span class="fcg-fill fcg-fill--${healthCls}" data-kpi="healthmeter" style="width:${gathering ? 0 : k.healthyPct}%"></span></div>
  </div>
  <div class="fcg-tile" role="listitem">
@@ -300,7 +300,7 @@
  if(attnH){
  const loaded = !(window.FleetStore && FleetStore.isLoaded && !FleetStore.isLoaded());
  attnH.textContent = !loaded ? "Needs attention"
- : (k.flagged ? "Needs attention" : "All clear, nothing needs attention 🌞");
+ : (k.flagged ? "Needs attention" : "No items need attention 🌞");
  attnH.classList.toggle("all-clear", loaded && !k.flagged);
  }
  if(!q) return;
@@ -423,7 +423,7 @@
  const k = MODEL.kpis;
  const regions = ["all", ...Array.from(new Set(MODEL.rows.map(r=>r.region))).filter(x=>x&&x!=="—").sort()];
  const simNote = MODEL.simulated
- ? `Simulated 100-array portfolio, sign in to load your live fleet.`
+ ? `Simulated portfolio. Sign in to load your fleet.`
  : `Live from your connected arrays.`;
  if(!q) return;
  q.innerHTML = `
@@ -459,7 +459,7 @@
  <tbody id="ccBody"></tbody>
  </table>
  </div>
- <div class="cc-foot">Flagged inverters only (${num(k.inverters-k.flagged)} healthy hidden). Peer-measured under the same sky. $ at ~$${energyRate().toFixed(2)}/kWh + ${REC_PER_MWH}/MWh RECs.</div>`;
+ <div class="cc-foot">Showing flagged inverters only (${num(k.inverters-k.flagged)} healthy hidden). Peer-measured under the same sky. $ at ~$${energyRate().toFixed(2)}/kWh + ${REC_PER_MWH}/MWh RECs.</div>`;
 
  renderBody();
  wire();
@@ -474,7 +474,7 @@
  function renderBody(){
  const body = document.getElementById("ccBody"); if(!body) return;
  const rows = filteredRows();
- if(!rows.length){ body.innerHTML = `<tr><td colspan="8" class="cc-empty">No inverters match, your fleet's clean here. 🌞</td></tr>`; return; }
+ if(!rows.length){ body.innerHTML = `<tr><td colspan="8" class="cc-empty">No matching inverters. 🌞</td></tr>`; return; }
  body.innerHTML = rows.map(r => {
  const piTxt = r.pi==null ? `<span class="cc-pi">—<small> no peers</small></span>`
  : `<span class="cc-pi">${r.pi.toFixed(2)}<small> · ${Math.round((1-r.pi)*100)}% low</small></span>`;
@@ -746,7 +746,7 @@ Thank you,
  ht.classList.toggle("ok", healthCls === "ok");
  ht.classList.toggle("warn", healthCls === "warn");
  ht.classList.toggle("neutral", gathering);
- setSub(ht, gathering ? "gathering data, no history yet"
+ setSub(ht, gathering ? "Collecting history"
  : `${num(Math.max(0, k.inverters - k.flagged))} of ${num(k.inverters)} inverters`);
  }
  const ft = tileOf('[data-kpi="flagged"]');

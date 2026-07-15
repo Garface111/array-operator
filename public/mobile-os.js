@@ -187,7 +187,7 @@
       story: "fleet",
       label: "Fleet Triage",
       sub: "Who needs me now",
-      why: "Morning glance: production pulse + needs-attention queue.",
+      why: "Fleet summary and priority attention list.",
       prompt:
         "Walk me through Fleet Triage, what the health cards mean and how I drill into a problem array.",
       hash: "#dashboard",
@@ -198,7 +198,7 @@
       story: "fleet",
       label: "Alerts",
       sub: "Email when it slips",
-      why: "Hands-off means Alerts find you, you don't have to stare at Triage.",
+      why: "Configure Alerts so issues are delivered without continuous monitoring.",
       prompt:
         "Help me set up inverter alerts: who gets email, grace window, and when to stay quiet after recovery.",
       hash: "#dashboard",
@@ -905,7 +905,7 @@
     var phase = state.phase;
     if (phase === "setup") {
       if (title) title.textContent = "Get hands-off";
-      if (sub) sub.textContent = "Talk to Agent, finish setup once";
+      if (sub) sub.textContent = "Complete setup with the agent";
       if (meter) {
         meter.hidden = false;
         var pct = progressPct(L);
@@ -1159,7 +1159,7 @@
       }
     } else if (ok && isNext) {
       acts =
-        '<div class="mh-step-why mh-step-ok">Done, Agent can help refine anytime.</div>';
+        '<div class="mh-step-why mh-step-ok">Complete. Use the agent for further help.</div>';
     } else if (ok) {
       // full done card when expanded
       acts =

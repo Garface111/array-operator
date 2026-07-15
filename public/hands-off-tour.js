@@ -19,338 +19,333 @@
  * `cta` navigates the real UI behind the dock; Continue advances the guide.
  */
  var STEPS = [
- {
- id: "welcome",
- rail: "Welcome",
- railSub: "The whole product",
- kicker: "Full guided tour",
- title: "A quick tour of Array Operator",
- lede:
- "Two jobs: <b>watch the fleet</b> and <b>invoice offtakers</b>. We'll open each main tab, then lock in the hands-off pieces so it can run without you.",
- kind: "welcome",
- },
- // ── Fleet ──────────────────────────────────────────────────────────────
- {
- id: "arrays",
- rail: "Inverters",
- railSub: "Sandbox map",
- kicker: "1 · Fleet · Inverters",
- title: "Your equipment map",
- lede:
- "<b>Inverters</b> is home. Sandbox shows Tenant → Array → Inverter: drag to regroup, read health, open a vendor portal when you need a sync.",
- kind: "step",
- bullets: [
- "Confirm every site you care about is listed with healthy cards.",
- "Use <b>Overview</b> for the whole fleet grid, <b>Tree</b> to drill one array.",
- "Missing hardware? We’ll cover <b>+ Add array</b> in a moment.",
- ],
- cta: { label: "Open Inverters Sandbox →", hash: "#arrays", openSandbox: true },
- statusKey: "arrays",
- autoNav: true,
- },
- {
- id: "spreadsheet",
- rail: "Spreadsheet",
- railSub: "Vendor table",
- kicker: "2 · Fleet · Spreadsheet",
- title: "Same fleet as a table",
- lede:
- "Prefer rows over cards? Toggle <b>Spreadsheet</b>: every vendor, live now, today kWh, status, last sync.",
- kind: "guide",
- bullets: [
- "Segment control: <b>Sandbox | Spreadsheet</b> (same data as the map).",
- "Expand a vendor row to see its arrays and inverters.",
- "Use search when the book is large; <b>Sync all</b> when capture needs a nudge.",
- ],
- cta: { label: "Open Spreadsheet view →", hash: "#arrays", openSheet: true },
- autoNav: true,
- },
- {
- id: "addarray",
- rail: "Add array",
- railSub: "Connect more sites",
- kicker: "3 · Fleet · Connect",
- title: "Add an array",
- lede:
- "Use <b>+ Add array</b> for new sites. One-click portal login is the easy path; manual keys sit behind “Enter manually.”",
- kind: "guide",
- bullets: [
- "SolarEdge / Locus can discover multiple sites from one credential.",
- "Fronius, SMA, Chint often use portal capture via the EnergyAgent helper.",
- "Utility-only connect is for meters that feed invoices, not inverter telemetry.",
- ],
- cta: { label: "Open Add array →", hash: "#arrays", openAddArray: true },
- autoNav: true,
- },
- {
- id: "triage",
- rail: "Fleet Triage",
- railSub: "Who needs me now",
- kicker: "4 · Fleet · Triage",
- title: "Fleet Triage",
- lede:
- "<b>Fleet Triage</b> is the morning glance: production pulse, health card, and who needs attention. Drill into Inverters when something looks off.",
- kind: "guide",
- bullets: [
- "Commander card = whole-fleet health at a glance.",
- "Attention queue sorts worst-first (underperforming, dark, vendor issues).",
- "This is the daily check; Inverters is the deep equipment map.",
- ],
- cta: { label: "Open Fleet Triage →", hash: "#dashboard" },
- autoNav: true,
- },
- {
- id: "alerts",
- rail: "Alerts",
- railSub: "Email when it slips",
- kicker: "5 · Fleet · Alerts",
- title: "Alerts",
- lede:
- "Bottom-right <b>Alerts</b>: who gets email when an inverter slips, and how chatty that should be. You don’t need to stare at Triage all day.",
- kind: "guide",
- bullets: [
- "Add every inbox that should hear about downtime.",
- "Grace window avoids noise on brief blips; recovery quiets the chain.",
- "Keep Setup (this guide) bottom-left and Alerts bottom-right as your chrome.",
- ],
- cta: { label: "Open Alerts panel →", hash: "#dashboard", openAlerts: true },
- autoNav: true,
- },
- // ── Intelligence ───────────────────────────────────────────────────────
- {
- id: "analysis",
- rail: "Analysis",
- railSub: "Fleet NOC",
- kicker: "6 · Intelligence · Analysis",
- title: "Analysis",
- lede:
- "<b>Analysis</b> is the deeper ops view: weather-expected vs actual, sites, performance, health, hardware. Start here when yield feels off.",
- kind: "guide",
- bullets: [
- "Portfolio strip first, then Sites / Performance / Health / Hardware.",
- "Specific yield (kWh/kW) compares arrays fairly across different sizes.",
- "Operations alarms roll up the same attention story as Triage, with more depth.",
- ],
- cta: { label: "Open Analysis →", hash: "#analysis" },
- autoNav: true,
- },
- {
- id: "trends",
- rail: "Trends",
- railSub: "Through time",
- kicker: "7 · Intelligence · Trends",
- title: "Trends",
- lede:
- "Under Analysis, open <b>Trends</b>: daily bars, monthly production, and a few visual views of the same generation history.",
- kind: "guide",
- bullets: [
- "Segment: <b>Fleet analysis | Trends</b> (same Analysis tab).",
- "Art views need more history (about two years).",
- "Use Trends when a board or offtaker wants a story, not a raw CSV.",
- ],
- cta: { label: "Open Trends →", hash: "#trends" },
- autoNav: true,
- },
- // ── Capture / settlement pillars ───────────────────────────────────────
- {
- id: "autorefresh",
- rail: "Auto-refresh",
- railSub: "The hands-off switch",
- kicker: "8 · Hands-off · Capture",
- title: "Save a portal login",
- lede:
- "This is the hands-off switch. Save a monitoring login below (encrypted). Full vault lives under <b>Account → Auto-refresh</b>.",
- kind: "step",
- loginForm: "inverter",
- bullets: [
- "Add every inverter portal you use (Chint, Fronius, SMA…). SolarEdge can use an API key in Account if you prefer.",
- "We switch you to <b>Store it with us</b> automatically when you save here.",
- "Device vault keeps passwords on your computer instead.",
- ],
- callout:
- "if a login isn’t saved, that feed only updates when someone opens the portal manually.",
- cta: { label: "Open full Auto-refresh →", hash: "#account", openAr: true },
- statusKey: "autorefresh",
- autoNav: true,
- },
- {
- id: "utility",
- rail: "Utility bills",
- railSub: "For invoices",
- kicker: "9 · Hands-off · Settlement",
- title: "Save your utility login",
- lede:
- "Offtaker invoices use <b>utility bills</b>, not inverter kWh alone. Save GMP or your co-op login so bills keep landing.",
- kind: "step",
- loginForm: "utility",
- bullets: [
- "Green Mountain Power, Vermont Electric Co-op, Washington Electric, and other live SmartHub utilities work here.",
- "After the first successful harvest you’ll see bill sources on Invoices.",
- "Need a utility we don’t list? Tell us from Account, we’ll wire it.",
- ],
- cta: { label: "Open Invoices (bill sources) →", hash: "#reports" },
- statusKey: "utility",
- autoNav: true,
- },
- // ── Invoicing ──────────────────────────────────────────────────────────
- {
- id: "offtakers",
- rail: "Offtakers",
- railSub: "Who you bill",
- kicker: "10 · Invoices · Roster",
- title: "Add offtakers",
- lede:
- "An offtaker is a customer who gets a share of solar credits. Set share % and bill source once; drafts show up each cycle.",
- kind: "step",
- bullets: [
- "Invoices → <b>Add an offtaker</b>: name, email, share %, master/sub utility.",
- "Master solar credit rate is optional fleet override; blank uses each bill’s rate.",
- "Next: bulk import if you have a spreadsheet, then bill audit + send mode.",
- ],
- cta: { label: "Open Offtakers →", hash: "#reports", openOfftakers: true },
- secondary: { label: "I only monitor, skip", skip: true },
- statusKey: "offtakers",
- autoNav: true,
- },
- {
- id: "bulkimport",
- rail: "Bulk import",
- railSub: "Whole roster at once",
- kicker: "11 · Invoices · Import",
- title: "Bulk import",
- lede:
- "<b>⬆ Bulk import</b> takes a membership export, Excel, or Sheets file. We map columns; you review before create.",
- kind: "guide",
- bullets: [
- "Works with messy headers: name, email, share %, account numbers.",
- "Multi-sheet workbooks: we skip Instructions / SAMPLE tabs.",
- "Deep link later: open Invoices with bulk setup anytime from Account help.",
- ],
- cta: { label: "Open Bulk import →", hash: "#reports", openBulk: true },
- autoNav: true,
- },
- {
- id: "billaudit",
- rail: "Bill audit",
- railSub: "GMP share check",
- kicker: "12 · Invoices · Audit",
- title: "Bill audit",
- lede:
- "On Invoices, open <b>Bill audit</b>. We compare the utility’s credited share to what you entered and flag mismatches.",
- kind: "guide",
- bullets: [
- "Segment: <b>Offtakers | Bill audit</b> at the top of Invoices.",
- "Needs master + offtaker bills on file for a real cross-check.",
- "Fix shares or chase the utility with evidence, don’t invent kWh.",
- ],
- cta: { label: "Open Bill audit →", hash: "#reports", openAudit: true },
- autoNav: true,
- },
- {
- id: "autosend",
- rail: "Send mode",
- railSub: "Preview + approve",
- kicker: "13 · Invoices · The payoff",
- title: "Invoice preview and send mode",
- lede:
- "See draft, bill, and amount due together. Then pick a fleet default: <b>Approve to send</b> or <b>Auto-send</b>.",
- kind: "dream",
- bullets: [
- "Open <b>one offtaker</b> to see draft email, math, and source bill together.",
- "Fleet default: approve each cycle, or auto-send when the bill settles.",
- "Per-offtaker overrides still work, this is the starting posture.",
- ],
- callout:
- "Customer email only goes out when a draft is ready and send mode allows it. ",
- cta: { label: "Open offtaker preview →", hash: "#reports", openPreview: true },
- secondary: { label: "Decide later, continue", skip: true },
- statusKey: "autosend",
- autoNav: true,
- },
- {
- id: "onlinepay",
- rail: "Online pay",
- railSub: "Collect without chasing",
- kicker: "14 · Invoices · Pay",
- title: "Online pay",
- lede:
- "Let offtakers pay from the invoice email. About two minutes on Stripe Connect; money lands in your bank.",
- kind: "step",
- bullets: [
- "Bank details stay on Stripe.",
- "Platform fee is a small % per payment (shown on Account).",
- "Without online pay, drafts still need you to collect offline.",
- ],
- callout:
- "offtakers without online pay still need manual collection.",
- cta: { label: "Enable online pay (~2 min) →", action: "start-connect" },
- secondaryCta: { label: "Open Account pay setup →", hash: "#account", openPay: true },
- secondary: { label: "Skip for now", skip: true },
- statusKey: "onlinepay",
- },
- // ── Supporting ─────────────────────────────────────────────────────────
- {
- id: "resources",
- rail: "Resources",
- railSub: "Rates & rules",
- kicker: "15 · Support · Resources",
- title: "Resources",
- lede:
- "<b>Resources</b>: net-metering rates, RECs, and operator news, so you're not hunting PDFs for a credit rate.",
- kind: "guide",
- bullets: [
- "Pick your state / utility context when offered.",
- "Use this before setting a master solar credit rate on Invoices.",
- "Opens in-app (same shell), no separate product to learn.",
- ],
- cta: { label: "Open Resources →", hash: "#resources" },
- autoNav: true,
- },
- {
- id: "account",
- rail: "Account",
- railSub: "Plan, card, vault",
- kicker: "16 · Support · Account",
- title: "Account",
- lede:
- "<b>Account</b>: company profile, plan, card, bill lines, online-pay status, and the full Auto-refresh vault.",
- kind: "guide",
- bullets: [
- "Plan gates tabs: monitoring → fleet tools; invoicing → Invoices; both → everything.",
- "Trial has no card; add one before the trial ends from Billing.",
- "Energy Agent Pro (optional) unlocks unlimited AI on Account when you want it.",
- ],
- cta: { label: "Open Account →", hash: "#account" },
- autoNav: true,
- },
- {
- id: "agent",
- rail: "Energy Agent",
- railSub: "Ask anything",
- kicker: "17 · Support · Agent",
- title: "Energy Agent",
- lede:
- "Open the Agent beside this setup panel, checklist on the left, co-pilot on the right. It knows this product: tours lockstep to real controls, answers “what still needs hands-off setup?”, and can navigate you.",
- kind: "guide",
- bullets: [
- "Agent opens in a companion window next to this guide (not on top of it).",
- "Try: “Walk me through Invoices” or “What’s still red for hands-off?”",
- "Setup (this rail) and Agent are complementary, checklist vs freeform.",
- ],
- cta: { label: "Open Energy Agent →", openAgent: true },
- autoNav: true,
- },
- {
- id: "done",
- rail: "You’re set",
- railSub: "Run the machine",
- kicker: "Tour complete",
- title: "You're set. Let it run.",
- lede:
- "You've seen the main surfaces. Keep arrays, auto-refresh, utility bills, send mode, and online pay (if you invoice) in good shape. Use Triage, Alerts, and Agent for exceptions.",
- kind: "done",
- },
- ];
+    {
+      id: "welcome",
+      rail: "Welcome",
+      railSub: "Overview",
+      kicker: "Product guide",
+      title: "Array Operator setup guide",
+      lede:
+        "This product does two things: <b>monitor the fleet</b> and <b>invoice offtakers</b>. This guide walks each major surface, then configures unattended capture and billing.",
+      kind: "welcome",
+    },
+    {
+      id: "arrays",
+      rail: "Inverters",
+      railSub: "Equipment map",
+      kicker: "1 · Fleet · Inverters",
+      title: "Inverters",
+      lede:
+        "<b>Inverters</b> is the default view. The sandbox maps Tenant → Array → Inverter: rearrange groups, review status, and open vendor portals as needed.",
+      kind: "step",
+      bullets: [
+        "Confirm each site you operate appears in the list.",
+        "Use <b>Overview</b> for the full fleet; <b>Tree</b> to inspect one array.",
+        "To add hardware, continue to <b>Add array</b>.",
+      ],
+      cta: { label: "Open Inverters →", hash: "#arrays", openSandbox: true },
+      statusKey: "arrays",
+      autoNav: true,
+    },
+    {
+      id: "spreadsheet",
+      rail: "Spreadsheet",
+      railSub: "Vendor table",
+      kicker: "2 · Fleet · Spreadsheet",
+      title: "Spreadsheet view",
+      lede:
+        "Switch to <b>Spreadsheet</b> for a tabular view of the same fleet: vendor, live output, daily energy, status, and last sync.",
+      kind: "guide",
+      bullets: [
+        "Toggle <b>Sandbox | Spreadsheet</b> (shared data).",
+        "Expand a vendor row for arrays and inverters.",
+        "Use search on large fleets; <b>Sync all</b> to refresh capture.",
+      ],
+      cta: { label: "Open Spreadsheet →", hash: "#arrays", openSheet: true },
+      autoNav: true,
+    },
+    {
+      id: "addarray",
+      rail: "Add array",
+      railSub: "Connect sites",
+      kicker: "3 · Fleet · Connect",
+      title: "Add an array",
+      lede:
+        "Use <b>+ Add array</b> to connect sites. Prefer portal sign-in when available; credential entry remains under manual options.",
+      kind: "guide",
+      bullets: [
+        "SolarEdge and Locus can attach multiple sites from one account.",
+        "Fronius, SMA, and Chint typically use the browser helper.",
+        "Utility-only connect is for meters that feed invoicing.",
+      ],
+      cta: { label: "Open Add array →", hash: "#arrays", openAddArray: true },
+      autoNav: true,
+    },
+    {
+      id: "triage",
+      rail: "Fleet Triage",
+      railSub: "Priority queue",
+      kicker: "4 · Fleet · Triage",
+      title: "Fleet Triage",
+      lede:
+        "<b>Fleet Triage</b> summarizes production and highlights units that need attention. Open Inverters from a tile to inspect detail.",
+      kind: "guide",
+      bullets: [
+        "Fleet health card is the portfolio summary.",
+        "The attention list is ordered by severity.",
+        "Use Triage for review; use Inverters for equipment work.",
+      ],
+      cta: { label: "Open Fleet Triage →", hash: "#dashboard" },
+      autoNav: true,
+    },
+    {
+      id: "alerts",
+      rail: "Alerts",
+      railSub: "Notifications",
+      kicker: "5 · Fleet · Alerts",
+      title: "Alerts",
+      lede:
+        "Configure <b>Alerts</b> (bottom-right) for downtime and underperformance notifications: recipients, enablement, and cadence.",
+      kind: "guide",
+      bullets: [
+        "Add each address that should receive alerts.",
+        "Grace periods reduce noise from brief outages.",
+        "Setup remains bottom-left; Alerts remain bottom-right.",
+      ],
+      cta: { label: "Open Alerts →", hash: "#dashboard", openAlerts: true },
+      autoNav: true,
+    },
+    {
+      id: "analysis",
+      rail: "Analysis",
+      railSub: "Performance",
+      kicker: "6 · Analysis",
+      title: "Analysis",
+      lede:
+        "<b>Analysis</b> covers weather-adjusted performance, sites, health, and hardware. Use it when yield is below expectation.",
+      kind: "guide",
+      bullets: [
+        "Start with the portfolio strip, then Sites and Performance.",
+        "Specific yield (kWh/kW) normalizes across site sizes.",
+        "Operations alarms align with Triage at greater depth.",
+      ],
+      cta: { label: "Open Analysis →", hash: "#analysis" },
+      autoNav: true,
+    },
+    {
+      id: "trends",
+      rail: "Trends",
+      railSub: "History",
+      kicker: "7 · Analysis · Trends",
+      title: "Trends",
+      lede:
+        "Under Analysis, open <b>Trends</b> for historical generation: daily bars, monthly totals, and alternate visualizations.",
+      kind: "guide",
+      bullets: [
+        "Segment control: <b>Fleet analysis | Trends</b>.",
+        "Multi-year views require sufficient history.",
+        "Export-ready views for reporting, not day-to-day ops.",
+      ],
+      cta: { label: "Open Trends →", hash: "#trends" },
+      autoNav: true,
+    },
+    {
+      id: "autorefresh",
+      rail: "Auto-refresh",
+      railSub: "Capture",
+      kicker: "8 · Capture",
+      title: "Portal credentials",
+      lede:
+        "Save inverter portal credentials for scheduled refresh. The full vault is under <b>Account → Auto-refresh</b>.",
+      kind: "step",
+      loginForm: "inverter",
+      bullets: [
+        "Add each inverter portal in use. SolarEdge may use an API key in Account instead.",
+        "Saving here enables cloud capture for that portal.",
+        "Device vault stores credentials on your machine as an alternative.",
+      ],
+      callout:
+        "Without saved credentials, that feed updates only when someone signs in to the portal.",
+      cta: { label: "Open Auto-refresh →", hash: "#account", openAr: true },
+      statusKey: "autorefresh",
+      autoNav: true,
+    },
+    {
+      id: "utility",
+      rail: "Utility bills",
+      railSub: "Settlement data",
+      kicker: "9 · Settlement",
+      title: "Utility credentials",
+      lede:
+        "Offtaker invoices are built from <b>utility bills</b>, not inverter kWh alone. Save utility credentials so bills continue to arrive.",
+      kind: "step",
+      loginForm: "utility",
+      bullets: [
+        "Supported providers include GMP, VEC, WEC, and other live SmartHub utilities.",
+        "After the first successful harvest, bill sources appear on Invoices.",
+        "Request additional utilities from Account if yours is missing.",
+      ],
+      cta: { label: "Open Invoices →", hash: "#reports" },
+      statusKey: "utility",
+      autoNav: true,
+    },
+    {
+      id: "offtakers",
+      rail: "Offtakers",
+      railSub: "Customers",
+      kicker: "10 · Invoices · Roster",
+      title: "Offtakers",
+      lede:
+        "An offtaker is a customer allocated a share of solar credits. Configure share and bill source once; invoices draft each cycle.",
+      kind: "step",
+      bullets: [
+        "Invoices → <b>Add an offtaker</b>: name, email, share, utility linkage.",
+        "Optional master rate; blank uses each bill's rate.",
+        "Continue to bulk import, bill audit, and delivery mode.",
+      ],
+      cta: { label: "Open Offtakers →", hash: "#reports", openOfftakers: true },
+      secondary: { label: "Skip (monitoring only)", skip: true },
+      statusKey: "offtakers",
+      autoNav: true,
+    },
+    {
+      id: "bulkimport",
+      rail: "Bulk import",
+      railSub: "Roster import",
+      kicker: "11 · Invoices · Import",
+      title: "Bulk import",
+      lede:
+        "<b>Bulk import</b> accepts membership exports, Excel, or CSV. Columns are detected; you review before create.",
+      kind: "guide",
+      bullets: [
+        "Typical fields: name, email, share, account number.",
+        "Instruction and sample sheets are skipped automatically.",
+        "Available anytime from Invoices.",
+      ],
+      cta: { label: "Open Bulk import →", hash: "#reports", openBulk: true },
+      autoNav: true,
+    },
+    {
+      id: "billaudit",
+      rail: "Bill audit",
+      railSub: "Allocation check",
+      kicker: "12 · Invoices · Audit",
+      title: "Bill audit",
+      lede:
+        "Open <b>Bill audit</b> on Invoices to compare utility-credited allocation against entered shares and list mismatches.",
+      kind: "guide",
+      bullets: [
+        "Segment: <b>Offtakers | Bill audit</b>.",
+        "Requires master and offtaker bills on file.",
+        "Correct the share or pursue the utility discrepancy.",
+      ],
+      cta: { label: "Open Bill audit →", hash: "#reports", openAudit: true },
+      autoNav: true,
+    },
+    {
+      id: "autosend",
+      rail: "Delivery",
+      railSub: "Preview and mode",
+      kicker: "13 · Invoices · Delivery",
+      title: "Invoice preview and delivery mode",
+      lede:
+        "Review a sample offtaker draft with bill math, then set the fleet default: <b>Approve to send</b> or <b>Auto-send</b>.",
+      kind: "dream",
+      bullets: [
+        "Open one offtaker for draft, math, and source bill.",
+        "Approve each cycle, or auto-send when the bill settles.",
+        "Per-offtaker overrides remain available.",
+      ],
+      callout:
+        "Outbound customer email requires a draft and an allowed delivery mode.",
+      cta: { label: "Open invoice preview →", hash: "#reports", openPreview: true },
+      secondary: { label: "Continue without changing mode", skip: true },
+      statusKey: "autosend",
+      autoNav: true,
+    },
+    {
+      id: "onlinepay",
+      rail: "Online pay",
+      railSub: "Collections",
+      kicker: "14 · Invoices · Pay",
+      title: "Online payments",
+      lede:
+        "Enable Stripe Connect so offtaker invoice emails can include a pay link. Setup takes a few minutes; funds deposit to your bank.",
+      kind: "step",
+      bullets: [
+        "Bank details are entered on Stripe only.",
+        "Platform fee is a small percentage per payment (see Account).",
+        "Skip if you collect payment outside the product.",
+      ],
+      callout:
+        "Without online pay, collection remains manual.",
+      cta: { label: "Enable online pay →", action: "start-connect" },
+      secondaryCta: { label: "Open Account pay setup →", hash: "#account", openPay: true },
+      secondary: { label: "Skip", skip: true },
+      statusKey: "onlinepay",
+    },
+    {
+      id: "resources",
+      rail: "Resources",
+      railSub: "Rates and news",
+      kicker: "15 · Resources",
+      title: "Resources",
+      lede:
+        "<b>Resources</b> provides net-metering rates, REC context, and operator-relevant news.",
+      kind: "guide",
+      bullets: [
+        "Select your state when available.",
+        "Useful reference before setting invoice rates.",
+        "In-app view; no separate product.",
+      ],
+      cta: { label: "Open Resources →", hash: "#resources" },
+      autoNav: true,
+    },
+    {
+      id: "account",
+      rail: "Account",
+      railSub: "Plan and vault",
+      kicker: "16 · Account",
+      title: "Account",
+      lede:
+        "<b>Account</b> covers profile, plan, payment method, billing lines, Connect status, and the Auto-refresh vault.",
+      kind: "guide",
+      bullets: [
+        "Plan selection controls which modules are enabled.",
+        "Add a payment method before the trial ends to avoid interruption.",
+        "Energy Agent Pro is optional for higher AI usage.",
+      ],
+      cta: { label: "Open Account →", hash: "#account" },
+      autoNav: true,
+    },
+    {
+      id: "agent",
+      rail: "Energy Agent",
+      railSub: "Assistant",
+      kicker: "17 · Assistant",
+      title: "Energy Agent",
+      lede:
+        "Energy Agent is in-product voice and chat for navigation, setup questions, and operational help.",
+      kind: "guide",
+      bullets: [
+        "Example: \"Walk me through Invoices.\"",
+        "Example: \"What remains for unattended setup?\"",
+        "This guide is structured; the agent is freeform.",
+      ],
+      cta: { label: "Open Energy Agent →", openAgent: true },
+      autoNav: true,
+    },
+    {
+      id: "done",
+      rail: "Complete",
+      railSub: "Summary",
+      kicker: "Guide complete",
+      title: "Setup guide complete",
+      lede:
+        "Primary surfaces are covered. Keep arrays, auto-refresh, utility capture, delivery mode, and online pay (if invoicing) configured. Use Triage, Alerts, and Energy Agent for exceptions.",
+      kind: "done",
+    },
+  ];
 
  var state = {
  open: false,
@@ -822,7 +817,7 @@
  el.id = "hoTour";
  el.hidden = true;
  el.setAttribute("role", "dialog");
- el.setAttribute("aria-label", "Hands-off setup walkthrough");
+ el.setAttribute("aria-label", "Setup guide walkthrough");
  document.body.appendChild(el);
  return el;
  }
@@ -834,8 +829,8 @@
  pill.type = "button";
  pill.id = "hoPill";
  pill.className = "ho-pill-fab";
- pill.setAttribute("aria-label", "Hands-off setup walkthrough");
- pill.title = "Hands-off setup walkthrough";
+ pill.setAttribute("aria-label", "Setup guide walkthrough");
+ pill.title = "Setup guide walkthrough";
  document.body.appendChild(pill);
  pill.addEventListener("click", function (e) {
  try {
@@ -889,18 +884,18 @@
  '<span class="ho-pill-lab">Setup</span>';
  pill.setAttribute(
  "aria-label",
- "Hands-off setup, " + left + " step" + (left === 1 ? "" : "s") + " left"
+ "Setup guide, " + left + " step" + (left === 1 ? "" : "s") + " left"
  );
  pill.title =
- left + " step" + (left === 1 ? "" : "s") + " left · open hands-off setup";
+ left + " step" + (left === 1 ? "" : "s") + " left · open setup guide";
  } else {
  pill.innerHTML =
  '<span class="ho-pill-ic ho-pill-play" aria-hidden="true">' +
  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>' +
  "</span>" +
  '<span class="ho-pill-lab">Setup</span>';
- pill.setAttribute("aria-label", "Replay hands-off setup walkthrough");
- pill.title = "Replay hands-off setup walkthrough";
+ pill.setAttribute("aria-label", "Replay setup guide");
+ pill.title = "Replay setup guide";
  }
  }
 
@@ -1008,23 +1003,23 @@
  var guides = guidesRemaining();
  var pct = progressPct(live);
  if (left === 0 && guides === 0) {
- if (live.offtakers && live.onlinePay) return "Full tour + invoicing hands-off ready";
- return "Full tour complete · core feeds good";
+ if (live.offtakers && live.onlinePay) return "Guide complete · invoicing ready";
+ return "Guide complete · core feeds ready";
  }
  if (left === 0 && guides > 0) {
- return pct + "% of tour · " + guides + " surface" + (guides === 1 ? "" : "s") + " left";
+ return pct + "% complete · " + guides + " surface" + (guides === 1 ? "" : "s") + " left";
  }
  if (live.offtakers && !live.deliveryChosen) {
- return "Approve how offtaker reports leave";
+ return "Set invoice delivery mode";
  }
  if (live.offtakers && !live.onlinePay && left === 1) {
- return "Enable online pay to finish offtaker setup";
+ return "Enable online pay to finish invoicing setup";
  }
  return (
  pct +
- "% toured · " +
+ "% complete · " +
  left +
- " required pillar" +
+ " required item" +
  (left === 1 ? "" : "s") +
  " open"
  );
@@ -1102,11 +1097,11 @@
  '<div class="ho-sheet">' +
  '<header class="ho-top">' +
  '<div class="ho-brand"><div class="ho-brand-mark" aria-hidden="true"></div>' +
- "<div><b>Hands-off setup</b><span>" +
+ "<div><b>Setup guide</b><span>" +
  esc(scoreLine(live)) +
  "</span></div></div>" +
  '<div class="ho-top-right">' +
- '<button type="button" class="ho-close" data-ho="minimize" aria-label="Close setup (keeps progress)" title="Close setup, reopen anytime from Setup">×</button>' +
+ '<button type="button" class="ho-close" data-ho="minimize" aria-label="Close guide" title="Close guide (reopen from Setup)">×</button>' +
  "</div></header>" +
  '<div class="ho-steps">' +
  buildStepsHtml(live) +
@@ -1505,9 +1500,9 @@
  : "GMP bill · Jun 2026";
  var badge = hasReal
  ? p.hasMath
- ? "Live draft math"
+ ? "Calculated from bill"
  : "Your offtaker · waiting on bill"
- : "Example layout";
+ : "Sample";
  return (
  '<div class="ho-dream">' +
  '<div class="ho-dream-glow" aria-hidden="true"></div>' +
@@ -1540,9 +1535,9 @@
  "</strong></div>" +
  '<div class="ho-dream-bill">' +
  '<span class="ho-dream-bill-ic" aria-hidden="true">☰</span>' +
- "<div><b>Source bill lined up</b><span>" +
+ "<div><b>Source bill</b><span>" +
  esc(bill) +
- " · used for kWh &amp; rate</span></div></div>" +
+ " · kWh and rate source</span></div></div>" +
  "</div></div>"
  );
  }
@@ -1552,34 +1547,34 @@
  var chosen = !!live.deliveryChosen;
  return (
  '<div class="ho-mode-pick" role="group" aria-label="How offtaker reports leave">' +
- '<div class="ho-mode-pick-lab">How should drafts leave once a bill settles?</div>' +
+ '<div class="ho-mode-pick-lab">Delivery mode when a bill settles</div>' +
  '<div class="ho-mode-cards">' +
  '<button type="button" class="ho-mode-card' +
  (mode === "approval" ? " is-on" : "") +
  (chosen && mode === "approval" ? " is-chosen" : "") +
  '" data-ho="set-mode" data-mode="approval">' +
- '<span class="ho-mode-tag">Trust anchor</span>' +
+ '<span class="ho-mode-tag">Default</span>' +
  "<b>Approve to send</b>" +
- "<p>Each draft waits for your OK. Best while you’re still verifying shares and bills.</p>" +
+ "<p>Drafts wait for approval before send. Prefer this while you’re still verifying shares and bills.</p>" +
  "</button>" +
  '<button type="button" class="ho-mode-card ho-mode-dream' +
  (mode === "auto" ? " is-on" : "") +
  (chosen && mode === "auto" ? " is-chosen" : "") +
  '" data-ho="set-mode" data-mode="auto">' +
- '<span class="ho-mode-tag is-rec">Hands-off · recommended</span>' +
+ '<span class="ho-mode-tag is-rec">Recommended for unattended send</span>' +
  "<b>Auto-send</b>" +
- "<p>When the utility bill settles, drafts email themselves. You stay in control of the pause switch.</p>" +
+ "<p>When the utility bill settles, drafts send on schedule. Pause remains available.</p>" +
  "</button>" +
  "</div>" +
  (chosen
  ? '<div class="ho-mode-confirm is-ok">' +
  (mode === "auto"
- ? "<b>Auto-send is on</b> for enabled offtakers. Per-offtaker overrides still work on Invoices."
- : "<b>Approve to send</b> is set. Open Invoices anytime to flip the fleet to auto-send.") +
+ ? "<b>Auto-send is enabled</b> for offtakers. Per-offtaker overrides remain available on Invoices."
+ : "<b>Approval mode</b> is set. Change the fleet default anytime on Invoices.") +
  "</div>"
  : live.offtakers
- ? '<div class="ho-mode-confirm">Tap a card to lock in your fleet default, you can change it later on Invoices.</div>'
- : '<div class="ho-mode-confirm">No offtakers yet, pick a default now so you’re ready when the first one lands.</div>') +
+ ? '<div class="ho-mode-confirm">Select a fleet default. You can change it later on Invoices.</div>'
+ : '<div class="ho-mode-confirm">No offtakers yet. You can still set a default delivery mode.</div>') +
  "</div>"
  );
  }
@@ -1596,11 +1591,11 @@
  if (step.kind === "welcome") {
  html +=
  '<div class="ho-hero ho-hero-3">' +
- '<div class="ho-hero-card"><div class="ho-hero-ic">▣</div><b>Watch the fleet</b><p>Inverters, Triage, Alerts, Analysis, Trends.</p></div>' +
- '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">▤</div><b>Invoice offtakers</b><p>Roster, bill audit, preview, auto-send, pay.</p></div>' +
- '<div class="ho-hero-card"><div class="ho-hero-ic">◎</div><b>Keep it running</b><p>Auto-refresh, Account, Resources, Agent.</p></div>' +
+ '<div class="ho-hero-card"><div class="ho-hero-ic">▣</div><b>Fleet monitoring</b><p>Inverters, Triage, Alerts, Analysis, Trends.</p></div>' +
+ '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">▤</div><b>Offtaker invoicing</b><p>Roster, audit, delivery, payments.</p></div>' +
+ '<div class="ho-hero-card"><div class="ho-hero-ic">◎</div><b>Unattended capture</b><p>Auto-refresh, Account, Resources, Agent.</p></div>' +
  "</div>" +
- '<div class="ho-callout"><b>How this works:</b> each stop opens the real tab. Explore freely; Continue moves on. Required items turn green when connected.</div>';
+ '<div class="ho-callout"><b>How this works:</b> each step opens the corresponding view. Continue advances. Required items turn green when configured.</div>';
  }
 
  if (step.kind === "guide") {
@@ -1621,7 +1616,7 @@
  if (isVisited(step.id)) {
  html +=
  '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)">' +
- "<b>You’ve been here.</b> Re-open anytime from the pills above, or Continue to the next stop." +
+ "<b>Visited.</b> Reopen from the step list, or Continue." +
  "</div>";
  }
  }
@@ -1633,7 +1628,7 @@
  if (step.bullets && step.bullets.length) {
  html +=
  '<details class="ho-details">' +
- "<summary>What you’re looking at</summary>" +
+ "<summary>Details</summary>" +
  '<ul class="ho-bullets">' +
  step.bullets
  .map(function (b) {
@@ -1649,8 +1644,8 @@
  html +=
  '<div class="ho-callout" style="background:var(--ho-green-soft);border-color:rgba(23,138,78,.22);color:var(--ho-green)">' +
  (live.deliveryMode === "auto"
- ? "<b>You’re in dreamland.</b> Drafts will auto-send when bills settle, open the full preview anytime."
- : "<b>Approve mode locked in.</b> Open the offtaker preview, then flip to auto-send when you trust the path.") +
+ ? "<b>Auto-send enabled.</b> Drafts send when bills settle. Open the full preview anytime."
+ : "<b>Approval mode set.</b> Open the offtaker preview anytime. Switch to auto-send from Invoices when ready.") +
  "</div>";
  }
  }
@@ -1666,7 +1661,7 @@
  '<details class="ho-details"' +
  (step.loginForm ? "" : " open") +
  ">" +
- "<summary>Tips for this step</summary>" +
+ "<summary>Details</summary>" +
  '<ul class="ho-bullets">' +
  step.bullets
  .map(function (b) {
@@ -1744,16 +1739,16 @@
  html += '<div class="ho-actions">';
  if (step.kind === "welcome") {
  html +=
- '<button type="button" class="ho-btn ho-btn-primary" data-ho="next">Start full product tour →</button>';
+ '<button type="button" class="ho-btn ho-btn-primary" data-ho="next">Start guide →</button>';
  html +=
- '<button type="button" class="ho-btn ho-btn-text" data-ho="minimize">Explore freely, keep Setup FAB</button>';
+ '<button type="button" class="ho-btn ho-btn-text" data-ho="minimize">Close guide</button>';
  } else if (step.kind === "done") {
  html +=
- '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Done, enter dashboard →</button>';
+ '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Close and continue →</button>';
  html +=
  '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#dashboard">Open Fleet Triage</button>';
  html +=
- '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Review Auto-refresh</button>';
+ '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Open Auto-refresh</button>';
  } else {
  if (step.cta) {
  if (step.cta.action === "start-connect") {
@@ -1795,7 +1790,7 @@
  // Dream step: Continue advances only after a mode choice (or skip)
  if (step.kind === "dream" && live.offtakers && !live.deliveryChosen) {
  html +=
- '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next" data-mark-mode="approval">Continue with approve-to-send</button>';
+ '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next" data-mark-mode="approval">Continue with approval mode</button>';
  } else {
  html +=
  '<button type="button" class="ho-btn ho-btn-ghost" data-ho="next">Continue</button>';
@@ -2064,7 +2059,7 @@
  if (r.ok && d.already_ready) {
  if (btn) {
  btn.disabled = false;
- btn.textContent = "✓ Already set up";
+ btn.textContent = "Already configured";
  }
  await probeLive();
  softUpdate();
@@ -2186,7 +2181,7 @@
  }
 
  if (!provider) {
- setMsg("Pick a portal.", false);
+ setMsg("Select a portal.", false);
  return;
  }
  if (!user || !pass) {
@@ -2194,11 +2189,11 @@
  return;
  }
  if (!consent || !consent.checked) {
- setMsg("Tick the authorization box first.", false);
+ setMsg("Confirm authorization first.", false);
  return;
  }
  if (!session()) {
- setMsg("Sign in to your account first.", false);
+ setMsg("Sign in first.", false);
  return;
  }
 
@@ -2227,7 +2222,7 @@
  if (!r.ok) {
  var detail =
  (typeof d.detail === "string" && d.detail) ||
- (r.status === 403 ? "Cloud capture not enabled yet" : "Couldn't save, try again");
+ (r.status === 403 ? "Cloud capture not enabled yet" : "Could not save. Try again.");
  setMsg(detail.slice(0, 80), false);
  btn.disabled = false;
  btn.textContent = "Save login →";
@@ -2295,7 +2290,7 @@
  });
  }, 600);
  } catch (e) {
- setMsg("Network error, try again.", false);
+ setMsg("Network error. Try again.", false);
  btn.disabled = false;
  btn.textContent = "Save login →";
  }

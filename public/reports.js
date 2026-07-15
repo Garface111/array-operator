@@ -685,7 +685,7 @@
  // pointer-events:none so it never blocks the click-anywhere-to-close, and fades on its own.
  const hint = document.createElement("div");
  hint.className = "rb-tpl-lb-hint";
- hint.innerHTML = 'Press <kbd>Esc</kbd>, or click anywhere, to go back';
+ hint.innerHTML = 'Press <kbd>Esc</kbd> or click outside to close';
  overlay.appendChild(hint);
  const close = () => { overlay.remove(); document.removeEventListener("keydown", onKey); };
  function onKey(e) { if (e.key === "Escape") { e.preventDefault(); close(); } }
@@ -1442,7 +1442,7 @@
  const scale = meta.offtakers
  ? `${meta.arrays || "—"} sites · ${meta.offtakers} offtakers`
  : "sample operator";
- note.innerHTML = `Demo, <b>Northeast Community Solar</b> (${scale}), frozen mid-cycle. <a href="/onboarding" style="color:var(--good);font-weight:650">Set up your own →</a>`;
+ note.innerHTML = `Demo · <b>Northeast Community Solar</b> (${scale}), sample mid-cycle state. <a href="/onboarding" style="color:var(--good);font-weight:650">Create an account →</a>`;
  head.parentNode.insertBefore(note, head.nextSibling);
  }
  const gmpStatus = $("#rbGmpBillsStatus");
@@ -1486,7 +1486,7 @@
  const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
  const headLine = pending
  ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Click an offtaker to review and send.`;
+ : `Select an offtaker to review and send.`;
  list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
  OFFTAKERS.slice(0, 40).map(s => subCard(s, demoArrays, demoUtil)).join("") +
  (OFFTAKERS.length > 40
@@ -1997,7 +1997,7 @@
  if (want === "auto") {
  const n = (PIPE && PIPE.mode_split && PIPE.mode_split.approval) || 0;
  const ok = await AODialog.confirm(
- "Their invoices will email on schedule from settled bills. Per-offtaker settings still override. Demo accounts don't send real mail.",
+ "Invoices send on schedule from settled bills. Per-offtaker settings still apply. Demo accounts do not send mail.",
  { title: `Switch ${fmt0(n)} offtaker${n === 1 ? "" : "s"} to Auto-send?` }
  );
  if (!ok) return;
@@ -5319,7 +5319,7 @@
  const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
  const headLine = pending
  ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Click an offtaker to review and send.`;
+ : `Select an offtaker to review and send.`;
  // Keep the currently-open card open across refreshes, but do NOT auto-open one on a
  // fresh load, every offtaker starts collapsed until the operator clicks one (Ford).
  const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
@@ -6919,7 +6919,7 @@
  ${bacSec}
  <p class="rb-draft-note">Sends to <b>${esc(d.customer_name)}</b> per the delivery setting,
  with the offtaker invoice${d.has_gmp_pdf ? " and the GMP bill" : ""} attached.
- When you're ready, use <b>Approve &amp; send</b> at the top.</p>
+ Use <b>Approve &amp; send</b> at the top when ready.</p>
  </div>`;
  }
 
