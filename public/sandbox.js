@@ -7604,8 +7604,15 @@
   // #account / #reports deep-link is always respected (we only default the EMPTY hash).
   function landDefaultTab(){
     if(!location.hash){
-      try { location.replace("#arrays"); }   // replace → no extra Back-button history entry
-      catch(_){ location.hash = "#arrays"; }
+      try {
+        // Onboarding "Upload offtaker spreadsheet" → Invoices bulk import
+        const q = new URLSearchParams(location.search || "");
+        if (q.get("setup") === "offtakers" || q.get("bulk") === "1") {
+          location.replace("#reports");
+        } else {
+          location.replace("#arrays");   // replace → no extra Back-button history entry
+        }
+      } catch(_){ location.hash = "#arrays"; }
     }
   }
   document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); ensureAlertsWidget(); });

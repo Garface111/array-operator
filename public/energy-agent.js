@@ -1259,7 +1259,11 @@
     setMindActivity(false);
   }
 
-  /** Inject a same-mind spoken/text update (never "agent finished"). */
+  /**
+   * Seamless mind awareness — status chip only, NEVER the chat transcript.
+   * Chat is reserved for real turns (user + agent replies). Fleet nags /
+   * background insights used to dump into the thread (Ford 2026-07-14 screenshot).
+   */
   function injectMindSpeak(text, opts) {
     opts = opts || {};
     var t = String(text || "").trim();
@@ -1293,18 +1297,15 @@
     }
     state._mindInjecting = true;
     try {
-      var painted = addMsg("agent", t, { mindUpdate: true });
-      // Optional accept/dismiss chips when the mind asks about a proposal
-      if (painted && opts.eventId && /proposal|want me|refresh/i.test(t)) {
-        addMindActionChips(opts.eventId, t);
+      // Status / mind chip only — short headline, no chat bubble, no voice barge-in
+      var short = t.length > 72 ? t.slice(0, 69).replace(/\s+\S*$/, "") + "…" : t;
+      setMindActivity(true, short);
+      // Also soft-status so "Looking into it" carries the point without polluting chat
+      if (!state.thinking && !state.speaking) {
+        setStatus(short, "on");
       }
-      if (painted && !state.voiceMuted && !state.thinking) {
-        // Soft speak — skip if already talking so we don't barge mid-reply
-        if (!state.speaking) {
-          enqueueSpeak(t, { source: "mind" }).catch(function () {});
-        }
-      }
-      return painted;
+      // Never addMsg, never enqueueSpeak for background mind — chat stays clean
+      return true;
     } finally {
       state._mindInjecting = false;
     }
@@ -1385,11 +1386,12 @@
         ev.speak_as_mind &&
         !ev.consumed
       ) {
-        var said = injectMindSpeak(ev.speak_as_mind, {
+        // Status-only (not chat). Always consume so we don't re-fire forever.
+        injectMindSpeak(ev.speak_as_mind, {
           eventId: ev.id,
           importance: ev.importance,
         });
-        if (said) toConsume.push(ev.id);
+        toConsume.push(ev.id);
       }
     }
 
@@ -2861,7 +2863,7 @@
         },
         {
           selector: "#rbBulkImport",
-          say: "**Bulk import** — add many offtakers from a CSV: name, percent share, account number.",
+          say: "**Bulk import** — drop any offtaker roster spreadsheet (utility export, Excel, Google Sheets). We detect columns, match each row to an array, and you review before anything is created. Template is optional.",
         },
         {
           selector: "#rbCustAdd",

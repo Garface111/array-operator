@@ -799,11 +799,10 @@
           if (first) { try { first.focus({ preventScroll: true }); } catch (_) { /* older browsers */ } }
         });
       };
-      // "⬆ Bulk import" — a CSV roster (name/percent/account number) creates many
-      // offtakers at once instead of one at a time. Closes the manual panel if open
-      // (the two are mutually exclusive — never two add-flows stacked at once).
+      // "⬆ Bulk import" — any roster spreadsheet creates many offtakers at once.
+      // Closes the manual panel if open (mutually exclusive with type-it-in).
       const bulkBtn = $("#rbBulkImport");
-      if (bulkBtn) bulkBtn.onclick = () => { MANUAL_OPEN = false; renderManual(); BULK_OPEN = true; renderBulkImport(); };
+      if (bulkBtn) bulkBtn.onclick = () => openBulkImport();
       // "Link utility bills" — ONE button opens the utility picker (every supported
       // utility, searchable — GMP/VEC/WEC quick-picks + ~470 SmartHub co-ops from
       // /v1/providers). The owner picks theirs; the extension opens that portal and
@@ -2300,7 +2299,7 @@
             </div>
             <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with: greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
             <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
-            <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers at once from a CSV roster: name, percent share, and (ideally) account number.">⬆ Bulk import</button>
+            <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet — utility export, Excel, or Google Sheets. We detect columns; you review before creating.">⬆ Bulk import</button>
             <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
           </div>
         </div>
@@ -8049,8 +8048,50 @@
     } catch (e) { fail("Preview failed."); }
   }
 
+  /** Open the bulk offtaker roster import panel (toolbar button + deep links). */
+  function openBulkImport() {
+    MANUAL_OPEN = false;
+    try { renderManual(); } catch (e) {}
+    BULK_OPEN = true;
+    renderBulkImport();
+    requestAnimationFrame(() => {
+      const host = document.getElementById("rbBulkHost");
+      if (!host) return;
+      const target = host.querySelector(".rb-add-panel") || host;
+      try { target.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+    });
+  }
+  window.__aoOpenBulkImport = openBulkImport;
+
+  /** Deep link: /?setup=offtakers#reports or /?bulk=1#reports opens Bulk import. */
+  function maybeOpenBulkFromQuery() {
+    try {
+      const q = new URLSearchParams(location.search || "");
+      if (q.get("setup") === "offtakers" || q.get("bulk") === "1") {
+        openBulkImport();
+        // Scrub so a refresh doesn't re-open forever; keep #reports hash.
+        q.delete("setup");
+        q.delete("bulk");
+        const qs = q.toString();
+        history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + (location.hash || "#reports"));
+      }
+    } catch (e) {}
+  }
+
   // If the Reports tab is the active hash on first load, render immediately.
   if (location.hash === "#reports") {
-    document.addEventListener("DOMContentLoaded", load);
+    document.addEventListener("DOMContentLoaded", async () => {
+      await load();
+      maybeOpenBulkFromQuery();
+    });
   }
+
+  // When the user lands later via hashchange (sandbox applyView → loadReports),
+  // still honor setup=offtakers after the shell exists.
+  const _prevLoad = window.__aoLoadReports;
+  window.__aoLoadReports = async function (opts) {
+    const r = await (_prevLoad ? _prevLoad(opts) : load(opts));
+    if (location.hash === "#reports") maybeOpenBulkFromQuery();
+    return r;
+  };
 })();
