@@ -10,7 +10,12 @@
     checkins: {},
     arrays: [],
     busy: false,
+    loadGen: 0,
+    bgReconcileAt: 0,
   };
+
+  var CACHE_KEY = "ao_ops_cache_v1";
+  var FETCH_MS = 20000; // hard cap — never leave the tab spinning
 
   function authHeaders() {
     var h = { "Content-Type": "application/json" };
@@ -51,16 +56,93 @@
     try { return !!localStorage.getItem("so_session"); } catch (e) { return false; }
   }
 
+  function readCache() {
+    try {
+      var raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !o.data) return null;
+      // discard after 30 min
+      if (o.ts && Date.now() - o.ts > 30 * 60 * 1000) return null;
+      return o.data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeCache(data) {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
+    } catch (e) {}
+  }
+
   async function api(path, opts) {
     opts = opts || {};
-    var r = await fetch(path, Object.assign({ headers: authHeaders() }, opts));
-    var d = null;
-    try { d = await r.json(); } catch (e) { d = null; }
-    if (!r.ok) {
-      var err = (d && (d.detail || d.error || d.message)) || ("HTTP " + r.status);
-      throw new Error(typeof err === "string" ? err : JSON.stringify(err));
+    var ctrl = opts.signal ? null : new AbortController();
+    var signal = opts.signal || (ctrl && ctrl.signal);
+    var timer = null;
+    if (ctrl) {
+      timer = setTimeout(function () {
+        try { ctrl.abort(); } catch (e) {}
+      }, opts.timeoutMs || FETCH_MS);
     }
-    return d;
+    try {
+      var r = await fetch(
+        path,
+        Object.assign({ headers: authHeaders() }, opts, { signal: signal })
+      );
+      var d = null;
+      try { d = await r.json(); } catch (e) { d = null; }
+      if (!r.ok) {
+        var err = (d && (d.detail || d.error || d.message)) || ("HTTP " + r.status);
+        throw new Error(typeof err === "string" ? err : JSON.stringify(err));
+      }
+      return d;
+    } catch (e) {
+      if (e && e.name === "AbortError") {
+        throw new Error("Request timed out — try Refresh");
+      }
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function applyData(d) {
+    if (!d) return;
+    STATE.data = d;
+    if (d.arrays && d.arrays.length) {
+      STATE.arrays = d.arrays;
+    } else {
+      try {
+        if (window.FleetStore && FleetStore.snapshot) {
+          var snap = FleetStore.snapshot();
+          if (snap && snap.arrays && snap.arrays.length) STATE.arrays = snap.arrays;
+        }
+      } catch (e) {}
+    }
+    writeCache(d);
+    render();
+  }
+
+  /** Non-blocking ticket reconcile — never blocks tab paint. */
+  function bgReconcile() {
+    var now = Date.now();
+    // at most once per 5 min per session visit
+    if (now - (STATE.bgReconcileAt || 0) < 5 * 60 * 1000) return;
+    STATE.bgReconcileAt = now;
+    api("/v1/array-owners/ops/reconcile", { method: "POST", timeoutMs: 90000 })
+      .then(function (r) {
+        if (r && r.ok && ((r.opened || 0) > 0 || (r.closed || 0) > 0)) {
+          // silent refresh of list after real changes
+          return api("/v1/array-owners/ops?reconcile_first=0", { timeoutMs: FETCH_MS });
+        }
+        return null;
+      })
+      .then(function (d) {
+        if (d && d.ok) applyData(d);
+      })
+      .catch(function () { /* ignore — tab already usable */ });
   }
 
   async function load(force) {
@@ -72,35 +154,48 @@
         "Track your O&M team, open repair tickets when sites go down, and check in by email, SMS, or phone.</div>";
       return;
     }
+
+    // Stale-while-revalidate: paint cache immediately so the tab never feels stuck
+    if (!STATE.data) {
+      var cached = readCache();
+      if (cached) {
+        STATE.data = cached;
+        if (cached.arrays && cached.arrays.length) STATE.arrays = cached.arrays;
+        render();
+      }
+    }
+
+    // Allow overlapping forced refresh; ignore duplicate background loads
     if (STATE.busy && !force) return;
+    var gen = ++STATE.loadGen;
     STATE.busy = true;
     if (!STATE.data) {
-      el.innerHTML = '<div class="empty" style="padding:28px 0;color:var(--faint)">Loading ops…</div>';
+      el.innerHTML =
+        '<div class="empty" style="padding:28px 0;color:var(--faint)">Loading operations…</div>';
     }
     try {
-      var d = await api("/v1/array-owners/ops?reconcile_first=1");
-      STATE.data = d;
-      // array list for assign dropdown
-      try {
-        if (window.FleetStore && FleetStore.snapshot) {
-          var snap = FleetStore.snapshot();
-          STATE.arrays = (snap && snap.arrays) || [];
-        }
-      } catch (e) {}
-      if (!STATE.arrays.length) {
-        try {
-          var tree = await api("/v1/array-owners/fleet-tree");
-          STATE.arrays = (tree.columns || []).map(function (c) {
-            return { id: c.array_id, name: c.array_name };
-          });
-        } catch (e2) {}
-      }
-      render();
+      // FAST path only — no fleet-tree / SolarEdge on tab open
+      var d = await api("/v1/array-owners/ops?reconcile_first=0", { timeoutMs: FETCH_MS });
+      if (gen !== STATE.loadGen) return; // superseded
+      applyData(d);
+      // After paint: optional background reconcile (does not block UI)
+      bgReconcile();
     } catch (e) {
-      el.innerHTML =
-        '<div class="ops-empty"><b>Couldn\'t load Operations</b>' + esc(e.message || e) + "</div>";
+      if (gen !== STATE.loadGen) return;
+      if (STATE.data) {
+        // Keep last good view; toast the error
+        toast(e.message || "Refresh failed");
+        render();
+      } else {
+        el.innerHTML =
+          '<div class="ops-empty"><b>Couldn\'t load Operations</b>' +
+          esc(e.message || e) +
+          '<div style="margin-top:12px"><button type="button" class="ops-btn primary" id="opsRetryLoad">Retry</button></div></div>';
+        var btn = document.getElementById("opsRetryLoad");
+        if (btn) btn.onclick = function () { load(true); };
+      }
     } finally {
-      STATE.busy = false;
+      if (gen === STATE.loadGen) STATE.busy = false;
     }
   }
 
