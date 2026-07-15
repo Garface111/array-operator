@@ -922,47 +922,23 @@
  }
 
  /**
- * Badge over the Energy Agent icon (top-left tab + mobile FAB).
- * Free: "Go Pro" pill (opens Account billing checkout).
- * Pro: no badge — plan status lives on Account / budget meter, not as a
- * tab notification (Ford 2026-07-14: clear Unlimited noise on the EA tab).
+ * Pro state only — no tab/FAB badge. Upgrade lives on Account / budget meter
+ * (Ford 2026-07-14: no Go Pro or Unlimited notifications on Energy Agent).
  */
  function setProBadge(isPro) {
  state._isPro = !!isPro;
- function paint(id) {
+ function hide(id) {
  var badge = document.getElementById(id);
  if (!badge) return;
- badge.classList.remove("ea-pro-badge--go", "ea-pro-badge--ok");
- if (isPro) {
  badge.hidden = true;
  badge.textContent = "";
  badge.removeAttribute("aria-label");
  badge.onclick = null;
+ badge.classList.remove("ea-pro-badge--go", "ea-pro-badge--ok");
  badge.style.pointerEvents = "none";
- return;
  }
- badge.hidden = false;
- badge.textContent = "Go Pro";
- badge.classList.add("ea-pro-badge--go");
- badge.setAttribute("aria-label", "Upgrade to Energy Agent Pro");
- badge.style.pointerEvents = "auto";
- badge.onclick = function (e) {
- if (e) { e.preventDefault(); e.stopPropagation(); }
- // Prefer Account Billing upgrade; fall back to hash
- try {
- if (window.location.hash !== "#account") {
- window.location.hash = "#account";
- }
- setTimeout(function () {
- var btn = document.getElementById("aoAiProUpgrade") ||
- document.getElementById("acctChangePlan");
- if (btn) btn.click();
- }, 280);
- } catch (_) {}
- };
- }
- paint("eaProBadgeTab");
- paint("eaProBadgeFab");
+ hide("eaProBadgeTab");
+ hide("eaProBadgeFab");
  }
  window.__eaSetProState = setProBadge;
 
