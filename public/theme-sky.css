@@ -481,6 +481,7 @@ html.sky .sb-fld input,
 html.sky .sb-data-pick,
 html.sky .ao-input,
 html.sky .ao-textarea,
+html.sky .ops-note-ta,
 html.sky .cc-search input,
 html.sky .cl-fld input,
 html.sky .cl-fld textarea,
@@ -492,6 +493,7 @@ html.sky .cl-grace input{
 }
 html.sky .ao-input:focus,
 html.sky .ao-textarea:focus,
+html.sky .ops-note-ta:focus,
 html.sky .cc-search input:focus,
 html.sky .sb-fld input:focus{
   border-color:var(--sky-primary) !important;

@@ -751,9 +751,176 @@
     );
   }
 
-  function promptText(title, def) {
-    var v = window.prompt(title, def || "");
-    return v == null ? null : String(v).trim();
+  /* Sky-styled dialogs — never window.prompt / window.confirm (Chrome-native).
+   * Prefer AODialog (app.js) so notes/confirms match the rest of the product glass.
+   * Fallbacks only if app.js failed to load. */
+  function opsConfirm(message, opts) {
+    opts = opts || {};
+    if (window.AODialog && typeof AODialog.confirm === "function") {
+      return AODialog.confirm(message, opts);
+    }
+    return Promise.resolve(window.confirm(message));
+  }
+
+  function opsPrompt(message, value, opts) {
+    opts = opts || {};
+    if (window.AODialog && typeof AODialog.prompt === "function") {
+      return AODialog.prompt(message, value || "", opts).then(function (v) {
+        return v == null ? null : String(v).trim();
+      });
+    }
+    var r = window.prompt(opts.title || message, value || "");
+    return Promise.resolve(r == null ? null : String(r).trim());
+  }
+
+  /** Multiline note entry (phone / log) — frosted modal + textarea, not a one-liner prompt. */
+  function opsNoteModal(opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      if (typeof openModal !== "function") {
+        opsPrompt(opts.message || "", opts.value || "", { title: opts.title || "Note" }).then(resolve);
+        return;
+      }
+      var id = "opsNote" + Date.now();
+      var settled = false;
+      var settle = function (v) {
+        if (settled) return;
+        settled = true;
+        resolve(v);
+      };
+      openModal({
+        title: opts.title || "Note",
+        bodyHTML:
+          (opts.message
+            ? '<p class="ao-dialog-msg" style="margin:0 0 12px;font-size:14px;line-height:1.55;">' +
+              esc(opts.message) +
+              "</p>"
+            : "") +
+          '<div class="ao-field">' +
+          '<textarea class="ao-input ops-note-ta" id="' +
+          id +
+          '" rows="5" placeholder="' +
+          esc(opts.placeholder || "") +
+          '" style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #cdd7e0;border-radius:12px;font-size:14px;line-height:1.5;resize:vertical;min-height:120px;font-family:inherit;">' +
+          esc(opts.value || "") +
+          "</textarea></div>",
+        footHTML:
+          '<button type="button" class="ao-btn ao-btn-ghost" data-act="cancel" style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:9px;background:#fff;cursor:pointer;font-weight:650;">Cancel</button>' +
+          '<button type="button" class="ao-btn ao-btn-primary" data-act="save" style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">' +
+          esc(opts.confirmLabel || "Save note") +
+          "</button>",
+        onClose: function () {
+          settle(null);
+        },
+        onMount: function (root, close) {
+          var ta = root.querySelector("#" + id);
+          var cancelBtn = root.querySelector('[data-act="cancel"]');
+          var saveBtn = root.querySelector('[data-act="save"]');
+          setTimeout(function () {
+            try {
+              if (ta) {
+                ta.focus();
+                ta.setSelectionRange(ta.value.length, ta.value.length);
+              }
+            } catch (e) {}
+          }, 30);
+          if (cancelBtn)
+            cancelBtn.onclick = function () {
+              settle(null);
+              close();
+            };
+          if (saveBtn)
+            saveBtn.onclick = function () {
+              var v = ta ? String(ta.value || "").trim() : "";
+              settle(v || null);
+              close();
+            };
+        },
+      });
+    });
+  }
+
+  /** Open a repair ticket — pick site + optional title (no free-text substring prompt). */
+  function opsOpenTicketModal() {
+    return new Promise(function (resolve) {
+      if (typeof openModal !== "function") {
+        opsPrompt("Array name (substring) or leave blank", "", {
+          title: "Open repair ticket",
+        }).then(function (name) {
+          resolve({ arrayName: name || "", title: "Manual repair ticket" });
+        });
+        return;
+      }
+      var arrays = STATE.arrays || [];
+      var optsHtml =
+        '<option value="">General / no specific site</option>' +
+        arrays
+          .map(function (a) {
+            var id = a.id || a.array_id || "";
+            var name = a.name || a.array_name || ("Array #" + id);
+            return (
+              '<option value="' +
+              esc(String(id)) +
+              '">' +
+              esc(name) +
+              "</option>"
+            );
+          })
+          .join("");
+      var settled = false;
+      var settle = function (v) {
+        if (settled) return;
+        settled = true;
+        resolve(v);
+      };
+      openModal({
+        title: "Open repair ticket",
+        bodyHTML:
+          '<p class="ao-dialog-msg" style="margin:0 0 14px;font-size:14px;line-height:1.55;">Log a field repair so your O&amp;M tech can check in by email or SMS.</p>' +
+          '<div class="ao-field" style="margin-bottom:12px;">' +
+          '<label style="display:block;font-size:11px;font-weight:650;color:#5a6b7b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Site</label>' +
+          '<select class="ao-input ops-ticket-array" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:9px;font-size:14px;background:#fff;">' +
+          optsHtml +
+          "</select></div>" +
+          '<div class="ao-field">' +
+          '<label style="display:block;font-size:11px;font-weight:650;color:#5a6b7b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Title</label>' +
+          '<input class="ao-input ops-ticket-title" type="text" value="Manual repair ticket" placeholder="e.g. Inverter offline — needs site visit" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cdd7e0;border-radius:9px;font-size:14px;">' +
+          "</div>",
+        footHTML:
+          '<button type="button" class="ao-btn ao-btn-ghost" data-act="cancel" style="padding:10px 16px;border:1px solid #cdd7e0;border-radius:9px;background:#fff;cursor:pointer;font-weight:650;">Cancel</button>' +
+          '<button type="button" class="ao-btn ao-btn-primary" data-act="create" style="padding:10px 18px;border:0;border-radius:9px;cursor:pointer;font-weight:650;">Open ticket</button>',
+        onClose: function () {
+          settle(null);
+        },
+        onMount: function (root, close) {
+          var sel = root.querySelector(".ops-ticket-array");
+          var titleIn = root.querySelector(".ops-ticket-title");
+          var cancelBtn = root.querySelector('[data-act="cancel"]');
+          var createBtn = root.querySelector('[data-act="create"]');
+          setTimeout(function () {
+            try {
+              if (titleIn) {
+                titleIn.focus();
+                titleIn.select();
+              }
+            } catch (e) {}
+          }, 30);
+          if (cancelBtn)
+            cancelBtn.onclick = function () {
+              settle(null);
+              close();
+            };
+          if (createBtn)
+            createBtn.onclick = function () {
+              settle({
+                arrayId: sel && sel.value ? parseInt(sel.value, 10) : null,
+                title: (titleIn && titleIn.value.trim()) || "Manual repair ticket",
+              });
+              close();
+            };
+        },
+      });
+    });
   }
 
   function wire() {
@@ -805,7 +972,11 @@
     el.querySelectorAll("[data-ops-checkin]").forEach(function (b) {
       b.onclick = async function () {
         var id = parseInt(b.getAttribute("data-ops-checkin"), 10);
-        if (!confirm("Send email check-in for ticket #" + id + "?")) return;
+        var ok = await opsConfirm(
+          "We'll email the assigned tech a check-in request for this ticket.",
+          { title: "Send email check-in?", confirmLabel: "Send check-in" }
+        );
+        if (!ok) return;
         try {
           await api("/v1/array-owners/ops/tickets/" + id + "/checkin", {
             method: "POST",
@@ -845,7 +1016,13 @@
     el.querySelectorAll("[data-ops-phone-note]").forEach(function (b) {
       b.onclick = async function () {
         var id = parseInt(b.getAttribute("data-ops-phone-note"), 10);
-        var note = promptText("Phone note for ticket #" + id, "Spoke with tech — ");
+        var note = await opsNoteModal({
+          title: "Phone note · ticket #" + id,
+          message: "What did you cover on the call?",
+          value: "Spoke with tech — ",
+          placeholder: "e.g. Spoke with tech — ETA Friday, needs ladder access",
+          confirmLabel: "Save phone note",
+        });
         if (!note) return;
         try {
           await api("/v1/array-owners/ops/tickets/" + id + "/phone-note", {
@@ -863,7 +1040,13 @@
     el.querySelectorAll("[data-ops-note]").forEach(function (b) {
       b.onclick = async function () {
         var id = parseInt(b.getAttribute("data-ops-note"), 10);
-        var note = promptText("Status note for ticket #" + id, "");
+        var note = await opsNoteModal({
+          title: "Log note · ticket #" + id,
+          message: "Status update for the repair log.",
+          value: "",
+          placeholder: "e.g. Parts ordered, waiting on SMA RMA #…",
+          confirmLabel: "Save note",
+        });
         if (!note) return;
         try {
           await api("/v1/array-owners/ops/tickets/" + id + "/note", {
@@ -897,17 +1080,14 @@
     var openT = document.getElementById("opsOpenTicket");
     if (openT) {
       openT.onclick = async function () {
-        var name = promptText("Array name (substring) or leave blank", "");
-        var body = { fail_type: "other", title: "Manual repair ticket" };
-        if (name) {
-          // resolve via overview sites or arrays list
-          var arr = (STATE.arrays || []).find(function (a) {
-            var n = (a.name || a.array_name || "").toLowerCase();
-            return n.indexOf(name.toLowerCase()) >= 0;
-          });
-          if (arr) body.array_id = arr.id || arr.array_id;
-          else body.description = "Array: " + name;
-        }
+        var picked = await opsOpenTicketModal();
+        if (!picked) return;
+        var body = {
+          fail_type: "other",
+          title: picked.title || "Manual repair ticket",
+        };
+        if (picked.arrayId) body.array_id = picked.arrayId;
+        else if (picked.arrayName) body.description = "Array: " + picked.arrayName;
         try {
           await api("/v1/array-owners/ops/tickets", {
             method: "POST",
@@ -999,7 +1179,12 @@
     el.querySelectorAll("[data-ops-del-contact]").forEach(function (b) {
       b.onclick = async function () {
         var id = parseInt(b.getAttribute("data-ops-del-contact"), 10);
-        if (!confirm("Remove this contact?")) return;
+        var ok = await opsConfirm("They'll be removed from your O&M team list.", {
+          title: "Remove this contact?",
+          danger: true,
+          confirmLabel: "Remove",
+        });
+        if (!ok) return;
         try {
           await api("/v1/array-owners/ops/contacts/" + id, { method: "DELETE" });
           toast("Contact removed");
@@ -1051,7 +1236,11 @@
     el.querySelectorAll("[data-ops-send-claim]").forEach(function (b) {
       b.onclick = async function () {
         var id = parseInt(b.getAttribute("data-ops-send-claim"), 10);
-        if (!confirm("Send warranty claim #" + id + "?")) return;
+        var ok = await opsConfirm(
+          "This emails the manufacturer claim package for claim #" + id + ".",
+          { title: "Send warranty claim?", confirmLabel: "Send claim" }
+        );
+        if (!ok) return;
         try {
           await api("/v1/array-owners/claims/" + id + "/send", {
             method: "POST",
