@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { isDemoMode } from "@/lib/demoData";
+import { ensureDemoSticky, isDemoMode } from "@/lib/demoData";
 import {
   captureTokenFromUrl,
   getSession,
@@ -17,6 +17,8 @@ export function AuthGate() {
     (async () => {
       await captureTokenFromUrl();
       if (cancelled) return;
+      // Stick ?demo=1 before any screen fetches — tab Links drop the query.
+      ensureDemoSticky();
       if (isDemoMode()) setSessionState("demo");
       else setSessionState(getSession());
       setReady(true);

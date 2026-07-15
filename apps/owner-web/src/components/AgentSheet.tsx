@@ -121,6 +121,26 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [msgs, busy, pending, voice]);
 
+  // Escape closes the sheet (backdrop is full-screen but z-order can block clicks)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function handleClose() {
+    agentVoice.stop(false);
+    setVoice("idle");
+    onClose();
+  }
+
   async function send(
     text: string,
     opts?: { fromVoice?: boolean }
@@ -230,11 +250,6 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void send(input);
-  }
-
-  function handleClose() {
-    agentVoice.stop(false);
-    onClose();
   }
 
   if (!open) return null;

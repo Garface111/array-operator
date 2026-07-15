@@ -211,13 +211,12 @@ export function AccountScreen() {
             className="ao-input mt-1"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
-            disabled={isDemoMode()}
           />
         </label>
         <button
           type="submit"
           className="ao-btn-primary w-full !min-h-10 !text-xs"
-          disabled={isDemoMode() || !!busy || !company.trim()}
+          disabled={!!busy || !company.trim()}
         >
           {busy === "company" ? "Saving…" : "Save company"}
         </button>
@@ -265,7 +264,7 @@ export function AccountScreen() {
           <button
             type="button"
             className="ao-btn-ghost !min-h-10 !text-xs"
-            disabled={isDemoMode() || !!busy}
+            disabled={!!busy}
             onClick={() => void openAddCard()}
           >
             {busy === "card" ? "…" : "Add card"}
@@ -273,7 +272,7 @@ export function AccountScreen() {
           <button
             type="button"
             className="ao-btn-primary !min-h-10 !text-xs"
-            disabled={isDemoMode() || !!busy}
+            disabled={!!busy}
             onClick={() => void openBillingPortal()}
           >
             {busy === "portal" ? "…" : "Billing portal"}
@@ -291,7 +290,7 @@ export function AccountScreen() {
             <button
               key={m}
               type="button"
-              disabled={isDemoMode() || !!busy}
+              disabled={!!busy}
               onClick={() => void onMode(m)}
               className={[
                 "rounded-xl border px-3 py-2.5 text-xs font-extrabold capitalize",

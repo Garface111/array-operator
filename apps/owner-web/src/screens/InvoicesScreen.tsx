@@ -228,7 +228,8 @@ export function InvoicesScreen() {
     <div className="space-y-4">
       {isDemoMode() ? (
         <DemoBanner>
-          Demo offtaker roster — sign in to create, edit, and preview PDFs.
+          Demo offtaker roster — Add / Edit / Preview work on sample data
+          (not saved to a real account).
         </DemoBanner>
       ) : null}
 
@@ -245,7 +246,6 @@ export function InvoicesScreen() {
         <button
           type="button"
           className="ao-btn-primary !min-h-9 !px-3 !text-xs"
-          disabled={isDemoMode()}
           onClick={() => setShowCreate((v) => !v)}
         >
           {showCreate ? "Close" : "Add"}
@@ -448,15 +448,9 @@ export function InvoicesScreen() {
             <button
               type="button"
               className="font-bold text-sky-800"
-              onClick={() =>
-                isDemoMode()
-                  ? openAgent(
-                      "Walk me through adding offtakers. What's the fastest path?"
-                    )
-                  : setShowCreate(true)
-              }
+              onClick={() => setShowCreate(true)}
             >
-              {isDemoMode() ? "Ask Agent →" : "Add one →"}
+              Add one →
             </button>
           </EmptyCard>
         ) : (
@@ -523,7 +517,7 @@ export function InvoicesScreen() {
                     <button
                       type="button"
                       className="text-xs font-bold text-sky-800"
-                      disabled={!!busy || isDemoMode()}
+                      disabled={!!busy}
                       onClick={() => void onPreview(s)}
                     >
                       {busy === `prev-${s.id}` ? "Opening…" : "Preview PDF"}
@@ -531,7 +525,6 @@ export function InvoicesScreen() {
                     <button
                       type="button"
                       className="text-xs font-bold text-sky-800"
-                      disabled={isDemoMode()}
                       onClick={() =>
                         setEditId(isEdit ? null : String(s.id))
                       }

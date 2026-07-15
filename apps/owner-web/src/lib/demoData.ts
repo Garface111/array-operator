@@ -8,6 +8,7 @@ import type {
   FleetTree,
   Overview,
   SendPipeline,
+  Subscription,
   SubscriptionsList,
 } from "./types";
 
@@ -36,6 +37,27 @@ export function isDemoMode(): boolean {
     return false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Stick demo on once detected (e.g. ?demo=1). React Router tab links drop the
+ * query string; without localStorage the next screen would call live APIs → 401.
+ * Safe to call often — only writes when already in demo and not sticky yet.
+ */
+export function ensureDemoSticky(): void {
+  try {
+    if (localStorage.getItem("ao_owner_demo") === "0") return;
+    if (localStorage.getItem("ao_owner_demo") === "1") return;
+    if (
+      /[?&]demo=1(&|$)/.test(location.search || "") ||
+      (isPreviewHost() && !localStorage.getItem("so_session"))
+    ) {
+      localStorage.setItem("ao_owner_demo", "1");
+      localStorage.removeItem("so_session");
+    }
+  } catch {
+    /* ignore */
   }
 }
 
@@ -197,35 +219,114 @@ export const demoCloud: CloudStatus = {
   ],
 };
 
+/** Mutable demo roster so Add/Edit offtaker can be dogfooded without a live session. */
 export const demoSubs: SubscriptionsList = {
   ok: true,
   subscriptions: [
     {
       id: 1,
       offtaker_name: "Town Library",
+      customer_name: "Town Library",
       email: "lib@example.org",
+      client_email: "lib@example.org",
       share_pct: 12.5,
+      allocation_pct: 0.125,
       delivery_mode: "approval",
       enabled: true,
       utility_account_name: "GMP master",
+      array_id: 1,
     },
     {
       id: 2,
       offtaker_name: "Fire Station",
+      customer_name: "Fire Station",
       email: "fire@example.org",
+      client_email: "fire@example.org",
       share_pct: 8,
+      allocation_pct: 0.08,
       delivery_mode: "auto",
       enabled: true,
       utility_account_name: "GMP master",
+      array_id: 1,
     },
     {
       id: 3,
       offtaker_name: "School District",
+      customer_name: "School District",
       email: "biz@schools.example",
+      client_email: "biz@schools.example",
       share_pct: 22,
+      allocation_pct: 0.22,
       delivery_mode: "approval",
       enabled: true,
       utility_account_name: "GMP master",
+      array_id: 2,
     },
   ],
 };
+
+let demoSubSeq = 100;
+
+export function demoCreateSubscription(fields: {
+  customer_name: string;
+  client_email?: string;
+  array_id?: number | null;
+  utility_account_id?: number | null;
+  allocation_pct?: number | null;
+  delivery_mode?: string;
+  enabled?: boolean;
+}): { ok: boolean; subscription: Subscription } {
+  const id = ++demoSubSeq;
+  const alloc =
+    fields.allocation_pct != null && fields.allocation_pct > 0
+      ? fields.allocation_pct > 1
+        ? fields.allocation_pct / 100
+        : fields.allocation_pct
+      : 0.1;
+  const sub: Subscription = {
+    id,
+    offtaker_name: fields.customer_name,
+    customer_name: fields.customer_name,
+    email: fields.client_email || "",
+    client_email: fields.client_email || "",
+    share_pct: Math.round(alloc * 1000) / 10,
+    allocation_pct: alloc,
+    delivery_mode: fields.delivery_mode || "approval",
+    enabled: fields.enabled !== false,
+    utility_account_name:
+      fields.utility_account_id != null ? "GMP master" : undefined,
+    array_id: fields.array_id ?? null,
+  };
+  demoSubs.subscriptions = [...(demoSubs.subscriptions || []), sub];
+  return { ok: true, subscription: sub };
+}
+
+export function demoPatchSubscription(
+  subId: number | string,
+  body: Record<string, unknown>
+): { ok: boolean; subscription: Subscription | null } {
+  const list = [...(demoSubs.subscriptions || [])];
+  const idx = list.findIndex((s) => String(s.id) === String(subId));
+  if (idx < 0) return { ok: false, subscription: null };
+  const cur: Subscription = { ...list[idx] };
+  if (body.customer_name != null) {
+    cur.customer_name = String(body.customer_name);
+    cur.offtaker_name = String(body.customer_name);
+  }
+  if (body.client_email !== undefined) {
+    cur.client_email = body.client_email == null ? "" : String(body.client_email);
+    cur.email = cur.client_email;
+  }
+  if (body.delivery_mode != null) cur.delivery_mode = String(body.delivery_mode);
+  if (body.enabled !== undefined) cur.enabled = Boolean(body.enabled);
+  if (body.allocation_pct != null) {
+    let n = Number(body.allocation_pct);
+    if (n > 1) n = n / 100;
+    cur.allocation_pct = n;
+    cur.share_pct = Math.round(n * 1000) / 10;
+  }
+  if (body.array_id != null) cur.array_id = Number(body.array_id);
+  list[idx] = cur;
+  demoSubs.subscriptions = list;
+  return { ok: true, subscription: cur };
+}

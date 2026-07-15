@@ -2,8 +2,10 @@ import { clearSession, getSession, SESSION_KEY, UNAUTHORIZED_EVENT } from "./ses
 import {
   demoAccount,
   demoCloud,
+  demoCreateSubscription,
   demoFleet,
   demoOverview,
+  demoPatchSubscription,
   demoPipeline,
   demoSubs,
   isDemoMode,
@@ -357,7 +359,12 @@ export async function createSubscription(fields: {
   cadence?: string;
   enabled?: boolean;
 }): Promise<{ ok?: boolean; subscription?: Subscription }> {
-  if (isDemoMode()) throw new ApiError(400, "Sign in to create offtakers");
+  if (isDemoMode()) {
+    return demoCreateSubscription(fields) as {
+      ok?: boolean;
+      subscription?: Subscription;
+    };
+  }
   const fd = new FormData();
   fd.set("customer_name", fields.customer_name);
   if (fields.client_email) fd.set("client_email", fields.client_email);
@@ -392,7 +399,12 @@ export async function patchSubscription(
   subId: number | string,
   body: Record<string, unknown>
 ): Promise<{ ok?: boolean; subscription?: Subscription }> {
-  if (isDemoMode()) throw new ApiError(400, "Sign in to edit offtakers");
+  if (isDemoMode()) {
+    const r = demoPatchSubscription(subId, body);
+    if (!r.ok || !r.subscription)
+      throw new ApiError(404, "Demo offtaker not found");
+    return { ok: true, subscription: r.subscription as Subscription };
+  }
   return apiFetch(`/v1/array-operator/billing/subscriptions/${subId}`, {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -406,7 +418,39 @@ export async function openSubscriptionPreview(
   fmt: "pdf" | "xlsx" = "pdf"
 ): Promise<void> {
   if (isDemoMode()) {
-    throw new ApiError(400, "PDF preview needs a live offtaker — sign in");
+    // Sample HTML stand-in so the Preview button is fully exercisable in demo.
+    const sub =
+      (demoSubs.subscriptions || []).find((s) => String(s.id) === String(subId)) ||
+      null;
+    const name =
+      sub?.customer_name ||
+      sub?.offtaker_name ||
+      sub?.name ||
+      `Offtaker #${subId}`;
+    const share =
+      sub?.allocation_pct != null
+        ? `${(Number(sub.allocation_pct) * 100).toFixed(1)}%`
+        : sub?.share_pct != null
+          ? `${sub.share_pct}%`
+          : "—";
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Demo ${kind} — ${name}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;color:#0f172a}
+h1{font-size:1.25rem} .muted{color:#64748b;font-size:.875rem} .box{border:1px solid #cbd5e1;border-radius:12px;padding:1rem;margin-top:1rem}</style>
+</head><body>
+<h1>Demo ${kind === "summary" ? "summary" : "invoice"} preview</h1>
+<p class="muted">Sample only — sign in for a real PDF from your utility bills.</p>
+<div class="box">
+  <div><strong>${name}</strong></div>
+  <div class="muted">Share ${share} · offtaker id ${subId}</div>
+  <p style="margin-top:1rem">Green Mountain Community Solar · period sample</p>
+  <p class="muted">This is not a bill. Live accounts open a generated PDF here.</p>
+</div>
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
   }
   const token = getSession();
   const headers = new Headers();
@@ -528,6 +572,15 @@ export async function agentChat(
     if (m.includes("attention") || m.includes("health"))
       reply =
         "Cover Rooftop is underperforming (peer ~0.78). Londonderry and West Glover look healthy. Next: check Cover’s inverter feed and shading/fault history.";
+    if (
+      m.includes("investigat") ||
+      m.includes("offline") ||
+      m.includes("inverter") ||
+      m.includes("fault") ||
+      m.includes("underperform")
+    )
+      reply =
+        "Investigation (demo): Cover Rooftop SE10K is the unit to check — peer ~0.78, 3.2 kW now vs site nameplate. Likely causes: partial string offline, communications lag, or shading. I’d pull last-24h power curve, fault codes, and peer delta next. Londonderry (4 inv) and West Glover look clear.";
     if (m.includes("invoice") || m.includes("offtaker"))
       reply =
         "Last cycle Jun 2026: 13 of 14 offtaker reports sent. Fleet default is approve-to-send. Town Library, Fire Station, and School District are on the sample roster.";

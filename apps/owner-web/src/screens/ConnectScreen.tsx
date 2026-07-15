@@ -150,7 +150,7 @@ export function ConnectScreen() {
     <div className="space-y-4">
       {isDemoMode() ? (
         <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2 text-xs font-semibold text-amber-950 backdrop-blur-md">
-          Demo connect status — sign in to attach real feeds.
+          Demo connect status — forms work; real vendor attach needs sign-in.
         </div>
       ) : null}
 
@@ -215,13 +215,12 @@ export function ConnectScreen() {
             value={seKey}
             onChange={(e) => setSeKey(e.target.value)}
             autoComplete="off"
-            disabled={isDemoMode()}
             required
           />
           <button
             type="submit"
             className="ao-btn-primary w-full !min-h-10 !text-xs"
-            disabled={!!busy || isDemoMode() || !seKey.trim()}
+            disabled={!!busy || !seKey.trim()}
           >
             {busy === "se" ? "Connecting…" : "Connect SolarEdge account"}
           </button>
@@ -341,7 +340,7 @@ export function ConnectScreen() {
             <button
               type="button"
               className="text-[11px] font-bold text-sky-800"
-              disabled={!!busy || isDemoMode()}
+              disabled={!!busy}
               onClick={() => void onRefreshHarvest()}
             >
               Harvest now
@@ -376,7 +375,7 @@ export function ConnectScreen() {
                       ? "bg-emerald-100 text-emerald-900"
                       : "bg-slate-100 text-slate-600",
                   ].join(" ")}
-                  disabled={isDemoMode() || !!busy}
+                  disabled={!!busy}
                   onClick={() =>
                     void toggleCloudCredential({
                       provider: String(c.provider),
@@ -401,7 +400,6 @@ export function ConnectScreen() {
             onChange={(e) =>
               setCloudForm((f) => ({ ...f, provider: e.target.value }))
             }
-            disabled={isDemoMode()}
           >
             {CLOUD_PROVIDERS.map((p) => (
               <option key={p.id} value={p.id}>
@@ -429,7 +427,6 @@ export function ConnectScreen() {
             }
             autoComplete="username"
             required
-            disabled={isDemoMode()}
           />
           <input
             className="ao-input"
@@ -441,7 +438,6 @@ export function ConnectScreen() {
             }
             autoComplete="current-password"
             required
-            disabled={isDemoMode()}
           />
           <label className="flex items-start gap-2 text-[11px] font-medium text-slate-800/80">
             <input
@@ -460,7 +456,6 @@ export function ConnectScreen() {
             className="ao-btn-primary w-full !min-h-10 !text-xs"
             disabled={
               !!busy ||
-              isDemoMode() ||
               !cloudForm.username ||
               !cloudForm.password ||
               !cloudForm.consent
@@ -514,7 +509,7 @@ export function ConnectScreen() {
           <button
             type="button"
             className="ao-btn-primary w-full !min-h-10 !text-xs"
-            disabled={!!busy || isDemoMode()}
+            disabled={!!busy}
             onClick={() => void onPayConnect()}
           >
             {busy === "pay" ? "Opening Stripe…" : "Enable online pay"}
