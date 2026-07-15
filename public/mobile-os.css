@@ -1,0 +1,679 @@
+/* ============================================================================
+   Mobile OS — Energy Agent as the operating layer (≤960px, signed-in).
+   body.mh-os     → AI home (full-screen agent + ops strip)
+   body.mh-detail → full tab UI with sticky "back to Agent" dock
+   Desktop ≥961px: this file is inert (shell hidden).
+   ============================================================================ */
+
+#mhOs {
+  display: none;
+}
+/* Dock lives on <body> as a sibling — never stretch with the top chrome shell */
+#mhDock {
+  display: none;
+}
+
+/* ── Active shell chrome (always present on mobile signed-in) ───────────── */
+@media (max-width: 960px) {
+  /* Top chrome only — height:auto, NEVER full-viewport (that made a giant white pill) */
+  body.mh-active #mhOs {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100%;
+    z-index: 99970;
+    pointer-events: none;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body.mh-active #mhOs > * {
+    pointer-events: auto;
+  }
+
+  /* Top brand + setup meter */
+  .mh-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px 8px;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.82),
+      rgba(255, 255, 255, 0.55)
+    );
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    border-bottom: 1px solid rgba(33, 150, 243, 0.12);
+  }
+  html:not(.sky) .mh-top {
+    background: linear-gradient(180deg, rgba(12, 18, 28, 0.92), rgba(12, 18, 28, 0.78));
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+  .mh-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .mh-orb {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background:
+      radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%),
+      radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%);
+    box-shadow: 0 6px 16px -6px rgba(33, 150, 243, 0.55),
+      0 0 0 2px rgba(255, 255, 255, 0.55);
+  }
+  .mh-brand-tx {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .mh-brand-tx b {
+    font-size: 15px;
+    font-weight: 780;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+    line-height: 1.15;
+  }
+  .mh-brand-tx small {
+    font-size: 11.5px;
+    font-weight: 560;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  html:not(.sky) .mh-brand-tx b {
+    color: #e8eef7;
+  }
+  html:not(.sky) .mh-brand-tx small {
+    color: #94a3b8;
+  }
+
+  .mh-meter {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+    max-width: 42%;
+  }
+  .mh-meter-lab {
+    font-size: 10px;
+    font-weight: 750;
+    color: #1976d2;
+    white-space: nowrap;
+  }
+  .mh-meter-track {
+    flex: 1 1 64px;
+    height: 6px;
+    border-radius: 99px;
+    background: rgba(33, 150, 243, 0.12);
+    overflow: hidden;
+  }
+  .mh-meter-track > i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #64b5f6, #2196f3);
+    transition: width 0.35s ease;
+  }
+  .mh-meter-pct {
+    font-size: 11px;
+    font-weight: 780;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: right;
+  }
+
+  /* Ops strip — checklist pills (setup) or system cards (running) */
+  .mh-ops {
+    display: none;
+    gap: 8px;
+    padding: 10px 12px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mh-ops::-webkit-scrollbar {
+    display: none;
+  }
+  body.mh-os .mh-ops {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+  /* Running phase: stack cards under top, still above chat */
+  body.mh-os.mh-phase-running .mh-ops,
+  body.mh-os:not(.mh-phase-setup) .mh-ops {
+    flex-wrap: wrap;
+    max-height: none;
+  }
+
+  .mh-pill {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 8px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(33, 150, 243, 0.16);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 4px 14px -8px rgba(20, 60, 120, 0.18);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: #0f172a;
+    min-height: 48px;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .mh-pill:active {
+    transform: scale(0.98);
+  }
+  .mh-pill.is-done {
+    border-color: rgba(33, 150, 243, 0.28);
+    background: linear-gradient(
+      165deg,
+      rgba(33, 150, 243, 0.12),
+      rgba(255, 255, 255, 0.85)
+    );
+  }
+  .mh-pill.is-next {
+    border-color: rgba(33, 150, 243, 0.55);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.14),
+      0 8px 20px -10px rgba(33, 150, 243, 0.45);
+  }
+  .mh-pill-mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748b;
+    flex: 0 0 auto;
+  }
+  .mh-pill.is-done .mh-pill-mark {
+    background: #2196f3;
+    color: #fff;
+  }
+  .mh-pill.is-next .mh-pill-mark {
+    background: linear-gradient(145deg, #56b4f0, #2196f3);
+    color: #fff;
+  }
+  .mh-pill-tx {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .mh-pill-tx b {
+    font-size: 12.5px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+  }
+  .mh-pill-tx small {
+    font-size: 10.5px;
+    color: #64748b;
+    font-weight: 560;
+  }
+
+  .mh-card {
+    flex: 1 1 140px;
+    min-width: 140px;
+    max-width: 100%;
+    padding: 12px 13px;
+    border-radius: 16px;
+    border: 1px solid rgba(33, 150, 243, 0.14);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 6px 18px -12px rgba(20, 60, 120, 0.2);
+  }
+  .mh-card-k {
+    font-size: 10px;
+    font-weight: 780;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #1976d2;
+    margin-bottom: 4px;
+  }
+  .mh-card-v {
+    font-size: 14.5px;
+    font-weight: 760;
+    color: #0f172a;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+  }
+  .mh-card-v small {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #64748b;
+  }
+  .mh-card-meta {
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: #475569;
+    line-height: 1.35;
+  }
+  .mh-card-cad {
+    margin-top: 6px;
+    font-size: 10.5px;
+    font-weight: 620;
+    color: #64748b;
+    opacity: 0.9;
+  }
+
+  .mh-actions {
+    display: none;
+    gap: 8px;
+    padding: 8px 12px 10px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  body.mh-os .mh-actions {
+    display: grid;
+  }
+  /* Running: tight 2×2 — every cell equal, no half-row dead space */
+  body.mh-os .mh-actions.mh-actions-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(44px, auto);
+  }
+  /* Setup: primary full-width, secondary full-width under it (or 50/50 if preferred) */
+  body.mh-os .mh-actions.mh-actions-setup {
+    grid-template-columns: 1fr 1fr;
+  }
+  body.mh-os .mh-actions.mh-actions-setup .mh-cta-wide {
+    grid-column: 1 / -1;
+  }
+  /* Single full-width CTA (setup complete) */
+  body.mh-os .mh-actions:not(.mh-actions-grid):not(.mh-actions-setup) {
+    grid-template-columns: 1fr;
+  }
+  .mh-cta {
+    min-height: 44px;
+    width: 100%;
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 760;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.18),
+        rgba(255, 255, 255, 0) 42%
+      ),
+      #2196f3;
+    box-shadow: 0 8px 20px -8px rgba(33, 150, 243, 0.55);
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mh-cta.ghost {
+    background: rgba(255, 255, 255, 0.82);
+    color: #0f172a;
+    border: 1px solid rgba(33, 150, 243, 0.2);
+    box-shadow: 0 2px 10px rgba(20, 60, 120, 0.06);
+    font-weight: 720;
+    font-size: 12.5px;
+  }
+  .mh-cta:active {
+    transform: scale(0.98);
+  }
+
+  /* Bottom mode dock — COMPACT horizontal pill only (never full-height).
+     border-radius:999 on a stretched element = giant vertical stadium; pin size. */
+  body.mh-active #mhDock.mh-dock,
+  body.mh-active nav.mh-dock {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: fixed !important;
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+    transform: translateX(-50%) !important;
+    z-index: 99990 !important;
+    width: max-content !important;
+    max-width: calc(100vw - 24px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 52px !important;
+    gap: 4px;
+    padding: 4px 5px !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    border: 1px solid rgba(33, 150, 243, 0.18) !important;
+    box-shadow: 0 12px 32px -12px rgba(15, 50, 110, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.6) inset !important;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    pointer-events: auto !important;
+    overflow: hidden;
+    box-sizing: border-box !important;
+    inset: auto !important; /* kill any inset:0 bleed */
+    inset-inline: auto !important;
+    /* re-assert bottom after inset reset */
+    bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+    left: 50% !important;
+  }
+  body.mh-active #mhDock .mh-dock-btn,
+  body.mh-active .mh-dock-btn {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px !important;
+    max-height: 44px !important;
+    height: 40px !important;
+    padding: 0 16px !important;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 720;
+    color: #64748b;
+    cursor: pointer;
+    white-space: nowrap;
+    width: auto !important;
+  }
+  body.mh-active #mhDock .mh-dock-btn.on,
+  body.mh-active .mh-dock-btn.on {
+    background: #2196f3;
+    color: #fff;
+    box-shadow: 0 4px 14px -4px rgba(33, 150, 243, 0.55);
+  }
+  body.mh-active #mhDock .mh-dock-ic,
+  body.mh-active .mh-dock-ic {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* ══ AI MODE — agent is the OS ═══════════════════════════════════════════ */
+  body.mh-os {
+    /* Hide desktop product chrome — AI is home */
+  }
+  body.mh-os .wrap,
+  body.mh-os #tabbar,
+  body.mh-os .demo-banner,
+  body.mh-os .gmp-gate,
+  body.mh-os #extLiveNudge,
+  body.mh-os .ao-al-fab,
+  body.mh-os #hoPill,
+  body.mh-os .mob-more,
+  body.mh-os .mob-more-backdrop {
+    display: none !important;
+  }
+  /* Energy Agent panel = full-screen home below ops strip */
+  body.mh-os #eaFab {
+    display: none !important; /* dock owns open/close semantics */
+  }
+  body.mh-os #eaBackdrop {
+    display: none !important;
+  }
+  body.mh-os #eaPanel,
+  body.mh-os #eaPanel.open {
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    z-index: 99950 !important;
+    /* room for top ops + bottom dock */
+    padding-top: 0;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    box-shadow: none !important;
+    background: linear-gradient(
+      180deg,
+      rgba(237, 245, 253, 0.97) 0%,
+      rgba(255, 255, 255, 0.94) 40%,
+      rgba(255, 255, 255, 0.98) 100%
+    ) !important;
+  }
+  html.sky body.mh-os #eaPanel {
+    background: linear-gradient(
+      180deg,
+      rgba(210, 232, 252, 0.55) 0%,
+      rgba(255, 255, 255, 0.72) 28%,
+      rgba(255, 255, 255, 0.88) 100%
+    ) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    backdrop-filter: blur(18px) saturate(1.5);
+  }
+  /* Reserve top for mh chrome — panel content starts under ops */
+  body.mh-os #eaPanel .ea-head {
+    display: none !important; /* brand lives in #mhTop */
+  }
+  body.mh-os #eaPanel {
+    /* Push msgs below fixed ops; JS sets --mh-ops-h dynamically if needed */
+    padding-top: var(--mh-chrome-h, 168px) !important;
+  }
+  body.mh-os #eaPanel .ea-status {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 0;
+    margin: 0;
+  }
+  body.mh-os #eaPanel .ea-msgs {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px 14px 16px;
+  }
+  body.mh-os #eaPanel .ea-msg {
+    font-size: 14px;
+    line-height: 1.45;
+    padding: 11px 13px;
+    max-width: 94%;
+  }
+  body.mh-os #eaPanel .ea-footer {
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.82);
+    border-top: 1px solid rgba(33, 150, 243, 0.1);
+  }
+  body.mh-os #eaPanel .ea-compose-bar > .ea-chip,
+  body.mh-os #eaPanel .ea-compose-bar > .ea-send {
+    height: 40px;
+    min-width: 40px;
+    font-size: 12px;
+  }
+  body.mh-os #eaPanel .ea-legal {
+    display: none;
+  }
+  body.mh-os #eaPanel .ea-x {
+    display: none !important;
+  }
+  /* Mic gate parks above dock */
+  body.mh-os .ea-mic-gate,
+  body.mh-os.ea-shell-open .ea-mic-gate {
+    left: 14px !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Ops chrome sits above the full-screen panel */
+  body.mh-os #mhOs .mh-top,
+  body.mh-os #mhOs .mh-ops,
+  body.mh-os #mhOs .mh-actions {
+    position: relative;
+    z-index: 99980;
+    background: transparent;
+  }
+  body.mh-os #mhOs .mh-top {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92),
+      rgba(255, 255, 255, 0.78)
+    );
+  }
+
+  /* ══ DETAIL MODE — full app, dock stays ══════════════════════════════════
+     Floating icons are packed into #mhFabTray (left stack) so they never
+     cover the bottom tabbar, mode dock, or content corners. */
+  body.mh-detail {
+    /* tabbar (~58) + mode dock (~52) + gap — FABs sit above this */
+    --mh-detail-chrome: calc(58px + 54px + env(safe-area-inset-bottom, 0px));
+  }
+  body.mh-detail #mhOs .mh-ops,
+  body.mh-detail #mhOs .mh-actions,
+  body.mh-detail #mhOs .mh-meter {
+    display: none !important;
+  }
+  body.mh-detail #mhOs .mh-top {
+    /* Compact bar: Agent is one tap away */
+    padding-bottom: 8px;
+  }
+  body.mh-detail #mhOs .mh-brand-tx small::after {
+    content: " · tap Agent to return";
+  }
+  body.mh-detail .wrap {
+    padding-top: 56px !important;
+    /* room for tabbar + mode dock + left tray */
+    padding-bottom: calc(var(--mh-detail-chrome) + 16px) !important;
+    padding-left: 12px !important;
+  }
+  /* Bottom tabbar sits above the Agent/Detail dock */
+  body.mh-detail #tabbar {
+    bottom: calc(54px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Agent sun bubble is redundant — Agent is on #mhDock */
+  body.mh-detail #eaFab {
+    display: none !important;
+  }
+  /* Improve-site floater: tuck into tray stack space or hide (EA Improve chip) */
+  body.mh-detail #fsWrap {
+    display: none !important;
+  }
+
+  /* ── Unified FAB tray (left, above bottom chrome) ─────────────────────── */
+  body.mh-detail #mhFabTray.mh-fab-tray {
+    display: flex !important;
+    flex-direction: column-reverse; /* Alerts closest to thumb */
+    align-items: stretch;
+    gap: 8px;
+    position: fixed !important;
+    left: 12px !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(var(--mh-detail-chrome) + 10px) !important;
+    z-index: 9005;
+    width: auto;
+    max-width: calc(100vw - 24px);
+    margin: 0;
+    padding: 0;
+    pointer-events: none; /* only children receive taps */
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  body.mh-detail #mhFabTray.mh-fab-tray > * {
+    pointer-events: auto;
+    /* Un-pin fixed children so the tray owns layout */
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    inset: auto !important;
+    margin: 0 !important;
+    z-index: auto !important;
+  }
+  /* Compact circular icons — full hit target, no text overflow onto UI */
+  body.mh-detail #mhFabTray .ao-al-fab,
+  body.mh-detail #mhFabTray #hoPill {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+  }
+  body.mh-detail #mhFabTray .ao-al-fab-txt,
+  body.mh-detail #mhFabTray .ho-pill-lab {
+    display: none !important;
+  }
+  body.mh-detail #mhFabTray .ao-al-fab-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+  }
+  body.mh-detail #mhFabTray .ao-al-fab {
+    position: relative !important;
+  }
+  /* Alerts panel opens above the tray, left-aligned, full function */
+  body.mh-detail .ao-al-panel {
+    left: 12px !important;
+    right: auto !important;
+    bottom: calc(var(--mh-detail-chrome) + 10px + 48px + 12px) !important;
+    width: min(372px, calc(100vw - 24px)) !important;
+    max-height: min(70vh, calc(100dvh - var(--mh-detail-chrome) - 80px)) !important;
+    overflow: auto !important;
+  }
+
+  /* When tray is hidden (not detail), don't leave a ghost */
+  #mhFabTray[hidden] {
+    display: none !important;
+  }
+}
+
+/* Agent mode: never show the detail FAB tray */
+body.mh-os #mhFabTray {
+  display: none !important;
+}
+
+/* Desktop: never show shell, dock, or mobile FAB tray */
+@media (min-width: 961px) {
+  #mhOs,
+  #mhDock,
+  #mhFabTray {
+    display: none !important;
+  }
+}
