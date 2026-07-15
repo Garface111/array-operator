@@ -1,123 +1,184 @@
-<!doctype html>
-<html lang="en" class="sky" data-theme="day">
+<!DOCTYPE html>
+<html lang="en" class="sky">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoices · Trends demo (sky)</title>
-<link rel="stylesheet" href="styles.css?v=demo">
-<link rel="stylesheet" href="theme-day.css?v=demo">
-<link rel="stylesheet" href="theme-sky.css?v=demo">
-<link rel="stylesheet" href="theme-sky-reports.css?v=20260715invTrends1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoices · Trends demo — offtaker gains</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="theme-day.css">
+<link rel="stylesheet" href="theme-sky.css?v=20260715offGain1">
+<link rel="stylesheet" href="theme-sky-reports.css?v=20260715offGain1">
 <style>
-  body{margin:0;min-height:100vh;font-family:system-ui,sans-serif}
-  /* sky mountain bg simplified */
-  html.sky body{
-    background:#0a0e14 url("img/sky/world-zo6-1600.webp") center top / cover no-repeat fixed;
-  }
-  .demo-wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
-  .demo-banner{
-    background:rgba(15,23,42,.72);color:#e2e8f0;padding:10px 14px;border-radius:12px;
-    font-size:13px;margin-bottom:16px;border:1px solid rgba(255,255,255,.12)
-  }
-  .demo-banner b{color:#7dd3fc}
-  /* minimal tabbar mimic */
-  .demo-tabs{
-    display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;
-    background:rgba(255,255,255,.55);backdrop-filter:blur(12px);
-    padding:8px;border-radius:999px;border:1px solid rgba(255,255,255,.5);
-    width:fit-content;
-  }
-  .demo-tabs span{
-    padding:8px 14px;border-radius:999px;font-size:13.5px;font-weight:650;color:#33415A
-  }
-  .demo-tabs span.on{background:#2196f3;color:#fff;box-shadow:0 4px 14px -4px rgba(33,150,243,.55)}
+  body{ margin:0; padding:24px 20px 48px; background:var(--bg,#eef6ff); color:var(--ink); font-family:system-ui,sans-serif; }
+  .demo-shell{ max-width:960px; margin:0 auto; }
+  .demo-tag{ font-size:12px; color:var(--muted); margin-bottom:12px; }
 </style>
 </head>
 <body>
-<div class="demo-wrap">
-  <div class="demo-banner">
-    <b>Demo · not live until you approve.</b>
-    Invoices tab → <b>Trends</b> sub-tab (sky design). Offtakers / Bill audit stay for editing.
-  </div>
-  <div class="demo-tabs" aria-hidden="true">
-    <span>Energy Agent</span><span>Fleet Triage</span><span>Inverters</span>
-    <span>Analysis</span><span class="on">Invoices</span><span>Resources</span><span>Account</span>
-  </div>
-
-  <div class="rb2">
-    <div class="rb2-head">
-      <div class="rb2-id">
-        <h1>Offtaker invoicing</h1>
-        <p>Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Review before you send it.</b></p>
-        <div class="rb2-tabrow">
-          <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist">
-            <button type="button" class="rb-subtab">Offtakers</button>
-            <button type="button" class="rb-subtab">Bill audit</button>
-            <button type="button" class="rb-subtab on">Trends</button>
-          </div>
+<div class="demo-shell">
+  <p class="demo-tag">Static preview of Invoices → Trends (offtaker financial gains). Production kWh lives on Analysis → Trends.</p>
+  <div id="rbFinTrends" class="rb-fin" style="display:block">
+    <div class="rb-fin-wrap">
+      <div class="rb-fin-intro">
+        <h2 class="rb-fin-h">Offtaker gains</h2>
+        <p class="rb-fin-p">What you’ve made from offtakers — last invoices, run-rate, and year-over-year delivery.</p>
+      </div>
+      <div class="rb-fin-kpis">
+        <div class="rb-fin-kpi">
+          <div class="rb-fin-kl">Active offtakers</div>
+          <div class="rb-fin-kv">4</div>
+          <div class="rb-fin-ks">3 with a recorded invoice</div>
+        </div>
+        <div class="rb-fin-kpi">
+          <div class="rb-fin-kl">Last invoices</div>
+          <div class="rb-fin-kv">$4,550</div>
+          <div class="rb-fin-ks">Sum of each offtaker’s latest send</div>
+        </div>
+        <div class="rb-fin-kpi">
+          <div class="rb-fin-kl">Est. annual run-rate</div>
+          <div class="rb-fin-kv">$54,600</div>
+          <div class="rb-fin-ks">From last invoice × cadence</div>
+        </div>
+        <div class="rb-fin-kpi">
+          <div class="rb-fin-kl">Delivered to date</div>
+          <div class="rb-fin-kv">$18,200</div>
+          <div class="rb-fin-ks">$1,949 in pending drafts</div>
         </div>
       </div>
-    </div>
 
-    <div id="rbFinTrends" class="rb-fin" style="display:block">
-      <div class="rb-fin-wrap">
-        <div class="rb-fin-intro">
-          <h2 class="rb-fin-h">Trends</h2>
-          <p class="rb-fin-p">Pipeline value and production by array — separate from drafting and sending invoices.</p>
-        </div>
-        <div class="rb-fin-kpis">
-          <div class="rb-fin-kpi">
-            <div class="rb-fin-kl">Ready to send</div>
-            <div class="rb-fin-kv">12</div>
-            <div class="rb-fin-ks">Drafts awaiting review</div>
+      <div class="rb-fin-card">
+        <div class="rb-fin-ch">Year over year</div>
+        <p class="rb-fin-cs">Dollars delivered to offtakers, grouped by the billing period’s end year.</p>
+        <div class="rb-fin-bars">
+          <div class="rb-fin-barrow">
+            <div class="rb-fin-bary">2024</div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:84%"></div></div>
+            <div class="rb-fin-barv">$41,200</div>
+            <div class="rb-fin-barn">36 sends</div>
           </div>
-          <div class="rb-fin-kpi">
-            <div class="rb-fin-kl">Drafted value</div>
-            <div class="rb-fin-kv">$18,400</div>
-            <div class="rb-fin-ks">In the current pipeline</div>
+          <div class="rb-fin-barrow">
+            <div class="rb-fin-bary">2025 <span class="rb-fin-delta up">+18.4%</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:100%"></div></div>
+            <div class="rb-fin-barv">$48,800</div>
+            <div class="rb-fin-barn">40 sends</div>
           </div>
-          <div class="rb-fin-kpi">
-            <div class="rb-fin-kl">Sent (recorded)</div>
-            <div class="rb-fin-kv">$2,150</div>
-            <div class="rb-fin-ks">1 offtaker send</div>
-          </div>
-          <div class="rb-fin-kpi">
-            <div class="rb-fin-kl">Fleet lifetime</div>
-            <div class="rb-fin-kv">412,880 <span class="rb-fin-u">kWh</span></div>
-            <div class="rb-fin-ks">Production across arrays</div>
+          <div class="rb-fin-barrow">
+            <div class="rb-fin-bary">2026 <span class="rb-fin-ytd">YTD</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:37%"></div></div>
+            <div class="rb-fin-barv">$18,200</div>
+            <div class="rb-fin-barn">14 sends</div>
           </div>
         </div>
-        <div class="rb-fin-card">
-          <div class="rb-fin-ch">Production by year</div>
-          <p class="rb-fin-cs">kWh by array. Current year is year-to-date. Dollar true-ups stay on each offtaker invoice — this view stays out of the edit list.</p>
-          <div class="rb-fin-scroll"><table class="rb-fin-table">
-            <thead><tr>
-              <th>Array</th>
-              <th class="rb-fin-num">2024</th>
-              <th class="rb-fin-num">2025</th>
-              <th class="rb-fin-num">2026 <span class="rb-fin-ytd">YTD</span></th>
-              <th class="rb-fin-num rb-fin-life">Lifetime</th>
-            </tr></thead>
-            <tbody>
-              <tr><td class="rb-fin-name">Danville Big Buck</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">48,210</td><td class="rb-fin-num rb-fin-life">48,210</td></tr>
-              <tr><td class="rb-fin-name">West Glover 50kW</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">12,440</td><td class="rb-fin-num rb-fin-life">12,440</td></tr>
-              <tr><td class="rb-fin-name">River</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
-              <tr><td class="rb-fin-name">Norwich Union Village</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
-              <tr><td class="rb-fin-name">52 COUNTY RD, GLOVER, VT</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
-              <tr class="rb-fin-tot">
-                <td class="rb-fin-name"><b>Fleet total</b></td>
-                <td class="rb-fin-num"><b>—</b></td>
-                <td class="rb-fin-num"><b>—</b></td>
-                <td class="rb-fin-num"><b>60,650</b></td>
-                <td class="rb-fin-num rb-fin-life"><b>60,650</b></td>
-              </tr>
-            </tbody>
-          </table></div>
+        <div class="rb-fin-scroll" style="margin-top:14px"><table class="rb-fin-table">
+          <thead><tr><th>Year</th><th class="rb-fin-num">Delivered</th><th class="rb-fin-num">Sends</th><th class="rb-fin-num">vs prior</th></tr></thead>
+          <tbody>
+            <tr><td class="rb-fin-name">2024</td><td class="rb-fin-num rb-fin-life">$41,200</td><td class="rb-fin-num">36</td><td class="rb-fin-num">—</td></tr>
+            <tr><td class="rb-fin-name">2025</td><td class="rb-fin-num rb-fin-life">$48,800</td><td class="rb-fin-num">40</td><td class="rb-fin-num">+18.4%</td></tr>
+            <tr><td class="rb-fin-name">2026 <span class="rb-fin-ytd">YTD</span></td><td class="rb-fin-num rb-fin-life">$18,200</td><td class="rb-fin-num">14</td><td class="rb-fin-num">—</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="rb-fin-card">
+        <div class="rb-fin-ch">Recent months</div>
+        <p class="rb-fin-cs">Delivered invoice total by month (up to the last 12 with activity).</p>
+        <div class="rb-fin-bars">
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">Jan ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:79%"></div></div><div class="rb-fin-barv">$2,800</div></div>
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">Feb ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:75%"></div></div><div class="rb-fin-barv">$2,650</div></div>
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">Mar ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:87%"></div></div><div class="rb-fin-barv">$3,100</div></div>
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">Apr ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:82%"></div></div><div class="rb-fin-barv">$2,900</div></div>
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">May ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:90%"></div></div><div class="rb-fin-barv">$3,200</div></div>
+          <div class="rb-fin-barrow rb-fin-barrow-sm"><div class="rb-fin-bary">Jun ’26</div><div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:100%"></div></div><div class="rb-fin-barv">$3,550</div></div>
         </div>
-        <div class="rb-fin-note">
-          <b>Invoice editing</b> is on the <span style="color:#2196f3;font-weight:700">Offtakers</span> tab.
-          This Trends view is for portfolio dollars and kWh at a glance.
+      </div>
+
+      <div class="rb-fin-card">
+        <div class="rb-fin-ch">Gains by offtaker</div>
+        <p class="rb-fin-cs">What each offtaker contributes — last invoice, estimated annual, and delivered history.</p>
+        <div class="rb-fin-shares">
+          <div class="rb-fin-share">
+            <div class="rb-fin-share-top"><span class="rb-fin-share-name">Valley Cares</span><span class="rb-fin-share-amt">$2,150</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:100%"></div></div>
+            <div class="rb-fin-share-sub">$2,150 last · 47.3% of last invoices</div>
+          </div>
+          <div class="rb-fin-share">
+            <div class="rb-fin-share-top"><span class="rb-fin-share-name">Town of Fairlee</span><span class="rb-fin-share-amt">$1,250</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:58%"></div></div>
+            <div class="rb-fin-share-sub">$1,250 last · 27.5% of last invoices</div>
+          </div>
+          <div class="rb-fin-share">
+            <div class="rb-fin-share-top"><span class="rb-fin-share-name">Town of Glover</span><span class="rb-fin-share-amt">$1,150</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:53%"></div></div>
+            <div class="rb-fin-share-sub">$1,150 last · 25.3% of last invoices</div>
+          </div>
+          <div class="rb-fin-share">
+            <div class="rb-fin-share-top"><span class="rb-fin-share-name">Norwich Fire District</span><span class="rb-fin-share-amt">—</span></div>
+            <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:3%"></div></div>
+            <div class="rb-fin-share-sub">No invoice recorded yet</div>
+          </div>
         </div>
+        <div class="rb-fin-scroll" style="margin-top:16px"><table class="rb-fin-table rb-fin-table-wide">
+          <thead><tr>
+            <th>Offtaker</th>
+            <th class="rb-fin-num">Last invoice</th>
+            <th class="rb-fin-num">Period end</th>
+            <th class="rb-fin-num">Cadence</th>
+            <th class="rb-fin-num">Est. annual</th>
+            <th class="rb-fin-num">Delivered</th>
+            <th class="rb-fin-num">Pending</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="rb-fin-name">Valley Cares</td>
+              <td class="rb-fin-num rb-fin-life">$2,150</td>
+              <td class="rb-fin-num">2026-06-24</td>
+              <td class="rb-fin-num">Monthly</td>
+              <td class="rb-fin-num">$25,800</td>
+              <td class="rb-fin-num">$9,600</td>
+              <td class="rb-fin-num">$2,150</td>
+            </tr>
+            <tr>
+              <td class="rb-fin-name">Town of Fairlee</td>
+              <td class="rb-fin-num rb-fin-life">$1,250</td>
+              <td class="rb-fin-num">2026-06-18</td>
+              <td class="rb-fin-num">Monthly</td>
+              <td class="rb-fin-num">$15,000</td>
+              <td class="rb-fin-num">$5,000</td>
+              <td class="rb-fin-num">$1,250</td>
+            </tr>
+            <tr>
+              <td class="rb-fin-name">Town of Glover</td>
+              <td class="rb-fin-num rb-fin-life">$1,150</td>
+              <td class="rb-fin-num">2026-06-21</td>
+              <td class="rb-fin-num">Monthly</td>
+              <td class="rb-fin-num">$13,800</td>
+              <td class="rb-fin-num">$3,600</td>
+              <td class="rb-fin-num">—</td>
+            </tr>
+            <tr>
+              <td class="rb-fin-name">Norwich Fire District</td>
+              <td class="rb-fin-num rb-fin-life">—</td>
+              <td class="rb-fin-num">—</td>
+              <td class="rb-fin-num">Monthly</td>
+              <td class="rb-fin-num">—</td>
+              <td class="rb-fin-num">—</td>
+              <td class="rb-fin-num">$699</td>
+            </tr>
+            <tr class="rb-fin-tot">
+              <td class="rb-fin-name"><b>Total</b></td>
+              <td class="rb-fin-num rb-fin-life"><b>$4,550</b></td>
+              <td class="rb-fin-num"></td>
+              <td class="rb-fin-num"></td>
+              <td class="rb-fin-num"><b>$54,600</b></td>
+              <td class="rb-fin-num"><b>$18,200</b></td>
+              <td class="rb-fin-num"><b>$4,099</b></td>
+            </tr>
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="rb-fin-note">
+        Edit schedules on <b>Offtakers</b>. Production kWh by year lives on <b>Analysis → Trends</b>.
       </div>
     </div>
   </div>

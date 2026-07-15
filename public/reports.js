@@ -616,7 +616,7 @@
  if (fin) fin.style.display = v === "trends" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
  if (v === "audit") renderAudit(); // lazy render + fetch on first view
- if (v === "trends") renderFinTrends(); // financial + production matrix
+ if (v === "trends") renderFinTrends(); // offtaker financial gains
  // Soft URL hash so deep links / Energy Agent can open Trends
  try {
  if (v === "trends" && location.hash.indexOf("reports") === 0) {
@@ -635,149 +635,295 @@
  } catch (e) {}
  }
 
- // ── Invoice Trends sub-tab (Paul 2026-07-15 / Ford: financial data off the
- // editing surface). Sky glass cards: pipeline $ KPIs + production-by-year
- // matrix. Does not touch offtaker edit flows.
+ // ── Invoice Trends sub-tab (Paul 2026-07-15 / Ford): offtaker financial gains.
+ // Production kWh lives on Analysis → Trends. This surface is dollars only —
+ // what the owner makes from offtakers (last invoices, run-rate, YoY, shares).
  let _finTrendsLoaded = false;
  async function renderFinTrends(force) {
  const host = document.getElementById("rbFinTrends");
  if (!host) return;
  if (_finTrendsLoaded && !force && host.dataset.ready === "1") return;
- host.innerHTML = `<div class="rb-fin-loading">Loading financial trends…</div>`;
+ host.innerHTML = `<div class="rb-fin-loading">Loading offtaker gains…</div>`;
 
- const money0 = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+ const money0 = n => {
+ const v = Number(n);
+ if (!isFinite(v)) return "—";
+ return "$" + Math.round(v).toLocaleString();
+ };
+ const money1 = n => {
+ const v = Number(n);
+ if (!isFinite(v)) return "—";
+ return "$" + v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+ };
  const fmt0 = n => Math.round(Number(n) || 0).toLocaleString();
  const esc = s => String(s == null ? "" : s)
  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
  .replace(/"/g, "&quot;");
+ const cadenceLabel = c => {
+ const x = String(c || "monthly").toLowerCase();
+ if (x.indexOf("quarter") === 0) return "Quarterly";
+ if (x.indexOf("annual") === 0 || x === "yearly" || x === "year") return "Annual";
+ if (x.indexOf("semi") === 0) return "Semi-annual";
+ return "Monthly";
+ };
 
- let pipe = null, trends = null;
+ let gains = null;
  try {
  const hdrs = authHeaders() || {};
- const [pr, tr] = await Promise.all([
- fetch("/v1/array-operator/billing/send-pipeline", { headers: hdrs })
- .then(r => r.ok ? r.json() : null).catch(() => null),
- fetch("/v1/array-owners/fleet-trends", { headers: hdrs })
- .then(r => r.ok ? r.json() : null).catch(() => null),
- ]);
- pipe = pr; trends = tr;
+ gains = await fetch("/v1/array-operator/billing/portfolio-gains", { headers: hdrs })
+ .then(r => r.ok ? r.json() : null).catch(() => null);
  } catch (e) { /* demo / offline */ }
 
- // Demo fallback when signed out
- if (!pipe && !trends && window.__AO_DEMO__) {
- try {
- pipe = { ready_count: 12, drafted_usd: 18400, sent_this_month_usd: 22100,
- auto_send: true, next_monthly: { fires_at: null, count: 12 } };
- } catch (e) {}
+ // Demo fallback when signed out or API missing
+ if (!gains && window.__AO_DEMO__) {
+ gains = {
+ ok: true,
+ kpis: {
+ enabled_offtakers: 4,
+ with_last_invoice: 3,
+ last_invoice_total_usd: 4550,
+ pending_drafts: 2,
+ pending_draft_usd: 1949,
+ est_annual_usd: 54600,
+ lifetime_sent_usd: 18200,
+ },
+ years: [2024, 2025, 2026],
+ by_year: {
+ "2024": { sent_usd: 41200, sent_count: 36 },
+ "2025": { sent_usd: 48800, sent_count: 40 },
+ "2026": { sent_usd: 18200, sent_count: 14 },
+ },
+ yoy: [
+ { year: 2024, sent_usd: 41200, sent_count: 36, delta_pct: null },
+ { year: 2025, sent_usd: 48800, sent_count: 40, delta_pct: 18.4 },
+ { year: 2026, sent_usd: 18200, sent_count: 14, delta_pct: null },
+ ],
+ months: ["2026-01","2026-02","2026-03","2026-04","2026-05","2026-06"],
+ by_month: {
+ "2026-01": { sent_usd: 2800, sent_count: 3 },
+ "2026-02": { sent_usd: 2650, sent_count: 3 },
+ "2026-03": { sent_usd: 3100, sent_count: 3 },
+ "2026-04": { sent_usd: 2900, sent_count: 2 },
+ "2026-05": { sent_usd: 3200, sent_count: 2 },
+ "2026-06": { sent_usd: 3550, sent_count: 1 },
+ },
+ offtakers: [
+ { customer_name: "Valley Cares", enabled: true, cadence: "monthly", last_sent_amount_usd: 2150, last_sent_period_end: "2026-06-24", est_annual_usd: 25800, pending_amount_usd: 2150, sent_lifetime_usd: 9600, share_pct: 47.3 },
+ { customer_name: "Town of Fairlee", enabled: true, cadence: "monthly", last_sent_amount_usd: 1250, last_sent_period_end: "2026-06-18", est_annual_usd: 15000, pending_amount_usd: 1250, sent_lifetime_usd: 5000, share_pct: 27.5 },
+ { customer_name: "Town of Glover", enabled: true, cadence: "monthly", last_sent_amount_usd: 1150, last_sent_period_end: "2026-06-21", est_annual_usd: 13800, pending_amount_usd: null, sent_lifetime_usd: 3600, share_pct: 25.3 },
+ { customer_name: "Norwich Fire District", enabled: true, cadence: "monthly", last_sent_amount_usd: null, last_sent_period_end: null, est_annual_usd: null, pending_amount_usd: 699, sent_lifetime_usd: null, share_pct: null },
+ ],
+ };
  }
 
- const byArray = (trends && trends.by_array) || [];
- const years = ((trends && trends.years) || []).slice().sort((a, b) => a - b);
+ const k = (gains && gains.kpis) || {};
+ const offtakers = (gains && gains.offtakers) || [];
+ const yoy = (gains && gains.yoy) || [];
+ const years = (gains && gains.years) || [];
+ const byYear = (gains && gains.by_year) || {};
+ const months = (gains && gains.months) || [];
+ const byMonth = (gains && gains.by_month) || {};
  const curY = new Date().getFullYear();
-
- // KPI strip from send-pipeline when present
- const readyN = pipe && (pipe.ready_count != null ? pipe.ready_count
- : (pipe.next_monthly && pipe.next_monthly.ready));
- const drafted = pipe && (pipe.drafted_usd != null ? pipe.drafted_usd
- : pipe.total_draft_usd);
- const sentMo = pipe && (pipe.sent_this_month_usd != null ? pipe.sent_this_month_usd
- : pipe.sent_usd);
- // Aggregate last_sent_amount from list if pipeline thin
- let lifetimeSent = 0, sentN = 0;
- try {
- const list = (window.__aoBillingSubs || window._rbSubs || []);
- (list || []).forEach(s => {
- if (s && s.last_sent_amount_usd != null) {
- lifetimeSent += Number(s.last_sent_amount_usd) || 0;
- sentN++;
- }
- });
- } catch (e) {}
 
  const kpis = `
  <div class="rb-fin-kpis">
  <div class="rb-fin-kpi">
- <div class="rb-fin-kl">Ready to send</div>
- <div class="rb-fin-kv">${readyN != null ? fmt0(readyN) : "—"}</div>
- <div class="rb-fin-ks">Drafts awaiting review</div>
+ <div class="rb-fin-kl">Active offtakers</div>
+ <div class="rb-fin-kv">${k.enabled_offtakers != null ? fmt0(k.enabled_offtakers) : "—"}</div>
+ <div class="rb-fin-ks">${k.with_last_invoice != null ? fmt0(k.with_last_invoice) + " with a recorded invoice" : "Enabled schedules"}</div>
  </div>
  <div class="rb-fin-kpi">
- <div class="rb-fin-kl">Drafted value</div>
- <div class="rb-fin-kv">${drafted != null ? money0(drafted) : "—"}</div>
- <div class="rb-fin-ks">In the current pipeline</div>
+ <div class="rb-fin-kl">Last invoices</div>
+ <div class="rb-fin-kv">${k.last_invoice_total_usd != null ? money0(k.last_invoice_total_usd) : "—"}</div>
+ <div class="rb-fin-ks">Sum of each offtaker’s latest send</div>
  </div>
  <div class="rb-fin-kpi">
- <div class="rb-fin-kl">Sent (recorded)</div>
- <div class="rb-fin-kv">${sentN ? money0(lifetimeSent) : (sentMo != null ? money0(sentMo) : "—")}</div>
- <div class="rb-fin-ks">${sentN ? sentN + " offtaker send" + (sentN === 1 ? "" : "s") : "From send pipeline"}</div>
+ <div class="rb-fin-kl">Est. annual run-rate</div>
+ <div class="rb-fin-kv">${k.est_annual_usd != null && k.est_annual_usd > 0 ? money0(k.est_annual_usd) : "—"}</div>
+ <div class="rb-fin-ks">From last invoice × cadence</div>
  </div>
  <div class="rb-fin-kpi">
- <div class="rb-fin-kl">Fleet lifetime</div>
- <div class="rb-fin-kv">${trends && trends.lifetime_kwh != null ? fmt0(trends.lifetime_kwh) + " <span class='rb-fin-u'>kWh</span>" : "—"}</div>
- <div class="rb-fin-ks">Production across arrays</div>
+ <div class="rb-fin-kl">Delivered to date</div>
+ <div class="rb-fin-kv">${k.lifetime_sent_usd != null && k.lifetime_sent_usd > 0 ? money0(k.lifetime_sent_usd) : "—"}</div>
+ <div class="rb-fin-ks">${k.pending_draft_usd ? money0(k.pending_draft_usd) + " in pending drafts" : "Sent draft ledger"}</div>
  </div>
  </div>`;
 
- // Production year matrix (same contract as Analysis trends)
- let matrix = "";
- if (byArray.length && years.length) {
- const rows = byArray.slice().sort((a, b) => (b.lifetime_kwh || 0) - (a.lifetime_kwh || 0));
- const colTot = {}; years.forEach(y => { colTot[y] = 0; });
- let lifeTot = 0;
- const body = rows.map(a => {
- const byY = a.kwh_by_year || {};
- const cells = years.map(y => {
- const v = Number(byY[String(y)] || 0);
- colTot[y] += v;
- return `<td class="rb-fin-num">${v > 0 ? fmt0(v) : "—"}</td>`;
+ // Year-over-year bars (sent $ by calendar year of billing period)
+ let yoyCard = "";
+ if (yoy.length >= 1) {
+ const maxY = Math.max.apply(null, yoy.map(r => Number(r.sent_usd) || 0).concat([1]));
+ const bars = yoy.map(r => {
+ const usd = Number(r.sent_usd) || 0;
+ const pct = Math.max(4, Math.round(100 * usd / maxY));
+ const isCur = r.year === curY;
+ const delta = r.delta_pct != null
+ ? `<span class="rb-fin-delta ${r.delta_pct >= 0 ? "up" : "dn"}">${r.delta_pct >= 0 ? "+" : ""}${r.delta_pct}%</span>`
+ : (isCur ? `<span class="rb-fin-ytd">YTD</span>` : "");
+ return `<div class="rb-fin-barrow">
+ <div class="rb-fin-bary">${r.year}${delta ? " " + delta : ""}</div>
+ <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:${pct}%"></div></div>
+ <div class="rb-fin-barv">${money0(usd)}</div>
+ <div class="rb-fin-barn">${fmt0(r.sent_count)} send${r.sent_count === 1 ? "" : "s"}</div>
+ </div>`;
  }).join("");
- const life = Number(a.lifetime_kwh || 0);
- lifeTot += life;
+ const yoyTableRows = yoy.map((r, i) => {
+ const prior = i > 0 ? yoy[i - 1].sent_usd : null;
+ const d = r.delta_pct != null
+ ? `${r.delta_pct >= 0 ? "+" : ""}${r.delta_pct}%`
+ : "—";
  return `<tr>
- <td class="rb-fin-name">${esc(a.name)}</td>
- ${cells}
- <td class="rb-fin-num rb-fin-life">${life > 0 ? fmt0(life) : "—"}</td>
+ <td class="rb-fin-name">${r.year}${r.year === curY ? ' <span class="rb-fin-ytd">YTD</span>' : ""}</td>
+ <td class="rb-fin-num rb-fin-life">${money1(r.sent_usd)}</td>
+ <td class="rb-fin-num">${fmt0(r.sent_count)}</td>
+ <td class="rb-fin-num">${d}</td>
  </tr>`;
  }).join("");
- const foot = `<tr class="rb-fin-tot">
- <td class="rb-fin-name"><b>Fleet total</b></td>
- ${years.map(y => `<td class="rb-fin-num"><b>${colTot[y] > 0 ? fmt0(colTot[y]) : "—"}</b></td>`).join("")}
- <td class="rb-fin-num rb-fin-life"><b>${lifeTot > 0 ? fmt0(lifeTot) : "—"}</b></td>
- </tr>`;
- const yHeads = years.map(y =>
- `<th class="rb-fin-num">${y}${y === curY ? ' <span class="rb-fin-ytd" title="Calendar year to date">YTD</span>' : ""}</th>`
- ).join("");
- matrix = `
+ yoyCard = `
  <div class="rb-fin-card">
- <div class="rb-fin-ch">Production by year</div>
- <p class="rb-fin-cs">kWh by array. Current year is year-to-date. Dollar true-ups live on each offtaker invoice — this view stays out of the edit list.</p>
- <div class="rb-fin-scroll"><table class="rb-fin-table">
- <thead><tr><th>Array</th>${yHeads}<th class="rb-fin-num rb-fin-life">Lifetime</th></tr></thead>
+ <div class="rb-fin-ch">Year over year</div>
+ <p class="rb-fin-cs">Dollars delivered to offtakers, grouped by the billing period’s end year.</p>
+ <div class="rb-fin-bars">${bars}</div>
+ <div class="rb-fin-scroll" style="margin-top:14px"><table class="rb-fin-table">
+ <thead><tr><th>Year</th><th class="rb-fin-num">Delivered</th><th class="rb-fin-num">Sends</th><th class="rb-fin-num">vs prior</th></tr></thead>
+ <tbody>${yoyTableRows}</tbody>
+ </table></div>
+ </div>`;
+ } else {
+ yoyCard = `
+ <div class="rb-fin-card rb-fin-empty">
+ <div class="rb-fin-ch">Year over year</div>
+ <p class="rb-fin-cs">After you send invoices, delivered dollars stack here by year so you can compare seasons.</p>
+ </div>`;
+ }
+
+ // Recent months (this year) — simple horizontal bars
+ let monthCard = "";
+ const recentMonths = months.slice(-12);
+ if (recentMonths.length >= 2) {
+ const maxM = Math.max.apply(null, recentMonths.map(ym => Number((byMonth[ym] || {}).sent_usd) || 0).concat([1]));
+ const mbars = recentMonths.map(ym => {
+ const cell = byMonth[ym] || {};
+ const usd = Number(cell.sent_usd) || 0;
+ const pct = Math.max(3, Math.round(100 * usd / maxM));
+ const label = (() => {
+ try {
+ const [yy, mm] = ym.split("-");
+ const d = new Date(Number(yy), Number(mm) - 1, 1);
+ return d.toLocaleString(undefined, { month: "short", year: "2-digit" });
+ } catch (e) { return ym; }
+ })();
+ return `<div class="rb-fin-barrow rb-fin-barrow-sm">
+ <div class="rb-fin-bary">${esc(label)}</div>
+ <div class="rb-fin-bartrack"><div class="rb-fin-barfill rb-fin-barfill-soft" style="width:${pct}%"></div></div>
+ <div class="rb-fin-barv">${money0(usd)}</div>
+ </div>`;
+ }).join("");
+ monthCard = `
+ <div class="rb-fin-card">
+ <div class="rb-fin-ch">Recent months</div>
+ <p class="rb-fin-cs">Delivered invoice total by month (up to the last 12 with activity).</p>
+ <div class="rb-fin-bars">${mbars}</div>
+ </div>`;
+ }
+
+ // Offtaker contribution bars + full table
+ let otCard = "";
+ const moneyRows = offtakers.filter(o => o.enabled !== false);
+ if (moneyRows.length) {
+ const maxShare = Math.max.apply(null,
+ moneyRows.map(o => Number(o.last_sent_amount_usd) || Number(o.est_annual_usd) || 0).concat([1]));
+ const top = moneyRows.slice(0, 12);
+ const shareBars = top.map(o => {
+ const usd = Number(o.last_sent_amount_usd) || 0;
+ const est = Number(o.est_annual_usd) || 0;
+ const barVal = usd || est;
+ const pct = Math.max(3, Math.round(100 * barVal / maxShare));
+ const sub = usd
+ ? money0(usd) + " last · " + (o.share_pct != null ? o.share_pct + "% of last invoices" : cadenceLabel(o.cadence))
+ : (est ? money0(est) + " est. annual · no send yet" : "No invoice recorded yet");
+ return `<div class="rb-fin-share">
+ <div class="rb-fin-share-top">
+ <span class="rb-fin-share-name">${esc(o.customer_name)}</span>
+ <span class="rb-fin-share-amt">${usd ? money0(usd) : (est ? money0(est) + " /yr" : "—")}</span>
+ </div>
+ <div class="rb-fin-bartrack"><div class="rb-fin-barfill" style="width:${pct}%"></div></div>
+ <div class="rb-fin-share-sub">${esc(sub)}</div>
+ </div>`;
+ }).join("");
+
+ const body = moneyRows.map(o => {
+ const last = o.last_sent_amount_usd != null ? money1(o.last_sent_amount_usd) : "—";
+ const ann = o.est_annual_usd != null ? money1(o.est_annual_usd) : "—";
+ const life = o.sent_lifetime_usd != null ? money1(o.sent_lifetime_usd) : "—";
+ const pend = o.pending_amount_usd != null ? money1(o.pending_amount_usd) : "—";
+ const period = o.last_sent_period_end || "—";
+ return `<tr>
+ <td class="rb-fin-name">${esc(o.customer_name)}${o.enabled === false ? ' <span class="rb-fin-off">off</span>' : ""}</td>
+ <td class="rb-fin-num rb-fin-life">${last}</td>
+ <td class="rb-fin-num">${esc(period)}</td>
+ <td class="rb-fin-num">${esc(cadenceLabel(o.cadence))}</td>
+ <td class="rb-fin-num">${ann}</td>
+ <td class="rb-fin-num">${life}</td>
+ <td class="rb-fin-num">${pend}</td>
+ </tr>`;
+ }).join("");
+ const sumLast = moneyRows.reduce((n, o) => n + (Number(o.last_sent_amount_usd) || 0), 0);
+ const sumAnn = moneyRows.reduce((n, o) => n + (Number(o.est_annual_usd) || 0), 0);
+ const sumLife = moneyRows.reduce((n, o) => n + (Number(o.sent_lifetime_usd) || 0), 0);
+ const sumPend = moneyRows.reduce((n, o) => n + (Number(o.pending_amount_usd) || 0), 0);
+ const foot = `<tr class="rb-fin-tot">
+ <td class="rb-fin-name"><b>Total</b></td>
+ <td class="rb-fin-num rb-fin-life"><b>${sumLast ? money1(sumLast) : "—"}</b></td>
+ <td class="rb-fin-num"></td>
+ <td class="rb-fin-num"></td>
+ <td class="rb-fin-num"><b>${sumAnn ? money1(sumAnn) : "—"}</b></td>
+ <td class="rb-fin-num"><b>${sumLife ? money1(sumLife) : "—"}</b></td>
+ <td class="rb-fin-num"><b>${sumPend ? money1(sumPend) : "—"}</b></td>
+ </tr>`;
+
+ otCard = `
+ <div class="rb-fin-card">
+ <div class="rb-fin-ch">Gains by offtaker</div>
+ <p class="rb-fin-cs">What each offtaker contributes — last invoice, estimated annual, and delivered history.</p>
+ <div class="rb-fin-shares">${shareBars}</div>
+ <div class="rb-fin-scroll" style="margin-top:16px"><table class="rb-fin-table rb-fin-table-wide">
+ <thead><tr>
+ <th>Offtaker</th>
+ <th class="rb-fin-num">Last invoice</th>
+ <th class="rb-fin-num">Period end</th>
+ <th class="rb-fin-num">Cadence</th>
+ <th class="rb-fin-num">Est. annual</th>
+ <th class="rb-fin-num">Delivered</th>
+ <th class="rb-fin-num">Pending</th>
+ </tr></thead>
  <tbody>${body}${foot}</tbody>
  </table></div>
  </div>`;
  } else {
- matrix = `
+ otCard = `
  <div class="rb-fin-card rb-fin-empty">
- <div class="rb-fin-ch">Production by year</div>
- <p class="rb-fin-cs">Connect arrays and let generation land — the year matrix fills in automatically. Editing offtakers stays on the Offtakers tab.</p>
+ <div class="rb-fin-ch">Gains by offtaker</div>
+ <p class="rb-fin-cs">Add offtakers and send an invoice — their dollars show up here as your offtaker business grows.</p>
  </div>`;
  }
 
  const note = `
  <div class="rb-fin-note">
- <b>Invoice editing</b> is on the <button type="button" class="rb-fin-link" id="rbFinGoOfftakers">Offtakers</button> tab.
- This Trends view is for portfolio dollars and kWh at a glance.
+ Edit schedules on <button type="button" class="rb-fin-link" id="rbFinGoOfftakers">Offtakers</button>.
+ Production kWh by year lives on <b>Analysis → Trends</b>.
  </div>`;
 
  host.innerHTML = `
  <div class="rb-fin-wrap">
  <div class="rb-fin-intro">
- <h2 class="rb-fin-h">Trends</h2>
- <p class="rb-fin-p">Pipeline value and production by array — separate from drafting and sending invoices.</p>
+ <h2 class="rb-fin-h">Offtaker gains</h2>
+ <p class="rb-fin-p">What you’ve made from offtakers — last invoices, run-rate, and year-over-year delivery.</p>
  </div>
  ${kpis}
- ${matrix}
+ ${yoyCard}
+ ${monthCard}
+ ${otCard}
  ${note}
  </div>`;
 

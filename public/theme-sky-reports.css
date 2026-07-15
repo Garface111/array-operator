@@ -497,7 +497,7 @@ html.sky .rb-listwrap .empty{color:#46658C}
 }
 
 /* ── Invoice Trends sub-tab (Offtakers | Bill audit | Trends) ───────────────
-   Read-only finance / production surface — keeps $ and kWh out of the edit list
+   Read-only offtaker financial gains — dollars only (kWh is on Analysis → Trends)
    (Paul + Ford 2026-07-15). Same glass material language as .rb2 bands. */
 html.sky .rb-fin{
   margin-top:4px;
@@ -581,6 +581,58 @@ html.sky .rb-fin-link{
 html.sky .rb-fin-loading{ padding:28px 8px; color:var(--muted); font-size:13.5px; }
 html.sky .rb-fin-empty .rb-fin-cs{ margin-bottom:4px; }
 
+/* YoY / month bar rows + offtaker share strips */
+html.sky .rb-fin-bars{ display:flex; flex-direction:column; gap:10px; margin-top:4px; }
+html.sky .rb-fin-barrow{
+  display:grid; grid-template-columns:72px minmax(0,1fr) 88px 72px; gap:10px; align-items:center;
+}
+html.sky .rb-fin-barrow-sm{ grid-template-columns:64px minmax(0,1fr) 80px; }
+html.sky .rb-fin-bary{
+  font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+html.sky .rb-fin-bartrack{
+  height:12px; border-radius:999px; background:rgba(33,150,243,.1);
+  border:1px solid rgba(20,60,120,.08); overflow:hidden;
+}
+html.sky .rb-fin-barfill{
+  height:100%; border-radius:999px;
+  background:linear-gradient(90deg, #42a5f5 0%, #1e88e5 100%);
+  min-width:4px;
+}
+html.sky .rb-fin-barfill-soft{
+  background:linear-gradient(90deg, rgba(66,165,245,.75) 0%, rgba(30,136,229,.85) 100%);
+}
+html.sky .rb-fin-barv{
+  text-align:right; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink);
+}
+html.sky .rb-fin-barn{
+  text-align:right; font-size:11.5px; color:var(--faint,#94a3b8); font-variant-numeric:tabular-nums;
+}
+html.sky .rb-fin-delta{
+  font-size:10.5px; font-weight:750; letter-spacing:.02em; margin-left:4px;
+}
+html.sky .rb-fin-delta.up{ color:#0d9488; }
+html.sky .rb-fin-delta.dn{ color:#e11d48; }
+html.sky .rb-fin-shares{ display:flex; flex-direction:column; gap:12px; margin-top:4px; }
+html.sky .rb-fin-share-top{
+  display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin-bottom:4px;
+}
+html.sky .rb-fin-share-name{ font-size:13.5px; font-weight:650; color:var(--ink); }
+html.sky .rb-fin-share-amt{
+  font-size:13.5px; font-weight:750; font-variant-numeric:tabular-nums; color:var(--ink); white-space:nowrap;
+}
+html.sky .rb-fin-share-sub{ margin-top:4px; font-size:11.5px; color:var(--faint,#94a3b8); }
+html.sky .rb-fin-table-wide{ min-width:640px; }
+html.sky .rb-fin-off{
+  font-size:10px; font-weight:750; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--faint,#94a3b8); margin-left:4px;
+}
+@media (max-width:640px){
+  html.sky .rb-fin-barrow{ grid-template-columns:56px minmax(0,1fr) 72px; }
+  html.sky .rb-fin-barn{ display:none; }
+}
+
 /* Non-sky fallback (day/night) so Trends still works if someone opts out */
 html:not(.sky) .rb-fin-wrap{ display:flex; flex-direction:column; gap:14px; }
 html:not(.sky) .rb-fin-kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
@@ -589,3 +641,6 @@ html:not(.sky) .rb-fin-kpi, html:not(.sky) .rb-fin-card, html:not(.sky) .rb-fin-
 }
 html:not(.sky) .rb-fin-kv{ font-size:20px; font-weight:750; }
 html:not(.sky) .rb-fin-num{ text-align:right; font-variant-numeric:tabular-nums; }
+html:not(.sky) .rb-fin-bartrack{ height:10px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden; }
+html:not(.sky) .rb-fin-barfill{ height:100%; background:var(--accent,#2563eb); }
+html:not(.sky) .rb-fin-barrow{ display:grid; grid-template-columns:72px 1fr 88px 72px; gap:8px; align-items:center; margin:6px 0; }
