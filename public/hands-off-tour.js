@@ -1241,11 +1241,11 @@
  })
  .join("");
  var title =
- kind === "utility" ? "Add a utility login" : "Add a monitoring login";
+ kind === "utility" ? "Utility login" : "Monitoring login";
  var sub =
  kind === "utility"
- ? "Encrypted on our servers · powers automatic offtaker invoices"
- : "Encrypted on our servers · keeps production fresh 24/7";
+ ? "Encrypted · for bill capture"
+ : "Encrypted · for scheduled refresh";
  // Saved logins chips, makes multi-vendor clear (what's already in vs what you're adding)
  var invSet = { chint: 1, fronius: 1, sma: 1, solaredge: 1, locus: 1, alsoenergy: 1 };
  var utilSet = { gmp: 1, vec: 1, wec: 1 };
@@ -1299,7 +1299,7 @@
  "</span></div>" +
  chips +
  '<div class="ho-login-now" data-ho-now>' +
- "Now adding: <b>" +
+ "Portal: <b>" +
  esc(firstLabel) +
  "</b>, enter <em>that portal’s</em> username &amp; password below" +
  "</div>" +
@@ -2094,7 +2094,7 @@
  nowEl.innerHTML =
  "<b>✓ " +
  esc(label) +
- " is saved.</b> Pick another portal above to add the next login, or continue.";
+ " saved.</b>";
  nowEl.classList.add("ho-login-now-ok");
  }
  });
@@ -2146,7 +2146,7 @@
  if (nowEl) {
  nowEl.classList.remove("ho-login-now-ok");
  nowEl.innerHTML =
- "Now adding: <b>" +
+ "Portal: <b>" +
  esc(lab) +
  "</b>, enter <em>that portal’s</em> username &amp; password below" +
  (opts.flash
