@@ -324,8 +324,7 @@
  panel.setAttribute("aria-label", "Energy Agent");
  panel.innerHTML =
  ' <div class="ea-head">' +
- ' <div><h3>Energy Agent</h3>' +
- ' <p>One mind for your fleet, continuous awareness, not a pile of agents.</p></div>' +
+ ' <div><h3>Energy Agent</h3></div>' +
  ' <button type="button" class="ea-x" id="eaClose" aria-label="Close">×</button>' +
  " </div>" +
  ' <div class="ea-tools" id="eaTools" hidden aria-hidden="true"></div>' +
@@ -383,7 +382,7 @@
  ' </div>' +
  ' </div>' +
  ' </div>' +
- ' <div class="ea-legal" id="eaLegal">Only your account · one mind · site changes are judge-gated · no billing edits</div>' +
+ ' <div class="ea-legal" id="eaLegal">Only your account</div>' +
  ' </div>';
  document.body.appendChild(panel);
 
@@ -1557,7 +1556,7 @@
  var cpp = m.cost && m.cost.cost_per_proposal_usd;
  var sr = m.tasks && m.tasks.success_rate;
  var ar = m.interrupts && m.interrupts.accept_rate;
- var bits = ["Only your account · one mind"];
+ var bits = ["Only your account"];
  if (cpw != null) bits.push("$" + Number(cpw).toFixed(2) + "/win");
  else if (cpp != null) bits.push("$" + Number(cpp).toFixed(2) + "/proposal");
  if (sr != null) bits.push(Math.round(sr * 100) + "% tasks ok");
