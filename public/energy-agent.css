@@ -207,6 +207,54 @@ body.ea-shell-open{
 }
 .wrap{ transition: margin-left .22s ease; }
 
+/* ── Beside hands-off setup (step 17 Open Energy Agent) ────────────────────
+   Setup keeps the LEFT rail; EA spawns as a slick companion window to its RIGHT
+   instead of covering the tour (Ford 2026-07-14). */
+body.ho-shell-open.ea-shell-open #eaPanel,
+body.ho-ea-sidebyside.ea-shell-open #eaPanel{
+  left: calc(var(--ho-rail, 380px) + 10px);
+  top: 12px;
+  bottom: 12px;
+  height: auto;
+  width: min(var(--ea-rail), calc(100vw - var(--ho-rail, 380px) - 28px));
+  max-width: min(380px, calc(100vw - var(--ho-rail, 380px) - 28px));
+  border-radius: 18px;
+  border: 1px solid rgba(14,165,233,.2);
+  box-shadow:
+    0 20px 50px -20px rgba(15,40,80,.4),
+    0 0 0 1px rgba(255,255,255,.5) inset;
+  z-index: 99968; /* under/over site; setup sheet stays visible on the left */
+}
+html.sky body.ho-shell-open.ea-shell-open #eaPanel,
+html.sky body.ho-ea-sidebyside.ea-shell-open #eaPanel{
+  border-color: rgba(33,150,243,.22);
+  box-shadow:
+    0 22px 56px -18px rgba(20,60,120,.38),
+    0 0 0 1px rgba(255,255,255,.55) inset;
+}
+/* Main content clears BOTH rails */
+body.ho-shell-open.ea-shell-open .wrap{
+  margin-left: calc(var(--ho-rail, 380px) + var(--ea-rail) + 18px);
+}
+/* Mic gate sits above the companion panel */
+body.ho-shell-open.ea-shell-open .ea-mic-gate{
+  left: calc(var(--ho-rail, 380px) + var(--ea-rail) + 28px);
+}
+@media (max-width: 900px){
+  /* Narrow: keep EA as bottom sheet / default mobile; don't stack two rails */
+  body.ho-shell-open.ea-shell-open #eaPanel,
+  body.ho-ea-sidebyside.ea-shell-open #eaPanel{
+    left: 0; top: 0; bottom: 0;
+    width: var(--ea-rail);
+    max-width: min(var(--ea-rail), 92vw);
+    border-radius: 0;
+    height: auto;
+  }
+  body.ho-shell-open.ea-shell-open .wrap{
+    margin-left: 0;
+  }
+}
+
 /* ── Panel internals ─────────────────────────────────────────────────────── */
 #eaRoot{ font-family: inherit; color: var(--ink, #0f172a); }
 #eaRoot *{ box-sizing: border-box; }

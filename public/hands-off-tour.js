@@ -330,12 +330,12 @@
       kicker: "17 · Support · Agent",
       title: "Energy Agent — your co-pilot on every tab",
       lede:
-        "The orb opens a voice/chat operator that knows this product: tours lockstep to real controls, answers “what still needs hands-off setup?”, and can navigate you. Prefer plain language — never raw tech IDs.",
+        "Open the Agent beside this setup panel — checklist on the left, co-pilot on the right. It knows this product: tours lockstep to real controls, answers “what still needs hands-off setup?”, and can navigate you.",
       kind: "guide",
       bullets: [
+        "Agent opens in a companion window next to this guide (not on top of it).",
         "Try: “Walk me through Invoices” or “What’s still red for hands-off?”",
-        "Voice can fill with a short “one second…” then answer when ready.",
-        "Setup FAB (this tour) and Agent are complementary — checklist vs freeform.",
+        "Setup (this rail) and Agent are complementary — checklist vs freeform.",
       ],
       cta: { label: "Open Energy Agent →", openAgent: true },
       autoNav: true,
@@ -1947,14 +1947,29 @@
     }
     if (extras.openAgent) {
       setTimeout(function () {
+        // Keep setup as LEFT dock; Energy Agent spawns as a companion window to its
+        // right (not covering the tour — Ford 2026-07-14 step 17).
         try {
-          if (typeof window.__eaOpen === "function") {
-            window.__eaOpen();
-            return;
+          if (state.mode !== "dock") {
+            markModalSeen();
+            state.mode = "dock";
           }
+          setShellOpen(true);
+          hardRender({ animate: false });
+          try {
+            document.body.classList.add("ho-ea-sidebyside");
+          } catch (e2) {}
         } catch (e) {}
-        clickWhenReady("#eaFab, #eaOrb, .ea-fab", 12);
-      }, 280);
+        setTimeout(function () {
+          try {
+            if (typeof window.__eaOpen === "function") {
+              window.__eaOpen();
+              return;
+            }
+          } catch (e3) {}
+          clickWhenReady("#eaFab, #eaOrb, .ea-fab", 12);
+        }, 40);
+      }, 200);
     }
   }
 
@@ -2093,6 +2108,9 @@
     }
     state.open = false;
     setShellOpen(false);
+    try {
+      document.body.classList.remove("ho-ea-sidebyside");
+    } catch (e) {}
     // Instant FAB restore — was waiting on probeLive() so the pill lagged after ×
     updatePill();
     // Refresh step counts in the background without blocking the pill

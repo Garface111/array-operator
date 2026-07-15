@@ -610,6 +610,15 @@ body.ho-shell-open .wrap{
   margin-left:var(--ho-rail);
   transition:none;
 }
+/* When EA is also open, energy-agent.css owns the combined margin (setup + agent).
+   Ensure setup rail stays on top of site content and under/beside EA cleanly. */
+body.ho-shell-open #hoTour.ho-mode-dock{
+  z-index:99966; /* above site; EA companion sits at 99968 to the right */
+}
+body.ho-shell-open #hoTour.ho-mode-dock .ho-sheet{
+  z-index:2;
+  box-shadow:8px 0 40px -16px rgba(15,40,80,.32);
+}
 @media(max-width:900px){
   body.ho-shell-open .wrap{ margin-left:0 }
   #hoTour.ho-mode-dock .ho-sheet{

@@ -1781,6 +1781,13 @@
     }
     // Desktop: shift site content right. Mobile CSS zeroes the margin.
     document.body.classList.toggle("ea-shell-open", state.open);
+    // Hands-off setup open? Dock EA to the RIGHT of the setup rail (don't cover it).
+    var tourOpen = false;
+    try {
+      var ho = document.getElementById("hoTour");
+      tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
+    } catch (e) {}
+    document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
     if (state.open) {
       await ensureSession();
       // Continuous mind awareness while the conversation window is open
