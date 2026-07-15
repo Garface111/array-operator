@@ -1442,7 +1442,7 @@
  // Label so it's obvious the product mind is talking
  var label = document.createElement("div");
  label.className = "ea-sov-label";
- label.textContent = "Energy Agent · product mind";
+ label.textContent = "Sovereign · Array Operator";
  d.appendChild(label);
  var body = document.createElement("div");
  body.className = "ea-sov-body";
