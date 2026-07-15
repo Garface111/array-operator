@@ -6,9 +6,15 @@
 }
 
 .rp-shell{
-  max-width: min(720px, 94vw);
+  max-width: min(760px, 94vw);
   margin: 18px auto 0;
-  padding: 8px 4px 40px;
+  padding: 22px 24px 36px;
+  border-radius: 22px;
+  /* Base (non-sky): solid sheet so content never floats on bare page */
+  background: var(--card, #fff);
+  border: 1px solid var(--line, rgba(15,23,42,.1));
+  box-shadow: 0 10px 32px -18px rgba(15,23,42,.22);
+  box-sizing: border-box;
 }
 
 .rp-head{
@@ -60,10 +66,10 @@
 
 .rp-empty{
   text-align: center;
-  padding: 48px 20px 40px;
-  border-radius: 22px;
-  border: 1px solid var(--line, rgba(255,255,255,.1));
-  background: linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  padding: 40px 22px 36px;
+  border-radius: 18px;
+  border: 1px solid var(--line, rgba(15,23,42,.1));
+  background: var(--card2, #f8fafc);
 }
 .rp-empty.calm{ padding-top: 56px; }
 .rp-empty-orb{
@@ -108,11 +114,12 @@
 .rp-cases{ display: flex; flex-direction: column; gap: 12px; }
 
 .rp-case{
-  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border: 1px solid var(--line, rgba(15,23,42,.1));
   border-radius: 16px;
   padding: 16px 18px;
-  background: linear-gradient(165deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-  box-shadow: 0 10px 28px -20px rgba(0,0,0,.5);
+  /* Solid cards (Inverters / Analysis style) — no glass-over-sky wash */
+  background: var(--card2, #f8fafc);
+  box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 8px 20px -16px rgba(15,23,42,.18);
 }
 .rp-case-top{
   display: flex;
@@ -196,9 +203,11 @@
 .rp-btn:disabled{ opacity: .45; cursor: not-allowed; }
 
 .rp-log-wrap{
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line, rgba(255,255,255,.08));
+  margin-top: 24px;
+  padding: 16px 16px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line, rgba(15,23,42,.1));
+  background: var(--card2, #f8fafc);
 }
 .rp-log-wrap h4{
   margin: 0 0 10px;
@@ -217,20 +226,65 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255,255,255,.04);
+  padding: 9px 4px;
+  border-bottom: 1px solid rgba(15,23,42,.06);
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
+.rp-log li:last-child{ border-bottom: 0; }
 .rp-log-v{ color: var(--ink); font-weight: 550; }
 .rp-log-t{ color: var(--faint); font-size: 11.5px; white-space: nowrap; }
 
-/* Sky theme */
+/* ── Sky theme: match Inverters (#sheetWrap / .vs-scroll) solid frosted cards ──
+   Translucent .78 white made agent-log text unreadable over the mountain
+   photo (Ford 2026-07-15). Sheet + cards are near-opaque like Analysis .an-card. */
+html.sky #panelOps .rp-shell{
+  background: rgba(255,255,255,.92) !important;
+  border: 1px solid rgba(255,255,255,.9) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 12px 36px -18px rgba(15,50,110,.35) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+html.sky #panelOps .rp-head h2,
+html.sky #panelOps .rp-case-site,
+html.sky #panelOps .rp-case-diag,
+html.sky #panelOps .rp-log-v{
+  color: #0f172a !important;
+}
+html.sky #panelOps .rp-status,
+html.sky #panelOps .rp-case-inv,
+html.sky #panelOps .rp-case-meta,
+html.sky #panelOps .rp-muted{
+  color: #475569 !important;
+}
+html.sky #panelOps .rp-working-label,
+html.sky #panelOps .rp-log-wrap h4,
+html.sky #panelOps .rp-log-t{
+  color: #64748b !important;
+}
 html.sky #panelOps .rp-empty,
-html.sky #panelOps .rp-case{
-  background: rgba(255,255,255,.78) !important;
-  border-color: var(--sky-glass-edge, rgba(20,60,120,.14)) !important;
-  box-shadow: 0 8px 22px -16px rgba(15,50,110,.28);
+html.sky #panelOps .rp-case,
+html.sky #panelOps .rp-log-wrap{
+  background: rgba(255,255,255,.96) !important;
+  border-color: rgba(14,20,32,.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 8px 22px -16px rgba(15,50,110,.22) !important;
+}
+html.sky #panelOps .rp-log li{
+  border-bottom-color: rgba(14,20,32,.07) !important;
+}
+html.sky #panelOps .rp-talk:not(.primary){
+  background: rgba(255,255,255,.95) !important;
+  border-color: rgba(14,20,32,.12) !important;
+  color: #0f172a !important;
+}
+html.sky #panelOps .rp-btn:not(.primary){
+  background: #fff !important;
+  border-color: rgba(14,20,32,.12) !important;
+  color: #0f172a !important;
 }
 html.sky #panelOps .rp-talk.primary,
 html.sky #panelOps .rp-btn.primary{
@@ -241,6 +295,7 @@ html.sky #panelOps .rp-btn.primary{
 html.sky #panelOps .rp-case-next{
   background: rgba(33,150,243,.1) !important;
   border-color: rgba(33,150,243,.22) !important;
+  color: #0f172a !important;
 }
 html.sky #panelOps .rp-case-stage{
   background: rgba(33,150,243,.12) !important;
