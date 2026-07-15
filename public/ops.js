@@ -164,17 +164,33 @@
     if (cases.length === 1) {
       var t = cases[0];
       var site = t.site_name || "a site";
+      var inv = t.inv_name || t.serial || "inverter";
+      var fail = t.fail_type || "issue";
       return (
-        "Tell me about my current repair system, especially the open case at " +
+        "Tell me about my current repair system. You're working on " +
         site +
-        "."
+        " / " +
+        inv +
+        " (" +
+        fail +
+        ") — are you emailing the repair team about it?"
       );
     }
     if (cases.length > 1) {
+      var bits = cases.slice(0, 4).map(function (c) {
+        return (
+          (c.site_name || "site") +
+          " " +
+          (c.inv_name || c.serial || "") +
+          " (" +
+          (c.fail_type || "issue") +
+          ")"
+        );
+      });
       return (
-        "Tell me about my current repair system — I have " +
-        cases.length +
-        " open cases. What are you working on?"
+        "Tell me about my current repair system. Open cases: " +
+        bits.join("; ") +
+        ". What are you emailing the repair team about right now?"
       );
     }
     return "Tell me about my current repair system.";
@@ -213,20 +229,23 @@
     render();
   }
 
-  function bgReconcile() {
+  function bgReconcile(force) {
     var now = Date.now();
-    if (now - (STATE.bgReconcileAt || 0) < 5 * 60 * 1000) return;
+    // Throttle unless forced (e.g. first open after setup so underperforming
+    // inverters open as real cases immediately).
+    if (!force && now - (STATE.bgReconcileAt || 0) < 60 * 1000) return;
     STATE.bgReconcileAt = now;
     api("/v1/array-owners/ops/reconcile", { method: "POST", timeoutMs: 90000 })
       .then(function (r) {
-        if (r && ((r.opened || 0) > 0 || (r.closed || 0) > 0)) {
-          return api("/v1/array-owners/ops?reconcile_first=0", {
-            timeoutMs: FETCH_MS,
-          });
-        }
-        return null;
+        // Always re-fetch after reconcile so fleet-linked cases replace orphans
+        return api("/v1/array-owners/ops?reconcile_first=0", {
+          timeoutMs: FETCH_MS,
+        }).then(function (d) {
+          return { tally: r, data: d };
+        });
       })
-      .then(function (d) {
+      .then(function (pack) {
+        var d = pack && pack.data;
         if (d && (d.tickets || d.active_cases || d.contacts)) applyData(d);
       })
       .catch(function () {});
@@ -268,7 +287,9 @@
       });
       if (gen !== STATE.loadGen) return;
       applyData(d);
-      bgReconcile();
+      // After contacts exist, always sync fleet → cases (underperforming etc.)
+      if ((d.contacts || []).length) bgReconcile(true);
+      else bgReconcile(false);
     } catch (e) {
       if (gen !== STATE.loadGen) return;
       if (STATE.data) render();
