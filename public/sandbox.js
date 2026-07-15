@@ -7083,7 +7083,9 @@
         const amt = Number(ln.amount_cents || 0);
         // Skip null amount lines (shouldn't reach here)
         if(ln.amount_cents == null && ln.included_in_monthly_total === false) return;
-        total += amt;
+        // Only sum lines that are actually on-plan / charged
+        const billed = (ln.billed !== false) && (ln.included_in_monthly_total !== false);
+        if(billed) total += amt;
         let calc = "";
         if(ln.basis === "nameplate_kw"){
           const q = Number(ln.quantity || 0);
@@ -7096,11 +7098,16 @@
           const rate = Number(ln.unit_cents || 1500);
           const full = Number(ln.full_unit_cents || rate);
           const disc = full > 0 && rate < full - 0.001;
-          calc = `${q} offtaker${q===1?"":"s"} × ${disc?"≈ ":""}${usdFromCents(rate)}`;
+          // Always show the per-offtaker math so the rate is obvious
+          calc = `${q} offtaker${q===1?"":"s"} × ${disc?"≈ ":""}${usdFromCents(rate)}`
+            + (full && !disc ? ` · $${(full/100).toFixed(0)}/ea` : "");
         } else {
           calc = ln.unit_label || "";
         }
-        lines += billLine(ln.kind || "Charge", calc, usdFromCents(amt), ln.desc || "");
+        const amtHtml = billed
+          ? usdFromCents(amt)
+          : `<span class="ao-bill-soft" title="Not charged on your current plan">${usdFromCents(amt)} · not on plan</span>`;
+        lines += billLine(ln.kind || "Charge", calc, amtHtml, ln.desc || "");
       });
       if(u.model_note){
         lines += `<div class="ao-bill-model-note">${esc(u.model_note)}</div>`;
