@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import {
+  DemoBanner,
+  EmptyCard,
+  MeterBar,
+  SectionHead,
+  StatusPill,
+} from "@/components/ui";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
 import {
   fetchFleetForecast,
@@ -65,18 +72,29 @@ export function AnalysisScreen() {
     .sort((a, b) => (Number(a.ratio) || 99) - (Number(b.ratio) || 99))
     .slice(0, 12);
 
+  const ratioSentence =
+    ratio == null
+      ? "Weather-adjusted expected isn’t available for enough arrays yet."
+      : ratio >= 0.95
+        ? `Fleet is tracking expected (${ratioPct} of modeled).`
+        : ratio >= 0.85
+          ? `Fleet is a bit soft vs expected (${ratioPct}). Check sites below.`
+          : `Fleet is well under expected (${ratioPct}). Prioritize worst sites.`;
+
   return (
     <div className="space-y-4">
       {isDemoMode() ? (
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2 text-xs font-semibold text-amber-950 backdrop-blur-md">
+        <DemoBanner>
           Demo analysis — sign in for your production history.
-        </div>
+        </DemoBanner>
       ) : null}
 
       <div>
         <h1 className="text-lg font-extrabold">Analysis</h1>
-        <p className="text-sm text-slate-800/75">
-          Production vs expected · trends · peer health.
+        <p className="text-sm font-medium text-slate-800/75">
+          {view === "trends"
+            ? "Multi-year portfolio production"
+            : "Weather-adjusted actual vs expected"}
         </p>
       </div>
 
@@ -121,12 +139,15 @@ export function AnalysisScreen() {
 
       {view === "analysis" ? (
       <>
+      <p className="text-xs font-semibold leading-snug text-slate-800/90 px-0.5">
+        {ratioSentence}
+      </p>
       {/* NOC: production vs expected */}
       <section className="ao-card space-y-3 p-3.5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-extrabold">Production vs expected</h2>
           <span className="text-[10px] font-bold uppercase text-muted">
-            {forecast?.window_days || 14}d
+            {forecast?.window_days || 14}d window
           </span>
         </div>
         {forecast?.available === false ||
@@ -190,9 +211,22 @@ export function AnalysisScreen() {
                 </div>
               </div>
             </div>
+            {ratio != null ? (
+              <MeterBar
+                pct={Math.min(100, ratio * 100)}
+                tone={
+                  ratioTone === "good"
+                    ? "good"
+                    : ratioTone === "warn"
+                      ? "warn"
+                      : "bad"
+                }
+              />
+            ) : null}
             {forecast?.kwh_per_kw_day != null ? (
               <p className="text-[11px] font-medium text-muted">
                 Fleet ~{Number(forecast.kwh_per_kw_day).toFixed(2)} kWh/kW/day
+                (specific yield)
               </p>
             ) : null}
           </>
@@ -201,7 +235,10 @@ export function AnalysisScreen() {
 
       {rows.length ? (
         <section className="space-y-2">
-          <h2 className="text-sm font-extrabold">Sites (worst first)</h2>
+          <SectionHead
+            title="Sites"
+            sub="Worst first by actual ÷ expected"
+          />
           <ul className="space-y-2">
             {rows.map((a) => {
               const r = a.ratio != null ? Number(a.ratio) : null;
@@ -229,20 +266,10 @@ export function AnalysisScreen() {
                         : ""}
                     </div>
                   </div>
-                  <span
-                    className={[
-                      "ao-chip shrink-0",
-                      tone === "good"
-                        ? "bg-emerald-100 text-emerald-900"
-                        : tone === "warn"
-                          ? "bg-amber-100 text-amber-950"
-                          : tone === "bad"
-                            ? "bg-red-100 text-red-900"
-                            : "bg-white/50 text-slate-700",
-                    ].join(" ")}
-                  >
-                    {r != null ? `${(r * 100).toFixed(0)}%` : "—"}
-                  </span>
+                  <StatusPill
+                    tone={tone}
+                    status={r != null ? `${(r * 100).toFixed(0)}%` : "—"}
+                  />
                 </li>
               );
             })}
@@ -258,7 +285,10 @@ export function AnalysisScreen() {
       ) : null}
 
       <section className="ao-card space-y-2 p-3.5">
-        <h2 className="text-sm font-extrabold">Peer health</h2>
+        <SectionHead
+          title="Peer health"
+          sub="Relative to cohort (not weather)"
+        />
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <div className="text-lg font-extrabold text-emerald-800">
@@ -283,6 +313,9 @@ export function AnalysisScreen() {
             </div>
           </div>
         </div>
+        <p className="text-[11px] text-muted">
+          Soft = underperforming peers · Hard = dead / fault / offline
+        </p>
         <Link to="/inverters" className="block text-xs font-bold text-sky-800">
           Open inverters →
         </Link>
@@ -362,9 +395,9 @@ export function AnalysisScreen() {
           </ul>
         </section>
       ) : (
-        <div className="ao-card p-4 text-sm text-muted">
+        <EmptyCard>
           No multi-year trend history yet — it builds as daily generation lands.
-        </div>
+        </EmptyCard>
       )}
       </>
       )}

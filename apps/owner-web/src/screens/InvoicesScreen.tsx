@@ -1,5 +1,12 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  DemoBanner,
+  EmptyCard,
+  KpiTile,
+  SectionHead,
+  StatusPill,
+} from "@/components/ui";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
 import {
   createSubscription,
@@ -11,6 +18,7 @@ import {
   patchSubscription,
 } from "@/lib/api";
 import { isDemoMode } from "@/lib/demoData";
+import { relTime } from "@/lib/format";
 import type {
   OfftakerArrayOption,
   OnboardingStatus,
@@ -32,9 +40,16 @@ function displayName(s: Subscription): string {
 }
 
 function shareLabel(s: Subscription): string {
-  if (s.allocation_pct != null) return `${(Number(s.allocation_pct) * 100).toFixed(1)}%`;
+  if (s.allocation_pct != null)
+    return `${(Number(s.allocation_pct) * 100).toFixed(1)}%`;
   if (s.share_pct != null) return `${Number(s.share_pct)}%`;
   return "—";
+}
+
+function shareFraction(s: Subscription): number | null {
+  if (s.allocation_pct != null) return Number(s.allocation_pct);
+  if (s.share_pct != null) return Number(s.share_pct) / 100;
+  return null;
 }
 
 export function InvoicesScreen() {
@@ -91,11 +106,31 @@ export function InvoicesScreen() {
     pipe?.total_enabled != null
       ? pipe.total_enabled
       : subs.filter((s) => s.enabled !== false).length;
+  const disabledCount = subs.filter((s) => s.enabled === false).length;
+  const autoCount = subs.filter(
+    (s) => s.enabled !== false && (s.delivery_mode || pipe?.default_delivery_mode) === "auto"
+  ).length;
+  const approvalCount = Math.max(0, (enabledCount || 0) - autoCount);
+  const shareSum = useMemo(() => {
+    let s = 0;
+    let n = 0;
+    subs.forEach((sub) => {
+      if (sub.enabled === false) return;
+      const f = shareFraction(sub);
+      if (f != null) {
+        s += f;
+        n += 1;
+      }
+    });
+    return n ? s : null;
+  }, [subs]);
 
   const needsUtility =
     onb && !onb.complete && !onb.has_utility_accounts && !isDemoMode();
 
   const editing = subs.find((s) => String(s.id) === editId) || null;
+  const arrayName = (id?: number | null) =>
+    arrays.find((a) => (a.id ?? a.array_id) === id)?.name;
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -189,16 +224,16 @@ export function InvoicesScreen() {
   return (
     <div className="space-y-4">
       {isDemoMode() ? (
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2 text-xs font-semibold text-amber-950 backdrop-blur-md">
+        <DemoBanner>
           Demo offtaker roster — sign in to create, edit, and preview PDFs.
-        </div>
+        </DemoBanner>
       ) : null}
 
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-extrabold">Invoices</h1>
           <p className="text-sm text-slate-800/75">
-            Offtakers, send pulse, and invoice preview.
+            Offtaker roster · send pulse · PDF preview
           </p>
         </div>
         <button
@@ -231,30 +266,68 @@ export function InvoicesScreen() {
         </div>
       ) : null}
 
-      <div className="ao-card space-y-3 p-4">
-        <Row k="Enabled offtakers" v={String(enabledCount || "—")} />
-        <Row k="Delivery mode" v={pipe?.default_delivery_mode || "—"} />
-        <Row
-          k="Last cycle"
-          v={
+      <div className="grid grid-cols-2 gap-2">
+        <KpiTile
+          label="Enabled"
+          value={String(enabledCount || 0)}
+          meta={
+            disabledCount
+              ? `${disabledCount} paused · ${subs.length} total`
+              : `${subs.length} on roster`
+          }
+          tone={enabledCount ? "good" : "muted"}
+        />
+        <KpiTile
+          label="Last cycle"
+          value={
+            delivered != null && enabledCount
+              ? `${delivered}/${enabledCount}`
+              : delivered != null
+                ? String(delivered)
+                : "—"
+          }
+          meta={
             last
-              ? `${last.period_label || last.period_month || "period"} · ${
-                  delivered != null ? delivered : "—"
-                } sent`
+              ? `${last.period_label || last.period_month || "period"} sent`
               : "No send yet"
           }
-        />
-        <Row
-          k="Online pay"
-          v={
-            pay?.ready
-              ? "Ready"
-              : pay?.connected
-                ? "Connect setup incomplete"
-                : "Off"
+          tone={
+            delivered != null &&
+            enabledCount &&
+            Number(delivered) < Number(enabledCount)
+              ? "warn"
+              : "good"
           }
         />
+        <KpiTile
+          label="Delivery"
+          value={String(pipe?.default_delivery_mode || "—")}
+          meta={`${approvalCount} approve · ${autoCount} auto`}
+        />
+        <KpiTile
+          label="Online pay"
+          value={pay?.ready ? "Ready" : pay?.connected ? "Setup" : "Off"}
+          meta={
+            pay?.ready
+              ? "Pay links on invoices"
+              : "Enable in Connect"
+          }
+          tone={pay?.ready ? "good" : "muted"}
+        />
       </div>
+      {shareSum != null ? (
+        <p className="text-[11px] font-medium text-muted px-0.5">
+          Enabled shares sum to{" "}
+          <span className="font-extrabold text-slate-800">
+            {(shareSum * 100).toFixed(1)}%
+          </span>
+          {shareSum > 1.02
+            ? " — over 100%, check overlaps."
+            : shareSum < 0.95
+              ? " — under 100% is OK if not fully allocated."
+              : " of production allocation."}
+        </p>
+      ) : null}
 
       {showCreate ? (
         <form onSubmit={onCreate} className="ao-card space-y-2.5 p-3.5">
@@ -351,14 +424,17 @@ export function InvoicesScreen() {
       ) : null}
 
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-extrabold">Roster</h2>
-          <span className="text-[11px] font-bold text-muted">
-            {subs.length} total
-          </span>
-        </div>
+        <SectionHead
+          title="Roster"
+          sub="Share · delivery · bill source"
+          action={
+            <span className="text-[11px] font-bold text-muted">
+              {subs.length} total
+            </span>
+          }
+        />
         {subs.length === 0 ? (
-          <div className="ao-card p-4 text-sm text-muted">
+          <EmptyCard>
             No offtakers yet.{" "}
             <button
               type="button"
@@ -373,33 +449,65 @@ export function InvoicesScreen() {
             >
               {isDemoMode() ? "Ask Agent →" : "Add one →"}
             </button>
-          </div>
+          </EmptyCard>
         ) : (
           <ul className="space-y-2">
             {subs.map((s) => {
               const name = displayName(s);
               const email = s.client_email || s.email || s.to_email || "";
               const isEdit = String(s.id) === editId;
+              const arrLabel = arrayName(s.array_id);
               return (
                 <li key={String(s.id || name)} className="ao-card overflow-hidden">
-                  <div className="flex items-start justify-between gap-2 px-3.5 py-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-extrabold">{name}</div>
-                      <div className="truncate text-xs text-muted">
-                        {email || s.utility_account_name || "—"}
+                  <div className="space-y-1.5 px-3.5 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-extrabold">{name}</div>
+                        <div className="truncate text-xs text-muted">
+                          {email || "No email"}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-sky-900">
+                          {shareLabel(s)}
+                        </div>
+                        <div className="text-[10px] font-bold uppercase text-muted">
+                          share
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-sky-900">
-                        {shareLabel(s)}
-                      </div>
-                      <div className="text-[10px] font-semibold uppercase text-muted">
-                        {s.enabled === false
-                          ? "off"
-                          : s.delivery_mode ||
-                            pipe?.default_delivery_mode ||
-                            "—"}
-                      </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusPill
+                        tone={s.enabled === false ? "muted" : "good"}
+                        status={s.enabled === false ? "Paused" : "Enabled"}
+                      />
+                      <StatusPill
+                        tone="muted"
+                        status={
+                          s.delivery_mode ||
+                          pipe?.default_delivery_mode ||
+                          "—"
+                        }
+                      />
+                      {s.cadence ? (
+                        <StatusPill tone="muted" status={String(s.cadence)} />
+                      ) : null}
+                    </div>
+                    <div className="text-[11px] font-medium leading-snug text-muted">
+                      {[
+                        arrLabel ? `Array · ${arrLabel}` : null,
+                        s.utility_account_name
+                          ? `Bill · ${s.utility_account_name}`
+                          : null,
+                        s.last_sent_at
+                          ? `Last sent ${relTime(s.last_sent_at)}`
+                          : "Not sent yet",
+                        s.next_send_at
+                          ? `Next ${relTime(s.next_send_at)}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 border-t border-white/40 px-3.5 py-2.5">
@@ -538,11 +646,4 @@ export function InvoicesScreen() {
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="font-semibold text-muted">{k}</span>
-      <span className="text-right font-bold text-ink">{v}</span>
-    </div>
-  );
-}
+

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { DemoBanner, KpiTile, SectionHead } from "@/components/ui";
 import {
   fetchAccount,
   fetchAddPaymentUrl,
@@ -9,7 +10,7 @@ import {
   updateCompanyName,
 } from "@/lib/api";
 import { disableDemoMode, isDemoMode } from "@/lib/demoData";
-import { fmtKwh, relTime } from "@/lib/format";
+import { fmtKwh, fmtMoney, relTime } from "@/lib/format";
 import { clearSession } from "@/lib/session";
 import type { AccountMe, BillingSummary } from "@/lib/types";
 
@@ -102,21 +103,22 @@ export function AccountScreen() {
     billing?.estimated_cents != null
       ? billing.estimated_cents
       : billing?.total_cents;
-  const estDollars =
-    est != null ? `$${(Number(est) / 100).toFixed(2)}` : null;
+  const estDollars = est != null ? fmtMoney(est, true) : "—";
+  const providers = account?.connected_providers || [];
 
   return (
     <div className="space-y-4">
       {isDemoMode() ? (
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/55 px-3.5 py-2 text-xs font-semibold text-amber-950 backdrop-blur-md">
+        <DemoBanner>
           Demo account — sign in for live billing and settings.
-        </div>
+        </DemoBanner>
       ) : null}
 
       <div>
         <h1 className="text-lg font-extrabold">Account</h1>
         <p className="text-sm text-slate-800/75">
-          Profile, billing, and capture mode.
+          {account?.company_name || account?.name || "Profile"} · billing ·
+          capture
         </p>
       </div>
 
@@ -131,26 +133,58 @@ export function AccountScreen() {
         </div>
       ) : null}
 
-      <section className="ao-card space-y-2 p-3.5">
-        <Row k="Email" v={account?.email || "—"} />
-        <Row k="Product" v={account?.product || "array_operator"} />
-        <Row
-          k="Plan"
-          v={
+      <div className="grid grid-cols-2 gap-2">
+        <KpiTile
+          label="Plan"
+          value={String(
             account?.plan_features?.plan ||
-            account?.billing_plan ||
-            account?.subscription_status ||
-            "—"
-          }
-        />
-        <Row
-          k="Status"
-          v={
+              account?.billing_plan ||
+              account?.subscription_status ||
+              "—"
+          )}
+          meta={
             account?.active === false
               ? "Inactive"
               : account?.subscription_status || "Active"
           }
+          tone={account?.active === false ? "bad" : "good"}
         />
+        <KpiTile
+          label="Est. bill"
+          value={estDollars}
+          meta={
+            billing?.billing_basis === "kwh"
+              ? `${fmtKwh(billing.mtd_kwh)} MTD`
+              : billing?.billable_arrays != null
+                ? `${billing.billable_arrays} arrays`
+                : "This period"
+          }
+        />
+        <KpiTile
+          label="Bills on file"
+          value={String(account?.bills_count ?? "—")}
+          meta={
+            account?.accounts_count != null
+              ? `${account.accounts_count} utility accts`
+              : "Utility history"
+          }
+        />
+        <KpiTile
+          label="Capture"
+          value={String(account?.capture_mode || "—")}
+          meta={
+            account?.extension_heartbeat_at
+              ? `Ext ${relTime(account.extension_heartbeat_at)}`
+              : "No extension beat"
+          }
+        />
+      </div>
+
+      <section className="ao-card space-y-2 p-3.5">
+        <SectionHead title="Profile" />
+        <Row k="Email" v={account?.email || "—"} />
+        <Row k="Company" v={account?.company_name || account?.name || "—"} />
+        <Row k="Product" v={account?.product || "array_operator"} />
         <Row
           k="Trial ends"
           v={
@@ -159,16 +193,13 @@ export function AccountScreen() {
               : "—"
           }
         />
+        <Row k="Last data pull" v={relTime(account?.last_pull_at)} />
         <Row
-          k="Last pull"
-          v={relTime(account?.last_pull_at)}
-        />
-        <Row
-          k="Extension"
+          k="Connected portals"
           v={
-            account?.extension_heartbeat_at
-              ? relTime(account.extension_heartbeat_at)
-              : "No heartbeat"
+            providers.length
+              ? providers.join(", ")
+              : "None yet — open Connect"
           }
         />
       </section>
@@ -193,13 +224,12 @@ export function AccountScreen() {
       </form>
 
       <section className="ao-card space-y-3 p-3.5">
-        <h2 className="text-sm font-extrabold">Billing</h2>
-        <Row
-          k="Basis"
-          v={
+        <SectionHead
+          title="Billing"
+          sub={
             billing?.billing_basis === "kwh"
-              ? "Per kWh generated"
-              : billing?.billing_basis || "—"
+              ? "Metered per kWh generated"
+              : "Array-based pricing"
           }
         />
         {billing?.billing_basis === "kwh" ? (
@@ -214,9 +244,9 @@ export function AccountScreen() {
             }
           />
         )}
-        <Row k="Est. this period" v={estDollars || "—"} />
+        <Row k="Est. this period" v={estDollars} />
         <Row
-          k="Card"
+          k="Card on file"
           v={
             billing?.card_last4 || account?.has_payment_method
               ? [

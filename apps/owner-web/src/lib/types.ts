@@ -39,6 +39,8 @@ export type Overview = {
     array_count?: number;
     today_kwh?: number;
     value_today?: number;
+    current_power_w?: number;
+    month_kwh?: number;
     [key: string]: unknown;
   };
   peer_summary?: {
