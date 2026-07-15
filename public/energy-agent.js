@@ -21,6 +21,8 @@
     mindTick: "/v1/energy-agent/mind/tick",
     mindWake: "/v1/energy-agent/mind/wake",
     mindMetrics: "/v1/energy-agent/mind/metrics",
+    // Deep mind steers the Realtime mouth (interim lines while tools run)
+    mindVoiceSteer: "/v1/energy-agent/mind/voice-steer",
   };
 
   var state = {
@@ -1373,15 +1375,27 @@
         openHint = true;
       }
 
-      // Seamless interrupt: policy-gated candidates only (importance on server)
-      if (ev.kind === "interrupt_candidate" && ev.speak_as_mind && !ev.consumed) {
-        var said = injectMindSpeak(ev.speak_as_mind, {
-          eventId: ev.id,
-          importance: ev.importance,
-        });
-        if (said) {
-          // Mark shown; accept/dismiss chips may upgrade outcome later
+      // Mind steers voice: interim/final directives + classic interrupt candidates
+      if (
+        (ev.kind === "interrupt_candidate" || ev.kind === "voice_steer") &&
+        ev.speak_as_mind &&
+        !ev.consumed
+      ) {
+        // Interim steers while thinking: mouth only (no second chat bubble spam)
+        if (ev.kind === "voice_steer" && state.thinking) {
+          setStatus(ev.speak_as_mind, "think");
+          // Respect speaker mute; force is only for injectMindSpeak thinking-gate
+          enqueueSpeak(ev.speak_as_mind, { source: "mind_steer" }).catch(function () {});
           toConsume.push(ev.id);
+        } else {
+          var said = injectMindSpeak(ev.speak_as_mind, {
+            eventId: ev.id,
+            importance: ev.importance,
+            force: ev.kind === "voice_steer",
+          });
+          if (said || ev.kind === "voice_steer") {
+            toConsume.push(ev.id);
+          }
         }
       }
     }
@@ -1931,6 +1945,36 @@
       try { state._chatAbort.abort(); } catch (e) {}
     }
     state._chatAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
+
+    // ── Mind steers voice immediately (parallel with deep chat) ───────────
+    // Realtime is only the mouth; background intelligence picks the interim line
+    // while tools run, then the final chat reply replaces/continues.
+    var isVoice = (source || "") === "voice";
+    if (isVoice) {
+      try {
+        fetch(API.mindVoiceSteer, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            session_id: sid,
+            message: text,
+            context: packContext(),
+          }),
+        })
+          .then(function (sr) { return sr.ok ? sr.json() : null; })
+          .then(function (sd) {
+            if (turnGen !== (state._turnAbortGen || 0)) return;
+            if (!sd || !sd.speak) return;
+            // Don't paint interim as a chat bubble — mouth only (or soft status)
+            setStatus(sd.speak, "think");
+            // Mind steers the mouth while tools run; mute still wins
+            enqueueSpeak(sd.speak, { source: "mind_steer" }).catch(function () {});
+            if (sd.mind) onMindPlanFromChat(sd.mind);
+          })
+          .catch(function () {});
+      } catch (e) {}
+    }
+
     try {
       var fetchOpts = {
         method: "POST",
@@ -1965,19 +2009,20 @@
       setBudget(d.budget);
       // tool_trace intentionally not rendered — keeps chat readable (tools still ran)
       clearTools();
-      // Operating mind: background plan started — same mind, quiet work
+      // Operating mind: background plan started — same mind steers voice
       if (d.mind) onMindPlanFromChat(d.mind);
       if (d.pending) showPending(d.pending);
       else showPending(null);
 
       var reply = d.reply || "…";
-      // Speak the full answer (voice used to truncate mid-reply). Chat bubble = same text.
+      // Mind-steered mouth line (prefer speak); full reply always in the chat bubble
+      var mouthLine = (d.speak && String(d.speak).trim()) || reply;
       addMsg("agent", reply);
       clearTools();
 
-      // SPEAK FIRST — don't wait on UI navigates/highlights (those delayed the mouth
-      // so Realtime often clipped the first half of the answer, Ford 2026-07-14).
-      var speakP = enqueueSpeak(reply, { source: "chat" });
+      // SPEAK FIRST — mind-directed final. Interim steer (if any) is already in the
+      // speak queue; final follows so the deep answer is heard in full.
+      var speakP = enqueueSpeak(mouthLine, { source: "chat" });
 
       var cmds = d.ui_commands || [];
       // Kill freehand multi-highlight "tours" from the LLM — replace with a real
@@ -3962,9 +4007,10 @@
         session: {
           type: "realtime",
           instructions:
-            "You are Energy Agent's voice. Only speak lines the app asks you to say via response.create. " +
-            "Do not invent your own answers to the user; the app handles reasoning and tools. " +
-            "Never speak over yourself; one utterance at a time.",
+            "You are Energy Agent's MOUTH only — continuous cognition steers you. " +
+            "Only speak lines the app sends via response.create. " +
+            "Do not invent answers; the deeper mind reasons with tools and steers what you say. " +
+            "Start from the first word, speak completely, never speak over yourself.",
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
