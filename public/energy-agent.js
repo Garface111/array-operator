@@ -1515,15 +1515,27 @@
  }
  }
 
+ function mindPollMs() {
+ // On Repairs, poll hard so tech email replies surface in chat within seconds
+ try {
+ var h = String(location.hash || "").toLowerCase();
+ if (h === "#ops" || h === "#repairs" || h === "#claims") return 3500;
+ } catch (e) {}
+ return 15000;
+ }
+
  function startMindAwareness() {
  if (state.mindPollTimer) return;
  // Soft poll, cheap event cursor; heavy work only on backend when tasks exist
- // Lighter poll cadence, less background chatter while talking (was 8s)
- state.mindPollTimer = setInterval(function () {
+ // Faster on Repairs so inbound tech email hits the chat almost immediately
+ // Self-rescheduling poll so cadence can tighten on #ops without a full restart
+ function mindTick() {
  pollMindEvents().catch(function () {});
- }, 15000);
+ state.mindPollTimer = setTimeout(mindTick, mindPollMs());
+ }
+ state.mindPollTimer = setTimeout(mindTick, mindPollMs());
  // First pull soon after open / chat plan
- setTimeout(function () { pollMindEvents().catch(function () {}); }, 1800);
+ setTimeout(function () { pollMindEvents().catch(function () {}); }, 900);
  // Wake the long-term mind after the intro has had time to finish
  // (was 900ms, collided with first greeting and cut the voice).
  if (!state._mindWokeThisOpen) {
@@ -1562,10 +1574,40 @@
 
  function stopMindAwareness() {
  if (state.mindPollTimer) {
+ clearTimeout(state.mindPollTimer);
  clearInterval(state.mindPollTimer);
  state.mindPollTimer = null;
  }
  setMindActivity(false);
+ }
+
+ /**
+ * Repair mail loop update — always a chat bubble (inbound tech reply or outbound send).
+ * Owner asked for unprompted updates when email arrives.
+ */
+ function injectRepairUpdate(text, opts) {
+ opts = opts || {};
+ var t = String(text || "").trim();
+ if (!t) return false;
+ try {
+ addMsg("agent", t, {
+ mindUpdate: true,
+ origin: "repair",
+ skipDedup: true,
+ });
+ setMindActivity(true, opts.kind === "repair_inbound" ? "Tech replied…" : "Emailed tech…");
+ setStatus(
+ opts.kind === "repair_inbound" ? "Repair team replied" : "Outreach sent",
+ "on"
+ );
+ // Soft-open the agent if closed so the owner sees it
+ if (!state.open && typeof setOpen === "function") {
+ setOpen(true).catch(function () {});
+ }
+ return true;
+ } catch (e) {
+ return false;
+ }
  }
 
  /**
@@ -1702,6 +1744,22 @@
  // (final mouth line comes once from /chat, speaking interim here caused double replies).
  if (ev.kind === "voice_steer" && ev.speak_as_mind && !ev.consumed) {
  if (state.thinking) setStatus(ev.speak_as_mind, "think");
+ toConsume.push(ev.id);
+ } else if (
+ (ev.kind === "repair_inbound" || ev.kind === "repair_outbound") &&
+ ev.speak_as_mind &&
+ !ev.consumed
+ ) {
+ // Repair mail loop: always show in chat (owner asked for unprompted updates)
+ injectRepairUpdate(ev.speak_as_mind, {
+ eventId: ev.id,
+ kind: ev.kind,
+ importance: ev.importance || 90,
+ });
+ // Refresh Repairs panel cases/log if present
+ try {
+ if (typeof window.__aoRefreshRepairs === "function") window.__aoRefreshRepairs();
+ } catch (e) {}
  toConsume.push(ev.id);
  } else if (
  (ev.kind === "interrupt_candidate" || ev.kind === "sovereign_interrupt") &&
