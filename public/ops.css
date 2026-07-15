@@ -28,16 +28,29 @@
 .ops-kpi.bad b{ color:var(--bad); }
 .ops-kpi.good b{ color:var(--good); }
 
+/* Sub-view switcher (Repairs / Team / Claims / Resources / Settings).
+   Sized and contrasted to read at a glance on both night and sky glass sheets
+   (Ford 2026-07-15: prior pills were pale and washed into the blue panel). */
 .ops-seg{
-  display:inline-flex; gap:2px; padding:3px; border-radius:12px;
-  background:rgba(0,0,0,.45); border:1px solid var(--line); margin-bottom:16px;
+  display:inline-flex; flex-wrap:wrap; gap:4px; padding:5px; border-radius:14px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14);
+  margin:0 0 18px; box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
 }
 .ops-seg-btn{
-  appearance:none; border:0; background:transparent; color:var(--muted);
-  font:600 13px/1.2 inherit; padding:8px 14px; border-radius:9px; cursor:pointer;
+  appearance:none; border:0; background:transparent;
+  color:var(--ink); opacity:.72;
+  font:700 14px/1.2 inherit; letter-spacing:-.01em;
+  padding:10px 16px; border-radius:10px; cursor:pointer;
+  transition:background .14s, color .14s, opacity .14s, box-shadow .14s;
 }
-.ops-seg-btn.on{ background:rgba(63,214,138,.14); color:var(--good2); box-shadow:0 0 0 1px rgba(63,214,138,.25); }
-.ops-seg-btn:hover{ color:var(--ink); }
+.ops-seg-btn:hover{ opacity:1; background:rgba(255,255,255,.08); color:var(--ink); }
+.ops-seg-btn.on{
+  opacity:1;
+  background:linear-gradient(180deg,var(--good2),var(--good));
+  color:#06140d;
+  box-shadow:0 4px 14px -4px rgba(63,214,138,.45);
+}
+.ops-seg-btn:focus-visible{ outline:2px solid rgba(63,214,138,.55); outline-offset:2px; }
 
 .ops-toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
 .ops-toolbar input, .ops-toolbar select, .ops-field input, .ops-field select, .ops-field textarea{
