@@ -73,7 +73,7 @@ export function HomeScreen() {
         setOnb(ob);
       } catch (e) {
         if (!cancelled)
-          setErr(e instanceof Error ? e.message : "Could not load triage");
+          setErr(e instanceof Error ? e.message : "Could not load fleet");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -235,7 +235,7 @@ export function HomeScreen() {
   if (loading) {
     return (
       <div className="space-y-3 py-8 text-center text-sm font-semibold text-muted">
-        Loading fleet triage…
+        Loading fleet…
       </div>
     );
   }
@@ -275,7 +275,7 @@ export function HomeScreen() {
 
       <section className="drop-shadow-sm">
         <p className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
-          Fleet triage
+          Fleet
         </p>
         <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
           {company}
@@ -406,7 +406,7 @@ export function HomeScreen() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-extrabold">Energy Agent</div>
             <div className="text-xs text-muted">
-              Brief, triage, or adjust offtakers
+              Brief fleet health or adjust offtakers
             </div>
           </div>
           <button

@@ -35,7 +35,7 @@ export function AppShell() {
               Array Operator
             </div>
             <div className="text-[11px] font-semibold text-slate-700/80">
-              Triage · Invoices · Resources · Account
+              Fleet · Invoices · Resources · Account
             </div>
           </div>
         </div>

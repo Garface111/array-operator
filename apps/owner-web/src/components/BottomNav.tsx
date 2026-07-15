@@ -10,7 +10,7 @@ const LEFT: Array<{
   icon: string;
   end?: boolean;
 }> = [
-  { to: "/triage", label: "Fleet Triage", short: "Triage", icon: "◎", end: true },
+  { to: "/fleet", label: "Fleet", short: "Fleet", icon: "◎", end: true },
   { to: "/invoices", label: "Invoices", short: "Invoices", icon: "▤" },
 ];
 

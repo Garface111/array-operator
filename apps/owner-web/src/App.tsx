@@ -10,8 +10,8 @@ import { ResourcesScreen } from "@/screens/ResourcesScreen";
 
 /**
  * Mobile four-tab app:
- *   Triage · Invoices · Resources · Account
- * Inverters / Analysis routes redirect into Triage (fleet health lives there).
+ *   Fleet · Invoices · Resources · Account
+ * (+ center Agent on the dock)
  */
 export default function App() {
   return (
@@ -19,15 +19,14 @@ export default function App() {
       <Route path="/login" element={<LoginScreen />} />
       <Route element={<AuthGate />}>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/triage" replace />} />
-          <Route path="triage" element={<HomeScreen />} />
-          <Route path="dashboard" element={<Navigate to="/triage" replace />} />
-          {/* Retired primary tabs → triage */}
-          <Route path="inverters" element={<Navigate to="/triage" replace />} />
-          <Route path="fleet" element={<Navigate to="/triage" replace />} />
-          <Route path="arrays" element={<Navigate to="/triage" replace />} />
-          <Route path="analysis" element={<Navigate to="/triage" replace />} />
-          <Route path="trends" element={<Navigate to="/triage" replace />} />
+          <Route index element={<Navigate to="/fleet" replace />} />
+          <Route path="fleet" element={<HomeScreen />} />
+          <Route path="triage" element={<Navigate to="/fleet" replace />} />
+          <Route path="dashboard" element={<Navigate to="/fleet" replace />} />
+          <Route path="inverters" element={<Navigate to="/fleet" replace />} />
+          <Route path="arrays" element={<Navigate to="/fleet" replace />} />
+          <Route path="analysis" element={<Navigate to="/fleet" replace />} />
+          <Route path="trends" element={<Navigate to="/fleet" replace />} />
           <Route path="invoices" element={<InvoicesScreen />} />
           <Route path="reports" element={<Navigate to="/invoices" replace />} />
           <Route path="resources" element={<ResourcesScreen />} />
@@ -36,7 +35,7 @@ export default function App() {
           <Route path="more" element={<Navigate to="/account" replace />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/triage" replace />} />
+      <Route path="*" element={<Navigate to="/fleet" replace />} />
     </Routes>
   );
 }
