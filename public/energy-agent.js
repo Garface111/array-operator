@@ -924,22 +924,24 @@
  /**
  * Badge over the Energy Agent icon (top-left tab + mobile FAB).
  * Free: "Go Pro" pill (opens Account billing checkout).
- * Pro: "Unlimited" calm badge.
+ * Pro: no badge — plan status lives on Account / budget meter, not as a
+ * tab notification (Ford 2026-07-14: clear Unlimited noise on the EA tab).
  */
  function setProBadge(isPro) {
  state._isPro = !!isPro;
  function paint(id) {
  var badge = document.getElementById(id);
  if (!badge) return;
- badge.hidden = false;
  badge.classList.remove("ea-pro-badge--go", "ea-pro-badge--ok");
  if (isPro) {
- badge.textContent = "Unlimited";
- badge.classList.add("ea-pro-badge--ok");
- badge.setAttribute("aria-label", "Energy Agent Pro, unlimited");
+ badge.hidden = true;
+ badge.textContent = "";
+ badge.removeAttribute("aria-label");
  badge.onclick = null;
  badge.style.pointerEvents = "none";
- } else {
+ return;
+ }
+ badge.hidden = false;
  badge.textContent = "Go Pro";
  badge.classList.add("ea-pro-badge--go");
  badge.setAttribute("aria-label", "Upgrade to Energy Agent Pro");
@@ -958,7 +960,6 @@
  }, 280);
  } catch (_) {}
  };
- }
  }
  paint("eaProBadgeTab");
  paint("eaProBadgeFab");
