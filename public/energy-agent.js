@@ -52,6 +52,9 @@
     voiceMode: "none", // realtime | webspeech | none
     rtResponseActive: false, // track open Realtime response — avoid cancel noise
     greeted: false, // one Realtime greeting per panel session
+    _greetingPlaying: false, // protect intro voice from barge-in / mind interrupts
+    _sessionUpdated: false, // Realtime session.update applied
+    _pendingGreetingText: null,
     touring: false,
     // Speech pipeline — one mouth at a time
     _onSpeakDone: null,
@@ -1235,10 +1238,30 @@
     }, 15000);
     // First pull soon after open / chat plan
     setTimeout(function () { pollMindEvents().catch(function () {}); }, 1800);
-    // Wake the long-term mind when the panel opens (event-driven, not spam)
+    // Wake the long-term mind after the intro has had time to finish
+    // (was 900ms — collided with first greeting and cut the voice).
     if (!state._mindWokeThisOpen) {
       state._mindWokeThisOpen = true;
       setTimeout(function () {
+        if (state._greetingPlaying) {
+          // Defer until greeting ends (polled lightly)
+          var tries = 0;
+          var waitG = setInterval(function () {
+            tries++;
+            if (!state._greetingPlaying || tries > 40) {
+              clearInterval(waitG);
+              fetch(API.mindWake, {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({
+                  reason: "session_open",
+                  session_id: state.sessionId || null,
+                }),
+              }).then(function () { return pollMindEvents(); }).catch(function () {});
+            }
+          }, 400);
+          return;
+        }
         fetch(API.mindWake, {
           method: "POST",
           headers: authHeaders(),
@@ -1247,7 +1270,7 @@
             session_id: state.sessionId || null,
           }),
         }).then(function () { return pollMindEvents(); }).catch(function () {});
-      }, 900);
+      }, 4500);
     }
   }
 
@@ -1269,6 +1292,8 @@
     var t = String(text || "").trim();
     if (!t) return false;
     var now = Date.now();
+    // Never interrupt the first voice intro
+    if (state._greetingPlaying && !opts.force) return false;
     // Rate-limit identical / near-identical seamless updates (fleet nags)
     var fp = t.slice(0, 96).toLowerCase().replace(/\s+/g, " ");
     var isFleetNag = /\bneed attention\b|\bfleet looks clear\b|\bmoney leak\b/i.test(t);
@@ -1698,6 +1723,9 @@
       stopBudgetPoll();
       stopVoice(true);
       state.greeted = false;
+      state._greetingPlaying = false;
+      state._sessionUpdated = false;
+      state._pendingGreetingSend = null;
     }
   }
 
@@ -3252,33 +3280,34 @@
 
   /**
    * Guarded barge-in (GPT Live style):
-   * - Longer mic mute at TTS attack so the first phrase is fully audible
-   *   (450ms was too short — speaker bleed cancelled the lead-in, Ford 2026-07-14).
-   * - Then re-open the mic so the user can interrupt with real speech.
-   * - Transcripts still pass echo / garbage / length filters (see acceptUserTranscript).
+   * - Mute mic at TTS attack so speaker bleed doesn't cancel the lead-in.
+   * - Greeting / holdMicFull: keep mic OFF until speech fully ends (intro was
+   *   always getting cut when mute reopened ~1.4s mid-sentence).
+   * - Other speech: re-open after a long attack mute for real barge-in.
    * Does NOT flip state.listening — user still shows as Live.
    */
-  function holdMicWhileSpeaking(hold) {
+  function holdMicWhileSpeaking(hold, opts) {
+    opts = opts || {};
     if (state._unmuteAfterSpeakTimer) {
       try { clearTimeout(state._unmuteAfterSpeakTimer); } catch (e) {}
       state._unmuteAfterSpeakTimer = null;
     }
     if (hold) {
-      if (!state.listening || !state.micStream) {
-        state._speakStartedAt = Date.now();
-        return;
-      }
       state._speakStartedAt = Date.now();
       state._micHeldForSpeak = true;
-      // Attack mute only — clear residual buffer, then reopen for barge-in
+      state._holdMicFull = !!(opts.holdMicFull || opts.source === "greeting");
       try {
-        state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
+        if (state.micStream) {
+          state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
+        }
       } catch (e) {}
       if (state.dc && state.dc.readyState === "open") {
         try {
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
+      // Greeting: NEVER re-open mic until done() — bleed was killing the intro
+      if (state._holdMicFull) return;
       // Longer mute for long answers so the whole first phrase (and more) is safe
       var muteMs = 1400;
       try {
@@ -3293,7 +3322,6 @@
         try {
           state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
         } catch (e) {}
-        // Clear again so attack-bleed buffered while muted doesn't fire a ghost turn
         if (state.dc && state.dc.readyState === "open") {
           try {
             state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
@@ -3304,6 +3332,7 @@
     }
     // Speech finished — ensure mic is open after a short settle (room reverb)
     state._micHeldForSpeak = false;
+    state._holdMicFull = false;
     state._unmuteAfterSpeakTimer = setTimeout(function () {
       state._unmuteAfterSpeakTimer = null;
       if (!state.listening || !state.micStream) return;
@@ -3315,7 +3344,7 @@
           state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
         } catch (e) {}
       }
-    }, 280);
+    }, 400);
   }
 
   /** True while agent audio is playing (informational — does not alone block barge-in). */
@@ -3384,6 +3413,8 @@
     if (!said || !state.listening) return false;
     // Stop / wait / cancel: always accept (even mid-think / mid-tour)
     if (isStopCommand(said)) return true;
+    // First intro must finish — speaker bleed was cutting it every time
+    if (state._greetingPlaying) return false;
     if (state.thinking) return false;
     // Mid-tour: allow barge-in with real speech (not just stop) so user can redirect
     if (state.touring) {
@@ -3531,18 +3562,28 @@
 
   function stopSpeak(opts) {
     opts = opts || {};
+    // Protect first intro: only hard "stop" / panel close may cut it
+    if (
+      state._greetingPlaying &&
+      opts.reason === "barge_in"
+    ) {
+      return;
+    }
     // Barge-in / new turn: cancel current audio only
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
     state.speaking = false;
     state.rtResponseActive = false;
     state._speakStartedAt = 0;
+    if (opts.reason === "barge_in" || opts.reason === "new_turn" || opts.reason === "stop") {
+      state._greetingPlaying = false;
+    }
     // Release any attack-mute so mic is live for the next user turn
     if (state._unmuteAfterSpeakTimer) {
       try { clearTimeout(state._unmuteAfterSpeakTimer); } catch (e) {}
       state._unmuteAfterSpeakTimer = null;
     }
     state._micHeldForSpeak = false;
-    if (state.listening && state.micStream) {
+    if (state.listening && state.micStream && !state._greetingPlaying) {
       try {
         state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
       } catch (e) {}
@@ -3643,6 +3684,7 @@
           return speakNow(chunk, {
             source: opts.source,
             force: true, // chunks must not dedupe against each other
+            holdMicFull: !!opts.holdMicFull || opts.source === "greeting",
             // Keep mic held across multi-chunk explanations
             keepMicHeld: !isLast,
             speakSeq: seq,
@@ -3677,6 +3719,10 @@
         state._speakEarlyDoneTimer = null;
         state.speaking = false;
         state.rtResponseActive = false;
+        if (opts.source === "greeting") {
+          state._greetingPlaying = false;
+          state._pendingGreetingSend = null;
+        }
         // Only settle mic after the LAST chunk of a long explanation
         if (!opts.keepMicHeld) {
           holdMicWhileSpeaking(false);
@@ -3735,15 +3781,21 @@
         state._speakEarlyDoneTimer = earlyDoneTimer;
       };
 
-      // Attack mute, then reopen mic for barge-in (see holdMicWhileSpeaking)
-      holdMicWhileSpeaking(true);
+      // Attack mute — full hold for greeting so intro never gets cut by bleed
+      var isGreeting = opts.source === "greeting";
+      if (isGreeting) state._greetingPlaying = true;
+      holdMicWhileSpeaking(true, {
+        holdMicFull: isGreeting || opts.holdMicFull,
+        source: opts.source,
+      });
 
       // ── GPT Realtime mouth ────────────────────────────────────────────
       if (realtimeMouthOpen()) {
         try {
           // Only cancel a *stale* prior response — never cancel the one we're about
           // to start. A cancel race was clipping the first half of answers.
-          if (state.rtResponseActive) {
+          // Never cancel during the first greeting unless forced supersede.
+          if (state.rtResponseActive && !isGreeting) {
             cancelRealtimeIfActive();
           }
           state.rtResponseActive = true;
@@ -3756,16 +3808,47 @@
             "Do not skip, summarize, reorder, or stop early. " +
             "Do not add greetings or questions. Take as long as you need:\n\n" +
             plain;
-          state.dc.send(JSON.stringify({
-            type: "response.create",
-            response: {
-              instructions: speakScript,
-            },
-          }));
+          // Wait for session.updated on first speak so response isn't dropped mid-stream
+          var sendCreate = function () {
+            if (!state.dc || state.dc.readyState !== "open") {
+              state.rtResponseActive = false;
+              if (isGreeting) state._greetingPlaying = false;
+              done();
+              return;
+            }
+            try {
+              state.dc.send(JSON.stringify({
+                type: "response.create",
+                response: {
+                  instructions: speakScript,
+                },
+              }));
+            } catch (e2) {
+              state.rtResponseActive = false;
+              if (isGreeting) state._greetingPlaying = false;
+              done();
+            }
+          };
+          if (isGreeting && !state._sessionUpdated) {
+            state._pendingGreetingSend = sendCreate;
+            setTimeout(function () {
+              // Failsafe if session.updated never arrives
+              if (state._pendingGreetingSend) {
+                var fn = state._pendingGreetingSend;
+                state._pendingGreetingSend = null;
+                fn();
+              }
+            }, 1000);
+          } else {
+            // Brief beat after session ready so first response isn't truncated
+            if (isGreeting) setTimeout(sendCreate, 180);
+            else sendCreate();
+          }
           setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
           return;
         } catch (e) {
           state.rtResponseActive = false;
+          if (isGreeting) state._greetingPlaying = false;
         }
       }
 
@@ -3798,6 +3881,15 @@
 
   function handleRealtimeEvent(ev) {
     if (!ev || !ev.type) return;
+    // Session config applied — safe to start first greeting response
+    if (ev.type === "session.updated" || ev.type === "session.created") {
+      state._sessionUpdated = true;
+      if (state._pendingGreetingSend) {
+        var gfn = state._pendingGreetingSend;
+        state._pendingGreetingSend = null;
+        try { gfn(); } catch (e) {}
+      }
+    }
     // Track whether a Realtime response is in flight (so cancel is safe)
     if (ev.type === "response.created" || ev.type === "response.output_item.added") {
       state.rtResponseActive = true;
@@ -4008,6 +4100,7 @@
     dc.addEventListener("open", function () {
       // One system: Realtime = ears + mouth only. create_response false = we reply via /chat.
       // VAD: less sensitive than OpenAI defaults so room noise / keys don't start turns.
+      state._sessionUpdated = false;
       dcSend({
         type: "session.update",
         session: {
@@ -4016,7 +4109,8 @@
             "You are Energy Agent's MOUTH only — continuous cognition steers you. " +
             "Only speak lines the app sends via response.create. " +
             "Do not invent answers; the deeper mind reasons with tools and steers what you say. " +
-            "Start from the first word, speak completely, never speak over yourself.",
+            "Start from the first word, speak completely, never speak over yourself. " +
+            "Never cut yourself off mid-sentence.",
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
@@ -4026,16 +4120,30 @@
           },
         },
       });
-      // Single greeting per panel open — text intro already exists from ensureSession
+      // Single greeting per panel open — hold mic full duration so speaker bleed
+      // cannot barge-in and cut the intro (Ford 2026-07-14).
       if (!state.greeted && !state.voiceMuted) {
         state.greeted = true;
+        state._greetingPlaying = true;
+        // Disable mic tracks immediately until greeting finishes
+        try {
+          if (state.micStream) {
+            state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
+          }
+        } catch (e) {}
         enqueueSpeak(
           "Hi — Energy Agent here. I'm listening whenever you're ready.",
-          { source: "greeting", force: true }
-        );
-      }
-      if (state.voiceMuted) {
-        // Shouldn't happen (startRealtimeVoice guards) — leave text-only
+          { source: "greeting", force: true, holdMicFull: true }
+        ).then(function () {
+          state._greetingPlaying = false;
+          if (state.listening && !state.voiceMuted) {
+            setStatus("Listening…", "listen");
+          }
+        }).catch(function () {
+          state._greetingPlaying = false;
+        });
+        setStatus("Speaking…", "speak");
+      } else if (state.voiceMuted) {
         setStatus("Text only — voice off", "on");
       } else {
         setStatus("Listening…", "listen");
