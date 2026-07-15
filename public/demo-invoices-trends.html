@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" class="sky" data-theme="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoices · Trends demo (sky)</title>
+<link rel="stylesheet" href="styles.css?v=demo">
+<link rel="stylesheet" href="theme-day.css?v=demo">
+<link rel="stylesheet" href="theme-sky.css?v=demo">
+<link rel="stylesheet" href="theme-sky-reports.css?v=20260715invTrends1">
+<style>
+  body{margin:0;min-height:100vh;font-family:system-ui,sans-serif}
+  /* sky mountain bg simplified */
+  html.sky body{
+    background:#0a0e14 url("img/sky/world-zo6-1600.webp") center top / cover no-repeat fixed;
+  }
+  .demo-wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
+  .demo-banner{
+    background:rgba(15,23,42,.72);color:#e2e8f0;padding:10px 14px;border-radius:12px;
+    font-size:13px;margin-bottom:16px;border:1px solid rgba(255,255,255,.12)
+  }
+  .demo-banner b{color:#7dd3fc}
+  /* minimal tabbar mimic */
+  .demo-tabs{
+    display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;
+    background:rgba(255,255,255,.55);backdrop-filter:blur(12px);
+    padding:8px;border-radius:999px;border:1px solid rgba(255,255,255,.5);
+    width:fit-content;
+  }
+  .demo-tabs span{
+    padding:8px 14px;border-radius:999px;font-size:13.5px;font-weight:650;color:#33415A
+  }
+  .demo-tabs span.on{background:#2196f3;color:#fff;box-shadow:0 4px 14px -4px rgba(33,150,243,.55)}
+</style>
+</head>
+<body>
+<div class="demo-wrap">
+  <div class="demo-banner">
+    <b>Demo · not live until you approve.</b>
+    Invoices tab → <b>Trends</b> sub-tab (sky design). Offtakers / Bill audit stay for editing.
+  </div>
+  <div class="demo-tabs" aria-hidden="true">
+    <span>Energy Agent</span><span>Fleet Triage</span><span>Inverters</span>
+    <span>Analysis</span><span class="on">Invoices</span><span>Resources</span><span>Account</span>
+  </div>
+
+  <div class="rb2">
+    <div class="rb2-head">
+      <div class="rb2-id">
+        <h1>Offtaker invoicing</h1>
+        <p>Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Review before you send it.</b></p>
+        <div class="rb2-tabrow">
+          <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist">
+            <button type="button" class="rb-subtab">Offtakers</button>
+            <button type="button" class="rb-subtab">Bill audit</button>
+            <button type="button" class="rb-subtab on">Trends</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="rbFinTrends" class="rb-fin" style="display:block">
+      <div class="rb-fin-wrap">
+        <div class="rb-fin-intro">
+          <h2 class="rb-fin-h">Trends</h2>
+          <p class="rb-fin-p">Pipeline value and production by array — separate from drafting and sending invoices.</p>
+        </div>
+        <div class="rb-fin-kpis">
+          <div class="rb-fin-kpi">
+            <div class="rb-fin-kl">Ready to send</div>
+            <div class="rb-fin-kv">12</div>
+            <div class="rb-fin-ks">Drafts awaiting review</div>
+          </div>
+          <div class="rb-fin-kpi">
+            <div class="rb-fin-kl">Drafted value</div>
+            <div class="rb-fin-kv">$18,400</div>
+            <div class="rb-fin-ks">In the current pipeline</div>
+          </div>
+          <div class="rb-fin-kpi">
+            <div class="rb-fin-kl">Sent (recorded)</div>
+            <div class="rb-fin-kv">$2,150</div>
+            <div class="rb-fin-ks">1 offtaker send</div>
+          </div>
+          <div class="rb-fin-kpi">
+            <div class="rb-fin-kl">Fleet lifetime</div>
+            <div class="rb-fin-kv">412,880 <span class="rb-fin-u">kWh</span></div>
+            <div class="rb-fin-ks">Production across arrays</div>
+          </div>
+        </div>
+        <div class="rb-fin-card">
+          <div class="rb-fin-ch">Production by year</div>
+          <p class="rb-fin-cs">kWh by array. Current year is year-to-date. Dollar true-ups stay on each offtaker invoice — this view stays out of the edit list.</p>
+          <div class="rb-fin-scroll"><table class="rb-fin-table">
+            <thead><tr>
+              <th>Array</th>
+              <th class="rb-fin-num">2024</th>
+              <th class="rb-fin-num">2025</th>
+              <th class="rb-fin-num">2026 <span class="rb-fin-ytd">YTD</span></th>
+              <th class="rb-fin-num rb-fin-life">Lifetime</th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="rb-fin-name">Danville Big Buck</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">48,210</td><td class="rb-fin-num rb-fin-life">48,210</td></tr>
+              <tr><td class="rb-fin-name">West Glover 50kW</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">12,440</td><td class="rb-fin-num rb-fin-life">12,440</td></tr>
+              <tr><td class="rb-fin-name">River</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
+              <tr><td class="rb-fin-name">Norwich Union Village</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
+              <tr><td class="rb-fin-name">52 COUNTY RD, GLOVER, VT</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num">—</td><td class="rb-fin-num rb-fin-life">—</td></tr>
+              <tr class="rb-fin-tot">
+                <td class="rb-fin-name"><b>Fleet total</b></td>
+                <td class="rb-fin-num"><b>—</b></td>
+                <td class="rb-fin-num"><b>—</b></td>
+                <td class="rb-fin-num"><b>60,650</b></td>
+                <td class="rb-fin-num rb-fin-life"><b>60,650</b></td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+        <div class="rb-fin-note">
+          <b>Invoice editing</b> is on the <span style="color:#2196f3;font-weight:700">Offtakers</span> tab.
+          This Trends view is for portfolio dollars and kWh at a glance.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

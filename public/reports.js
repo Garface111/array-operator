@@ -605,13 +605,189 @@
  if (!tabs.length) return;
  const list = document.getElementById("rbGenList");
  const audit = document.getElementById("rbAuditView");
+ const fin = document.getElementById("rbFinTrends");
+ const pipe = document.getElementById("rb2Pipe");
  tabs.forEach(btn => btn.onclick = () => {
  const v = btn.getAttribute("data-gentab");
  tabs.forEach(b => b.classList.toggle("on", b === btn));
+ // Editing chrome only on Offtakers; Trends is read-only finance.
  if (list) list.style.display = v === "offtakers" ? "" : "none";
  if (audit) audit.style.display = v === "audit" ? "" : "none";
+ if (fin) fin.style.display = v === "trends" ? "" : "none";
+ if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
  if (v === "audit") renderAudit(); // lazy render + fetch on first view
+ if (v === "trends") renderFinTrends(); // financial + production matrix
+ // Soft URL hash so deep links / Energy Agent can open Trends
+ try {
+ if (v === "trends" && location.hash.indexOf("reports") === 0) {
+ history.replaceState(null, "", "#reports/trends");
+ } else if (v === "offtakers" && /reports\/trends/.test(location.hash || "")) {
+ history.replaceState(null, "", "#reports");
+ }
+ } catch (e) {}
  });
+ // Deep-link: #reports/trends opens the finance sub-tab once
+ try {
+ if (/#reports\/trends/i.test(location.hash || "")) {
+ const t = document.querySelector('#rbGenTabs [data-gentab="trends"]');
+ if (t) t.click();
+ }
+ } catch (e) {}
+ }
+
+ // ── Invoice Trends sub-tab (Paul 2026-07-15 / Ford: financial data off the
+ // editing surface). Sky glass cards: pipeline $ KPIs + production-by-year
+ // matrix. Does not touch offtaker edit flows.
+ let _finTrendsLoaded = false;
+ async function renderFinTrends(force) {
+ const host = document.getElementById("rbFinTrends");
+ if (!host) return;
+ if (_finTrendsLoaded && !force && host.dataset.ready === "1") return;
+ host.innerHTML = `<div class="rb-fin-loading">Loading financial trends…</div>`;
+
+ const money0 = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+ const fmt0 = n => Math.round(Number(n) || 0).toLocaleString();
+ const esc = s => String(s == null ? "" : s)
+ .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+ .replace(/"/g, "&quot;");
+
+ let pipe = null, trends = null;
+ try {
+ const hdrs = authHeaders() || {};
+ const [pr, tr] = await Promise.all([
+ fetch("/v1/array-operator/billing/send-pipeline", { headers: hdrs })
+ .then(r => r.ok ? r.json() : null).catch(() => null),
+ fetch("/v1/array-owners/fleet-trends", { headers: hdrs })
+ .then(r => r.ok ? r.json() : null).catch(() => null),
+ ]);
+ pipe = pr; trends = tr;
+ } catch (e) { /* demo / offline */ }
+
+ // Demo fallback when signed out
+ if (!pipe && !trends && window.__AO_DEMO__) {
+ try {
+ pipe = { ready_count: 12, drafted_usd: 18400, sent_this_month_usd: 22100,
+ auto_send: true, next_monthly: { fires_at: null, count: 12 } };
+ } catch (e) {}
+ }
+
+ const byArray = (trends && trends.by_array) || [];
+ const years = ((trends && trends.years) || []).slice().sort((a, b) => a - b);
+ const curY = new Date().getFullYear();
+
+ // KPI strip from send-pipeline when present
+ const readyN = pipe && (pipe.ready_count != null ? pipe.ready_count
+ : (pipe.next_monthly && pipe.next_monthly.ready));
+ const drafted = pipe && (pipe.drafted_usd != null ? pipe.drafted_usd
+ : pipe.total_draft_usd);
+ const sentMo = pipe && (pipe.sent_this_month_usd != null ? pipe.sent_this_month_usd
+ : pipe.sent_usd);
+ // Aggregate last_sent_amount from list if pipeline thin
+ let lifetimeSent = 0, sentN = 0;
+ try {
+ const list = (window.__aoBillingSubs || window._rbSubs || []);
+ (list || []).forEach(s => {
+ if (s && s.last_sent_amount_usd != null) {
+ lifetimeSent += Number(s.last_sent_amount_usd) || 0;
+ sentN++;
+ }
+ });
+ } catch (e) {}
+
+ const kpis = `
+ <div class="rb-fin-kpis">
+ <div class="rb-fin-kpi">
+ <div class="rb-fin-kl">Ready to send</div>
+ <div class="rb-fin-kv">${readyN != null ? fmt0(readyN) : "—"}</div>
+ <div class="rb-fin-ks">Drafts awaiting review</div>
+ </div>
+ <div class="rb-fin-kpi">
+ <div class="rb-fin-kl">Drafted value</div>
+ <div class="rb-fin-kv">${drafted != null ? money0(drafted) : "—"}</div>
+ <div class="rb-fin-ks">In the current pipeline</div>
+ </div>
+ <div class="rb-fin-kpi">
+ <div class="rb-fin-kl">Sent (recorded)</div>
+ <div class="rb-fin-kv">${sentN ? money0(lifetimeSent) : (sentMo != null ? money0(sentMo) : "—")}</div>
+ <div class="rb-fin-ks">${sentN ? sentN + " offtaker send" + (sentN === 1 ? "" : "s") : "From send pipeline"}</div>
+ </div>
+ <div class="rb-fin-kpi">
+ <div class="rb-fin-kl">Fleet lifetime</div>
+ <div class="rb-fin-kv">${trends && trends.lifetime_kwh != null ? fmt0(trends.lifetime_kwh) + " <span class='rb-fin-u'>kWh</span>" : "—"}</div>
+ <div class="rb-fin-ks">Production across arrays</div>
+ </div>
+ </div>`;
+
+ // Production year matrix (same contract as Analysis trends)
+ let matrix = "";
+ if (byArray.length && years.length) {
+ const rows = byArray.slice().sort((a, b) => (b.lifetime_kwh || 0) - (a.lifetime_kwh || 0));
+ const colTot = {}; years.forEach(y => { colTot[y] = 0; });
+ let lifeTot = 0;
+ const body = rows.map(a => {
+ const byY = a.kwh_by_year || {};
+ const cells = years.map(y => {
+ const v = Number(byY[String(y)] || 0);
+ colTot[y] += v;
+ return `<td class="rb-fin-num">${v > 0 ? fmt0(v) : "—"}</td>`;
+ }).join("");
+ const life = Number(a.lifetime_kwh || 0);
+ lifeTot += life;
+ return `<tr>
+ <td class="rb-fin-name">${esc(a.name)}</td>
+ ${cells}
+ <td class="rb-fin-num rb-fin-life">${life > 0 ? fmt0(life) : "—"}</td>
+ </tr>`;
+ }).join("");
+ const foot = `<tr class="rb-fin-tot">
+ <td class="rb-fin-name"><b>Fleet total</b></td>
+ ${years.map(y => `<td class="rb-fin-num"><b>${colTot[y] > 0 ? fmt0(colTot[y]) : "—"}</b></td>`).join("")}
+ <td class="rb-fin-num rb-fin-life"><b>${lifeTot > 0 ? fmt0(lifeTot) : "—"}</b></td>
+ </tr>`;
+ const yHeads = years.map(y =>
+ `<th class="rb-fin-num">${y}${y === curY ? ' <span class="rb-fin-ytd" title="Calendar year to date">YTD</span>' : ""}</th>`
+ ).join("");
+ matrix = `
+ <div class="rb-fin-card">
+ <div class="rb-fin-ch">Production by year</div>
+ <p class="rb-fin-cs">kWh by array. Current year is year-to-date. Dollar true-ups live on each offtaker invoice — this view stays out of the edit list.</p>
+ <div class="rb-fin-scroll"><table class="rb-fin-table">
+ <thead><tr><th>Array</th>${yHeads}<th class="rb-fin-num rb-fin-life">Lifetime</th></tr></thead>
+ <tbody>${body}${foot}</tbody>
+ </table></div>
+ </div>`;
+ } else {
+ matrix = `
+ <div class="rb-fin-card rb-fin-empty">
+ <div class="rb-fin-ch">Production by year</div>
+ <p class="rb-fin-cs">Connect arrays and let generation land — the year matrix fills in automatically. Editing offtakers stays on the Offtakers tab.</p>
+ </div>`;
+ }
+
+ const note = `
+ <div class="rb-fin-note">
+ <b>Invoice editing</b> is on the <button type="button" class="rb-fin-link" id="rbFinGoOfftakers">Offtakers</button> tab.
+ This Trends view is for portfolio dollars and kWh at a glance.
+ </div>`;
+
+ host.innerHTML = `
+ <div class="rb-fin-wrap">
+ <div class="rb-fin-intro">
+ <h2 class="rb-fin-h">Trends</h2>
+ <p class="rb-fin-p">Pipeline value and production by array — separate from drafting and sending invoices.</p>
+ </div>
+ ${kpis}
+ ${matrix}
+ ${note}
+ </div>`;
+
+ const go = document.getElementById("rbFinGoOfftakers");
+ if (go) go.onclick = () => {
+ const t = document.querySelector('#rbGenTabs [data-gentab="offtakers"]');
+ if (t) t.click();
+ };
+ host.dataset.ready = "1";
+ _finTrendsLoaded = true;
  }
 
  // ── pdf.js: paint page 1 of a PDF onto a <canvas> inside `paper`, no browser
@@ -2230,6 +2406,7 @@
  <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
  <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
  <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
+ <button type="button" class="rb-subtab" data-gentab="trends" title="Financial and production trends by array — separate from invoice editing.">Trends</button>
  </div>
  <div class="rb2-kpis" id="rb2Kpis" hidden></div>
  </div>
@@ -2237,6 +2414,7 @@
  </div>
  <div class="rb2-pipe" id="rb2Pipe" hidden></div>
  <div id="rbAuditView" class="rb-au" style="display:none"></div>
+ <div id="rbFinTrends" class="rb-fin" style="display:none" aria-label="Invoice trends"></div>
  <div id="rbGenList">
  <!-- Master solar credit rate, Tenant.default_net_rate_per_kwh (+ discount).
  SET → fleet override for every offtaker without a per-offtaker rate.
