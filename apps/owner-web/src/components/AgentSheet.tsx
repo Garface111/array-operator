@@ -203,13 +203,26 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     }
     try {
       setErr(null);
+      // Keep this synchronous from the tap: start() requests the mic first so
+      // Chrome still treats it as a user gesture and shows Allow/Block.
       setVoice("connecting");
+      setVoiceDetail("Allow microphone if your browser asks…");
       await agentVoice.start();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not start voice";
       if (msg !== "cancelled") {
         setErr(msg);
         setVoice("error");
+        setMsgs((m) => [
+          ...m,
+          {
+            role: "agent",
+            text:
+              msg.includes("blocked") || msg.includes("Microphone")
+                ? msg
+                : `Voice: ${msg}`,
+          },
+        ]);
       } else {
         setVoice("idle");
       }
@@ -434,9 +447,15 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
             </button>
           </div>
           <p className="mt-1.5 px-1 text-center text-[10px] font-semibold text-muted">
-            {voiceLive
-              ? "Verbal mode on · same Energy Agent brain as desktop"
-              : "Tap mic for voice · text always works"}
+            {voice === "connecting"
+              ? "Browser may ask for microphone access — tap Allow"
+              : voice === "listening"
+                ? "Listening — speak after the green pulse · pause when done"
+                : voice === "speaking"
+                  ? "Agent speaking — mic muted so it doesn’t cut itself off"
+                  : voice === "error"
+                    ? "Voice error — fix mic permission or tap mic to retry"
+                    : "Tap mic · Chrome/Safari will ask for microphone once"}
           </p>
         </form>
       </section>
