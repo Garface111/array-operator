@@ -74,7 +74,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="theme-day.css?v=20260715opsSeg1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
-<link rel="stylesheet" href="resources.css?v=20260715ops5"><!-- Resources briefing; scoped to #panelOps #rsHost -->
+<link rel="stylesheet" href="resources.css?v=20260715opsRes1"><!-- Resources briefing; scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
 <!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
@@ -419,11 +419,26 @@ document.documentElement.setAttribute("data-theme","day");
  </section>
 
  <!-- ============================ TAB: OPERATIONS ============================ -->
- <!-- O&M team, repair tickets, warranty claims, and Resources (rates/news) as a
- sub-tab. Resources content mounts into #rsHost (ops.js keeps that node stable).
- styles: ops.css + resources.css (scoped). -->
+ <!-- Two main sub-views under the Operations top tab (mirrors Analysis ⇄ Trends):
+ Operations = O&M / repairs / claims; Resources = original briefing page.
+ Both panels share .ops-main-seg (Operations | Resources). -->
  <section class="panel" id="panelOps" role="tabpanel" aria-label="Operations">
+ <div class="vs-seg ops-main-seg" role="group" aria-label="Operations view" style="margin:14px auto 6px">
+ <button class="vs-seg-btn on" type="button" data-opsmain="ops" aria-pressed="true">Operations</button>
+ <button class="vs-seg-btn" type="button" data-opsmain="resources" aria-pressed="false">Resources</button>
+ </div>
  <div id="opsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading operations…</div></div>
+ </section>
+
+ <!-- ============================ TAB: RESOURCES (sub of Operations) ============================ -->
+ <!-- Original Resources briefing look (pre-nesting). #resources deep-link lands
+ here; top-nav Operations stays active. __aoLoadResources injects resources.html. -->
+ <section class="panel" id="panelResources" role="tabpanel" aria-label="Resources">
+ <div class="vs-seg ops-main-seg" role="group" aria-label="Operations view" style="margin:14px auto 6px">
+ <button class="vs-seg-btn" type="button" data-opsmain="ops" aria-pressed="false">Operations</button>
+ <button class="vs-seg-btn on" type="button" data-opsmain="resources" aria-pressed="true">Resources</button>
+ </div>
+ <div id="rsHost"><p class="ao-res-loading">Loading the briefing…</p></div>
  </section>
 
  <!-- ============================ TAB: AUDIT (removed) ============================ -->
@@ -437,62 +452,24 @@ document.documentElement.setAttribute("data-theme","day");
  Invoice Generator. Loaded BEFORE sandbox.js/reports.js; only rendered when
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
-<script src="app.js?v=20260714pro1"></script>
+<script src="app.js?v=20260715eaModal2"></script>
 <script src="sandbox.js?v=20260715ops5"></script>
 <script src="vendor-sheet.js?v=20260714nodash1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260715offGain1"></script>
-<script src="ops.js?v=20260715ops6"></script>
+<script src="ops.js?v=20260715opsRes1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260715ops5" defer></script>
+<script src="mobile-nav.js?v=20260715opsRes1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=1"></script>
-<!-- Resources loader: mounts the rates/news briefing into #rsHost (now under the
- Operations → Resources sub-tab). First open fetches resources.html once; every
- open refreshes the feed. Called by ops.js when the Resources sub-tab is active.
- Deep-link #resources still works (routes to Operations + Resources sub). -->
+<!-- Resources loader: mounts the rates/news briefing into #panelResources #rsHost
+ (original full-page look). First open fetches resources.html once; every open
+ refreshes the feed. Called by sandbox.js when #resources is active. -->
 <script>
 (function(){
  var LOADED = false;
- function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
- return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
- function fmtDate(iso){
- try { var d = new Date(iso + "T00:00:00");
- return d.toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"}); }
- catch(e){ return iso; }
- }
- function loadFeed(){
- var feed = document.getElementById("feed");
- var meta = document.getElementById("newsMeta");
- if(!feed || !meta) return;
- fetch("/news.json?cb=" + Date.now()).then(function(r){ return r.json(); }).then(function(data){
- var items = (data && data.items) || [];
- items.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
- if(!items.length){ meta.textContent = "No updates yet, check back soon."; return; }
- meta.innerHTML = "Last updated " + esc(fmtDate(data.updated || items[0].date)) +
- " · " + items.length + " item" + (items.length===1?"":"s");
- feed.innerHTML = items.map(function(it){
- var alert = /rule|cut|phase|deadline|case|alert/i.test((it.tag||"") + " " + (it.title||""));
- return '<div class="item">' +
- '<div class="when">' + esc(fmtDate(it.date)) + '</div>' +
- '<div><span class="tag' + (alert ? ' alert' : '') + '">' + esc(it.tag || "Update") + '</span>' +
- '<h4>' + esc(it.title) + '</h4>' +
- (it.summary ? '<p>' + esc(it.summary) + '</p>' : '') +
- (it.url ? '<div class="src"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
- esc(it.source || "Read more") + ' ↗</a></div>' : '') +
- '</div></div>';
- }).join("");
- }).catch(function(){
- meta.textContent = "Couldn't load the latest updates right now, see the sources below.";
- });
- }
- // New England edition (2026-07-10): the state picker / per-state reference / location-
- // filtered news all live in the shared resources.js (window.AOResources) so this panel and
- // the standalone page render identically. We inject resources.html's SHELL (.wrap, scripts
- // stripped), then load resources.js and mount() into #rsHost. mount() re-renders + refreshes
- // the feed on every open.
  window.__aoLoadResources = function(){
  var host = document.getElementById("rsHost");
  if(!host) return;
@@ -504,7 +481,7 @@ document.documentElement.setAttribute("data-theme","day");
  var ex = document.getElementById("aoResourcesJs");
  if(ex){ ex.addEventListener("load", mount); return; }
  var s = document.createElement("script");
- s.id = "aoResourcesJs"; s.src = "/resources.js?v=20260713rec";
+ s.id = "aoResourcesJs"; s.src = "/resources.js?v=20260715opsRes1";
  s.onload = mount; s.onerror = fail;
  document.head.appendChild(s);
  }
@@ -546,7 +523,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js?v=20260715live1"></script>
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
-<link rel="stylesheet" href="energy-agent.css?v=20260715eaModal1">
+<link rel="stylesheet" href="energy-agent.css?v=20260715eaModal2">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
 <script src="energy-agent.js?v=20260715ops5"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->

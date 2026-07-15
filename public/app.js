@@ -104,11 +104,12 @@ function ensureOverlay(){
  if(_ovl) return _ovl;
  _ovl = document.createElement("div");
  _ovl.className = "ao-overlay";
- _ovl.style.display = "none";
- // minimal inline layout so it's usable even before the designer styles it
+ // Prefer top/right/bottom over inset:0 so energy-agent.css can pin `left` to
+ // the EA/setup rail when body.ea-shell-open (otherwise the modal centers under
+ // the agent panel on ~1280px screens).
  _ovl.setAttribute("style",
- "display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,16,24,.62);"+
- "backdrop-filter:blur(2px);overflow:auto;padding:5vh 16px;");
+ "display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9999;"+
+ "background:rgba(10,16,24,.62);backdrop-filter:blur(2px);overflow:auto;padding:5vh 16px;");
  document.body.appendChild(_ovl);
  return _ovl;
 }

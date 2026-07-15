@@ -216,19 +216,21 @@ body.ea-shell-open{
    ~1280px widths ("Open repair ticket" × Open tickets KPIs bleeding through
    the frosted card into the Energy Agent panel). Pin scrims to the content
    column so dialogs center in the remaining width only. */
+/* !important: openModal() stamps inline `inset:0` on .ao-overlay, which would
+   otherwise win over a plain left: rule and keep the modal under the EA rail. */
 body.ea-shell-open .ao-overlay,
 body.ea-shell-open .sb-ov,
 body.ea-shell-open .cl-modal-back{
-  left: var(--ea-rail, 360px);
-  right: 0;
-  width: auto;
+  left: var(--ea-rail, 360px) !important;
+  right: 0 !important;
+  width: auto !important;
 }
 body.ho-shell-open:not(.ea-shell-open) .ao-overlay,
 body.ho-shell-open:not(.ea-shell-open) .sb-ov,
 body.ho-shell-open:not(.ea-shell-open) .cl-modal-back{
-  left: var(--ho-rail, 380px);
-  right: 0;
-  width: auto;
+  left: var(--ho-rail, 380px) !important;
+  right: 0 !important;
+  width: auto !important;
 }
 body.ho-shell-open.ea-shell-open .ao-overlay,
 body.ho-shell-open.ea-shell-open .sb-ov,
@@ -236,9 +238,9 @@ body.ho-shell-open.ea-shell-open .cl-modal-back,
 body.ho-ea-sidebyside.ea-shell-open .ao-overlay,
 body.ho-ea-sidebyside.ea-shell-open .sb-ov,
 body.ho-ea-sidebyside.ea-shell-open .cl-modal-back{
-  left: calc(var(--ho-rail, 380px) + var(--ea-rail, 360px) + 18px);
-  right: 0;
-  width: auto;
+  left: calc(var(--ho-rail, 380px) + var(--ea-rail, 360px) + 18px) !important;
+  right: 0 !important;
+  width: auto !important;
 }
 @media (max-width: 900px){
   /* Mobile EA is a bottom sheet (rail width → 0); keep full-bleed scrims. */
@@ -252,7 +254,7 @@ body.ho-ea-sidebyside.ea-shell-open .cl-modal-back{
   body.ho-shell-open.ea-shell-open .sb-ov,
   body.ho-shell-open.ea-shell-open .cl-modal-back,
   body.ho-ea-sidebyside.ea-shell-open .ao-overlay{
-    left: 0;
+    left: 0 !important;
   }
 }
 
