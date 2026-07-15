@@ -1,58 +1,37 @@
-:root{
-    --bg:#0a0e14; --bg2:#0e131c; --ink:#eaf0f7; --muted:#8b97a8; --faint:#6b7686;
-    --gold:#f5b942; --gold2:#ffd479; --sky:#5ec2ff; --good:#3fd68a; --good2:#7ff0bb;
-    --warn:#ffb454; --bad:#ff6b6b; --line:rgba(255,255,255,.08);
-    --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.018);
-    --green-deep:#3fd68a;
-    /* Octarine — the vault's bold signature (Ford's calibrated brand temperament);
-       carries the panel's character. Green/amber/red stay reserved for LIVE state. */
-    --ao-oct:#3b82f6; --ao-oct-soft:rgba(59,130,246,.13); --ao-oct-line:rgba(59,130,246,.36);
-    /* Live-state signal — an explicit green (day-mode --good is BLUE, so it can't
-       double as "working"). This is the colour of the pulsing dots. */
-    --ao-live:#2ee68a; --ao-live-glow:rgba(46,230,138,.55); --ao-live-ink:#34d399;
-    /* ── Motion system — the hard-and-fast rules, codified (Ford 2026-07-11) ──────
-       1. DURATION: hover/caret 140ms · standard UI 200ms · reveals/panels 260ms.
-          Nothing over ~320ms for functional UI; exits a touch quicker than entrances.
-       2. EASING: never bare `ease`/`linear` for spatial motion (reads robotic).
-          Entrances DECELERATE (fast→slow → things arrive softly); exits ACCELERATE;
-          moves-within-view use the standard curve.
-       3. Animate transform + opacity (GPU-composited) — avoid width/height/top/left.
-       4. Honor prefers-reduced-motion (block below). */
-    --ease-out: cubic-bezier(.22,1,.36,1);      /* entrances — decelerate + tiny settle */
-    --ease-standard: cubic-bezier(.4,0,.2,1);   /* moves within view (Material standard) */
-    --ease-in: cubic-bezier(.4,0,1,1);          /* exits — accelerate away */
-    --motion-fast:140ms; --motion:200ms; --motion-slow:260ms;
-    /* Lets <details> and other keyword sizes animate smoothly where supported (Chromium). */
-    interpolate-size: allow-keywords;
-  }
-  /* Accessibility: honor the OS "reduce motion" preference — kill spatial jank. */
-  @media (prefers-reduced-motion: reduce){
-    *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important;
-      transition-duration:.01ms !important; scroll-behavior:auto !important; }
-  }
-  /* Smooth expandable reveal for the native <details> accordions (Edit email / Invoice
-     template / Generation spreadsheet / Advanced / Invoice archive) — they used to SNAP
-     open, the main "jumpy" Ford flagged. Progressive enhancement: buttery in Chromium via
-     ::details-content + interpolate-size; unchanged (instant) where unsupported. */
-  @supports selector(::details-content){
-    .rb-sec::details-content, .rb-arch::details-content, .rb-fadv::details-content{
-      height:0; overflow:clip;
-      transition:height var(--motion-slow) var(--ease-standard),
-                 content-visibility var(--motion-slow) allow-discrete; }
-    .rb-sec[open]::details-content, .rb-arch[open]::details-content,
-    .rb-fadv[open]::details-content{ height:auto; }
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  /* Global keyboard-focus ring (default/night theme). theme-day.css already ships
-     the day-mode equivalent; this is its night counterpart so EVERY focusable
-     control — primary CTAs (Open dashboard, Connect GMP, Add a card), modal close
-     buttons, segment toggles, links — gets a consistent, visible focus indicator
-     for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
-  :focus-visible{outline:2px solid rgba(94,194,255,.6);
-
-/* Invoices tab: status-first layout (feature #20) — status badge leads, reduced noise,
-   tighter scan rows, muted secondary fields. */
-#invoices .inv-row{display:flex;align-items:center;gap:12px}
-#invoices .inv-row .status{order:-1;flex:0 0 auto;font-weight:600}
-#invoices .inv-row .meta{flex:1;opacity:.85}
-#invoices .inv-row .amount,#invoices .inv-row .date{flex:0 0 auto;color:var(--muted);font-size:.92em}
+/* Invoices tab: status-first layout (feature #21)
+   - Status badge first for scannability
+   - Reduced visual noise (compact rows, muted secondary)
+   - Easier scan: tighter spacing, status color priority */
+#invoices .inv-row,
+.sb-inv {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+#invoices .inv-status,
+.sb-inv .status {
+  order: -1;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .75rem;
+  white-space: nowrap;
+}
+#invoices .inv-meta,
+.sb-inv .meta {
+  color: var(--muted);
+  font-size: .85rem;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+#invoices .inv-row:hover,
+.sb-inv:hover {
+  background: var(--card2);
+}
+/* less noise: hide faint lines unless needed */
+#invoices .inv-row + .inv-row {
+  border-top: 1px solid var(--line);
+}
