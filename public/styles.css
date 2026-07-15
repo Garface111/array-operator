@@ -49,5 +49,10 @@
      buttons, segment toggles, links — gets a consistent, visible focus indicator
      for keyboard users. Uses :focus-visible so mouse clicks stay clean. */
   :focus-visible{outline:2px solid rgba(94,194,255,.6);
-/* Hamburger: mission-critical only visible; rest in #navMenu behind menu */
-.hamburger{display:none}@media(max-width:768px){.hamburger{display:block}.nav-menu{display:none}.nav-menu.open{display:block}}
+
+/* Invoices tab: status-first layout (feature #20) — status badge leads, reduced noise,
+   tighter scan rows, muted secondary fields. */
+#invoices .inv-row{display:flex;align-items:center;gap:12px}
+#invoices .inv-row .status{order:-1;flex:0 0 auto;font-weight:600}
+#invoices .inv-row .meta{flex:1;opacity:.85}
+#invoices .inv-row .amount,#invoices .inv-row .date{flex:0 0 auto;color:var(--muted);font-size:.92em}
