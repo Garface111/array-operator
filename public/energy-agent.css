@@ -199,13 +199,45 @@ html.sky #eaPanel{
 body.ea-shell-open .wrap{
   margin-left: var(--ea-rail);
   transition: margin-left .22s ease;
+  /* Cap width to the remaining viewport so the tabbar can't overflow past the
+     right edge and clip the account email (Ford 2026-07-15). */
   width: auto;
-  max-width: none;
+  max-width: calc(100vw - var(--ea-rail));
+  min-width: 0;
+  box-sizing: border-box;
 }
 body.ea-shell-open{
   /* keep fixed bottom mobile nav clear of rail if needed */
 }
-.wrap{ transition: margin-left .22s ease; }
+.wrap{ transition: margin-left .22s ease; min-width: 0; }
+
+/* When EA rail is open, tighten the tabbar so labels + identity chip all fit
+   inside the narrowed .wrap without clipping the account email mid-character. */
+body.ea-shell-open .tabbar{
+  gap: 2px;
+  padding-left: 3px;
+  padding-right: 3px;
+}
+body.ea-shell-open .tabbar > .tab:not(.tab-whoami):not(.tab-signout){
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 13px;
+}
+body.ea-shell-open .tab.tab-whoami{
+  max-width: min(180px, 28%);
+  padding-left: 9px;
+  padding-right: 10px;
+  gap: 6px;
+}
+body.ea-shell-open .tab.tab-signout{
+  padding-left: 8px;
+  padding-right: 10px;
+  font-size: 12px;
+}
+body.ea-shell-open #tabbar .tab.ea-tab{
+  padding-left: 10px;
+  padding-right: 10px;
+}
 
 /* ── Beside hands-off setup (step 17 Open Energy Agent) ────────────────────
    Setup keeps the LEFT rail; EA spawns as a slick companion window to its RIGHT
@@ -235,6 +267,8 @@ html.sky body.ho-ea-sidebyside.ea-shell-open #eaPanel{
 /* Main content clears BOTH rails */
 body.ho-shell-open.ea-shell-open .wrap{
   margin-left: calc(var(--ho-rail, 380px) + var(--ea-rail) + 18px);
+  max-width: calc(100vw - var(--ho-rail, 380px) - var(--ea-rail) - 18px);
+  min-width: 0;
 }
 /* Mic gate sits above the companion panel */
 body.ho-shell-open.ea-shell-open .ea-mic-gate{

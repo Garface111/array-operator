@@ -278,8 +278,14 @@ html.sky ::selection{background:rgba(33,150,243,.22)}
     background:rgba(255,255,255,.7) !important;
     border-color:var(--sky-glass-edge);
     color:var(--ink) !important;           /* never inherit muted chrome ink */
+    /* Chip must be allowed to shrink when EA rail steals width (see styles.css). */
+    min-width:0; max-width:min(220px,34%);
   }
-  html.sky .tab.tab-whoami .whoami-email{color:var(--ink) !important; max-width:180px}
+  html.sky .tab.tab-whoami .whoami-email{
+    color:var(--ink) !important;
+    min-width:0; max-width:none; /* width constrained by chip, not a hard px cap */
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
   html.sky .tab.tab-whoami:hover{background:rgba(255,255,255,.9) !important}
 }
 @media (max-width:600px){
