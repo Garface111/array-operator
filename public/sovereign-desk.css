@@ -1,7 +1,7 @@
 /* Sovereign Desk — deep navy leadership chat (Ford only) */
 
 .sov-desk{
-  max-width: min(720px, 96vw);
+  max-width: min(1100px, 98vw);
   margin: 16px auto 48px;
   display: flex;
   flex-direction: column;
@@ -53,6 +53,21 @@ html:not(.sky) .sov-desk-sub{ color: #9bb0d4; }
 #panelSovereign[hidden]{ display:none !important; }
 #panelSovereign.active[hidden]{ display:block !important; }
 
+.sov-desk-layout{
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  min-height: 0;
+}
+@media (max-width: 900px){
+  .sov-desk-layout{ grid-template-columns: 1fr; }
+}
+.sov-desk-main{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
 .sov-desk-body{
   flex: 1;
   overflow: auto;
@@ -62,6 +77,62 @@ html:not(.sky) .sov-desk-sub{ color: #9bb0d4; }
   gap: 10px;
   background:
     radial-gradient(800px 300px at 10% 0%, rgba(26,77,184,.08), transparent 60%);
+  min-height: 280px;
+}
+.sov-ops{
+  border-left: 1px solid rgba(12,48,120,.14);
+  background: rgba(255,255,255,.45);
+  padding: 12px 12px 16px;
+  overflow: auto;
+  font-size: 12px;
+}
+html:not(.sky) .sov-ops{ background: rgba(0,0,0,.2); border-color: rgba(255,255,255,.08); }
+.sov-ops-title{
+  font-weight: 780; font-size: 12px; letter-spacing: .04em; text-transform: uppercase;
+  color: #0a2a6e; margin-bottom: 8px;
+}
+.sov-ops-auth{ margin-bottom: 8px; color: #3a5680; }
+.sov-ops-auth b{ color: #0a2a6e; }
+.sov-ops-actions{ display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.sov-ops-actions button{
+  appearance: none; border: 1px solid rgba(12,48,120,.28); background: #fff;
+  border-radius: 10px; padding: 8px 10px; text-align: left; cursor: pointer;
+  font: 650 12px/1.25 inherit; color: #061536;
+}
+.sov-ops-actions button:hover{ border-color: #0a2a6e; background: rgba(230,240,255,.9); }
+.sov-ops-kpis{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.sov-ops-kpi{
+  background: rgba(255,255,255,.75); border: 1px solid rgba(12,48,120,.12);
+  border-radius: 10px; padding: 8px;
+}
+.sov-ops-kpi b{ display: block; font-size: 16px; color: #061536; }
+.sov-ops-kpi span{ font-size: 10px; color: #5a7196; text-transform: uppercase; letter-spacing: .03em; }
+.sov-ops h4{ margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #3a5680; }
+.sov-ops-list{ list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sov-ops-list li{
+  background: rgba(255,255,255,.7); border: 1px solid rgba(12,48,120,.1);
+  border-radius: 8px; padding: 6px 8px; line-height: 1.35; color: #16202b;
+}
+.sov-ops-mini{
+  appearance: none; border: 0; background: #0a2a6e; color: #fff;
+  border-radius: 6px; padding: 2px 6px; font: 650 10px/1.2 inherit; cursor: pointer;
+  margin-left: 4px;
+}
+.sov-pill{
+  display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: 999px; background: rgba(10,42,110,.1); color: #0a2a6e;
+}
+.sov-ops-err{ color: #b91c1c; }
+.sov-ops-meta{ margin: 0 0 8px; font-size: 11px; color: #5a7196; line-height: 1.4; }
+.sov-pill{
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(12,48,120,.1);
+  color: #0a2a6e;
+  vertical-align: middle;
 }
 
 .sov-desk-empty{

@@ -9,6 +9,7 @@
     access: "/v1/sovereign/desk/access",
     history: "/v1/sovereign/desk/history",
     chat: "/v1/sovereign/desk/chat",
+    ops: "/v1/sovereign/desk/ops",
   };
 
   var state = {
@@ -65,7 +66,7 @@
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
       "        <h1>Sovereign</h1>" +
-      '        <p class="sov-desk-sub">Array Operator leadership desk · private with Ford</p>' +
+      '        <p class="sov-desk-sub">Array Operator leadership desk · full ops authority</p>' +
       "      </div>" +
       "    </div>" +
       '    <div class="sov-desk-head-right">' +
@@ -73,12 +74,30 @@
       '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh">↻</button>' +
       "    </div>" +
       "  </header>" +
-      '  <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
-      '  <form class="sov-desk-compose" id="sovDeskForm">' +
-      '    <textarea id="sovDeskInput" rows="2" placeholder="Talk to Sovereign…" autocomplete="off"></textarea>' +
-      '    <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
-      "  </form>" +
-      '  <p class="sov-desk-foot">Not Energy Agent. Direct line to the product leadership mind.</p>' +
+      '  <div class="sov-desk-layout">' +
+      '    <div class="sov-desk-main">' +
+      '      <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
+      '      <form class="sov-desk-compose" id="sovDeskForm">' +
+      '        <textarea id="sovDeskInput" rows="2" placeholder="Talk to Sovereign…" autocomplete="off"></textarea>' +
+      '        <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
+      "      </form>" +
+      "    </div>" +
+      '    <aside class="sov-ops" id="sovOpsPanel">' +
+      '      <div class="sov-ops-title">Ops control · full authority</div>' +
+      '      <div class="sov-ops-actions">' +
+      '        <button type="button" data-ops="sweep">Run full sweep</button>' +
+      '        <button type="button" data-ops="feature_triage">Triage new features</button>' +
+      '        <button type="button" data-ops="ship_reviewed">Ship features (reviewed→build)</button>' +
+      '        <button type="button" data-ops="utility_advance">Advance utilities</button>' +
+      '        <button type="button" data-ops="escalation_sweep">Resolve needs_ford</button>' +
+      '        <button type="button" data-ops="jobs_drain">Execute job queue</button>' +
+      '        <button type="button" data-ops="deploy_stage">Stage deploy</button>' +
+      '        <button type="button" data-ops="credentials">Credential inventory</button>' +
+      "      </div>" +
+      '      <div class="sov-ops-body" id="sovOpsBody">Loading queues…</div>' +
+      "    </aside>" +
+      "  </div>" +
+      '  <p class="sov-desk-foot">Not Energy Agent. Full triage/ship · utilities · deploy stage · escalations · memory/agenda · jobs.</p>' +
       "</div>";
 
     var form = document.getElementById("sovDeskForm");
@@ -104,9 +123,189 @@
       ref._wired = true;
       ref.onclick = function () {
         loadHistory();
+        loadOps();
       };
     }
+    var ops = document.getElementById("sovOpsPanel");
+    if (ops && !ops._wired) {
+      ops._wired = true;
+      ops.addEventListener("click", function (e) {
+        var b = e.target && e.target.closest ? e.target.closest("[data-ops]") : null;
+        if (!b) return;
+        runOps(b.getAttribute("data-ops"));
+      });
+    }
     return sec;
+  }
+
+  async function loadOps() {
+    var body = document.getElementById("sovOpsBody");
+    if (!body || !state.allowed) return;
+    try {
+      var r = await fetch(API.ops, { headers: authHeaders() });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
+      var s = (d.summary && d.summary) || d.summary || {};
+      // summary nested under d.summary from API
+      s = d.summary || {};
+      var f = s.features || {};
+      var u = s.utilities || {};
+      var e = s.escalations || {};
+      var j = s.jobs || {};
+      var html = "";
+      html +=
+        '<div class="sov-ops-kpis">' +
+        kpi("New", f.new) +
+        kpi("Reviewed", f.reviewed) +
+        kpi("Building", f.building) +
+        kpi("Utils hot", (u.researching || 0) + (u.reviewed || 0) + (u.new || 0)) +
+        kpi("needs_ford", e.needs_ford) +
+        kpi("Jobs", j.queued) +
+        "</div>";
+      html += "<h4>Reviewed features</h4><ul class='sov-ops-list'>";
+      (d.features_reviewed || []).slice(0, 8).forEach(function (it) {
+        html +=
+          "<li><b>#" +
+          it.id +
+          "</b> " +
+          esc((it.text || "").slice(0, 80)) +
+          ' <button type="button" class="sov-ops-mini" data-ops-one="feature_assign" data-id="' +
+          it.id +
+          '">build</button>' +
+          ' <button type="button" class="sov-ops-mini" data-ops-one="feature_ship" data-id="' +
+          it.id +
+          '">shipped</button></li>';
+      });
+      html += "</ul><h4>Utilities</h4><ul class='sov-ops-list'>";
+      (d.utilities_active || [])
+        .filter(function (it) {
+          return it.status !== "added" && it.status !== "declined";
+        })
+        .slice(0, 8)
+        .forEach(function (it) {
+          html +=
+            "<li><b>#" +
+            it.id +
+            "</b> " +
+            esc(it.name || "") +
+            " <span class='sov-pill'>" +
+            esc(it.status) +
+            "</span></li>";
+        });
+      html += "</ul><h4>Escalations needs_ford</h4><ul class='sov-ops-list'>";
+      (d.escalations_needs_ford || []).slice(0, 6).forEach(function (it) {
+        html +=
+          "<li><b>" +
+          esc((it.id || "").slice(0, 12)) +
+          "</b> " +
+          esc((it.summary || "").slice(0, 80)) +
+          ' <button type="button" class="sov-ops-mini" data-ops-one="escalation_resolve" data-id="' +
+          esc(it.id) +
+          '">close</button></li>';
+      });
+      html += "</ul><h4>Goals (agenda)</h4><ul class='sov-ops-list'>";
+      (d.goals || []).slice(0, 6).forEach(function (g) {
+        html +=
+          "<li><b>p" +
+          esc(g.priority) +
+          "</b> " +
+          esc((g.title || g.id || "").slice(0, 70)) +
+          "</li>";
+      });
+      html += "</ul>";
+      var creds = (d.credentials && d.credentials.credentials) || [];
+      var portals = (d.credentials && d.credentials.portal_status) || [];
+      html +=
+        "<h4>Credentials (meta)</h4><p class='sov-ops-meta'>" +
+        creds.length +
+        " stored · " +
+        portals.length +
+        " portal rows · passwords never shown</p>";
+      var auth = d.ops_authority ? "ON" : "OFF";
+      html =
+        '<div class="sov-ops-auth">Authority: <b>' +
+        auth +
+        "</b> · independent desk when Ford offline</div>" +
+        html;
+      body.innerHTML = html;
+      body.querySelectorAll("[data-ops-one]").forEach(function (btn) {
+        btn.onclick = function () {
+          var act = btn.getAttribute("data-ops-one");
+          var id = btn.getAttribute("data-id");
+          if (act === "feature_ship")
+            runOps("feature_ship", { feature_id: parseInt(id, 10) });
+          if (act === "feature_assign")
+            runOps("feature_assign", {
+              feature_id: parseInt(id, 10),
+              status: "building",
+              note: "Assigned from desk",
+            });
+          if (act === "escalation_resolve")
+            runOps("escalation_resolve", {
+              escalation_id: id,
+              status: "done",
+              note: "Closed from desk UI",
+            });
+        };
+      });
+    } catch (err) {
+      body.innerHTML =
+        "<p class='sov-ops-err'>" + esc(err.message || "ops load failed") + "</p>";
+    }
+  }
+
+  function kpi(label, n) {
+    return (
+      '<div class="sov-ops-kpi"><b>' +
+      esc(n == null ? "—" : n) +
+      "</b><span>" +
+      esc(label) +
+      "</span></div>"
+    );
+  }
+
+  async function runOps(action, payload) {
+    payload = payload || {};
+    var map = {
+      sweep: "sweep",
+      ship_reviewed: "feature_ship_batch",
+      feature_triage: "feature_triage",
+      feature_assign: "feature_assign",
+      utility_advance: "utility_advance",
+      escalation_sweep: "escalation_sweep",
+      jobs_drain: "jobs_drain",
+      feature_ship: "feature_ship",
+      escalation_resolve: "escalation_resolve",
+      deploy_stage: "deploy_stage",
+      credentials: "credentials",
+    };
+    var act = map[action] || action;
+    try {
+      var r = await fetch(API.ops, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ action: act, payload: payload }),
+      });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
+      state.messages.push({
+        role: "system",
+        content: "Ops " + act + ": " + JSON.stringify(d).slice(0, 400),
+      });
+      renderMessages();
+      loadOps();
+      loadHistory();
+    } catch (e) {
+      state.messages.push({
+        role: "system",
+        content: "Ops failed: " + (e.message || e),
+      });
+      renderMessages();
+    }
   }
 
   function renderMessages() {
@@ -257,8 +456,10 @@
   function startPoll() {
     stopPoll();
     state.pollTimer = setInterval(function () {
-      if (location.hash === "#sovereign" && state.allowed && !state.sending)
+      if (location.hash === "#sovereign" && state.allowed && !state.sending) {
         loadHistory();
+        loadOps();
+      }
     }, 12000);
   }
 
@@ -283,6 +484,7 @@
     var acctTab = document.getElementById("tabAccount");
     if (acctTab) acctTab.classList.add("active");
     loadHistory();
+    loadOps();
     startPoll();
   }
 
