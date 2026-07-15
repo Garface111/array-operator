@@ -75,7 +75,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260710a"><!-- Resources tab (in-app briefing); scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
-<link rel="stylesheet" href="mobile-os.css?v=20260714mobileSetup2"><!-- AI-as-OS home (≤960, signed-in) -->
+<link rel="stylesheet" href="mobile-os.css?v=20260714trailFix1"><!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
  it parser-blocking (no FOUC) and positions it AFTER mobile.css so it is the
  final word in the cascade. Skipped only when the visitor opted out (?sky=0). -->
@@ -551,10 +551,10 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260715eaBesideSetup1">
 <script src="energy-agent.js?v=20260715eaBesideSetup1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
-<link rel="stylesheet" href="hands-off-tour.css?v=20260714pro2">
-<script src="hands-off-tour.js?v=20260714pro2"></script>
+<link rel="stylesheet" href="hands-off-tour.css?v=20260714impl1">
+<script src="hands-off-tour.js?v=20260714impl1"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
-<script src="mobile-os.js?v=20260714mobileSetup2"></script>
+<script src="mobile-os.js?v=20260714trailFix1"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */
