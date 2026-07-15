@@ -348,8 +348,7 @@
  panel.setAttribute("aria-label", "Energy Agent");
  panel.innerHTML =
  ' <div class="ea-head">' +
- ' <div><h3>Energy Agent</h3>' +
- ' <p>One mind for your fleet, continuous awareness, not a pile of agents.</p></div>' +
+ ' <div><h3>Energy Agent</h3></div>' +
  ' <button type="button" class="ea-x" id="eaClose" aria-label="Close">×</button>' +
  " </div>" +
  ' <div class="ea-tools" id="eaTools" hidden aria-hidden="true"></div>' +
