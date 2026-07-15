@@ -469,45 +469,60 @@
  else if (worstCls !== "bad") worstCls = "warn";
  issues.push(st);
  });
- if (!issues.length) return { label: "All clear", cls: "ok" };
+ if (!issues.length) return { label: "All clear", cls: "ok", pills: [{ label: "All clear", cls: "ok" }] };
 
  // Tally by display label (already human-readable from arrStatus).
  const byLabel = {};
+ const clsByLabel = {};
+ const tipByLabel = {};
  const tips = [];
  issues.forEach(st => {
  const lab = (st.label || "Issue").trim();
  byLabel[lab] = (byLabel[lab] || 0) + 1;
+ if (st.cls === "bad") clsByLabel[lab] = "bad";
+ else if (clsByLabel[lab] !== "bad") clsByLabel[lab] = st.cls || "warn";
+ if (st.tip && !tipByLabel[lab]) tipByLabel[lab] = st.tip;
  if (st.tip) tips.push(st.tip);
  });
  const keys = Object.keys(byLabel);
+ // One pill per distinct issue type (Ford 2026-07-15: a single "A · B" string
+ // wrapped into two overlapping orange capsules when EA squeezed the table).
+ const pills = keys.map(lab => {
+ const n = byLabel[lab];
+ let label = lab;
+ if (n > 1 && !/^\d+\s/.test(lab) && !/^\d+\s*×/i.test(lab)) {
+ label = n + " × " + lab;
+ }
+ if (label.length > 28) label = label.slice(0, 26).replace(/\s+\S*$/, "") + "…";
+ return {
+ label,
+ cls: clsByLabel[lab] || worstCls,
+ tip: tipByLabel[lab] || "",
+ };
+ });
  let label;
  if (keys.length === 1) {
- // Single issue type across the vendor, show it by name, not "N issues".
- // Multi-array same type: "Vendor issue" stays singular (same problem);
- // labels that already carry a count ("2 dark now") keep as-is.
- const lab = keys[0];
- const n = byLabel[lab];
- if (n > 1 && !/^\d+\s/.test(lab) && !/^\d+\s*×/i.test(lab)) {
- // e.g. two arrays both "Vendor issue" → "2 × Vendor issue"
- label = n + " × " + lab;
+ label = pills[0].label;
  } else {
- label = lab;
+ label = pills.map(p => p.label).join(" · ");
  }
- } else {
- // Mixed issues: list each type so nothing is buried behind a count.
- label = keys.map(k => {
- const n = byLabel[k];
- if (n > 1 && !/^\d+\s/.test(k)) return n + " × " + k;
- return k;
- }).join(" · ");
- }
- // Cap length so a messy mixed fleet still fits the pill.
  if (label.length > 42) label = label.slice(0, 40).replace(/\s+\S*$/, "") + "…";
  return {
  label,
+ pills,
  cls: worstCls,
  tip: tips[0] || ("Issues on " + issues.length + " array" + (issues.length === 1 ? "" : "s")),
  };
+ }
+
+ /** Render one or more status pills. Multi-issue vendors get separate capsules
+  *  so they never wrap into two overlapping half-pills (Ford 2026-07-15). */
+ function statusPillsHtml(st) {
+ const pills = (st && st.pills && st.pills.length) ? st.pills
+  : [{ label: (st && st.label) || "—", cls: (st && st.cls) || "muted", tip: (st && st.tip) || "" }];
+ return pills.map(p =>
+  `<span class="vs-pill ${esc(p.cls || "muted")}"${p.tip ? ` title="${esc(p.tip)}"` : (st && st.tip && pills.length === 1 ? ` title="${esc(st.tip)}"` : "")}>${esc(p.label)}</span>`
+ ).join("");
  }
 
  // Per-vendor live-refresh cadence (minutes), from the EnergyAgent extension's
@@ -1389,7 +1404,7 @@
  <span class="vs-c-inv">${nInv}</span>
  <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
  <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
- <span class="vs-c-status"><span class="vs-pill ${vStatus.cls}"${vStatus.tip ? ` title="${esc(vStatus.tip)}"` : ""}>${esc(vStatus.label)}</span></span>
+ <span class="vs-c-status">${statusPillsHtml(vStatus)}</span>
  <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
  </div>${vnote}
  <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;

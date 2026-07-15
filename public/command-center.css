@@ -2325,10 +2325,22 @@ html[data-theme="day"] .rep-fld.req > select{
    the fr ratio — identical on every row regardless of what it contains. The
    Vendor column keeps a small px floor (not 0) sized to its widest real button so
    that content still fits without wrapping/clipping. */
-/* Status col min fits [116px spark | UNDERPERFORMING pill] — graphs stay aligned
-   and the orange fill never clips the label (Ford 2026-07-14). */
-.vs-row{ display:grid; grid-template-columns:minmax(150px,1.7fr) minmax(104px,.8fr) 80px 68px minmax(0,.82fr) minmax(0,.9fr) minmax(268px,1.6fr) minmax(96px,.8fr);
-  align-items:center; gap:12px; padding:11px 16px; width:100%; box-sizing:border-box; text-align:left; }
+/* Column floors matter when Energy Agent is open (body.ea-shell-open shrinks
+   .wrap). Live now + Today used minmax(0,…) and could collapse to 0 → kW/kWh
+   text stacked as "kWkWh" on top of each other. Status min 268px then stole
+   the rest and stacked long pills. Ford 2026-07-15. */
+.vs-row{ display:grid;
+  grid-template-columns:
+    minmax(128px,1.5fr)   /* array name */
+    minmax(92px,.75fr)    /* vendor */
+    72px                  /* gauge */
+    52px                  /* inverter count */
+    minmax(72px,.85fr)    /* live now — fits "999.9 kW" */
+    minmax(80px,.9fr)     /* today — fits "99,999 kWh" */
+    minmax(132px,1.35fr)  /* status pills (was 268 — too greedy) */
+    minmax(84px,.7fr);    /* synced */
+  align-items:center; gap:10px; padding:11px 14px; width:100%;
+  box-sizing:border-box; text-align:left; min-width:0; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
 .vs-c-gauge{ display:flex; align-items:center; justify-content:center; }
@@ -2441,9 +2453,12 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    the header cells too (COLS reuses these same classes), and to both per-array
    rows and the vendor-group rollup row, so the whole table stays one consistent
    grid regardless of row type. */
-.vs-c-inv, .vs-c-pow, .vs-c-today, .vs-c-status, .vs-c-fresh{ text-align:right; }
-.vs-c-inv, .vs-c-pow, .vs-c-today{ font-variant-numeric:tabular-nums; color:var(--ink); }
-.vs-c-fresh{ font-size:11.5px; color:var(--faint); }
+.vs-c-inv, .vs-c-pow, .vs-c-today, .vs-c-status, .vs-c-fresh{ text-align:right; min-width:0; }
+.vs-c-inv, .vs-c-pow, .vs-c-today{
+  font-variant-numeric:tabular-nums; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.vs-c-fresh{ font-size:11.5px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Frozen feed: dim the stale live value, amber the "N min ago" so a paused feed never reads as current. */
 .vs-c-pow.vs-stale{ color:var(--muted); font-weight:400; }
 /* "· N% of rated" rides next to the inverter's live kW (was misplaced under the Today=kWh column) — secondary weight so the kW reads as primary. */
@@ -2452,6 +2467,12 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    mute it and tag "est." so it can never be mistaken for metered production. */
 .vs-c-today.vs-est{ color:var(--muted); }
 .vs-est-tag{ font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--gold2,#b45309); text-transform:uppercase; }
+/* Status cell: keep pills on one row, never let wrapped cloned backgrounds
+   look like two stacked notifications on top of Live/Today (Ford 2026-07-15). */
+.vs-c-status{
+  display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center;
+  gap:4px; min-width:0; max-width:100%;
+}
 /* "latest data 36m ago" used to render gold+bold, which read as an ALARM when
    nothing is wrong (Ford 2026-07-11): the vendor portal publishes on its own
    cadence and our sync is live — a 36-minute-old source reading is normal. Match
@@ -2469,11 +2490,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   padding:5px 12px; border-radius:999px; white-space:nowrap; line-height:1.2;
   width:max-content; max-width:none;
 }
-/* Vendor/array status: allow wrap only for long free-text headlines, and keep the
-   background painted on every line (box-decoration-break). */
+/* Vendor/array status: single-line pill (ellipsis if squeezed). Multi-issue
+   vendors render as separate .vs-pill siblings (see vendorStatusHtml) instead
+   of one long "A · B" string that wrapped into two overlapping capsules. */
 .vs-c-status:not(.vs-inv-statcell) .vs-pill{
-  white-space:normal; max-width:100%; text-align:center;
-  -webkit-box-decoration-break:clone; box-decoration-break:clone;
+  white-space:nowrap; max-width:100%; text-align:center;
+  overflow:hidden; text-overflow:ellipsis;
+  -webkit-box-decoration-break:unset; box-decoration-break:unset;
 }
 .vs-pill.ok{ color:#065f46; background:rgba(16,185,129,.20); }
 .vs-pill.warn{ color:#92400e; background:rgba(217,119,6,.28); }
@@ -3041,3 +3064,24 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-cta{ min-width:200px; }
 .ao-pay-fee{ font-size:12px; color:var(--faint,#64748b); }
 .ao-pay-inner .acct-msg{ margin-top:10px; }
+
+/* ── Energy Agent open: spreadsheet must not crush Live/Today into each other ──
+   body.ea-shell-open shrinks .wrap; without min-widths Live+Today collapsed to
+   0 and painted "kWkWh" on top of each other (Ford 2026-07-15 screenshot). */
+body.ea-shell-open #sheetWrap{
+  max-width:none;
+  padding-left:12px;
+  padding-right:12px;
+}
+body.ea-shell-open .vs-scroll{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+body.ea-shell-open .vs-row{
+  /* Keep the 8 columns readable; scroll horizontally rather than stack cells */
+  min-width:780px;
+}
+/* Hands-off rail open (no EA) — same squeeze risk */
+body.ho-shell-open:not(.ea-shell-open) #sheetWrap{ max-width:none; }
+body.ho-shell-open:not(.ea-shell-open) .vs-scroll{ overflow-x:auto; }
+body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:780px; }
