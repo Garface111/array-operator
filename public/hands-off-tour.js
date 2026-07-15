@@ -109,26 +109,41 @@
     {
       id: "autorefresh",
       rail: "Auto-refresh",
-      railSub: "",
-      kicker: "8",
-      title: "Auto-refresh",
-      lede: "",
+      railSub: "Inverter portals",
+      kicker: "8 · Hands-off",
+      title: "Inverter portals — enter logins on Account",
+      lede:
+        "Add monitoring passwords in the main Account page on the right under <b>Inverter portals</b> (AlsoEnergy, Fronius, SMA, Chint…). This setup rail only guides — credentials stay in the real vault.",
       kind: "step",
-      loginForm: "inverter",
-      cta: { label: "Open →", hash: "#account", openAr: true },
+      // No loginForm here — Ford 2026-07-14: enter passwords in Account vault, not the setup window
+      callout:
+        "<b>Where to type:</b> Account → Auto-refresh → <b>Inverter portals</b>. Save each portal login there, then come back here and Continue.",
+      cta: {
+        label: "Open Inverter portals →",
+        hash: "#account",
+        openAr: true,
+        arFocus: "inverter",
+      },
       statusKey: "autorefresh",
       autoNav: true,
     },
     {
       id: "utility",
       rail: "Utility",
-      railSub: "",
-      kicker: "9",
-      title: "Utility",
-      lede: "",
+      railSub: "Utility portals",
+      kicker: "9 · Hands-off",
+      title: "Utility portals — enter logins on Account",
+      lede:
+        "Bill capture logins go in Account under <b>Utility portals</b> (GMP, VEC, SmartHub co-ops…). Same Auto-refresh vault as inverters — not this setup panel.",
       kind: "step",
-      loginForm: "utility",
-      cta: { label: "Open →", hash: "#reports" },
+      callout:
+        "<b>Where to type:</b> Account → Auto-refresh → <b>Utility portals</b>. Save the utility login there, then Continue.",
+      cta: {
+        label: "Open Utility portals →",
+        hash: "#account",
+        openAr: true,
+        arFocus: "utility",
+      },
       statusKey: "utility",
       autoNav: true,
     },
@@ -869,6 +884,7 @@
  !!cta.openPay,
  !!cta.openPreview,
  {
+ arFocus: cta.arFocus || null,
  openSheet: !!cta.openSheet,
  openSandbox: !!cta.openSandbox,
  openAddArray: !!cta.openAddArray,
@@ -1574,6 +1590,7 @@
  '<button type="button" class="ho-btn ho-btn-primary" data-ho="cta"' +
  (step.cta.hash ? ' data-hash="' + esc(step.cta.hash) + '"' : "") +
  (step.cta.openAr ? ' data-ar="1"' : "") +
+ (step.cta.arFocus ? ' data-ar-focus="' + esc(step.cta.arFocus) + '"' : "") +
  (step.cta.openPay ? ' data-pay="1"' : "") +
  (step.cta.openPreview ? ' data-preview="1"' : "") +
  (step.cta.openSheet ? ' data-sheet="1"' : "") +
@@ -1693,7 +1710,7 @@
  setTimeout(function () {
  try {
  if (typeof window.__aoOpenCredentialVault === "function") {
- window.__aoOpenCredentialVault();
+ window.__aoOpenCredentialVault(extras.arFocus || null);
  return;
  }
  } catch (e) {}
@@ -2287,6 +2304,7 @@
  var pay = btn.getAttribute("data-pay") === "1";
  var preview = btn.getAttribute("data-preview") === "1";
  var extras = {
+ arFocus: btn.getAttribute("data-ar-focus") || null,
  openSheet: btn.getAttribute("data-sheet") === "1",
  openSandbox: btn.getAttribute("data-sandbox") === "1",
  openAddArray: btn.getAttribute("data-addarray") === "1",
@@ -2471,6 +2489,7 @@
  !!opts.openPay,
  !!opts.openPreview,
  {
+ arFocus: opts.arFocus || null,
  openSheet: !!opts.openSheet,
  openSandbox: !!opts.openSandbox,
  openAddArray: !!opts.openAddArray,

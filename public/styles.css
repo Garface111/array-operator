@@ -1647,3 +1647,15 @@
 
 
 
+
+/* Hands-off tour points at Account portal sections */
+.ar-group.ar-group-focus{
+  outline:2px solid rgba(33,150,243,.55);
+  outline-offset:4px;
+  border-radius:14px;
+  animation:arGroupPulse 1.4s ease-in-out 2;
+}
+@keyframes arGroupPulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(33,150,243,0); }
+  50%{ box-shadow:0 0 0 8px rgba(33,150,243,.12); }
+}

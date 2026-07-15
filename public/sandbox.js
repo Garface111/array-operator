@@ -5321,6 +5321,7 @@
  // render + row wiring are reused; only the data source + destination differ.
  const AR_MODE_KEY = "ao_ar_mode";
  let _arWantOpen = false; // set by __aoOpenCredentialVault → wireAutoRefreshRow opens+scrolls the panel
+ let _arWantFocus = null; // "inverter" | "utility" | null
  function _arGetMode(){ try { return localStorage.getItem(AR_MODE_KEY) === "cloud" ? "cloud" : "device"; } catch(e){ return "device"; } }
  function _arSetMode(m){
  const mode = m === "cloud" ? "cloud" : "device";
@@ -5398,9 +5399,11 @@
  // "+ Add vendor" in cloud mode → the Credential Vault is where a server-side login
  // is added, so jump straight there (Master Account → Auto-refresh, cloud mode,
  // expanded + scrolled). Reuses the panel's own open/scroll/flash via _arWantOpen.
- window.__aoOpenCredentialVault = function(){
+ // focus: "inverter" | "utility" | null — scroll to that portal group in Account vault
+ window.__aoOpenCredentialVault = function(focus){
  _arSetMode("cloud");
  _arWantOpen = true;
+ _arWantFocus = focus === "utility" ? "utility" : (focus === "inverter" ? "inverter" : null);
  if(location.hash !== "#account"){ location.hash = "#account"; }
  else { try { wireAutoRefreshRow(); } catch(e){} }
  };
@@ -5918,15 +5921,39 @@
  const _fromParam = _sp.get("setup") === "autorefresh" && !window._arSetupHandled;
  if(_fromParam || _arWantOpen){
  if(_fromParam) window._arSetupHandled = true;
+ const _focus = _arWantFocus;
  _arWantOpen = false;
+ _arWantFocus = null;
  const _row = document.getElementById("rowAutoRefresh");
  const _body = document.getElementById("arBody");
  _arSetBodyOpen(true); // ensure logins visible
+ // Prefer the real portal sections (Inverter / Utility) — not the setup rail form
+ const _scrollTarget = () => {
+ const list = document.getElementById("arList");
+ if(_focus === "utility"){
+ return list && (list.querySelector(".ar-group-util") || list.querySelector(".ar-group:not(.ar-group-inv)"));
+ }
+ if(_focus === "inverter"){
+ return list && list.querySelector(".ar-group-inv");
+ }
+ return _row;
+ };
+ setTimeout(() => {
+ const t = _scrollTarget() || _row;
+ if(t) t.scrollIntoView({ behavior:"smooth", block:"start" });
  if(_row){
- setTimeout(() => { _row.scrollIntoView({ behavior:"smooth", block:"start" }); }, 60);
  _row.classList.add("ar-flash");
  setTimeout(() => _row.classList.remove("ar-flash"), 2600);
  }
+ // Pulse the target portal group so "type here" is obvious
+ try{
+ const g = _scrollTarget();
+ if(g && g.classList){
+ g.classList.add("ar-group-focus");
+ setTimeout(() => g.classList.remove("ar-group-focus"), 2800);
+ }
+ }catch(e){}
+ }, 80);
  if(_fromParam){
  _sp.delete("setup");
  history.replaceState(null, "", location.pathname + (_sp.toString() ? "?"+_sp.toString() : "") + location.hash);
@@ -6215,7 +6242,7 @@
  </div>
  </div>
  <div class="ar-card ar-card-group">
- <div class="ar-group">
+ <div class="ar-group ar-group-util">
  <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily, powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
  ${shownCodes.map(utilCard).join("")}
  <div class="ar-addutil">
