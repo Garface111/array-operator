@@ -116,6 +116,13 @@
 .tr-table tr:last-child td{border-bottom:0}
 .tr-aname{font-weight:600} .tr-anum{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
 .tr-ayears{color:var(--muted)}
+/* year × array production matrix */
+.tr-ymatrix{margin-top:22px}
+.tr-ym-table th.tr-anum,.tr-ym-table td.tr-anum{min-width:4.5rem}
+.tr-ym-partial{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--good2,#3fd68a);vertical-align:super}
+.tr-ym-tot td{border-top:1px solid var(--line);background:color-mix(in srgb,var(--ink) 3%,transparent)}
+.tr-ym-life{font-weight:650;color:var(--ink)!important}
+.tr-tablewrap-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 
 /* empty / error */
 .tr-empty{text-align:center;padding:40px 16px;color:var(--muted)}

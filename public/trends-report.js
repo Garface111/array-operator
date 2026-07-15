@@ -91,10 +91,15 @@
  const lyM={}, pyM={};
  (monthly[String(ly)]||[]).forEach(p=>lyM[p.month]=p.kwh||0);
  if(py!=null) (monthly[String(py)]||[]).forEach(p=>pyM[p.month]=p.kwh||0);
+ // Full months only for YoY % (Paul 2026-07-15): current calendar month is
+ // partial MTD vs a full prior year — do not draw a YoY point for it.
+ const _now = new Date();
+ const _curY = _now.getFullYear(), _curM = _now.getMonth()+1;
+ const _partialMo = (m) => ly === _curY && m === _curM && _now.getDate() < 28;
  const data = MON3.map((lbl,i)=>{ const m=i+1;
  const kwh = lyM[m]!=null?lyM[m]:null; const prev = pyM[m];
- const pct = (py!=null && prev!=null && prev>0 && kwh!=null) ? 100*(kwh-prev)/prev : null;
- return { label:lbl, kwh, prev, pct }; });
+ const pct = (!_partialMo(m) && py!=null && prev!=null && prev>0 && kwh!=null) ? 100*(kwh-prev)/prev : null;
+ return { label:lbl, kwh, prev, pct, partial:_partialMo(m) }; });
 
  const padL=58, padR=58, padT=26, padB=50;
  function geom(w,h){ return { x0:padL, y0:padT, plotW:w-padL-padR, plotH:h-padT-padB }; }

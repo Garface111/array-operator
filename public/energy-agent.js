@@ -1121,10 +1121,17 @@
  // Single-asterisk italic, avoid matching inside already-processed strong tags
  s = s.replace(/(^|[^*\\])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
 
- // Links, https only
+ // Links, markdown [label](https://...) then bare https URLs
  s = s.replace(
  /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
  '<a class="ea-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+ );
+ // Bare URLs not already inside an href="..."
+ s = s.replace(
+ /(^|[^"'>=])(https?:\/\/[^\s<]+[^\s<.,);:'"!])/g,
+ function (_, pre, url) {
+ return pre + '<a class="ea-link" href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + "</a>";
+ }
  );
 
  // Restore inline code
@@ -2529,6 +2536,20 @@
  ok = await apiProxy(cmd.args || {});
  detail = cmd.args || {};
  if (ok) softRefreshUi(detail.body || detail);
+ } else if (cmd.type === "open_url" || cmd.type === "ui_open_url") {
+ // Open vendor/utility portal in a new tab (Paul: SmartHub / Solar.web links)
+ var ou = (cmd.args && (cmd.args.url || cmd.args.href)) || "";
+ if (/^https?:\/\//i.test(ou)) {
+ try { window.open(ou, "_blank", "noopener,noreferrer"); ok = true; }
+ catch (e) { ok = false; }
+ detail = { url: ou };
+ if (ok && !(cmd.args && cmd.args.silent)) {
+ addMsg("agent", "Opening [" + (cmd.args.label || "portal") + "](" + ou + ").");
+ }
+ } else {
+ ok = false;
+ detail = { error: "bad_url" };
+ }
  } else if (cmd.type === "ui_refresh" || cmd.type === "refresh") {
  softRefreshUi(cmd.args || {});
  ok = true;

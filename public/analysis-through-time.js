@@ -284,9 +284,14 @@
  var lySum = sumTrail(byYear, trail, 1);
  var yoyPct = null;
  if (curSum && lySum && lySum.sum > 0 && lySum.n >= 3) {
- // only months that exist in both (recompute aligned)
+ // Full months only (Paul 2026-07-15): skip in-progress calendar month so
+ // MTD is never compared to a full prior-year month.
+ var now = new Date();
+ var curY = now.getFullYear(), curM = now.getMonth() + 1;
+ var skipPartial = now.getDate() < 28;
  var cA = 0, lA = 0, nA = 0;
  trail.forEach(function (pt) {
+ if (skipPartial && pt.year === curY && pt.month === curM) return;
  var c = monthKwh(byYear, pt.year, pt.month);
  var l = monthKwh(byYear, pt.year - 1, pt.month);
  if (c != null && l != null) { cA += c; lA += l; nA++; }

@@ -128,8 +128,21 @@
  const cur = d.monthly_by_year[String(latestYr)] || [];
  const prev = d.monthly_by_year[String(prevYr)] || [];
  const prevByMonth = {}; prev.forEach(p => prevByMonth[p.month] = p.kwh || 0);
+ // FULL MONTHS ONLY (Paul Bozuwa 2026-07-15): never compare a partial
+ // current calendar month to the same month last year (full). Drop the
+ // in-progress month from both sides of the YoY sum.
+ const now = new Date();
+ const curY = now.getFullYear(), curM = now.getMonth() + 1;
+ const skipPartial = (m) => latestYr === curY && m === curM && now.getDate() < 28;
  let curSum = 0, prevSum = 0;
- cur.forEach(p => { if (prevByMonth[p.month] != null) { curSum += (p.kwh || 0); prevSum += prevByMonth[p.month]; yoyMonths++; } });
+ cur.forEach(p => {
+ if (skipPartial(p.month)) return;
+ if (prevByMonth[p.month] != null) {
+ curSum += (p.kwh || 0);
+ prevSum += prevByMonth[p.month];
+ yoyMonths++;
+ }
+ });
  if (prevSum > 0 && yoyMonths > 0) latestYoY = (100 * (curSum - prevSum) / prevSum);
  }
  // Best single month on record (a real, satisfying number even with 1 year).
@@ -143,7 +156,7 @@
  // Implied blended rate behind the savings number, for the tooltip.
  const rate = (d.ttm_savings_usd && d.ttm_kwh) ? (d.ttm_savings_usd / d.ttm_kwh) : null;
  const yoyTitle = yoyMonths > 0
- ? `${latestYr} vs ${prevYr}, same ${yoyMonths} month${yoyMonths === 1 ? "" : "s"}`
+ ? `${latestYr} vs ${prevYr}, same ${yoyMonths} full month${yoyMonths === 1 ? "" : "s"} (in-progress month excluded)`
  : "Year-over-year appears once you have two years of history";
  const savTitle = rate ? `≈ $${rate.toFixed(3)}/kWh blended rate × trailing-12-mo kWh` : "Estimated value of the energy produced";
 
@@ -241,6 +254,56 @@
  <div class="tr-tablewrap"><table class="tr-table">
  <thead><tr><th>Array</th><th class="tr-anum">Lifetime</th><th>Share</th><th>Years</th></tr></thead>
  <tbody>${body}</tbody>
+ </table></div>
+ </div>`;
+ }
+
+ // Year × array kWh matrix (Paul Bozuwa 2026-07-15): each array as a row,
+ // calendar years as columns + lifetime. Current year column is YTD.
+ // Production only — offtaker $ true-ups stay on Invoices when that history exists.
+ function yearMatrix(byArray, fleetYears) {
+ const c = C();
+ if (!byArray || !byArray.length) return "";
+ const yearSet = {};
+ (fleetYears || []).forEach(y => { yearSet[String(y)] = 1; });
+ byArray.forEach(a => {
+ Object.keys(a.kwh_by_year || {}).forEach(y => { yearSet[y] = 1; });
+ });
+ const years = Object.keys(yearSet).map(Number).filter(n => n > 1990).sort((a, b) => a - b);
+ if (!years.length) return "";
+ const curY = new Date().getFullYear();
+ const rows = byArray.slice().sort((a, b) => (b.lifetime_kwh || 0) - (a.lifetime_kwh || 0));
+ const colTot = {}; years.forEach(y => { colTot[y] = 0; });
+ let lifeTot = 0;
+ const body = rows.map((a, i) => {
+ const byY = a.kwh_by_year || {};
+ const cells = years.map(y => {
+ const v = Number(byY[String(y)] || 0);
+ colTot[y] += v;
+ return `<td class="tr-anum">${v > 0 ? c.fmt0(v) : "—"}</td>`;
+ }).join("");
+ const life = Number(a.lifetime_kwh || 0);
+ lifeTot += life;
+ return `<tr style="--ri:${i}">
+ <td class="tr-aname">${c.esc(a.name)}</td>
+ ${cells}
+ <td class="tr-anum tr-ym-life">${life > 0 ? c.fmt0(life) : "—"}</td>
+ </tr>`;
+ }).join("");
+ const foot = `<tr class="tr-ym-tot">
+ <td class="tr-aname"><b>Fleet total</b></td>
+ ${years.map(y => `<td class="tr-anum"><b>${colTot[y] > 0 ? c.fmt0(colTot[y]) : "—"}</b></td>`).join("")}
+ <td class="tr-anum tr-ym-life"><b>${lifeTot > 0 ? c.fmt0(lifeTot) : "—"}</b></td>
+ </tr>`;
+ const yHeads = years.map(y =>
+ `<th class="tr-anum">${y}${y === curY ? " <span class=\"tr-ym-partial\" title=\"Calendar year to date\">YTD</span>" : ""}</th>`
+ ).join("");
+ return `<div class="tr-block tr-ymatrix" id="trYearMatrix">
+ <div class="tr-block-h">PRODUCTION BY YEAR</div>
+ <div class="tr-block-sub">kWh by array and calendar year. ${curY} is year-to-date. LATEST YOY above uses full months only.</div>
+ <div class="tr-tablewrap tr-tablewrap-scroll"><table class="tr-table tr-ym-table">
+ <thead><tr><th>Array</th>${yHeads}<th class="tr-anum tr-ym-life">Lifetime</th></tr></thead>
+ <tbody>${body}${foot}</tbody>
  </table></div>
  </div>`;
  }
@@ -400,6 +463,7 @@
  </button>
  <div id="trAdvPanel" class="tr-adv-panel" hidden>${blocks}</div>
  </div>
+ ${yearMatrix(d.by_array, d.years)}
  ${byArrayTable(d.by_array)}
  `;
 
