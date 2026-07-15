@@ -58,7 +58,16 @@
       sec.setAttribute("aria-label", "Sovereign desk");
       wrap.appendChild(sec);
     }
-    if (sec.querySelector(".sov-desk")) return sec;
+    var existing = sec.querySelector(".sov-desk");
+    if (existing) {
+      // Already new layout (ops rail first / left)
+      var lay = existing.querySelector(".sov-desk-layout");
+      var first = lay && lay.firstElementChild;
+      if (first && first.classList.contains("sov-ops")) return sec;
+      // Old right-rail shell — rebuild
+      existing.remove();
+    }
+    // Controls rail LEFT (sticky while chat scrolls) · conversation RIGHT
     sec.innerHTML =
       '<div class="sov-desk">' +
       '  <header class="sov-desk-head">' +
@@ -66,41 +75,58 @@
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
       "        <h1>Sovereign</h1>" +
-      '        <p class="sov-desk-sub">Array Operator leadership desk · full ops authority</p>' +
+      '        <p class="sov-desk-sub">Leadership desk</p>' +
       "      </div>" +
       "    </div>" +
       '    <div class="sov-desk-head-right">' +
       '      <div class="sov-desk-meta" id="sovDeskMeta">Developer only</div>' +
-      '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh">↻</button>' +
+      '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh" aria-label="Refresh">↻</button>' +
       "    </div>" +
       "  </header>" +
       '  <div class="sov-desk-layout">' +
+      '    <aside class="sov-ops" id="sovOpsPanel" aria-label="Ops controls">' +
+      '      <div class="sov-ops-sticky">' +
+      '        <div class="sov-ops-title">Controls</div>' +
+      '        <div class="sov-ops-auth" id="sovOpsAuth">Authority…</div>' +
+      "      </div>" +
+      '      <div class="sov-ops-scroll">' +
+      '        <div class="sov-ops-group">' +
+      '          <div class="sov-ops-group-label">Run</div>' +
+      '          <button type="button" class="sov-ops-primary" data-ops="sweep">Full sweep</button>' +
+      '          <button type="button" data-ops="feature_triage">Triage features</button>' +
+      "        </div>" +
+      '        <div class="sov-ops-group">' +
+      '          <div class="sov-ops-group-label">Ship</div>' +
+      '          <button type="button" data-ops="ship_reviewed">Reviewed → build</button>' +
+      '          <button type="button" data-ops="ship_building">Building queue</button>' +
+      "        </div>" +
+      '        <div class="sov-ops-group">' +
+      '          <div class="sov-ops-group-label">Utilities</div>' +
+      '          <button type="button" data-ops="utility_advance">Advance utilities</button>' +
+      '          <button type="button" data-ops="utility_cred_stage">Stage credentials</button>' +
+      "        </div>" +
+      '        <div class="sov-ops-group">' +
+      '          <div class="sov-ops-group-label">Jobs &amp; deploy</div>' +
+      '          <button type="button" data-ops="jobs_drain">Drain job queue</button>' +
+      '          <button type="button" data-ops="jobs_requeue">Requeue failures</button>' +
+      '          <button type="button" data-ops="deploy_stage">Stage deploy</button>' +
+      "        </div>" +
+      '        <div class="sov-ops-group">' +
+      '          <div class="sov-ops-group-label">Escalations</div>' +
+      '          <button type="button" data-ops="escalation_sweep">Resolve needs_ford</button>' +
+      '          <button type="button" data-ops="credentials">Credential inventory</button>' +
+      "        </div>" +
+      '        <div class="sov-ops-body" id="sovOpsBody">Loading queues…</div>' +
+      "      </div>" +
+      "    </aside>" +
       '    <div class="sov-desk-main">' +
       '      <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
       '      <form class="sov-desk-compose" id="sovDeskForm">' +
-      '        <textarea id="sovDeskInput" rows="2" placeholder="Talk to Sovereign…" autocomplete="off"></textarea>' +
+      '        <textarea id="sovDeskInput" rows="2" placeholder="Message Sovereign…" autocomplete="off"></textarea>' +
       '        <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "      </form>" +
       "    </div>" +
-      '    <aside class="sov-ops" id="sovOpsPanel">' +
-      '      <div class="sov-ops-title">Ops control · full authority</div>' +
-      '      <div class="sov-ops-actions">' +
-      '        <button type="button" data-ops="sweep">Run full sweep</button>' +
-      '        <button type="button" data-ops="feature_triage">Triage new features</button>' +
-      '        <button type="button" data-ops="ship_reviewed">Ship features (reviewed→build)</button>' +
-      '        <button type="button" data-ops="ship_building">Ship building queue</button>' +
-      '        <button type="button" data-ops="utility_advance">Advance utilities</button>' +
-      '        <button type="button" data-ops="utility_cred_stage">Stage utility credentials</button>' +
-      '        <button type="button" data-ops="escalation_sweep">Resolve needs_ford</button>' +
-      '        <button type="button" data-ops="jobs_requeue">Requeue repo-fail jobs</button>' +
-      '        <button type="button" data-ops="jobs_drain">Execute job queue</button>' +
-      '        <button type="button" data-ops="deploy_stage">Stage deploy</button>' +
-      '        <button type="button" data-ops="credentials">Credential inventory</button>' +
-      "      </div>" +
-      '      <div class="sov-ops-body" id="sovOpsBody">Loading queues…</div>' +
-      "    </aside>" +
       "  </div>" +
-      '  <p class="sov-desk-foot">Not Energy Agent. Full triage/ship · utilities · deploy stage · escalations · memory/agenda · jobs.</p>' +
       "</div>";
 
     var form = document.getElementById("sovDeskForm");
@@ -229,15 +255,17 @@
       var auth = d.ops_authority ? "ON" : "OFF";
       var credsOn = d.credentials_unlocked ? "unlocked" : "locked";
       var portalOn = d.portal_signoff ? "ON" : "OFF";
-      html =
-        '<div class="sov-ops-auth">Authority: <b>' +
-        auth +
-        "</b> · creds <b>" +
-        credsOn +
-        "</b> · portal sign-off <b>" +
-        portalOn +
-        "</b><br/>independent desk when Ford offline</div>" +
-        html;
+      var authEl = document.getElementById("sovOpsAuth");
+      if (authEl) {
+        authEl.innerHTML =
+          "Authority <b>" +
+          auth +
+          "</b> · creds <b>" +
+          credsOn +
+          "</b> · portal <b>" +
+          portalOn +
+          "</b>";
+      }
       body.innerHTML = html;
       body.querySelectorAll("[data-ops-one]").forEach(function (btn) {
         btn.onclick = function () {
@@ -326,9 +354,8 @@
     if (!state.messages.length) {
       host.innerHTML =
         '<div class="sov-desk-empty">' +
-        "<b>Sovereign is listening.</b>" +
-        "<p>Expansion, queues, succession, unlocks — talk here. " +
-        "Energy Agent stays clean for fleet O&amp;M.</p>" +
+        "<b>Sovereign is listening</b>" +
+        "<p>Queues, succession, unlocks — use the rail or write freely.</p>" +
         "</div>";
       return;
     }
@@ -531,8 +558,7 @@
         '<div class="sov-desk-entry-inner">' +
         "<div>" +
         "<b>Sovereign desk</b>" +
-        "<p>Direct line to the Array Operator leadership mind. " +
-        "Not mixed with Energy Agent fleet chat.</p>" +
+        "<p>Leadership mind — separate from Energy Agent fleet chat.</p>" +
         "</div>" +
         '<button type="button" class="sov-desk-entry-btn" id="sovDeskOpenBtn">Open desk</button>' +
         "</div>";
