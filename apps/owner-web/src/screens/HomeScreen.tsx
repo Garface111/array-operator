@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { FleetSheet, mergeSheetArrays } from "@/components/FleetSheet";
 import {
   DemoBanner,
   EmptyCard,
@@ -16,6 +17,7 @@ import {
   fetchOverview,
   fetchSendPipeline,
 } from "@/lib/api";
+import { readFleetCache, writeFleetCache } from "@/lib/fleetCache";
 import { isDemoMode } from "@/lib/demoData";
 import {
   fmtKwh,
@@ -42,49 +44,128 @@ type AttnRow = {
   diagnosis?: string;
 };
 
+/**
+ * Progressive load (speed):
+ *  1. Paint from local cache immediately (if any)
+ *  2. Overview first (array KPIs) — usually faster than fleet-tree
+ *  3. Fleet-tree for inverter sheet (can be slower; never blocks first paint)
+ *  4. Account / pipeline / onboarding deferred
+ */
 export function HomeScreen() {
   const { openAgent } = useOutletAgent();
+  const cached = useMemo(() => (isDemoMode() ? null : readFleetCache()), []);
+
   const [account, setAccount] = useState<AccountMe | null>(null);
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [tree, setTree] = useState<FleetTree | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(
+    () => cached?.overview || null
+  );
+  const [tree, setTree] = useState<FleetTree | null>(
+    () => cached?.tree || null
+  );
   const [pipe, setPipe] = useState<SendPipeline | null>(null);
   const [onb, setOnb] = useState<OnboardingStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [kpiLoading, setKpiLoading] = useState(!cached?.overview);
+  const [sheetLoading, setSheetLoading] = useState(!cached?.tree);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fromCache, setFromCache] = useState(!!cached);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
+
+    async function load(forceTree = false) {
       setErr(null);
-      try {
-        const [a, o, t, p, ob] = await Promise.all([
-          fetchAccount().catch(() => null),
-          fetchOverview().catch(() => null),
-          fetchFleetTree().catch(() => null),
-          fetchSendPipeline().catch(() => null),
-          fetchOnboardingStatus().catch(() => null),
+      if (!overview) setKpiLoading(true);
+      if (!tree) setSheetLoading(true);
+
+      // Phase A — overview (KPIs) as soon as possible
+      const ovP = fetchOverview()
+        .then((o) => {
+          if (cancelled) return;
+          setOverview(o);
+          setKpiLoading(false);
+          setFromCache(false);
+          writeFleetCache({ overview: o });
+        })
+        .catch((e) => {
+          if (!cancelled && !overview)
+            setErr(e instanceof Error ? e.message : "Could not load overview");
+          if (!cancelled) setKpiLoading(false);
+        });
+
+      // Phase B — fleet-tree (inverter sheet) without blocking KPIs
+      const treeP = fetchFleetTree(forceTree)
+        .then((t) => {
+          if (cancelled) return;
+          setTree(t);
+          setSheetLoading(false);
+          setFromCache(false);
+          writeFleetCache({ tree: t });
+        })
+        .catch(() => {
+          if (!cancelled) setSheetLoading(false);
+        });
+
+      // Phase C — secondary, after a tick so A/B get network first
+      const secondary = Promise.resolve().then(async () => {
+        await Promise.all([
+          fetchAccount()
+            .then((a) => {
+              if (!cancelled) setAccount(a);
+            })
+            .catch(() => null),
+          fetchSendPipeline()
+            .then((p) => {
+              if (!cancelled) setPipe(p);
+            })
+            .catch(() => null),
+          fetchOnboardingStatus()
+            .then((o) => {
+              if (!cancelled) setOnb(o);
+            })
+            .catch(() => null),
         ]);
-        if (cancelled) return;
-        setAccount(a);
-        setOverview(o);
-        setTree(t);
-        setPipe(p);
-        setOnb(ob);
-      } catch (e) {
-        if (!cancelled)
-          setErr(e instanceof Error ? e.message : "Could not load fleet");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      });
+
+      await Promise.all([ovP, treeP, secondary]);
+      if (!cancelled) setRefreshing(false);
+    }
+
+    void load(false);
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function onRefresh() {
+    setRefreshing(true);
+    setSheetLoading(true);
+    try {
+      const [o, t] = await Promise.all([
+        fetchOverview(),
+        fetchFleetTree(true),
+      ]);
+      setOverview(o);
+      setTree(t);
+      writeFleetCache({ overview: o, tree: t });
+      setFromCache(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Refresh failed");
+    } finally {
+      setRefreshing(false);
+      setSheetLoading(false);
+      setKpiLoading(false);
+    }
+  }
+
+  const sheetArrays = useMemo(
+    () => mergeSheetArrays(tree?.arrays, overview?.arrays),
+    [tree, overview]
+  );
+
   const kpis = useMemo(() => {
-    const arrays = tree?.arrays || overview?.arrays || [];
+    const arrays = sheetArrays;
     const nArrays =
       overview?.totals?.array_count ?? arrays.length;
     let inv = 0;
@@ -94,35 +175,39 @@ export function HomeScreen() {
     let nameplate = 0;
 
     arrays.forEach((a) => {
-      const invs =
-        (a as { inverters?: Array<{ status?: string; current_power_w?: number }> })
-          .inverters || [];
+      const invs = a.inverters || [];
       if (invs.length) {
         invs.forEach((row) => {
           inv += 1;
-          const t = statusTone(row.status || (a as { status?: string }).status);
+          const t = statusTone(row.status || a.status);
           if (t === "bad") bad += 1;
           else if (t === "warn") warn += 1;
           if (row.current_power_w != null) power += Number(row.current_power_w);
+          if (row.nameplate_kw != null) nameplate += Number(row.nameplate_kw);
         });
       } else {
-        const t = statusTone((a as { status?: string }).status);
+        const t = statusTone(a.status);
         if (t === "bad") bad += 1;
         else if (t === "warn") warn += 1;
+        if (a.nameplate_kw) nameplate += Number(a.nameplate_kw);
       }
-      const pw = (a as { current_power_w?: number }).current_power_w;
-      if (pw != null && !invs.some((i) => i.current_power_w != null))
-        power += Number(pw);
-      const np = (a as { nameplate_kw?: number }).nameplate_kw;
-      if (np) nameplate += Number(np);
+      if (
+        a.current_power_w != null &&
+        !invs.some((i) => i.current_power_w != null)
+      ) {
+        power += Number(a.current_power_w);
+      }
     });
 
     const peer = overview?.peer_summary;
-    if (peer) {
-      // Prefer peer rollup when present (desktop does too)
+    // Prefer live inverter counts from the sheet; fall back to peer rollup
+    if (inv === 0 && peer) {
+      const ok = peer.ok ?? 0;
+      const u = peer.underperforming ?? 0;
+      const d = peer.dead ?? 0;
+      inv = ok + u + d;
       if (peer.dead != null) bad = peer.dead;
       if (peer.underperforming != null) warn = peer.underperforming;
-      if (peer.ok != null && inv === 0) inv = (peer.ok || 0) + bad + warn;
     }
 
     const flagged = bad + warn;
@@ -131,16 +216,10 @@ export function HomeScreen() {
     const healthyPct =
       gradeable > 0 ? Math.round((healthyN / gradeable) * 100) : null;
 
-    const todayKwh = overview?.totals?.today_kwh;
-    const valueToday = overview?.totals?.value_today as number | undefined;
-    // Rough recoverable: value_today scaled by underperformance — honest when we
-    // only have peer flags (desktop prices real loss; we show watch + $ today).
-    const riskHint =
-      bad > 0
-        ? "Critical units may be losing production"
-        : warn > 0
-          ? "Soft flags — confirm before dispatch"
-          : "No priced loss detected";
+    const totPower =
+      overview?.totals?.current_power_w != null
+        ? Number(overview.totals.current_power_w)
+        : power;
 
     const last = pipe?.last;
     const delivered = last?.delivered ?? last?.sent;
@@ -153,32 +232,25 @@ export function HomeScreen() {
       flagged,
       healthyPct,
       healthyN,
-      power: overview?.totals?.current_power_w != null
-        ? Number(overview.totals.current_power_w)
-        : power,
+      power: totPower,
       nameplate,
-      todayKwh,
-      valueToday,
-      riskHint,
+      todayKwh: overview?.totals?.today_kwh,
+      valueToday: overview?.totals?.value_today as number | undefined,
       delivered,
       enabled: pipe?.total_enabled,
       mode: pipe?.default_delivery_mode || "—",
       period: last?.period_label || last?.period_month || null,
       source: overview?.source,
     };
-  }, [overview, tree, pipe]);
+  }, [overview, sheetArrays, pipe]);
 
   const attention = useMemo(() => {
     const rows: AttnRow[] = [];
-    (tree?.arrays || overview?.arrays || []).forEach((a) => {
+    sheetArrays.forEach((a) => {
       const name = String(a.name || "Array");
       const st = String(a.status || "");
       const tone = statusTone(st);
-      const diag = String(
-        (a as { diagnosis?: string }).diagnosis ||
-          (a as { peer?: { diagnosis?: string } }).peer?.diagnosis ||
-          ""
-      );
+      const diag = String(a.diagnosis || "");
       if (tone === "warn" || tone === "bad") {
         rows.push({
           key: `a-${a.id || name}`,
@@ -186,29 +258,18 @@ export function HomeScreen() {
           status: st || "attention",
           tone,
           meta: [
-            (a as { today_kwh?: number }).today_kwh != null
-              ? `${fmtKwh((a as { today_kwh?: number }).today_kwh)} today`
+            a.today_kwh != null ? `${fmtKwh(a.today_kwh)} today` : null,
+            a.peer_index != null
+              ? `peer ${Number(a.peer_index).toFixed(2)}`
               : null,
-            (a as { peer_index?: number }).peer_index != null
-              ? `peer ${Number((a as { peer_index?: number }).peer_index).toFixed(2)}`
-              : null,
+            a.current_power_w != null ? fmtPower(a.current_power_w) : null,
           ]
             .filter(Boolean)
             .join(" · "),
           diagnosis: diag || undefined,
         });
       }
-      (
-        a as {
-          inverters?: Array<{
-            id?: string | number;
-            name?: string;
-            status?: string;
-            peer_index?: number | null;
-            diagnosis?: string;
-          }>;
-        }
-      ).inverters?.forEach((inv) => {
+      (a.inverters || []).forEach((inv) => {
         const t = statusTone(inv.status);
         if (t === "warn" || t === "bad")
           rows.push({
@@ -216,29 +277,26 @@ export function HomeScreen() {
             name: `${name} · ${inv.name || "inverter"}`,
             status: String(inv.status || "attention"),
             tone: t,
-            meta:
+            meta: [
               inv.peer_index != null
                 ? `peer ${Number(inv.peer_index).toFixed(2)}`
-                : undefined,
-            diagnosis: inv.diagnosis,
+                : null,
+              inv.current_power_w != null
+                ? fmtPower(inv.current_power_w)
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            diagnosis: inv.diagnosis ? String(inv.diagnosis) : undefined,
           });
       });
     });
-    // Worst first
     rows.sort((x, y) => {
-      const rank = (t: string) => (t === "bad" ? 0 : t === "warn" ? 1 : 2);
-      return rank(x.tone) - rank(y.tone);
+      const r = (t: string) => (t === "bad" ? 0 : t === "warn" ? 1 : 2);
+      return r(x.tone) - r(y.tone);
     });
     return rows.slice(0, 12);
-  }, [tree, overview]);
-
-  if (loading) {
-    return (
-      <div className="space-y-3 py-8 text-center text-sm font-semibold text-muted">
-        Loading fleet…
-      </div>
-    );
-  }
+  }, [sheetArrays]);
 
   const company =
     account?.company_name || account?.name || "Your fleet";
@@ -251,6 +309,15 @@ export function HomeScreen() {
           ? "warn"
           : "bad";
   const livePct = livePctOfNameplate(kpis.power, kpis.nameplate || null);
+  const showSkeleton = kpiLoading && !overview && !tree;
+
+  if (showSkeleton) {
+    return (
+      <div className="space-y-3 py-6 text-center text-sm font-semibold text-muted">
+        Loading fleet…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -260,7 +327,7 @@ export function HomeScreen() {
           <Link to="/login" className="underline">
             sign in
           </Link>{" "}
-          for live numbers.
+          for live hardware numbers.
         </DemoBanner>
       ) : null}
 
@@ -269,24 +336,37 @@ export function HomeScreen() {
           to="/connect"
           className="block rounded-2xl border border-sky-300/60 bg-sky-50/60 px-3.5 py-2.5 text-xs font-semibold text-sky-950 shadow-sm backdrop-blur-md"
         >
-          Finish setup — next: {onb.next_step?.replace(/_/g, " ") || "connect a feed"} →
+          Finish setup — next:{" "}
+          {onb.next_step?.replace(/_/g, " ") || "connect a feed"} →
         </Link>
       ) : null}
 
-      <section className="drop-shadow-sm">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
-          Fleet
-        </p>
-        <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-          {company}
-        </h1>
-        <p className="text-sm font-medium text-slate-800/75">
-          {kpis.source === "live" || (!isDemoMode() && kpis.nArrays > 0)
-            ? "Live from your connected arrays"
-            : isDemoMode()
-              ? "Sample data for review"
-              : "Production health at a glance"}
-        </p>
+      <section className="flex items-start justify-between gap-2 drop-shadow-sm">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
+            Fleet
+          </p>
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
+            {company}
+          </h1>
+          <p className="text-sm font-medium text-slate-800/75">
+            {fromCache && (kpiLoading || sheetLoading)
+              ? "Showing last snapshot · refreshing…"
+              : isDemoMode()
+                ? "Sample data for review"
+                : overview || tree
+                  ? "Live from your connected arrays"
+                  : "Production health at a glance"}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="ao-btn-ghost !min-h-9 !px-3 !text-xs"
+          disabled={refreshing || isDemoMode()}
+          onClick={() => void onRefresh()}
+        >
+          {refreshing ? "…" : "Refresh"}
+        </button>
       </section>
 
       {err ? (
@@ -295,7 +375,6 @@ export function HomeScreen() {
         </div>
       ) : null}
 
-      {/* Desktop-style commander KPI grid */}
       <div className="grid grid-cols-2 gap-2">
         <KpiTile
           label="Fleet healthy"
@@ -304,7 +383,9 @@ export function HomeScreen() {
           }
           meta={
             kpis.healthyPct == null
-              ? "Collecting history"
+              ? sheetLoading
+                ? "Loading units…"
+                : "Collecting history"
               : `${kpis.healthyN} of ${kpis.inv} units clear`
           }
           tone={healthTone}
@@ -337,7 +418,7 @@ export function HomeScreen() {
           {livePct != null ? (
             <div className="text-[10px] font-semibold text-muted">
               {Math.round(livePct)}% of nameplate
-              {kpis.nameplate ? ` · ${kpis.nameplate} kW` : ""}
+              {kpis.nameplate ? ` · ${kpis.nameplate.toFixed(0)} kW` : ""}
             </div>
           ) : null}
         </div>
@@ -345,7 +426,11 @@ export function HomeScreen() {
         <KpiTile
           label="Inverters"
           value={String(kpis.inv)}
-          meta={`across ${kpis.nArrays} array${kpis.nArrays === 1 ? "" : "s"}`}
+          meta={
+            sheetLoading && !tree
+              ? "Loading sheet…"
+              : `across ${kpis.nArrays} array${kpis.nArrays === 1 ? "" : "s"}`
+          }
         />
         <KpiTile
           label="Flagged"
@@ -387,53 +472,16 @@ export function HomeScreen() {
         />
       </div>
 
-      <p className="text-[11px] font-medium text-muted px-0.5">
-        {kpis.riskHint}
-        {kpis.valueToday != null
-          ? ` · Today’s production value ~${fmtMoney(kpis.valueToday)}.`
-          : ""}
-      </p>
-
-      <section className="ao-card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-white/45 bg-white/25 px-3.5 py-3">
-          <div
-            className="h-10 w-10 shrink-0 rounded-full shadow-md ring-2 ring-white/50"
-            style={{
-              background:
-                "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
-            }}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-extrabold">Energy Agent</div>
-            <div className="text-xs text-muted">
-              Brief fleet health or adjust offtakers
-            </div>
-          </div>
-          <button
-            type="button"
-            className="ao-btn-primary !min-h-9 !px-3 !text-xs"
-            onClick={() => openAgent()}
-          >
-            Chat
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2 p-3">
-          {[
-            "Brief me on fleet health.",
-            "What's left for hands-off setup?",
-            "How did offtaker invoices go?",
-          ].map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => openAgent(q)}
-              className="rounded-full border border-white/55 bg-white/45 px-3 py-1.5 text-left text-[11px] font-semibold text-sky-950 shadow-sm backdrop-blur-md"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Spreadsheet-style inverter data (desktop Vendor Data) */}
+      <FleetSheet
+        arrays={sheetArrays}
+        loading={sheetLoading && !sheetArrays.length}
+        onAsk={(name, status) =>
+          openAgent(
+            `Help me with ${name} (status: ${status}). What's wrong and what should I do?`
+          )
+        }
+      />
 
       <section className="space-y-2">
         <SectionHead
@@ -463,7 +511,7 @@ export function HomeScreen() {
         />
         {attention.length === 0 ? (
           <EmptyCard>
-            Nothing flagged. Ask Agent anytime for a deeper fleet brief.
+            Nothing flagged. Scroll the vendor sheet above for every unit.
           </EmptyCard>
         ) : (
           <ul className="space-y-2">
@@ -482,7 +530,10 @@ export function HomeScreen() {
                     <span className="text-sm font-bold leading-snug">
                       {row.name}
                     </span>
-                    <StatusPill status={statusLabel(row.status)} tone={row.tone} />
+                    <StatusPill
+                      status={statusLabel(row.status)}
+                      tone={row.tone}
+                    />
                   </div>
                   {row.meta ? (
                     <div className="text-[11px] font-medium text-muted">
@@ -499,6 +550,31 @@ export function HomeScreen() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="ao-card overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-white/45 bg-white/25 px-3.5 py-3">
+          <div
+            className="h-9 w-9 shrink-0 rounded-full shadow-md ring-2 ring-white/50"
+            style={{
+              background:
+                "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
+            }}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-extrabold">Energy Agent</div>
+            <div className="text-xs text-muted">
+              Brief fleet health or adjust offtakers
+            </div>
+          </div>
+          <button
+            type="button"
+            className="ao-btn-primary !min-h-9 !px-3 !text-xs"
+            onClick={() => openAgent()}
+          >
+            Chat
+          </button>
+        </div>
       </section>
     </div>
   );
