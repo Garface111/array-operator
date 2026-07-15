@@ -926,9 +926,17 @@
  var dot = document.getElementById("eaDot");
  var orb = document.getElementById("eaOrb");
  var fab = document.getElementById("eaFab");
+ var statusRow = document.getElementById("eaStatus") || (el && el.closest(".ea-status"));
  if (el) el.textContent = text;
  if (dot) {
- dot.className = "ea-dot" + (mode === "on" ? " on" : mode === "warn" ? " warn" : "");
+ dot.className = "ea-dot" + (
+ mode === "on" || mode === "sov" ? " on" :
+ mode === "warn" ? " warn" : ""
+ );
+ if (mode === "sov") dot.classList.add("sov");
+ }
+ if (statusRow) {
+ statusRow.classList.toggle("sov", mode === "sov");
  }
  function paintOrb(node) {
  if (!node) return;
@@ -936,6 +944,7 @@
  node.classList.toggle("thinking", mode === "think");
  node.classList.toggle("speaking", mode === "speak");
  node.classList.toggle("open", state.open);
+ node.classList.toggle("sov", mode === "sov");
  }
  paintOrb(orb);
  paintOrb(fab);
@@ -1240,17 +1249,34 @@
  if (opts.skipIfDup && state._lastUserSaid === t && role === "user") return false;
  if (role === "user" && !opts.history) state._lastUserSaid = t;
  var d = document.createElement("div");
+ var isSovereign = !!(opts.sovereign || opts.origin === "sovereign");
  d.className = "ea-msg " + (role === "user" ? "user" : "agent") +
  (opts.mindUpdate ? " mind-update" : "") +
+ (isSovereign ? " sovereign" : "") +
  (opts.history ? " history" : "");
  d.setAttribute("data-role", role);
  d.setAttribute("data-raw", t);
  if (opts.mindUpdate) d.setAttribute("data-mind", "1");
+ if (isSovereign) d.setAttribute("data-origin", "sovereign");
  // Agent replies get full markdown; user bubbles stay plain (they typed it)
  // unless they include obvious markdown markers.
- var rich = role === "agent" || /\*\*|__|`|^#\s|^\s*[-•]\s/m.test(t);
- if (rich) d.innerHTML = formatMsg(t);
- else d.textContent = t;
+ var rich = role === "agent" || isSovereign || /\*\*|__|`|^#\s|^\s*[-•]\s/m.test(t);
+ if (isSovereign) {
+ // Label so it's obvious the product mind is talking
+ var label = document.createElement("div");
+ label.className = "ea-sov-label";
+ label.textContent = "Energy Agent · product mind";
+ d.appendChild(label);
+ var body = document.createElement("div");
+ body.className = "ea-sov-body";
+ if (rich) body.innerHTML = formatMsg(t);
+ else body.textContent = t;
+ d.appendChild(body);
+ } else if (rich) {
+ d.innerHTML = formatMsg(t);
+ } else {
+ d.textContent = t;
+ }
  host.appendChild(d);
  if (!opts.history) {
  host.scrollTop = host.scrollHeight;
@@ -1366,21 +1392,23 @@
  }
 
  /**
- * Seamless mind awareness, status chip only, NEVER the chat transcript.
- * Chat is reserved for real turns (user + agent replies). Fleet nags /
- * background insights used to dump into the thread (Ford 2026-07-14 screenshot).
+ * Seamless mind awareness.
+ * - Tenant mind (default): status chip only — never pollutes the chat transcript.
+ * - Sovereign (product mind, opts.origin === "sovereign"): deep-blue special bubble
+ *   in the chat so it's clear who is talking, plus the mind activity chip.
  */
  function injectMindSpeak(text, opts) {
  opts = opts || {};
  var t = String(text || "").trim();
  if (!t) return false;
+ var isSovereign = opts.origin === "sovereign" || opts.sovereign === true;
  var now = Date.now();
  // Never interrupt the first voice intro
  if (state._greetingPlaying && !opts.force) return false;
  // Rate-limit identical / near-identical seamless updates (fleet nags)
  var fp = t.slice(0, 96).toLowerCase().replace(/\s+/g, " ");
- var isFleetNag = /\bneed attention\b|\bfleet looks clear\b|\bmoney leak\b/i.test(t);
- var coolMs = isFleetNag ? 4 * 3600 * 1000 : 90 * 1000;
+ var isFleetNag = !isSovereign && /\bneed attention\b|\bfleet looks clear\b|\bmoney leak\b/i.test(t);
+ var coolMs = isFleetNag ? 4 * 3600 * 1000 : (isSovereign ? 45 * 1000 : 90 * 1000);
  if (
  state._lastMindSpeakFp === fp &&
  (now - (state._lastMindSpeakAt || 0)) < coolMs
@@ -1394,8 +1422,8 @@
  ) {
  return false;
  }
- // Don't stomp while the user is mid-turn thinking
- if (state.thinking && !opts.force) return false;
+ // Don't stomp while the user is mid-turn thinking (sovereign may force)
+ if (state.thinking && !opts.force && !isSovereign) return false;
  state._lastMindSpeak = t;
  state._lastMindSpeakFp = fp;
  state._lastMindSpeakAt = now;
@@ -1405,14 +1433,23 @@
  }
  state._mindInjecting = true;
  try {
- // Status / mind chip only, short headline, no chat bubble, no voice barge-in
  var short = t.length > 72 ? t.slice(0, 69).replace(/\s+\S*$/, "") + "…" : t;
- setMindActivity(true, short);
- // Also soft-status so "Looking into it" carries the point without polluting chat
+ setMindActivity(true, isSovereign ? ("Product · " + short) : short);
  if (!state.thinking && !state.speaking) {
- setStatus(short, "on");
+ setStatus(short, isSovereign ? "sov" : "on");
  }
- // Never addMsg, never enqueueSpeak for background mind, chat stays clean
+ if (isSovereign) {
+ // Product mind: special chat bubble (deep blue) so the speaker is obvious
+ addMsg("agent", t, {
+ sovereign: true,
+ origin: "sovereign",
+ skipDedup: true,
+ });
+ if (opts.eventId) {
+ try { addMindActionChips(opts.eventId, t); } catch (e) {}
+ }
+ }
+ // Tenant mind: never addMsg — chat stays for real turns only
  return true;
  } finally {
  state._mindInjecting = false;
