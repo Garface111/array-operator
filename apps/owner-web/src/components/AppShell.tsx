@@ -21,9 +21,9 @@ export function AppShell() {
           WebkitBackdropFilter: "blur(22px) saturate(1.4)",
         }}
       >
-        <div className="flex items-center gap-3 pb-3 pt-1">
+        <div className="flex items-center gap-3 pb-2.5 pt-1">
           <div
-            className="h-9 w-9 shrink-0 rounded-full shadow-md ring-2 ring-white/50"
+            className="h-8 w-8 shrink-0 rounded-full shadow-md ring-2 ring-white/50"
             style={{
               background:
                 "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
@@ -38,24 +38,23 @@ export function AppShell() {
               Triage · Invoices · Resources · Account
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => openAgent()}
-            className="ao-btn-primary !min-h-9 !rounded-full !px-3 !text-xs"
-          >
-            Agent
-          </button>
         </div>
       </header>
 
       <main
         className="flex-1 px-4 pt-4"
-        style={{ paddingBottom: "calc(var(--nav-h) + 24px + env(safe-area-inset-bottom))" }}
+        style={{
+          paddingBottom:
+            "calc(var(--nav-h) + 28px + env(safe-area-inset-bottom))",
+        }}
       >
         <Outlet context={{ openAgent }} />
       </main>
 
-      <BottomNav />
+      <BottomNav
+        onAgent={() => openAgent()}
+        agentOpen={agentOpen}
+      />
       <AgentSheet
         open={agentOpen}
         onClose={() => setAgentOpen(false)}
