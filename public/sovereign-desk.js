@@ -88,8 +88,11 @@
       '        <button type="button" data-ops="sweep">Run full sweep</button>' +
       '        <button type="button" data-ops="feature_triage">Triage new features</button>' +
       '        <button type="button" data-ops="ship_reviewed">Ship features (reviewed→build)</button>' +
+      '        <button type="button" data-ops="ship_building">Ship building queue</button>' +
       '        <button type="button" data-ops="utility_advance">Advance utilities</button>' +
+      '        <button type="button" data-ops="utility_cred_stage">Stage utility credentials</button>' +
       '        <button type="button" data-ops="escalation_sweep">Resolve needs_ford</button>' +
+      '        <button type="button" data-ops="jobs_requeue">Requeue repo-fail jobs</button>' +
       '        <button type="button" data-ops="jobs_drain">Execute job queue</button>' +
       '        <button type="button" data-ops="deploy_stage">Stage deploy</button>' +
       '        <button type="button" data-ops="credentials">Credential inventory</button>' +
@@ -224,10 +227,16 @@
         portals.length +
         " portal rows · passwords never shown</p>";
       var auth = d.ops_authority ? "ON" : "OFF";
+      var credsOn = d.credentials_unlocked ? "unlocked" : "locked";
+      var portalOn = d.portal_signoff ? "ON" : "OFF";
       html =
         '<div class="sov-ops-auth">Authority: <b>' +
         auth +
-        "</b> · independent desk when Ford offline</div>" +
+        "</b> · creds <b>" +
+        credsOn +
+        "</b> · portal sign-off <b>" +
+        portalOn +
+        "</b><br/>independent desk when Ford offline</div>" +
         html;
       body.innerHTML = html;
       body.querySelectorAll("[data-ops-one]").forEach(function (btn) {
@@ -271,10 +280,13 @@
     var map = {
       sweep: "sweep",
       ship_reviewed: "feature_ship_batch",
+      ship_building: "feature_ship_building",
       feature_triage: "feature_triage",
       feature_assign: "feature_assign",
       utility_advance: "utility_advance",
+      utility_cred_stage: "utility_cred_stage",
       escalation_sweep: "escalation_sweep",
+      jobs_requeue: "jobs_requeue",
       jobs_drain: "jobs_drain",
       feature_ship: "feature_ship",
       escalation_resolve: "escalation_resolve",
