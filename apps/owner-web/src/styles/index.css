@@ -28,26 +28,30 @@ body {
   color: #0f172a;
 }
 
-/* Fixed sky layer (works on iOS; body background-attachment:fixed does not) */
+/* Fixed sky layer — soft/blurred so UI stays readable (iOS-safe fixed pseudo) */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  /* Overflow + scale so blur doesn't clip hard edges */
+  inset: -24px;
   z-index: -1;
   pointer-events: none;
-  background-color: #7eb8e8;
+  background-color: #8ec4ef;
   background-image:
+    /* Heavier frost wash so the photo reads foggy, not sharp */
     linear-gradient(
       180deg,
-      rgba(14, 60, 110, 0.18) 0%,
-      rgba(14, 60, 110, 0.08) 28%,
-      rgba(255, 255, 255, 0.05) 55%,
-      rgba(10, 45, 90, 0.22) 100%
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(230, 245, 255, 0.38) 40%,
+      rgba(200, 228, 248, 0.45) 100%
     ),
     url("/sky-mobile.png");
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
+  filter: blur(18px) saturate(1.05);
+  transform: scale(1.06);
+  -webkit-transform: scale(1.06);
 }
 
 /* iOS: avoid focus zoom on form fields */
