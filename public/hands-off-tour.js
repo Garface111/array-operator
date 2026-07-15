@@ -960,14 +960,12 @@
     html += '<p class="ho-lede">' + step.lede + "</p>";
 
     if (step.kind === "welcome") {
-      // No decorative bar — keep welcome tight so the CTA is above the fold
+      // Two benefit cards only — no extra "promise" callout (Ford 2026-07-14)
       html +=
         '<div class="ho-hero">' +
-        '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Cloud auto-refresh</b><p>We sign in for you 24/7. No tab left open overnight.</p></div>' +
-        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">✓</div><b>Invoices on rails</b><p>Utility bills land → offtaker drafts ready when you are.</p></div>' +
+        '<div class="ho-hero-card"><div class="ho-hero-ic">↻</div><b>Cloud auto-refresh</b><p>Live data 24/7.</p></div>' +
+        '<div class="ho-hero-card ho-accent-green"><div class="ho-hero-ic">✓</div><b>Invoices on rails</b><p>Offtaker drafts send automatically or at your approval.</p></div>' +
         "</div>";
-      html +=
-        '<div class="ho-callout"><b>The promise:</b> spend one focused setup, then open Array Operator when something needs a human — not every morning to “check if it synced.”</div>';
     }
 
     if (step.kind === "step") {
