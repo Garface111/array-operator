@@ -19,6 +19,11 @@
     messages: [],
     pollTimer: null,
     booted: false,
+    // Voice → text (Web Speech API)
+    listening: false,
+    recognition: null,
+    baseText: "", // textarea content before this listening session
+    interim: "",
   };
 
   function authHeaders() {
@@ -389,7 +394,8 @@
       if (
         existing.classList.contains("sov-desk--chat") &&
         existing.classList.contains("sov-desk--rich") &&
-        !existing.querySelector(".sov-ops")
+        !existing.querySelector(".sov-ops") &&
+        existing.querySelector("#sovDeskMic")
       )
         return sec;
       existing.remove();
@@ -416,7 +422,11 @@
       "      <span>Sovereign is thinking…</span>" +
       "    </div>" +
       '    <form class="sov-desk-compose" id="sovDeskForm">' +
-      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (Enter to send · Shift+Enter newline)" autocomplete="off"></textarea>' +
+      '      <button type="button" class="sov-desk-mic" id="sovDeskMic" ' +
+      'title="Talk — voice to text" aria-label="Voice to text" aria-pressed="false">' +
+      '        <span class="sov-mic-ic" aria-hidden="true"></span>' +
+      "      </button>" +
+      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (mic to talk · Enter to send)" autocomplete="off"></textarea>' +
       '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "    </form>" +
       "  </div>" +
@@ -440,8 +450,21 @@
         }
       });
       ta.addEventListener("input", function () {
+        // Manual edits while listening become the new base
+        if (state.listening) {
+          state.baseText = ta.value;
+          state.interim = "";
+        }
         autoGrow(ta);
       });
+    }
+    var mic = document.getElementById("sovDeskMic");
+    if (mic && !mic._wired) {
+      mic._wired = true;
+      mic.onclick = function (e) {
+        e.preventDefault();
+        toggleVoice();
+      };
     }
     var ref = document.getElementById("sovDeskRefresh");
     if (ref && !ref._wired) {
@@ -450,7 +473,167 @@
         loadHistory();
       };
     }
+    syncMicUi();
     return sec;
+  }
+
+  // ── Voice → text (browser SpeechRecognition) ─────────────────────────────
+  function speechSupported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  function syncMicUi() {
+    var mic = document.getElementById("sovDeskMic");
+    if (!mic) return;
+    if (!speechSupported()) {
+      mic.disabled = true;
+      mic.title = "Voice not supported in this browser — try Chrome";
+      mic.classList.add("unsupported");
+      mic.setAttribute("aria-pressed", "false");
+      return;
+    }
+    mic.disabled = false;
+    mic.classList.toggle("listening", !!state.listening);
+    mic.setAttribute("aria-pressed", state.listening ? "true" : "false");
+    mic.title = state.listening
+      ? "Listening… click to stop"
+      : "Talk — voice to text";
+    var form = document.getElementById("sovDeskForm");
+    if (form) form.classList.toggle("sov-listening", !!state.listening);
+  }
+
+  function applyVoiceText() {
+    var ta = document.getElementById("sovDeskInput");
+    if (!ta) return;
+    var base = state.baseText || "";
+    var interim = state.interim || "";
+    var joined = base;
+    if (interim) {
+      joined = base
+        ? base.replace(/\s+$/, "") + (base && !/\s$/.test(base) ? " " : "") + interim
+        : interim;
+    }
+    ta.value = joined;
+    autoGrow(ta);
+  }
+
+  function stopVoice(opts) {
+    opts = opts || {};
+    state.listening = false;
+    state.interim = "";
+    if (state.recognition) {
+      try {
+        state.recognition.onresult = null;
+        state.recognition.onerror = null;
+        state.recognition.onend = null;
+        state.recognition.stop();
+      } catch (e) {}
+      try {
+        state.recognition.abort();
+      } catch (e2) {}
+      state.recognition = null;
+    }
+    syncMicUi();
+    if (opts.focus) {
+      var ta = document.getElementById("sovDeskInput");
+      if (ta) ta.focus();
+    }
+  }
+
+  function startVoice() {
+    if (!speechSupported()) {
+      alert("Voice-to-text needs Chrome (or Edge). This browser has no SpeechRecognition.");
+      return;
+    }
+    if (state.sending) return;
+    stopVoice(); // clean prior instance
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = (navigator.language || "en-US").indexOf("en") === 0
+      ? navigator.language || "en-US"
+      : "en-US";
+    rec.maxAlternatives = 1;
+
+    var ta = document.getElementById("sovDeskInput");
+    state.baseText = ta ? String(ta.value || "").replace(/\s+$/, "") : "";
+    state.interim = "";
+    state.recognition = rec;
+    state.listening = true;
+    syncMicUi();
+
+    rec.onresult = function (ev) {
+      var finalChunk = "";
+      var interim = "";
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        var piece = (r[0] && r[0].transcript) || "";
+        if (r.isFinal) finalChunk += piece;
+        else interim += piece;
+      }
+      if (finalChunk) {
+        var add = finalChunk.replace(/^\s+/, "");
+        if (state.baseText && !/\s$/.test(state.baseText) && add) {
+          state.baseText += " ";
+        }
+        state.baseText += add;
+        // Light punctuation help: capitalise sentence starts after .!?
+        state.baseText = state.baseText.replace(/\s+/g, " ");
+        state.interim = "";
+      } else {
+        state.interim = interim;
+      }
+      applyVoiceText();
+    };
+
+    rec.onerror = function (ev) {
+      var err = (ev && ev.error) || "";
+      if (err === "aborted" || err === "no-speech") {
+        // benign — no-speech often fires between utterances
+        if (err === "no-speech" && state.listening) return;
+      }
+      if (err === "not-allowed" || err === "service-not-allowed") {
+        stopVoice();
+        alert(
+          "Microphone blocked. Click the lock icon in the address bar → Microphone → Allow, then try the mic again."
+        );
+        return;
+      }
+      // network / other — stop cleanly
+      if (err !== "no-speech") stopVoice({ focus: true });
+    };
+
+    rec.onend = function () {
+      // Chrome ends recognition after pauses even with continuous:true —
+      // restart while user still wants to talk.
+      if (state.listening && state.recognition === rec && !state.sending) {
+        try {
+          rec.start();
+          return;
+        } catch (e) {
+          /* fall through to stop */
+        }
+      }
+      state.listening = false;
+      state.recognition = null;
+      state.interim = "";
+      // Keep finalized text in the box
+      applyVoiceText();
+      syncMicUi();
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      stopVoice();
+      alert("Couldn’t start the microphone: " + ((e && e.message) || e));
+    }
+  }
+
+  function toggleVoice() {
+    if (state.listening) stopVoice({ focus: true });
+    else startVoice();
   }
 
   function autoGrow(ta) {
@@ -646,6 +829,8 @@
     var ta = document.getElementById("sovDeskInput");
     var text = ta ? String(ta.value || "").trim() : "";
     if (!text) return;
+    // Stop dictation so we don't keep filling the box mid-send
+    if (state.listening) stopVoice();
     state.sending = true;
     setTyping(true);
     var btn = document.getElementById("sovDeskSend");
@@ -851,6 +1036,7 @@
         });
     } else {
       stopPoll();
+      if (state.listening) stopVoice();
       var p = document.getElementById("panelSovereign");
       if (p) {
         p.classList.remove("active");
