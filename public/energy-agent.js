@@ -3084,6 +3084,11 @@
  var chatCtx = packContext() || {};
  // Backend uses source + voice_source for tight spoken replies (less barge-in cutoffs)
  if (isVoiceTurn) chatCtx.voice_source = true;
+ // Voice OUTPUT live (spoken aloud) even for a typed turn → backend spends the
+ // humanizer pass so the mouth gets a real one-liner, not a truncated wall.
+ if (!state.voiceMuted && (state.listening || state.micStream || isVoiceTurn)) {
+   chatCtx.voice_active = true;
+ }
  var chatBody = {
  session_id: sid,
  message: text,
