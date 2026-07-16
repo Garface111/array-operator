@@ -8,6 +8,9 @@
      the inset from every viewport edge, --ea-radius its corner rounding. */
   --ea-gap: 14px;
   --ea-radius: 22px;
+  /* Total horizontal footprint the open card claims on the left (card + both
+     insets). The site content shifts by half of this to re-center beside it. */
+  --ea-footprint: calc(var(--ea-rail) + var(--ea-gap) * 2);
   --ea-sky: #38bdf8;
   --ea-sky2: #0ea5e9;
   --ea-sun: #fbbf24;
@@ -202,18 +205,16 @@ html.sky #eaPanel{
   box-shadow: 0 24px 60px -22px rgba(14,60,120,.4), 0 6px 18px -10px rgba(14,60,120,.24);
 }
 
-/* Shift main app chrome right when dock is open — clear the floating card plus
-   its inset gap on each side, so content sits beside the card, not under it. */
+/* Shift main app chrome right when the dock is open. The shift rides on
+   TRANSFORM (GPU-composited), NOT margin-left — animating margin-left reflowed
+   the entire dashboard (tabbar + fleet table + cards) every frame, so the site
+   stuttered while the panel (transform) glided. The desktop transform lives in
+   the ≥961px block below, on the SAME curve/duration/trigger as the panel, so
+   the two move as one. Here we keep only the non-animated guards. */
 body.ea-shell-open .wrap{
-  margin-left: calc(var(--ea-rail) + var(--ea-gap) * 2);
-  transition: margin-left .34s cubic-bezier(.2,.8,.2,1);
-  /* Cap width to the remaining viewport so the tabbar can't overflow past the
-     right edge and clip the account email (Ford 2026-07-15). */
-  width: auto;
-  max-width: calc(100vw - var(--ea-rail) - var(--ea-gap) * 2);
   min-width: 0;
   box-sizing: border-box;
-  /* Clip any child that still tries 100vw breakout under the rail */
+  /* Clip any child that still tries 100vw breakout beside the card */
   overflow-x: clip;
 }
 body.ea-shell-open{
@@ -225,7 +226,7 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-.wrap{ transition: margin-left .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
+.wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
 
 /* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
    The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
@@ -256,6 +257,19 @@ body.ea-shell-open .panel.active{
     pointer-events: auto;
     transition: transform .34s cubic-bezier(.2,.8,.2,1),
                 visibility 0s;
+  }
+  /* The SITE slides right on transform — same curve, same duration, same trigger
+     as the panel above, so they move in perfect lockstep and both stay on the
+     GPU (no reflow). .wrap stays centered (margin:0 auto); the transform re-
+     centers it into the space beside the card, and max-width caps the column so
+     the tabbar/account email never clip. On wide screens the cap already equals
+     the resting 1440px width, so opening is a pure composited slide with ZERO
+     reflow; narrower desktops take a single width reflow, then glide. */
+  body.ea-shell-open .wrap{
+    max-width: min(1440px, calc(100vw - var(--ea-footprint) - 24px));
+    transform: translateX(calc(var(--ea-footprint) / 2));
+    transition: transform .34s cubic-bezier(.2,.8,.2,1);
+    will-change: transform;
   }
 }
 @media (prefers-reduced-motion: reduce){
@@ -375,11 +389,13 @@ html.sky body.ho-ea-sidebyside.ea-shell-open #eaPanel{
     0 22px 56px -18px rgba(20,60,120,.38),
     0 0 0 1px rgba(255,255,255,.55) inset;
 }
-/* Main content clears BOTH floating cards */
+/* Main content clears BOTH floating cards. This side-by-side combo positions via
+   margin-left, so cancel the EA-only transform re-center or it would double-shift. */
 body.ho-shell-open.ea-shell-open .wrap{
   margin-left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px + var(--ea-rail) + 12px);
   max-width: calc(100vw - var(--ho-inset, 12px) - var(--ho-rail, 360px) - 10px - var(--ea-rail) - 12px);
   min-width: 0;
+  transform: none;
 }
 /* Mic gate sits above the companion panel */
 body.ho-shell-open.ea-shell-open .ea-mic-gate{
