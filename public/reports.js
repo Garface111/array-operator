@@ -604,6 +604,7 @@
  const h = (location.hash || "").toLowerCase();
  if (/#reports\/audit/i.test(h) || h === "#bill-audit" || h === "#billaudit") return "audit";
  if (/#reports\/trends/i.test(h)) return "trends";
+ if (/#reports\/generation/i.test(h) && genrepFlag()) return "genreports";
  return "offtakers";
  }
  function applyInvoicesSub(v) {
@@ -611,6 +612,7 @@
  const list = document.getElementById("rbGenList");
  const audit = document.getElementById("rbAuditView");
  const fin = document.getElementById("rbFinTrends");
+ const gen = document.getElementById("rbGenReportsView");
  const pipe = document.getElementById("rb2Pipe");
  const head = document.querySelector("#rbSubInvoice .rb2-head");
  if (!v) v = invoicesSubFromHash();
@@ -622,6 +624,7 @@
  if (list) list.style.display = v === "offtakers" ? "" : "none";
  if (audit) audit.style.display = v === "audit" ? "" : "none";
  if (fin) fin.style.display = v === "trends" ? "" : "none";
+ if (gen) gen.style.display = v === "genreports" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
  // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on others
  if (head) {
@@ -636,14 +639,19 @@
  } else if (v === "trends") {
  if (id) id.textContent = "Invoice trends";
  if (sub) sub.style.display = "none";
+ } else if (v === "genreports") {
+ if (id) id.textContent = "Generation reports";
+ if (sub) sub.style.display = "none";
  }
  }
  if (v === "audit") renderAudit();
  if (v === "trends") renderFinTrends();
+ if (v === "genreports") renderGenReports();
  try {
  const want =
  v === "audit" ? "#reports/audit" :
  v === "trends" ? "#reports/trends" :
+ v === "genreports" ? "#reports/generation" :
  "#reports";
  if ((location.hash || "").toLowerCase() !== want) {
  history.replaceState(null, "", want);
@@ -660,9 +668,65 @@
  };
  });
  // Honor deep link / restore last sub-view
+ revealGenrepPill();
  applyInvoicesSub(invoicesSubFromHash());
  }
  try { window.__aoApplyInvoicesSub = applyInvoicesSub; } catch (e) {}
+
+ // ── Generation reports sub-tab (THE FOLD, 2026-07-16): the NEPOOL Operator
+ // product folded in as a React embed module — solar-operator web/app's
+ // `build:embed` bundle served from /genrep/ on THIS origin. It reads the
+ // same so_session and calls the same /v1 API, so there's no auth plumbing.
+ // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
+ // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
+ const GENREP_V = "20260716a";
+ function genrepFlag() {
+ try {
+ const m = location.search.match(/[?&]genrep=([01])/);
+ if (m) localStorage.setItem("ao_genrep", m[1]);
+ return localStorage.getItem("ao_genrep") === "1";
+ } catch (e) { return false; }
+ }
+ function revealGenrepPill() {
+ const b = document.getElementById("invTabGenrep");
+ if (b && genrepFlag()) b.style.display = "";
+ }
+ let _genrepMounted = false;
+ function renderGenReports() {
+ const host = document.getElementById("rbGenReportsView");
+ if (!host || _genrepMounted) return;
+ if (!session()) {
+ // Anonymous demo stays honest: no fabricated NEPOOL data, just the door.
+ host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — sign in to use them.</div>';
+ return;
+ }
+ _genrepMounted = true;
+ host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
+ const fail = (e) => {
+ _genrepMounted = false;
+ host.innerHTML = '<div class="rb-au-empty">Couldn\'t load generation reports — ' + esc((e && e.message) || "script error") + '. Reload the page to retry.</div>';
+ };
+ try {
+ if (!document.getElementById("genrepCss")) {
+ const l = document.createElement("link");
+ l.id = "genrepCss"; l.rel = "stylesheet";
+ l.href = "/genrep/embed.css?v=" + GENREP_V;
+ document.head.appendChild(l);
+ }
+ if (window.NepoolGenReports) { host.innerHTML = ""; window.NepoolGenReports.mount(host); return; }
+ const s = document.createElement("script");
+ s.src = "/genrep/embed.js?v=" + GENREP_V;
+ s.onload = () => {
+ try {
+ if (!window.NepoolGenReports) throw new Error("embed bundle didn't register");
+ host.innerHTML = "";
+ window.NepoolGenReports.mount(host);
+ } catch (e) { fail(e); }
+ };
+ s.onerror = () => fail(new Error("couldn't fetch the module"));
+ document.head.appendChild(s);
+ } catch (e) { fail(e); }
+ }
 
  // ── Invoice Trends sub-tab (Paul 2026-07-15 / Ford): offtaker financial gains.
  // Production kWh lives on Analysis → Trends. This surface is dollars only —
@@ -2588,6 +2652,7 @@
  <div class="rb2-pipe" id="rb2Pipe" hidden></div>
  <div id="rbAuditView" class="rb-au" style="display:none"></div>
  <div id="rbFinTrends" class="rb-fin" style="display:none" aria-label="Invoice trends"></div>
+ <div id="rbGenReportsView" class="rb-genrep" style="display:none" aria-label="Generation reports"></div>
  <div id="rbGenList">
  <!-- Master solar credit rate, Tenant.default_net_rate_per_kwh (+ discount).
  SET → fleet override for every offtaker without a per-offtaker rate.
