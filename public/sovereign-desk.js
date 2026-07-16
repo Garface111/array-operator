@@ -5,10 +5,13 @@
 (function () {
   "use strict";
 
+  // Chat goes direct to Railway so Netlify's ~60s edge proxy cannot 504 a slow brain.
+  // Other desk GETs stay same-origin (fast). CORS already allows arrayoperator.com.
+  var RAIL_API = "https://web-production-49c83.up.railway.app";
   var API = {
     access: "/v1/sovereign/desk/access",
     history: "/v1/sovereign/desk/history",
-    chat: "/v1/sovereign/desk/chat",
+    chat: RAIL_API + "/v1/sovereign/desk/chat",
     upload: "/v1/sovereign/desk/upload",
     bridgeStatus: "/v1/sovereign/desk/bridge/status",
   };
@@ -1144,6 +1147,12 @@
         var detail = d && d.detail;
         if (typeof detail === "object")
           detail = detail.message || JSON.stringify(detail);
+        if (r.status === 504 || r.status === 502 || r.status === 524)
+          throw new Error(
+            "Sovereign took too long (gateway " +
+              r.status +
+              "). Your message may still have landed — hit ↻ refresh, then try a shorter ask."
+          );
         throw new Error(detail || "HTTP " + r.status);
       }
       // Stamp Ford bubble with server id so later history merge is stable
