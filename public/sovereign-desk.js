@@ -425,7 +425,7 @@
     if (existing) {
       var micOk =
         existing.querySelector("#sovDeskMic") &&
-        existing.querySelector("#sovDeskMic svg");
+        existing.querySelector("#sovDeskMic svg rect"); // stroke mic (not old filled path)
       var attachOk =
         existing.querySelector("#sovDeskAttach") &&
         existing.querySelector("#sovDeskAttach svg");
@@ -475,8 +475,13 @@
       '      <button type="button" class="sov-desk-mic" id="sovDeskMic" ' +
       'title="Talk — voice to text" aria-label="Voice to text" aria-pressed="false">' +
       '        <span class="sov-mic-ic" aria-hidden="true">' +
-      '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
-      '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 17 11z"/>' +
+      // Clean outline mic (stroke) — avoids the chunky filled-path artifact
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="9" y="2.5" width="6" height="11" rx="3"/>' +
+      '<path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/>' +
+      '<path d="M12 17v4.5"/>' +
+      '<path d="M8.5 21.5h7"/>' +
       "</svg></span>" +
       "      </button>" +
       '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +

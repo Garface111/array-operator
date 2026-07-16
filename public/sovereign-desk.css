@@ -754,12 +754,12 @@ html.sky .sov-desk-attach:hover{
   color: #1565c0;
 }
 
-/* Mic — voice to text */
+/* Mic — voice to text (clean outline glyph) */
 .sov-desk-mic{
   appearance: none;
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   border: 1px solid var(--sov-line);
   background: rgba(255,255,255,.05);
@@ -767,12 +767,14 @@ html.sky .sov-desk-attach:hover{
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background .15s, border-color .15s, box-shadow .15s, transform .1s;
+  transition: background .15s, border-color .15s, box-shadow .15s, transform .1s, color .15s;
   padding: 0;
+  line-height: 0;
 }
 .sov-desk-mic:hover{
   border-color: rgba(63,214,138,.45);
   background: rgba(63,214,138,.1);
+  color: var(--sov-good2);
 }
 .sov-desk-mic:active{ transform: scale(.97); }
 .sov-desk-mic:disabled{
@@ -780,17 +782,22 @@ html.sky .sov-desk-attach:hover{
   cursor: not-allowed;
 }
 .sov-desk-mic .sov-mic-ic{
-  width: 20px;
-  height: 20px;
   display: grid;
   place-items: center;
-  opacity: .95;
+  width: 20px;
+  height: 20px;
   line-height: 0;
+  /* kill any legacy CSS-mask / background-icon leftovers */
+  background: none !important;
+  -webkit-mask: none !important;
+  mask: none !important;
 }
 .sov-desk-mic .sov-mic-ic svg{
   display: block;
   width: 20px;
   height: 20px;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 .sov-desk-mic.listening{
   background: linear-gradient(180deg, rgba(63,214,138,.28), rgba(63,214,138,.14));
@@ -800,29 +807,29 @@ html.sky .sov-desk-attach:hover{
   animation: sovMicPulse 1.5s ease-in-out infinite;
 }
 html.sky .sov-desk-mic{
-  background: rgba(255,255,255,.75);
-  border-color: rgba(20,60,120,.14);
-  color: #0f2744;
+  background: rgba(255,255,255,.88);
+  border-color: rgba(20,60,120,.12);
+  color: #1e3a5f;
 }
 html.sky .sov-desk-mic:hover{
-  border-color: rgba(33,150,243,.4);
-  background: rgba(255,255,255,.95);
+  border-color: rgba(33,150,243,.45);
+  background: #fff;
   color: #1565c0;
 }
 html.sky .sov-desk-mic.listening{
-  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  background: linear-gradient(180deg, #42a5f5, #1e88e5);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 6px 18px -8px rgba(14,165,233,.65);
+  box-shadow: 0 6px 16px -8px rgba(30,136,229,.65);
   animation: sovMicPulseSky 1.5s ease-in-out infinite;
 }
 @keyframes sovMicPulse{
   0%,100%{ box-shadow: 0 0 0 0 rgba(63,214,138,.4); }
-  50%{ box-shadow: 0 0 0 8px rgba(63,214,138,.08); }
+  50%{ box-shadow: 0 0 0 7px rgba(63,214,138,.08); }
 }
 @keyframes sovMicPulseSky{
-  0%,100%{ box-shadow: 0 6px 18px -8px rgba(14,165,233,.55); }
-  50%{ box-shadow: 0 6px 22px -4px rgba(14,165,233,.75), 0 0 0 6px rgba(14,165,233,.12); }
+  0%,100%{ box-shadow: 0 6px 16px -8px rgba(30,136,229,.5); }
+  50%{ box-shadow: 0 6px 18px -4px rgba(30,136,229,.7), 0 0 0 5px rgba(33,150,243,.12); }
 }
 @media (prefers-reduced-motion: reduce){
   .sov-desk-mic.listening{ animation: none; }
