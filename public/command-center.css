@@ -2327,8 +2327,10 @@ html[data-theme="day"] .rep-fld.req > select{
    that content still fits without wrapping/clipping. */
 /* Column floors matter when Energy Agent is open (body.ea-shell-open shrinks
    .wrap). Live now + Today used minmax(0,…) and could collapse to 0 → kW/kWh
-   text stacked as "kWkWh" on top of each other. Status min 268px then stole
-   the rest and stacked long pills. Ford 2026-07-15. */
+   text stacked as "kWkWh". Status MUST stay wide enough for inverter rows:
+   [116px spark | gap | UNDERPERFORMING pill] ≈ 250px+. The 132px floor
+   (2026-07-15) was a regression — sparklines painted over the pill/text
+   (Ford 2026-07-16). Prefer horizontal scroll over crushing graphs into labels. */
 .vs-row{ display:grid;
   grid-template-columns:
     minmax(128px,1.5fr)   /* array name */
@@ -2337,10 +2339,12 @@ html[data-theme="day"] .rep-fld.req > select{
     52px                  /* inverter count */
     minmax(72px,.85fr)    /* live now — fits "999.9 kW" */
     minmax(80px,.9fr)     /* today — fits "99,999 kWh" */
-    minmax(132px,1.35fr)  /* status pills (was 268 — too greedy) */
+    minmax(250px,1.55fr)  /* status: 116px spark + gap + long pill (40122b9) */
     minmax(84px,.7fr);    /* synced */
   align-items:center; gap:10px; padding:11px 14px; width:100%;
-  box-sizing:border-box; text-align:left; min-width:0; }
+  box-sizing:border-box; text-align:left;
+  /* Floor so [spark|pill] never compresses into Live/Today text (regression fix) */
+  min-width:920px; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
 .vs-c-gauge{ display:flex; align-items:center; justify-content:center; }
@@ -2468,10 +2472,16 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-c-today.vs-est{ color:var(--muted); }
 .vs-est-tag{ font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--gold2,#b45309); text-transform:uppercase; }
 /* Status cell: keep pills on one row, never let wrapped cloned backgrounds
-   look like two stacked notifications on top of Live/Today (Ford 2026-07-15). */
+   look like two stacked notifications on top of Live/Today (Ford 2026-07-15).
+   Inverter spark cells use .vs-inv-statcell (grid) and MUST override this flex. */
 .vs-c-status{
   display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center;
   gap:4px; min-width:0; max-width:100%;
+}
+.vs-c-status.vs-inv-statcell{
+  /* Never fall back to flex-wrap — that stacks spark on top of the pill */
+  flex-wrap:nowrap;
+  min-width:250px;
 }
 /* "latest data 36m ago" used to render gold+bold, which read as an ALARM when
    nothing is wrong (Ford 2026-07-11): the vendor portal publishes on its own
@@ -2541,23 +2551,27 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    Track 1 is always 116px for the spark (or "no history" placeholder); track 2
    holds the pill, right-aligned. Every graph's left edge then lines up. */
 .vs-inv .vs-c-status.vs-inv-statcell{
-  display:grid;
-  grid-template-columns:116px minmax(0,1fr);
+  display:grid !important; /* beat .vs-c-status flex — regression guard */
+  grid-template-columns:116px minmax(110px,1fr);
   align-items:center;
   column-gap:10px;
   justify-items:stretch;
   text-align:left; /* override the column's default text-align:right for this grid */
+  min-width:250px;
+  overflow:visible;
 }
 .vs-inv-rowspark-wrap{
   grid-column:1;
   width:116px;
   max-width:116px;
+  min-width:116px; /* never shrink under the pill */
   display:flex;
   align-items:center;
   justify-content:flex-start;
   line-height:0;
   opacity:.92;
-  min-width:0;
+  flex-shrink:0;
+  overflow:hidden; /* clip bars inside the spark box only */
 }
 .vs-inv-statcell > .vs-pill{
   grid-column:2;
@@ -2568,8 +2582,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   width:max-content;
   white-space:nowrap;
   flex-shrink:0;
+  position:relative;
+  z-index:1; /* pill text always above any paint bleed */
 }
-.vs-inv-rowspark{ display:block; width:116px; height:26px; }
+.vs-inv-rowspark{ display:block; width:116px; height:26px; flex-shrink:0; }
 .vs-inv-rowspark rect{ fill:var(--good,#2563eb); opacity:.78; }
 .vs-inv-rowspark .vs-spark-empty{ fill:var(--line,#e6e9ef); opacity:1; }
 .vs-inv:hover .vs-inv-rowspark rect{ opacity:.92; }
@@ -3078,10 +3094,12 @@ body.ea-shell-open .vs-scroll{
   -webkit-overflow-scrolling:touch;
 }
 body.ea-shell-open .vs-row{
-  /* Keep the 8 columns readable; scroll horizontally rather than stack cells */
-  min-width:780px;
+  /* Same floor as base .vs-row — scroll, don't crush spark into pill/text */
+  min-width:920px;
 }
 /* Hands-off rail open (no EA) — same squeeze risk */
 body.ho-shell-open:not(.ea-shell-open) #sheetWrap{ max-width:none; }
 body.ho-shell-open:not(.ea-shell-open) .vs-scroll{ overflow-x:auto; }
-body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:780px; }
+body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:920px; }
+/* Always allow sheet to scroll horizontally when the spark+pill floor needs it */
+.vs-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
