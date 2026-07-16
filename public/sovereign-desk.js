@@ -56,14 +56,41 @@
       .replace(/"/g, "&quot;");
   }
 
-  /** Drop trailing side-effect JSON block if the model leaked it into prose. */
+  /** Drop trailing side-effect JSON (and fenced leaks) so chat never shows raw mind JSON. */
   function stripSideJson(text) {
     var t = String(text || "");
     var cut = t.indexOf("---JSON---");
     if (cut >= 0) t = t.slice(0, cut);
-    // bare trailing { ... } with actions/monologue keys
-    t = t.replace(/\n\s*\{[\s\S]*"(?:actions|monologue|ford_ask)"[\s\S]*\}\s*$/, "");
-    return t.replace(/\s+$/, "");
+    // trailing fenced ```json { monologue/actions ... } ```
+    t = t.replace(
+      /\n?```(?:json|JSON)?\s*\n?\{[\s\S]*"(?:actions|monologue|ford_ask|mood|succession_gap|memory_writes)"[\s\S]*?\}\s*\n?```\s*$/i,
+      ""
+    );
+    // bare trailing { ... } with side-meta keys
+    t = t.replace(
+      /\n\s*\{[\s\S]*"(?:actions|monologue|ford_ask|mood|succession_gap|memory_writes)"[\s\S]*\}\s*$/,
+      ""
+    );
+    t = t.replace(/\s+$/, "");
+    // Whole bubble is pure side-meta JSON → show monologue/ford_ask only
+    var trimmed = t.trim();
+    if (trimmed.charAt(0) === "{" && /"(?:monologue|actions|mood)"/.test(trimmed)) {
+      try {
+        var obj = JSON.parse(trimmed);
+        if (obj && typeof obj === "object") {
+          var mono = String(obj.monologue || "").trim();
+          var ask = String(obj.ford_ask || "").trim();
+          if (mono && ask && mono.indexOf(ask) < 0)
+            return mono + "\n\n**What I need from you:** " + ask;
+          if (mono) return mono;
+          if (ask) return ask;
+          return "Understood.";
+        }
+      } catch (e) {
+        /* keep stripped text */
+      }
+    }
+    return t;
   }
 
   // ── Safe markdown (same discipline as Energy Agent chat) ────────────────
@@ -396,12 +423,18 @@
     }
     var existing = sec.querySelector(".sov-desk");
     if (existing) {
+      var micOk =
+        existing.querySelector("#sovDeskMic") &&
+        existing.querySelector("#sovDeskMic svg");
+      var attachOk =
+        existing.querySelector("#sovDeskAttach") &&
+        existing.querySelector("#sovDeskAttach svg");
       if (
         existing.classList.contains("sov-desk--chat") &&
         existing.classList.contains("sov-desk--rich") &&
         !existing.querySelector(".sov-ops") &&
-        existing.querySelector("#sovDeskMic") &&
-        existing.querySelector("#sovDeskAttach")
+        micOk &&
+        attachOk
       )
         return sec;
       existing.remove();
@@ -434,11 +467,17 @@
       'accept=".txt,.md,.json,.csv,.py,.js,.ts,.tsx,.html,.css,.yml,.yaml,.log,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.sh,.sql,.xml">' +
       '      <button type="button" class="sov-desk-attach" id="sovDeskAttach" ' +
       'title="Attach file or data" aria-label="Attach file">' +
-      '        <span class="sov-attach-ic" aria-hidden="true"></span>' +
+      '        <span class="sov-attach-ic" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">' +
+      '<path d="M16.5 6.5v9.25a4.5 4.5 0 1 1-9 0V6.75a3 3 0 0 1 6 0v8.5a1.5 1.5 0 1 1-3 0V7.5a.75.75 0 0 0-1.5 0v7.75a3 3 0 1 0 6 0V6.75a4.5 4.5 0 1 0-9 0v9a6 6 0 1 0 12 0V6.5a.75.75 0 0 0-1.5 0z"/>' +
+      "</svg></span>" +
       "      </button>" +
       '      <button type="button" class="sov-desk-mic" id="sovDeskMic" ' +
       'title="Talk — voice to text" aria-label="Voice to text" aria-pressed="false">' +
-      '        <span class="sov-mic-ic" aria-hidden="true"></span>' +
+      '        <span class="sov-mic-ic" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
+      '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 17 11z"/>' +
+      "</svg></span>" +
       "      </button>" +
       '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
       '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
