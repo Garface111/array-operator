@@ -16,7 +16,7 @@
     "panelDashboard","panelAccount","panelSovereign","panelArrays",
     "panelAnalysis","panelTrends","panelResources","panelReports","panelOps"
   ];
-  var DUR_MS = 400;
+  var DUR_MS = 500;
   var stage = null, sliding = false, activeCleanup = null;
 
   function disabled(){
@@ -81,13 +81,26 @@
       var enter = (dir >= 0 ? "100vw" : "-100vw");   // incoming starts off this side
       var exit  = (dir >= 0 ? "-100vw" : "100vw");   // outgoing leaves to this side
 
-      // Reveal both via the slide classes (CSS forces display:block on each).
+      // Pin the content column width BEFORE the stage goes full-bleed, so the
+      // absolutely-positioned panels stay their normal width (not stretched to
+      // 100vw). Measured off the outgoing panel, which is currently in flow.
+      var pinW = fromEl.offsetWidth || toEl.offsetWidth || 0;
+
+      // Reveal both via the slide classes (CSS: stage full-bleed + clip both axes;
+      // panels position:absolute, left:50%, transform-eased).
       s.classList.add("ao-sliding");
       fromEl.classList.add("ao-slide-from");
       toEl.classList.add("ao-slide-to");
       try{ document.documentElement.classList.add("ao-tab-sliding"); }catch(e){}
-      // Measure heights now (both are display:block) to animate the stage's
-      // vertical resize instead of snapping when the panels differ in height.
+      // Pin width + center each panel (left:50% from CSS, negative half-width here).
+      if(pinW > 0){
+        [fromEl, toEl].forEach(function(el){
+          el.style.width = pinW + "px";
+          el.style.marginLeft = (-pinW / 2) + "px";
+        });
+      }
+      // Measure heights now (both are display:block at the pinned width) to ease
+      // the stage's vertical resize instead of snapping when panels differ.
       var fromH = fromEl.offsetHeight || 0, toH = toEl.offsetHeight || 0;
       // Commit the LOGICAL active state immediately — only `to` is .active. Both
       // panels stay visible during the slide via .ao-slide-from/.ao-slide-to, so a
@@ -126,6 +139,7 @@
           try{
             el.classList.remove("ao-slide-from","ao-slide-to");
             el.style.transform = ""; el.style.transition = "";
+            el.style.width = ""; el.style.marginLeft = "";
           }catch(e){}
         });
         // Final truth: only `to` is active.
@@ -145,6 +159,7 @@
         [fromEl, toEl].forEach(function(el){
           el.classList.remove("ao-slide-from","ao-slide-to");
           el.style.transform = ""; el.style.transition = "";
+          el.style.width = ""; el.style.marginLeft = "";
         });
       }catch(e){}
       instant(fromEl, toEl);

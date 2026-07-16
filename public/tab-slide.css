@@ -1,34 +1,32 @@
 /* Tab pager (Ford 2026-07-16): switching top tabs slides the outgoing panel out
-   and the incoming panel in horizontally, directional by tab order, on the same
-   smooth ease-out curve as the Energy Agent dock.
+   and the incoming panel in horizontally, directional by tab order, gently eased.
 
-   The panels are moved (once, by tab-slide.js) into a no-padding .panel-stage.
-   During a slide the two panels are position:absolute + overlapped and travel a
-   FULL viewport width (translateX ±100vw) so they enter/leave from the true
-   screen edges rather than materialising at the centered content column's edge.
-   Clipping is done on <html> (overflow-x:clip) so nothing spills into a
-   horizontal scrollbar while a panel is off-screen. The stage HEIGHT is animated
-   from the outgoing to the incoming panel's height so a taller/shorter panel
-   (e.g. Inverters with its sub-tabs) resizes smoothly instead of snapping. */
+   The panels are moved (once, by tab-slide.js) into a .panel-stage. During a
+   slide the stage goes FULL-BLEED (100vw) and clips BOTH axes (overflow:clip):
+   horizontally at the viewport (so panels travel edge-to-edge and are clipped at
+   the screen edges, not the content column) and VERTICALLY at the stage's
+   animating height (so a taller panel can't spill below and shove the layout —
+   the vertical glitch). The two panels are position:absolute, centered (left:50%
+   + a negative inline margin = pinned content width so nothing stretches to
+   100vw), and slide on transform. The stage HEIGHT eases from the outgoing to the
+   incoming panel's height so the vertical resize is smooth, not a snap. */
 
-html.ao-tab-sliding{ overflow-x: clip; }
+html.ao-tab-sliding{ overflow-x: clip; }   /* guard vs a 100vw scrollbar */
 
 .panel-stage{ position: relative; }
 
 .panel-stage.ao-sliding{
-  /* height is set inline (from → to) and eased here; the absolute panels below
-     are clipped by <html>, not the stage, so they can slide over the margins. */
-  transition: height .4s cubic-bezier(.2,.8,.2,1);
-  overflow: visible;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);            /* break out to full viewport width */
+  overflow: clip;                            /* clip horiz @viewport + vert @height */
+  transition: height .5s cubic-bezier(.4, 0, .2, 1);
 }
 .panel-stage.ao-sliding > .panel.ao-slide-from,
 .panel-stage.ao-sliding > .panel.ao-slide-to{
   position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  margin: 0;
-  display: block;              /* keep both panels rendered through the slide */
-  transition: transform .4s cubic-bezier(.2,.8,.2,1);
+  top: 0; left: 50%;                         /* width + negative margin (inline) center it */
+  display: block;                            /* keep both panels rendered through the slide */
+  transition: transform .5s cubic-bezier(.4, 0, .2, 1);
   will-change: transform;
 }
 
