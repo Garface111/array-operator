@@ -88,6 +88,11 @@ window.FleetStore = (function(){
       produced_today_kwh: _num(iv.produced_today_kwh),
       peer_index: _num(iv.peer_index),
       last_seen: iv.last_seen != null ? _str(iv.last_seen, 40) : null,
+      // Live-reading provenance — MUST survive the cache/allow-list or liveVerdict
+      // goes blind to estimated splits + stale readings and re-flags them (the bug).
+      power_estimated: iv.power_estimated === true,
+      power_age_hours: _num(iv.power_age_hours),
+      no_energy_register: !!iv.no_energy_register,
     };
     return out;
   }
@@ -307,6 +312,20 @@ window.FleetStore = (function(){
    * ==========================================================================*/
   const LIVE_FLOOR_W = 25;   // below this (or 1% of rated) = idle, not "producing"
   const LOW_PEER_GAP = 0.15; // >15% below the peer median pct-of-max = "low" (Ford's threshold)
+  const LIVE_MAX_AGE_H = 2;  // a captured power reading older than this is not "now"
+  // A per-inverter live reading we can TRUST for a dark/low verdict — and trust as
+  // peer evidence. Mirrors the backend alert sweep's _has_fresh_real_reading
+  // ([[inverter-alerting]] 98941d3): NEVER an estimated site-total split
+  // (Fronius/SMA/Chint report ONE site wattage; the backend divides it by energy
+  // share — a fabricated per-device number), and freshly captured. A null age means
+  // a polled vendor (SolarEdge) whose poll IS the freshness, so null passes on age.
+  // This is the gate that was fixed for the emails but never ported to the dashboard,
+  // which is why Bruce's cards flipped "lagging"/"dark" every capture.
+  function _freshReal(inv){
+    if(!inv || inv.power_estimated === true) return false;   // fabricated split, not a device reading
+    if(inv.current_power_w == null) return false;            // no reading at all
+    return inv.power_age_hours == null || inv.power_age_hours <= LIVE_MAX_AGE_H;
+  }
   function _liveFloor(inv){
     return inv.nameplate_kw!=null ? Math.max(LIVE_FLOOR_W, inv.nameplate_kw*1000*0.01) : LIVE_FLOOR_W;
   }
@@ -341,7 +360,11 @@ window.FleetStore = (function(){
     // proves the hardware works, so a current hard zero in daylight is anomalous.
     return peak >= inv.nameplate_kw * 4.6 * 0.25;
   }
-  function liveVerdict(inv, peers, isDaylight){
+  // srcOk (optional, default true): the array's VENDOR FEED is itself fresh. When a
+  // caller knows the source is stale/unpolled (source_status), it passes false so a
+  // stale reading can never masquerade as a live fault — the honest signal there is
+  // "vendor feed is behind", surfaced separately, not "this inverter went dark".
+  function liveVerdict(inv, peers, isDaylight, srcOk){
     // NO ENERGY REGISTER (backend no_energy_register, e.g. Tannery #7): the unit
     // streams live power but has a dead cumulative-energy register, so it has no
     // gradeable history AND its per-inverter power is a bogus energy-share split
@@ -350,31 +373,43 @@ window.FleetStore = (function(){
     // FAULT. Surfaces render its own honest "no energy data" state instead.
     if(inv && inv.no_energy_register) return "ok";
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
+    if(srcOk === false) return "ok";               // vendor feed stale → don't trust live readings
+    // Peers only count as live evidence when THEIR reading is fresh + real — an
+    // estimated site-split can never be fake peer-proof (was Bruce's phantom "dark").
+    const litReal = (peers||[]).filter(p => !_samePeer(p, inv) && _freshReal(p) && isProducing(p));
+    const siblings = (peers||[]).filter(p => !_samePeer(p, inv));
+    // This unit's reading isn't trustworthy (estimated split, stale, or absent):
+    // never a live FAULT. If real peers clearly produce while THIS unit has no
+    // reading at all, surface the honest info-state "No signal" — not dark/low.
+    if(!_freshReal(inv)){
+      if(inv && inv.current_power_w == null && litReal.length >= 2) return "stale";
+      return "ok";
+    }
     if(isProducing(inv)){
       // Producing, but is it keeping pace with its array peers? An inverter running
       // far below its neighbors (Ford: >15% under) is underperforming even if it's on.
-      const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p));
-      if(lit.length < 2) return "ok";              // not enough peer signal to judge live "low" (solo sag → recompute's window check)
+      if(litReal.length < 2) return "ok";          // not enough real peer signal to judge live "low"
       const myPct = _pctOfMax(inv);
       if(myPct == null) return "ok";               // no nameplate → can't compare
-      const peerPcts = lit.map(_pctOfMax).filter(v => v != null).sort((a,b) => a-b);
+      const peerPcts = litReal.map(_pctOfMax).filter(v => v != null).sort((a,b) => a-b);
       if(peerPcts.length < 2) return "ok";
       const med = peerPcts[Math.floor(peerPcts.length/2)];   // peer median pct-of-max
       if(med < 0.30) return "ok";                  // cohort not genuinely producing (dawn/dusk) → don't judge
       if(myPct < med*(1-LOW_PEER_GAP)) return "low";  // >15% below the peer median → underperforming live
       return "ok";
     }
-    const lit = (peers||[]).filter(p => !_samePeer(p, inv) && isProducing(p)).length;
-    if(lit >= 2) return (inv.current_power_w != null) ? "dark" : "stale";
-    // No peer signal. Solo fallback: a fresh 0 W (not a null/missing feed) in daylight
-    // from a unit its own history proves is a real producer = a live "dark" anomaly.
-    if(inv.current_power_w != null && _provenProducer(inv)) return "dark";
+    // Not producing, with a fresh REAL ~0 reading:
+    if(litReal.length >= 2) return "dark";         // >=2 real peers produce while I read a fresh 0 = anomaly
+    // No real producing peers. A whole multi-inverter cohort reading ~0 is a feed
+    // gap (they never all fail at once), NOT N simultaneous dead inverters — this was
+    // the "all 20 Primos dark" false alarm. Only a GENUINELY solo array is judged dark.
+    if(siblings.length === 0 && _provenProducer(inv)) return "dark";
     return "ok";                                   // otherwise not enough signal to judge
   }
   // True when an inverter that 14-day health calls "ok" is actually a live
   // anomaly RIGHT NOW (dark, or low vs its peers, while peers produce). Cross-surface flag.
-  function isLiveAnomaly(inv, peers, isDaylight){
-    return inv.status === "ok" && ["dark","low"].includes(liveVerdict(inv, peers, isDaylight));
+  function isLiveAnomaly(inv, peers, isDaylight, srcOk){
+    return inv.status === "ok" && ["dark","low"].includes(liveVerdict(inv, peers, isDaylight, srcOk));
   }
 
   /* ===========================================================================
@@ -407,6 +442,11 @@ window.FleetStore = (function(){
         peer_index: i.peer_index, status: i.status, diagnosis: i.diagnosis,
         window_kwh: i.window_kwh, produced_today_kwh: i.produced_today_kwh, current_power_w: i.current_power_w,
         daily: i.daily || [], min_kwh: i.min_kwh, peak_kwh: i.peak_kwh,
+        // Live-reading provenance — liveVerdict trusts a dark/low ONLY on a fresh,
+        // real reading. Without these the overview re-flags estimated splits + stale
+        // readings (Bruce's cards that flipped every capture). Carry them through.
+        power_estimated: i.power_estimated === true,
+        power_age_hours: i.power_age_hours,
         // Dead-energy-register flag (live power, no cumulative energy), MUST ride
         // through or every surface loses the honest "no energy data" state and #7
         // falls back to Error/Offline (the bug). Carried like status/peer_index.
@@ -1021,6 +1061,12 @@ window.FleetStore = (function(){
         name: inv.name, model: inv.model, nameplate_kw: inv.nameplate_kw,
         peer_index: inv.peer_index, status: inv.status, window_kwh: inv.window_kwh,
         current_power_w: inv.current_power_w, stale_hours: inv.stale_hours,
+        // Live-reading provenance (backend inverter_fleet build): power_estimated =
+        // this per-device wattage is a site-total split, not a real reading;
+        // power_age_hours = how long ago we captured it. liveVerdict needs both to
+        // avoid flagging fabricated/stale readings — carry them through.
+        power_estimated: inv.power_estimated === true,
+        power_age_hours: inv.power_age_hours,
         daily: inv.daily || [], min_kwh: inv.min_kwh, peak_kwh: inv.peak_kwh,
         // Dead-energy-register flag from the backend (live power but no cumulative
         // energy), carry it through so the card/spreadsheet/command-center all

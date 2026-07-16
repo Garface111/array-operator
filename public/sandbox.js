@@ -884,30 +884,35 @@
  const invs = col.inverters || [];
  const totalNp = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0) || 1;
  const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
- let flagged = 0, crit = 0, lostKwh = 0, liveAnoms = 0;
- // Vendor-side outage (source_status.state === "stale" in daylight) is a real
- // problem even when every inverter's 14-day peer verdict still says "ok"
- // (frozen history). Without this the array card badges "All good" on a site
- // whose monitoring vendor stopped reporting (Londonderry SolarEdge, Ford
- // 2026-07-13). Overnight stale is "asleep", not flagged.
+ // THREE honest, SEPARATE tiers — never conflated (that conflation is what made
+ // Bruce's tiles read "N flagged" for a passing-cloud dip that contradicted the
+ // 14-day "pulling its weight"):
+ //   hard  = a CONFIRMED 14-day peer verdict (dead / fault / underperforming /
+ //           comm_gap) — a real, sustained problem worth money language.
+ //   watch = a LIVE-only anomaly (dark/low right now) on an inverter the 14-day
+ //           verdict still calls healthy — momentary, unconfirmed, soft.
+ //   vendorOut = the monitoring FEED itself is behind (data freshness, not a
+ //           hardware fault) — we can't even see live truth, so we don't guess.
+ let hard = 0, crit = 0, watch = 0, lostKwh = 0;
+ // Vendor-side outage (source_status.state === "stale" in daylight): the monitoring
+ // vendor stopped reporting. Real, but it's a DATA problem, not "your inverter died"
+ // — and while the feed is behind we must NOT trust the stale readings for a live
+ // verdict (Ford 2026-07-13; the stale-SolarEdge false-flag). Overnight = "asleep".
  const _srcStale = col && col.source_status && col.source_status.state === "stale";
- const _vendorOut = _srcStale && col.is_daylight !== false;
- if(_vendorOut){ flagged = Math.max(flagged, 1); }
+ const vendorOut = !!(_srcStale && col.is_daylight !== false);
+ const srcOk = !vendorOut;   // gate live verdicts on a fresh feed
  for(const inv of invs){
- // A LIVE anomaly (dark, OR low vs peers, right now while peers produce) the
- // 14-day health hasn't flagged yet still counts as flagged here, otherwise the
- // tile reads "all good" while a card inside shows "Not producing"/"Low vs peers".
- // Shared classifier.
- const _lvBad = inv.status === "ok" && window.FleetStore && FleetStore.liveVerdict
- ? FleetStore.liveVerdict(inv, invs, col.is_daylight) : null;
- const liveBad = _lvBad === "dark" || _lvBad === "low";
  if(inv.status === "ok"){
- if(liveBad){ flagged++; liveAnoms++; }
+ // Shared classifier, now gated on fresh+real readings + feed freshness so an
+ // estimated site-split or stale reading can't fake a live anomaly.
+ const lv = window.FleetStore && FleetStore.liveVerdict
+ ? FleetStore.liveVerdict(inv, invs, col.is_daylight, srcOk) : null;
+ if(lv === "dark" || lv === "low") watch++;   // soft, live-only — NOT a hard flag
  continue;
  }
  // "monitoring" = not enough evidence to judge yet, neutral, never flagged.
  if(inv.status === "monitoring") continue;
- flagged++;
+ hard++;
  if(inv.status === "dead" || inv.status === "fault") crit++;
  const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
  if(inv.status === "dead" || inv.status === "fault") lostKwh += Math.max(0, fair-(inv.window_kwh||0));
@@ -915,8 +920,15 @@
  // comm_gap = unknown until it reports, no $ claimed
  }
  const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
- const tone = crit ? "bad" : flagged ? "warn" : "ok";
- return { tone, flagged, crit, lossMo, total: invs.length, liveAnoms, vendorOut: !!_vendorOut };
+ // Card TINT tone stays the legacy 3-value space {ok,warn,bad} so the canvas-card
+ // consumers are unchanged: red only for a confirmed fault, amber for a confirmed
+ // 14-day underperformer or a stalled feed. A LIVE-only watch NEVER tints the card
+ // amber — it's surfaced softly (the canvas card still shows its live "Not
+ // producing" state via arrayLiveState/liveAnoms independently).
+ const tone = crit ? "bad" : (hard || vendorOut) ? "warn" : "ok";
+ // `flagged`/`liveAnoms` kept for back-compat: flagged is now HARD (14-day) only.
+ return { tone, flagged: hard, hard, crit, watch, lossMo, total: invs.length,
+ liveAnoms: watch, vendorOut };
  }
 
  function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -2436,7 +2448,8 @@
  const max = Math.max(...vals, 0.001);
  // utility stream → blue; vendor stream → health-tinted as before.
  const fill = stream === "utility" ? "var(--util, #5b8def)"
- : tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--good)";
+ : tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)"
+ : tone === "watch" ? "var(--sky, #0891b2)" : "var(--good)";
  const baseY = h - pad;
  const slot = (w - 2*pad) / vals.length;
  const gap = Math.min(1, slot * 0.2);
@@ -2459,28 +2472,44 @@
  const cols = filterColsByStream((window.FleetStore && FleetStore.toColumns)
  ? (FleetStore.toColumns().columns || [])
  : []);
- // compute health once, sort worst-first (crit → warn → ok), then by $ at stake
- const rank = { bad:0, warn:1, ok:2 };
- const tiles = cols.map(col => ({ col, h: arrayHealth(col) }))
- .sort((a,b) => (rank[a.h.tone]-rank[b.h.tone]) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
+ // The honest status of ONE array tile. FIVE distinct states, never conflated —
+ // a live/data blip must never wear the same badge as a confirmed 14-day fault
+ // (that conflation is exactly why Bruce saw "flagged" on arrays his own eyes
+ // and the SolarEdge portal said were fine).
+ const tileStatus = (h) => {
+ if(h.crit)      return { cls:"bad",   label:`${h.crit} down`,
+   tip:`${h.crit} inverter${h.crit===1?"":"s"} stopped earning — a confirmed fault over the last 14 days.` };
+ if(h.hard)      return { cls:"warn",  label:`${h.hard} underperforming`,
+   tip:`${h.hard} of ${h.total} inverter${h.total===1?"":"s"} ran below their neighbors over the last 14 days.` };
+ if(h.vendorOut) return { cls:"watch", label:"feed behind",
+   tip:`The monitoring vendor has stopped sending fresh data for this site. That's a data-freshness gap, not a hardware fault — live status is paused until the feed catches up.` };
+ if(h.watch)     return { cls:"watch", label:`watching ${h.watch}`,
+   tip:`${h.watch} inverter${h.watch===1?"":"s"} dipped below ${h.watch===1?"its":"their"} neighbors in the latest reading — a momentary live watch, not a confirmed problem. The 14-day health still looks healthy.` };
+ return                 { cls:"ok",    label:"all good",
+   tip:`Every inverter is pulling its weight over the last 14 days.` };
+ };
+ // Sort worst-first so real problems surface top-left: fault → underperforming →
+ // watch (live/feed, soft) → all good; then by $ at stake, then name.
+ const rank = { bad:0, warn:1, watch:2, ok:3 };
+ const tiles = cols.map(col => { const h = arrayHealth(col); return { col, h, st: tileStatus(h) }; })
+ .sort((a,b) => (rank[a.st.cls]-rank[b.st.cls]) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
 
- const tilesHTML = tiles.map(({col, h}) => {
- const flaggedBadge = h.vendorOut
- ? `<span class="sb-tile-flag warn">vendor issue</span>`
- : h.flagged
- ? `<span class="sb-tile-flag ${h.tone}">${h.flagged} flagged</span>`
- : `<span class="sb-tile-flag ok">all good</span>`;
- const risk = h.lossMo >= 1
+ const tilesHTML = tiles.map(({col, h, st}) => {
+ // $ at stake is claimed ONLY for confirmed hard loss (dead/underperforming) —
+ // a live watch or a stale feed never asserts a dollar figure.
+ const risk = (h.lossMo >= 1)
  ? `<span class="sb-tile-risk" title="${riskTip()}">${usd0(h.lossMo)}<small>/mo est.</small></span>`
  : ``;
  return `
- <button type="button" class="sb-tile ${h.tone}" data-array-id="${esc(col.array_id)}"
+ <button type="button" class="sb-tile ${st.cls}" data-array-id="${esc(col.array_id)}"
  title="Open ${esc(col.array_name)} in the tree view">
- <span class="sb-tile-dot ${h.tone}"></span>
+ <span class="sb-tile-head">
  <span class="sb-tile-name">${esc(col.array_name)}</span>
+ <span class="sb-tile-chip ${st.cls}" title="${esc(st.tip)}">${esc(st.label)}</span>
+ </span>
  <span class="sb-tile-sub">${h.total} inverter${h.total===1?"":"s"}${col.vendor?` · ${esc(BRAND[col.vendor]||col.vendor)}`:""}</span>
- ${tileSpark(col, h.tone)}
- <span class="sb-tile-foot">${flaggedBadge}${risk}</span>
+ ${tileSpark(col, st.cls)}
+ ${risk ? `<span class="sb-tile-foot">${risk}</span>` : ``}
  </button>`;
  }).join("");
 

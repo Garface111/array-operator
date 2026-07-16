@@ -511,11 +511,16 @@ html[data-theme="day"] .sb-tile{
 }
 html[data-theme="day"] .sb-tile.warn{background:linear-gradient(168deg,#fffbeb,#fef3c7) !important;border-color:rgba(217,119,6,.32) !important}
 html[data-theme="day"] .sb-tile.bad{background:linear-gradient(168deg,#fef2f2,#fee2e2) !important;border-color:rgba(220,38,38,.32) !important}
+/* watch = soft live/data state — cyan on a cool wash, deliberately calmer than amber */
+html[data-theme="day"] .sb-tile.watch{background:linear-gradient(168deg,#f0f9ff,#e0f2fe) !important;border-color:rgba(8,145,178,.30) !important}
+html[data-theme="day"] .sb-tile.watch:hover{border-color:rgba(8,145,178,.55) !important}
 html[data-theme="day"] .sb-tile:hover{box-shadow:0 12px 26px -14px rgba(15,23,42,.22) !important}
 html[data-theme="day"] .sb-tile-name{color:var(--ink) !important}
 html[data-theme="day"] .sb-tile-sub{color:var(--muted) !important}
-html[data-theme="day"] .sb-tile-flag.warn{color:var(--warn) !important;background:rgba(217,119,6,.13) !important}
-html[data-theme="day"] .sb-tile-flag.bad{color:var(--bad) !important;background:rgba(220,38,38,.1) !important}
+html[data-theme="day"] .sb-tile-chip.ok{color:var(--good) !important;background:rgba(37,99,235,.10) !important}
+html[data-theme="day"] .sb-tile-chip.warn{color:var(--warn) !important;background:rgba(217,119,6,.13) !important}
+html[data-theme="day"] .sb-tile-chip.bad{color:var(--bad) !important;background:rgba(220,38,38,.10) !important}
+html[data-theme="day"] .sb-tile-chip.watch{color:#0e7490 !important;background:rgba(8,145,178,.12) !important}
 html[data-theme="day"] .sb-tile-risk{color:var(--bad) !important}
 html[data-theme="day"] .sb-tile-risk small{color:var(--faint) !important}
 
