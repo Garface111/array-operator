@@ -604,7 +604,7 @@
  const h = (location.hash || "").toLowerCase();
  if (/#reports\/audit/i.test(h) || h === "#bill-audit" || h === "#billaudit") return "audit";
  if (/#reports\/trends/i.test(h)) return "trends";
- if (/#reports\/generation/i.test(h) && genrepFlag()) return "genreports";
+ if (/#reports\/generation/i.test(h) && (_genrepOn || genrepFlag())) return "genreports";
  return "offtakers";
  }
  function applyInvoicesSub(v) {
@@ -687,9 +687,27 @@
  return localStorage.getItem("ao_genrep") === "1";
  } catch (e) { return false; }
  }
+ let _genrepOn = false;
  function revealGenrepPill() {
  const b = document.getElementById("invTabGenrep");
- if (b && genrepFlag()) b.style.display = "";
+ if (!b) return;
+ if (genrepFlag()) { _genrepOn = true; b.style.display = ""; return; }
+ // Default-on when this account's generation-reports world is live (the
+ // fold migration set Tenant.generation_reports; nepool-product accounts
+ // are always live). Anonymous demo + unmigrated AO tenants stay hidden.
+ const h = authHeaders();
+ if (!h) return;
+ fetch("/v1/account", { headers: h })
+ .then(r => (r.ok ? r.json() : null))
+ .then(a => {
+ if (!a || a.generation_reports !== true) return;
+ _genrepOn = true;
+ b.style.display = "";
+ // Honor a #reports/generation deep link that landed before this
+ // async check resolved (it fell back to Offtakers above).
+ if (/#reports\/generation/i.test(location.hash || "")) applyInvoicesSub("genreports");
+ })
+ .catch(() => {});
  }
  let _genrepMounted = false;
  function renderGenReports() {
