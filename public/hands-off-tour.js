@@ -56,10 +56,11 @@
       rail: "Add array",
       railSub: "",
       kicker: "3",
-      title: "Add array",
-      lede: "",
+      title: "Add array — save your monitoring login",
+      lede:
+        "Arrays come in on their own once you save your monitoring login. On the Account page under <b>Inverter portals</b>, add your SolarEdge, AlsoEnergy, Locus, Fronius, SMA or Chint login — we discover and attach every site for you. No browser extension needed.",
       kind: "guide",
-      cta: { label: "Open →", hash: "#arrays", openAddArray: true },
+      cta: { label: "Open Inverter portals →", hash: "#account", openAr: true, arFocus: "inverter" },
       autoNav: true,
     },
     {
