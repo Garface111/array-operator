@@ -116,6 +116,41 @@
       .replace(/"/g, "&quot;");
   }
 
+  /** Format timestamp as relative time (e.g., "2 minutes ago", "3 hours ago").
+   *  Fixes #27: timestamps were all showing "just now" incorrectly. */
+  function formatRelativeTime(isoString) {
+    if (!isoString) return "just now";
+    try {
+      var then = new Date(isoString).getTime();
+      var now = Date.now();
+      var diffMs = now - then;
+      
+      // Handle future timestamps (clock skew)
+      if (diffMs < 0) diffMs = 0;
+      
+      var diffSec = Math.floor(diffMs / 1000);
+      var diffMin = Math.floor(diffSec / 60);
+      var diffHr = Math.floor(diffMin / 60);
+      var diffDay = Math.floor(diffHr / 24);
+      
+      if (diffSec < 10) return "just now";
+      if (diffSec < 60) return diffSec + " seconds ago";
+      if (diffMin === 1) return "1 minute ago";
+      if (diffMin < 60) return diffMin + " minutes ago";
+      if (diffHr === 1) return "1 hour ago";
+      if (diffHr < 24) return diffHr + " hours ago";
+      if (diffDay === 1) return "1 day ago";
+      if (diffDay < 7) return diffDay + " days ago";
+      
+      // For older messages, show the actual date
+      var d = new Date(isoString);
+      var month = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+      return month + " " + d.getDate();
+    } catch (e) {
+      return "just now";
+    }
+  }
+
   /** Drop trailing side-effect JSON (and fenced leaks) so chat never shows raw mind JSON. */
   function stripSideJson(text) {
     var t = String(text || "");
@@ -134,491 +169,302 @@
     return t.trim();
   }
 
-  /** Relative time for chat timestamps — accurate intervals, not always "just now" */
-  function relativeTime(isoStr) {
-    if (!isoStr) return "";
-    try {
-      var then = new Date(isoStr).getTime();
-      var now = Date.now();
-      var diff = Math.floor((now - then) / 1000); // seconds
-      
-      if (diff < 10) return "just now";
-      if (diff < 60) return diff + "s ago";
-      
-      var mins = Math.floor(diff / 60);
-      if (mins < 60) return mins + "m ago";
-      
-      var hrs = Math.floor(mins / 60);
-      if (hrs < 24) return hrs + "h ago";
-      
-      var days = Math.floor(hrs / 24);
-      if (days < 7) return days + "d ago";
-      
-      var weeks = Math.floor(days / 7);
-      if (weeks < 4) return weeks + "w ago";
-      
-      // For older messages, show actual date
-      var d = new Date(then);
-      var mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-      return mon + " " + d.getDate();
-    } catch (e) {
-      return "";
-    }
+  function renderMessage(msg) {
+    var role = msg.role || "user";
+    var text = stripSideJson(msg.content || "");
+    var ts = msg.created_at || msg.timestamp;
+    var relTime = formatRelativeTime(ts);
+    
+    var cls = role === "assistant" ? "sd-msg sd-sov" : "sd-msg sd-ford";
+    var label = role === "assistant" ? "Sovereign" : "You";
+    
+    var html = '<div class="' + cls + '"><div class="sd-msg-meta"><span class="sd-msg-lbl">' +
+      esc(label) + '</span><span class="sd-msg-ts" data-timestamp="' + esc(ts) + '">' +
+      esc(relTime) + "</span></div><div class=\"sd-msg-txt\">" +
+      renderMarkdown(text) + "</div></div>";
+    return html;
   }
 
-  /** Update all visible timestamps (called on render + every 30s to keep them fresh) */
+  /** Update all visible timestamps to show correct relative time */
   function refreshTimestamps() {
-    var els = document.querySelectorAll(".sd-msg-time");
+    var els = document.querySelectorAll(".sd-msg-ts[data-timestamp]");
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      var iso = el.getAttribute("data-ts");
-      if (iso) el.textContent = relativeTime(iso);
+      var ts = el.getAttribute("data-timestamp");
+      if (ts) {
+        el.textContent = formatRelativeTime(ts);
+      }
     }
   }
 
-  /** Markdown → HTML (basic: **bold**, *em*, `code`, links, fenced blocks) */
-  function md(text) {
-    var h = esc(stripSideJson(text));
-    // fenced code blocks
-    h = h.replace(
-      /```([\s\S]*?)```/g,
-      '<pre class="sd-code"><code>$1</code></pre>'
-    );
-    // inline code
-    h = h.replace(/`([^`]+)`/g, '<code class="sd-inline-code">$1</code>');
+  function renderMarkdown(text) {
+    var html = esc(text);
     // bold
-    h = h.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     // italic
-    h = h.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    // inline code
+    html = html.replace(/`([^`]+)`/g, '<code class="sd-code">$1</code>');
     // links
-    h = h.replace(
+    html = html.replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener" class="sd-link">$1</a>'
+      '<a href="$2" target="_blank" rel="noopener">$1</a>'
     );
-    // line breaks
-    h = h.replace(/\n/g, "<br>");
-    return h;
+    // newlines
+    html = html.replace(/\n/g, "<br>");
+    return html;
+  }
+
+  function scrollToBottom() {
+    var container = document.getElementById("sdMsgs");
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }
 
   function renderMessages() {
-    var cont = document.getElementById("sdMsgs");
-    if (!cont) return;
+    var container = document.getElementById("sdMsgs");
+    if (!container) return;
     var html = "";
     for (var i = 0; i < state.messages.length; i++) {
-      var m = state.messages[i];
-      var role = m.role || "user";
-      var cls = role === "user" ? "sd-msg-user" : "sd-msg-sov";
-      var label = role === "user" ? state.email || "You" : "Sovereign";
-      var ts = m.created_at ? '<span class="sd-msg-time" data-ts="' + esc(m.created_at) + '">' + relativeTime(m.created_at) + '</span>' : "";
-      html +=
-        '<div class="sd-msg ' +
-        cls +
-        '"><div class="sd-msg-head"><strong>' +
-        esc(label) +
-        "</strong>" +
-        ts +
-        '</div><div class="sd-msg-body">' +
-        md(m.content) +
-        "</div></div>";
+      html += renderMessage(state.messages[i]);
     }
-    cont.innerHTML = html;
-    cont.scrollTop = cont.scrollHeight;
+    container.innerHTML = html;
+    scrollToBottom();
   }
 
-  function addMessage(role, content, createdAt) {
-    state.messages.push({ role: role, content: content, created_at: createdAt || new Date().toISOString() });
-    renderMessages();
+  function showError(msg) {
+    var el = document.getElementById("sdError");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? "block" : "none";
   }
 
-  function checkAccess() {
-    if (!hasSession()) {
-      state.allowed = false;
-      return Promise.resolve(false);
+  function setLoading(yes) {
+    state.loading = yes;
+    var btn = document.getElementById("sdSend");
+    if (btn) btn.disabled = yes || state.sending;
+  }
+
+  function setSending(yes) {
+    state.sending = yes;
+    var btn = document.getElementById("sdSend");
+    if (btn) {
+      btn.disabled = yes || state.loading;
+      btn.textContent = yes ? "Sending…" : "Send";
     }
-    return fetch(API.access, { headers: authHeaders() })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        state.allowed = !!d.desk;
-        state.email = d.email || null;
-        return state.allowed;
-      })
-      .catch(function () {
-        state.allowed = false;
-        return false;
-      });
   }
 
-  function loadHistory() {
-    return fetch(API.history, { headers: authHeaders() })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        state.messages = d.messages || [];
-        renderMessages();
-      })
-      .catch(function (err) {
-        console.error("[Desk] history load fail:", err);
-      });
+  async function loadHistory() {
+    setLoading(true);
+    showError("");
+    try {
+      var resp = await fetch(API.history, { headers: authHeaders() });
+      if (!resp.ok) throw new Error("Failed to load history");
+      var data = await resp.json();
+      state.messages = data.messages || [];
+      renderMessages();
+      // Start timestamp refresh interval
+      if (!state.pollTimer) {
+        state.pollTimer = setInterval(refreshTimestamps, 30000); // Update every 30s
+      }
+    } catch (err) {
+      showError("Could not load chat history: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function sendMessage(text) {
-    if (!text.trim()) return;
+  async function sendMessage() {
+    var input = document.getElementById("sdInput");
+    if (!input) return;
+    var text = input.value.trim();
+    if (!text) return;
+
+    setSending(true);
+    showError("");
+
     var crid = newClientRequestId();
     state.activeCrid = crid;
     state.userCancelled = false;
-    addMessage("user", text);
-    saveDraft("");
-    document.getElementById("sdInput").value = "";
-    state.sending = true;
-    updateUI();
 
-    var body = { client_request_id: crid, message: text };
-    if (state.attachments.length > 0) {
-      body.attachments = state.attachments.map(function (a) {
-        return { upload_id: a.id, filename: a.filename };
+    try {
+      // Optimistically add user message
+      state.messages.push({
+        role: "user",
+        content: text,
+        created_at: new Date().toISOString(),
       });
-      state.attachments = [];
-      renderAttachments();
+      renderMessages();
+      input.value = "";
+      saveDraft("");
+
+      var payload = {
+        message: text,
+        client_request_id: crid,
+        attachments: state.attachments,
+      };
+
+      state.fetchCtrl = new AbortController();
+      var resp = await fetch(API.chat, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+        signal: state.fetchCtrl.signal,
+      });
+
+      if (!resp.ok) throw new Error("Chat request failed");
+      var data = await resp.json();
+
+      if (data.ford_id) {
+        state.activeFordId = data.ford_id;
+        await pollTurnStatus(data.ford_id, crid);
+      }
+    } catch (err) {
+      if (err.name === "AbortError") {
+        showError("Message cancelled");
+      } else {
+        showError("Send failed: " + err.message);
+      }
+    } finally {
+      setSending(false);
+      state.activeCrid = null;
+      state.activeFordId = null;
+      state.fetchCtrl = null;
+    }
+  }
+
+  async function pollTurnStatus(fordId, crid) {
+    var maxAttempts = 120; // 2 minutes
+    var attempt = 0;
+
+    while (attempt < maxAttempts && !state.userCancelled) {
+      try {
+        var resp = await fetch(
+          API.turn + "?ford_id=" + encodeURIComponent(fordId),
+          { headers: authHeaders() }
+        );
+        if (!resp.ok) throw new Error("Status check failed");
+        var data = await resp.json();
+
+        if (data.status === "complete" && data.reply) {
+          state.messages.push({
+            role: "assistant",
+            content: data.reply,
+            created_at: new Date().toISOString(),
+          });
+          renderMessages();
+          return;
+        }
+
+        if (data.status === "error") {
+          throw new Error(data.error || "Turn failed");
+        }
+
+        await sleep(1000);
+        attempt++;
+      } catch (err) {
+        showError("Status check error: " + err.message);
+        return;
+      }
     }
 
-    savePendingTurn({ crid: crid, userMessage: text });
+    if (attempt >= maxAttempts) {
+      showError("Response timeout - please refresh");
+    }
+  }
 
-    state.fetchCtrl = new AbortController();
-    fetch(API.chat, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify(body),
-      signal: state.fetchCtrl.signal,
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        state.activeFordId = d.ford_id || null;
-        return pollTurn(crid);
-      })
-      .catch(function (err) {
-        if (err.name === "AbortError") return;
-        console.error("[Desk] send fail:", err);
-        addMessage(
-          "system",
-          "**Error**: Failed to send message. " + String(err.message || err)
-        );
-      })
-      .finally(function () {
-        if (state.activeCrid === crid) {
-          state.sending = false;
-          state.activeCrid = null;
-          state.activeFordId = null;
-          state.fetchCtrl = null;
-          savePendingTurn(null);
-          updateUI();
+  function cancelSend() {
+    if (state.fetchCtrl) {
+      state.fetchCtrl.abort();
+    }
+    if (state.activeFordId) {
+      fetch(API.cancel, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ ford_id: state.activeFordId }),
+      }).catch(function () {});
+    }
+    state.userCancelled = true;
+  }
+
+  function handleInput() {
+    var input = document.getElementById("sdInput");
+    if (input) {
+      saveDraft(input.value);
+    }
+  }
+
+  function initUI() {
+    var input = document.getElementById("sdInput");
+    if (input) {
+      input.value = loadDraft();
+      input.addEventListener("input", handleInput);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
         }
       });
-  }
-
-  function pollTurn(crid) {
-    var maxAttempts = 120;
-    var attempt = 0;
-    function poll() {
-      if (state.userCancelled) return Promise.resolve();
-      if (attempt++ > maxAttempts) {
-        addMessage("system", "**Timeout**: Sovereign did not respond in time.");
-        return Promise.resolve();
-      }
-      return fetch(
-        API.turn +
-          "?client_request_id=" +
-          encodeURIComponent(crid) +
-          "&t=" +
-          Date.now(),
-        { headers: authHeaders() }
-      )
-        .then(function (r) {
-          if (!r.ok) throw new Error(r.status);
-          return r.json();
-        })
-        .then(function (d) {
-          if (d.status === "complete") {
-            addMessage("assistant", d.response, d.completed_at);
-            return Promise.resolve();
-          }
-          return sleep(1000).then(poll);
-        })
-        .catch(function (err) {
-          console.error("[Desk] poll fail:", err);
-          return sleep(2000).then(poll);
-        });
     }
-    return poll();
-  }
 
-  function cancelTurn() {
-    if (!state.activeCrid) return;
-    state.userCancelled = true;
-    if (state.fetchCtrl) state.fetchCtrl.abort();
-    fetch(API.cancel, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({
-        client_request_id: state.activeCrid,
-        ford_id: state.activeFordId,
-      }),
-    }).catch(function (err) {
-      console.error("[Desk] cancel fail:", err);
-    });
-    state.sending = false;
-    state.activeCrid = null;
-    state.activeFordId = null;
-    state.fetchCtrl = null;
-    savePendingTurn(null);
-    addMessage("system", "**Cancelled** by you.");
-    updateUI();
-  }
+    var btn = document.getElementById("sdSend");
+    if (btn) {
+      btn.addEventListener("click", sendMessage);
+    }
 
-  function resumePending() {
-    var p = loadPendingTurn();
-    if (!p || !p.crid) return;
-    state.activeCrid = p.crid;
-    state.sending = true;
-    updateUI();
-    pollTurn(p.crid).finally(function () {
-      state.sending = false;
-      state.activeCrid = null;
-      savePendingTurn(null);
-      updateUI();
-    });
-  }
-
-  function updateUI() {
-    var sendBtn = document.getElementById("sdSend");
     var cancelBtn = document.getElementById("sdCancel");
-    var input = document.getElementById("sdInput");
-    if (sendBtn) sendBtn.disabled = state.sending;
-    if (cancelBtn) cancelBtn.style.display = state.sending ? "inline-block" : "none";
-    if (input) input.disabled = state.sending;
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", cancelSend);
+    }
   }
 
-  function renderAttachments() {
-    var cont = document.getElementById("sdAttachList");
-    if (!cont) return;
-    if (state.attachments.length === 0) {
-      cont.innerHTML = "";
+  async function checkAccess() {
+    if (!hasSession()) {
+      document.body.innerHTML =
+        '<div style="padding:2rem;color:var(--muted)">Please log in to access Sovereign Desk.</div>';
       return;
     }
-    var html = "";
-    for (var i = 0; i < state.attachments.length; i++) {
-      var a = state.attachments[i];
-      html +=
-        '<div class="sd-attach-item"><span>' +
-        esc(a.filename) +
-        '</span><button class="sd-attach-rm" data-idx="' +
-        i +
-        '">×</button></div>';
-    }
-    cont.innerHTML = html;
-  }
 
-  function attachFile(file) {
-    var formData = new FormData();
-    formData.append("file", file);
-    fetch(API.upload, { method: "POST", headers: authHeaders(), body: formData })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        state.attachments.push({
-          id: d.upload_id,
-          filename: file.name,
-          mime: file.type,
-          size: file.size,
-        });
-        renderAttachments();
-      })
-      .catch(function (err) {
-        console.error("[Desk] upload fail:", err);
-        alert("Upload failed: " + String(err.message || err));
-      });
-  }
-
-  function initVoice() {
-    if (!window.webkitSpeechRecognition && !window.SpeechRecognition) return;
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    state.recognition = new SpeechRecognition();
-    state.recognition.continuous = true;
-    state.recognition.interimResults = true;
-    state.recognition.onresult = function (event) {
-      var interim = "";
-      var final = "";
-      for (var i = event.resultIndex; i < event.results.length; i++) {
-        var transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) final += transcript + " ";
-        else interim += transcript;
-      }
-      var input = document.getElementById("sdInput");
-      if (input) {
-        if (final) state.baseText += final;
-        input.value = state.baseText + interim;
-      }
-    };
-    state.recognition.onerror = function (event) {
-      console.error("[Desk] voice error:", event.error);
-      stopVoice();
-    };
-    state.recognition.onend = function () {
-      if (state.listening) {
-        try {
-          state.recognition.start();
-        } catch (e) {
-          stopVoice();
-        }
-      }
-    };
-  }
-
-  function startVoice() {
-    if (!state.recognition) return;
-    var input = document.getElementById("sdInput");
-    state.baseText = input ? input.value : "";
-    state.listening = true;
     try {
-      state.recognition.start();
-    } catch (e) {
-      console.error("[Desk] voice start fail:", e);
-      state.listening = false;
+      var resp = await fetch(API.access, { headers: authHeaders() });
+      if (!resp.ok) throw new Error("Access check failed");
+      var data = await resp.json();
+
+      if (!data.desk) {
+        document.body.innerHTML =
+          '<div style="padding:2rem;color:var(--muted)">Sovereign Desk access not enabled for your account.</div>';
+        return;
+      }
+
+      state.allowed = true;
+      state.email = data.email;
+      await loadHistory();
+    } catch (err) {
+      document.body.innerHTML =
+        '<div style="padding:2rem;color:var(--bad)">Failed to verify access: ' +
+        esc(err.message) +
+        "</div>";
     }
-    var btn = document.getElementById("sdVoice");
-    if (btn) btn.textContent = "🎤 Stop";
-  }
-
-  function stopVoice() {
-    if (!state.recognition) return;
-    state.listening = false;
-    try {
-      state.recognition.stop();
-    } catch (e) {}
-    var btn = document.getElementById("sdVoice");
-    if (btn) btn.textContent = "🎤 Voice";
-  }
-
-  function toggleVoice() {
-    if (state.listening) stopVoice();
-    else startVoice();
-  }
-
-  function checkBridge() {
-    fetch(API.bridgeStatus, { headers: authHeaders() })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        state.bridgeOnline = !!d.online;
-      })
-      .catch(function () {
-        state.bridgeOnline = false;
-      });
   }
 
   function boot() {
     if (state.booted) return;
     state.booted = true;
-    var root = document.getElementById("sovereignDesk");
-    if (!root) return;
-
-    checkAccess().then(function (allowed) {
-      if (!allowed) {
-        root.innerHTML =
-          '<div class="sd-denied"><h2>Access Denied</h2><p>You do not have Sovereign Desk access.</p></div>';
-        return;
-      }
-
-      root.innerHTML =
-        '<div class="sd-wrap">' +
-        '<div class="sd-header"><h2>Sovereign Desk</h2></div>' +
-        '<div class="sd-msgs" id="sdMsgs"></div>' +
-        '<div class="sd-attach-list" id="sdAttachList"></div>' +
-        '<div class="sd-input-wrap">' +
-        '<textarea id="sdInput" placeholder="Type your message..."></textarea>' +
-        '<div class="sd-controls">' +
-        '<button id="sdAttach" title="Attach file">📎</button>' +
-        '<button id="sdVoice" title="Voice input">🎤 Voice</button>' +
-        '<button id="sdCancel" style="display:none">Cancel</button>' +
-        '<button id="sdSend">Send</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>';
-
-      var input = document.getElementById("sdInput");
-      var sendBtn = document.getElementById("sdSend");
-      var cancelBtn = document.getElementById("sdCancel");
-      var attachBtn = document.getElementById("sdAttach");
-      var voiceBtn = document.getElementById("sdVoice");
-
-      input.value = loadDraft();
-      input.addEventListener("input", function () {
-        saveDraft(input.value);
-      });
-      input.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage(input.value);
-        }
-      });
-
-      sendBtn.addEventListener("click", function () {
-        sendMessage(input.value);
-      });
-
-      cancelBtn.addEventListener("click", cancelTurn);
-
-      attachBtn.addEventListener("click", function () {
-        var fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.onchange = function () {
-          if (fileInput.files.length > 0) attachFile(fileInput.files[0]);
-        };
-        fileInput.click();
-      });
-
-      if (voiceBtn) voiceBtn.addEventListener("click", toggleVoice);
-
-      document.addEventListener("click", function (e) {
-        if (e.target && e.target.classList.contains("sd-attach-rm")) {
-          var idx = parseInt(e.target.getAttribute("data-idx"), 10);
-          if (!isNaN(idx)) {
-            state.attachments.splice(idx, 1);
-            renderAttachments();
-          }
-        }
-      });
-
-      initVoice();
-      loadHistory().then(function () {
-        resumePending();
-      });
-      checkBridge();
-      
-      // Refresh timestamps every 30 seconds to keep them current
-      setInterval(refreshTimestamps, 30000);
-    });
-  }
-
-  function onHashChange() {
-    if (window.location.hash === "#sovereign") boot();
+    initUI();
+    checkAccess();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", onHashChange);
+    document.addEventListener("DOMContentLoaded", boot);
   } else {
-    onHashChange();
+    boot();
   }
-  window.addEventListener("hashchange", onHashChange);
+
+  // Cleanup on page unload
+  window.addEventListener("beforeunload", function () {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+    }
+  });
 })();
