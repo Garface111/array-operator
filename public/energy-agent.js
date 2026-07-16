@@ -93,6 +93,9 @@
  // True after we sent response.cancel until audio is confirmed stopped
  _rtCancelPending: false,
  _budgetPollTimer: null,
+ // Single-flight session start + history paint (hard-refresh race)
+ _sessionPromise: null,
+ _historyPainted: false,
  };
 
  function token() {
@@ -975,6 +978,7 @@
  if (host) {
  host.hidden = true;
  }
+ document.body.classList.remove("ea-journey-open");
  showEaJourneyMini(true);
  }
 
@@ -1096,19 +1100,20 @@
  improve.activeId = null;
  if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
  improve.journeyCollapsed = false;
+ document.body.classList.remove("ea-journey-open");
  showEaJourneyMini(false);
  }
 
  var JOURNEY_STEPS = [
- { key: "received", label: "Received", sub: "Got your mark-up and note" },
- { key: "mind", label: "In Energy Agent’s mind", sub: "Live insight — work started" },
- { key: "building", label: "Building", sub: "Writing the change" },
- { key: "deploying", label: "Deploying live", sub: "Pushing to the site" },
- { key: "live", label: "Live on the site", sub: "Refresh to see your change" },
+ { key: "received", label: "Received" },
+ { key: "mind", label: "In mind" },
+ { key: "building", label: "Building" },
+ { key: "deploying", label: "Deploying" },
+ { key: "live", label: "Live" },
  ];
 
  function mapBuildStep(st, elapsedSec) {
- // Sovereign claims on submit → building almost immediately.
+ // Claims on submit → building almost immediately.
  if (st === "shipped") return 4;
  if (st === "building") return elapsedSec > 90 ? 3 : 2;
  if (st === "reviewed") return 1; // held / human look after mind saw it
@@ -1140,6 +1145,7 @@
  }
 
  host.hidden = false;
+ document.body.classList.add("ea-journey-open");
  showEaJourneyMini(false);
  var title = improve.lastSt === "shipped"
   ? "It's live."
@@ -1153,15 +1159,25 @@
  : failed
  ? (detail || "Held for a human look. Nothing was lost.")
  : (detail || "Energy Agent has this in mind — pure UI usually ships live.");
- var html = "<h4>" + esc(title) + "</h4><p class=\"ea-j-lead\">" + esc(lead) + "</p><ul class=\"ea-j-steps\">";
+ // Compact horizontal stepper (avoids tall list crushing the chat rail)
+ var html =
+ '<div class="ea-j-top">' +
+ "<h4>" + esc(title) + "</h4>" +
+ '<p class="ea-j-lead">' + esc(lead) + "</p>" +
+ "</div>" +
+ '<ol class="ea-j-steps" aria-label="Build progress">';
  JOURNEY_STEPS.forEach(function (s, i) {
  var cls = "todo";
  if (improve.lastSt === "shipped" || i < stepIdx) cls = "done";
  else if (i === stepIdx) cls = failed ? "fail" : "active";
- var icon = cls === "done" ? "✓" : cls === "active" ? "●" : cls === "fail" ? "!" : String(i + 1);
- html += '<li class="' + cls + '"><i aria-hidden="true">' + icon + "</i><div><b>" + s.label + "</b><span>" + s.sub + "</span></div></li>";
+ var icon = cls === "done" ? "✓" : cls === "fail" ? "!" : String(i + 1);
+ html +=
+ '<li class="' + cls + '">' +
+ '<span class="ea-j-ic" aria-hidden="true">' + icon + "</span>" +
+ "<b>" + esc(s.label) + "</b>" +
+ "</li>";
  });
- html += "</ul><div class=\"ea-j-actions\">";
+ html += "</ol><div class=\"ea-j-actions\">";
  if (improve.lastSt === "shipped") {
  html += '<button type="button" id="eaJReload">Refresh page</button>';
  }
@@ -1194,6 +1210,7 @@
  stopBuildWatch();
  host.hidden = true;
  host.innerHTML = "";
+ document.body.classList.remove("ea-journey-open");
  } else {
  // Still building — collapse to reopenable bubble; poll keeps running.
  collapseEaJourney();
@@ -2315,6 +2332,27 @@
  } catch (e) {}
  }
 
+ function msgsHostEmpty() {
+ var host = document.getElementById("eaMsgs");
+ if (!host) return true;
+ return !host.querySelector(".ea-msg");
+ }
+
+ function scrollMsgsToEnd() {
+ var host = document.getElementById("eaMsgs");
+ if (!host) return;
+ // Double rAF: first open after hard refresh often paints before flex
+ // finishes laying out the rail — second frame lands scroll correctly.
+ requestAnimationFrame(function () {
+ requestAnimationFrame(function () {
+ try {
+ host.scrollTop = host.scrollHeight;
+ void host.offsetHeight;
+ } catch (e) {}
+ });
+ });
+ }
+
  /** Paint prior turns from the server (no TTS spam on restore). */
  function paintHistory(messages) {
  var host = document.getElementById("eaMsgs");
@@ -2324,6 +2362,7 @@
  var n = 0;
  (messages || []).forEach(function (m) {
  if (!m || !m.content) return;
+ // Server uses "assistant"; accept either for safety
  var role = m.role === "user" ? "user" : "agent";
  // Email-channel turns (repair mailbox) are the same mind surface as chat
  var fromEmail = m.channel === "email" || m.origin === "repair" || !!m.mindUpdate;
@@ -2338,10 +2377,8 @@
  kind: m.kind,
  })) n += 1;
  });
- // Land on newest; user can scroll up for earlier turns / screenshots context
- requestAnimationFrame(function () {
- host.scrollTop = host.scrollHeight;
- });
+ state._historyPainted = n > 0;
+ scrollMsgsToEnd();
  // Subtle cue when there's scrollback
  if (n > 4) {
  setStatus("Restored " + n + " messages, scroll up for earlier", "on");
@@ -2349,12 +2386,45 @@
  return n;
  }
 
+ /** Re-fetch history when the thread is empty but we already have a session id. */
+ async function reloadSessionHistory() {
+ if (!state.sessionId || !signedIn()) return 0;
+ try {
+ var r = await fetch(API.session + "/" + encodeURIComponent(state.sessionId), {
+ headers: authHeaders(),
+ });
+ var d = await r.json().catch(function () { return null; });
+ if (!r.ok || !d) return 0;
+ var msgs = d.messages || [];
+ if (!msgs.length) return 0;
+ return paintHistory(msgs);
+ } catch (e) {
+ return 0;
+ }
+ }
+
  async function ensureSession() {
- if (state.sessionId) return state.sessionId;
+ // Single-flight: mic+tab can call setOpen twice on first gesture
+ if (state._sessionPromise) return state._sessionPromise;
+
+ // Already have a session — still restore history if the rail is empty
+ // (hard-refresh race: sessionId set before paint, or paint lost).
+ if (state.sessionId) {
+ if (msgsHostEmpty() && signedIn()) {
+ state._sessionPromise = reloadSessionHistory()
+ .then(function () { return state.sessionId; })
+ .finally(function () { state._sessionPromise = null; });
+ return state._sessionPromise;
+ }
+ return state.sessionId;
+ }
+
  if (!signedIn()) {
  addMsg("agent", "Sign in to use Energy Agent, I only work inside your own account.");
  return null;
  }
+
+ state._sessionPromise = (async function () {
  setStatus("Starting…", "think");
  // resume:true → server returns the open conversation + history from the DB.
  // preferred_session_id is a local hint only; if cache was cleared, server
@@ -2383,11 +2453,6 @@
  var resumed = !!d.resumed && (d.messages || []).length > 0;
  if (resumed) {
  paintHistory(d.messages);
- // Quiet restore, no re-greeting intro, no voice of the whole history
- if (d.welcome_back) {
- // Optional one-line continuity cue (text only)
- // skip, history itself is the continuity signal
- }
  setStatus("Picked up where we left off", "on");
  } else {
  // Fresh conversation, intro as before
@@ -2415,6 +2480,7 @@
  }
  } catch (e) {}
  addMsg("agent", intro);
+ state._historyPainted = true;
  }
 
  if (d.realtime_ready) {
@@ -2428,7 +2494,16 @@
  "You can still type. Brain: " + (d.brain || "stub") + ".");
  }
  }
+ // Layout can settle after first paint on hard refresh — re-scroll once open
+ scrollMsgsToEnd();
  return state.sessionId;
+ })();
+
+ try {
+ return await state._sessionPromise;
+ } finally {
+ state._sessionPromise = null;
+ }
  }
 
  async function toggle() {
@@ -2519,6 +2594,12 @@
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
  if (state.open) {
  await ensureSession();
+ // Hard-refresh fix: if the rail is still empty after session attach, force
+ // a history reload (close→reopen used to be the only way to see chat).
+ if (signedIn() && state.sessionId && msgsHostEmpty()) {
+ await reloadSessionHistory();
+ }
+ scrollMsgsToEnd();
  // Continuous mind awareness while the conversation window is open
  if (signedIn()) {
  startMindAwareness();
