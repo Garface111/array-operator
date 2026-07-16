@@ -903,12 +903,12 @@
  if (ta) ta.value = "";
  closeImproveCompose();
  addMsg("user", "Improve site: " + text);
- var claimed = d.sovereign && d.sovereign.claimed;
+ var claimed = !!(d.sovereign && d.sovereign.claimed) || d.status === "building";
  addMsg(
   "agent",
-  claimed
+  claimed || d.status === "building"
    ? "Got it — **Sovereign** has this in mind and is building it now. I'll track progress here."
-   : "Got it — queued for Sovereign + the judge. I'll update you as it builds."
+   : "Got it — Sovereign is taking this into mind. I'll update you as it builds."
  );
  watchBuild(d.id, { initialStatus: d.status || (claimed ? "building" : "new") });
  } catch (e) {
@@ -1014,7 +1014,9 @@
  improve.lastDetail =
   improve.lastSt === "building"
    ? "Sovereign claimed this and is building it now."
-   : "Queued — Sovereign and the judge are on it.";
+   : improve.lastSt === "shipped"
+   ? "Live on the site — refresh to see it."
+   : "Sovereign is taking this into mind now.";
  // Ensure dock is open so journey is visible (not the old floating card)
  if (!state.open) {
  state.open = true;
@@ -1099,20 +1101,19 @@
 
  var JOURNEY_STEPS = [
  { key: "received", label: "Received", sub: "Got your mark-up and note" },
- { key: "reading", label: "AI is reading it", sub: "Looking at what you circled" },
- { key: "deciding", label: "Judge deciding", sub: "Approve, branch, or pass" },
- { key: "building", label: "Building", sub: "Writing the code" },
+ { key: "mind", label: "In Sovereign’s mind", sub: "Live insight — work started" },
+ { key: "building", label: "Building", sub: "Writing the change" },
  { key: "deploying", label: "Deploying live", sub: "Pushing to the site" },
  { key: "live", label: "Live on the site", sub: "Refresh to see your change" },
  ];
 
  function mapBuildStep(st, elapsedSec) {
- if (st === "shipped") return 5;
- if (st === "building") return elapsedSec > 120 ? 4 : 3;
- if (st === "reviewed") return 2;
- if (elapsedSec < 8) return 0;
- if (elapsedSec < 25) return 1;
- return 2;
+ // Sovereign claims on submit → building almost immediately.
+ if (st === "shipped") return 4;
+ if (st === "building") return elapsedSec > 90 ? 3 : 2;
+ if (st === "reviewed") return 1; // held / human look after mind saw it
+ if (elapsedSec < 4) return 0;
+ return 1; // status still "new" briefly while claim lands
  }
 
  function renderEaJourney(st, opts) {
