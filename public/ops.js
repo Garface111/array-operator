@@ -431,6 +431,7 @@
         '<p class="rp-status">Not set up yet — Energy Agent will walk you through your O&amp;M team.</p>';
     }
     html += "</div>";
+    // Same mark as top-left tabbar control (orb + label) for instant recognition
     html +=
       '<button type="button" class="rp-talk ea-match" id="opsTalk" data-ops-open-empty="1" ' +
       'title="Talk to Energy Agent" aria-label="Talk to Energy Agent">' +

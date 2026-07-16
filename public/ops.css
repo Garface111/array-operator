@@ -64,70 +64,69 @@
 }
 .rp-talk.primary:hover{ filter: brightness(1.05); }
 
-/* Match top-left tabbar Energy Agent control (orb + label) — instant recognition */
-.rp-talk.ea-match{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px 10px 12px;
-  font-size: 14px;
-  font-weight: 650;
+/* Match top-left tabbar Energy Agent control (orb + “Energy Agent”) exactly.
+   Specificity must beat html.sky #panelOps .rp-talk:not(.primary) below. */
+.rp-talk.ea-match,
+html.sky #panelOps .rp-talk.ea-match,
+html.sky #panelOps .rp-talk.ea-match:not(.primary){
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center;
+  gap: 8px !important;
+  width: auto !important;
+  padding: 10px 16px 10px 12px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   letter-spacing: -.01em;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: var(--ink);
-  box-shadow: 0 4px 14px -6px rgba(0,0,0,.25);
+  line-height: 1;
+  border-radius: 999px !important;
+  border: 0 !important;
+  cursor: pointer;
+  white-space: nowrap;
+  /* Default (agent closed): glass pill like inactive tab */
+  background: rgba(255,255,255,.72) !important;
+  color: #33415A !important;
+  box-shadow: 0 4px 14px -4px rgba(20,60,120,.18) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: background .15s, color .15s, box-shadow .15s, transform .1s;
 }
-.rp-talk.ea-match .ea-tab-ic{
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  display: inline-block;
+.rp-talk.ea-match .ea-tab-ic,
+html.sky #panelOps .rp-talk.ea-match .ea-tab-ic{
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  flex: 0 0 auto !important;
+  display: inline-block !important;
   background:
     radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 32%, transparent 48%),
-    radial-gradient(circle at 50% 55%, #38bdf8 0%, #0ea5e9 60%, #0369a1 100%);
+    radial-gradient(circle at 50% 55%, #38bdf8 0%, #0ea5e9 60%, #0369a1 100%) !important;
   box-shadow: 0 0 0 0 rgba(56,189,248,.45);
 }
-.rp-talk.ea-match .ea-tab-label{
-  font-weight: 720;
-  line-height: 1;
+.rp-talk.ea-match .ea-tab-label,
+html.sky #panelOps .rp-talk.ea-match .ea-tab-label{
+  font-weight: 720 !important;
+  line-height: 1 !important;
+  color: inherit !important;
 }
-.rp-talk.ea-match:hover{
+.rp-talk.ea-match:hover,
+html.sky #panelOps .rp-talk.ea-match:hover{
   transform: translateY(-1px);
-  border-color: rgba(14,165,233,.35);
-  background: rgba(14,165,233,.1);
-}
-.rp-talk.ea-match:active{ transform: translateY(0); }
-
-/* Sky: same glass / active blue pill as #tabbar .tab.ea-tab */
-html.sky .rp-talk.ea-match{
-  background: rgba(255,255,255,.72);
-  border: 1px solid rgba(255,255,255,.85);
-  color: #33415A;
-  box-shadow: 0 4px 14px -4px rgba(20,60,120,.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-html.sky .rp-talk.ea-match:hover{
-  background: rgba(255,255,255,.9) !important;
+  background: rgba(255,255,255,.92) !important;
   color: #0f2744 !important;
-  border-color: rgba(33,150,243,.28);
 }
-/* When the agent dock is open, mirror the selected tab (solid blue + white) */
-html.sky body.ea-shell-open .rp-talk.ea-match,
-html.sky .rp-talk.ea-match:focus-visible{
+/* Agent open → same solid blue selected tab as top-left */
+html.sky body.ea-shell-open #panelOps .rp-talk.ea-match,
+html.sky body.ea-shell-open #panelOps .rp-talk.ea-match:not(.primary),
+body.ea-shell-open .rp-talk.ea-match{
   background: var(--sky-primary, #2196f3) !important;
   color: #ffffff !important;
-  border-color: transparent !important;
-  box-shadow: 0 4px 14px -4px rgba(33,150,243,.6);
+  box-shadow: 0 4px 14px -4px rgba(33,150,243,.6) !important;
 }
-html.sky body.ea-shell-open .rp-talk.ea-match .ea-tab-ic,
-html.sky .rp-talk.ea-match:focus-visible .ea-tab-ic{
-  box-shadow: 0 0 0 2px rgba(255,255,255,.35);
+html.sky body.ea-shell-open #panelOps .rp-talk.ea-match .ea-tab-ic,
+body.ea-shell-open .rp-talk.ea-match .ea-tab-ic{
+  box-shadow: 0 0 0 2px rgba(255,255,255,.35) !important;
 }
-html.sky .rp-talk.ea-match .ea-tab-label{ font-weight: 720; }
 
 .rp-empty{
   text-align: center;
