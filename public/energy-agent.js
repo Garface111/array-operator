@@ -4772,23 +4772,21 @@
  if (words.length < 2 && said.trim().length < 12) return false;
  return true;
  }
- // Mid-speech barge-in: protect lead-in; require a real interrupt to cut long answers
+ // Mid-speech: LET HER FINISH. She's mid-thought in a real conversation, so
+ // only an explicit STOP (already accepted above) or a genuine, sustained
+ // interruption cuts in. Backchannels people say while listening ("yeah", "ok",
+ // "mm-hmm", "right", "go on"), short noise, and speaker echo must NOT stop her
+ // mid-sentence (Ford 2026-07-16: "she stops halfway through / let her hold a
+ // whole conversation").
  if (isAgentMouthBusy() || state._micHeldForSpeak) {
- // Attack mute window: only STOP (already returned) or a clear multi-word cut-in
- // after a short protect — was blocking ALL non-stop forever while _micHeldForSpeak
- var started = state._speakStartedAt || 0;
- var heldMs = started ? now - started : 0;
- // First 1.2s of speech: only stop (prevent speaker bleed cancel)
- if (state._micHeldForSpeak && heldMs < 1200) return false;
- // Opening 2s of answer: need a clear phrase
- if (started && heldMs < 2000 && (words.length < 4 || said.trim().length < 18)) {
- return false;
- }
- var ack = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|go|please|hey)$/i.test(
- said.trim().replace(/[.!?]+$/, "")
- );
- // While speaking, need a clear multi-word interrupt, not speaker bleed
- if (!ack && (words.length < 4 || said.trim().length < 18)) {
+ var t = said.trim().replace(/[.!?]+$/, "").toLowerCase();
+ // Listening backchannels — never a barge-in while she's talking.
+ var isBackchannel = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|k|sure|right|alright|uh ?huh|mm ?hmm|mhm|hmm|got it|i see|gotcha|makes sense|nice|cool|wow|nvm|hey|go on|keep going|continue|and\??|so\??)$/.test(t);
+ if (isBackchannel) return false;
+ // A real interruption is a clear, multi-word cut-in. Below that bar, keep
+ // talking — the user can always say "stop" to hard-halt.
+ var minWords = parseInt((window.__EA_BARGE_MIN_WORDS || 5), 10) || 5;
+ if (words.length < minWords || said.trim().length < 22) {
  return false;
  }
  return true;
