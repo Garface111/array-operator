@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-13",
+  "updated": "2026-07-16",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
@@ -35,7 +35,7 @@
       "how": "The NEM 2.0 credit formula is locked through Jan 1, 2041 (Docket DE 16-576) — unusually long-term stability for the region.",
       "note": "",
       "utils": ["Eversource", "Liberty Utilities", "New Hampshire Electric Cooperative", "Unitil"],
-      "reg": "NH PUC affirmed the Eversource rate case (monthly customer charge ≈ $14 → $19.81, ROE 9.5%) but threw out automatic annual increases; a 2026 docket will examine alternative regulation.",
+      "reg": "NH PUC affirmed the Eversource rate case (monthly customer charge ≈ $14 → $19.81, ROE 9.5%) but on reconsideration (Jan 6, 2026 order) threw out the automatic annual increases; the Dept. of Energy has appealed the alternative-regulation framework (Docket DE 24-070) to the NH Supreme Court.",
       "sources": [
         { "l": "NH PUC", "u": "https://www.puc.nh.gov/" },
         { "l": "NH Dept. of Energy", "u": "https://www.energy.nh.gov/" },
@@ -59,10 +59,10 @@
     "me": {
       "name": "Maine",
       "comp": "Net Energy Billing (NEB) — 1:1 retail-rate credits for rooftop solar. CMP ≈ $0.27/kWh, Versant ≈ $0.32/kWh; credits roll monthly and true up annually.",
-      "how": "Rooftop NEB is protected; LD 1777 reformed only community-solar NEB (slowing its cost growth), with a successor program to be designed in 2026.",
-      "note": "",
+      "how": "Rooftop NEB is protected; LD 1777 halted new community-solar NEB and added monthly charges on existing community arrays, with a successor front-of-meter program (DSES) to be designed in 2026.",
+      "note": "LD 1777 bars new community-solar NEB and adds monthly charges on existing arrays ($2.80/kW-AC for 1–3 MW-AC, $6/kW-AC for 3–5 MW-AC) effective Jan 1, 2026; a successor (DSES) program draft is due Sept 30, 2026. CMP's one-year distribution rate plan (~$69M) is pending before the MPUC.",
       "utils": ["Central Maine Power (CMP)", "Versant Power"],
-      "reg": "Maine PUC (MPUC). LD 1792 reversed a 2025 cost-allocation increase; tariff rates are set through 2046 (Dockets 2019-00197, 2022-00185).",
+      "reg": "Maine PUC (MPUC). LD 1792 reversed a 2025 cost-allocation increase; tariff rates are set through 2046 (Dockets 2019-00197, 2022-00185). CMP residential Standard Offer (supply) is 12.721¢/kWh for 2026.",
       "sources": [
         { "l": "Maine PUC · Net Energy Billing", "u": "https://www.maine.gov/mpuc/regulated-utilities/electricity/neb" },
         { "l": "Maine PUC", "u": "https://www.maine.gov/mpuc/" }
@@ -98,8 +98,8 @@
         "price_usd_per_mwh_low": 30,
         "price_usd_per_mwh_high": 40,
         "owner_path": "SMART-enrolled systems usually assign RECs to the utility as a condition of the incentive. Legacy SREC I/II systems still mint SRECs until their term ends (or Q4 2027, whichever first), then roll to Class I. Independent systems can sell Class I via NEPOOL-GIS.",
-        "how": "Massachusetts is the regional demand anchor for Class I RECs. Minimum standard steps to 27% in 2026 (incl. solar carve-outs). ACP is the ceiling; DOER publishes it each year (Jan 31). 1 REC = 1 MWh; minting is quarterly with ~1-quarter lag via NEPOOL-GIS + Independent Verifier.",
-        "acp_or_cap": "MA Class I ACP set annually by DOER (CPI-adjusted). Caps the market — suppliers may pay ACP instead of buying RECs.",
+        "how": "Massachusetts is the regional demand anchor for Class I RECs. The Class I minimum standard keeps stepping up each year (plus solar carve-outs). The $40/MWh Class I ACP (fixed since 2023) is the hard ceiling. 1 REC = 1 MWh; minting is on the NEPOOL-GIS trimester cycle with a lag, via GIS + Independent Verifier.",
+        "acp_or_cap": "MA Class I ACP is fixed at $40/MWh (225 CMR 14.08, unchanged since Compliance Year 2023) — it caps the market, since suppliers can pay the ACP instead of buying RECs.",
         "sources": [
           { "l": "MassCEC / Class I RECs", "u": "https://www.masscec.com/production-tracking-system-pts/renewable-energy-certificates" },
           { "l": "Xpansiv · MA Class I market", "u": "https://www.ms.xpansiv.com/markets/rps/class-1/massachusetts" },
@@ -113,7 +113,7 @@
       "how": "Whichever option you choose at enrollment is locked for 20 years; Eversource and United Illuminating administer it identically.",
       "note": "",
       "utils": ["Eversource", "United Illuminating (UI)"],
-      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022.",
+      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022. Eversource filed a ~$727M (≈18%) distribution rate case on July 14, 2026 (new rates would take effect July 2027); a May 1, 2026 Rate Adjustment Mechanism decision cut interim Eversource and UI rates.",
       "sources": [
         { "l": "CT PURA", "u": "https://portal.ct.gov/pura" },
         { "l": "Office of Consumer Counsel", "u": "https://portal.ct.gov/occ" }
@@ -138,7 +138,7 @@
       "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
       "note": "The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
       "utils": ["Rhode Island Energy"],
-      "reg": "RI PUC + Office of Energy Resources (OER).",
+      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) is pending, and Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
       "sources": [
         { "l": "RI PUC", "u": "https://ripuc.ri.gov/" },
         { "l": "Office of Energy Resources", "u": "https://energy.ri.gov/renewable-energy/net-metering" }
@@ -167,7 +167,7 @@
       "price_display": "≈ $30–40 / MWh",
       "price_usd_per_mwh_low": 30,
       "price_usd_per_mwh_high": 40,
-      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The Alternative Compliance Payment (ACP) in the demanding state is the hard ceiling. Prices have historically swung from single digits to $50+/MWh.",
+      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The MA Class I Alternative Compliance Payment (ACP) — fixed at $40/MWh (225 CMR 14.08) since 2023 — is the hard ceiling, and Class I has recently traded up toward it. Prices have historically swung from single digits to the cap.",
       "registry": "NEPOOL-GIS",
       "mint_lag": "Issued quarterly, roughly one quarter after generation (e.g. Q1 generation mints mid-year).",
       "eligible_states": ["ma", "ct", "ri", "nh", "me", "vt"]
