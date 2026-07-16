@@ -1903,12 +1903,17 @@
  // Keep setup as LEFT dock; Energy Agent spawns as a companion window to its
  // right (not covering the tour, Ford 2026-07-14 step 17).
  try {
+ // Only (re)render on the real modal→dock transition. Calling hardRender on
+ // EVERY openAgent re-fires navigateStepSurface → goHash(openAgent) →
+ // hardRender in a loop on step 17 (the agent step auto-navs to itself),
+ // which rebuilt the stepper (scrollLeft→0) then re-centered it endlessly —
+ // the "slides left then snaps back" glitch while the agent is open.
  if (state.mode !== "dock") {
  markModalSeen();
  state.mode = "dock";
+ hardRender({ animate: false });
  }
  setShellOpen(true);
- hardRender({ animate: false });
  try {
  document.body.classList.add("ho-ea-sidebyside");
  } catch (e2) {}
