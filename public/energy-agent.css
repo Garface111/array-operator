@@ -367,8 +367,8 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   border-bottom: 1px solid rgba(14,165,233,.1);
   flex: 0 0 auto;
 }
-/* Docked above the compose bar (Ford 2026-07-14) — always in the thumb zone
-   so "Text only / Thinking / Looking into it" is hard to miss */
+/* Docked above the compose bar — status + Pro meter on row 1; mind chip alone on row 2
+   so it never floats over the Pro badge (Ford visual glitch 2026-07-16). */
 .ea-status.ea-status-dock{
   margin: 0 0 8px;
   padding: 8px 10px;
@@ -377,26 +377,44 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   border-radius: 12px;
   background: rgba(255,255,255,.72);
   box-shadow: 0 1px 0 rgba(255,255,255,.6) inset;
-  /* Let mind chip grow so thinking text is readable */
-  gap: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  position: relative;
+  z-index: 2;
+  overflow: hidden; /* contain chips — no floating over compose */
 }
 html:not(.sky) .ea-status.ea-status-dock{
   background: rgba(11,18,32,.72);
   border-color: rgba(255,255,255,.1);
   box-shadow: none;
 }
-.ea-status.ea-status-dock .ea-mind{
-  max-width: min(42ch, 70%);
-  flex: 1 1 auto;
-}
+.ea-status.ea-status-dock .ea-dot{ order: 1; }
 .ea-status.ea-status-dock #eaStatusText{
+  order: 2;
   font-weight: 650;
   color: var(--ink, #0f172a);
   min-width: 0;
   flex: 1 1 auto;
 }
 html:not(.sky) .ea-status.ea-status-dock #eaStatusText{ color: var(--ink, #e8eef7); }
-.ea-status.ea-status-dock .ea-budget{ margin-left: auto; flex: 0 0 auto; }
+.ea-status.ea-status-dock .ea-budget{
+  order: 3;
+  margin-left: auto;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+}
+/* Mind chip always on its own full-width row under status — never collides with Pro */
+.ea-status.ea-status-dock .ea-mind{
+  order: 4;
+  flex: 1 1 100%;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
 .ea-dot{
   width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; flex: 0 0 auto;
 }
@@ -416,13 +434,14 @@ html:not(.sky) .ea-status.ea-status-dock #eaStatusText{ color: var(--ink, #e8eef
   border: 1px solid rgba(14,165,233,.18);
   border-radius: 99px;
   padding: 2px 8px 2px 6px;
-  max-width: 14ch;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ea-mind.on,
-.ea-mind:not([hidden]){ display: inline-flex; }
+.ea-mind[hidden],
+.ea-mind:not(.on){ display: none !important; }
+.ea-mind.on{ display: inline-flex !important; }
 .ea-mind-pulse{
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--ea-sky2, #0ea5e9);

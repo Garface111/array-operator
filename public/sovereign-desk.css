@@ -134,6 +134,16 @@ html.sky .sov-desk-meta{ color: #0d6b42; }
 .sov-desk--chat .sov-desk-main{
   flex: 1;
   min-height: 0;
+  overflow: hidden; /* keep bubbles from painting under the sticky header */
+}
+.sov-desk--chat .sov-desk-head{
+  position: relative;
+  z-index: 3;
+}
+.sov-desk--chat .sov-desk-body{
+  /* First bubble must not clip under the head border */
+  padding-top: 12px;
+  scroll-padding-top: 8px;
 }
 
 /* Legacy ops rail (removed from shell — hide if cached markup remains) */

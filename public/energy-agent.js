@@ -1110,7 +1110,17 @@
  var orb = document.getElementById("eaOrb");
  var fab = document.getElementById("eaFab");
  var statusRow = document.getElementById("eaStatus") || (el && el.closest(".ea-status"));
- if (el) el.textContent = text;
+ // Never paint theater status lines into the main dock (they used to float as chips)
+ var statusText = String(text == null ? "" : text).trim();
+ if (mode === "think" && isFakeMindLabel(statusText)) {
+ statusText = "Thinking…";
+ } else if (isFakeMindLabel(statusText) && mode !== "listen" && mode !== "speak") {
+ // Keep honest voice-off / ready lines; drop vague "looking into it"
+ if (!/text only|voice|ready|muted|listening|speaking/i.test(statusText)) {
+ statusText = mode === "think" ? "Thinking…" : (el && el.textContent) || "Ready";
+ }
+ }
+ if (el) el.textContent = statusText;
  if (dot) {
  dot.className = "ea-dot" + (
  mode === "on" || mode === "sov" ? " on" :
@@ -1776,21 +1786,32 @@
 
  // ── Operating mind stream (seamless updates, one voice) ──────────────────
  // Status chip only for REAL, user-visible events (e.g. repair mail).
- // Never show theater like "Looking into it…" — Ford 2026-07-15: not real.
- var _FAKE_MIND_LABELS = /looking into|still working|working in background|working…|working\.\.\./i;
+ // Never show theater like "Looking into it…" — Ford 2026-07-15/16: not real work.
+ // Also matches unicode ellipsis (…) and "Looking into it..." variants.
+ var _FAKE_MIND_LABELS =
+ /looking\s*into|still\s*working|working\s*in\s*background|working[\s.…·]*$|one\s*second|hang\s*tight|bear\s*with/i;
+ function isFakeMindLabel(label) {
+ var lab = String(label || "").trim();
+ if (!lab) return true;
+ if (_FAKE_MIND_LABELS.test(lab)) return true;
+ // Very short vague status chrome
+ if (/^(working|busy|thinking|loading)[\s.…·!]*$/i.test(lab)) return true;
+ return false;
+ }
  function setMindActivity(on, label) {
  var el = document.getElementById("eaMind");
  var txt = document.getElementById("eaMindText");
  if (!el) return;
  var lab = String(label || "").trim();
- // Hard block fake background-work chrome
- if (on && (!lab || _FAKE_MIND_LABELS.test(lab))) {
+ // Hard block fake background-work chrome (and never leave a stale chip visible)
+ if (on && isFakeMindLabel(lab)) {
  on = false;
  }
  state.mindBusy = !!on;
  if (on) {
  el.hidden = false;
  el.classList.add("on");
+ el.setAttribute("aria-hidden", "false");
  if (txt) txt.textContent = lab;
  // Auto-clear after a few seconds so chips don't stick forever
  if (state._mindChipTimer) {
@@ -1802,6 +1823,7 @@
  } else {
  el.hidden = true;
  el.classList.remove("on");
+ el.setAttribute("aria-hidden", "true");
  if (txt) txt.textContent = "";
  if (state._mindChipTimer) {
  try { clearTimeout(state._mindChipTimer); } catch (e) {}
@@ -1951,8 +1973,11 @@
  state._mindInjecting = true;
  try {
  var short = t.length > 72 ? t.slice(0, 69).replace(/\s+\S*$/, "") + "…" : t;
+ // Theater labels: never open the mind chip (layout used to float over Pro)
+ if (!isFakeMindLabel(short)) {
  setMindActivity(true, isSovereign ? ("Product · " + short) : short);
- if (!state.thinking && !state.speaking) {
+ }
+ if (!state.thinking && !state.speaking && !isFakeMindLabel(short)) {
  setStatus(short, isSovereign ? "sov" : "on");
  }
  if (isSovereign) {
@@ -2043,7 +2068,12 @@
  // Mind events: interrupt candidates may speak; voice_steer is status-only
  // (final mouth line comes once from /chat, speaking interim here caused double replies).
  if (ev.kind === "voice_steer" && ev.speak_as_mind && !ev.consumed) {
- if (state.thinking) setStatus(ev.speak_as_mind, "think");
+ // Never surface fake "Looking into it…" theater in the dock
+ if (state.thinking && !isFakeMindLabel(ev.speak_as_mind)) {
+ setStatus(ev.speak_as_mind, "think");
+ } else if (state.thinking) {
+ setStatus("Thinking…", "think");
+ }
  toConsume.push(ev.id);
  } else if (
  (ev.kind === "repair_inbound" || ev.kind === "repair_outbound") &&
