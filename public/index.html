@@ -1521,15 +1521,53 @@ document.documentElement.setAttribute("data-theme","day");
  var wrap=document.getElementById("fsWrap");
  if(wrap && document.getElementById("eaOrb")) wrap.style.display="none";
  }catch(e){}
- if(typeof window.__eaBuildWatch==="function"){
- setTimeout(function(){ window.__eaBuildWatch(last.id); }, 600);
- return;
- }
- ACTIVE_ID=last.id;
- ACTIVE_SINCE=last.ts||now;
- renderJourney("new");
- POLL_T=setInterval(tickStatus, 5000);
- tickStatus();
+ // Probe status first. Already-shipped: drop from pending and do NOT re-open
+ // the "It's live" card after a hard refresh (Dismiss also clears fsPending in
+ // energy-agent.js). Held/failed still resume so Escalate stays available.
+ fetch("/v1/feature-suggestion/"+encodeURIComponent(last.id)+"/status")
+ .then(function(r){
+  if(r.status===404){
+   try{
+    var p=JSON.parse(localStorage.getItem("fsPending")||"[]");
+    p=p.filter(function(x){ return x && x.id!==last.id && String(x.id)!==String(last.id); });
+    localStorage.setItem("fsPending", JSON.stringify(p));
+   }catch(e){}
+   return null;
+  }
+  return r.ok ? r.json() : null;
+ })
+ .then(function(d){
+  if(!d || !d.status) return;
+  if(d.status==="shipped"){
+   try{
+    var p2=JSON.parse(localStorage.getItem("fsPending")||"[]");
+    p2=p2.filter(function(x){ return x && x.id!==last.id && String(x.id)!==String(last.id); });
+    localStorage.setItem("fsPending", JSON.stringify(p2));
+   }catch(e){}
+   return;
+  }
+  if(typeof window.__eaBuildWatch==="function"){
+   setTimeout(function(){ window.__eaBuildWatch(last.id); }, 600);
+   return;
+  }
+  ACTIVE_ID=last.id;
+  ACTIVE_SINCE=last.ts||now;
+  renderJourney("new");
+  POLL_T=setInterval(tickStatus, 5000);
+  tickStatus();
+ })
+ .catch(function(){
+  // Network blip: resume optimistically so in-progress builds still surface.
+  if(typeof window.__eaBuildWatch==="function"){
+   setTimeout(function(){ window.__eaBuildWatch(last.id); }, 600);
+   return;
+  }
+  ACTIVE_ID=last.id;
+  ACTIVE_SINCE=last.ts||now;
+  renderJourney("new");
+  POLL_T=setInterval(tickStatus, 5000);
+  tickStatus();
+ });
  }catch(e){}
  })();
 

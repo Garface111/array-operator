@@ -1098,12 +1098,30 @@
  .catch(function () {});
  }
 
+ function clearFsPending(dropId) {
+ // index.html resume() re-opens the journey from localStorage.fsPending after
+ // every hard refresh. Dismiss/stop must drop the id or "It's live" comes back
+ // forever (shipped status stays terminal; the card re-attaches on load).
+ try {
+  var pend = JSON.parse(localStorage.getItem("fsPending") || "[]");
+  if (!Array.isArray(pend)) pend = [];
+  if (dropId != null) {
+   pend = pend.filter(function (p) {
+    return p && p.id !== dropId && String(p.id) !== String(dropId);
+   });
+  }
+  localStorage.setItem("fsPending", JSON.stringify(pend));
+ } catch (e) {}
+ }
+
  function stopBuildWatch() {
+ var dropId = improve.activeId;
  improve.activeId = null;
  if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
  improve.journeyCollapsed = false;
  document.body.classList.remove("ea-journey-open");
  showEaJourneyMini(false);
+ clearFsPending(dropId);
  }
 
  var JOURNEY_STEPS = [
@@ -1192,7 +1210,13 @@
  "</button></div>";
  host.innerHTML = html;
  var reload = document.getElementById("eaJReload");
- if (reload) reload.onclick = function () { location.reload(); };
+ if (reload) reload.onclick = function () {
+  // Clear pending before reload so the journey doesn't re-attach as "It's live".
+  stopBuildWatch();
+  host.hidden = true;
+  host.innerHTML = "";
+  location.reload();
+ };
  var escBtn = document.getElementById("eaJEscalate");
  if (escBtn) escBtn.onclick = function () {
  addMsg("user", "Yes, escalate this site change to the developer.");
