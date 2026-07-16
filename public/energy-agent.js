@@ -136,19 +136,94 @@
  captureMode = localStorage.getItem("ao_ar_mode") || null;
  } catch (e) {}
  var fleetVendors = [];
+ var fleetAttentionSnapshot = null;
  try {
  if (window.FleetStore && FleetStore.snapshot) {
  var snap = FleetStore.snapshot() || {};
  var seen = {};
+ var attnArrays = [];
+ var totals = {
+ arrays: 0,
+ inverters: 0,
+ attention_arrays: 0,
+ attention_units_14d: 0,
+ attention_units_live: 0,
+ };
  (snap.arrays || []).forEach(function (a) {
- var v = String((a && a.vendor) || "").toLowerCase();
+ if (!a) return;
+ totals.arrays += 1;
+ var v = String(a.vendor || "").toLowerCase();
  if (v) seen[v] = true;
- (a.inverters || []).forEach(function (inv) {
- var iv = String((inv && inv.vendor) || "").toLowerCase();
+ var invs = a.inverters || [];
+ totals.inverters += invs.length;
+ var issues = [];
+ invs.forEach(function (inv) {
+ if (!inv) return;
+ var iv = String(inv.vendor || "").toLowerCase();
  if (iv) seen[iv] = true;
+ var st = inv.status || "ok";
+ if (st !== "ok" && st !== "monitoring") {
+ issues.push({
+ name: inv.name || inv.sn || "inverter",
+ kind: "health_14d",
+ status: st,
  });
+ } else if (st === "ok" && FleetStore.liveVerdict) {
+ var lv = FleetStore.liveVerdict(inv, invs, a.is_daylight !== false);
+ if (lv === "dark" || lv === "low") {
+ issues.push({
+ name: inv.name || inv.sn || "inverter",
+ kind: "live",
+ status: lv,
+ power_w: inv.current_power_w,
+ });
+ }
+ }
+ if (inv.no_energy_register) {
+ issues.push({
+ name: inv.name || inv.sn || "inverter",
+ kind: "meter",
+ status: "no_energy_register",
+ });
+ }
+ });
+ var srcSt = ((a.source_status || {}).state || "").toLowerCase();
+ if (srcSt === "stale" || srcSt === "dark" || srcSt === "offline") {
+ issues.push({
+ name: a.name || "array",
+ kind: "source",
+ status: srcSt,
+ age_hours: (a.source_status || {}).age_hours,
+ });
+ }
+ if (issues.length) {
+ var n14 = issues.filter(function (x) { return x.kind === "health_14d"; }).length;
+ var nLive = issues.filter(function (x) { return x.kind === "live"; }).length;
+ totals.attention_arrays += 1;
+ totals.attention_units_14d += n14;
+ totals.attention_units_live += nLive;
+ attnArrays.push({
+ name: a.name,
+ vendor: a.vendor || null,
+ power_w: a.current_power_w,
+ today_kwh: a.produced_today_kwh,
+ issue_count: issues.length,
+ issues: issues.slice(0, 16),
+ });
+ }
  });
  fleetVendors = Object.keys(seen);
+ // Sort worst-first by issue count
+ attnArrays.sort(function (x, y) {
+ return (y.issue_count || 0) - (x.issue_count || 0);
+ });
+ fleetAttentionSnapshot = {
+ totals: totals,
+ attention: attnArrays.slice(0, 24),
+ note:
+ "Matches Spreadsheet NEED ATTENTION: 14-day peer health + live dark/low overlays. " +
+ "Use this as ground truth for 'how is my fleet' answers.",
+ };
  }
  } catch (e) {}
  // Macro/meso mental model for the open tab (server product_map surface_* is deeper)
@@ -240,6 +315,8 @@
  extension_name: "EnergyAgent",
  capture_mode_client: captureMode,
  fleet_vendors_client: fleetVendors,
+ // Live fleet attention (same classifiers as Spreadsheet / sandbox cards)
+ fleet_attention_snapshot: fleetAttentionSnapshot,
  capture_paths_reminder: {
  cloud: "Account Auto-refresh 'Store it with us', server holds encrypted portal passwords, harvester 24/7",
  device: "Account Auto-refresh 'Keep it on my computer', passwords in extension vault",
