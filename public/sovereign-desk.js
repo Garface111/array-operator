@@ -5,16 +5,20 @@
 (function () {
   "use strict";
 
-  // Chat goes direct to Railway so Netlify's ~60s edge proxy cannot 504 a slow brain.
-  // Other desk GETs stay same-origin (fast). CORS already allows arrayoperator.com.
+  // Chat + turn status go direct to Railway so Netlify's ~60s edge proxy cannot
+  // 504 a slow brain. History/access stay same-origin (fast).
   var RAIL_API = "https://web-production-49c83.up.railway.app";
   var API = {
     access: "/v1/sovereign/desk/access",
     history: "/v1/sovereign/desk/history",
     chat: RAIL_API + "/v1/sovereign/desk/chat",
+    turn: RAIL_API + "/v1/sovereign/desk/turn",
     upload: "/v1/sovereign/desk/upload",
     bridgeStatus: "/v1/sovereign/desk/bridge/status",
   };
+
+  var DRAFT_KEY = "sov_desk_draft_v1";
+  var PENDING_KEY = "sov_desk_pending_v1";
 
   var state = {
     allowed: false,
@@ -32,7 +36,57 @@
     // File / data attachments for the next send
     attachments: [], // {id, filename, mime, size, preview}
     bridgeOnline: null,
+    // In-flight durable send
+    activeCrid: null,
+    activeFordId: null,
   };
+
+  function newClientRequestId() {
+    return (
+      "cr_" +
+      Date.now().toString(36) +
+      "_" +
+      Math.random().toString(36).slice(2, 10)
+    );
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function saveDraft(text) {
+    try {
+      if (text) localStorage.setItem(DRAFT_KEY, text);
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch (e) {}
+  }
+
+  function loadDraft() {
+    try {
+      return localStorage.getItem(DRAFT_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function savePendingTurn(p) {
+    try {
+      if (p) localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+      else localStorage.removeItem(PENDING_KEY);
+    } catch (e) {}
+  }
+
+  function loadPendingTurn() {
+    try {
+      var raw = localStorage.getItem(PENDING_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
 
   function authHeaders() {
     var h = { "Content-Type": "application/json", Accept: "application/json" };
@@ -517,6 +571,8 @@
           state.interim = "";
         }
         autoGrow(ta);
+        // Durable draft so a refresh/crash never eats unsent text
+        if (!state.sending) saveDraft(String(ta.value || ""));
       });
     }
     var mic = document.getElementById("sovDeskMic");
@@ -1078,6 +1134,191 @@
     }
   }
 
+  function applyTurnResult(d, fordLocal) {
+    if (!d) return false;
+    var fordMsg = d.ford_message || null;
+    if (fordLocal) {
+      fordLocal._pending = false;
+      if (fordMsg && fordMsg.id) {
+        fordLocal.id = fordMsg.id;
+        fordLocal.created_at = fordMsg.created_at || fordLocal.created_at;
+        fordLocal._local = false;
+      } else if (d.ford_message_id) {
+        fordLocal.id = d.ford_message_id;
+        fordLocal._local = false;
+      }
+    }
+    var reply = (d.message && d.message.content) || d.reply || "";
+    if (!reply) return false;
+    var mid = d.message && d.message.id;
+    var exists =
+      mid &&
+      (state.messages || []).some(function (m) {
+        return m && m.id === mid;
+      });
+    if (!exists) {
+      state.messages.push({
+        id: mid,
+        role: "sovereign",
+        content: reply,
+        provider: d.provider,
+        created_at:
+          (d.message && d.message.created_at) || new Date().toISOString(),
+        _local: !mid,
+      });
+    }
+    return true;
+  }
+
+  async function postChat(payload, attempt) {
+    attempt = attempt || 0;
+    var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = null;
+    // Client-side ceiling well above server wait — pending path should return first
+    if (ctrl) timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 95000);
+    try {
+      var r = await fetch(API.chat, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+        signal: ctrl ? ctrl.signal : undefined,
+      });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) {
+        var detail = d && d.detail;
+        if (typeof detail === "object")
+          detail = detail.message || JSON.stringify(detail);
+        // Transient gateway — retry once, then treat as pending so poll can recover
+        if (
+          (r.status === 502 || r.status === 503 || r.status === 504 || r.status === 524) &&
+          attempt < 2
+        ) {
+          await sleep(800 * (attempt + 1));
+          return postChat(payload, attempt + 1);
+        }
+        if (r.status === 504 || r.status === 502 || r.status === 524) {
+          return {
+            ok: true,
+            pending: true,
+            poll: true,
+            client_request_id: payload.client_request_id,
+            soft_gateway: r.status,
+            hint: "Gateway slow — recovering via poll.",
+          };
+        }
+        throw new Error(detail || "HTTP " + r.status);
+      }
+      return d;
+    } catch (e) {
+      var name = (e && e.name) || "";
+      var msg = (e && e.message) || String(e);
+      var transient =
+        name === "AbortError" ||
+        /failed to fetch|network|timeout|aborted/i.test(msg);
+      if (transient && attempt < 2) {
+        await sleep(900 * (attempt + 1));
+        return postChat(payload, attempt + 1);
+      }
+      if (transient) {
+        // Network died mid-flight — message may already be saved; poll recovers
+        return {
+          ok: true,
+          pending: true,
+          poll: true,
+          client_request_id: payload.client_request_id,
+          soft_network: true,
+          hint: "Network blip — recovering via poll.",
+        };
+      }
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async function pollTurnUntilReady(crid, fordId, opts) {
+    opts = opts || {};
+    var maxMs = opts.maxMs || 180000;
+    var start = Date.now();
+    var delay = 1500;
+    while (Date.now() - start < maxMs) {
+      // Prefer dedicated turn endpoint; fall back to history + chat poll_only
+      try {
+        var q = [];
+        if (crid) q.push("client_request_id=" + encodeURIComponent(crid));
+        if (fordId) q.push("ford_message_id=" + encodeURIComponent(fordId));
+        var r = await fetch(API.turn + "?" + q.join("&"), {
+          headers: authHeaders(),
+        });
+        var d = await r.json().catch(function () {
+          return {};
+        });
+        if (r.ok && d && ((d.message && d.message.content) || d.reply)) {
+          return d;
+        }
+        if (r.ok && d && d.ford_message_id && !fordId) {
+          fordId = d.ford_message_id;
+          state.activeFordId = fordId;
+          savePendingTurn({
+            crid: crid,
+            fordId: fordId,
+            at: Date.now(),
+          });
+        }
+      } catch (e) {
+        /* keep polling */
+      }
+      // Also poke chat poll_only (idempotent) + refresh history
+      try {
+        if (crid) {
+          var d2 = await postChat({
+            message: "",
+            attachment_ids: [],
+            client_request_id: crid,
+            poll_only: true,
+          });
+          if (d2 && ((d2.message && d2.message.content) || d2.reply)) return d2;
+          if (d2 && d2.ford_message_id) fordId = d2.ford_message_id;
+        }
+      } catch (e2) {}
+      try {
+        await loadHistory({ force: true });
+        // Detect reply after our ford bubble in local state
+        if (fordId) {
+          var idx = -1;
+          for (var i = 0; i < state.messages.length; i++) {
+            if (state.messages[i] && state.messages[i].id === fordId) idx = i;
+          }
+          if (idx >= 0) {
+            for (var j = idx + 1; j < state.messages.length; j++) {
+              var m = state.messages[j];
+              if (
+                m &&
+                m.role === "sovereign" &&
+                m.provider !== "error" &&
+                (m.content || "").trim()
+              ) {
+                return {
+                  ok: true,
+                  pending: false,
+                  ford_message_id: fordId,
+                  message: m,
+                  reply: m.content,
+                  provider: m.provider,
+                };
+              }
+            }
+          }
+        }
+      } catch (e3) {}
+      await sleep(delay);
+      delay = Math.min(5000, Math.floor(delay * 1.25));
+    }
+    return null;
+  }
+
   async function send() {
     if (state.sending || !state.allowed) return;
     var ta = document.getElementById("sovDeskInput");
@@ -1099,6 +1340,7 @@
       ta.value = "";
       autoGrow(ta);
     }
+    saveDraft(""); // clear draft once we've accepted the send
     var attachNote = "";
     if (attachIds.length) {
       attachNote =
@@ -1117,6 +1359,8 @@
     var sentAttach = state.attachments.slice();
     state.attachments = [];
     renderAttachments();
+    var crid = newClientRequestId();
+    state.activeCrid = crid;
     var localId = "local_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     var fordLocal = {
       role: "ford",
@@ -1125,71 +1369,99 @@
       _local: true,
       _pending: true,
       _localId: localId,
-      meta: { attachments: sentAttach },
+      meta: { attachments: sentAttach, client_request_id: crid },
     };
     state.messages.push(fordLocal);
     renderMessages();
     var host = document.getElementById("sovDeskMsgs");
     if (host) host.scrollTop = host.scrollHeight;
+    savePendingTurn({ crid: crid, text: text, at: Date.now() });
+
     try {
-      var r = await fetch(API.chat, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          message: text || "",
-          attachment_ids: attachIds,
-        }),
+      var d = await postChat({
+        message: text || "",
+        attachment_ids: attachIds,
+        client_request_id: crid,
       });
-      var d = await r.json().catch(function () {
-        return {};
-      });
-      if (!r.ok) {
-        var detail = d && d.detail;
-        if (typeof detail === "object")
-          detail = detail.message || JSON.stringify(detail);
-        if (r.status === 504 || r.status === 502 || r.status === 524)
-          throw new Error(
-            "Sovereign took too long (gateway " +
-              r.status +
-              "). Your message may still have landed — hit ↻ refresh, then try a shorter ask."
-          );
-        throw new Error(detail || "HTTP " + r.status);
+
+      var fordId =
+        (d && d.ford_message && d.ford_message.id) ||
+        (d && d.ford_message_id) ||
+        null;
+      if (fordId) {
+        state.activeFordId = fordId;
+        savePendingTurn({ crid: crid, fordId: fordId, at: Date.now() });
       }
-      // Stamp Ford bubble with server id so later history merge is stable
-      var fordMsg = d.ford_message || null;
-      fordLocal._pending = false;
-      if (fordMsg && fordMsg.id) {
-        fordLocal.id = fordMsg.id;
-        fordLocal.created_at = fordMsg.created_at || fordLocal.created_at;
-        fordLocal._local = false;
-      } else if (d.ford_message_id) {
-        fordLocal.id = d.ford_message_id;
-        fordLocal._local = false;
+
+      var gotReply = applyTurnResult(d, fordLocal);
+      if (!gotReply && d && (d.pending || d.poll || !((d.message && d.message.content) || d.reply))) {
+        // Soft-pending: keep typing indicator and poll until reply lands
+        setTyping(true);
+        var typingEl = document.getElementById("sovDeskTyping");
+        if (typingEl) {
+          var span = typingEl.querySelector("span:last-child") || typingEl;
+          // leave default "Sovereign is thinking…"
+        }
+        var finished = await pollTurnUntilReady(crid, fordId, { maxMs: 180000 });
+        if (finished) {
+          applyTurnResult(finished, fordLocal);
+          gotReply = true;
+        } else {
+          // Still no reply after long wait — message is safe; don't scare Ford
+          fordLocal._pending = false;
+          state.messages.push({
+            role: "sovereign",
+            content:
+              "Still working on that — your message is saved. Hit ↻ in a moment; " +
+              "the reply will appear when Sovereign finishes.",
+            provider: "system",
+            created_at: new Date().toISOString(),
+            _local: true,
+            _localId: "pend_" + localId,
+          });
+        }
       }
-      var reply = (d.message && d.message.content) || d.reply || "";
-      if (reply) {
-        state.messages.push({
-          id: d.message && d.message.id,
-          role: "sovereign",
-          content: reply,
-          provider: d.provider,
-          created_at:
-            (d.message && d.message.created_at) || new Date().toISOString(),
-          _local: !(d.message && d.message.id),
-        });
-      }
+      savePendingTurn(null);
+      state.activeCrid = null;
+      state.activeFordId = null;
       renderMessages();
       if (host) host.scrollTop = host.scrollHeight;
+      // Sync with server truth
+      try {
+        await loadHistory({ force: true });
+      } catch (e) {}
     } catch (e) {
       fordLocal._pending = false;
-      state.messages.push({
-        role: "sovereign",
-        content: "Couldn't send that just now — " + (e.message || e) + ". Try again.",
-        provider: "error",
-        created_at: new Date().toISOString(),
-        _local: true,
-        _localId: "err_" + localId,
-      });
+      // Hard failure — but still try recovery poll once
+      var recovered = null;
+      try {
+        recovered = await pollTurnUntilReady(crid, state.activeFordId, {
+          maxMs: 12000,
+        });
+      } catch (e2) {}
+      if (recovered && applyTurnResult(recovered, fordLocal)) {
+        savePendingTurn(null);
+      } else {
+        // Restore draft so Ford never loses typed text on hard fail
+        if (text) {
+          saveDraft(text);
+          if (ta) {
+            ta.value = text;
+            autoGrow(ta);
+          }
+        }
+        state.messages.push({
+          role: "sovereign",
+          content:
+            "Couldn't finish that send — " +
+            ((e && e.message) || e) +
+            ". Your draft was restored. Hit Send again (safe to retry).",
+          provider: "error",
+          created_at: new Date().toISOString(),
+          _local: true,
+          _localId: "err_" + localId,
+        });
+      }
       renderMessages();
     } finally {
       state.sending = false;
@@ -1199,6 +1471,36 @@
         btn.textContent = "Send";
       }
       if (ta) ta.focus();
+    }
+  }
+
+  /** Resume a turn that was in-flight when the tab closed / refreshed. */
+  async function resumePendingTurn() {
+    var p = loadPendingTurn();
+    if (!p || !p.crid) return;
+    // Drop stale pendings (>15 min)
+    if (p.at && Date.now() - p.at > 15 * 60 * 1000) {
+      savePendingTurn(null);
+      return;
+    }
+    if (state.sending) return;
+    state.sending = true;
+    setTyping(true);
+    try {
+      var d = await pollTurnUntilReady(p.crid, p.fordId || null, {
+        maxMs: 90000,
+      });
+      if (d) {
+        applyTurnResult(d, null);
+        savePendingTurn(null);
+        renderMessages();
+        await loadHistory({ force: true });
+      }
+    } catch (e) {
+      /* leave pending for next open */
+    } finally {
+      state.sending = false;
+      setTyping(false);
     }
   }
 
@@ -1231,11 +1533,22 @@
     }
     var acctTab = document.getElementById("tabAccount");
     if (acctTab) acctTab.classList.add("active");
+    // Restore unsaved draft if compose is empty
+    var ta = document.getElementById("sovDeskInput");
+    if (ta && !String(ta.value || "").trim()) {
+      var draft = loadDraft();
+      if (draft) {
+        ta.value = draft;
+        autoGrow(ta);
+      }
+    }
     loadHistory();
     startPoll();
+    // Resume any in-flight turn from a prior tab crash / hard refresh
+    resumePendingTurn();
     setTimeout(function () {
-      var ta = document.getElementById("sovDeskInput");
-      if (ta) ta.focus();
+      var ta2 = document.getElementById("sovDeskInput");
+      if (ta2) ta2.focus();
     }, 80);
   }
 
