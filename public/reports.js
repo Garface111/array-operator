@@ -697,15 +697,16 @@
  // are always live). Anonymous demo + unmigrated AO tenants stay hidden.
  const h = authHeaders();
  if (!h) return;
+ // Capture the deep-link intent NOW — applyInvoicesSub runs right after us
+ // and rewrites the hash to #reports before the account fetch resolves.
+ const wantedGenrep = /#reports\/generation/i.test(location.hash || "");
  fetch("/v1/account", { headers: h })
  .then(r => (r.ok ? r.json() : null))
  .then(a => {
  if (!a || a.generation_reports !== true) return;
  _genrepOn = true;
  b.style.display = "";
- // Honor a #reports/generation deep link that landed before this
- // async check resolved (it fell back to Offtakers above).
- if (/#reports\/generation/i.test(location.hash || "")) applyInvoicesSub("genreports");
+ if (wantedGenrep) applyInvoicesSub("genreports");
  })
  .catch(() => {});
  }
