@@ -2388,6 +2388,16 @@ body.ea-shell-open #panelReports .inv-sub-seg{
 #panelReports > #reportsRoot{
   margin-top: 0;
 }
+/* Kill content-sheet top margins that un-center the sub-nav pill */
+#panelAnalysis .an-wrap,
+#panelTrends .an-wrap{
+  margin-top: 0 !important;
+}
+#panelReports .rb2,
+#panelReports .rb-subpanel.rb2{
+  margin-top: 0 !important;
+}
+
 .vs-seg-btn{ border:0; cursor:pointer; font:inherit; font-size:12.5px; font-weight:700; color:var(--muted,#64748b);
   padding:7px 18px; border-radius:8px; background:none; transition:background .12s, color .12s, box-shadow .12s;
   line-height:1.25; display:inline-flex; align-items:center; justify-content:center; }

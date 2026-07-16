@@ -67,7 +67,9 @@ html.sky #panelAnalysis .an-wrap{
   max-width: none;
   width: 100%;
   margin-inline: 0 !important;   /* kill the full-bleed breakout — match tab bar */
-  margin-block:14px 46px;
+  /* top 0: .ao-subnav strip supplies the only gap above so the pill stays
+     vertically centered in the banner→sheet band (was 14px and sat high). */
+  margin-block:0 46px;
   /* Tighter pad so Sites table can show Capacity without clipping (was 42px). */
   padding:28px 16px 52px;
   /* matches the #sheetWrap alpha (Ford: "make all backgrounds look like this one"),
