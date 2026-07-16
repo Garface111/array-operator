@@ -1748,12 +1748,13 @@
 
 /* Hands-off tour points at Account portal sections */
 .ar-group.ar-group-focus{
-  outline:2px solid rgba(33,150,243,.55);
+  outline:3px solid rgba(33,150,243,.9);
   outline-offset:4px;
   border-radius:14px;
-  animation:arGroupPulse 1.4s ease-in-out 2;
+  background:rgba(33,150,243,.06);
+  animation:arGroupPulse 1.05s ease-in-out 3;
 }
 @keyframes arGroupPulse{
-  0%,100%{ box-shadow:0 0 0 0 rgba(33,150,243,0); }
-  50%{ box-shadow:0 0 0 8px rgba(33,150,243,.12); }
+  0%,100%{ box-shadow:0 0 0 0 rgba(33,150,243,.35); }
+  50%{ box-shadow:0 0 0 12px rgba(33,150,243,.22); }
 }

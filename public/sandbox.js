@@ -6039,22 +6039,35 @@
  }
  return _row;
  };
- setTimeout(() => {
- const t = _scrollTarget() || _row;
+ // The Inverter/Utility portal groups render AFTER an async status fetch, so a
+ // fixed timeout usually misses them and we fall back to flashing the whole row
+ // (the operator lands on the panel but not ON the box). Poll until the focused
+ // group actually exists, THEN scroll to it and pulse it, so the setup guide
+ // always drops you exactly where you type. Retries cap at ~3s.
+ let _focusTries = 0;
+ const _doFocus = () => {
+ const g = _scrollTarget();
+ const groupReady = g && g.classList && g.classList.contains("ar-group");
+ // When we asked for a specific portal group, wait for it; the bare row is
+ // only an acceptable target when no focus was requested (or after we give up).
+ if(_focus && !groupReady && _focusTries < 24){
+ _focusTries++;
+ setTimeout(_doFocus, 120);
+ return;
+ }
+ const t = g || _row;
  if(t) t.scrollIntoView({ behavior:"smooth", block:"start" });
  if(_row){
  _row.classList.add("ar-flash");
  setTimeout(() => _row.classList.remove("ar-flash"), 2600);
  }
- // Pulse the target portal group so "type here" is obvious
- try{
- const g = _scrollTarget();
- if(g && g.classList){
+ // Pulse the target portal group so "type here" is obvious.
+ if(groupReady){
  g.classList.add("ar-group-focus");
- setTimeout(() => g.classList.remove("ar-group-focus"), 2800);
+ setTimeout(() => g.classList.remove("ar-group-focus"), 3200);
  }
- }catch(e){}
- }, 80);
+ };
+ setTimeout(_doFocus, 80);
  if(_fromParam){
  _sp.delete("setup");
  history.replaceState(null, "", location.pathname + (_sp.toString() ? "?"+_sp.toString() : "") + location.hash);
