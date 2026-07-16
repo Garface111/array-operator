@@ -2307,58 +2307,47 @@ html[data-theme="day"] .rep-fld.req > select{
 .vs-seg-btn:not(.on):hover,
 .vs-seg-btn:not(.on):focus-visible{ background:var(--day-hover,rgba(15,23,42,.08)); color:var(--ink,#0f172a); opacity:1; outline:none; }
 
-/* The spreadsheet panel itself. */
-/* Wider sheet so the dedicated 14-day spark column has room (was 1120 — felt
-   cramped with graphs jammed into Status). */
+/* The spreadsheet panel itself.
+   Fit the full table in the viewport — NO horizontal scroll (Ford 2026-07-16).
+   When EA rail is open we densify columns; we never force min-width past 100%. */
 #sheetWrap{
-  padding:16px 20px 48px; max-width:1280px; margin:0 auto;
-  width:100%; box-sizing:border-box;
-  /* Contain the scrollport so EA-rail narrowing scrolls the table instead of
-     crushing Live/Today into "kWkWh" (Ford 2026-07-15/16). */
-  overflow:hidden; min-width:0;
+  padding:16px 16px 48px; max-width:1280px; margin:0 auto;
+  width:100%; box-sizing:border-box; min-width:0; overflow:hidden;
 }
 .vs-headrow{ margin:0 2px 14px; }
 .vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
 .vs-sub{ font-size:13px; color:var(--muted); }
 .vs-hint{ margin-top:6px; font-size:12px; line-height:1.45; color:var(--muted); max-width:680px; }
 .vs-hint strong{ color:var(--good,#2563eb); font-weight:650; }
-/* Scrollport: MUST be width-bound to parent. If this grows with content, body
-   overflow-x:hidden clips the sheet with no scrollbar and columns crush. */
 .vs-scroll{
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
+  /* Vertical scroll for many rows only — never horizontal (hideous per Ford) */
+  overflow-x:hidden;
+  overflow-y:auto;
   width:100%;
   max-width:100%;
   min-width:0;
   border:1px solid var(--line); border-radius:14px;
   background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06);
 }
-/* Each .vs-row is its OWN independent grid (not one shared table grid across all
-   rows), so a bare `Nfr` track's implicit min-content floor lets one row's wide
-   cell content (e.g. the "↗ Open Fronius to sync" button — the longest of the
-   three vendor names that get one) steal extra width for THAT row only, pushing
-   every later column left relative to every other row. minmax(0,Nfr) removes the
-   content-based floor so a track's width depends ONLY on the fixed row width +
-   the fr ratio — identical on every row regardless of what it contains. The
-   Vendor column keeps a small px floor (not 0) sized to its widest real button so
-   that content still fits without wrapping/clipping. */
-/* 9 columns: dedicated SPARK column (left of Status) so graphs never share a
-   cell with UNDERPERFORMING / OK pills (Ford 2026-07-16 — "tons of space to the
-   left of the graphs", stop intersecting). Prefer horizontal scroll over crush. */
+/* 9 columns fill 100% of the card. Flexible name/vendor/status shrink with
+   ellipsis; live/today/spark stay separate so units never stack as "kWkWh" and
+   graphs never share a cell with the status pill. */
 .vs-row{ display:grid;
   grid-template-columns:
-    minmax(120px,1.35fr)  /* array name */
-    minmax(84px,.7fr)     /* vendor */
-    68px                  /* gauge */
-    48px                  /* inverter count / peer */
-    minmax(68px,.8fr)     /* live now */
-    minmax(76px,.85fr)    /* today */
-    148px                 /* 14-day spark — fixed, roomy, never shares Status */
-    minmax(118px,1.15fr)  /* status pill only */
-    minmax(80px,.65fr);   /* synced */
-  align-items:center; gap:12px; padding:11px 14px; width:100%;
+    minmax(0,1.45fr)      /* array — ellipsis */
+    minmax(0,.7fr)        /* vendor — ellipsis */
+    56px                  /* gauge */
+    40px                  /* inv count / peer */
+    minmax(64px,.85fr)    /* live now */
+    minmax(72px,.9fr)     /* today */
+    minmax(72px,104px)    /* 14-day spark (own col, scales down) */
+    minmax(0,1.15fr)      /* status pill */
+    minmax(0,.7fr);       /* synced */
+  align-items:center; gap:8px; padding:10px 12px;
   box-sizing:border-box; text-align:left;
-  min-width:1040px; }
+  width:100%;
+  min-width:0;
+}
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
 .vs-c-gauge{ display:flex; align-items:center; justify-content:center; }
@@ -3095,24 +3084,65 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-fee{ font-size:12px; color:var(--faint,#64748b); }
 .ao-pay-inner .acct-msg{ margin-top:10px; }
 
-/* ── Energy Agent open: spreadsheet must not crush Live/Today into each other ──
-   body.ea-shell-open shrinks .wrap; without min-widths Live+Today collapsed to
-   0 and painted "kWkWh" on top of each other (Ford 2026-07-15 screenshot). */
-body.ea-shell-open #sheetWrap{
+/* ── Energy Agent / hands-off rail open ───────────────────────────────────
+   Rail shrinks .wrap. Sheet must SCROLL, not reflow columns into "kWkWh" or
+   overlapping LIVE NOW / TODAY headers (Ford 2026-07-15/16 screenshots). */
+body.ea-shell-open #sheetWrap,
+body.ho-shell-open #sheetWrap{
   max-width:none;
-  padding-left:12px;
-  padding-right:12px;
+  width:100%;
+  min-width:0;
+  padding-left:10px;
+  padding-right:10px;
+  overflow:hidden;
 }
-body.ea-shell-open .vs-scroll{
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
+body.ea-shell-open .vs-scroll,
+body.ho-shell-open .vs-scroll{
+  overflow:auto;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  /* Visible cue that more columns exist to the right */
+  background:
+    linear-gradient(90deg, var(--card,#fff) 85%, rgba(255,255,255,0)) left center / 28px 100% no-repeat,
+    linear-gradient(270deg, var(--card,#fff) 85%, rgba(255,255,255,0)) right center / 28px 100% no-repeat,
+    var(--card,#fff);
+  background-attachment: local, local, scroll;
 }
-body.ea-shell-open .vs-row{
-  min-width:1040px; /* 9 cols incl. dedicated spark */
+body.ea-shell-open .vs-row,
+body.ho-shell-open .vs-row{
+  /* Compact but SAFE track floors — never below readable kW / kWh */
+  grid-template-columns:
+    minmax(110px,1.2fr)
+    minmax(76px,.65fr)
+    60px
+    44px
+    96px     /* live — hard */
+    104px    /* today — hard */
+    128px    /* spark slightly tighter when rail open */
+    minmax(112px,1.1fr)
+    88px;
+  width:max-content;
+  min-width:1080px;
+  gap:10px;
+  padding:10px 12px;
 }
-/* Hands-off rail open (no EA) — same squeeze risk */
-body.ho-shell-open:not(.ea-shell-open) #sheetWrap{ max-width:none; }
-body.ho-shell-open:not(.ea-shell-open) .vs-scroll{ overflow-x:auto; }
-body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:1040px; }
-/* Always allow sheet to scroll horizontally when 9 cols need the room */
-.vs-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+/* Live / Today cells: never wrap units onto a second line */
+body.ea-shell-open .vs-c-pow,
+body.ea-shell-open .vs-c-today,
+body.ho-shell-open .vs-c-pow,
+body.ho-shell-open .vs-c-today{
+  white-space:nowrap !important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  min-width:0;
+}
+body.ea-shell-open .vs-colhead .vs-c-pow,
+body.ea-shell-open .vs-colhead .vs-c-today,
+body.ho-shell-open .vs-colhead .vs-c-pow,
+body.ho-shell-open .vs-colhead .vs-c-today{
+  white-space:normal;
+  line-height:1.15;
+  font-size:10px;
+  letter-spacing:.04em;
+}
