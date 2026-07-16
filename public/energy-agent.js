@@ -8,6 +8,7 @@
  var API = {
  session: "/v1/energy-agent/session",
  chat: "/v1/energy-agent/chat",
+ upload: "/v1/energy-agent/upload",
  confirm: "/v1/energy-agent/confirm",
  realtime: "/v1/energy-agent/realtime-session",
  realtimeCall: "/v1/energy-agent/realtime-call",
@@ -32,6 +33,8 @@
  thinking: false,
  speaking: false,
  pending: null,
+ // File / image attachments for the next chat turn
+ attachments: [], // {id, filename, mime, size, preview}
  recog: null,
  budget: null,
  brain: null,
@@ -391,15 +394,23 @@
  ' </span>' +
  ' </div>' +
  ' <div class="ea-compose" id="eaCompose">' +
+ ' <div class="ea-attach-row" id="eaAttachRow" hidden></div>' +
  ' <div class="ea-compose-shell">' +
- ' <textarea id="eaInput" rows="2" placeholder="Message Energy Agent…"></textarea>' +
+ ' <textarea id="eaInput" rows="2" placeholder="Message Energy Agent… drop files or paste images"></textarea>' +
+ ' <input type="file" id="eaFile" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log" hidden />' +
  ' <div class="ea-compose-bar">' +
+ ' <button type="button" class="ea-chip ea-attach" id="eaAttach" title="Attach a file or image">' +
+ ' <span class="ea-chip-ic ea-chip-ic-svg" aria-hidden="true">' +
+ '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+ 'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">' +
+ '<path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.49-8.49a3.5 3.5 0 0 1 4.95 4.95l-8.5 8.49a1.5 1.5 0 0 1-2.12-2.12l7.78-7.78"/>' +
+ '</svg></span><span class="ea-chip-lbl">Attach</span></button>' +
  ' <button type="button" class="ea-chip" id="eaImproveOpen" title="Mark up the page and ship a small improvement">' +
  ' <span class="ea-chip-ic" aria-hidden="true">✦</span><span class="ea-chip-lbl">Improve</span></button>' +
  ' <button type="button" class="ea-chip ea-mic" id="eaMic" title="Toggle microphone">' +
  ' <span class="ea-chip-ic ea-chip-ic-svg" aria-hidden="true">' +
  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
- 'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">' +
+ 'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
  '<rect x="9" y="2.5" width="6" height="11" rx="3"/>' +
  '<path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/>' +
  '<path d="M12 17v4.5"/><path d="M8.5 21.5h7"/>' +
@@ -462,7 +473,9 @@
  setVoiceMuted(!state.voiceMuted);
  };
  syncMuteBtn();
+ syncMicBtn();
  applyVoiceMuteToAudio();
+ wireEaAttachments();
  var eaIn = document.getElementById("eaInput");
  eaIn.addEventListener("keydown", function (e) {
  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
@@ -487,6 +500,166 @@
  document.getElementById("eaImproveText").addEventListener("keydown", function (e) {
  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitImprove(); }
  });
+ }
+
+ function escHtml(s) {
+ return String(s == null ? "" : s)
+ .replace(/&/g, "&amp;")
+ .replace(/</g, "&lt;")
+ .replace(/>/g, "&gt;")
+ .replace(/"/g, "&quot;");
+ }
+
+ /** Attach / drag-drop / paste images into EA chat for agent analysis. */
+ function wireEaAttachments() {
+ var attachBtn = document.getElementById("eaAttach");
+ var fileInput = document.getElementById("eaFile");
+ if (attachBtn && fileInput && !attachBtn._wired) {
+ attachBtn._wired = true;
+ attachBtn.onclick = function (e) {
+ e.preventDefault();
+ fileInput.click();
+ };
+ fileInput.onchange = function () {
+ var files = fileInput.files;
+ if (!files || !files.length) return;
+ for (var i = 0; i < files.length; i++) eaUploadFile(files[i]);
+ fileInput.value = "";
+ };
+ }
+ var panel = document.getElementById("eaPanel");
+ var compose = document.getElementById("eaCompose");
+ var dropTargets = [panel, compose].filter(Boolean);
+ dropTargets.forEach(function (el) {
+ if (el._dropWired) return;
+ el._dropWired = true;
+ ["dragenter", "dragover"].forEach(function (ev) {
+ el.addEventListener(ev, function (e) {
+ e.preventDefault();
+ e.stopPropagation();
+ el.classList.add("ea-drop-hot");
+ if (compose) compose.classList.add("ea-drop-hot");
+ });
+ });
+ ["dragleave", "drop"].forEach(function (ev) {
+ el.addEventListener(ev, function (e) {
+ e.preventDefault();
+ e.stopPropagation();
+ el.classList.remove("ea-drop-hot");
+ if (compose) compose.classList.remove("ea-drop-hot");
+ });
+ });
+ el.addEventListener("drop", function (e) {
+ var dt = e.dataTransfer;
+ if (!dt || !dt.files || !dt.files.length) return;
+ for (var i = 0; i < dt.files.length; i++) eaUploadFile(dt.files[i]);
+ });
+ });
+ var ta = document.getElementById("eaInput");
+ if (ta && !ta._pasteWired) {
+ ta._pasteWired = true;
+ ta.addEventListener("paste", function (e) {
+ var items = e.clipboardData && e.clipboardData.items;
+ if (!items) return;
+ for (var i = 0; i < items.length; i++) {
+ var it = items[i];
+ if (it.kind === "file") {
+ var f = it.getAsFile();
+ if (f) {
+ e.preventDefault();
+ eaUploadFile(f);
+ }
+ }
+ }
+ });
+ }
+ renderEaAttachments();
+ }
+
+ function renderEaAttachments() {
+ var row = document.getElementById("eaAttachRow");
+ if (!row) return;
+ if (!state.attachments || !state.attachments.length) {
+ row.hidden = true;
+ row.innerHTML = "";
+ return;
+ }
+ row.hidden = false;
+ row.innerHTML = state.attachments
+ .map(function (a, idx) {
+ var size =
+ a.size > 1024 * 1024
+ ? (a.size / (1024 * 1024)).toFixed(1) + " MB"
+ : a.size > 1024
+ ? Math.round(a.size / 1024) + " KB"
+ : (a.size || 0) + " B";
+ return (
+ '<span class="ea-attach-chip" data-idx="' +
+ idx +
+ '">' +
+ '<span class="ea-attach-name">' +
+ escHtml(a.filename || "file") +
+ "</span>" +
+ '<span class="ea-attach-size">' +
+ escHtml(size) +
+ "</span>" +
+ '<button type="button" class="ea-attach-x" data-rm="' +
+ idx +
+ '" aria-label="Remove">×</button>' +
+ "</span>"
+ );
+ })
+ .join("");
+ row.querySelectorAll("[data-rm]").forEach(function (btn) {
+ btn.onclick = function () {
+ var i = parseInt(btn.getAttribute("data-rm"), 10);
+ if (!isNaN(i)) {
+ state.attachments.splice(i, 1);
+ renderEaAttachments();
+ }
+ };
+ });
+ }
+
+ async function eaUploadFile(file) {
+ if (!file) return;
+ if (!signedIn()) {
+ addMsg("agent", "Sign in to attach files for analysis.");
+ return;
+ }
+ var row = document.getElementById("eaAttachRow");
+ if (row) {
+ row.hidden = false;
+ row.innerHTML =
+ (row.innerHTML || "") +
+ '<span class="ea-attach-chip ea-attach-uploading">Uploading ' +
+ escHtml(file.name || "file") +
+ "…</span>";
+ }
+ try {
+ var fd = new FormData();
+ fd.append("file", file, file.name || "upload.bin");
+ var headers = authHeaders();
+ delete headers["Content-Type"];
+ var r = await fetch(API.upload, {
+ method: "POST",
+ headers: headers,
+ body: fd,
+ });
+ var d = await r.json().catch(function () { return {}; });
+ if (!r.ok) throw new Error((d && d.detail) || "upload failed");
+ if (d.asset) {
+ if (!state.attachments) state.attachments = [];
+ if (state.attachments.length >= 8) {
+ addMsg("agent", "You can attach up to 8 files per message.");
+ } else {
+ state.attachments.push(d.asset);
+ }
+ }
+ } catch (e) {
+ addMsg("agent", "Upload failed: " + ((e && e.message) || e));
+ }
+ renderEaAttachments();
  }
 
  // ── Improve-the-site (merged with feature-suggestion + judge pipeline) ──
@@ -2307,9 +2480,10 @@
  async function sendText() {
  var input = document.getElementById("eaInput");
  var text = (input && input.value || "").trim();
- if (!text) return;
+ var hasAttach = state.attachments && state.attachments.length > 0;
+ if (!text && !hasAttach) return;
  if (input) input.value = "";
- await turn(text, "text");
+ await turn(text || "Please analyze the attached file(s).", "text");
  }
 
  /**
@@ -2409,7 +2583,11 @@
 
  async function turn(text, source, opts) {
  opts = opts || {};
- if (!text) return;
+ var pendingAttach = (state.attachments || []).slice();
+ if (!text && !pendingAttach.length) return;
+ if (!text && pendingAttach.length) {
+ text = "Please analyze the attached file(s).";
+ }
  // Hard stop first, works even if a previous turn is still thinking/speaking
  if (isStopCommand(text)) {
  if (!opts.userAlreadyShown) addMsg("user", text);
@@ -2442,11 +2620,23 @@
  state._turnBusy = false;
  return;
  }
+ // Capture attachments for this turn, clear UI immediately so a retry doesn't double-send
+ var attachIds = pendingAttach.map(function (a) { return a.id; }).filter(Boolean);
+ var attachNames = pendingAttach.map(function (a) { return a.filename || "file"; });
+ if (attachIds.length) {
+ state.attachments = [];
+ renderEaAttachments();
+ }
  if (!opts.userAlreadyShown) {
- addMsg("user", text);
+ var userLine = text;
+ if (attachNames.length) {
+ userLine = text + "\n\n📎 " + attachNames.join(", ");
+ }
+ addMsg("user", userLine);
  }
  // Seamless merge: site-improve intent opens mark-up with their ask prefilled
- if (isImproveIntent(text)) {
+ // (skip when attachments present — owner wants analysis, not markup)
+ if (!attachIds.length && isImproveIntent(text)) {
  openImproveFlow({
  markFirst: true,
  hint: craftImprovePrompt(text),
@@ -2458,7 +2648,8 @@
  }
  // Visual / color / button look-and-feel: short ack + quiet improve path.
  // Do NOT dump design-token lectures or multi-tool cascades (Ford 2026-07-14).
- if (isVisualFixIntent(text)) {
+ // Skip when attachments need real analysis.
+ if (!attachIds.length && isVisualFixIntent(text)) {
  try {
  await handleVisualFixFast(text, sid, source);
  } finally {
@@ -2470,9 +2661,9 @@
  return;
  }
  // Tab names must match the top bar, answer locally so the model can't invent Dashboard/Arrays/Reports
- if (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/i.test(text)
+ if (!attachIds.length && (/\bwhat (are|is) (all )?(the )?(different )?tabs\b/i.test(text)
  || /\b(list|name|explain) (all )?(the )?tabs\b/i.test(text)
- || /\btabs (do i|are there|in (the )?(app|nav|bar))\b/i.test(text)) {
+ || /\btabs (do i|are there|in (the )?(app|nav|bar))\b/i.test(text))) {
  addMsg("agent", tabsCheatSheet());
  try {
  enqueueSpeak(
@@ -2487,7 +2678,7 @@
  }
  // Show-and-tell tours: fully client-side, real DOM selectors, voice lockstep.
  // NEVER call the LLM for freehand highlights (hallucinated boxes / desync).
- var tourId = detectTourId(text);
+ var tourId = attachIds.length ? null : detectTourId(text);
  if (tourId) {
  setStatus("Walking you through…", "think");
  try {
@@ -2541,15 +2732,17 @@
  startThinkingFiller(text, turnGen, isVoice);
 
  try {
- var fetchOpts = {
- method: "POST",
- headers: authHeaders(),
- body: JSON.stringify({
+ var chatBody = {
  session_id: sid,
  message: text,
  context: packContext(),
  source: source || "text",
- }),
+ };
+ if (attachIds.length) chatBody.attachment_ids = attachIds;
+ var fetchOpts = {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify(chatBody),
  };
  if (state._chatAbort) fetchOpts.signal = state._chatAbort.signal;
  var r = await fetch(API.chat, fetchOpts);
@@ -3943,13 +4136,13 @@
 
  function syncMicBtn() {
  var b = document.getElementById("eaMic");
- if (b) {
+ if (!b) return;
  b.classList.toggle("on", state.listening);
+ // NEVER set b.textContent — that wipes the SVG mic icon (Ford 2026-07-16)
  var lbl = b.querySelector(".ea-chip-lbl");
  if (lbl) lbl.textContent = state.listening ? "Live" : "Mic";
- else b.textContent = state.listening ? "Live" : "Mic";
  b.title = state.listening ? "Microphone on, click to mute" : "Toggle microphone";
- }
+ b.setAttribute("aria-pressed", state.listening ? "true" : "false");
  }
 
  function syncMuteBtn() {

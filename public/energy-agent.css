@@ -790,9 +790,21 @@ html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: v
   place-items: center;
   width: 14px;
   height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex: 0 0 14px;
   line-height: 0;
+  overflow: visible;
 }
-.ea-chip-ic-svg svg{ display: block; width: 14px; height: 14px; }
+.ea-chip-ic-svg svg{
+  display: block;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex: none;
+  overflow: visible;
+}
 
 /* Markdown inside bubbles — scannable structure (lists, headings, spacing) */
 .ea-msg{
@@ -1022,7 +1034,7 @@ html:not(.sky) .ea-compose-bar{
   width: 0;            /* equal columns with flex */
   min-width: 0;
   height: 32px;
-  padding: 0 4px;
+  padding: 0 6px;
   border-radius: 999px;
   font: inherit;
   font-size: 11px;
@@ -1031,10 +1043,11 @@ html:not(.sky) .ea-compose-bar{
   white-space: nowrap;
   cursor: pointer;
   box-sizing: border-box;
+  overflow: hidden;
   transition: background .12s, border-color .12s, color .12s, filter .12s, box-shadow .12s, transform .1s;
 }
 
-/* Quiet chip buttons (Improve / Mic / Mute) */
+/* Quiet chip buttons (Attach / Improve / Mic / Mute) */
 .ea-chip{
   border: 1px solid rgba(14,165,233,.18);
   background: rgba(255,255,255,.75);
@@ -1046,12 +1059,28 @@ html:not(.sky) .ea-compose-bar{
   transform: translateY(-0.5px);
 }
 .ea-chip:active{ transform: translateY(0); }
-.ea-chip-ic{ font-size: 11px; line-height: 1; opacity: .95; flex: none; }
+.ea-chip-ic{
+  font-size: 11px;
+  line-height: 1;
+  opacity: .95;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Never let flex equal-width crush the mic/attach SVG */
+.ea-compose-bar > .ea-chip .ea-chip-ic,
+.ea-compose-bar > .ea-chip .ea-chip-ic-svg{
+  flex: 0 0 14px;
+  width: 14px;
+  min-width: 14px;
+}
 .ea-chip-lbl{
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  min-width: 0;
 }
 html:not(.sky) .ea-chip{
   background: rgba(255,255,255,.06);
@@ -1101,6 +1130,67 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 
 /* Legacy class hooks (no-op if unused) */
 .ea-mic{ /* mic styling lives on .ea-chip.ea-mic */ }
+
+/* Attachment strip above composer */
+.ea-attach-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px 8px;
+  flex: 0 0 auto;
+}
+.ea-attach-row[hidden]{ display: none !important; }
+.ea-attach-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  background: rgba(14,165,233,.1);
+  border: 1px solid rgba(14,165,233,.28);
+  color: #0c4a6e;
+  font-size: 11.5px;
+  font-weight: 650;
+  max-width: 100%;
+}
+html:not(.sky) .ea-attach-chip{
+  background: rgba(56,189,248,.12);
+  border-color: rgba(56,189,248,.28);
+  color: #e2e8f0;
+}
+.ea-attach-name{
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ea-attach-size{ opacity: .65; font-weight: 600; font-size: 10.5px; }
+.ea-attach-x{
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: .7;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.ea-attach-x:hover{ opacity: 1; }
+.ea-attach-uploading{ opacity: .75; font-style: italic; }
+
+/* Drag-drop highlight on compose / panel */
+.ea-compose.ea-drop-hot .ea-compose-shell,
+#eaPanel.ea-drop-hot .ea-compose-shell{
+  outline: 2px dashed rgba(14,165,233,.55);
+  outline-offset: 2px;
+  background: rgba(14,165,233,.06);
+}
+html:not(.sky) .ea-compose.ea-drop-hot .ea-compose-shell,
+html:not(.sky) #eaPanel.ea-drop-hot .ea-compose-shell{
+  outline-color: rgba(56,189,248,.55);
+  background: rgba(56,189,248,.08);
+}
 
 /* Footer metrics strip removed (Ford 2026-07-15). */
 .ea-legal{ display: none !important; }
@@ -1389,9 +1479,16 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-msgs{ padding: 10px 12px 12px; }
   .ea-msg{ font-size: 12.5px; padding: 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
-  .ea-compose-bar{ gap: 4px; padding: 5px; }
+  .ea-compose-bar{ gap: 3px; padding: 5px; }
   .ea-compose-bar > .ea-chip,
-  .ea-compose-bar > .ea-send{ height: 34px; font-size: 10.5px; }
+  .ea-compose-bar > .ea-send{ height: 34px; font-size: 10px; padding: 0 4px; }
+  /* Icon stays; labels may ellipsis on 5 equal chips */
+  .ea-compose-bar > .ea-chip .ea-chip-ic,
+  .ea-compose-bar > .ea-chip .ea-chip-ic-svg{
+    flex: 0 0 14px;
+    width: 14px;
+    min-width: 14px;
+  }
 
   /* Mic gate parks near the bubble, not the rail */
   .ea-mic-gate,
