@@ -723,36 +723,57 @@ body.mh-os .ea-tools{
 }
 html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: var(--line); }
 
-/* Full-message copy (parity with Sovereign desk) */
+/* Tiny corner copy control (icon only) */
 .ea-msg .chat-msg-copy{
   appearance: none;
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(15,23,42,.1);
-  background: rgba(255,255,255,.72);
-  color: #33415A;
-  font: 650 10.5px/1 inherit;
-  letter-spacing: .02em;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(15,23,42,.08);
+  background: rgba(255,255,255,.55);
+  color: #64748b;
+  font: inherit;
   cursor: pointer;
   opacity: 0;
   transition: opacity .12s, background .12s, border-color .12s, color .12s;
+  box-sizing: border-box;
+  line-height: 0;
 }
 .ea-msg:hover .chat-msg-copy,
 .ea-msg:focus-within .chat-msg-copy,
-.chat-msg-copy:focus-visible{ opacity: 1; }
+.ea-msg .chat-msg-copy:focus-visible{ opacity: .85; }
 .ea-msg .chat-msg-copy:hover{
-  background: #fff;
-  border-color: rgba(14,165,233,.4);
+  opacity: 1;
+  background: rgba(255,255,255,.95);
+  border-color: rgba(14,165,233,.35);
   color: #0369a1;
 }
-.ea-msg .chat-msg-copy svg{ display: block; flex: none; }
+.ea-msg .chat-msg-copy svg{
+  display: block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+/* Label hidden — icon-only; aria-label stays for a11y */
+.ea-msg .chat-msg-copy .chat-msg-copy-lbl{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .ea-msg .chat-msg-copy.copied{
   opacity: 1;
   background: linear-gradient(180deg, var(--ea-sky), var(--ea-sky2));
@@ -765,25 +786,26 @@ html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: v
   color: #ff6b6b;
 }
 .ea-msg.user .chat-msg-copy{
-  background: rgba(255,255,255,.2);
-  border-color: rgba(255,255,255,.35);
-  color: #fff;
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.25);
+  color: rgba(255,255,255,.85);
 }
 .ea-msg.user .chat-msg-copy:hover{
-  background: rgba(255,255,255,.32);
+  background: rgba(255,255,255,.3);
   color: #fff;
+  opacity: 1;
 }
 .ea-msg.user .chat-msg-copy.copied{
   background: #fff;
   color: #0369a1;
 }
-/* Room for the copy control so text doesn't sit under it */
+/* Small inset so text doesn't collide with the 18px control */
 .ea-msg .ea-msg-body,
 .ea-msg .ea-sov-body,
 .ea-msg .ea-email-body{ padding-right: 4px; }
 .ea-msg:hover .ea-msg-body,
 .ea-msg:hover .ea-sov-body,
-.ea-msg:hover .ea-email-body{ padding-right: 72px; }
+.ea-msg:hover .ea-email-body{ padding-right: 22px; }
 
 .ea-chip-ic-svg{
   display: grid;

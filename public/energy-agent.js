@@ -1581,8 +1581,8 @@
  /** Single chat log for voice + text. Returns false if this is a near-duplicate of the last bubble. */
  function copyIconSvg() {
  return (
- '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
- 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+ '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" ' +
+ 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
  '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
  '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>' +
  "</svg>"
@@ -1595,14 +1595,13 @@
  if (!btn) return;
  btn.classList.toggle("copied", !!ok);
  btn.classList.toggle("copy-fail", !ok);
- var lbl = btn.querySelector(".chat-msg-copy-lbl");
- if (lbl) lbl.textContent = ok ? "Copied" : "Failed";
+ btn.title = ok ? "Copied" : (ok === false ? "Copy failed" : "Copy message");
  btn.setAttribute("aria-label", ok ? "Copied" : "Copy failed");
  setTimeout(function () {
  btn.classList.remove("copied", "copy-fail");
- if (lbl) lbl.textContent = "Copy";
+ btn.title = "Copy message";
  btn.setAttribute("aria-label", "Copy message");
- }, 1400);
+ }, 1200);
  }
  function fallback() {
  try {
