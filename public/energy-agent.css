@@ -711,6 +711,7 @@ body.mh-os .ea-tools{
 .ea-msg{
   max-width: 94%; font-size: 13px; line-height: 1.5; padding: 10px 13px; border-radius: 14px;
   letter-spacing: -.005em;
+  position: relative;
 }
 .ea-msg.user{
   align-self: flex-end; background: linear-gradient(180deg, var(--ea-sky), var(--ea-sky2));
@@ -721,6 +722,77 @@ body.mh-os .ea-tools{
   border-bottom-left-radius: 5px;
 }
 html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: var(--line); }
+
+/* Full-message copy (parity with Sovereign desk) */
+.ea-msg .chat-msg-copy{
+  appearance: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,.1);
+  background: rgba(255,255,255,.72);
+  color: #33415A;
+  font: 650 10.5px/1 inherit;
+  letter-spacing: .02em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s, background .12s, border-color .12s, color .12s;
+}
+.ea-msg:hover .chat-msg-copy,
+.ea-msg:focus-within .chat-msg-copy,
+.chat-msg-copy:focus-visible{ opacity: 1; }
+.ea-msg .chat-msg-copy:hover{
+  background: #fff;
+  border-color: rgba(14,165,233,.4);
+  color: #0369a1;
+}
+.ea-msg .chat-msg-copy svg{ display: block; flex: none; }
+.ea-msg .chat-msg-copy.copied{
+  opacity: 1;
+  background: linear-gradient(180deg, var(--ea-sky), var(--ea-sky2));
+  border-color: transparent;
+  color: #fff;
+}
+.ea-msg .chat-msg-copy.copy-fail{
+  opacity: 1;
+  border-color: rgba(255,107,107,.5);
+  color: #ff6b6b;
+}
+.ea-msg.user .chat-msg-copy{
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.35);
+  color: #fff;
+}
+.ea-msg.user .chat-msg-copy:hover{
+  background: rgba(255,255,255,.32);
+  color: #fff;
+}
+.ea-msg.user .chat-msg-copy.copied{
+  background: #fff;
+  color: #0369a1;
+}
+/* Room for the copy control so text doesn't sit under it */
+.ea-msg .ea-msg-body,
+.ea-msg .ea-sov-body,
+.ea-msg .ea-email-body{ padding-right: 4px; }
+.ea-msg:hover .ea-msg-body,
+.ea-msg:hover .ea-sov-body,
+.ea-msg:hover .ea-email-body{ padding-right: 72px; }
+
+.ea-chip-ic-svg{
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  line-height: 0;
+}
+.ea-chip-ic-svg svg{ display: block; width: 14px; height: 14px; }
 
 /* Markdown inside bubbles — scannable structure (lists, headings, spacing) */
 .ea-msg{

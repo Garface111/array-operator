@@ -959,6 +959,72 @@
     else el.setAttribute("hidden", "");
   }
 
+  function copyIconSvg() {
+    return (
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
+      '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>' +
+      "</svg>"
+    );
+  }
+
+  function copyMessageText(text, btn) {
+    var raw = String(text == null ? "" : text);
+    function flash(ok) {
+      if (!btn) return;
+      btn.classList.toggle("copied", !!ok);
+      btn.classList.toggle("copy-fail", !ok);
+      var lbl = btn.querySelector(".chat-msg-copy-lbl");
+      if (lbl) lbl.textContent = ok ? "Copied" : "Failed";
+      btn.setAttribute("aria-label", ok ? "Copied" : "Copy failed");
+      setTimeout(function () {
+        btn.classList.remove("copied", "copy-fail");
+        if (lbl) lbl.textContent = "Copy";
+        btn.setAttribute("aria-label", "Copy message");
+      }, 1400);
+    }
+    function fallback() {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = raw;
+        ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;left:-9999px;top:0";
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        flash(ok);
+      } catch (e) {
+        flash(false);
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(raw).then(
+        function () {
+          flash(true);
+        },
+        fallback
+      );
+    } else {
+      fallback();
+    }
+  }
+
+  function wireCopyDelegation(host) {
+    if (!host || host._copyWired) return;
+    host._copyWired = true;
+    host.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".chat-msg-copy") : null;
+      if (!btn || !host.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var bubble = btn.closest("[data-raw]");
+      var raw = bubble ? bubble.getAttribute("data-raw") || "" : "";
+      copyMessageText(raw, btn);
+    });
+  }
+
   function bubbleHtml(m) {
     var role = m.role === "ford" ? "ford" : "sov";
     var label = role === "ford" ? "You" : "Sovereign";
@@ -967,17 +1033,24 @@
       ? formatChatMd(raw)
       : esc(raw).replace(/\n/g, "<br>");
     var t = formatTime(m.created_at);
+    // data-raw holds plain text for one-click full-message copy
     return (
       '<div class="sov-bubble sov-bubble--' +
       role +
       '" data-role="' +
       role +
+      '" data-raw="' +
+      esc(raw) +
       '">' +
       '<div class="sov-bubble-lab">' +
       '<span class="sov-bubble-who">' +
       esc(label) +
       "</span>" +
       (t ? '<span class="sov-bubble-time">' + esc(t) + "</span>" : "") +
+      '<button type="button" class="chat-msg-copy" title="Copy message" aria-label="Copy message">' +
+      copyIconSvg() +
+      '<span class="chat-msg-copy-lbl">Copy</span>' +
+      "</button>" +
       "</div>" +
       '<div class="sov-bubble-body sov-md">' +
       body +
@@ -989,6 +1062,7 @@
   function renderMessages() {
     var host = document.getElementById("sovDeskMsgs");
     if (!host) return;
+    wireCopyDelegation(host);
     var visible = state.messages.filter(isChatWorthy);
     if (!visible.length && !state.sending) {
       host.innerHTML =

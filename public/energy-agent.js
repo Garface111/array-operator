@@ -397,7 +397,13 @@
  ' <button type="button" class="ea-chip" id="eaImproveOpen" title="Mark up the page and ship a small improvement">' +
  ' <span class="ea-chip-ic" aria-hidden="true">✦</span><span class="ea-chip-lbl">Improve</span></button>' +
  ' <button type="button" class="ea-chip ea-mic" id="eaMic" title="Toggle microphone">' +
- ' <span class="ea-chip-ic" aria-hidden="true">🎙</span><span class="ea-chip-lbl">Mic</span></button>' +
+ ' <span class="ea-chip-ic ea-chip-ic-svg" aria-hidden="true">' +
+ '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+ 'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">' +
+ '<rect x="9" y="2.5" width="6" height="11" rx="3"/>' +
+ '<path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/>' +
+ '<path d="M12 17v4.5"/><path d="M8.5 21.5h7"/>' +
+ '</svg></span><span class="ea-chip-lbl">Mic</span></button>' +
  ' <button type="button" class="ea-chip ea-mute" id="eaMute" title="Mute agent voice">' +
  ' <span class="ea-chip-ic" aria-hidden="true">🔊</span><span class="ea-chip-lbl">Mute</span></button>' +
  ' <span class="ea-compose-spacer"></span>' +
@@ -1400,10 +1406,82 @@
  }
 
  /** Single chat log for voice + text. Returns false if this is a near-duplicate of the last bubble. */
+ function copyIconSvg() {
+ return (
+ '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+ 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+ '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
+ '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>' +
+ "</svg>"
+ );
+ }
+
+ function copyMessageText(text, btn) {
+ var raw = String(text == null ? "" : text);
+ function flash(ok) {
+ if (!btn) return;
+ btn.classList.toggle("copied", !!ok);
+ btn.classList.toggle("copy-fail", !ok);
+ var lbl = btn.querySelector(".chat-msg-copy-lbl");
+ if (lbl) lbl.textContent = ok ? "Copied" : "Failed";
+ btn.setAttribute("aria-label", ok ? "Copied" : "Copy failed");
+ setTimeout(function () {
+ btn.classList.remove("copied", "copy-fail");
+ if (lbl) lbl.textContent = "Copy";
+ btn.setAttribute("aria-label", "Copy message");
+ }, 1400);
+ }
+ function fallback() {
+ try {
+ var ta = document.createElement("textarea");
+ ta.value = raw;
+ ta.setAttribute("readonly", "");
+ ta.style.cssText = "position:fixed;left:-9999px;top:0";
+ document.body.appendChild(ta);
+ ta.select();
+ var ok = document.execCommand("copy");
+ document.body.removeChild(ta);
+ flash(ok);
+ } catch (e) {
+ flash(false);
+ }
+ }
+ if (navigator.clipboard && navigator.clipboard.writeText) {
+ navigator.clipboard.writeText(raw).then(function () { flash(true); }, fallback);
+ } else {
+ fallback();
+ }
+ }
+
+ function wireEaCopyDelegation(host) {
+ if (!host || host._copyWired) return;
+ host._copyWired = true;
+ host.addEventListener("click", function (e) {
+ var btn = e.target && e.target.closest ? e.target.closest(".chat-msg-copy") : null;
+ if (!btn || !host.contains(btn)) return;
+ e.preventDefault();
+ e.stopPropagation();
+ var bubble = btn.closest("[data-raw]");
+ var raw = bubble ? bubble.getAttribute("data-raw") || "" : "";
+ copyMessageText(raw, btn);
+ });
+ }
+
+ function makeCopyBtn() {
+ var copyBtn = document.createElement("button");
+ copyBtn.type = "button";
+ copyBtn.className = "chat-msg-copy";
+ copyBtn.title = "Copy message";
+ copyBtn.setAttribute("aria-label", "Copy message");
+ copyBtn.innerHTML = copyIconSvg() + '<span class="chat-msg-copy-lbl">Copy</span>';
+ return copyBtn;
+ }
+
  function addMsg(role, text, opts) {
  opts = opts || {};
  var host = document.getElementById("eaMsgs");
  if (!host) return false;
+ wireEaCopyDelegation(host);
  var t = String(text || "").trim();
  if (!t) return false;
  // Dedupe: voice transcript path + turn() used to double-post the same line.
@@ -1445,6 +1523,10 @@
  // unless they include obvious markdown markers (lists, bold, code, headers).
  var rich = role === "agent" || isSovereign ||
  /\*\*|__|`|^#\s|^\s*[-*+•]\s|^\s*\d+[.)]\s|^\s*\(\d+\)\s/m.test(t);
+
+ // Copy whole message — same control as Sovereign desk
+ d.appendChild(makeCopyBtn());
+
  if (isRepairEmail && role !== "user") {
  var elab = document.createElement("div");
  elab.className = "ea-email-label";
@@ -1458,21 +1540,23 @@
  label.textContent = "Sovereign · Array Operator";
  d.appendChild(label);
  var body = document.createElement("div");
- body.className = "ea-sov-body";
+ body.className = "ea-sov-body ea-msg-body";
  if (rich) body.innerHTML = formatMsg(t);
  else body.textContent = t;
  d.appendChild(body);
  } else if (isRepairEmail) {
  // Append body without wiping the Email · label
  var rbody = document.createElement("div");
- rbody.className = "ea-email-body";
+ rbody.className = "ea-email-body ea-msg-body";
  if (rich) rbody.innerHTML = formatMsg(t);
  else rbody.textContent = t;
  d.appendChild(rbody);
- } else if (rich) {
- d.innerHTML = formatMsg(t);
  } else {
- d.textContent = t;
+ var bodyWrap = document.createElement("div");
+ bodyWrap.className = "ea-msg-body";
+ if (rich) bodyWrap.innerHTML = formatMsg(t);
+ else bodyWrap.textContent = t;
+ d.appendChild(bodyWrap);
  }
  host.appendChild(d);
  if (!opts.history) {

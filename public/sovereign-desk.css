@@ -348,12 +348,12 @@ html.sky .sov-pill{ color: #0d6b42; background: rgba(63,214,138,.15); }
   line-height: 1.55;
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  position: relative;
 }
 .sov-bubble-lab{
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   font-size: 10px;
   font-weight: 780;
   letter-spacing: .06em;
@@ -361,6 +361,7 @@ html.sky .sov-pill{ color: #0d6b42; background: rgba(63,214,138,.15); }
   margin-bottom: 6px;
   opacity: .9;
 }
+.sov-bubble-who{ flex: 0 1 auto; min-width: 0; }
 .sov-bubble-time{
   font-weight: 600;
   letter-spacing: .02em;
@@ -368,6 +369,68 @@ html.sky .sov-pill{ color: #0d6b42; background: rgba(63,214,138,.15); }
   opacity: .72;
   font-variant-numeric: tabular-nums;
   font-size: 10.5px;
+  margin-right: auto;
+}
+/* Shared with Energy Agent — full-message copy */
+.chat-msg-copy{
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.06);
+  color: inherit;
+  font: 650 10.5px/1 inherit;
+  letter-spacing: .02em;
+  text-transform: none;
+  cursor: pointer;
+  opacity: .72;
+  transition: opacity .12s, background .12s, border-color .12s, color .12s;
+}
+.sov-bubble:hover .chat-msg-copy,
+.chat-msg-copy:focus-visible{ opacity: 1; }
+.chat-msg-copy:hover{
+  background: rgba(0,0,0,.1);
+  border-color: rgba(63,214,138,.4);
+}
+.chat-msg-copy svg{ display: block; flex: none; }
+.chat-msg-copy.copied{
+  opacity: 1;
+  color: #06140d;
+  background: linear-gradient(180deg, var(--sov-good2, #7ff0bb), var(--sov-good, #3fd68a));
+  border-color: transparent;
+}
+.chat-msg-copy.copy-fail{ opacity: 1; border-color: rgba(255,107,107,.5); color: #ff6b6b; }
+html.sky .chat-msg-copy{
+  background: rgba(255,255,255,.7);
+  border-color: rgba(20,60,120,.14);
+  color: #33415A;
+}
+html.sky .chat-msg-copy:hover{
+  background: #fff;
+  border-color: rgba(33,150,243,.4);
+  color: #1565c0;
+}
+html.sky .chat-msg-copy.copied{
+  background: linear-gradient(180deg, #42a5f5, #1e88e5);
+  color: #fff;
+  border-color: transparent;
+}
+html.sky .sov-bubble--ford .chat-msg-copy{
+  background: rgba(255,255,255,.22);
+  border-color: rgba(255,255,255,.35);
+  color: #fff;
+}
+html.sky .sov-bubble--ford .chat-msg-copy:hover{
+  background: rgba(255,255,255,.35);
+}
+html.sky .sov-bubble--ford .chat-msg-copy.copied{
+  background: #fff;
+  color: #0d6b42;
 }
 .sov-bubble-body{ color: inherit; }
 .sov-bubble-body strong,
