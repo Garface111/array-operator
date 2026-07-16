@@ -229,9 +229,12 @@ html.sky .vs-seg{
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-pill) !important;
   padding:4px !important;
-  margin:16px auto !important; /* equal top/bottom — vertically centered in strip */
+  margin:0 auto !important; /* vertical rhythm owned by .ao-subnav strip */
   box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
   align-items:center;
+}
+html.sky .ao-subnav{
+  padding:14px 0;
 }
 html.sky .vs-seg-btn{
   border-radius:var(--sky-r-pill) !important;

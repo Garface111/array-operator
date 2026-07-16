@@ -97,9 +97,9 @@ html.sky .rb2-id p{color:var(--muted);font-size:12.5px;line-height:1.45;max-widt
 /* ── 3 · GENERATOR TABS → GLASS PILL SEGMENT (mirrors the main tab bar) ────
    The underline tabs become a pill track; active = solid action blue. */
 html.sky .rb2-tabrow{border-bottom:0;align-items:center;gap:14px;margin-top:10px}
-/* Invoices secondary nav — same scale as Analysis .an-sub-seg (Ford 2026-07-16). */
+/* Invoices secondary nav — same scale as Analysis; strip centers it (Ford 2026-07-16). */
 html.sky #panelReports .inv-sub-seg{
-  margin:16px auto !important;
+  margin:0 !important;
   padding:4px !important;
   box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
 }

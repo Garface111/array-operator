@@ -369,7 +369,10 @@ html.sky #panelOps .ops-seg-btn.on:hover{
   filter: brightness(1.04);
 }
 html.sky #panelDashboard .dash-wrap{padding:30px 30px 60px !important;margin-top:14px !important}
-html.sky #sheetWrap{padding:26px 28px 48px;margin-top:14px}
+/* margin-top 0: .ao-subnav strip provides the only gap above the sheet so the
+   sub-nav pill stays vertically centered in the banner→card band (was +14px
+   and sat the Inverters pill high). */
+html.sky #sheetWrap{padding:26px 28px 48px;margin-top:0}
 html.sky .acct-list{overflow:hidden}
 
 /* the pannable fleet board inside the #sbWrap sheet: let the sky glow through

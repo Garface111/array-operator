@@ -588,7 +588,8 @@
      commander card. Aligned to the centered content column (command-center.css
      sets #sbWrap to width:100% of the centered .wrap) — no viewport breakout, so
      nothing clips off the right edge. Taller viewport so the canvas dominates. */
-  #sbWrap.sb-fullscreen{margin-top:8px;padding:10px 12px 12px;border-radius:16px}
+  /* margin-top 0 under .ao-subnav so Spreadsheet|Sandbox stays vertically centered */
+  #sbWrap.sb-fullscreen{margin-top:0;padding:10px 12px 12px;border-radius:16px}
   #sbWrap.sb-fullscreen .sb-viewport{height:calc(100vh - 150px);min-height:520px}
 
   /* ── OVERVIEW GRID: a health-tinted tile per array, packed to fill the width.
