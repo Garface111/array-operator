@@ -520,7 +520,84 @@
     }
   }
 
-  async function loadHistory() {
+  function msgKey(m) {
+    if (m && m.id) return "id:" + m.id;
+    if (m && m._localId) return "local:" + m._localId;
+    return (
+      "tmp:" +
+      (m && m.role) +
+      ":" +
+      String((m && m.content) || "").slice(0, 120) +
+      ":" +
+      String((m && m.created_at) || "")
+    );
+  }
+
+  /** Merge server history with in-flight / local bubbles so poll never wipes a send. */
+  function applyServerHistory(serverMsgs) {
+    serverMsgs = Array.isArray(serverMsgs) ? serverMsgs : [];
+    var byId = {};
+    serverMsgs.forEach(function (m) {
+      if (m && m.id) byId[m.id] = m;
+    });
+
+    // Keep local-only bubbles (optimistic send, offline error) until server has them
+    var locals = (state.messages || []).filter(function (m) {
+      if (!m) return false;
+      if (m._pending) return true; // in-flight send — never drop
+      if (m.id && byId[m.id]) return false; // server is source of truth
+      if (m.id && !byId[m.id]) return true; // rare lag: keep until next poll
+      // No id: keep recent local echoes if server doesn't already have same content
+      if (m._local) {
+        var dup = serverMsgs.some(function (s) {
+          return (
+            s &&
+            s.role === m.role &&
+            String(s.content || "").trim() === String(m.content || "").trim()
+          );
+        });
+        return !dup;
+      }
+      return false;
+    });
+
+    // If server returned empty but we have real conversation, don't blank the UI
+    if (!serverMsgs.length && (state.messages || []).length && !state._historyEverLoaded) {
+      // first load empty is fine
+    } else if (!serverMsgs.length && locals.length === 0 && (state.messages || []).length) {
+      // Server empty + no locals → keep prior messages (stale worker-filter bug)
+      var prior = (state.messages || []).filter(isChatWorthy);
+      if (prior.length) {
+        state._historyEverLoaded = true;
+        return;
+      }
+    }
+
+    var merged = serverMsgs.slice();
+    locals.forEach(function (loc) {
+      var exists = merged.some(function (s) {
+        if (loc.id && s.id && loc.id === s.id) return true;
+        return (
+          s.role === loc.role &&
+          String(s.content || "").trim() === String(loc.content || "").trim()
+        );
+      });
+      if (!exists) merged.push(loc);
+    });
+
+    merged.sort(function (a, b) {
+      var ta = a.created_at ? Date.parse(a.created_at) : 0;
+      var tb = b.created_at ? Date.parse(b.created_at) : 0;
+      if (ta && tb && ta !== tb) return ta - tb;
+      return 0;
+    });
+
+    state.messages = merged;
+    state._historyEverLoaded = true;
+  }
+
+  async function loadHistory(opts) {
+    opts = opts || {};
     var host = document.getElementById("sovDeskMsgs");
     if (!state.allowed) {
       if (host)
@@ -529,19 +606,24 @@
           "<p>Sovereign desk is only on the developer account.</p></div>";
       return;
     }
+    // Never clobber an in-flight turn (the classic "send then both disappear" race)
+    if (state.sending && !opts.force) return;
     try {
       var r = await fetch(API.history + "?limit=120", { headers: authHeaders() });
       var d = await r.json().catch(function () {
         return {};
       });
       if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
-      state.messages = (d && d.messages) || [];
+      // If a send started while fetch was in flight, don't apply
+      if (state.sending && !opts.force) return;
+      applyServerHistory((d && d.messages) || []);
       var meta = document.getElementById("sovDeskMeta");
       if (meta)
         meta.textContent = (d.email || state.email || "desk") + " · private";
       renderMessages();
     } catch (e) {
-      if (host)
+      // On error, keep whatever is on screen — don't clear the transcript
+      if (host && !(state.messages || []).length)
         host.innerHTML =
           '<div class="sov-desk-empty"><b>Couldn’t load desk</b><p>' +
           esc(e.message || "network") +
@@ -565,11 +647,16 @@
       ta.value = "";
       autoGrow(ta);
     }
-    state.messages.push({
+    var localId = "local_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    var fordLocal = {
       role: "ford",
       content: text,
       created_at: new Date().toISOString(),
-    });
+      _local: true,
+      _pending: true,
+      _localId: localId,
+    };
+    state.messages.push(fordLocal);
     renderMessages();
     var host = document.getElementById("sovDeskMsgs");
     if (host) host.scrollTop = host.scrollHeight;
@@ -588,24 +675,40 @@
           detail = detail.message || JSON.stringify(detail);
         throw new Error(detail || "HTTP " + r.status);
       }
+      // Stamp Ford bubble with server id so later history merge is stable
+      var fordMsg = d.ford_message || null;
+      fordLocal._pending = false;
+      if (fordMsg && fordMsg.id) {
+        fordLocal.id = fordMsg.id;
+        fordLocal.created_at = fordMsg.created_at || fordLocal.created_at;
+        fordLocal._local = false;
+      } else if (d.ford_message_id) {
+        fordLocal.id = d.ford_message_id;
+        fordLocal._local = false;
+      }
       var reply = (d.message && d.message.content) || d.reply || "";
       if (reply) {
         state.messages.push({
+          id: d.message && d.message.id,
           role: "sovereign",
           content: reply,
           provider: d.provider,
           created_at:
             (d.message && d.message.created_at) || new Date().toISOString(),
+          _local: !(d.message && d.message.id),
         });
       }
       renderMessages();
       if (host) host.scrollTop = host.scrollHeight;
     } catch (e) {
+      fordLocal._pending = false;
       state.messages.push({
         role: "sovereign",
         content: "Couldn't send that just now — " + (e.message || e) + ". Try again.",
         provider: "error",
         created_at: new Date().toISOString(),
+        _local: true,
+        _localId: "err_" + localId,
       });
       renderMessages();
     } finally {
@@ -625,7 +728,7 @@
       if (location.hash === "#sovereign" && state.allowed && !state.sending) {
         loadHistory();
       }
-    }, 15000);
+    }, 20000);
   }
 
   function stopPoll() {
