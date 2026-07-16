@@ -209,10 +209,23 @@
       statusKey: "onlinepay",
     },
     {
+      id: "repairs",
+      rail: "Repairs",
+      railSub: "",
+      kicker: "15",
+      title: "Repair contact",
+      lede: "",
+      kind: "step",
+      cta: { label: "Open →", hash: "#ops" },
+      secondary: { label: "Skip", skip: true },
+      statusKey: "repairs",
+      autoNav: true,
+    },
+    {
       id: "resources",
       rail: "Resources",
       railSub: "",
-      kicker: "15",
+      kicker: "16",
       title: "Resources",
       lede: "",
       kind: "guide",
@@ -223,7 +236,7 @@
       id: "account",
       rail: "Account",
       railSub: "",
-      kicker: "16",
+      kicker: "17",
       title: "Account",
       lede: "",
       kind: "guide",
@@ -234,7 +247,7 @@
       id: "agent",
       rail: "Agent",
       railSub: "",
-      kicker: "17",
+      kicker: "18",
       title: "Energy Agent",
       lede: "",
       kind: "guide",
@@ -433,6 +446,8 @@
  onlinePayConnected: false,
  onlinePayFee: null,
  cloudLogins: [],
+ repairContact: null,
+ repairContacts: 0,
  };
  try {
  var chosen = localStorage.getItem(DELIVERY_CHOSEN_KEY);
@@ -652,6 +667,20 @@
  }
  } catch (e) {}
 
+ // O&M / repair roster — the agent can't email anyone when a site dies
+ // until at least one active contact exists.
+ try {
+ var oc = await fetch("/v1/array-owners/ops/contacts", { headers: authHeaders() });
+ if (oc.ok) {
+ var od2 = await oc.json();
+ var cl = (od2 && od2.contacts) || [];
+ live.repairContacts = cl.filter(function (c) {
+ return c && c.active !== false;
+ }).length;
+ live.repairContact = live.repairContacts > 0;
+ }
+ } catch (e) {}
+
  // fallback array count from overview if FleetStore empty
  if (live.arrays == null) {
  try {
@@ -682,6 +711,7 @@
  return !!live.deliveryChosen;
  }
  if (step.statusKey === "onlinepay") return !!live.onlinePay;
+ if (step.statusKey === "repairs") return !!live.repairContact;
  // Guide surfaces: complete once walked
  if (step.kind === "guide" || (step.kind === "step" && !step.statusKey)) {
  return isVisited(step.id);

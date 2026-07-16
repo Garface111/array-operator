@@ -103,6 +103,30 @@
       },
     },
     {
+      id: "repairs",
+      story: "hands_off",
+      label: "Repair contact",
+      sub: "Who fixes it (optional)",
+      why: "When an inverter dies, Energy Agent emails your O&M tech and coordinates the fix — but only if it knows who they are.",
+      prompt:
+        "Set up my repair system. I want you to know who fixes my arrays so you can email them the moment a site goes dark. Let's add my O&M contact — name and email first.",
+      hash: "#ops",
+      detailHint: "Repairs",
+      open: {},
+      openLabel: "Open Repairs",
+      optional: true,
+      statusLine: function (L) {
+        if (L && L.repairContact)
+          return (L.repairContacts || 0) + " contact" + ((L.repairContacts || 0) === 1 ? "" : "s") + " on call";
+        if (isSkipped("repairs")) return "Skipped · I'll handle repairs";
+        return "Nobody to email when a site dies";
+      },
+      done: function (L) {
+        return !!(L && L.repairContact) || isSkipped("repairs");
+      },
+      skipLabel: "I'll handle repairs myself",
+    },
+    {
       id: "offtakers",
       story: "hands_off",
       label: "Offtakers",
