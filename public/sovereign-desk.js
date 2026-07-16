@@ -478,7 +478,7 @@
       sec.className = "panel";
       sec.id = "panelSovereign";
       sec.setAttribute("role", "tabpanel");
-      sec.setAttribute("aria-label", "Energy Agent desk");
+      sec.setAttribute("aria-label", "Energy Agent Prime desk");
       wrap.appendChild(sec);
     }
     var existing = sec.querySelector(".sov-desk");
@@ -507,8 +507,8 @@
       '    <div class="sov-desk-brand">' +
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
-      "        <h1>Energy Agent</h1>" +
-      '        <p class="sov-desk-sub">Private chat · files · local bridge</p>' +
+      "        <h1>Energy Agent Prime</h1>" +
+      '        <p class="sov-desk-sub">Product mind · private · files · bridge</p>' +
       "      </div>" +
       "    </div>" +
       '    <div class="sov-desk-head-right">' +
@@ -521,9 +521,9 @@
       '    <div class="sov-desk-body" id="sovDeskMsgs" aria-live="polite"></div>' +
       '    <div class="sov-desk-typing" id="sovDeskTyping" hidden>' +
       '      <span class="sov-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
-      '      <span class="sov-typing-label">Energy Agent is thinking…</span>' +
+      '      <span class="sov-typing-label">Prime is thinking…</span>' +
       '      <button type="button" class="sov-desk-stop" id="sovDeskStop" hidden ' +
-      'title="Stop Energy Agent" aria-label="Stop Energy Agent">Stop</button>' +
+      'title="Stop Energy Agent Prime" aria-label="Stop Energy Agent Prime">Stop</button>' +
       "    </div>" +
       '    <div class="sov-attach-row" id="sovAttachRow" hidden></div>' +
       '    <form class="sov-desk-compose" id="sovDeskForm">' +
@@ -548,7 +548,7 @@
       '<path d="M8.5 21.5h7"/>' +
       "</svg></span>" +
       "      </button>" +
-      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Energy Agent…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
+      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Prime…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
       '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "    </form>" +
       "  </div>" +
@@ -993,8 +993,8 @@
       btn.disabled = false;
       btn.textContent = "Stop";
       btn.classList.add("sov-desk-send--stop");
-      btn.title = "Stop Energy Agent";
-      btn.setAttribute("aria-label", "Stop Energy Agent");
+      btn.title = "Stop Energy Agent Prime";
+      btn.setAttribute("aria-label", "Stop Energy Agent Prime");
     } else {
       btn.disabled = false;
       btn.textContent = "Send";
@@ -1097,7 +1097,7 @@
 
   function bubbleHtml(m) {
     var role = m.role === "ford" ? "ford" : "sov";
-    var label = role === "ford" ? "You" : "Energy Agent";
+    var label = role === "ford" ? "You" : "Prime";
     var raw = stripSideJson(m.content || "");
     var body = shouldRich(role, raw)
       ? formatChatMd(raw)
@@ -1148,8 +1148,8 @@
     if (!visible.length && !state.sending) {
       host.innerHTML =
         '<div class="sov-desk-empty">' +
-        "<b>Energy Agent is here</b>" +
-        "<p>Just talk. He’ll format answers clearly — links, lists, the works.</p>" +
+        "<b>Energy Agent Prime is here</b>" +
+        "<p>Product mind — keeps the site safe, ships careful improvements. Talk normally.</p>" +
         "</div>";
       return;
     }
@@ -1266,7 +1266,7 @@
       if (host)
         host.innerHTML =
           '<div class="sov-desk-empty"><b>Sign in as Ford</b>' +
-          "<p>Energy Agent desk is only on the developer account.</p></div>";
+          "<p>Energy Agent Prime desk is only on the developer account.</p></div>";
       return;
     }
     // Never clobber an in-flight turn (the classic "send then both disappear" race)
@@ -1661,7 +1661,7 @@
             role: "sovereign",
             content:
               "Still working on that — your message is saved. Hit ↻ in a moment; " +
-              "the reply will appear when Energy Agent finishes.",
+              "the reply will appear when Prime finishes.",
             provider: "system",
             created_at: new Date().toISOString(),
             _local: true,
@@ -1842,8 +1842,8 @@
       card.innerHTML =
         '<div class="sov-desk-entry-inner">' +
         "<div>" +
-        "<b>Energy Agent</b>" +
-        "<p>Private chat with the product mind.</p>" +
+        "<b>Energy Agent Prime</b>" +
+        "<p>Private chat with the product mind (not the owner chat).</p>" +
         "</div>" +
         '<button type="button" class="sov-desk-entry-btn" id="sovDeskOpenBtn">Open chat</button>' +
         "</div>";
@@ -1856,9 +1856,9 @@
       fab2.type = "button";
       fab2.id = "sovDeskFab";
       fab2.className = "sov-desk-fab";
-      fab2.title = "Energy Agent";
-      fab2.setAttribute("aria-label", "Open Energy Agent chat");
-      fab2.textContent = "EA";
+      fab2.title = "Energy Agent Prime";
+      fab2.setAttribute("aria-label", "Open Energy Agent Prime");
+      fab2.textContent = "P";
       fab2.onclick = openDesk;
       document.body.appendChild(fab2);
     }
