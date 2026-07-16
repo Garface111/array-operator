@@ -30,7 +30,7 @@ html.sky #trendsRoot{
   border-radius:var(--sky-r-sheet);
   box-shadow:var(--sky-shadow-sheet);
   padding:20px 26px 30px;
-  margin-top:14px;
+  margin-top:0; /* .ao-subnav owns the gap above */
 }
 @media (max-width:600px){
   html.sky #trendsRoot{padding:14px 12px 22px;border-radius:24px}
