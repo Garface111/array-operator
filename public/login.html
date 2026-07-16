@@ -146,7 +146,6 @@
 // On a local static preview, hit the Railway backend directly (CORS allows it).
 const API_BASE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
  ? "https://web-production-49c83.up.railway.app" : "";
-const NEPOOL_LOGIN = "https://nepooloperator.com/accounts";
 
 const msg = document.getElementById("msg");
 function showMsg(text, kind){ msg.className = "msg show " + kind; msg.innerHTML = text; }
@@ -185,10 +184,12 @@ async function doPassword(e){
  showMsg(d.detail || "Sign-in failed. Please try again in a moment.", "err");
  btn.disabled = false; btn.textContent = "Sign in →"; return false;
  }
- // Wrong product? Send them to their real home rather than a confusing dashboard.
+ // Defensive: post-fold (2026-07-16) every tenant is array_operator, so a
+ // non-AO product here is a residual/unmigrated account. Never redirect to
+ // the sunsetting nepooloperator.com — explain in place instead.
  if(d.product && d.product !== "array_operator"){
- showMsg("That's a NEPOOL Operator account, taking you there…", "ok");
- setTimeout(()=>go(NEPOOL_LOGIN), 900); return false;
+ showMsg("That account has moved into Array Operator — sign in with the same email here.", "ok");
+ btn.disabled = false; btn.textContent = "Sign in →"; return false;
  }
  try{ localStorage.setItem("so_session", d.session_token); }catch(_){}
  enterDashboard();
