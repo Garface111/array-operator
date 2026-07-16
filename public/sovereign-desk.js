@@ -1,6 +1,6 @@
-/* Sovereign Desk — private Ford ↔ Sovereign chat (not Energy Agent).
- * Visible when GET /v1/sovereign/desk/access returns desk:true
- * (ford.genereaux@gmail.com + allowlist). Hash: #sovereign
+/* Sovereign Desk — private Ford ↔ Sovereign chat only (not Energy Agent).
+ * Visible when GET /v1/sovereign/desk/access returns desk:true.
+ * Hash: #sovereign. No ops rail / worker dump surface — chat is the interface.
  */
 (function () {
   "use strict";
@@ -9,7 +9,6 @@
     access: "/v1/sovereign/desk/access",
     history: "/v1/sovereign/desk/history",
     chat: "/v1/sovereign/desk/chat",
-    ops: "/v1/sovereign/desk/ops",
   };
 
   var state = {
@@ -47,6 +46,26 @@
       .replace(/"/g, "&quot;");
   }
 
+  /** Hide worker dumps / ops telemetry — chat is conversation, not a log. */
+  function isChatWorthy(m) {
+    if (!m) return false;
+    var role = (m.role || "").toLowerCase();
+    var prov = (m.provider || "").toLowerCase();
+    var meta = m.meta || {};
+    var text = String(m.content || "");
+    if (role === "system") return false;
+    if (prov === "worker" || prov === "rules" || prov === "admin") return false;
+    if (meta && (meta.job_id || meta.from === "rules_utility_triage" || meta.legacy)) {
+      // Only hide auto-worker / rule dumps, not real sovereign replies that happen to carry meta
+      if (prov === "worker" || /^Sovereign shipped job/i.test(text) || /^Ops /i.test(text))
+        return false;
+    }
+    if (/^Sovereign shipped job\s/i.test(text)) return false;
+    if (/^Ship:\s*\{/m.test(text) && /Deploy:\s*\{/m.test(text)) return false;
+    if (/^Ops\s+\w+:\s*\{/.test(text)) return false;
+    return !!(text || "").trim();
+  }
+
   function ensureShell() {
     var sec = document.getElementById("panelSovereign");
     if (!sec) {
@@ -60,22 +79,19 @@
     }
     var existing = sec.querySelector(".sov-desk");
     if (existing) {
-      // Already new layout (ops rail first / left)
-      var lay = existing.querySelector(".sov-desk-layout");
-      var first = lay && lay.firstElementChild;
-      if (first && first.classList.contains("sov-ops")) return sec;
-      // Old right-rail shell — rebuild
+      // Chat-only shell (no ops rail)
+      if (existing.classList.contains("sov-desk--chat") && !existing.querySelector(".sov-ops"))
+        return sec;
       existing.remove();
     }
-    // Controls rail LEFT (sticky while chat scrolls) · conversation RIGHT
     sec.innerHTML =
-      '<div class="sov-desk">' +
+      '<div class="sov-desk sov-desk--chat">' +
       '  <header class="sov-desk-head">' +
       '    <div class="sov-desk-brand">' +
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
       "        <h1>Sovereign</h1>" +
-      '        <p class="sov-desk-sub">Leadership desk</p>' +
+      '        <p class="sov-desk-sub">Private chat</p>' +
       "      </div>" +
       "    </div>" +
       '    <div class="sov-desk-head-right">' +
@@ -83,49 +99,12 @@
       '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh" aria-label="Refresh">↻</button>' +
       "    </div>" +
       "  </header>" +
-      '  <div class="sov-desk-layout">' +
-      '    <aside class="sov-ops" id="sovOpsPanel" aria-label="Ops controls">' +
-      '      <div class="sov-ops-sticky">' +
-      '        <div class="sov-ops-title">Controls</div>' +
-      '        <div class="sov-ops-auth" id="sovOpsAuth">Authority…</div>' +
-      "      </div>" +
-      '      <div class="sov-ops-scroll">' +
-      '        <div class="sov-ops-group">' +
-      '          <div class="sov-ops-group-label">Run</div>' +
-      '          <button type="button" class="sov-ops-primary" data-ops="sweep">Full sweep</button>' +
-      '          <button type="button" data-ops="feature_triage">Triage features</button>' +
-      "        </div>" +
-      '        <div class="sov-ops-group">' +
-      '          <div class="sov-ops-group-label">Ship</div>' +
-      '          <button type="button" data-ops="ship_reviewed">Reviewed → build</button>' +
-      '          <button type="button" data-ops="ship_building">Building queue</button>' +
-      "        </div>" +
-      '        <div class="sov-ops-group">' +
-      '          <div class="sov-ops-group-label">Utilities</div>' +
-      '          <button type="button" data-ops="utility_advance">Advance utilities</button>' +
-      '          <button type="button" data-ops="utility_cred_stage">Stage credentials</button>' +
-      "        </div>" +
-      '        <div class="sov-ops-group">' +
-      '          <div class="sov-ops-group-label">Jobs &amp; deploy</div>' +
-      '          <button type="button" data-ops="jobs_drain">Drain job queue</button>' +
-      '          <button type="button" data-ops="jobs_requeue">Requeue failures</button>' +
-      '          <button type="button" data-ops="deploy_stage">Stage deploy</button>' +
-      "        </div>" +
-      '        <div class="sov-ops-group">' +
-      '          <div class="sov-ops-group-label">Escalations</div>' +
-      '          <button type="button" data-ops="escalation_sweep">Resolve needs_ford</button>' +
-      '          <button type="button" data-ops="credentials">Credential inventory</button>' +
-      "        </div>" +
-      '        <div class="sov-ops-body" id="sovOpsBody">Loading queues…</div>' +
-      "      </div>" +
-      "    </aside>" +
-      '    <div class="sov-desk-main">' +
-      '      <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
-      '      <form class="sov-desk-compose" id="sovDeskForm">' +
-      '        <textarea id="sovDeskInput" rows="2" placeholder="Message Sovereign…" autocomplete="off"></textarea>' +
-      '        <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
-      "      </form>" +
-      "    </div>" +
+      '  <div class="sov-desk-main">' +
+      '    <div class="sov-desk-body" id="sovDeskMsgs"></div>' +
+      '    <form class="sov-desk-compose" id="sovDeskForm">' +
+      '      <textarea id="sovDeskInput" rows="2" placeholder="Message Sovereign…" autocomplete="off"></textarea>' +
+      '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
+      "    </form>" +
       "  </div>" +
       "</div>";
 
@@ -152,229 +131,35 @@
       ref._wired = true;
       ref.onclick = function () {
         loadHistory();
-        loadOps();
       };
     }
-    var ops = document.getElementById("sovOpsPanel");
-    if (ops && !ops._wired) {
-      ops._wired = true;
-      ops.addEventListener("click", function (e) {
-        var b = e.target && e.target.closest ? e.target.closest("[data-ops]") : null;
-        if (!b) return;
-        runOps(b.getAttribute("data-ops"));
-      });
-    }
     return sec;
-  }
-
-  async function loadOps() {
-    var body = document.getElementById("sovOpsBody");
-    if (!body || !state.allowed) return;
-    try {
-      var r = await fetch(API.ops, { headers: authHeaders() });
-      var d = await r.json().catch(function () {
-        return {};
-      });
-      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
-      var s = (d.summary && d.summary) || d.summary || {};
-      // summary nested under d.summary from API
-      s = d.summary || {};
-      var f = s.features || {};
-      var u = s.utilities || {};
-      var e = s.escalations || {};
-      var j = s.jobs || {};
-      var html = "";
-      html +=
-        '<div class="sov-ops-kpis">' +
-        kpi("New", f.new) +
-        kpi("Reviewed", f.reviewed) +
-        kpi("Building", f.building) +
-        kpi("Utils hot", (u.researching || 0) + (u.reviewed || 0) + (u.new || 0)) +
-        kpi("needs_ford", e.needs_ford) +
-        kpi("Jobs", j.queued) +
-        "</div>";
-      html += "<h4>Reviewed features</h4><ul class='sov-ops-list'>";
-      (d.features_reviewed || []).slice(0, 8).forEach(function (it) {
-        html +=
-          "<li><b>#" +
-          it.id +
-          "</b> " +
-          esc((it.text || "").slice(0, 80)) +
-          ' <button type="button" class="sov-ops-mini" data-ops-one="feature_assign" data-id="' +
-          it.id +
-          '">build</button>' +
-          ' <button type="button" class="sov-ops-mini" data-ops-one="feature_ship" data-id="' +
-          it.id +
-          '">shipped</button></li>';
-      });
-      html += "</ul><h4>Utilities</h4><ul class='sov-ops-list'>";
-      (d.utilities_active || [])
-        .filter(function (it) {
-          return it.status !== "added" && it.status !== "declined";
-        })
-        .slice(0, 8)
-        .forEach(function (it) {
-          html +=
-            "<li><b>#" +
-            it.id +
-            "</b> " +
-            esc(it.name || "") +
-            " <span class='sov-pill'>" +
-            esc(it.status) +
-            "</span></li>";
-        });
-      html += "</ul><h4>Escalations needs_ford</h4><ul class='sov-ops-list'>";
-      (d.escalations_needs_ford || []).slice(0, 6).forEach(function (it) {
-        html +=
-          "<li><b>" +
-          esc((it.id || "").slice(0, 12)) +
-          "</b> " +
-          esc((it.summary || "").slice(0, 80)) +
-          ' <button type="button" class="sov-ops-mini" data-ops-one="escalation_resolve" data-id="' +
-          esc(it.id) +
-          '">close</button></li>';
-      });
-      html += "</ul><h4>Goals (agenda)</h4><ul class='sov-ops-list'>";
-      (d.goals || []).slice(0, 6).forEach(function (g) {
-        html +=
-          "<li><b>p" +
-          esc(g.priority) +
-          "</b> " +
-          esc((g.title || g.id || "").slice(0, 70)) +
-          "</li>";
-      });
-      html += "</ul>";
-      var creds = (d.credentials && d.credentials.credentials) || [];
-      var portals = (d.credentials && d.credentials.portal_status) || [];
-      html +=
-        "<h4>Credentials (meta)</h4><p class='sov-ops-meta'>" +
-        creds.length +
-        " stored · " +
-        portals.length +
-        " portal rows · passwords never shown</p>";
-      var auth = d.ops_authority ? "ON" : "OFF";
-      var credsOn = d.credentials_unlocked ? "unlocked" : "locked";
-      var portalOn = d.portal_signoff ? "ON" : "OFF";
-      var authEl = document.getElementById("sovOpsAuth");
-      if (authEl) {
-        authEl.innerHTML =
-          "Authority <b>" +
-          auth +
-          "</b> · creds <b>" +
-          credsOn +
-          "</b> · portal <b>" +
-          portalOn +
-          "</b>";
-      }
-      body.innerHTML = html;
-      body.querySelectorAll("[data-ops-one]").forEach(function (btn) {
-        btn.onclick = function () {
-          var act = btn.getAttribute("data-ops-one");
-          var id = btn.getAttribute("data-id");
-          if (act === "feature_ship")
-            runOps("feature_ship", { feature_id: parseInt(id, 10) });
-          if (act === "feature_assign")
-            runOps("feature_assign", {
-              feature_id: parseInt(id, 10),
-              status: "building",
-              note: "Assigned from desk",
-            });
-          if (act === "escalation_resolve")
-            runOps("escalation_resolve", {
-              escalation_id: id,
-              status: "done",
-              note: "Closed from desk UI",
-            });
-        };
-      });
-    } catch (err) {
-      body.innerHTML =
-        "<p class='sov-ops-err'>" + esc(err.message || "ops load failed") + "</p>";
-    }
-  }
-
-  function kpi(label, n) {
-    return (
-      '<div class="sov-ops-kpi"><b>' +
-      esc(n == null ? "—" : n) +
-      "</b><span>" +
-      esc(label) +
-      "</span></div>"
-    );
-  }
-
-  async function runOps(action, payload) {
-    payload = payload || {};
-    var map = {
-      sweep: "sweep",
-      ship_reviewed: "feature_ship_batch",
-      ship_building: "feature_ship_building",
-      feature_triage: "feature_triage",
-      feature_assign: "feature_assign",
-      utility_advance: "utility_advance",
-      utility_cred_stage: "utility_cred_stage",
-      escalation_sweep: "escalation_sweep",
-      jobs_requeue: "jobs_requeue",
-      jobs_drain: "jobs_drain",
-      feature_ship: "feature_ship",
-      escalation_resolve: "escalation_resolve",
-      deploy_stage: "deploy_stage",
-      credentials: "credentials",
-    };
-    var act = map[action] || action;
-    try {
-      var r = await fetch(API.ops, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ action: act, payload: payload }),
-      });
-      var d = await r.json().catch(function () {
-        return {};
-      });
-      if (!r.ok) throw new Error((d && d.detail) || "HTTP " + r.status);
-      state.messages.push({
-        role: "system",
-        content: "Ops " + act + ": " + JSON.stringify(d).slice(0, 400),
-      });
-      renderMessages();
-      loadOps();
-      loadHistory();
-    } catch (e) {
-      state.messages.push({
-        role: "system",
-        content: "Ops failed: " + (e.message || e),
-      });
-      renderMessages();
-    }
   }
 
   function renderMessages() {
     var host = document.getElementById("sovDeskMsgs");
     if (!host) return;
-    if (!state.messages.length) {
+    var visible = state.messages.filter(isChatWorthy);
+    if (!visible.length) {
       host.innerHTML =
         '<div class="sov-desk-empty">' +
-        "<b>Sovereign is listening</b>" +
-        "<p>Queues, succession, unlocks — use the rail or write freely.</p>" +
+        "<b>Sovereign is here</b>" +
+        "<p>Just talk. He’ll say when something matters.</p>" +
         "</div>";
       return;
     }
     var nearBottom =
       host.scrollHeight - host.scrollTop - host.clientHeight < 80;
-    host.innerHTML = state.messages
+    host.innerHTML = visible
       .map(function (m) {
-        var role =
-          m.role === "ford" ? "ford" : m.role === "system" ? "system" : "sov";
-        var label =
-          role === "ford" ? "You" : role === "system" ? "System" : "Sovereign";
-        var prov = m.provider ? " · " + esc(m.provider) : "";
+        var role = m.role === "ford" ? "ford" : "sov";
+        var label = role === "ford" ? "You" : "Sovereign";
         return (
           '<div class="sov-bubble sov-bubble--' +
           role +
           '">' +
           '<div class="sov-bubble-lab">' +
           esc(label) +
-          prov +
           "</div>" +
           '<div class="sov-bubble-body">' +
           esc(m.content).replace(/\n/g, "<br>") +
@@ -415,7 +200,7 @@
       return;
     }
     try {
-      var r = await fetch(API.history + "?limit=100", { headers: authHeaders() });
+      var r = await fetch(API.history + "?limit=120", { headers: authHeaders() });
       var d = await r.json().catch(function () {
         return {};
       });
@@ -465,8 +250,7 @@
           detail = detail.message || JSON.stringify(detail);
         throw new Error(detail || "HTTP " + r.status);
       }
-      var reply =
-        (d.message && d.message.content) || d.reply || "";
+      var reply = (d.message && d.message.content) || d.reply || "";
       if (reply) {
         state.messages.push({
           role: "sovereign",
@@ -478,8 +262,9 @@
       if (host) host.scrollTop = host.scrollHeight;
     } catch (e) {
       state.messages.push({
-        role: "system",
-        content: "Send failed: " + (e.message || e),
+        role: "sovereign",
+        content: "Couldn't send that just now — " + (e.message || e) + ". Try again.",
+        provider: "error",
       });
       renderMessages();
     } finally {
@@ -497,9 +282,8 @@
     state.pollTimer = setInterval(function () {
       if (location.hash === "#sovereign" && state.allowed && !state.sending) {
         loadHistory();
-        loadOps();
       }
-    }, 12000);
+    }, 15000);
   }
 
   function stopPoll() {
@@ -523,7 +307,6 @@
     var acctTab = document.getElementById("tabAccount");
     if (acctTab) acctTab.classList.add("active");
     loadHistory();
-    loadOps();
     startPoll();
   }
 
@@ -531,7 +314,6 @@
     ensureShell();
     if (location.hash !== "#sovereign") {
       location.hash = "#sovereign";
-      // applyView / hashchange will call showPanel
       setTimeout(function () {
         if (location.hash === "#sovereign") showPanel();
       }, 50);
@@ -548,7 +330,6 @@
       if (fab) fab.remove();
       return;
     }
-    // Account tab card — re-insert after Account re-renders
     var list = document.getElementById("acctList");
     if (list && !document.getElementById("sovDeskEntry")) {
       var card = document.createElement("section");
@@ -557,10 +338,10 @@
       card.innerHTML =
         '<div class="sov-desk-entry-inner">' +
         "<div>" +
-        "<b>Sovereign desk</b>" +
-        "<p>Leadership mind — separate from Energy Agent fleet chat.</p>" +
+        "<b>Sovereign</b>" +
+        "<p>Private chat with the product mind.</p>" +
         "</div>" +
-        '<button type="button" class="sov-desk-entry-btn" id="sovDeskOpenBtn">Open desk</button>' +
+        '<button type="button" class="sov-desk-entry-btn" id="sovDeskOpenBtn">Open chat</button>' +
         "</div>";
       list.insertBefore(card, list.firstChild);
       var b = document.getElementById("sovDeskOpenBtn");
@@ -571,8 +352,8 @@
       fab2.type = "button";
       fab2.id = "sovDeskFab";
       fab2.className = "sov-desk-fab";
-      fab2.title = "Sovereign desk";
-      fab2.setAttribute("aria-label", "Open Sovereign desk");
+      fab2.title = "Sovereign";
+      fab2.setAttribute("aria-label", "Open Sovereign chat");
       fab2.textContent = "S";
       fab2.onclick = openDesk;
       document.body.appendChild(fab2);
@@ -582,7 +363,7 @@
   async function boot() {
     var ok = await checkAccess();
     if (!ok) {
-      mountEntry(); // removes UI
+      mountEntry();
       return false;
     }
     ensureShell();
@@ -619,7 +400,6 @@
     }
   });
 
-  // Remount Account card when Account re-renders
   setTimeout(function () {
     var list = document.getElementById("acctList");
     if (!list) return;
@@ -629,7 +409,6 @@
     obs.observe(list, { childList: true });
   }, 1500);
 
-  // Re-check access when session appears (login)
   var _sess = null;
   try {
     _sess = localStorage.getItem("so_session");

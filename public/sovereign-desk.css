@@ -1,5 +1,4 @@
-/* Sovereign Desk — Array Operator visual language (black + green).
-   Controls rail LEFT (sticky); long conversation RIGHT. Ford only. */
+/* Sovereign Desk — chat only (Ford ↔ Sovereign). No ops rail / worker log. */
 
 #panelSovereign.active{ display:block !important; }
 #panelSovereign[hidden]{ display:none !important; }
@@ -20,14 +19,12 @@
   --sov-good2: var(--good2, #7ff0bb);
   --sov-line: var(--line, rgba(255,255,255,.08));
   --sov-card: linear-gradient(165deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-  --sov-rail: 300px;
-
-  max-width: min(1400px, 100%);
+  max-width: min(760px, 96vw);
   margin: 10px auto 0;
   display: flex;
   flex-direction: column;
-  height: min(calc(100vh - 100px), 920px);
-  min-height: 560px;
+  height: min(calc(100vh - 100px), 820px);
+  min-height: 480px;
   background:
     radial-gradient(900px 420px at 12% -8%, rgba(63,214,138,.10), transparent 55%),
     radial-gradient(700px 360px at 92% 8%, rgba(94,194,255,.06), transparent 50%),
@@ -133,67 +130,14 @@ html.sky .sov-desk-meta{ color: #0d6b42; }
 }
 .sov-desk-refresh:active{ transform: rotate(-30deg); }
 
-/* ── Layout: controls LEFT · conversation RIGHT ─────────────────────────── */
-.sov-desk-layout{
+/* Chat-only main column fills the card */
+.sov-desk--chat .sov-desk-main{
   flex: 1;
-  display: grid;
-  grid-template-columns: var(--sov-rail) minmax(0, 1fr);
   min-height: 0;
-  height: 100%;
-}
-@media (max-width: 920px){
-  .sov-desk{
-    height: auto;
-    min-height: 0;
-  }
-  .sov-desk-layout{
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(420px, 70vh);
-  }
-  .sov-ops{
-    border-right: 0 !important;
-    border-bottom: 1px solid var(--sov-line);
-    max-height: 42vh;
-  }
 }
 
-/* Left rail — sticky controls while conversation scrolls */
-.sov-ops{
-  border-right: 1px solid var(--sov-line);
-  background: rgba(0,0,0,.28);
-  padding: 0;
-  overflow: auto;
-  font-size: 12px;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(63,214,138,.25) transparent;
-}
-html.sky .sov-ops{ background: rgba(255,255,255,.4); }
-
-.sov-ops-sticky{
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 12px 12px 10px;
-  background: linear-gradient(180deg, rgba(10,14,20,.96), rgba(10,14,20,.88));
-  border-bottom: 1px solid var(--sov-line);
-  backdrop-filter: blur(10px);
-}
-html.sky .sov-ops-sticky{
-  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.88));
-}
-
-.sov-ops-title{
-  font-weight: 780;
-  font-size: 10.5px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--sov-good2);
-  margin: 0 0 4px;
-}
-html.sky .sov-ops-title{ color: #0d6b42; }
+/* Legacy ops rail (removed from shell — hide if cached markup remains) */
+.sov-ops{ display: none !important; }
 
 .sov-ops-auth{
   margin: 0;
