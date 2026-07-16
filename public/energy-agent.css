@@ -1036,19 +1036,27 @@ html:not(.sky) .ea-compose-shell:focus-within{
   width: 100%;
   box-sizing: border-box;
   flex: none;
-  min-height: 52px;
+  min-height: 40px;      /* one clean line at rest — grows with content */
   max-height: 120px;
   resize: none;
   font: inherit;
   font-size: 13.5px;
   line-height: 1.45;
   letter-spacing: -.01em;
-  padding: 12px 14px 8px;
+  padding: 10px 14px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: inherit;
   field-sizing: content; /* progressive: grows with content where supported */
+  overflow-y: auto;
+  scrollbar-width: none; /* no bar at rest; still scrollable once past max-height */
+}
+.ea-compose textarea::-webkit-scrollbar,
+.ea-compose-shell textarea::-webkit-scrollbar{
+  width: 0;
+  height: 0;
+  display: none;
 }
 .ea-compose textarea:focus,
 .ea-compose-shell textarea:focus{

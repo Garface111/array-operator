@@ -476,7 +476,7 @@
  ' <div class="ea-compose" id="eaCompose">' +
  ' <div class="ea-attach-row" id="eaAttachRow" hidden></div>' +
  ' <div class="ea-compose-shell">' +
- ' <textarea id="eaInput" rows="2" placeholder="Message Energy Agent… drop files or paste images"></textarea>' +
+ ' <textarea id="eaInput" rows="1" placeholder="Message Energy Agent"></textarea>' +
  ' <input type="file" id="eaFile" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log" hidden />' +
  ' <div class="ea-compose-bar">' +
  // Icon-only chips (labels cut off in the rail). Hover/title + aria-label carry
@@ -562,10 +562,10 @@
  eaIn.addEventListener("keydown", function (e) {
  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
  });
- // Auto-grow the raised composer row (cap ~5 lines)
+ // Auto-grow the composer: one clean line at rest, grows with content (~5 max)
  function growInput() {
  eaIn.style.height = "auto";
- var h = Math.min(120, Math.max(52, eaIn.scrollHeight));
+ var h = Math.min(120, Math.max(40, eaIn.scrollHeight));
  eaIn.style.height = h + "px";
  }
  eaIn.addEventListener("input", growInput);
