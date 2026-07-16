@@ -903,8 +903,14 @@
  if (ta) ta.value = "";
  closeImproveCompose();
  addMsg("user", "Improve site: " + text);
- addMsg("agent", "Got it, the judge is reviewing. I'll update you as it builds.");
- watchBuild(d.id);
+ var claimed = d.sovereign && d.sovereign.claimed;
+ addMsg(
+  "agent",
+  claimed
+   ? "Got it — **Sovereign** has this in mind and is building it now. I'll track progress here."
+   : "Got it — queued for Sovereign + the judge. I'll update you as it builds."
+ );
+ watchBuild(d.id, { initialStatus: d.status || (claimed ? "building" : "new") });
  } catch (e) {
  if (msg) {
  msg.style.color = "#b45309";
@@ -996,15 +1002,19 @@
  });
  }
 
- function watchBuild(id) {
+ function watchBuild(id, opts) {
+ opts = opts || {};
  improve.activeId = id;
  improve.since = Date.now();
  improve._toldFail = false;
  improve._pendingEscalateId = null;
  improve.journeyCollapsed = false;
- improve.lastSt = "new";
+ improve.lastSt = opts.initialStatus || "new";
  improve.lastFailed = false;
- improve.lastDetail = "";
+ improve.lastDetail =
+  improve.lastSt === "building"
+   ? "Sovereign claimed this and is building it now."
+   : "Queued — Sovereign and the judge are on it.";
  // Ensure dock is open so journey is visible (not the old floating card)
  if (!state.open) {
  state.open = true;
@@ -1024,7 +1034,7 @@
  if (mini) mini.classList.remove("show");
  } catch (e) {}
  showEaJourneyMini(false);
- renderEaJourney("new");
+ renderEaJourney(improve.lastSt, { detail: improve.lastDetail });
  if (improve.poll) clearInterval(improve.poll);
  improve.poll = setInterval(tickBuildStatus, 4000);
  setTimeout(tickBuildStatus, 800);
@@ -1130,19 +1140,25 @@
 
  host.hidden = false;
  showEaJourneyMini(false);
- var title = improve.lastSt === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your change…";
+ var title = improve.lastSt === "shipped"
+  ? "It's live."
+  : failed
+  ? "Couldn't auto-ship."
+  : improve.lastSt === "building"
+  ? "Building your change…"
+  : "Working on your change…";
  var lead = improve.lastSt === "shipped"
  ? (detail || "Your change is on the site. Refresh to see it.")
  : failed
- ? (detail || "Judge held this for a human look. Nothing was lost.")
- : (detail || "Judge reviews first, pure UI (colors, layout, copy) usually ships live.");
+ ? (detail || "Held for a human look. Nothing was lost.")
+ : (detail || "Sovereign has this in mind — pure UI usually ships live.");
  var html = "<h4>" + esc(title) + "</h4><p class=\"ea-j-lead\">" + esc(lead) + "</p><ul class=\"ea-j-steps\">";
  JOURNEY_STEPS.forEach(function (s, i) {
- var cls = "";
+ var cls = "todo";
  if (improve.lastSt === "shipped" || i < stepIdx) cls = "done";
  else if (i === stepIdx) cls = failed ? "fail" : "active";
  var icon = cls === "done" ? "✓" : cls === "active" ? "●" : cls === "fail" ? "!" : String(i + 1);
- html += '<li class="' + cls + '"><i>' + icon + "</i><div><b>" + s.label + "</b><span>" + s.sub + "</span></div></li>";
+ html += '<li class="' + cls + '"><i aria-hidden="true">' + icon + "</i><div><b>" + s.label + "</b><span>" + s.sub + "</span></div></li>";
  });
  html += "</ul><div class=\"ea-j-actions\">";
  if (improve.lastSt === "shipped") {
