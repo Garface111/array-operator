@@ -4,29 +4,47 @@
 #panelSovereign[hidden]{ display:none !important; }
 #panelSovereign.active[hidden]{ display:block !important; }
 
-/* Full viewport under tab chrome — kill dead space below the card */
+/*
+ * Full-height workspace under the tabbar — NEVER use 100vw breakout.
+ * 100vw ignores body.ea-shell-open margin and slides content under the
+ * Energy Agent left rail (Ford 2026-07-16 screenshots). Stay inside .wrap,
+ * which already shifts by --ea-rail when the agent is open.
+ */
 #panelSovereign.active{
   display: flex !important;
   flex-direction: column;
-  /* Fill from tab bar to bottom of window (break out of .wrap width/padding) */
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  /* sticky nav ~56px + tabbar ~48px ≈ 104; keep a touch of room */
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  /* cancel .wrap horizontal padding so the glass goes edge-to-edge of the
+     content column (not the full browser, not under EA) */
+  width: calc(100% + 56px);
+  max-width: none;
+  margin-left: -28px;
+  margin-right: -28px;
   height: calc(100dvh - 104px);
   min-height: calc(100vh - 104px);
   max-height: none;
   padding: 0;
   box-sizing: border-box;
   overflow: hidden;
+  min-width: 0;
 }
-/* When Sovereign is open: no footer gap; keep wrap padding so tabbar stays aligned */
+/* When Sovereign is open: no footer gap */
 body:has(#panelSovereign.active) footer{
   display: none !important;
 }
 body:has(#panelSovereign.active) .wrap{
   padding-bottom: 0 !important;
+}
+/* EA dock open: wrap is already margin-left: var(--ea-rail) + max-width
+   calc(100vw - rail). Our negative margin only cancels wrap padding — still
+   stays in the content column to the RIGHT of the agent. */
+body.ea-shell-open #panelSovereign.active{
+  width: calc(100% + 56px);
+  margin-left: -28px;
+  margin-right: -28px;
+  max-width: none;
 }
 
 .sov-desk{
@@ -739,22 +757,44 @@ html.sky .sov-bubble--system{
 }
 .sov-bubble--system .sov-bubble-lab{ color: var(--sov-faint); }
 
-/* Compose — pinned bottom of conversation */
+/* Compose — pinned bottom of conversation.
+   Clear fixed Setup (bottom-left) + Alerts (bottom-right) fabs so attach/mic/send
+   are never covered (Ford 2026-07-16 screenshots). */
 .sov-desk-compose{
   display: flex;
   gap: 10px;
   align-items: flex-end;
-  padding: 12px clamp(16px, 3vw, 28px) 16px;
+  /* L/R inset clears ~100px fabs; bottom clears fab height + gap */
+  padding: 12px max(100px, calc(16px + env(safe-area-inset-right, 0px)))
+           max(18px, calc(12px + env(safe-area-inset-bottom, 0px)))
+           max(100px, calc(16px + env(safe-area-inset-left, 0px)));
   border-top: 1px solid var(--sov-line);
   background: rgba(0,0,0,.22);
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
 }
 html.sky .sov-desk-compose{
   background: rgba(255,255,255,.36);
   border-top-color: rgba(255,255,255,.5);
   box-shadow: 0 -1px 0 rgba(255,255,255,.4) inset;
+}
+/* When EA rail is open, Setup shifts right next to the rail — still need left inset
+   relative to the content column (Setup sits at content-left + ~0). */
+body.ea-shell-open .sov-desk-compose{
+  padding-left: max(100px, 16px);
+  padding-right: max(100px, 16px);
+}
+/* Attach strip + typing also clear the fabs */
+.sov-attach-row{
+  padding-left: max(100px, 16px) !important;
+  padding-right: max(100px, 16px) !important;
+}
+.sov-desk-typing{
+  padding-left: max(100px, 18px) !important;
+  padding-right: max(100px, 18px) !important;
 }
 .sov-desk-compose.sov-listening{
   box-shadow: inset 0 0 0 1px rgba(63,214,138,.35);

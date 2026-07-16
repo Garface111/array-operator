@@ -205,9 +205,17 @@ body.ea-shell-open .wrap{
   max-width: calc(100vw - var(--ea-rail));
   min-width: 0;
   box-sizing: border-box;
+  /* Clip any child that still tries 100vw breakout under the rail */
+  overflow-x: clip;
 }
 body.ea-shell-open{
   /* keep fixed bottom mobile nav clear of rail if needed */
+}
+/* Global: no full-viewport width breakouts while EA dock owns the left strip */
+body.ea-shell-open .panel.active{
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .wrap{ transition: margin-left .22s ease; min-width: 0; }
 
