@@ -7746,14 +7746,34 @@
  function applyView(){
  const active = tabFromHash();
  const isSov = location.hash === "#sovereign";
+ // Tab pager (Ford 2026-07-16): when the top content panel changes, slide the
+ // outgoing panel out and the incoming in (via tab-slide.js) instead of an
+ // instant swap. Falls back to instant on first paint, Sovereign, sub-view
+ // deep-links (#trends/#resources), mobile, reduced motion, or any error.
+ const _slideOK = !_firstApply && !isSov && typeof window.__aoTabSlide === "function"
+ && location.hash !== "#trends" && location.hash !== "#resources";
+ const _prevPanel = _slideOK ? document.querySelector(
+ "#panelDashboard.active,#panelArrays.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelOps.active,#panelAccount.active") : null;
+ const _toPanel = (!isSov && TABS[active]) ? document.getElementById(TABS[active].panel) : null;
+ const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel);
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
  const tab = document.getElementById(t.tab);
- // Sovereign desk takes over the main stage (Account tab stays highlighted)
- if(panel) panel.classList.toggle("active", !isSov && name === active);
+ // Sovereign desk takes over the main stage (Account tab stays highlighted).
+ // Skip the instant toggle for the sliding pair — the pager owns their .active.
+ if(panel && !(_willSlide && (panel === _prevPanel || panel === _toPanel))){
+ panel.classList.toggle("active", !isSov && name === active);
+ }
  if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
  });
+ if(_willSlide){
+ const _ord = {panelDashboard:0,panelArrays:1,panelAnalysis:2,panelTrends:2,panelResources:2,panelReports:3,panelOps:4,panelAccount:5};
+ const _fi = (_ord[_prevPanel.id] != null ? _ord[_prevPanel.id] : 0);
+ const _ti = (_ord[_toPanel.id] != null ? _ord[_toPanel.id] : 0);
+ try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
+ catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
+ }
  const pSov = document.getElementById("panelSovereign");
  if(pSov){
  if(isSov){

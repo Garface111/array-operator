@@ -1,0 +1,33 @@
+/* Tab pager (Ford 2026-07-16): switching top tabs slides the outgoing panel out
+   and the incoming panel in horizontally, directional by tab order, on the same
+   smooth ease-out curve as the Energy Agent dock (.34s cubic-bezier(.2,.8,.2,1)).
+
+   The panels are moved (once, by tab-slide.js) into a no-padding .panel-stage so
+   absolutely-positioned panels align regardless of .wrap's horizontal padding.
+   Only during a slide are the two panels taken out of flow + overlapped; at rest
+   the stage is inert and the normal `.panel{display:none}/.panel.active{display:block}`
+   rules govern, so there is zero behavioural change when not animating. */
+
+.panel-stage{ position: relative; }
+
+/* Active slide: clip the off-stage panels; hold height so the stage can't collapse
+   while both panels are position:absolute (min-height set inline = tallest panel). */
+.panel-stage.ao-sliding{
+  overflow: hidden;
+  min-height: var(--ao-stage-h, auto);
+}
+.panel-stage.ao-sliding > .panel.ao-slide-from,
+.panel-stage.ao-sliding > .panel.ao-slide-to{
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  margin: 0;
+  display: block;              /* keep the incoming panel rendered through the slide */
+  transition: transform .34s cubic-bezier(.2,.8,.2,1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .panel-stage.ao-sliding > .panel.ao-slide-from,
+  .panel-stage.ao-sliding > .panel.ao-slide-to{ transition: none; }
+}
