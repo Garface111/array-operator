@@ -907,8 +907,8 @@
  addMsg(
   "agent",
   claimed || d.status === "building"
-   ? "Got it — **Sovereign** has this in mind and is building it now. I'll track progress here."
-   : "Got it — Sovereign is taking this into mind. I'll update you as it builds."
+   ? "Got it — **Energy Agent** has this in mind and is building it now. I'll track progress here."
+   : "Got it — Energy Agent is taking this into mind. I'll update you as it builds."
  );
  watchBuild(d.id, { initialStatus: d.status || (claimed ? "building" : "new") });
  } catch (e) {
@@ -1013,10 +1013,10 @@
  improve.lastFailed = false;
  improve.lastDetail =
   improve.lastSt === "building"
-   ? "Sovereign claimed this and is building it now."
+   ? "Energy Agent claimed this and is building it now."
    : improve.lastSt === "shipped"
    ? "Live on the site — refresh to see it."
-   : "Sovereign is taking this into mind now.";
+   : "Energy Agent is taking this into mind now.";
  // Ensure dock is open so journey is visible (not the old floating card)
  if (!state.open) {
  state.open = true;
@@ -1101,7 +1101,7 @@
 
  var JOURNEY_STEPS = [
  { key: "received", label: "Received", sub: "Got your mark-up and note" },
- { key: "mind", label: "In Sovereign’s mind", sub: "Live insight — work started" },
+ { key: "mind", label: "In Energy Agent’s mind", sub: "Live insight — work started" },
  { key: "building", label: "Building", sub: "Writing the change" },
  { key: "deploying", label: "Deploying live", sub: "Pushing to the site" },
  { key: "live", label: "Live on the site", sub: "Refresh to see your change" },
@@ -1152,7 +1152,7 @@
  ? (detail || "Your change is on the site. Refresh to see it.")
  : failed
  ? (detail || "Held for a human look. Nothing was lost.")
- : (detail || "Sovereign has this in mind — pure UI usually ships live.");
+ : (detail || "Energy Agent has this in mind — pure UI usually ships live.");
  var html = "<h4>" + esc(title) + "</h4><p class=\"ea-j-lead\">" + esc(lead) + "</p><ul class=\"ea-j-steps\">";
  JOURNEY_STEPS.forEach(function (s, i) {
  var cls = "todo";
@@ -1854,7 +1854,7 @@
  // Label so it's obvious the product mind is talking
  var label = document.createElement("div");
  label.className = "ea-sov-label";
- label.textContent = "Sovereign · Array Operator";
+ label.textContent = "Energy Agent · Array Operator";
  d.appendChild(label);
  var body = document.createElement("div");
  body.className = "ea-sov-body ea-msg-body";

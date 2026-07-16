@@ -478,7 +478,7 @@
       sec.className = "panel";
       sec.id = "panelSovereign";
       sec.setAttribute("role", "tabpanel");
-      sec.setAttribute("aria-label", "Sovereign desk");
+      sec.setAttribute("aria-label", "Energy Agent desk");
       wrap.appendChild(sec);
     }
     var existing = sec.querySelector(".sov-desk");
@@ -507,7 +507,7 @@
       '    <div class="sov-desk-brand">' +
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
-      "        <h1>Sovereign</h1>" +
+      "        <h1>Energy Agent</h1>" +
       '        <p class="sov-desk-sub">Private chat · files · local bridge</p>' +
       "      </div>" +
       "    </div>" +
@@ -521,9 +521,9 @@
       '    <div class="sov-desk-body" id="sovDeskMsgs" aria-live="polite"></div>' +
       '    <div class="sov-desk-typing" id="sovDeskTyping" hidden>' +
       '      <span class="sov-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
-      '      <span class="sov-typing-label">Sovereign is thinking…</span>' +
+      '      <span class="sov-typing-label">Energy Agent is thinking…</span>' +
       '      <button type="button" class="sov-desk-stop" id="sovDeskStop" hidden ' +
-      'title="Stop Sovereign" aria-label="Stop Sovereign">Stop</button>' +
+      'title="Stop Energy Agent" aria-label="Stop Energy Agent">Stop</button>' +
       "    </div>" +
       '    <div class="sov-attach-row" id="sovAttachRow" hidden></div>' +
       '    <form class="sov-desk-compose" id="sovDeskForm">' +
@@ -548,7 +548,7 @@
       '<path d="M8.5 21.5h7"/>' +
       "</svg></span>" +
       "      </button>" +
-      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
+      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Energy Agent…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
       '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "    </form>" +
       "  </div>" +
@@ -993,8 +993,8 @@
       btn.disabled = false;
       btn.textContent = "Stop";
       btn.classList.add("sov-desk-send--stop");
-      btn.title = "Stop Sovereign";
-      btn.setAttribute("aria-label", "Stop Sovereign");
+      btn.title = "Stop Energy Agent";
+      btn.setAttribute("aria-label", "Stop Energy Agent");
     } else {
       btn.disabled = false;
       btn.textContent = "Send";
@@ -1097,7 +1097,7 @@
 
   function bubbleHtml(m) {
     var role = m.role === "ford" ? "ford" : "sov";
-    var label = role === "ford" ? "You" : "Sovereign";
+    var label = role === "ford" ? "You" : "Energy Agent";
     var raw = stripSideJson(m.content || "");
     var body = shouldRich(role, raw)
       ? formatChatMd(raw)
@@ -1148,7 +1148,7 @@
     if (!visible.length && !state.sending) {
       host.innerHTML =
         '<div class="sov-desk-empty">' +
-        "<b>Sovereign is here</b>" +
+        "<b>Energy Agent is here</b>" +
         "<p>Just talk. He’ll format answers clearly — links, lists, the works.</p>" +
         "</div>";
       return;
@@ -1266,7 +1266,7 @@
       if (host)
         host.innerHTML =
           '<div class="sov-desk-empty"><b>Sign in as Ford</b>' +
-          "<p>Sovereign desk is only on the developer account.</p></div>";
+          "<p>Energy Agent desk is only on the developer account.</p></div>";
       return;
     }
     // Never clobber an in-flight turn (the classic "send then both disappear" race)
@@ -1661,7 +1661,7 @@
             role: "sovereign",
             content:
               "Still working on that — your message is saved. Hit ↻ in a moment; " +
-              "the reply will appear when Sovereign finishes.",
+              "the reply will appear when Energy Agent finishes.",
             provider: "system",
             created_at: new Date().toISOString(),
             _local: true,
@@ -1842,7 +1842,7 @@
       card.innerHTML =
         '<div class="sov-desk-entry-inner">' +
         "<div>" +
-        "<b>Sovereign</b>" +
+        "<b>Energy Agent</b>" +
         "<p>Private chat with the product mind.</p>" +
         "</div>" +
         '<button type="button" class="sov-desk-entry-btn" id="sovDeskOpenBtn">Open chat</button>' +
@@ -1856,9 +1856,9 @@
       fab2.type = "button";
       fab2.id = "sovDeskFab";
       fab2.className = "sov-desk-fab";
-      fab2.title = "Sovereign";
-      fab2.setAttribute("aria-label", "Open Sovereign chat");
-      fab2.textContent = "S";
+      fab2.title = "Energy Agent";
+      fab2.setAttribute("aria-label", "Open Energy Agent chat");
+      fab2.textContent = "EA";
       fab2.onclick = openDesk;
       document.body.appendChild(fab2);
     }
