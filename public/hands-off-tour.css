@@ -203,19 +203,33 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 }
 
 /* step pills */
-.ho-steps{ padding:10px 12px 4px; flex:0 0 auto }
+.ho-steps{ padding:10px 12px 4px; flex:0 0 auto; min-width:0 }
+/* Track: fixed pill+line sizes so content width is stable. Flex-grow on the
+   connector lines made the row reflow (looked like left↔right sliding) when
+   the dock width / sibling EA panel changed — especially late steps (17+). */
 .ho-stepper{
-  display:flex; align-items:center; gap:0; flex-wrap:nowrap;
-  overflow-x:auto; scrollbar-width:none;
+  display:flex; align-items:center; gap:2px; flex-wrap:nowrap;
+  overflow-x:auto; overflow-y:hidden;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+  /* JS owns smooth scroll; CSS smooth fights remounts and feels glitchy */
+  scroll-behavior:auto;
+  overscroll-behavior-x:contain;
+  padding-bottom:2px;
+  min-width:0;
+  max-width:100%;
 }
 .ho-stepper::-webkit-scrollbar{ display:none }
 .ho-sp{
-  width:28px; height:28px; border-radius:999px; flex:0 0 auto;
+  width:26px; min-width:26px; height:26px; border-radius:999px;
+  flex:0 0 26px;
   border:1.5px solid var(--ho-line);
   background:rgba(255,255,255,.85);
   font-size:11px; font-weight:750; color:var(--ho-muted);
   cursor:pointer; display:grid; place-items:center;
   transition:background .12s, border-color .12s, color .12s, box-shadow .12s;
+  /* never let transform/animations shift layout of the track */
+  transform:none;
 }
 .ho-sp.is-active{
   background:var(--ho-blue); color:#fff; border-color:var(--ho-blue);
@@ -226,8 +240,9 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
   border-color:rgba(23,138,78,.35);
 }
 .ho-sp-line{
-  flex:1 1 8px; min-width:6px; max-width:18px; height:2px;
+  flex:0 0 8px; width:8px; min-width:8px; max-width:8px; height:2px;
   background:var(--ho-line); border-radius:2px;
+  pointer-events:none;
 }
 .ho-stepper-now{
   display:flex; align-items:baseline; gap:8px; margin-top:8px;
@@ -243,19 +258,6 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
   border:1px solid rgba(33,150,243,.16);
   border-radius:999px; padding:2px 8px;
 }
-/* Full product tour: many stops — denser pills + scroll */
-.ho-stepper{
-  gap:2px;
-  scrollbar-width:none;
-  -ms-overflow-style:none;
-  scroll-behavior:smooth;
-  padding-bottom:2px;
-}
-.ho-sp{
-  min-width:26px; height:26px; font-size:11px;
-  flex:0 0 auto;
-}
-.ho-sp-line{ width:8px; min-width:6px }
 .ho-bullets-open{ margin-top:4px }
 
 .ho-main{ padding:8px 16px 18px; flex:1 1 auto; min-height:0; overflow:auto }

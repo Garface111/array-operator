@@ -810,7 +810,7 @@
  } catch (e) {}
  }
 
- /** Compact horizontal stepper, scrolls the active pill into view after paint. */
+ /** Compact horizontal stepper HTML (full build). */
  function buildStepsHtml(live) {
  var cur = STEPS[state.idx] || STEPS[0];
  var walkableCount = STEPS.length - 2; // exclude welcome + done for display index
@@ -827,7 +827,7 @@
  '" data-idx="' +
  i +
  '" title="' +
- esc(s.rail + ", " + s.railSub) +
+ esc(s.rail + (s.railSub ? ", " + s.railSub : "")) +
  '" aria-label="' +
  esc(s.rail) +
  '" aria-current="' +
@@ -842,20 +842,136 @@
  pills +
  "</div>" +
  '<div class="ho-stepper-now">' +
- "<b>" + esc(cur.rail) + "</b>" + (cur.railSub ? "<span>" + esc(cur.railSub) + "</span>" : "") +
+ "<b>" + esc(cur.rail) + "</b>" + (cur.railSub ? "<span>" + esc(cur.railSub) + "</span>" : "<span hidden></span>") +
  '<em class="ho-stepper-pct">' +
  progressPct(live) +
  "%</em></div>"
  );
  }
 
- function scrollActiveStepPill() {
- try {
- var root = document.getElementById("hoTour");
- var active = root && root.querySelector(".ho-sp.is-active");
- if (active && active.scrollIntoView) {
- active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+ function wireStepClicks(stepsHost) {
+ if (!stepsHost) return;
+ stepsHost.querySelectorAll("[data-idx]").forEach(function (btn) {
+ if (btn._hoStepWired) return;
+ btn._hoStepWired = true;
+ btn.addEventListener("click", function () {
+ state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
+ hardRender({ animate: false });
+ });
+ });
  }
+
+ /**
+ * Paint the step rail. softUpdate uses in-place class/label updates so we never
+ * remount the track (remount reset scrollLeft → left/right glitch on step 17+).
+ * hardRender rebuilds once and centers the active pill.
+ */
+ function paintStepper(live, opts) {
+ opts = opts || {};
+ var root = document.getElementById("hoTour");
+ var stepsHost = root && root.querySelector(".ho-steps");
+ if (!stepsHost) return;
+ live = live || state.live || {};
+ var existing = stepsHost.querySelector(".ho-stepper");
+ var needRebuild =
+  !!opts.rebuild ||
+  !existing ||
+  existing.querySelectorAll(".ho-sp").length !== STEPS.length;
+
+ if (needRebuild) {
+  var prevScroll = existing ? existing.scrollLeft : 0;
+  stepsHost.innerHTML = buildStepsHtml(live);
+  wireStepClicks(stepsHost);
+  stepsHost.setAttribute("data-ho-idx", String(state.idx));
+  var stepper = stepsHost.querySelector(".ho-stepper");
+  if (stepper) {
+   // Restore prior scroll first (no flash to 0), then optionally center.
+   stepper.scrollLeft = prevScroll;
+  }
+  if (opts.centerActive !== false) {
+   // rAF: layout must settle before offsetLeft is reliable
+   requestAnimationFrame(function () {
+    scrollActiveStepPill({ instant: !!opts.instant });
+   });
+  }
+  return;
+ }
+
+ // ── In-place update (preserves scrollLeft; no scroll animation) ──
+ var walkableCount = STEPS.length - 2;
+ var cur = STEPS[state.idx] || STEPS[0];
+ STEPS.forEach(function (s, i) {
+  var btn = stepsHost.querySelector('.ho-sp[data-idx="' + i + '"]');
+  if (!btn) return;
+  var done =
+   stepComplete(s, live) ||
+   isVisited(s.id) ||
+   (s.id === "done" && requiredRemaining(live) === 0);
+  var active = i === state.idx;
+  btn.classList.toggle("is-active", active);
+  btn.classList.toggle("is-done", !!done);
+  var num =
+   s.id === "welcome" ? "★" : s.id === "done" ? "✓" : String(Math.min(i, walkableCount));
+  if (done && s.id !== "welcome" && !active) num = "✓";
+  if (btn.textContent !== num) btn.textContent = num;
+  btn.setAttribute("aria-current", active ? "step" : "false");
+  btn.title = s.rail + (s.railSub ? ", " + s.railSub : "");
+ });
+ var nowB = stepsHost.querySelector(".ho-stepper-now b");
+ var nowSpan = stepsHost.querySelector(".ho-stepper-now span");
+ var nowPct = stepsHost.querySelector(".ho-stepper-pct");
+ if (nowB && nowB.textContent !== cur.rail) nowB.textContent = cur.rail;
+ if (nowSpan) {
+  if (cur.railSub) {
+   nowSpan.hidden = false;
+   if (nowSpan.textContent !== cur.railSub) nowSpan.textContent = cur.railSub;
+  } else {
+   nowSpan.textContent = "";
+   nowSpan.hidden = true;
+  }
+ }
+ if (nowPct) {
+  var pctTxt = progressPct(live) + "%";
+  if (nowPct.textContent !== pctTxt) nowPct.textContent = pctTxt;
+ }
+ // Only re-center when the active step index actually changed
+ var prevIdx = stepsHost.getAttribute("data-ho-idx");
+ var idxStr = String(state.idx);
+ if (prevIdx !== idxStr) {
+  stepsHost.setAttribute("data-ho-idx", idxStr);
+  if (opts.centerActive !== false) {
+   scrollActiveStepPill({ instant: !!opts.instant });
+  }
+ } else {
+  stepsHost.setAttribute("data-ho-idx", idxStr);
+ }
+ }
+
+ /**
+ * Scroll ONLY the stepper track. Never use scrollIntoView — it also scrolls
+ * .ho-sheet / the page and fights soft updates, which is the left↔right glitch.
+ */
+ function scrollActiveStepPill(opts) {
+ opts = opts || {};
+ try {
+  var root = document.getElementById("hoTour");
+  var stepper = root && root.querySelector(".ho-stepper");
+  var active = root && root.querySelector(".ho-sp.is-active");
+  if (!stepper || !active) return;
+  var target =
+   active.offsetLeft - (stepper.clientWidth - active.offsetWidth) / 2;
+  var max = Math.max(0, stepper.scrollWidth - stepper.clientWidth);
+  target = Math.max(0, Math.min(max, target));
+  if (Math.abs(stepper.scrollLeft - target) < 1.5) return;
+  if (opts.instant || typeof stepper.scrollTo !== "function") {
+   stepper.scrollLeft = target;
+  } else {
+   try {
+    stepper.scrollTo({ left: target, behavior: "smooth" });
+   } catch (e2) {
+    stepper.scrollLeft = target;
+   }
+  }
  } catch (e) {}
  }
 
@@ -937,16 +1053,8 @@
  var live = state.live || {};
  var brandSub = root.querySelector(".ho-brand span");
  if (brandSub) brandSub.textContent = scoreLine(live);
- var stepsHost = root.querySelector(".ho-steps");
- if (stepsHost) {
- stepsHost.innerHTML = buildStepsHtml(live);
- stepsHost.querySelectorAll("[data-idx]").forEach(function (btn) {
- btn.addEventListener("click", function () {
- state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
- hardRender({ animate: false });
- });
- });
- }
+ // In-place stepper paint — never remount (preserves scroll; no left↔right glitch)
+ paintStepper(live, { rebuild: false, centerActive: false });
  var main = root.querySelector(".ho-main");
  if (main) {
  var formSnap = snapshotLoginForm(main);
@@ -1022,8 +1130,10 @@
  setShellOpen(mode === "dock");
  updatePill();
  wire(root);
- // Keep the long stepper centered on the active stop
- setTimeout(scrollActiveStepPill, 40);
+ // Center the active pill on the track only (not ancestors)
+ setTimeout(function () {
+  scrollActiveStepPill({ instant: false });
+ }, 40);
  // Dock mode: whisk the real UI to this step's surface (behind the rail)
  if (mode === "dock" && step.autoNav) {
  setTimeout(function () {
@@ -2329,14 +2439,11 @@
  }
 
  function wire(root) {
- root.querySelectorAll("[data-idx]").forEach(function (btn) {
- if (btn._hoStepWired) return;
- btn._hoStepWired = true;
- btn.addEventListener("click", function () {
- state.idx = parseInt(btn.getAttribute("data-idx"), 10) || 0;
- hardRender({ animate: false });
- });
- });
+ var stepsHost = root.querySelector(".ho-steps");
+ if (stepsHost) {
+  stepsHost.setAttribute("data-ho-idx", String(state.idx));
+  wireStepClicks(stepsHost);
+ }
  wireActions(root);
  }
 
