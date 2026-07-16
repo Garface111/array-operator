@@ -4,6 +4,10 @@
 
 :root{
   --ea-rail: 360px;
+  /* Desktop dock is a FLOATING rounded card, not a full-bleed slab: --ea-gap is
+     the inset from every viewport edge, --ea-radius its corner rounding. */
+  --ea-gap: 14px;
+  --ea-radius: 22px;
   --ea-sky: #38bdf8;
   --ea-sky2: #0ea5e9;
   --ea-sun: #fbbf24;
@@ -163,46 +167,50 @@ html:not(.sky) .ea-mic-gate{
   color: var(--ink,#e5e7eb); border-color: rgba(56,189,248,.35);
 }
 /* When dock is open, park the gate above the rail */
-body.ea-shell-open .ea-mic-gate{ left: calc(var(--ea-rail) + 16px); top: 16px; }
+body.ea-shell-open .ea-mic-gate{ left: calc(var(--ea-gap) + var(--ea-rail) + 16px); top: 16px; }
 
-/* ── Left dock rail ──────────────────────────────────────────────────────── */
+/* ── Left dock — a FLOATING rounded card (inset from every edge, not a slab) ── */
 #eaPanel{
   display: none;
   position: fixed;
-  top: 0; left: 0; bottom: 0;
+  top: var(--ea-gap); left: var(--ea-gap); bottom: var(--ea-gap);
   width: var(--ea-rail);
-  max-width: min(var(--ea-rail), 92vw);
+  max-width: min(var(--ea-rail), calc(100vw - var(--ea-gap) * 2));
   z-index: 99970;
   flex-direction: column;
   background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,249,255,.97));
-  border-right: 1px solid rgba(14,165,233,.18);
-  box-shadow: 12px 0 40px -24px rgba(14,60,120,.35);
+  border: 1px solid rgba(14,165,233,.18);
+  border-radius: var(--ea-radius);
+  /* All-around elevation so it reads as a floating card, not an edge-anchored rail. */
+  box-shadow: 0 24px 60px -22px rgba(14,60,120,.45), 0 6px 18px -10px rgba(14,60,120,.28);
   font-family: inherit;
   color: var(--ink, #0f172a);
-  overflow: hidden;
+  overflow: hidden;          /* clip header/composer to the rounded corners */
 }
 #eaPanel.open{ display: flex; }
 html:not(.sky) #eaPanel{
   background: linear-gradient(180deg, var(--card,#111827), var(--card2,#0b1220));
   border-color: var(--line, rgba(255,255,255,.1));
   color: var(--ink, #e5e7eb);
-  box-shadow: 12px 0 40px -20px rgba(0,0,0,.55);
+  box-shadow: 0 24px 60px -18px rgba(0,0,0,.6), 0 6px 18px -10px rgba(0,0,0,.4);
 }
 html.sky #eaPanel{
   background: var(--sky-glass-chrome, linear-gradient(180deg, rgba(255,255,255,.92), rgba(240,249,255,.88)));
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
   backdrop-filter: blur(24px) saturate(1.5);
-  border-right: 1px solid var(--sky-glass-edge, rgba(14,165,233,.18));
+  border: 1px solid var(--sky-glass-edge, rgba(14,165,233,.18));
+  box-shadow: 0 24px 60px -22px rgba(14,60,120,.4), 0 6px 18px -10px rgba(14,60,120,.24);
 }
 
-/* Shift main app chrome right when dock is open */
+/* Shift main app chrome right when dock is open — clear the floating card plus
+   its inset gap on each side, so content sits beside the card, not under it. */
 body.ea-shell-open .wrap{
-  margin-left: var(--ea-rail);
+  margin-left: calc(var(--ea-rail) + var(--ea-gap) * 2);
   transition: margin-left .34s cubic-bezier(.2,.8,.2,1);
   /* Cap width to the remaining viewport so the tabbar can't overflow past the
      right edge and clip the account email (Ford 2026-07-15). */
   width: auto;
-  max-width: calc(100vw - var(--ea-rail));
+  max-width: calc(100vw - var(--ea-rail) - var(--ea-gap) * 2);
   min-width: 0;
   box-sizing: border-box;
   /* Clip any child that still tries 100vw breakout under the rail */
@@ -233,7 +241,9 @@ body.ea-shell-open .panel.active{
 @media (min-width: 961px){
   #eaPanel{
     display: flex;
-    transform: translateX(-100%);
+    /* Park fully off-screen: clear the card width + its left inset + shadow blur
+       so no sliver/shadow peeks at the edge when closed. */
+    transform: translateX(calc(-100% - var(--ea-gap) - 28px));
     visibility: hidden;
     pointer-events: none;
     will-change: transform;
@@ -266,7 +276,7 @@ body.ea-shell-open .ao-overlay,
 body.ea-shell-open .sb-ov,
 body.ea-shell-open .cl-modal-back,
 body.ea-shell-open .sb-detail-host.sb-dc-open{
-  left: var(--ea-rail, 360px) !important;
+  left: calc(var(--ea-rail) + var(--ea-gap) * 2) !important;
   right: 0 !important;
   width: auto !important;
 }
