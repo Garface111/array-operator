@@ -889,8 +889,12 @@
  body: JSON.stringify({ text: text, screenshot_b64: improve.shot || undefined }),
  });
  d = await r.json().catch(function () { return null; });
- if (!(d && d.ok && d.id)) throw new Error("submit failed");
+ if (!(d && d.id) || !r.ok) {
+ var detail = (d && (d.detail || d.message)) || ("HTTP " + r.status);
+ throw new Error(detail);
  }
+ }
+ if (!d || !d.id) throw new Error("submit failed — no id");
  if (ta) ta.value = "";
  closeImproveCompose();
  addMsg("user", "Improve site: " + text);
@@ -899,7 +903,10 @@
  } catch (e) {
  if (msg) {
  msg.style.color = "#b45309";
- msg.textContent = "Couldn't send, try again in a moment.";
+ msg.textContent =
+ "Couldn't send" +
+ (e && e.message ? " (" + String(e.message).slice(0, 120) + ")" : "") +
+ ". Try again in a moment.";
  }
  } finally {
  if (sendBtn) sendBtn.disabled = false;

@@ -513,7 +513,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260716copyStill1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716lookFix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260716lookFix1"></script>
+<script src="energy-agent.js?v=20260716improveOk1"></script>
 <script src="sovereign-desk.js?v=20260716lookFix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">
@@ -1527,10 +1527,15 @@ document.documentElement.setAttribute("data-theme","day");
  var payload={text:t};
  if(MARK_B64) payload.screenshot_b64=MARK_B64;
  fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
- .then(function(r){ return r.ok?r.json():null; })
- .then(function(d){
+ .then(function(r){
+ return r.json().then(function(d){ return { okHttp:r.ok, status:r.status, d:d }; })
+ .catch(function(){ return { okHttp:r.ok, status:r.status, d:null }; });
+ })
+ .then(function(res){
  send.disabled=false;
- if(d&&d.ok&&d.id){
+ var d = res && res.d;
+ // Accept ok:true OR bare id (older/newer API shapes)
+ if(d && d.id && (d.ok !== false) && res.okHttp){
  txt.value="";
  MARK_B64=null; setThumb();
  msg.textContent="";
@@ -1538,7 +1543,8 @@ document.documentElement.setAttribute("data-theme","day");
  startWatch(d.id);
  } else {
  msg.style.color="#b45309";
- msg.textContent="Couldn't send just now, try again in a moment.";
+ var detail = (d && (d.detail || d.message)) || ("HTTP " + (res && res.status));
+ msg.textContent="Couldn't send (" + detail + "). Try again.";
  }
  })
  .catch(function(){
@@ -1560,19 +1566,23 @@ document.documentElement.setAttribute("data-theme","day");
  if(shotB64) payload.screenshot_b64 = shotB64;
  else if(MARK_B64) payload.screenshot_b64 = MARK_B64;
  return fetch("/v1/feature-suggestion",{method:"POST",headers:h,body:JSON.stringify(payload)})
- .then(function(r){ return r.ok ? r.json() : null; })
- .then(function(d){
- if(d && d.ok && d.id){
+ .then(function(r){
+ return r.json().then(function(d){ return { okHttp:r.ok, status:r.status, d:d }; })
+ .catch(function(){ return { okHttp:r.ok, status:r.status, d:null }; });
+ })
+ .then(function(res){
+ var d = res && res.d;
+ if(d && d.id && (d.ok !== false) && res.okHttp){
  MARK_B64 = null; setThumb();
  openPanel(false);
  startWatch(d.id);
- // Mirror journey into Energy Agent dock when present
  try{
  if(typeof window.__eaBuildWatch==="function") window.__eaBuildWatch(d.id);
  }catch(e){}
  return d;
  }
- throw new Error("submit failed");
+ var detail = (d && (d.detail || d.message)) || ("HTTP " + (res && res.status));
+ throw new Error(detail || "submit failed");
  });
  }
 
