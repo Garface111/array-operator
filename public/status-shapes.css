@@ -1,0 +1,348 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * STATUS SHAPE IMPROVEMENTS (#30) — improve-ok-shape-check
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Enhanced visual distinction for status indicators across all themes.
+ * Makes "OK"/healthy status more recognizable and distinct from "working" state.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Status Indicator Base Shapes ────────────────────────────────────────── */
+
+/* OK/Healthy status — square with rounded corners (stable, complete) */
+.status-ok,
+.status-healthy,
+[data-status="ok"],
+[data-status="healthy"] {
+  --status-shape: 4px;
+  border-radius: var(--status-shape);
+}
+
+/* Working/Active status — circular (ongoing, in-motion) */
+.status-working,
+.status-active,
+[data-status="working"],
+[data-status="active"] {
+  --status-shape: 50%;
+  border-radius: var(--status-shape);
+}
+
+/* Warning/Attention status — octagon-like (sharp corners, attention-grabbing) */
+.status-warn,
+.status-attention,
+[data-status="warn"],
+[data-status="attention"] {
+  --status-shape: 2px;
+  border-radius: var(--status-shape);
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%, 100% 70%,
+    70% 100%, 30% 100%, 0% 70%, 0% 30%
+  );
+}
+
+/* Error/Fault status — diamond (critical, sharp) */
+.status-error,
+.status-fault,
+[data-status="error"],
+[data-status="fault"] {
+  --status-shape: 0;
+  border-radius: var(--status-shape);
+  transform: rotate(45deg);
+}
+
+/* ── Status Chip/Badge Enhancements ──────────────────────────────────────── */
+
+/* OK status chips — firmer presence */
+.chip-ok,
+.badge-ok {
+  background: var(--good);
+  color: white;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: transform var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.chip-ok:hover,
+.badge-ok:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+}
+
+/* Working status chips — pulsing circular indicator */
+.chip-working,
+.badge-working {
+  background: var(--ao-live);
+  color: white;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  position: relative;
+  overflow: visible;
+}
+
+.chip-working::before,
+.badge-working::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-working 2s var(--ease-standard) infinite;
+}
+
+@keyframes pulse-working {
+  0%, 100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+  opacity: 0.6;
+    transform: translateY(-50%) scale(1.15);
+  }
+}
+
+/* Warning status chips — amber with icon space */
+.chip-warn,
+.badge-warn {
+  background: var(--warn);
+  color: white;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Error status chips — red with sharp corners */
+.chip-error,
+.badge-error {
+  background: var(--bad);
+  color: white;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.03em;
+}
+
+/* ── Status Dots (for compact indicators) ────────────────────────────────── */
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* OK status dot — square with rounded corners */
+.status-dot-ok,
+.status-dot[data-status="ok"] {
+  background: var(--good);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--good2);
+}
+
+/* Working status dot — circular with glow */
+.status-dot-working,
+.status-dot[data-status="working"] {
+  background: var(--ao-live);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--ao-live-glow);
+  animation: glow-working 2s ease-in-out infinite;
+}
+
+@keyframes glow-working {
+  0%, 100% {
+    box-shadow: 0 0 6px var(--ao-live-glow);
+  }
+  50% {
+    box-shadow: 0 0 12px var(--ao-live-glow), 0 0 4px var(--ao-live);
+  }
+}
+
+/* Warning status dot — diamond shape */
+.status-dot-warn,
+.status-dot[data-status="warn"] {
+  background: var(--warn);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+/* Error status dot — sharp diamond */
+.status-dot-error,
+.status-dot[data-status="error"] {
+  background: var(--bad);
+  border-radius: 0;
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.3);
+}
+
+/* ── Icon Status Indicators ──────────────────────────────────────────────── */
+
+/* For status icons that need shape distinction */
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.status-icon-ok {
+  background: var(--good);
+  color: white;
+  border-radius: 4px;
+}
+
+.status-icon-working {
+  background: var(--ao-live);
+  color: white;
+  border-radius: 50%;
+}
+
+.status-icon-warn {
+  background: var(--warn);
+  color: white;
+  border-radius: 2px;
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%, 100% 70%,
+    70% 100%, 30% 100%, 0% 70%, 0% 30%
+  );
+}
+
+.status-icon-error {
+  background: var(--bad);
+  color: white;
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.status-icon-error > * {
+  transform: rotate(-45deg);
+}
+
+/* ── Accessibility & Interaction ─────────────────────────────────────────── */
+
+/* Interactive status elements get hover feedback */
+button.chip-ok,
+button.chip-working,
+button.chip-warn,
+button.chip-error,
+a.chip-ok,
+a.chip-working,
+a.chip-warn,
+a.chip-error {
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard),
+              background var(--motion-fast) var(--ease-standard);
+}
+
+button.chip-ok:hover,
+a.chip-ok:hover {
+  background: var(--green-deep);
+  transform: translateY(-1px);
+}
+
+button.chip-working:hover,
+a.chip-working:hover {
+  background: var(--ao-live-ink);
+  transform: scale(1.02);
+}
+
+button.chip-warn:hover,
+a.chip-warn:hover {
+  background: var(--gold2);
+  transform: translateY(-1px);
+}
+
+button.chip-error:hover,
+a.chip-error:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+/* Focus states for keyboard navigation */
+.chip-ok:focus-visible,
+.chip-working:focus-visible,
+.chip-warn:focus-visible,
+.chip-error:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* ── Reduced Motion Fallbacks ────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-working::before,
+  .badge-working::before,
+  .status-dot-working {
+    animation: none;
+  }
+  
+  .status-dot-ok,
+  .status-dot-working {
+    box-shadow: none;
+  }
+}
+
+/* ── Theme-Specific Refinements ──────────────────────────────────────────── */
+
+/* Day theme: higher contrast chips */
+html[data-theme="day"] .chip-ok {
+  background: #2563eb;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+html[data-theme="day"] .chip-working {
+  background: #16a34a;
+}
+
+html[data-theme="day"] .chip-warn {
+  background: #d97706;
+}
+
+html[data-theme="day"] .chip-error {
+  background: #dc2626;
+}
+
+/* Sky theme: frosted glass status chips */
+html.sky .chip-ok,
+html.sky .chip-working,
+html.sky .chip-warn,
+html.sky .chip-error {
+  backdrop-filter: blur(8px) saturate(1.4);
+  background: rgba(255, 255, 255, 0.24);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html.sky .chip-ok {
+  color: var(--good);
+}
+
+html.sky .chip-working {
+  color: var(--ao-live-ink);
+}
+
+html.sky .chip-warn {
+  color: var(--warn);
+}
+
+html.sky .chip-error {
+  color: var(--bad);
+}
