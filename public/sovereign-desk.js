@@ -352,6 +352,7 @@
     var meta = m.meta || {};
     var text = String(m.content || "");
     if (role === "system") return false;
+    // Allow provider "email" (Sovereign mailed you — short desk breadcrumb)
     if (prov === "worker" || prov === "rules" || prov === "admin") return false;
     if (meta && (meta.job_id || meta.from === "rules_utility_triage" || meta.legacy)) {
       if (prov === "worker" || /^Sovereign shipped job/i.test(text) || /^Ops /i.test(text))
@@ -360,6 +361,15 @@
     if (/^Sovereign shipped job\s/i.test(text)) return false;
     if (/^Ship:\s*\{/m.test(text) && /Deploy:\s*\{/m.test(text)) return false;
     if (/^Ops\s+\w+:\s*\{/.test(text)) return false;
+    // Ops email dumps that used to spam the desk (code-hire / job telemetry)
+    if (
+      prov === "email" &&
+      (/code-hire/i.test(text) ||
+        /job id:/i.test(text) ||
+        /utility-add request #/i.test(text) ||
+        (/emailed you from/i.test(text) && /job/i.test(text)))
+    )
+      return false;
     return !!(text || "").trim();
   }
 
