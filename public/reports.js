@@ -691,7 +691,11 @@
  function revealGenrepPill() {
  const b = document.getElementById("invTabGenrep");
  if (!b) return;
- if (genrepFlag()) { _genrepOn = true; b.style.display = ""; return; }
+ // Reveal = drop the inline display:none!important (the important flag is
+ // required: a .vs-seg-btn stylesheet rule sets display:flex!important,
+ // which beats plain inline styles — the classic [hidden]-vs-flex trap).
+ const show = () => b.style.removeProperty("display");
+ if (genrepFlag()) { _genrepOn = true; show(); return; }
  // Default-on when this account's generation-reports world is live (the
  // fold migration set Tenant.generation_reports; nepool-product accounts
  // are always live). Anonymous demo + unmigrated AO tenants stay hidden.
@@ -705,7 +709,7 @@
  .then(a => {
  if (!a || a.generation_reports !== true) return;
  _genrepOn = true;
- b.style.display = "";
+ show();
  if (wantedGenrep) applyInvoicesSub("genreports");
  })
  .catch(() => {});

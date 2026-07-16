@@ -441,10 +441,11 @@ document.documentElement.setAttribute("data-theme","day");
  </button>
  <button class="vs-seg-btn" type="button" data-gentab="trends" aria-pressed="false"
  title="What you've made from offtakers — invoices, run-rate, year-over-year.">Trends</button>
- <!-- THE FOLD: NEPOOL Operator lives here now. Hidden behind ?genrep=1 while
- the embed spike bakes (inline display:none — [hidden] loses to .vs-seg-btn's
- author display); reports.js revealGenrepPill() unhides when flagged. -->
- <button class="vs-seg-btn" type="button" data-gentab="genreports" id="invTabGenrep" style="display:none"
+ <!-- THE FOLD: NEPOOL Operator lives here now. Hidden until the account's
+ reports world is live (or ?genrep=1). display:none needs !important —
+ a .vs-seg-btn rule sets display:flex!important, which beats plain
+ inline styles. reports.js revealGenrepPill() removes the property. -->
+ <button class="vs-seg-btn" type="button" data-gentab="genreports" id="invTabGenrep" style="display:none!important"
  title="NEPOOL/REC generation reporting — clients, report cadence, workbook history.">Generation reports</button>
  </div>
  </div>
@@ -473,7 +474,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="sandbox.js?v=20260716focus1"></script>
 <script src="vendor-sheet.js?v=20260716shading1"></script>
 <script src="command-center.js?v=20260714pro1"></script>
-<script src="reports.js?v=20260716genrep6"></script>
+<script src="reports.js?v=20260716genrep7"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
