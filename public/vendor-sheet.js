@@ -954,6 +954,8 @@
  }
 
  // The sortable columns (Vendor is the grouping, not sortable).
+ // Spark is its OWN column (not crammed into Status) so graphs never intersect
+ // the UNDERPERFORMING / OK pill — Ford 2026-07-16.
  const COLS = [
  { key: "name", cls: "vs-c-name", label: "Array" },
  { key: null, cls: "vs-c-vendor", label: "Vendor" },
@@ -961,6 +963,7 @@
  { key: "inv", cls: "vs-c-inv", label: "Inverters" },
  { key: "pow", cls: "vs-c-pow", label: "Live now" },
  { key: "today", cls: "vs-c-today", label: "Today" },
+ { key: null, cls: "vs-c-spark", label: "14-day" },
  { key: "status", cls: "vs-c-status", label: "Status" },
  { key: "fresh", cls: "vs-c-fresh", label: "Synced" },
  ];
@@ -1404,6 +1407,7 @@
  <span class="vs-c-inv">${nInv}</span>
  <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
  <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
+ <span class="vs-c-spark" aria-hidden="true"></span>
  <span class="vs-c-status">${statusPillsHtml(vStatus)}</span>
  <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
  </div>${vnote}
@@ -1426,6 +1430,7 @@
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
+ <span class="vs-c-spark" aria-hidden="true"></span>
  <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
  <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
  </button>`;
@@ -1493,15 +1498,11 @@
  const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "";
  const _liveTip = _al ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : "";
  const _peerTip = iv.peer_index != null ? ` title="14-day output vs its neighbors, 1.00× is right at the group median"` : "";
- // Inverter rows use the SAME 8-column grid as the vendor/array rows above them,
- // so every column, gauge, live, today, status, lines up in one vertical column
- // (Ford 2026-07-12). A compact 14-day sparkline rides in the Status cell, just
- // LEFT of the verdict pill (Ford 2026-07-13: "show the graph again of the
- // inverters… to the left of the OK"), cohort-scaled so an underperformer's bars
- // visibly sit below its peers. The WHOLE row is clickable → the full Details
- // chart + array comparison deck (a redundant "Details →" affordance stays too).
+ // Inverter rows share the SAME grid as vendor/array rows. Spark has its OWN
+ // column (left of Status) so the graph never intersects the OK/UNDERPERFORMING
+ // pill — roomy gap, glance-aligned edges (Ford 2026-07-16).
  const _rowspark = sparkline(iv.daily, cohortScale, {
- cls: "vs-inv-rowspark", w: 116, h: 26, mini: true,
+ cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
  h += `<div class="vs-row vs-inv" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
@@ -1510,7 +1511,8 @@
  <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
  <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
- <span class="vs-c-status vs-inv-statcell"><span class="vs-inv-rowspark-wrap" title="14-day daily yield (kWh per kW nameplate) vs neighbors, fair across different inverter sizes. Click for the full chart.">${_rowspark}</span><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
+ <span class="vs-c-spark"><span class="vs-inv-rowspark-wrap" title="14-day daily yield (kWh per kW nameplate) vs neighbors, fair across different inverter sizes. Click for the full chart.">${_rowspark}</span></span>
+ <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
  <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart + array comparison">Details →</button></span>
  </div>`;
  });

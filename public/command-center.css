@@ -2308,7 +2308,9 @@ html[data-theme="day"] .rep-fld.req > select{
 .vs-seg-btn:not(.on):focus-visible{ background:var(--day-hover,rgba(15,23,42,.08)); color:var(--ink,#0f172a); opacity:1; outline:none; }
 
 /* The spreadsheet panel itself. */
-#sheetWrap{ padding:16px 20px 48px; max-width:1120px; margin:0 auto; }
+/* Wider sheet so the dedicated 14-day spark column has room (was 1120 — felt
+   cramped with graphs jammed into Status). */
+#sheetWrap{ padding:16px 20px 48px; max-width:1280px; margin:0 auto; }
 .vs-headrow{ margin:0 2px 14px; }
 .vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
 .vs-sub{ font-size:13px; color:var(--muted); }
@@ -2325,26 +2327,23 @@ html[data-theme="day"] .rep-fld.req > select{
    the fr ratio — identical on every row regardless of what it contains. The
    Vendor column keeps a small px floor (not 0) sized to its widest real button so
    that content still fits without wrapping/clipping. */
-/* Column floors matter when Energy Agent is open (body.ea-shell-open shrinks
-   .wrap). Live now + Today used minmax(0,…) and could collapse to 0 → kW/kWh
-   text stacked as "kWkWh". Status MUST stay wide enough for inverter rows:
-   [116px spark | gap | UNDERPERFORMING pill] ≈ 250px+. The 132px floor
-   (2026-07-15) was a regression — sparklines painted over the pill/text
-   (Ford 2026-07-16). Prefer horizontal scroll over crushing graphs into labels. */
+/* 9 columns: dedicated SPARK column (left of Status) so graphs never share a
+   cell with UNDERPERFORMING / OK pills (Ford 2026-07-16 — "tons of space to the
+   left of the graphs", stop intersecting). Prefer horizontal scroll over crush. */
 .vs-row{ display:grid;
   grid-template-columns:
-    minmax(128px,1.5fr)   /* array name */
-    minmax(92px,.75fr)    /* vendor */
-    72px                  /* gauge */
-    52px                  /* inverter count */
-    minmax(72px,.85fr)    /* live now — fits "999.9 kW" */
-    minmax(80px,.9fr)     /* today — fits "99,999 kWh" */
-    minmax(250px,1.55fr)  /* status: 116px spark + gap + long pill (40122b9) */
-    minmax(84px,.7fr);    /* synced */
-  align-items:center; gap:10px; padding:11px 14px; width:100%;
+    minmax(120px,1.35fr)  /* array name */
+    minmax(84px,.7fr)     /* vendor */
+    68px                  /* gauge */
+    48px                  /* inverter count / peer */
+    minmax(68px,.8fr)     /* live now */
+    minmax(76px,.85fr)    /* today */
+    148px                 /* 14-day spark — fixed, roomy, never shares Status */
+    minmax(118px,1.15fr)  /* status pill only */
+    minmax(80px,.65fr);   /* synced */
+  align-items:center; gap:12px; padding:11px 14px; width:100%;
   box-sizing:border-box; text-align:left;
-  /* Floor so [spark|pill] never compresses into Live/Today text (regression fix) */
-  min-width:920px; }
+  min-width:1040px; }
 /* Output gauge column — a little speedometer of % of nameplate. Given a roomy column and
    centered so it sits between Vendor and Inverters without a big empty gap on either side. */
 .vs-c-gauge{ display:flex; align-items:center; justify-content:center; }
@@ -2471,17 +2470,31 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    mute it and tag "est." so it can never be mistaken for metered production. */
 .vs-c-today.vs-est{ color:var(--muted); }
 .vs-est-tag{ font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--gold2,#b45309); text-transform:uppercase; }
-/* Status cell: keep pills on one row, never let wrapped cloned backgrounds
-   look like two stacked notifications on top of Live/Today (Ford 2026-07-15).
-   Inverter spark cells use .vs-inv-statcell (grid) and MUST override this flex. */
+/* Status cell: pills only (spark lives in .vs-c-spark). */
 .vs-c-status{
   display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center;
   gap:4px; min-width:0; max-width:100%;
 }
-.vs-c-status.vs-inv-statcell{
-  /* Never fall back to flex-wrap — that stacks spark on top of the pill */
-  flex-wrap:nowrap;
-  min-width:250px;
+/* Dedicated 14-day graph column — fixed width, air to the right of bars */
+.vs-c-spark{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  width:148px;
+  min-width:148px;
+  max-width:148px;
+  padding-right:8px; /* breathing room before Status pill */
+  box-sizing:border-box;
+  line-height:0;
+}
+.vs-colhead .vs-c-spark{
+  font-size:10.5px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  font-weight:700;
+  color:var(--faint);
+  line-height:1.2;
+  justify-content:flex-start;
 }
 /* "latest data 36m ago" used to render gold+bold, which read as an ALARM when
    nothing is wrong (Ford 2026-07-11): the vendor portal publishes on its own
@@ -2503,7 +2516,7 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 /* Vendor/array status: single-line pill (ellipsis if squeezed). Multi-issue
    vendors render as separate .vs-pill siblings (see vendorStatusHtml) instead
    of one long "A · B" string that wrapped into two overlapping capsules. */
-.vs-c-status:not(.vs-inv-statcell) .vs-pill{
+.vs-c-status .vs-pill{
   white-space:nowrap; max-width:100%; text-align:center;
   overflow:hidden; text-overflow:ellipsis;
   -webkit-box-decoration-break:unset; box-decoration-break:unset;
@@ -2544,62 +2557,51 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   background:transparent; border:1px solid transparent; border-radius:7px; padding:4px 8px; white-space:nowrap;
   transition:background .12s, border-color .12s; }
 .vs-inv-details:hover{ background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.4); }
-/* Inline 14-day sparkline LEFT of the verdict pill (Ford 2026-07-13).
-   CRITICAL: use a FIXED two-track grid, not flex-end. Flex-end packed [spark][pill]
-   to the right edge, so a long pill ("UNDERPERFORMING") shoved that row's graph
-   left of its OK neighbors — glance-compare was broken (Ford 2026-07-14).
-   Track 1 is always 116px for the spark (or "no history" placeholder); track 2
-   holds the pill, right-aligned. Every graph's left edge then lines up. */
-.vs-inv .vs-c-status.vs-inv-statcell{
-  display:grid !important; /* beat .vs-c-status flex — regression guard */
-  grid-template-columns:116px minmax(110px,1fr);
-  align-items:center;
-  column-gap:10px;
-  justify-items:stretch;
-  text-align:left; /* override the column's default text-align:right for this grid */
-  min-width:250px;
-  overflow:visible;
-}
+/* Spark lives in .vs-c-spark (own grid column). Never co-located with .vs-pill. */
 .vs-inv-rowspark-wrap{
-  grid-column:1;
-  width:116px;
-  max-width:116px;
-  min-width:116px; /* never shrink under the pill */
+  width:132px;
+  max-width:132px;
+  min-width:132px;
   display:flex;
   align-items:center;
   justify-content:flex-start;
   line-height:0;
-  opacity:.92;
-  flex-shrink:0;
-  overflow:hidden; /* clip bars inside the spark box only */
+  opacity:.95;
+  overflow:hidden;
 }
-.vs-inv-statcell > .vs-pill{
-  grid-column:2;
-  justify-self:end;
-  /* Must NOT max-width:100% — that clipped the orange fill while the text still
-     painted past the capsule edge on UNDERPERFORMING (Ford 2026-07-14). */
+.vs-c-status .vs-pill{
   max-width:none;
   width:max-content;
   white-space:nowrap;
   flex-shrink:0;
-  position:relative;
-  z-index:1; /* pill text always above any paint bleed */
 }
-.vs-inv-rowspark{ display:block; width:116px; height:26px; flex-shrink:0; }
+.vs-inv-rowspark{ display:block; width:132px; height:28px; flex-shrink:0; }
 .vs-inv-rowspark rect{ fill:var(--good,#2563eb); opacity:.78; }
 .vs-inv-rowspark .vs-spark-empty{ fill:var(--line,#e6e9ef); opacity:1; }
 .vs-inv:hover .vs-inv-rowspark rect{ opacity:.92; }
-.vs-inv-nospark{ align-self:center; font-size:10.5px; line-height:1.2; white-space:normal; }
+.vs-inv-nospark{ font-size:10.5px; line-height:1.2; white-space:normal; color:var(--faint); font-style:italic; }
 @media(max-width:760px){
-  .vs-inv .vs-c-status.vs-inv-statcell{ grid-template-columns:78px minmax(0,1fr); }
-  .vs-inv-rowspark-wrap{ width:78px; max-width:78px; }
-  .vs-inv-rowspark{ width:78px; }
+  .vs-row{
+    grid-template-columns:
+      minmax(110px,1.2fr) minmax(72px,.65fr) 60px 44px
+      minmax(64px,.75fr) minmax(70px,.8fr)
+      100px minmax(100px,1fr) minmax(72px,.6fr);
+    min-width:880px; gap:10px;
+  }
+  .vs-c-spark{ width:100px; min-width:100px; max-width:100px; padding-right:4px; }
+  .vs-inv-rowspark-wrap{ width:96px; max-width:96px; min-width:96px; }
+  .vs-inv-rowspark{ width:96px; height:24px; }
 }
 @media(max-width:640px){ .vs-inv-name{ padding-left:26px; }
-  .vs-inv-rowspark-wrap{ display:none; }
-  .vs-inv .vs-c-status.vs-inv-statcell{ grid-template-columns:1fr; }
-  .vs-inv-statcell > .vs-pill{ grid-column:1; justify-self:end; }
-}   /* phones: pill only, deck lives in Details */
+  .vs-c-spark, .vs-inv-rowspark-wrap{ display:none; } /* phones: pill only */
+  .vs-row{
+    grid-template-columns:
+      minmax(100px,1.2fr) minmax(70px,.7fr) 56px 40px
+      minmax(60px,.8fr) minmax(64px,.85fr)
+      0px minmax(90px,1fr) minmax(70px,.65fr);
+    min-width:720px;
+  }
+}
 
 /* ── Full-screen inverter detail: the interactive 14-day chart (Ford + Martin 2026-07-12) ── */
 .vs-dc-ov{ position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
@@ -3094,12 +3096,11 @@ body.ea-shell-open .vs-scroll{
   -webkit-overflow-scrolling:touch;
 }
 body.ea-shell-open .vs-row{
-  /* Same floor as base .vs-row — scroll, don't crush spark into pill/text */
-  min-width:920px;
+  min-width:1040px; /* 9 cols incl. dedicated spark */
 }
 /* Hands-off rail open (no EA) — same squeeze risk */
 body.ho-shell-open:not(.ea-shell-open) #sheetWrap{ max-width:none; }
 body.ho-shell-open:not(.ea-shell-open) .vs-scroll{ overflow-x:auto; }
-body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:920px; }
-/* Always allow sheet to scroll horizontally when the spark+pill floor needs it */
+body.ho-shell-open:not(.ea-shell-open) .vs-row{ min-width:1040px; }
+/* Always allow sheet to scroll horizontally when 9 cols need the room */
 .vs-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
