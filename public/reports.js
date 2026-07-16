@@ -290,7 +290,7 @@
  // Flip the generator to the Bill-audit tab (the flagged chip's destination —
  // that's where the catches live, organized the way GMP allocates them).
  function openAuditTab() {
- const btn = document.querySelector('#rbGenTabs [data-gentab="audit"]');
+ const btn = document.querySelector('.inv-sub-seg [data-gentab="audit"], #rbGenTabs [data-gentab="audit"]');
  if (btn) { btn.click(); return true; }
  return false;
  }
@@ -596,44 +596,73 @@
  return `<div class="rb-au-empty">${esc(msg || "Connect an array's utility bill + its offtakers' bills to audit GMP's allocation. Once both are on file, this shows the array's group excess with each offtaker's share checked against what GMP actually credited them.")}</div>`;
  }
 
- // The "Offtakers | Bill audit" segmented toggle at the top of the generator: swaps
- // the body between the offtaker list (#rbGenList) and the Bill-audit sandbox
- // (#rbAuditView). Lazily fetches the audit on first switch. Works in the demo too
- // (renderAudit shows the sign-in/empty state without a live fetch).
- function wireGenTabs() {
- const tabs = Array.from(document.querySelectorAll("#rbGenTabs [data-gentab]"));
- if (!tabs.length) return;
+ // Invoices secondary nav (Ford 2026-07-16): same treatment as Analysis.
+ // Pills live in #panelReports .inv-sub-seg (under the main tabbar). Swaps
+ // #rbGenList / #rbAuditView / #rbFinTrends. Deep links:
+ // #reports | #reports/audit | #reports/trends
+ function invoicesSubFromHash() {
+ const h = (location.hash || "").toLowerCase();
+ if (/#reports\/audit/i.test(h) || h === "#bill-audit" || h === "#billaudit") return "audit";
+ if (/#reports\/trends/i.test(h)) return "trends";
+ return "offtakers";
+ }
+ function applyInvoicesSub(v) {
+ const tabs = Array.from(document.querySelectorAll(".inv-sub-seg [data-gentab], #rbGenTabs [data-gentab]"));
  const list = document.getElementById("rbGenList");
  const audit = document.getElementById("rbAuditView");
  const fin = document.getElementById("rbFinTrends");
  const pipe = document.getElementById("rb2Pipe");
- tabs.forEach(btn => btn.onclick = () => {
- const v = btn.getAttribute("data-gentab");
- tabs.forEach(b => b.classList.toggle("on", b === btn));
- // Editing chrome only on Offtakers; Trends is read-only finance.
+ const head = document.querySelector("#rbSubInvoice .rb2-head");
+ if (!v) v = invoicesSubFromHash();
+ tabs.forEach(b => {
+ const on = b.getAttribute("data-gentab") === v;
+ b.classList.toggle("on", on);
+ b.setAttribute("aria-pressed", on ? "true" : "false");
+ });
  if (list) list.style.display = v === "offtakers" ? "" : "none";
  if (audit) audit.style.display = v === "audit" ? "" : "none";
  if (fin) fin.style.display = v === "trends" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
- if (v === "audit") renderAudit(); // lazy render + fetch on first view
- if (v === "trends") renderFinTrends(); // offtaker financial gains
- // Soft URL hash so deep links / Energy Agent can open Trends
+ // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on others
+ if (head) {
+ const id = head.querySelector(".rb2-id h1");
+ const sub = head.querySelector(".rb2-id #rb2Sub, .rb2-id p");
+ if (v === "offtakers") {
+ if (id) id.textContent = "Offtaker invoicing";
+ if (sub) sub.style.display = "";
+ } else if (v === "audit") {
+ if (id) id.textContent = "Bill audit";
+ if (sub) sub.style.display = "none";
+ } else if (v === "trends") {
+ if (id) id.textContent = "Invoice trends";
+ if (sub) sub.style.display = "none";
+ }
+ }
+ if (v === "audit") renderAudit();
+ if (v === "trends") renderFinTrends();
  try {
- if (v === "trends" && location.hash.indexOf("reports") === 0) {
- history.replaceState(null, "", "#reports/trends");
- } else if (v === "offtakers" && /reports\/trends/.test(location.hash || "")) {
- history.replaceState(null, "", "#reports");
+ const want =
+ v === "audit" ? "#reports/audit" :
+ v === "trends" ? "#reports/trends" :
+ "#reports";
+ if ((location.hash || "").toLowerCase() !== want) {
+ history.replaceState(null, "", want);
  }
  } catch (e) {}
+ }
+ function wireGenTabs() {
+ const tabs = Array.from(document.querySelectorAll(".inv-sub-seg [data-gentab], #rbGenTabs [data-gentab]"));
+ if (!tabs.length) return;
+ tabs.forEach(btn => {
+ btn.onclick = () => {
+ const v = btn.getAttribute("data-gentab") || "offtakers";
+ applyInvoicesSub(v);
+ };
  });
- // Deep-link: #reports/trends opens the finance sub-tab once
- try {
- if (/#reports\/trends/i.test(location.hash || "")) {
- const t = document.querySelector('#rbGenTabs [data-gentab="trends"]');
- if (t) t.click();
+ // Honor deep link / restore last sub-view
+ applyInvoicesSub(invoicesSubFromHash());
  }
- } catch (e) {}
- }
+ try { window.__aoApplyInvoicesSub = applyInvoicesSub; } catch (e) {}
 
  // ── Invoice Trends sub-tab (Paul 2026-07-15 / Ford): offtaker financial gains.
  // Production kWh lives on Analysis → Trends. This surface is dollars only —
@@ -929,8 +958,9 @@
 
  const go = document.getElementById("rbFinGoOfftakers");
  if (go) go.onclick = () => {
- const t = document.querySelector('#rbGenTabs [data-gentab="offtakers"]');
+ const t = document.querySelector('.inv-sub-seg [data-gentab="offtakers"], #rbGenTabs [data-gentab="offtakers"]');
  if (t) t.click();
+ else if (window.__aoApplyInvoicesSub) window.__aoApplyInvoicesSub("offtakers");
  };
  host.dataset.ready = "1";
  _finTrendsLoaded = true;
@@ -2548,12 +2578,9 @@
  gone, only the ONE signal the pipeline doesn't carry (do the bills reconcile
  against GMP?) survives, as an inline status. Same #rb2Kpis host + renderKpis
  wiring; it renders one line now instead of four cards. -->
- <div class="rb2-tabrow">
- <div class="rb-subtabs rb-subtabs-bare rb2-subtabs" role="tablist" id="rbGenTabs">
- <button type="button" class="rb-subtab on" data-gentab="offtakers">Offtakers</button>
- <button type="button" class="rb-subtab" data-gentab="audit" title="Audit GMP's per-offtaker allocation against each array's master utility bill.">Bill audit<span class="rb-au-genbadge" id="rbAuditTabBadge" hidden></span></button>
- <button type="button" class="rb-subtab" data-gentab="trends" title="Financial and production trends by array — separate from invoice editing.">Trends</button>
- </div>
+ <!-- Sub-nav lives above the sheet (index.html .inv-sub-seg), matching
+ Analysis Fleet analysis | Trends | Resources. KPI glance stays here. -->
+ <div class="rb2-tabrow rb2-tabrow--kpis-only">
  <div class="rb2-kpis" id="rb2Kpis" hidden></div>
  </div>
  </div>

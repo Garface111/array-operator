@@ -92,6 +92,21 @@ html.sky .rb2-id p{color:var(--muted)}
 /* ── 3 · GENERATOR TABS → GLASS PILL SEGMENT (mirrors the main tab bar) ────
    The underline tabs become a pill track; active = solid action blue. */
 html.sky .rb2-tabrow{border-bottom:0;align-items:center;gap:14px;margin-top:15px}
+/* Invoices secondary nav — lives on #panelReports .inv-sub-seg (Analysis twin).
+ Badge for flagged bill-audit count sits inside the active/inactive pill. */
+html.sky #panelReports .inv-sub-seg .rb-au-genbadge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 6px;margin-left:6px;
+  border-radius:999px;font-size:10.5px;font-weight:780;
+  background:rgba(180,83,9,.14);color:#b45309;border:1px solid rgba(180,83,9,.28);
+  vertical-align:middle;line-height:1;
+}
+html.sky #panelReports .inv-sub-seg .vs-seg-btn.on .rb-au-genbadge{
+  background:#fff;color:#b45309;border-color:#fff;
+}
+html.sky #panelReports .rb2-tabrow--kpis-only{
+  margin-top:4px;justify-content:flex-end;
+}
 html.sky .rb2-subtabs.rb-subtabs{border-bottom:0;margin:0;gap:4px;padding:5px;
   display:inline-flex;background:rgba(255,255,255,.55);
   border:1px solid var(--sky-glass-edge);border-radius:var(--sky-r-pill);

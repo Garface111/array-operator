@@ -7509,7 +7509,7 @@
  if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
  if(h === "#arrays" || h === "#sandbox") return "arrays";
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
- if(h === "#reports") return "reports";
+ if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
  if(h === "#dashboard") return "dashboard";
  if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
  return "arrays";
@@ -7613,6 +7613,12 @@
  applyAnalysisSub();
  } else if(active === "reports"){
  loadReports();
+ // Re-apply Offtakers | Bill audit | Trends sub-view after shell paint
+ try {
+ setTimeout(function(){
+ if(window.__aoApplyInvoicesSub) window.__aoApplyInvoicesSub();
+ }, 0);
+ } catch(_){}
  } else if(active === "ops"){
  try { if(window.__aoLoadOps) window.__aoLoadOps(); } catch(_){}
  try {
