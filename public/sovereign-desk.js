@@ -419,6 +419,49 @@
     }
   }
 
+  async function fetchAccessWithRetry() {
+    // Same-origin first (Netlify→Railway proxy). On gateway failures, fall back
+    // direct to Railway so a wedged edge proxy cannot brick the desk.
+    var urls = [API.access, RAIL_API + "/v1/sovereign/desk/access"];
+    var lastErr = null;
+    for (var u = 0; u < urls.length; u++) {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+          var timer = ctrl
+            ? setTimeout(function () {
+                try {
+                  ctrl.abort();
+                } catch (e) {}
+              }, 12000)
+            : null;
+          var resp = await fetch(urls[u], {
+            headers: authHeaders(),
+            signal: ctrl ? ctrl.signal : undefined,
+          });
+          if (timer) clearTimeout(timer);
+          // Transient gateway / cold-start — retry, then try next URL
+          if (resp.status === 502 || resp.status === 503 || resp.status === 504) {
+            lastErr = new Error(
+              "API temporarily unavailable (HTTP " + resp.status + ")"
+            );
+            await sleep(400 * (attempt + 1));
+            continue;
+          }
+          if (!resp.ok) {
+            throw new Error("Access check failed (HTTP " + resp.status + ")");
+          }
+          return await resp.json();
+        } catch (err) {
+          lastErr = err;
+          // Network / abort — short backoff then retry
+          if (attempt < 2) await sleep(350 * (attempt + 1));
+        }
+      }
+    }
+    throw lastErr || new Error("Access check failed");
+  }
+
   async function checkAccess() {
     if (!hasSession()) {
       document.body.innerHTML =
@@ -427,9 +470,7 @@
     }
 
     try {
-      var resp = await fetch(API.access, { headers: authHeaders() });
-      if (!resp.ok) throw new Error("Access check failed");
-      var data = await resp.json();
+      var data = await fetchAccessWithRetry();
 
       if (!data.desk) {
         document.body.innerHTML =
@@ -441,10 +482,25 @@
       state.email = data.email;
       await loadHistory();
     } catch (err) {
+      var msg = (err && err.message) || "Access check failed";
+      // AbortError → friendlier copy
+      if (err && err.name === "AbortError") {
+        msg = "API timed out — backend may be restarting. Refresh in a moment.";
+      }
       document.body.innerHTML =
         '<div style="padding:2rem;color:var(--bad)">Failed to verify access: ' +
-        esc(err.message) +
-        "</div>";
+        esc(msg) +
+        ' <button type="button" id="sdRetryAccess" style="margin-left:0.75rem;cursor:pointer">Retry</button></div>';
+      var rb = document.getElementById("sdRetryAccess");
+      if (rb) {
+        rb.addEventListener("click", function () {
+          document.body.innerHTML =
+            '<div style="padding:2rem;color:var(--muted)">Checking access…</div>';
+          // Allow re-boot path
+          state.booted = false;
+          boot();
+        });
+      }
     }
   }
 
