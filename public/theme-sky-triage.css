@@ -229,9 +229,19 @@ html.sky .vs-seg{
   border:1px solid var(--sky-glass-edge) !important;
   border-radius:var(--sky-r-pill) !important;
   padding:4px !important;
+  margin:16px auto !important; /* equal top/bottom — vertically centered in strip */
   box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
+  align-items:center;
 }
-html.sky .vs-seg-btn{ border-radius:var(--sky-r-pill) !important; padding:7px 18px; }
+html.sky .vs-seg-btn{
+  border-radius:var(--sky-r-pill) !important;
+  padding:7px 18px !important;
+  font-size:12.5px !important;
+  line-height:1.25 !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
 html.sky .vs-seg-btn.on{
   background:var(--sky-primary) !important; color:#fff !important;
   box-shadow:0 3px 12px -3px rgba(33,150,243,.6) !important;
