@@ -16,7 +16,7 @@
     "panelDashboard","panelAccount","panelSovereign","panelArrays",
     "panelAnalysis","panelTrends","panelResources","panelReports","panelOps"
   ];
-  var DUR_MS = 340;
+  var DUR_MS = 400;
   var stage = null, sliding = false, activeCleanup = null;
 
   function disabled(){
@@ -75,17 +75,20 @@
 
     try{
       sliding = true;
-      var enter = (dir >= 0 ? 100 : -100);   // incoming starts off this side (%)
-      var exit  = (dir >= 0 ? -100 : 100);   // outgoing leaves to this side (%)
+      // Travel a FULL viewport width so panels enter/leave at the true screen
+      // edges instead of the centered column's edge (Ford: "they spawn right next
+      // to it"). <html>.ao-tab-sliding clips the off-screen travel (no scrollbar).
+      var enter = (dir >= 0 ? "100vw" : "-100vw");   // incoming starts off this side
+      var exit  = (dir >= 0 ? "-100vw" : "100vw");   // outgoing leaves to this side
 
-      // Reveal both via the slide classes (CSS forces display:block on each) and
-      // hold the stage height at the taller of the two so it can't collapse while
-      // both are position:absolute.
+      // Reveal both via the slide classes (CSS forces display:block on each).
       s.classList.add("ao-sliding");
       fromEl.classList.add("ao-slide-from");
       toEl.classList.add("ao-slide-to");
-      var h = Math.max(fromEl.offsetHeight || 0, toEl.offsetHeight || 0);
-      if(h > 0) s.style.setProperty("--ao-stage-h", h + "px");
+      try{ document.documentElement.classList.add("ao-tab-sliding"); }catch(e){}
+      // Measure heights now (both are display:block) to animate the stage's
+      // vertical resize instead of snapping when the panels differ in height.
+      var fromH = fromEl.offsetHeight || 0, toH = toEl.offsetHeight || 0;
       // Commit the LOGICAL active state immediately — only `to` is .active. Both
       // panels stay visible during the slide via .ao-slide-from/.ao-slide-to, so a
       // rapid re-switch mid-slide reads `to` as the current panel (no two-active
@@ -96,20 +99,29 @@
       // Place at start with transitions OFF, force a reflow, then play.
       fromEl.style.transition = "none";
       toEl.style.transition = "none";
+      s.style.transition = "none";
       fromEl.style.transform = "translateX(0)";
-      toEl.style.transform = "translateX(" + enter + "%)";
+      toEl.style.transform = "translateX(" + enter + ")";
+      if(fromH > 0) s.style.height = fromH + "px";
       void s.offsetWidth;                       // commit the start frame
       fromEl.style.transition = "";             // hand easing back to tab-slide.css
       toEl.style.transition = "";
-      fromEl.style.transform = "translateX(" + exit + "%)";
+      s.style.transition = "";
+      fromEl.style.transform = "translateX(" + exit + ")";
       toEl.style.transform = "translateX(0)";
+      if(toH > 0) s.style.height = toH + "px";   // eases via .ao-sliding transition
 
       var done = false, timer = 0;
       function cleanup(){
         if(done) return; done = true;
         try{ clearTimeout(timer); }catch(e){}
         try{ toEl.removeEventListener("transitionend", onEnd); }catch(e){}
-        try{ s.classList.remove("ao-sliding"); s.style.removeProperty("--ao-stage-h"); }catch(e){}
+        try{
+          s.classList.remove("ao-sliding");
+          s.style.height = ""; s.style.transition = "";
+          s.style.removeProperty("--ao-stage-h");
+        }catch(e){}
+        try{ document.documentElement.classList.remove("ao-tab-sliding"); }catch(e){}
         [fromEl, toEl].forEach(function(el){
           try{
             el.classList.remove("ao-slide-from","ao-slide-to");
@@ -120,6 +132,7 @@
         try{ fromEl.classList.remove("active"); toEl.classList.add("active"); }catch(e){}
         sliding = false; activeCleanup = null;
       }
+      // Cleanup fires on the panel transform finishing; the height eases in parallel.
       function onEnd(e){ if(e.target === toEl && e.propertyName === "transform") cleanup(); }
       activeCleanup = cleanup;
       toEl.addEventListener("transitionend", onEnd);
@@ -127,7 +140,8 @@
     }catch(err){
       // Anything unexpected → guarantee correct final state instantly.
       try{
-        if(s){ s.classList.remove("ao-sliding"); s.style.removeProperty("--ao-stage-h"); }
+        if(s){ s.classList.remove("ao-sliding"); s.style.height = ""; s.style.transition = ""; s.style.removeProperty("--ao-stage-h"); }
+        try{ document.documentElement.classList.remove("ao-tab-sliding"); }catch(e){}
         [fromEl, toEl].forEach(function(el){
           el.classList.remove("ao-slide-from","ao-slide-to");
           el.style.transform = ""; el.style.transition = "";
