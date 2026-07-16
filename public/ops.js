@@ -432,7 +432,11 @@
     }
     html += "</div>";
     html +=
-      '<button type="button" class="rp-talk" id="opsTalk" data-ops-open-empty="1">Talk to Energy Agent</button>';
+      '<button type="button" class="rp-talk ea-match" id="opsTalk" data-ops-open-empty="1" ' +
+      'title="Talk to Energy Agent" aria-label="Talk to Energy Agent">' +
+      '<span class="ea-tab-ic" aria-hidden="true"></span>' +
+      '<span class="ea-tab-label">Energy Agent</span>' +
+      "</button>";
     html += "</header>";
 
     if (!ready) {
