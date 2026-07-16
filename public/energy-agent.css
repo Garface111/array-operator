@@ -1058,14 +1058,14 @@ html:not(.sky) .ea-compose-shell:focus-within{
   font-weight: 500;
 }
 
-/* Equal-width action row — Improve / Mic / Mute / Send share the rail evenly
-   (Ford 2026-07-13: no dead space, all same size). */
+/* Compose action row — icon-only chips + written Send (Ford 2026-07-16).
+   Labels were clipping in the narrow EA rail; hover title / aria-label name them. */
 .ea-compose-bar{
   display: flex;
-  align-items: stretch;
+  align-items: center;
   flex-wrap: nowrap;
-  gap: 5px;
-  padding: 6px;
+  gap: 6px;
+  padding: 6px 8px;
   border-top: 1px solid rgba(14,165,233,.08);
   background: linear-gradient(180deg, rgba(14,165,233,.03), rgba(14,165,233,.06));
   min-width: 0;
@@ -1075,24 +1075,25 @@ html:not(.sky) .ea-compose-bar{
   border-top-color: rgba(255,255,255,.06);
   background: rgba(0,0,0,.15);
 }
-/* Legacy spacer — hide so buttons fill the row with no gap */
-.ea-compose-spacer{ display: none !important; }
+/* Push Send to the trailing edge */
+.ea-compose-spacer{
+  display: block !important;
+  flex: 1 1 auto;
+  min-width: 4px;
+  height: 1px;
+}
 
-/* Shared geometry for every bar control */
+/* Shared geometry for bar controls */
 .ea-compose-bar > .ea-chip,
 .ea-compose-bar > .ea-send{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  flex: 1 1 0;
-  width: 0;            /* equal columns with flex */
-  min-width: 0;
-  height: 32px;
-  padding: 0 6px;
+  gap: 5px;
+  height: 34px;
   border-radius: 999px;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 720;
   letter-spacing: -.015em;
   white-space: nowrap;
@@ -1102,11 +1103,34 @@ html:not(.sky) .ea-compose-bar{
   transition: background .12s, border-color .12s, color .12s, filter .12s, box-shadow .12s, transform .1s;
 }
 
+/* Icon-only chips — fixed square, never crush text (text is hidden) */
+.ea-compose-bar > .ea-chip.ea-chip-icon,
+.ea-compose-bar > .ea-chip{
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  padding: 0;
+}
+/* Visually hide labels; keep in DOM for syncMicBtn/syncMuteBtn state text */
+.ea-compose-bar > .ea-chip .ea-chip-lbl{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Quiet chip buttons (Attach / Improve / Mic / Mute) */
 .ea-chip{
   border: 1px solid rgba(14,165,233,.18);
   background: rgba(255,255,255,.75);
   color: #0c4a6e;
+  position: relative;
 }
 .ea-chip:hover{
   background: #fff;
@@ -1115,7 +1139,7 @@ html:not(.sky) .ea-compose-bar{
 }
 .ea-chip:active{ transform: translateY(0); }
 .ea-chip-ic{
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1;
   opacity: .95;
   flex: 0 0 auto;
@@ -1123,19 +1147,12 @@ html:not(.sky) .ea-compose-bar{
   align-items: center;
   justify-content: center;
 }
-/* Never let flex equal-width crush the mic/attach SVG */
 .ea-compose-bar > .ea-chip .ea-chip-ic,
 .ea-compose-bar > .ea-chip .ea-chip-ic-svg{
-  flex: 0 0 14px;
-  width: 14px;
-  min-width: 14px;
-}
-.ea-chip-lbl{
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  min-width: 0;
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
 }
 html:not(.sky) .ea-chip{
   background: rgba(255,255,255,.06);
@@ -1161,8 +1178,12 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 }
 .ea-chip.ea-mute.on:hover{ filter: brightness(1.06); }
 
-/* Primary send — same size as chips, accent fill only */
+/* Primary send — keeps written "Send" label; grows to fill remaining rail */
+.ea-compose-bar > .ea-send,
 .ea-send{
+  flex: 0 0 auto;
+  min-width: 76px;
+  padding: 0 14px 0 16px;
   border: 0;
   background: linear-gradient(180deg, #38bdf8, #0ea5e9);
   color: #fff;
@@ -1176,12 +1197,12 @@ html:not(.sky) .ea-chip:hover{ background: rgba(255,255,255,.1); }
 .ea-send:active{ transform: translateY(0); filter: brightness(.98); }
 .ea-send-ic{
   display: inline-flex; align-items: center; justify-content: center;
-  width: 14px; height: 14px; border-radius: 50%;
+  width: 16px; height: 16px; border-radius: 50%;
   background: rgba(255,255,255,.22);
-  font-size: 10px; font-weight: 800; line-height: 1;
+  font-size: 11px; font-weight: 800; line-height: 1;
   flex: none;
 }
-.ea-send-lbl{ line-height: 1; overflow: hidden; text-overflow: ellipsis; }
+.ea-send-lbl{ line-height: 1; flex: 0 0 auto; }
 
 /* Legacy class hooks (no-op if unused) */
 .ea-mic{ /* mic styling lives on .ea-chip.ea-mic */ }
@@ -1726,15 +1747,26 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-msgs{ padding: 10px 12px 12px; }
   .ea-msg{ font-size: 12.5px; padding: 9px 24px 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
-  .ea-compose-bar{ gap: 3px; padding: 5px; }
-  .ea-compose-bar > .ea-chip,
-  .ea-compose-bar > .ea-send{ height: 34px; font-size: 10px; padding: 0 4px; }
-  /* Icon stays; labels may ellipsis on 5 equal chips */
+  .ea-compose-bar{ gap: 5px; padding: 6px 8px; }
+  .ea-compose-bar > .ea-chip.ea-chip-icon,
+  .ea-compose-bar > .ea-chip{
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    height: 36px;
+  }
+  .ea-compose-bar > .ea-send{
+    height: 36px;
+    min-width: 72px;
+    font-size: 12px;
+    padding: 0 12px 0 14px;
+  }
   .ea-compose-bar > .ea-chip .ea-chip-ic,
   .ea-compose-bar > .ea-chip .ea-chip-ic-svg{
-    flex: 0 0 14px;
-    width: 14px;
-    min-width: 14px;
+    flex: 0 0 16px;
+    width: 16px;
+    min-width: 16px;
   }
 
   /* Mic gate parks near the bubble, not the rail */

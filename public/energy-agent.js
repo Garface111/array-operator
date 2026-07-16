@@ -402,26 +402,28 @@
  ' <textarea id="eaInput" rows="2" placeholder="Message Energy Agent… drop files or paste images"></textarea>' +
  ' <input type="file" id="eaFile" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log" hidden />' +
  ' <div class="ea-compose-bar">' +
- ' <button type="button" class="ea-chip ea-attach" id="eaAttach" title="Attach a file or image">' +
+ // Icon-only chips (labels cut off in the rail). Hover/title + aria-label carry
+ // the name; Send keeps written label (Ford 2026-07-16).
+ ' <button type="button" class="ea-chip ea-attach ea-chip-icon" id="eaAttach" title="Attach a file or image" aria-label="Attach a file or image">' +
  ' <span class="ea-chip-ic ea-chip-ic-svg" aria-hidden="true">' +
- '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+ '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
  'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">' +
  '<path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.49-8.49a3.5 3.5 0 0 1 4.95 4.95l-8.5 8.49a1.5 1.5 0 0 1-2.12-2.12l7.78-7.78"/>' +
  '</svg></span><span class="ea-chip-lbl">Attach</span></button>' +
- ' <button type="button" class="ea-chip" id="eaImproveOpen" title="Mark up the page and ship a small improvement">' +
+ ' <button type="button" class="ea-chip ea-chip-icon" id="eaImproveOpen" title="Improve this site — mark up and ship a small change" aria-label="Improve this site">' +
  ' <span class="ea-chip-ic" aria-hidden="true">✦</span><span class="ea-chip-lbl">Improve</span></button>' +
- ' <button type="button" class="ea-chip ea-mic" id="eaMic" title="Toggle microphone">' +
+ ' <button type="button" class="ea-chip ea-mic ea-chip-icon" id="eaMic" title="Turn microphone on" aria-label="Microphone">' +
  ' <span class="ea-chip-ic ea-chip-ic-svg" aria-hidden="true">' +
- '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+ '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
  'stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
  '<rect x="9" y="2.5" width="6" height="11" rx="3"/>' +
  '<path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/>' +
  '<path d="M12 17v4.5"/><path d="M8.5 21.5h7"/>' +
  '</svg></span><span class="ea-chip-lbl">Mic</span></button>' +
- ' <button type="button" class="ea-chip ea-mute" id="eaMute" title="Mute agent voice">' +
+ ' <button type="button" class="ea-chip ea-mute ea-chip-icon" id="eaMute" title="Mute agent voice" aria-label="Mute agent voice">' +
  ' <span class="ea-chip-ic" aria-hidden="true">🔊</span><span class="ea-chip-lbl">Mute</span></button>' +
  ' <span class="ea-compose-spacer"></span>' +
- ' <button type="button" class="ea-send" id="eaSend" title="Send">' +
+ ' <button type="button" class="ea-send" id="eaSend" title="Send message" aria-label="Send message">' +
  ' <span class="ea-send-lbl">Send</span><span class="ea-send-ic" aria-hidden="true">↑</span></button>' +
  ' </div>' +
  ' </div>' +
@@ -4386,7 +4388,9 @@
  // NEVER set b.textContent — that wipes the SVG mic icon (Ford 2026-07-16)
  var lbl = b.querySelector(".ea-chip-lbl");
  if (lbl) lbl.textContent = state.listening ? "Live" : "Mic";
- b.title = state.listening ? "Microphone on, click to mute" : "Toggle microphone";
+ var tip = state.listening ? "Microphone on — click to turn off" : "Turn microphone on";
+ b.title = tip;
+ b.setAttribute("aria-label", tip);
  b.setAttribute("aria-pressed", state.listening ? "true" : "false");
  }
 
@@ -4400,9 +4404,11 @@
  var lbl = b.querySelector(".ea-chip-lbl");
  if (ic) ic.textContent = muted ? "🔇" : "🔊";
  if (lbl) lbl.textContent = muted ? "Muted" : "Mute";
- b.title = muted
- ? "Text only, GPT voice fully off (no credit burn). Click to turn voice back on."
- : "Turn off GPT voice, text chat only, saves credits";
+ var tip = muted
+ ? "Voice muted (text only) — click to turn agent voice back on"
+ : "Mute agent voice (text only, saves credits)";
+ b.title = tip;
+ b.setAttribute("aria-label", tip);
  }
 
  /** Soft-mute Realtime <audio> element without tearing down the WebRTC pipe. */
