@@ -401,14 +401,12 @@ const VENDORS = [
  {name:"password", label:"Tigo EI password", secret:true},
  {name:"system_id", label:"System ID (optional)"},
  ] },
- { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
- note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
+ { code:"locus", label:"Locus Energy", meta:"SolarNOC · 1 login", available:true, discover:true,
+ note:"One SolarNOC login attaches every site on the account — the same username & password you use at the Locus SolarNOC portal. No API key or client secret needed. Leave Site ID blank to connect them all.",
  fields:[
- {name:"client_id", label:"Client ID"},
- {name:"client_secret", label:"Client Secret", secret:true},
  {name:"username", label:"SolarNOC username"},
  {name:"password", label:"SolarNOC password", secret:true},
- {name:"partner_id", label:"Partner ID (optional, shows every site at once)"},
+ {name:"site_id", label:"Site ID (optional, leave blank for every site)", optional:true},
  ] },
  { code:"fronius", label:"Fronius", meta:"One account key", available:true, discover:false,
  note:"Paste your Solar.web REST API keys (Solar.web → Settings → REST API → CREATE NEW KEY) and we'll list every PV system on your account at once, same one-key connect as SolarEdge. US accounts: Fronius enables API access on request; the Query API is a paid Fronius service.",
@@ -2018,12 +2016,11 @@ async function finish(){
  });
  cd = await conn.json().catch(()=>({}));
  state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
- } else if(state.vendor==="locus" && (state.fields.partner_id||"").trim()){
+ } else if(state.vendor==="locus" && !(state.fields.site_id||"").trim()){
+ // One SolarNOC login → every site on the account (Cognito API).
  conn = await fetch(`${API_BASE}/v1/array-owners/locus/connect-account`, {
  method:"POST", headers:hdr, body: JSON.stringify({
- client_id: state.fields.client_id, client_secret: state.fields.client_secret,
- username: state.fields.username, password: state.fields.password,
- partner_id: parseInt(state.fields.partner_id, 10)
+ username: state.fields.username, password: state.fields.password
  })
  });
  cd = await conn.json().catch(()=>({}));
@@ -2054,7 +2051,7 @@ async function finish(){
  cd = await conn.json().catch(()=>({}));
  state.arraysConnected = !!(conn.ok && (cd.connected || cd.created || cd.matched));
  } else {
- // Single-system vendors (Fronius, SMA, Locus without a partner_id):
+ // Single-system vendors (Fronius, SMA, Locus with a named Site ID):
  // build the config from the collected fields and attach one array.
  const config = {};
  (v.fields||[]).forEach(f=>{

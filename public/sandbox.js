@@ -83,14 +83,12 @@
  {name:"client_id", label:"Client ID (advanced, optional)", optional:true},
  {name:"client_secret", label:"Client Secret (advanced, optional)", secret:true, optional:true},
  ] },
- { code:"locus", label:"Locus Energy", meta:"SolarNOC", available:true, discover:false,
- note:"Locus needs API credentials (client ID/secret + your SolarNOC login) from your Locus account manager. Enter them and we'll connect your sites.",
+ { code:"locus", label:"Locus Energy", meta:"SolarNOC · 1 login", available:true, discover:true,
+ note:"One SolarNOC login attaches every site on the account — the same username & password you use at the Locus SolarNOC portal. No API key or client secret needed. Leave Site ID blank to connect them all.",
  fields:[
- {name:"client_id", label:"Client ID"},
- {name:"client_secret", label:"Client Secret", secret:true},
  {name:"username", label:"SolarNOC username"},
  {name:"password", label:"SolarNOC password", secret:true},
- {name:"partner_id", label:"Partner ID (optional, shows every site at once)"},
+ {name:"site_id", label:"Site ID (optional, leave blank for every site)", optional:true, hint:"Only if you want one site; otherwise we attach the whole account."},
  ] },
  { code:"chint", label:"Chint / CPS", meta:"Chint Connect", available:false, discover:false,
  note:"Chint/CPS has no key to paste, use the one-click 'Log in with Chint' option above. Support is in final verification against live accounts." },
@@ -121,7 +119,7 @@
  sma: "https://ennexos.sunnyportal.com/",
  chint: "https://monitor.chintpowersystems.com/",
  alsoenergy:"https://hmi.alsoenergy.com/",
- locus: "https://hmi.alsoenergy.com/",
+ locus: "https://app.locusenergy.com/",
  gmp: "https://greenmountainpower.com/",
  vec: "https://vermontelectric.smarthub.coop/",
  wec: "https://washingtonelectric.smarthub.coop/",
@@ -547,7 +545,7 @@
  const _syncState = {}; // vendor -> {phase:"syncing"|"signin"|"failed"|"needext", msg?}
  const _syncTimers = {}; // vendor -> setTimeout id
  const _SYNCABLE_VENDORS = new Set(["fronius","sma","chint"]); // extension-captured → user can sync
- const _POLLED_VENDORS = new Set(["solaredge","alsoenergy"]); // server-polled → passive "as of" only
+ const _POLLED_VENDORS = new Set(["solaredge","alsoenergy","locus"]); // server-polled → passive "as of" only
  const REFRESH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
 
  function _friendlySyncFail(reason, vlabel){
@@ -4250,7 +4248,7 @@
  let _ovUtilityOnly = false;
  // Default inverter chips shown in Add-array (keys + one-click). AlsoEnergy is
  // API-login (opens credential form), not extension portal scrape.
- const _INVERTER_VENDORS = ["solaredge","alsoenergy","fronius","sma","chint"];
+ const _INVERTER_VENDORS = ["solaredge","alsoenergy","locus","fronius","sma","chint"];
  // API-credential vendors: "Log in" opens the keys form for that brand instead
  // of a browser portal tab (no extension scrape path).
  const _API_KEY_VENDORS = new Set(["solaredge","alsoenergy","locus"]);
@@ -4573,11 +4571,14 @@
  if((config.site_id || fields.site_id || "").toString().trim()){
  body2.site_ids = [parseInt(config.site_id || fields.site_id, 10)];
  }
- } else if(vendor==="locus" && (fields.partner_id||"").trim()){
+ } else if(vendor==="locus"){
+ // One SolarNOC login → every site (Cognito API, not extension scrape).
  url = "/v1/array-owners/locus/connect-account";
- body2 = { client_id: fields.client_id, client_secret: fields.client_secret,
- username: fields.username, password: fields.password,
- partner_id: parseInt(fields.partner_id, 10) };
+ body2 = { username: config.username || fields.username,
+ password: config.password || fields.password };
+ if((config.site_id || fields.site_id || "").toString().trim()){
+ body2.site_ids = [parseInt(config.site_id || fields.site_id, 10)];
+ }
  } else {
  url = "/v1/array-owners/connect-single";
  body2 = { vendor, config };
@@ -6254,6 +6255,33 @@
  </div>`;
  };
 
+ // Locus Energy (SolarNOC), username+password API (Cognito) — its OWN card, NOT
+ // the AlsoEnergy one. Same server-polled home as AlsoEnergy/SolarEdge: one
+ // SolarNOC login discovers + attaches every site on the account (no client
+ // ID/secret, no API key — that legacy path is dead).
+ const locusCardHTML = () => {
+ let nLoc = 0;
+ try {
+ nLoc = (window.FleetStore && FleetStore.snapshot().arrays || [])
+ .filter(a => (a.vendor || a.source_vendor) === "locus").length;
+ } catch (e) {}
+ const stat = nLoc
+ ? `<div class="ar-cloud-stat" style="color:var(--good,#0a7d4f)">${nLoc} array${nLoc===1?"":"s"} connected</div>`
+ : `<div class="ar-cloud-stat" style="color:var(--faint)">One login · every site on the account</div>`;
+ return `<div class="ar-util" data-code="locus">
+ <div class="ar-util-name">Locus Energy (SolarNOC)</div>
+ ${stat}
+ <div class="ar-fields ar-locus-add">
+ <input class="ar-locus-user" type="text" autocomplete="username" placeholder="SolarNOC username">
+ <input class="ar-locus-pass" type="password" autocomplete="current-password" placeholder="SolarNOC password">
+ <div class="ar-actions">
+ <button class="acct-btn primary ar-locus-save" type="button">Connect all sites</button>
+ </div>
+ </div>
+ <div class="ar-locus-stat ar-cloud-stat" aria-live="polite"></div>
+ </div>`;
+ };
+
  // Vault inverter cards (Fronius / SMA / Chint), same markup for cloud vs device.
  const vaultInvHTML = mode === "cloud"
  ? AR_INVERTERS.map(invCard).join("")
@@ -6270,6 +6298,7 @@
  <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
  <div class="ar-inv-row ar-inv-api">
  ${alsoEnergyCardHTML()}
+ ${locusCardHTML()}
  ${solarEdgeCardHTML()}
  </div>
  <div class="ar-inv-row ar-inv-vault">
@@ -6414,6 +6443,64 @@
  try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("alsoenergy"); } catch (e2) {}
  if (aeStat) { aeStat.className = "ar-ae-stat ar-cloud-stat err"; aeStat.textContent = "Network error. Try again."; }
  aeSave.disabled = false; aeSave.textContent = aeLabel;
+ }
+ });
+ }
+ // ── Locus Energy SolarNOC: username+password → connect-account (all sites)
+ const locusSave = listEl.querySelector(".ar-locus-save");
+ if (locusSave) {
+ const locusUser = listEl.querySelector(".ar-locus-user");
+ const locusPass = listEl.querySelector(".ar-locus-pass");
+ const locusStat = listEl.querySelector(".ar-locus-stat");
+ const locusLabel = locusSave.textContent;
+ locusSave.addEventListener("click", async () => {
+ const username = (locusUser && locusUser.value || "").trim();
+ const password = (locusPass && locusPass.value) || "";
+ if (!username || !password) {
+ locusSave.textContent = "Enter login";
+ setTimeout(() => locusSave.textContent = locusLabel, 1500);
+ return;
+ }
+ locusSave.disabled = true; locusSave.textContent = "Connecting…";
+ if (locusStat) { locusStat.className = "ar-locus-stat ar-cloud-stat"; locusStat.textContent = ""; }
+ try {
+ if (window.__aoPendingFeeds) {
+ const mark = window.__aoPendingFeeds.markInverter || window.__aoPendingFeeds.mark;
+ mark.call(window.__aoPendingFeeds, "locus", {
+ label: "Locus Energy",
+ note: "api connect, discovering sites",
+ });
+ }
+ const r = await fetch("/v1/array-owners/locus/connect-account", {
+ method: "POST",
+ headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+ body: JSON.stringify({ username, password }),
+ });
+ const d = await r.json().catch(() => ({}));
+ if (r.ok && d.ok) {
+ if (locusPass) locusPass.value = "";
+ if (locusStat) {
+ locusStat.className = "ar-locus-stat ar-cloud-stat ok";
+ locusStat.textContent = d.message || "Connected.";
+ }
+ try {
+ if (window.FleetStore && FleetStore.refetch) await FleetStore.refetch();
+ if (window.__aoPendingFeeds) {
+ window.__aoPendingFeeds.reconcile((FleetStore.snapshot() || {}).arrays || []);
+ window.__aoPendingFeeds.startPoll();
+ }
+ } catch (e) {}
+ setTimeout(() => { wireAutoRefreshRow(); }, 900);
+ } else {
+ try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("locus"); } catch (e) {}
+ const msg = (d && d.detail) ? d.detail : ("Couldn't connect (HTTP " + r.status + ").");
+ if (locusStat) { locusStat.className = "ar-locus-stat ar-cloud-stat err"; locusStat.textContent = msg; }
+ locusSave.disabled = false; locusSave.textContent = locusLabel;
+ }
+ } catch (e) {
+ try { if (window.__aoPendingFeeds) window.__aoPendingFeeds.clear("locus"); } catch (e2) {}
+ if (locusStat) { locusStat.className = "ar-locus-stat ar-cloud-stat err"; locusStat.textContent = "Network error. Try again."; }
+ locusSave.disabled = false; locusSave.textContent = locusLabel;
  }
  });
  }
