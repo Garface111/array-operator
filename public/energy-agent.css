@@ -825,14 +825,7 @@ html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: v
   background: #fff;
   color: #0369a1;
 }
-/*
- * Always reserve the corner for the 18px copy control — do NOT change
- * padding on hover (that reflowed text when the button appeared).
- */
-.ea-msg{
-  /* corner gutter for absolute copy btn; same hovered or not */
-  padding-right: 26px;
-}
+/* Body fills the bubble; corner gutter lives on .ea-msg padding (stable on hover) */
 .ea-msg .ea-msg-body,
 .ea-msg .ea-sov-body,
 .ea-msg .ea-email-body{
@@ -1346,6 +1339,69 @@ html:not(.sky) .ea-journey{ background: rgba(255,255,255,.04); }
 }
 .ea-j-actions .ea-j-esc:hover{ background: rgba(251,191,36,.28); }
 
+/* Mini bubble when "Building your change" is Hidden — click to reopen (Ford 2026-07-15).
+   Fixed so it survives closing the EA panel; poll keeps running. */
+.ea-journey-mini{
+  display: none;
+  position: fixed;
+  z-index: 9035;
+  left: 16px;
+  bottom: 16px;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(14,165,233,.35);
+  background: rgba(255,255,255,.94);
+  color: #0E1420;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 680;
+  font-size: 12.5px;
+  box-shadow: 0 8px 28px -10px rgba(14,165,233,.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  max-width: min(280px, calc(100vw - 32px));
+  appearance: none;
+  -webkit-appearance: none;
+}
+.ea-journey-mini.show,
+.ea-journey-mini:not([hidden]){ display: inline-flex; }
+.ea-journey-mini[hidden]{ display: none !important; }
+.ea-journey-mini:hover{
+  border-color: var(--ea-sky2);
+  box-shadow: 0 12px 32px -10px rgba(14,165,233,.45);
+}
+.ea-journey-mini .ea-j-mini-dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ea-sky2);
+  flex-shrink: 0;
+  animation: eaJMiniPulse 1.4s ease-in-out infinite;
+}
+.ea-journey-mini.live .ea-j-mini-dot{ background: #10b981; animation: none; }
+.ea-journey-mini.fail .ea-j-mini-dot{ background: #dc2626; animation: none; }
+.ea-journey-mini span{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes eaJMiniPulse{
+  0%,100%{ opacity: 1; transform: scale(1); }
+  50%{ opacity: .55; transform: scale(.85); }
+}
+/* Park beside the open EA rail on desktop so it doesn't cover the dock */
+body.ea-shell-open .ea-journey-mini{
+  left: calc(var(--ea-rail, 360px) + 16px);
+  bottom: 20px;
+}
+html:not(.sky) .ea-journey-mini{
+  background: rgba(15,23,42,.92);
+  color: #e2e8f0;
+  border-color: rgba(56,189,248,.35);
+}
+
 /* Hide residual floating wish widget when EA is the improve entry */
 body.ea-shell-open #fsWrap,
 #eaOrb ~ #fsWrap,
@@ -1531,7 +1587,7 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-status{ padding: 6px 14px; font-size: 11px; }
   .ea-status.ea-status-dock{ padding: 7px 9px; margin-bottom: 6px; font-size: 11px; }
   .ea-msgs{ padding: 10px 12px 12px; }
-  .ea-msg{ font-size: 12.5px; padding: 9px 11px; }
+  .ea-msg{ font-size: 12.5px; padding: 9px 24px 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
   .ea-compose-bar{ gap: 3px; padding: 5px; }
   .ea-compose-bar > .ea-chip,
@@ -1554,6 +1610,19 @@ html.ea-merged #fsWrap{ display: none !important; }
   }
   body.ea-shell-open .ea-mic-gate{
     bottom: calc(var(--ea-bottom-clear) + var(--ea-sheet-h) + 60px);
+  }
+
+  /* Build journey mini sits above the FAB (or sheet when open) */
+  .ea-journey-mini{
+    left: auto;
+    right: 14px;
+    bottom: calc(var(--ea-bottom-clear) + var(--ea-fab) + 14px);
+  }
+  body.ea-shell-open .ea-journey-mini{
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    bottom: calc(var(--ea-bottom-clear) + var(--ea-sheet-h) + 12px);
   }
 }
 

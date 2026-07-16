@@ -669,7 +669,12 @@
  poll: null,
  since: 0,
  prefilledPrompt: null, // agent-written Build-it text survives mark/recircle
- }
+ // Journey can collapse to a reopenable bubble (not gone forever)
+ journeyCollapsed: false,
+ lastSt: "new",
+ lastFailed: false,
+ lastDetail: "",
+ };
 
  function stashImprovePrompt(t) {
  t = String(t || "").trim().slice(0, 1600);
@@ -913,11 +918,93 @@
  }
  }
 
+ function ensureEaJourneyMini() {
+ var mini = document.getElementById("eaJourneyMini");
+ if (mini) return mini;
+ mini = document.createElement("button");
+ mini.type = "button";
+ mini.id = "eaJourneyMini";
+ mini.className = "ea-journey-mini";
+ mini.hidden = true;
+ mini.setAttribute("aria-label", "Reopen build progress");
+ mini.title = "Show build progress";
+ mini.innerHTML =
+ '<i class="ea-j-mini-dot" aria-hidden="true"></i>' +
+ '<span id="eaJourneyMiniLabel">Building your change…</span>';
+ mini.onclick = function () {
+ expandEaJourney();
+ };
+ document.body.appendChild(mini);
+ return mini;
+ }
+
+ function showEaJourneyMini(show) {
+ var mini = ensureEaJourneyMini();
+ var label = document.getElementById("eaJourneyMiniLabel");
+ if (!show) {
+ mini.hidden = true;
+ mini.classList.remove("show", "live", "fail");
+ return;
+ }
+ mini.hidden = false;
+ mini.classList.add("show");
+ mini.classList.toggle("live", improve.lastSt === "shipped");
+ mini.classList.toggle("fail", !!improve.lastFailed);
+ if (label) {
+ label.textContent =
+ improve.lastSt === "shipped"
+ ? "Your change is live — open"
+ : improve.lastFailed
+ ? "Build finished — open"
+ : improve.lastSt === "building"
+ ? "Building… tap to follow"
+ : "Change in progress — tap to follow";
+ }
+ }
+
+ function collapseEaJourney() {
+ // Hide the big journey card; keep a bubble so Hide is recoverable.
+ improve.journeyCollapsed = true;
+ var host = document.getElementById("eaJourney");
+ if (host) {
+ host.hidden = true;
+ }
+ showEaJourneyMini(true);
+ }
+
+ function expandEaJourney() {
+ improve.journeyCollapsed = false;
+ showEaJourneyMini(false);
+ // Reopen EA dock so the journey is actually visible
+ try {
+ if (!state.open) {
+ state.open = true;
+ var panel = document.getElementById("eaPanel");
+ var orb = document.getElementById("eaOrb");
+ if (panel) panel.classList.add("open");
+ if (orb) {
+ orb.classList.add("open", "active");
+ }
+ document.body.classList.add("ea-shell-open");
+ }
+ } catch (e) {}
+ renderEaJourney(improve.lastSt || "new", {
+ failed: !!improve.lastFailed,
+ detail: improve.lastDetail || "",
+ forceExpand: true,
+ canEscalate: !!improve._pendingEscalateId,
+ });
+ }
+
  function watchBuild(id) {
  improve.activeId = id;
  improve.since = Date.now();
  improve._toldFail = false;
  improve._pendingEscalateId = null;
+ improve.journeyCollapsed = false;
+ improve.lastSt = "new";
+ improve.lastFailed = false;
+ improve.lastDetail = "";
  // Ensure dock is open so journey is visible (not the old floating card)
  if (!state.open) {
  state.open = true;
@@ -936,6 +1023,7 @@
  var mini = document.getElementById("fsMini");
  if (mini) mini.classList.remove("show");
  } catch (e) {}
+ showEaJourneyMini(false);
  renderEaJourney("new");
  if (improve.poll) clearInterval(improve.poll);
  improve.poll = setInterval(tickBuildStatus, 4000);
@@ -995,6 +1083,8 @@
  function stopBuildWatch() {
  improve.activeId = null;
  if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
+ improve.journeyCollapsed = false;
+ showEaJourneyMini(false);
  }
 
  var JOURNEY_STEPS = [
@@ -1019,13 +1109,29 @@
  opts = opts || {};
  var host = document.getElementById("eaJourney");
  if (!host) return;
+ improve.lastSt = st || "new";
+ improve.lastFailed = !!opts.failed;
+ if (opts.detail != null) improve.lastDetail = opts.detail || "";
  var elapsed = improve.since ? Math.floor((Date.now() - improve.since) / 1000) : 0;
- var stepIdx = mapBuildStep(st || "new", elapsed);
- var failed = !!opts.failed;
- var detail = opts.detail || "";
+ var stepIdx = mapBuildStep(improve.lastSt, elapsed);
+ var failed = improve.lastFailed;
+ var detail = improve.lastDetail || "";
+
+ // Collapsed: keep polling, only refresh the bubble — unless terminal, then re-expand.
+ if (improve.journeyCollapsed && !opts.forceExpand) {
+ if (improve.lastSt === "shipped" || failed) {
+ improve.journeyCollapsed = false;
+ showEaJourneyMini(false);
+ } else {
+ showEaJourneyMini(true);
+ return;
+ }
+ }
+
  host.hidden = false;
- var title = st === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your change…";
- var lead = st === "shipped"
+ showEaJourneyMini(false);
+ var title = improve.lastSt === "shipped" ? "It's live." : failed ? "Couldn't auto-ship." : "Building your change…";
+ var lead = improve.lastSt === "shipped"
  ? (detail || "Your change is on the site. Refresh to see it.")
  : failed
  ? (detail || "Judge held this for a human look. Nothing was lost.")
@@ -1033,19 +1139,22 @@
  var html = "<h4>" + esc(title) + "</h4><p class=\"ea-j-lead\">" + esc(lead) + "</p><ul class=\"ea-j-steps\">";
  JOURNEY_STEPS.forEach(function (s, i) {
  var cls = "";
- if (st === "shipped" || i < stepIdx) cls = "done";
+ if (improve.lastSt === "shipped" || i < stepIdx) cls = "done";
  else if (i === stepIdx) cls = failed ? "fail" : "active";
  var icon = cls === "done" ? "✓" : cls === "active" ? "●" : cls === "fail" ? "!" : String(i + 1);
  html += '<li class="' + cls + '"><i>' + icon + "</i><div><b>" + s.label + "</b><span>" + s.sub + "</span></div></li>";
  });
  html += "</ul><div class=\"ea-j-actions\">";
- if (st === "shipped") {
+ if (improve.lastSt === "shipped") {
  html += '<button type="button" id="eaJReload">Refresh page</button>';
  }
  if (failed || opts.canEscalate) {
  html += '<button type="button" id="eaJEscalate" class="ea-j-esc">Escalate to developer</button>';
  }
- html += '<button type="button" id="eaJDismiss">' + (st === "shipped" || failed ? "Dismiss" : "Hide") + "</button></div>";
+ // Hide = collapse to bubble (recoverable). Dismiss only when terminal.
+ html += '<button type="button" id="eaJDismiss">' +
+ (improve.lastSt === "shipped" || failed ? "Dismiss" : "Hide") +
+ "</button></div>";
  host.innerHTML = html;
  var reload = document.getElementById("eaJReload");
  if (reload) reload.onclick = function () { location.reload(); };
@@ -1063,12 +1172,14 @@
  };
  var dismiss = document.getElementById("eaJDismiss");
  if (dismiss) dismiss.onclick = function () {
- if (st === "shipped" || failed) {
+ if (improve.lastSt === "shipped" || failed) {
+ // Done — clear watch and bubble.
  stopBuildWatch();
  host.hidden = true;
  host.innerHTML = "";
  } else {
- host.hidden = true;
+ // Still building — collapse to reopenable bubble; poll keeps running.
+ collapseEaJourney();
  }
  };
  }
