@@ -5,10 +5,9 @@
 #panelSovereign.active[hidden]{ display:block !important; }
 
 /*
- * Full-height workspace under the tabbar — NEVER use 100vw breakout.
- * 100vw ignores body.ea-shell-open margin and slides content under the
- * Energy Agent left rail (Ford 2026-07-16 screenshots). Stay inside .wrap,
- * which already shifts by --ea-rail when the agent is open.
+ * Full-height squircle sheet under the tabbar — same language as Analysis
+ * .an-wrap / Invoices .rb2 (sky-r-sheet ≈ 32px). NEVER 100vw breakout:
+ * that slides under the Energy Agent rail.
  */
 #panelSovereign.active{
   display: flex !important;
@@ -16,19 +15,15 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
-  /* cancel .wrap horizontal padding so the glass goes edge-to-edge of the
-     content column (not the full browser, not under EA) */
-  width: calc(100% + 56px);
-  max-width: none;
-  margin-left: -28px;
-  margin-right: -28px;
+  /* Fill remaining viewport under chrome; outer pad frames the squircle */
   height: calc(100dvh - 104px);
   min-height: calc(100vh - 104px);
   max-height: none;
-  padding: 0;
+  padding: 10px 10px 14px;
   box-sizing: border-box;
   overflow: hidden;
   min-width: 0;
+  background: transparent;
 }
 /* When Sovereign is open: no footer gap */
 body:has(#panelSovereign.active) footer{
@@ -37,26 +32,21 @@ body:has(#panelSovereign.active) footer{
 body:has(#panelSovereign.active) .wrap{
   padding-bottom: 0 !important;
 }
-/* EA dock open: wrap is already margin-left: var(--ea-rail) + max-width
-   calc(100vw - rail). Our negative margin only cancels wrap padding — still
-   stays in the content column to the RIGHT of the agent. */
 body.ea-shell-open #panelSovereign.active{
-  width: calc(100% + 56px);
-  margin-left: -28px;
-  margin-right: -28px;
-  max-width: none;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sov-desk{
+  --sov-r: var(--sky-r-sheet, 32px);
   --sov-bg: transparent;
   --sov-ink: var(--ink, #eaf0f7);
   --sov-muted: var(--muted, #8b97a8);
   --sov-faint: var(--faint, #6b7686);
   --sov-good: var(--good, #3fd68a);
   --sov-good2: var(--good2, #7ff0bb);
-  --sov-line: rgba(255,255,255,.12);
+  --sov-line: rgba(255,255,255,.14);
   --sov-card: linear-gradient(165deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
-  /* Edge-to-edge under chrome */
   width: 100%;
   max-width: none;
   margin: 0;
@@ -65,39 +55,45 @@ body.ea-shell-open #panelSovereign.active{
   height: 100%;
   display: flex;
   flex-direction: column;
-  /* Frosted glass — semi-transparent over the site backdrop */
+  /* Frosted glass squircle — matches Analysis / Invoices content sheets */
   background:
     radial-gradient(1100px 520px at 10% -12%, rgba(63,214,138,.14), transparent 55%),
     radial-gradient(900px 420px at 92% 0%, rgba(94,194,255,.08), transparent 52%),
-    linear-gradient(165deg, rgba(12,18,28,.52), rgba(8,12,20,.38));
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+    linear-gradient(165deg, rgba(12,18,28,.55), rgba(8,12,20,.40));
+  border: 1px solid var(--sov-line);
+  border-radius: var(--sov-r);
+  box-shadow:
+    0 28px 70px -36px rgba(0,0,0,.55),
+    0 0 0 1px rgba(63,214,138,.05) inset;
   backdrop-filter: blur(22px) saturate(1.25);
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
   overflow: hidden;
   color: var(--sov-ink);
+  /* Continuous corner clip for head + compose */
+  isolation: isolate;
 }
 
-/* Sky mode: translucent glass over mountain/sky wallpaper */
+/* Sky mode: translucent glass squircle over mountain/sky wallpaper */
 html.sky .sov-desk{
+  --sov-r: var(--sky-r-sheet, 32px);
   --sov-bg: transparent;
   --sov-ink: #0f1a14;
   --sov-muted: #3d4f58;
   --sov-faint: #5a6e78;
-  --sov-line: rgba(255,255,255,.42);
+  --sov-line: var(--sky-glass-edge, rgba(255,255,255,.55));
   --sov-card: linear-gradient(165deg, rgba(255,255,255,.55), rgba(255,255,255,.28));
   background:
     radial-gradient(1000px 480px at 12% -10%, rgba(127,240,187,.18), transparent 55%),
     radial-gradient(800px 400px at 90% 0%, rgba(94,194,255,.12), transparent 50%),
-    linear-gradient(165deg, rgba(255,255,255,.42), rgba(255,255,255,.22));
+    linear-gradient(165deg, rgba(255,255,255,.48), rgba(255,255,255,.26));
   backdrop-filter: blur(24px) saturate(1.35);
   -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  border: 1px solid var(--sov-line);
+  border-radius: var(--sov-r);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.55),
+    var(--sky-shadow-sheet, 0 24px 50px -28px rgba(10,40,20,.22)),
+    inset 0 1px 0 rgba(255,255,255,.62),
     inset 0 -1px 0 rgba(15,30,40,.04);
-  border: 0;
-  border-radius: 0;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -112,6 +108,8 @@ html.sky .sov-desk{
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   flex: 0 0 auto;
+  /* Match parent squircle on the top edge */
+  border-radius: var(--sov-r, 32px) var(--sov-r, 32px) 0 0;
 }
 html.sky .sov-desk-head{
   background: rgba(255,255,255,.38);
@@ -775,6 +773,8 @@ html.sky .sov-bubble--system{
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
+  /* Match parent squircle on the bottom edge */
+  border-radius: 0 0 var(--sov-r, 32px) var(--sov-r, 32px);
 }
 html.sky .sov-desk-compose{
   background: rgba(255,255,255,.36);
