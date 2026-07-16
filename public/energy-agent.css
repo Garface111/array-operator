@@ -198,7 +198,7 @@ html.sky #eaPanel{
 /* Shift main app chrome right when dock is open */
 body.ea-shell-open .wrap{
   margin-left: var(--ea-rail);
-  transition: margin-left .22s ease;
+  transition: margin-left .3s cubic-bezier(.32,.72,0,1);
   /* Cap width to the remaining viewport so the tabbar can't overflow past the
      right edge and clip the account email (Ford 2026-07-15). */
   width: auto;
@@ -217,7 +217,30 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-.wrap{ transition: margin-left .22s ease; min-width: 0; }
+.wrap{ transition: margin-left .3s cubic-bezier(.32,.72,0,1); min-width: 0; }
+
+/* ── Energy Agent dock — open motion (desktop rail) ─────────────────────────
+   The panel slides in from the left while .wrap shifts right, in lockstep, on a
+   decelerate "settle" curve: fast out of the gate, easing to a soft stop. ~300ms
+   with cubic-bezier(.32,.72,0,1) reads slick and intentional — the old .22s
+   symmetric `ease` slid the same distance ~25% faster with no deceleration, so
+   it snapped rather than settled ("too fast / uncomfortable"). Research: entering
+   side sheets sit best at ~250–320ms on an ease-out curve (Material large-surface
+   decelerate; NN/g ~300ms). Scoped ≥961px so the mobile bottom-sheet (translateY,
+   further down) is untouched; the panel is display:none→flex, so a keyframe (which
+   runs on reveal) is used rather than a transition (which can't). */
+@keyframes eaRailSlideIn{
+  from{ transform: translateX(-100%); }
+  to{ transform: translateX(0); }
+}
+@media (min-width: 961px){
+  #eaPanel.open{ animation: eaRailSlideIn .3s cubic-bezier(.32,.72,0,1); }
+}
+@media (prefers-reduced-motion: reduce){
+  body.ea-shell-open .wrap,
+  .wrap{ transition: none; }
+  #eaPanel.open{ animation: none; }
+}
 
 /* App modals (openModal / AODialog / claim) center on the FULL viewport by
    default. With the EA rail open that lands the card under/over the agent on
