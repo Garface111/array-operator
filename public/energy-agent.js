@@ -1519,19 +1519,38 @@
  }
 
  // ── Operating mind stream (seamless updates, one voice) ──────────────────
+ // Status chip only for REAL, user-visible events (e.g. repair mail).
+ // Never show theater like "Looking into it…" — Ford 2026-07-15: not real.
+ var _FAKE_MIND_LABELS = /looking into|still working|working in background|working…|working\.\.\./i;
  function setMindActivity(on, label) {
- state.mindBusy = !!on;
  var el = document.getElementById("eaMind");
  var txt = document.getElementById("eaMindText");
  if (!el) return;
+ var lab = String(label || "").trim();
+ // Hard block fake background-work chrome
+ if (on && (!lab || _FAKE_MIND_LABELS.test(lab))) {
+ on = false;
+ }
+ state.mindBusy = !!on;
  if (on) {
  el.hidden = false;
  el.classList.add("on");
- if (txt) txt.textContent = label || "Working in background…";
+ if (txt) txt.textContent = lab;
+ // Auto-clear after a few seconds so chips don't stick forever
+ if (state._mindChipTimer) {
+ try { clearTimeout(state._mindChipTimer); } catch (e) {}
+ }
+ state._mindChipTimer = setTimeout(function () {
+ setMindActivity(false);
+ }, 4500);
  } else {
  el.hidden = true;
  el.classList.remove("on");
- if (txt) txt.textContent = "Working…";
+ if (txt) txt.textContent = "";
+ if (state._mindChipTimer) {
+ try { clearTimeout(state._mindChipTimer); } catch (e) {}
+ state._mindChipTimer = null;
+ }
  }
  }
 
@@ -1753,14 +1772,16 @@
  if (!d || !d.events) return;
 
  var toConsume = [];
- var openHint = false;
  for (var i = 0; i < d.events.length; i++) {
  var ev = d.events[i];
  if (!ev || !ev.id) continue;
  if (ev.id > state.mindSinceId) state.mindSinceId = ev.id;
 
+ // task_queued / plan_created: consume silently — do NOT show "Looking into it"
+ // theater (not real owner-visible work).
  if (ev.kind === "task_queued" || ev.kind === "plan_created") {
- openHint = true;
+ toConsume.push(ev.id);
+ continue;
  }
 
  // Mind events: interrupt candidates may speak; voice_steer is status-only
@@ -1803,6 +1824,9 @@
  ) {
  // Swallow leftover sovereign EA injects — conversation lives on #sovereign desk
  toConsume.push(ev.id);
+ } else if (!ev.consumed) {
+ // Unknown / noise — consume so it doesn't pile up
+ toConsume.push(ev.id);
  }
  }
 
@@ -1812,11 +1836,7 @@
  } catch (e) {}
  }
 
- // Activity chip from events (cheap). Full /mind snapshot only every ~45s
- // so we don't stack network while the user is talking (Ford speed pass).
- if (openHint) {
- setMindActivity(true, "Looking into it…");
- }
+ // Occasional mind snapshot for insights only — never a fake "Looking into it" chip.
  var now = Date.now();
  if (!state._lastMindSnapAt || now - state._lastMindSnapAt > 45000) {
  state._lastMindSnapAt = now;
@@ -1824,13 +1844,7 @@
  var snap = await fetch(API.mind, { headers: authHeaders() });
  if (snap.ok) {
  var mind = await snap.json().catch(function () { return null; });
- var n = (mind && mind.open_tasks && mind.open_tasks.length) || 0;
- state.mindOpenTasks = n;
- if (n > 0) {
- setMindActivity(true, n === 1 ? "Looking into it…" : "Still working…");
- } else if (!openHint) {
- setMindActivity(false);
- }
+ state.mindOpenTasks = (mind && mind.open_tasks && mind.open_tasks.length) || 0;
  // Soft-surface latest proactive insight only for spikes / first notice
  // (importance >= 65 server-side). Client fleet-nag cool-down is 4h.
  var ins = mind && mind.insights && mind.insights[0];
@@ -1842,9 +1856,7 @@
  }
  }
  }
- } catch (e) {
- if (openHint) setMindActivity(true, "Looking into it…");
- }
+ } catch (e) {}
  }
  }
 
@@ -1855,10 +1867,9 @@
  return;
  }
 
- /** After chat returns a mind plan, surface subtle awareness + accelerate poll. */
+ /** After chat returns a mind plan — poll for real events only (no fake chip). */
  function onMindPlanFromChat(mind) {
  if (!mind) return;
- setMindActivity(true, "Looking into it…");
  startMindAwareness();
  // Background drain after the spoken reply path has room (don't race the chat)
  setTimeout(function () {
@@ -2565,7 +2576,6 @@
  "Okay.",
  "One moment.",
  "On it.",
- "Looking into that.",
  ];
  return pool[Math.floor(Math.random() * pool.length)];
  }
