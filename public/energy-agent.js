@@ -3003,10 +3003,14 @@
  startThinkingFiller(text, turnGen, isVoice);
 
  try {
+ var isVoiceTurn = (source || "") === "voice";
+ var chatCtx = packContext() || {};
+ // Backend uses source + voice_source for tight spoken replies (less barge-in cutoffs)
+ if (isVoiceTurn) chatCtx.voice_source = true;
  var chatBody = {
  session_id: sid,
  message: text,
- context: packContext(),
+ context: chatCtx,
  source: source || "text",
  };
  if (attachIds.length) chatBody.attachment_ids = attachIds;
