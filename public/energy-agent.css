@@ -198,7 +198,7 @@ html.sky #eaPanel{
 /* Shift main app chrome right when dock is open */
 body.ea-shell-open .wrap{
   margin-left: var(--ea-rail);
-  transition: margin-left .3s cubic-bezier(.32,.72,0,1);
+  transition: margin-left .34s cubic-bezier(.2,.8,.2,1);
   /* Cap width to the remaining viewport so the tabbar can't overflow past the
      right edge and clip the account email (Ford 2026-07-15). */
   width: auto;
@@ -217,29 +217,42 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-.wrap{ transition: margin-left .3s cubic-bezier(.32,.72,0,1); min-width: 0; }
+.wrap{ transition: margin-left .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
 
-/* ── Energy Agent dock — open motion (desktop rail) ─────────────────────────
-   The panel slides in from the left while .wrap shifts right, in lockstep, on a
-   decelerate "settle" curve: fast out of the gate, easing to a soft stop. ~300ms
-   with cubic-bezier(.32,.72,0,1) reads slick and intentional — the old .22s
-   symmetric `ease` slid the same distance ~25% faster with no deceleration, so
-   it snapped rather than settled ("too fast / uncomfortable"). Research: entering
-   side sheets sit best at ~250–320ms on an ease-out curve (Material large-surface
-   decelerate; NN/g ~300ms). Scoped ≥961px so the mobile bottom-sheet (translateY,
-   further down) is untouched; the panel is display:none→flex, so a keyframe (which
-   runs on reveal) is used rather than a transition (which can't). */
-@keyframes eaRailSlideIn{
-  from{ transform: translateX(-100%); }
-  to{ transform: translateX(0); }
-}
+/* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
+   The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
+   on TRANSFORM, so it glides both IN on open and back OUT on close (the X /
+   minimize) — in lockstep with the .wrap content shift, on the same smooth
+   ease-out curve the mobile sheet uses (cubic-bezier(.2,.8,.2,1), ~340ms; the
+   researched ~250–320ms band, nudged up a touch for a smoother settle). Using a
+   transition (not a one-shot keyframe) also makes it INTERRUPTIBLE: closing
+   mid-open reverses smoothly from wherever it is instead of snapping.
+   `visibility` (delayed one duration on close) keeps the parked rail out of the
+   a11y tree + hit-testing without a display:none that would kill the exit slide.
+   Scoped ≥961px so the mobile bottom-sheet (translateY, further down) is untouched. */
 @media (min-width: 961px){
-  #eaPanel.open{ animation: eaRailSlideIn .3s cubic-bezier(.32,.72,0,1); }
+  #eaPanel{
+    display: flex;
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
+    will-change: transform;
+    transition: transform .34s cubic-bezier(.2,.8,.2,1),
+                visibility 0s linear .34s;
+  }
+  #eaPanel.open{
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform .34s cubic-bezier(.2,.8,.2,1),
+                visibility 0s;
+  }
 }
 @media (prefers-reduced-motion: reduce){
   body.ea-shell-open .wrap,
   .wrap{ transition: none; }
-  #eaPanel.open{ animation: none; }
+  #eaPanel,
+  #eaPanel.open{ transition: none; }
 }
 
 /* App modals (openModal / AODialog / claim) center on the FULL viewport by
