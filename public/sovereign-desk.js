@@ -13,6 +13,7 @@
     history: "/v1/sovereign/desk/history",
     chat: RAIL_API + "/v1/sovereign/desk/chat",
     turn: RAIL_API + "/v1/sovereign/desk/turn",
+    cancel: RAIL_API + "/v1/sovereign/desk/cancel",
     upload: "/v1/sovereign/desk/upload",
     bridgeStatus: "/v1/sovereign/desk/bridge/status",
   };
@@ -39,6 +40,8 @@
     // In-flight durable send
     activeCrid: null,
     activeFordId: null,
+    userCancelled: false,
+    fetchCtrl: null,
   };
 
   function newClientRequestId() {
@@ -486,12 +489,14 @@
       var attachOk =
         existing.querySelector("#sovDeskAttach") &&
         existing.querySelector("#sovDeskAttach svg");
+      var stopOk = existing.querySelector("#sovDeskStop");
       if (
         existing.classList.contains("sov-desk--chat") &&
         existing.classList.contains("sov-desk--rich") &&
         !existing.querySelector(".sov-ops") &&
         micOk &&
-        attachOk
+        attachOk &&
+        stopOk
       )
         return sec;
       existing.remove();
@@ -516,7 +521,9 @@
       '    <div class="sov-desk-body" id="sovDeskMsgs" aria-live="polite"></div>' +
       '    <div class="sov-desk-typing" id="sovDeskTyping" hidden>' +
       '      <span class="sov-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
-      "      <span>Sovereign is thinking…</span>" +
+      '      <span class="sov-typing-label">Sovereign is thinking…</span>' +
+      '      <button type="button" class="sov-desk-stop" id="sovDeskStop" hidden ' +
+      'title="Stop Sovereign" aria-label="Stop Sovereign">Stop</button>' +
       "    </div>" +
       '    <div class="sov-attach-row" id="sovAttachRow" hidden></div>' +
       '    <form class="sov-desk-compose" id="sovDeskForm">' +
@@ -552,8 +559,22 @@
       form._wired = true;
       form.addEventListener("submit", function (e) {
         e.preventDefault();
+        // While thinking, the Send button acts as Stop (ChatGPT-style)
+        if (state.sending) {
+          interruptSovereign();
+          return;
+        }
         send();
       });
+    }
+    var stopBtn = document.getElementById("sovDeskStop");
+    if (stopBtn && !stopBtn._wired) {
+      stopBtn._wired = true;
+      stopBtn.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        interruptSovereign();
+      };
     }
     var ta = document.getElementById("sovDeskInput");
     if (ta && !ta._wired) {
@@ -957,6 +978,55 @@
     if (!el) return;
     if (on) el.removeAttribute("hidden");
     else el.setAttribute("hidden", "");
+    var stop = document.getElementById("sovDeskStop");
+    if (stop) {
+      if (on) stop.removeAttribute("hidden");
+      else stop.setAttribute("hidden", "");
+    }
+    syncSendStopUi();
+  }
+
+  function syncSendStopUi() {
+    var btn = document.getElementById("sovDeskSend");
+    if (!btn) return;
+    if (state.sending) {
+      btn.disabled = false;
+      btn.textContent = "Stop";
+      btn.classList.add("sov-desk-send--stop");
+      btn.title = "Stop Sovereign";
+      btn.setAttribute("aria-label", "Stop Sovereign");
+    } else {
+      btn.disabled = false;
+      btn.textContent = "Send";
+      btn.classList.remove("sov-desk-send--stop");
+      btn.title = "Send";
+      btn.setAttribute("aria-label", "Send");
+    }
+  }
+
+  /** Abort in-flight brain turn (client + server). */
+  async function interruptSovereign() {
+    if (!state.sending && !state.activeCrid) return;
+    state.userCancelled = true;
+    if (state.fetchCtrl) {
+      try {
+        state.fetchCtrl.abort();
+      } catch (e) {}
+    }
+    var crid = state.activeCrid;
+    var fordId = state.activeFordId;
+    // Fire-and-forget cancel so UI unblocks immediately
+    if (crid || fordId) {
+      fetch(API.cancel, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          client_request_id: crid || null,
+          ford_message_id: fordId || null,
+        }),
+      }).catch(function () {});
+    }
+    savePendingTurn(null);
   }
 
   function copyIconSvg() {
@@ -1246,7 +1316,23 @@
 
   async function postChat(payload, attempt) {
     attempt = attempt || 0;
+    if (state.userCancelled) {
+      return {
+        ok: true,
+        cancelled: true,
+        pending: false,
+        client_request_id: payload.client_request_id,
+        reply: "*(Stopped.)*",
+        message: {
+          role: "sovereign",
+          content: "*(Stopped.)*",
+          provider: "system",
+          created_at: new Date().toISOString(),
+        },
+      };
+    }
     var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    state.fetchCtrl = ctrl;
     var timer = null;
     // Client-side ceiling well above server wait — pending path should return first
     if (ctrl) timer = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 95000);
@@ -1260,6 +1346,24 @@
       var d = await r.json().catch(function () {
         return {};
       });
+      if (state.userCancelled) {
+        return {
+          ok: true,
+          cancelled: true,
+          pending: false,
+          client_request_id: payload.client_request_id,
+          ford_message_id: d && d.ford_message_id,
+          ford_message: d && d.ford_message,
+          reply: (d && d.reply) || "*(Stopped.)*",
+          message:
+            (d && d.message) || {
+              role: "sovereign",
+              content: "*(Stopped.)*",
+              provider: "system",
+              created_at: new Date().toISOString(),
+            },
+        };
+      }
       if (!r.ok) {
         var detail = d && d.detail;
         if (typeof detail === "object")
@@ -1267,7 +1371,8 @@
         // Transient gateway — retry once, then treat as pending so poll can recover
         if (
           (r.status === 502 || r.status === 503 || r.status === 504 || r.status === 524) &&
-          attempt < 2
+          attempt < 2 &&
+          !state.userCancelled
         ) {
           await sleep(800 * (attempt + 1));
           return postChat(payload, attempt + 1);
@@ -1286,12 +1391,27 @@
       }
       return d;
     } catch (e) {
+      if (state.userCancelled || ((e && e.name) === "AbortError" && state.userCancelled)) {
+        return {
+          ok: true,
+          cancelled: true,
+          pending: false,
+          client_request_id: payload.client_request_id,
+          reply: "*(Stopped.)*",
+          message: {
+            role: "sovereign",
+            content: "*(Stopped.)*",
+            provider: "system",
+            created_at: new Date().toISOString(),
+          },
+        };
+      }
       var name = (e && e.name) || "";
       var msg = (e && e.message) || String(e);
       var transient =
         name === "AbortError" ||
         /failed to fetch|network|timeout|aborted/i.test(msg);
-      if (transient && attempt < 2) {
+      if (transient && attempt < 2 && !state.userCancelled) {
         await sleep(900 * (attempt + 1));
         return postChat(payload, attempt + 1);
       }
@@ -1309,6 +1429,7 @@
       throw e;
     } finally {
       if (timer) clearTimeout(timer);
+      if (state.fetchCtrl === ctrl) state.fetchCtrl = null;
     }
   }
 
@@ -1318,6 +1439,22 @@
     var start = Date.now();
     var delay = 1500;
     while (Date.now() - start < maxMs) {
+      if (state.userCancelled) {
+        return {
+          ok: true,
+          cancelled: true,
+          pending: false,
+          client_request_id: crid,
+          ford_message_id: fordId,
+          reply: "*(Stopped.)*",
+          message: {
+            role: "sovereign",
+            content: "*(Stopped.)*",
+            provider: "system",
+            created_at: new Date().toISOString(),
+          },
+        };
+      }
       // Prefer dedicated turn endpoint; fall back to history + chat poll_only
       try {
         var q = [];
@@ -1403,13 +1540,10 @@
     if (!text && !attachIds.length) return;
     // Stop dictation so we don't keep filling the box mid-send
     if (state.listening) stopVoice();
+    state.userCancelled = false;
     state.sending = true;
     setTyping(true);
-    var btn = document.getElementById("sovDeskSend");
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = "…";
-    }
+    syncSendStopUi();
     if (ta) {
       ta.value = "";
       autoGrow(ta);
@@ -1468,19 +1602,44 @@
       }
 
       var gotReply = applyTurnResult(d, fordLocal);
-      if (!gotReply && d && (d.pending || d.poll || !((d.message && d.message.content) || d.reply))) {
+      if (d && d.cancelled) {
+        fordLocal._pending = false;
+        if (!gotReply) {
+          state.messages.push({
+            role: "sovereign",
+            content: "*(Stopped.)*",
+            provider: "system",
+            created_at: new Date().toISOString(),
+            _local: true,
+            _localId: "stop_" + localId,
+          });
+        }
+        gotReply = true;
+      } else if (
+        !gotReply &&
+        d &&
+        (d.pending || d.poll || !((d.message && d.message.content) || d.reply))
+      ) {
         // Soft-pending: keep typing indicator and poll until reply lands
         setTyping(true);
-        var typingEl = document.getElementById("sovDeskTyping");
-        if (typingEl) {
-          var span = typingEl.querySelector("span:last-child") || typingEl;
-          // leave default "Sovereign is thinking…"
-        }
         var finished = await pollTurnUntilReady(crid, fordId, { maxMs: 180000 });
-        if (finished) {
+        if (finished && finished.cancelled) {
+          fordLocal._pending = false;
+          if (!applyTurnResult(finished, fordLocal)) {
+            state.messages.push({
+              role: "sovereign",
+              content: "*(Stopped.)*",
+              provider: "system",
+              created_at: new Date().toISOString(),
+              _local: true,
+              _localId: "stop_" + localId,
+            });
+          }
+          gotReply = true;
+        } else if (finished) {
           applyTurnResult(finished, fordLocal);
           gotReply = true;
-        } else {
+        } else if (!state.userCancelled) {
           // Still no reply after long wait — message is safe; don't scare Ford
           fordLocal._pending = false;
           state.messages.push({
@@ -1500,50 +1659,64 @@
       state.activeFordId = null;
       renderMessages();
       if (host) host.scrollTop = host.scrollHeight;
-      // Sync with server truth
-      try {
-        await loadHistory({ force: true });
-      } catch (e) {}
+      // Sync with server truth (skip if user just stopped — avoid flicker)
+      if (!state.userCancelled) {
+        try {
+          await loadHistory({ force: true });
+        } catch (e) {}
+      }
     } catch (e) {
       fordLocal._pending = false;
-      // Hard failure — but still try recovery poll once
-      var recovered = null;
-      try {
-        recovered = await pollTurnUntilReady(crid, state.activeFordId, {
-          maxMs: 12000,
-        });
-      } catch (e2) {}
-      if (recovered && applyTurnResult(recovered, fordLocal)) {
-        savePendingTurn(null);
-      } else {
-        // Restore draft so Ford never loses typed text on hard fail
-        if (text) {
-          saveDraft(text);
-          if (ta) {
-            ta.value = text;
-            autoGrow(ta);
-          }
-        }
+      if (state.userCancelled) {
         state.messages.push({
           role: "sovereign",
-          content:
-            "Couldn't finish that send — " +
-            ((e && e.message) || e) +
-            ". Your draft was restored. Hit Send again (safe to retry).",
-          provider: "error",
+          content: "*(Stopped.)*",
+          provider: "system",
           created_at: new Date().toISOString(),
           _local: true,
-          _localId: "err_" + localId,
+          _localId: "stop_" + localId,
         });
+        savePendingTurn(null);
+      } else {
+        // Hard failure — but still try recovery poll once
+        var recovered = null;
+        try {
+          recovered = await pollTurnUntilReady(crid, state.activeFordId, {
+            maxMs: 12000,
+          });
+        } catch (e2) {}
+        if (recovered && applyTurnResult(recovered, fordLocal)) {
+          savePendingTurn(null);
+        } else {
+          // Restore draft so Ford never loses typed text on hard fail
+          if (text) {
+            saveDraft(text);
+            if (ta) {
+              ta.value = text;
+              autoGrow(ta);
+            }
+          }
+          state.messages.push({
+            role: "sovereign",
+            content:
+              "Couldn't finish that send — " +
+              ((e && e.message) || e) +
+              ". Your draft was restored. Hit Send again (safe to retry).",
+            provider: "error",
+            created_at: new Date().toISOString(),
+            _local: true,
+            _localId: "err_" + localId,
+          });
+        }
       }
       renderMessages();
     } finally {
       state.sending = false;
+      state.userCancelled = false;
+      state.activeCrid = null;
+      state.activeFordId = null;
       setTyping(false);
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = "Send";
-      }
+      syncSendStopUi();
       if (ta) ta.focus();
     }
   }
