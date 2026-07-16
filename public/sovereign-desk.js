@@ -1129,7 +1129,18 @@
     );
   }
 
-  function renderMessages() {
+  function msgsNearBottom(host, threshold) {
+    if (!host) return true;
+    var t = threshold == null ? 120 : threshold;
+    return host.scrollHeight - host.scrollTop - host.clientHeight < t;
+  }
+
+  /**
+   * Paint transcript. Auto-scroll ONLY if already near bottom (or forceScroll).
+   * Never yank the user back down while Sovereign is thinking and they scrolled up.
+   */
+  function renderMessages(opts) {
+    opts = opts || {};
     var host = document.getElementById("sovDeskMsgs");
     if (!host) return;
     wireCopyDelegation(host);
@@ -1142,10 +1153,15 @@
         "</div>";
       return;
     }
-    var nearBottom =
-      host.scrollHeight - host.scrollTop - host.clientHeight < 120;
+    var prevTop = host.scrollTop;
+    var nearBottom = msgsNearBottom(host);
     host.innerHTML = visible.map(bubbleHtml).join("");
-    if (nearBottom || state.sending) host.scrollTop = host.scrollHeight;
+    if (opts.forceScroll || nearBottom) {
+      host.scrollTop = host.scrollHeight;
+    } else {
+      // Keep the same scroll offset so reading history isn't interrupted by polls
+      host.scrollTop = prevTop;
+    }
   }
 
   async function checkAccess() {
@@ -1580,9 +1596,8 @@
       meta: { attachments: sentAttach, client_request_id: crid },
     };
     state.messages.push(fordLocal);
-    renderMessages();
-    var host = document.getElementById("sovDeskMsgs");
-    if (host) host.scrollTop = host.scrollHeight;
+    // Only force scroll on the user's own send so they see their bubble + typing
+    renderMessages({ forceScroll: true });
     savePendingTurn({ crid: crid, text: text, at: Date.now() });
 
     try {
@@ -1657,8 +1672,8 @@
       savePendingTurn(null);
       state.activeCrid = null;
       state.activeFordId = null;
+      // No force-scroll: if Ford scrolled up while thinking, leave him there
       renderMessages();
-      if (host) host.scrollTop = host.scrollHeight;
       // Sync with server truth (skip if user just stopped — avoid flicker)
       if (!state.userCancelled) {
         try {
