@@ -2310,14 +2310,29 @@ html[data-theme="day"] .rep-fld.req > select{
 /* The spreadsheet panel itself. */
 /* Wider sheet so the dedicated 14-day spark column has room (was 1120 — felt
    cramped with graphs jammed into Status). */
-#sheetWrap{ padding:16px 20px 48px; max-width:1280px; margin:0 auto; }
+#sheetWrap{
+  padding:16px 20px 48px; max-width:1280px; margin:0 auto;
+  width:100%; box-sizing:border-box;
+  /* Contain the scrollport so EA-rail narrowing scrolls the table instead of
+     crushing Live/Today into "kWkWh" (Ford 2026-07-15/16). */
+  overflow:hidden; min-width:0;
+}
 .vs-headrow{ margin:0 2px 14px; }
 .vs-headrow h2{ font-size:20px; font-weight:760; color:var(--ink); margin:0 0 2px; letter-spacing:-.01em; }
 .vs-sub{ font-size:13px; color:var(--muted); }
 .vs-hint{ margin-top:6px; font-size:12px; line-height:1.45; color:var(--muted); max-width:680px; }
 .vs-hint strong{ color:var(--good,#2563eb); font-weight:650; }
-.vs-scroll{ overflow-y:auto; border:1px solid var(--line); border-radius:14px;
-  background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06); }
+/* Scrollport: MUST be width-bound to parent. If this grows with content, body
+   overflow-x:hidden clips the sheet with no scrollbar and columns crush. */
+.vs-scroll{
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  border:1px solid var(--line); border-radius:14px;
+  background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06);
+}
 /* Each .vs-row is its OWN independent grid (not one shared table grid across all
    rows), so a bare `Nfr` track's implicit min-content floor lets one row's wide
    cell content (e.g. the "↗ Open Fronius to sync" button — the longest of the
@@ -2529,11 +2544,8 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    (.vs-vgroup border-left) — NO background flood (Ford: "just hold the little line on
    the left... don't let the color follow all the way down"). So the wrap is plain card. */
 .vs-inv-wrap{ background:var(--card,#fff); border-bottom:1px solid var(--line); }
-/* Inverter rows now share the SAME 8-column grid as the vendor/array rows above them
-   (they're .vs-row too), so the gauge + every column line up in one straight vertical
-   column — no more jagged, per-tier layouts (Ford 2026-07-12 realignment). The row only
-   adds nesting cues: a deeper name indent + a hairline. The 14-day chart moved to the
-   full-screen Details view, so nothing here breaks the grid. */
+/* Inverter rows share the SAME 9-column grid as vendor/array rows (incl. 14-day
+   spark). Gauge + every column line up in one straight vertical column. */
 .vs-inv{ cursor:pointer; border-top:1px solid var(--line,#e2e8f0); }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
