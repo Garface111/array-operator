@@ -6139,13 +6139,22 @@
  } else if (pay && pay.status === "open" && pay.pay_url) {
  payPill = `<span class="rb-chip" title="Invoice includes a Stripe pay link">Pay link open</span>`;
  }
+ // Status-first: one leading dot summarizes this offtaker's state so the list
+ // scans top-to-bottom at a glance — needs-action (ready) first, then paused,
+ // sent, or idle. Reuses the .rb-sec-dot halo language already in the card.
+ let statusCls, statusLabel;
+ if (!s.enabled) { statusCls = "paused"; statusLabel = "Paused"; }
+ else if (draft) { statusCls = "ready"; statusLabel = draft.amount_usd != null ? money(draft.amount_usd) + " ready to review" : "Report ready to review"; }
+ else if (s.last_sent_at) { statusCls = "sent"; statusLabel = "Sent · last " + last; }
+ else { statusCls = "idle"; statusLabel = "No report sent yet"; }
+ const statusDot = `<span class="rb-acc-dot rb-acc-dot-${statusCls}" title="${esc(statusLabel)}" aria-label="${esc(statusLabel)}"></span>`;
  return `
  <div class="rb-acc ${s.enabled ? "" : "rb-paused"}" data-id="${s.id}" data-open="false">
  <div class="rb-acc-head" role="button" tabindex="0" aria-expanded="false"
  aria-controls="rbAccBody-${s.id}" data-acchead="${s.id}">
  <span class="rb-acc-caret" aria-hidden="true">▸</span>
  <div class="rb-acc-head-main">
- <div class="rb-acc-name">${esc(s.customer_name)}
+ <div class="rb-acc-name">${statusDot}${esc(s.customer_name)}
  ${readyPill}${payPill}
  <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
  ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
