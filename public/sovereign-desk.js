@@ -9,6 +9,8 @@
     access: "/v1/sovereign/desk/access",
     history: "/v1/sovereign/desk/history",
     chat: "/v1/sovereign/desk/chat",
+    upload: "/v1/sovereign/desk/upload",
+    bridgeStatus: "/v1/sovereign/desk/bridge/status",
   };
 
   var state = {
@@ -24,6 +26,9 @@
     recognition: null,
     baseText: "", // textarea content before this listening session
     interim: "",
+    // File / data attachments for the next send
+    attachments: [], // {id, filename, mime, size, preview}
+    bridgeOnline: null,
   };
 
   function authHeaders() {
@@ -395,7 +400,8 @@
         existing.classList.contains("sov-desk--chat") &&
         existing.classList.contains("sov-desk--rich") &&
         !existing.querySelector(".sov-ops") &&
-        existing.querySelector("#sovDeskMic")
+        existing.querySelector("#sovDeskMic") &&
+        existing.querySelector("#sovDeskAttach")
       )
         return sec;
       existing.remove();
@@ -407,11 +413,12 @@
       '      <div class="sov-desk-mark" aria-hidden="true"></div>' +
       "      <div>" +
       "        <h1>Sovereign</h1>" +
-      '        <p class="sov-desk-sub">Private chat</p>' +
+      '        <p class="sov-desk-sub">Private chat · files · local bridge</p>' +
       "      </div>" +
       "    </div>" +
       '    <div class="sov-desk-head-right">' +
       '      <div class="sov-desk-meta" id="sovDeskMeta">Developer only</div>' +
+      '      <span class="sov-bridge-pill" id="sovBridgePill" title="Local computer bridge">bridge…</span>' +
       '      <button type="button" class="sov-desk-refresh" id="sovDeskRefresh" title="Refresh" aria-label="Refresh">↻</button>' +
       "    </div>" +
       "  </header>" +
@@ -421,12 +428,19 @@
       '      <span class="sov-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
       "      <span>Sovereign is thinking…</span>" +
       "    </div>" +
+      '    <div class="sov-attach-row" id="sovAttachRow" hidden></div>' +
       '    <form class="sov-desk-compose" id="sovDeskForm">' +
+      '      <input type="file" id="sovDeskFile" multiple hidden ' +
+      'accept=".txt,.md,.json,.csv,.py,.js,.ts,.tsx,.html,.css,.yml,.yaml,.log,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.sh,.sql,.xml">' +
+      '      <button type="button" class="sov-desk-attach" id="sovDeskAttach" ' +
+      'title="Attach file or data" aria-label="Attach file">' +
+      '        <span class="sov-attach-ic" aria-hidden="true"></span>' +
+      "      </button>" +
       '      <button type="button" class="sov-desk-mic" id="sovDeskMic" ' +
       'title="Talk — voice to text" aria-label="Voice to text" aria-pressed="false">' +
       '        <span class="sov-mic-ic" aria-hidden="true"></span>' +
       "      </button>" +
-      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (mic to talk · Enter to send)" autocomplete="off"></textarea>' +
+      '      <textarea id="sovDeskInput" rows="1" placeholder="Message Sovereign…  (attach · mic · Enter to send)" autocomplete="off"></textarea>' +
       '      <button type="submit" class="sov-desk-send" id="sovDeskSend">Send</button>' +
       "    </form>" +
       "  </div>" +
@@ -466,15 +480,208 @@
         toggleVoice();
       };
     }
+    var attachBtn = document.getElementById("sovDeskAttach");
+    var fileInput = document.getElementById("sovDeskFile");
+    if (attachBtn && fileInput && !attachBtn._wired) {
+      attachBtn._wired = true;
+      attachBtn.onclick = function (e) {
+        e.preventDefault();
+        fileInput.click();
+      };
+      fileInput.onchange = function () {
+        var files = fileInput.files;
+        if (!files || !files.length) return;
+        for (var i = 0; i < files.length; i++) uploadFile(files[i]);
+        fileInput.value = "";
+      };
+    }
+    // Drag-drop files onto the desk
+    var main = sec.querySelector(".sov-desk-main") || sec;
+    if (main && !main._dropWired) {
+      main._dropWired = true;
+      ["dragenter", "dragover"].forEach(function (ev) {
+        main.addEventListener(ev, function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          main.classList.add("sov-drop-hot");
+        });
+      });
+      ["dragleave", "drop"].forEach(function (ev) {
+        main.addEventListener(ev, function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          main.classList.remove("sov-drop-hot");
+        });
+      });
+      main.addEventListener("drop", function (e) {
+        var dt = e.dataTransfer;
+        if (!dt || !dt.files || !dt.files.length) return;
+        for (var i = 0; i < dt.files.length; i++) uploadFile(dt.files[i]);
+      });
+    }
+    // Paste images / large text into the box
+    if (ta && !ta._pasteWired) {
+      ta._pasteWired = true;
+      ta.addEventListener("paste", function (e) {
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (var i = 0; i < items.length; i++) {
+          var it = items[i];
+          if (it.kind === "file") {
+            var f = it.getAsFile();
+            if (f) {
+              e.preventDefault();
+              uploadFile(f);
+            }
+          }
+        }
+      });
+    }
     var ref = document.getElementById("sovDeskRefresh");
     if (ref && !ref._wired) {
       ref._wired = true;
       ref.onclick = function () {
         loadHistory();
+        refreshBridgeStatus();
       };
     }
     syncMicUi();
+    renderAttachments();
+    refreshBridgeStatus();
     return sec;
+  }
+
+  function renderAttachments() {
+    var row = document.getElementById("sovAttachRow");
+    if (!row) return;
+    if (!state.attachments.length) {
+      row.hidden = true;
+      row.innerHTML = "";
+      return;
+    }
+    row.hidden = false;
+    row.innerHTML = state.attachments
+      .map(function (a, idx) {
+        var size =
+          a.size > 1024 * 1024
+            ? (a.size / (1024 * 1024)).toFixed(1) + " MB"
+            : a.size > 1024
+              ? Math.round(a.size / 1024) + " KB"
+              : a.size + " B";
+        return (
+          '<span class="sov-attach-chip" data-idx="' +
+          idx +
+          '">' +
+          '<span class="sov-attach-name">' +
+          esc(a.filename || "file") +
+          "</span>" +
+          '<span class="sov-attach-size">' +
+          esc(size) +
+          "</span>" +
+          '<button type="button" class="sov-attach-x" data-rm="' +
+          idx +
+          '" aria-label="Remove">×</button>' +
+          "</span>"
+        );
+      })
+      .join("");
+    row.querySelectorAll("[data-rm]").forEach(function (btn) {
+      btn.onclick = function () {
+        var i = parseInt(btn.getAttribute("data-rm"), 10);
+        if (!isNaN(i)) {
+          state.attachments.splice(i, 1);
+          renderAttachments();
+        }
+      };
+    });
+  }
+
+  async function uploadFile(file) {
+    if (!file || !state.allowed) return;
+    var row = document.getElementById("sovAttachRow");
+    if (row) {
+      row.hidden = false;
+      row.innerHTML =
+        (row.innerHTML || "") +
+        '<span class="sov-attach-chip sov-attach-uploading">Uploading ' +
+        esc(file.name || "file") +
+        "…</span>";
+    }
+    try {
+      var fd = new FormData();
+      fd.append("file", file, file.name || "upload.bin");
+      var headers = authHeaders();
+      // Let browser set multipart boundary
+      delete headers["Content-Type"];
+      var r = await fetch(API.upload, {
+        method: "POST",
+        headers: headers,
+        body: fd,
+      });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error((d && d.detail) || "upload failed");
+      if (d.asset) {
+        state.attachments.push(d.asset);
+      }
+    } catch (e) {
+      alert("Upload failed: " + ((e && e.message) || e));
+    }
+    renderAttachments();
+  }
+
+  async function uploadSnippet(text, filename) {
+    if (!text || !state.allowed) return;
+    try {
+      var fd = new FormData();
+      fd.append("snippet", text);
+      fd.append("filename", filename || "paste.txt");
+      var headers = authHeaders();
+      delete headers["Content-Type"];
+      var r = await fetch(API.upload, {
+        method: "POST",
+        headers: headers,
+        body: fd,
+      });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error((d && d.detail) || "snippet failed");
+      if (d.asset) state.attachments.push(d.asset);
+      renderAttachments();
+    } catch (e) {
+      alert("Couldn’t attach data: " + ((e && e.message) || e));
+    }
+  }
+
+  async function refreshBridgeStatus() {
+    var pill = document.getElementById("sovBridgePill");
+    if (!pill || !state.allowed) return;
+    try {
+      var r = await fetch(API.bridgeStatus, { headers: authHeaders() });
+      var d = await r.json().catch(function () {
+        return {};
+      });
+      if (!r.ok) throw new Error("no");
+      var q = (d.queued || 0) + (d.running || 0);
+      var configured = !!d.bridge_token_configured;
+      pill.className =
+        "sov-bridge-pill " +
+        (configured ? (q ? "busy" : "ready") : "off");
+      pill.textContent = !configured
+        ? "bridge off"
+        : q
+          ? "bridge · " + q + " task" + (q === 1 ? "" : "s")
+          : "bridge ready";
+      pill.title = configured
+        ? "Local computer bridge token is set. Run scripts/sovereign_local_bridge.py on your machine."
+        : "Set SOVEREIGN_BRIDGE_TOKEN on Railway + run the local bridge for computer access.";
+      state.bridgeOnline = configured;
+    } catch (e) {
+      pill.className = "sov-bridge-pill off";
+      pill.textContent = "bridge ?";
+    }
   }
 
   // ── Voice → text (browser SpeechRecognition) ─────────────────────────────
@@ -828,7 +1035,10 @@
     if (state.sending || !state.allowed) return;
     var ta = document.getElementById("sovDeskInput");
     var text = ta ? String(ta.value || "").trim() : "";
-    if (!text) return;
+    var attachIds = (state.attachments || []).map(function (a) {
+      return a.id;
+    });
+    if (!text && !attachIds.length) return;
     // Stop dictation so we don't keep filling the box mid-send
     if (state.listening) stopVoice();
     state.sending = true;
@@ -842,14 +1052,33 @@
       ta.value = "";
       autoGrow(ta);
     }
+    var attachNote = "";
+    if (attachIds.length) {
+      attachNote =
+        "\n\n[Attached " +
+        attachIds.length +
+        " file" +
+        (attachIds.length === 1 ? "" : "s") +
+        ": " +
+        state.attachments
+          .map(function (a) {
+            return a.filename;
+          })
+          .join(", ") +
+        "]";
+    }
+    var sentAttach = state.attachments.slice();
+    state.attachments = [];
+    renderAttachments();
     var localId = "local_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     var fordLocal = {
       role: "ford",
-      content: text,
+      content: text + attachNote,
       created_at: new Date().toISOString(),
       _local: true,
       _pending: true,
       _localId: localId,
+      meta: { attachments: sentAttach },
     };
     state.messages.push(fordLocal);
     renderMessages();
@@ -859,7 +1088,10 @@
       var r = await fetch(API.chat, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text || "",
+          attachment_ids: attachIds,
+        }),
       });
       var d = await r.json().catch(function () {
         return {};

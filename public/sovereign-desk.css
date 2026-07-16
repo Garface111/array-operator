@@ -624,6 +624,132 @@ html.sky .sov-desk-compose.sov-listening textarea{
   box-shadow: 0 0 0 3px rgba(33,150,243,.12);
 }
 
+/* Attachments strip */
+.sov-attach-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px 0;
+  flex: 0 0 auto;
+}
+.sov-attach-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 999px;
+  background: rgba(63,214,138,.12);
+  border: 1px solid rgba(63,214,138,.3);
+  color: var(--sov-ink);
+  font-size: 12px;
+  font-weight: 650;
+  max-width: 100%;
+}
+html.sky .sov-attach-chip{
+  background: rgba(33,150,243,.1);
+  border-color: rgba(33,150,243,.28);
+  color: #0f2744;
+}
+.sov-attach-name{
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sov-attach-size{ opacity: .65; font-weight: 600; font-size: 11px; }
+.sov-attach-x{
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: .7;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.sov-attach-x:hover{ opacity: 1; }
+.sov-attach-uploading{ opacity: .75; font-style: italic; }
+
+.sov-desk-main.sov-drop-hot{
+  outline: 2px dashed rgba(63,214,138,.55);
+  outline-offset: -8px;
+}
+html.sky .sov-desk-main.sov-drop-hot{
+  outline-color: rgba(33,150,243,.55);
+}
+
+.sov-bridge-pill{
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--sov-line);
+  color: var(--sov-muted);
+  background: rgba(255,255,255,.04);
+  white-space: nowrap;
+}
+.sov-bridge-pill.ready{
+  color: var(--sov-good2);
+  border-color: rgba(63,214,138,.35);
+  background: rgba(63,214,138,.1);
+}
+.sov-bridge-pill.busy{
+  color: #ffd479;
+  border-color: rgba(255,180,84,.4);
+  background: rgba(255,180,84,.1);
+}
+.sov-bridge-pill.off{ opacity: .7; }
+html.sky .sov-bridge-pill.ready{
+  color: #0d6b42;
+  background: rgba(16,185,129,.12);
+}
+html.sky .sov-bridge-pill.busy{
+  color: #b45309;
+  background: rgba(251,191,36,.15);
+}
+
+/* Attach control */
+.sov-desk-attach{
+  appearance: none;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--sov-line);
+  background: rgba(255,255,255,.05);
+  color: var(--sov-ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background .15s, border-color .15s, transform .1s;
+  padding: 0;
+}
+.sov-desk-attach:hover{
+  border-color: rgba(63,214,138,.45);
+  background: rgba(63,214,138,.1);
+}
+.sov-desk-attach .sov-attach-ic{
+  width: 18px;
+  height: 18px;
+  display: block;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'><path d='M16.5 6.5v9.25a4.5 4.5 0 1 1-9 0V6.75a3 3 0 0 1 6 0v8.5a1.5 1.5 0 1 1-3 0V7.5a.75.75 0 0 0-1.5 0v7.75a3 3 0 1 0 6 0V6.75a4.5 4.5 0 1 0-9 0v9a6 6 0 1 0 12 0V6.5a.75.75 0 0 0-1.5 0z'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'><path d='M16.5 6.5v9.25a4.5 4.5 0 1 1-9 0V6.75a3 3 0 0 1 6 0v8.5a1.5 1.5 0 1 1-3 0V7.5a.75.75 0 0 0-1.5 0v7.75a3 3 0 1 0 6 0V6.75a4.5 4.5 0 1 0-9 0v9a6 6 0 1 0 12 0V6.5a.75.75 0 0 0-1.5 0z'/></svg>") center / contain no-repeat;
+  opacity: .9;
+}
+html.sky .sov-desk-attach{
+  background: rgba(255,255,255,.75);
+  border-color: rgba(20,60,120,.14);
+  color: #0f2744;
+}
+html.sky .sov-desk-attach:hover{
+  border-color: rgba(33,150,243,.4);
+  color: #1565c0;
+}
+
 /* Mic — voice to text */
 .sov-desk-mic{
   appearance: none;
