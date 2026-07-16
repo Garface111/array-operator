@@ -2296,12 +2296,34 @@ html[data-theme="day"] .rep-fld.req > select{
 .vs-seg{ display:flex; width:fit-content; margin:12px auto 6px; position:relative; z-index:55;
   gap:2px; padding:3px; border-radius:11px; border:1px solid var(--line,#e2e8f0);
   background:var(--card,#fff); box-shadow:0 2px 12px -5px rgba(15,23,42,.35); }
-/* Invoices twin of Analysis .an-sub-seg — same visual language under main tabbar */
-#panelReports .inv-sub-seg{ margin:14px auto 6px; }
+/* Invoices twin of Analysis .an-sub-seg — same language, slightly denser so it
+   doesn't crowd the Energy Agent rail or the bottom Setup / Alerts fabs. */
+#panelReports{
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Room for fixed Setup + Alerts pills so they don't cover Save / CTAs */
+  padding-bottom: 88px;
+}
+#panelReports .inv-sub-seg{
+  margin: 8px auto 4px;
+  z-index: 20; /* well under #eaPanel (99970) */
+  padding: 2px;
+  gap: 1px;
+  max-width: min(100%, 420px);
+  box-sizing: border-box;
+}
+#panelReports .inv-sub-seg .vs-seg-btn{
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
 #panelReports .inv-sub-seg .rb-au-genbadge{
   display:inline-flex; align-items:center; justify-content:center;
-  min-width:18px; height:18px; padding:0 6px; margin-left:6px;
-  border-radius:999px; font-size:10.5px; font-weight:780;
+  min-width:16px; height:16px; padding:0 5px; margin-left:5px;
+  border-radius:999px; font-size:10px; font-weight:780;
   background:rgba(217,119,6,.16); color:#b45309; border:1px solid rgba(217,119,6,.28);
   vertical-align:middle; line-height:1;
 }
@@ -2312,6 +2334,17 @@ html[data-theme="day"] .rep-fld.req > select{
   display:flex; justify-content:flex-end; margin:0 0 4px; border:0;
 }
 #panelReports .rb2-tabrow--kpis-only .rb2-kpis{ margin:0; }
+/* When Energy Agent left dock is open, keep invoices content inside remaining width */
+body.ea-shell-open #panelReports{
+  max-width: 100%;
+  overflow-x: hidden;
+}
+body.ea-shell-open #panelReports .rb2,
+body.ea-shell-open #panelReports #reportsRoot{
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 .vs-seg-btn{ border:0; cursor:pointer; font:inherit; font-size:12.5px; font-weight:700; color:var(--muted,#64748b);
   padding:6px 18px; border-radius:8px; background:none; transition:background .12s, color .12s, box-shadow .12s; }
 .vs-seg-btn.on{ background:var(--good,#2563eb); color:#fff; box-shadow:0 1px 4px -1px rgba(37,99,235,.5); }

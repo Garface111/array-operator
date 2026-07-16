@@ -56,11 +56,15 @@ html.sky .rb2{
      the bands with soft white instead of the vivid mountain photo, so the eye rests on a
      continuous plane — exactly why #panelAnalysis .an-wrap reads as calm. */
   background:rgba(255,255,255,.66);
-  padding:16px 18px 26px;
+  /* Tighter than v1 — leave room for Setup/Alerts fabs + EA rail */
+  padding:12px 14px 20px;
   border:1px solid var(--sky-glass-edge);
   border-radius:var(--sky-r-sheet);
   box-shadow:var(--sky-shadow-sheet);
-  margin:4px 0 40px;
+  margin:2px 0 12px;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
 }
 
 /* ── 2 · TOP-LEVEL BANDS = GLASS SHEETS (content tier, blur allowed) ───────
@@ -81,23 +85,32 @@ html.sky .rb2 > .rb-au{
   border-radius:22px;
   box-shadow:var(--sky-shadow-card);
 }
-/* generous air — the decluttering is spacing, not fewer facts */
-html.sky .rb2-head{padding:26px 32px 22px}
-html.sky .rb2-pipe{padding:20px 32px 22px}
-html.sky .rb2-listwrap{padding:24px 32px 36px}
-html.sky .rb2 > .rb-au{padding:24px 32px 36px}
-html.sky .rb2-id h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
-html.sky .rb2-id p{color:var(--muted)}
+/* Compact air under the secondary nav — denser than Analysis cards so the
+   docked Energy Agent + bottom Setup/Alerts pills don't collide. */
+html.sky .rb2-head{padding:16px 18px 14px}
+html.sky .rb2-pipe{padding:14px 18px 16px}
+html.sky .rb2-listwrap{padding:16px 18px 28px}
+html.sky .rb2 > .rb-au{padding:16px 18px 28px}
+html.sky .rb2-id h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+html.sky .rb2-id p{color:var(--muted);font-size:12.5px;line-height:1.45;max-width:62ch}
 
 /* ── 3 · GENERATOR TABS → GLASS PILL SEGMENT (mirrors the main tab bar) ────
    The underline tabs become a pill track; active = solid action blue. */
-html.sky .rb2-tabrow{border-bottom:0;align-items:center;gap:14px;margin-top:15px}
-/* Invoices secondary nav — lives on #panelReports .inv-sub-seg (Analysis twin).
- Badge for flagged bill-audit count sits inside the active/inactive pill. */
+html.sky .rb2-tabrow{border-bottom:0;align-items:center;gap:14px;margin-top:10px}
+/* Invoices secondary nav — denser than Analysis; never cover the EA rail. */
+html.sky #panelReports .inv-sub-seg{
+  margin:8px auto 2px !important;
+  padding:2px !important;
+  box-shadow:0 2px 10px -3px rgba(20,60,120,.14) !important;
+}
+html.sky #panelReports .inv-sub-seg .vs-seg-btn{
+  padding:5px 12px !important;
+  font-size:11.5px !important;
+}
 html.sky #panelReports .inv-sub-seg .rb-au-genbadge{
   display:inline-flex;align-items:center;justify-content:center;
-  min-width:18px;height:18px;padding:0 6px;margin-left:6px;
-  border-radius:999px;font-size:10.5px;font-weight:780;
+  min-width:16px;height:16px;padding:0 5px;margin-left:5px;
+  border-radius:999px;font-size:10px;font-weight:780;
   background:rgba(180,83,9,.14);color:#b45309;border:1px solid rgba(180,83,9,.28);
   vertical-align:middle;line-height:1;
 }
@@ -105,7 +118,10 @@ html.sky #panelReports .inv-sub-seg .vs-seg-btn.on .rb-au-genbadge{
   background:#fff;color:#b45309;border-color:#fff;
 }
 html.sky #panelReports .rb2-tabrow--kpis-only{
-  margin-top:4px;justify-content:flex-end;
+  margin-top:2px;justify-content:flex-end;
+}
+html.sky #panelReports{
+  padding-bottom:96px; /* Setup + Alerts fabs */
 }
 html.sky .rb2-subtabs.rb-subtabs{border-bottom:0;margin:0;gap:4px;padding:5px;
   display:inline-flex;background:rgba(255,255,255,.55);
