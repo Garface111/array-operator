@@ -93,6 +93,12 @@ window.FleetStore = (function(){
       power_estimated: iv.power_estimated === true,
       power_age_hours: _num(iv.power_age_hours),
       no_energy_register: !!iv.no_energy_register,
+      // Owner-confirmed expected-low (shading): judged against its own baseline, so
+      // it must NOT be re-flagged "underperforming"/"low" here. Carry through.
+      expected_low: iv.expected_low === true,
+      expected_low_reason: iv.expected_low_reason != null ? _str(iv.expected_low_reason, 240) : null,
+      expected_low_baseline: _num(iv.expected_low_baseline),
+      expected_low_breach: iv.expected_low_breach === true,
     };
     return out;
   }
@@ -248,6 +254,16 @@ window.FleetStore = (function(){
     // Need at least 2 inverters WITH history to have a real peer comparison.
     const haveCohort = eligible.length >= 2 && median > 0;
     producing.forEach(i => {
+      if(i.expected_low){
+        // Owner-confirmed expected-low (shading): the BACKEND already re-baselined
+        // this unit against its own recorded level (peer_analysis) and set its
+        // status/diagnosis/expected_low_breach accordingly. Never override that here
+        // with a raw peer comparison — that would re-introduce the false
+        // "underperforming". Just refresh peer_index for display.
+        if(i.nameplate_kw>0 && i.window_kwh!=null && median>0)
+          i.peer_index = Math.round((i.window_kwh/i.nameplate_kw)/median*100)/100;
+        return;
+      }
       const hasHistory = i.nameplate_kw>0 && i.window_kwh!=null && i.window_kwh>0;
       if(!hasHistory){
         // No usable window at all, show neutral, claim nothing.
@@ -395,6 +411,11 @@ window.FleetStore = (function(){
       if(peerPcts.length < 2) return "ok";
       const med = peerPcts[Math.floor(peerPcts.length/2)];   // peer median pct-of-max
       if(med < 0.30) return "ok";                  // cohort not genuinely producing (dawn/dusk) → don't judge
+      // Owner-confirmed expected-low (shading): running below its peers is the WHOLE
+      // POINT — never a live "low" on it. The backend 14-day re-baseline still catches
+      // a drop below its baseline; live "dark" (a fresh 0 W below) still applies since
+      // going fully dark isn't expected even for a shaded unit.
+      if(inv && inv.expected_low) return "ok";
       if(myPct < med*(1-LOW_PEER_GAP)) return "low";  // >15% below the peer median → underperforming live
       return "ok";
     }
@@ -529,6 +550,12 @@ window.FleetStore = (function(){
         // readings (Bruce's cards that flipped every capture). Carry them through.
         power_estimated: i.power_estimated === true,
         power_age_hours: i.power_age_hours,
+        // Owner-confirmed expected-low (shading) — carried so the card shows the calm
+        // "expected lower" state and the live overlay never re-flags a shaded unit.
+        expected_low: i.expected_low === true,
+        expected_low_reason: i.expected_low_reason || null,
+        expected_low_baseline: i.expected_low_baseline != null ? i.expected_low_baseline : null,
+        expected_low_breach: i.expected_low_breach === true,
         // Dead-energy-register flag (live power, no cumulative energy), MUST ride
         // through or every surface loses the honest "no energy data" state and #7
         // falls back to Error/Offline (the bug). Carried like status/peer_index.
@@ -1149,6 +1176,11 @@ window.FleetStore = (function(){
         // avoid flagging fabricated/stale readings — carry them through.
         power_estimated: inv.power_estimated === true,
         power_age_hours: inv.power_age_hours,
+        // Owner-confirmed expected-low (shading), from the backend verdict.
+        expected_low: inv.expected_low === true,
+        expected_low_reason: inv.expected_low_reason || null,
+        expected_low_baseline: inv.expected_low_baseline != null ? inv.expected_low_baseline : null,
+        expected_low_breach: inv.expected_low_breach === true,
         daily: inv.daily || [], min_kwh: inv.min_kwh, peak_kwh: inv.peak_kwh,
         // Dead-energy-register flag from the backend (live power but no cumulative
         // energy), carry it through so the card/spreadsheet/command-center all

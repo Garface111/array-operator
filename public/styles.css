@@ -1490,6 +1490,15 @@
   .sb-dc-sv small{font-size:11px;font-weight:600;color:var(--faint);margin-left:2px}
   .sb-dc-sv.ok{color:var(--good)} .sb-dc-sv.warn{color:var(--warn)} .sb-dc-sv.bad{color:var(--bad)}
   .sb-dc-stat.hero .sb-dc-sv{font-size:24px}
+  /* Expected-low (shading) control in the inverter detail card */
+  .sb-dc-shade{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+  .sb-dc-shade.on{padding:8px 10px;border-radius:10px;border:1px solid rgba(94,194,255,.28);
+    background:linear-gradient(180deg,rgba(94,194,255,.10),rgba(94,194,255,.04))}
+  .sb-dc-shade-lbl{font-size:12.5px;font-weight:650;color:var(--sky,#5ec2ff)}
+  .sb-dc-shade-btn{font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:10px;cursor:pointer;
+    border:1px solid var(--line);background:var(--card2);color:var(--muted)}
+  .sb-dc-shade-btn:hover{border-color:rgba(94,194,255,.5);color:var(--sky,#5ec2ff)}
+  .sb-dc-shade-btn:disabled{opacity:.6;cursor:default}
   .sb-dc-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:4px}
   .sb-dc-actions .sb-dc-origin{
     display:inline-flex;align-items:center;gap:6px;

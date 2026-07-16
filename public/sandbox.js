@@ -2234,6 +2234,8 @@
  data-np-kw="${esc(inv.nameplate_kw!=null?inv.nameplate_kw:'')}" data-win-kwh="${esc(inv.window_kwh!=null?inv.window_kwh:'')}"
  data-pi="${esc(inv.peer_index!=null?inv.peer_index:'')}" data-stale="${esc(inv.stale_hours!=null?inv.stale_hours:'')}"
  data-peak="${esc(inv.peak_kwh!=null?inv.peak_kwh:'')}" data-min="${esc(inv.min_kwh!=null?inv.min_kwh:'')}"
+ data-expected-low="${inv.expected_low?'1':''}" data-el-reason="${esc(inv.expected_low_reason||'')}"
+ data-el-baseline="${esc(inv.expected_low_baseline!=null?inv.expected_low_baseline:'')}" data-el-breach="${inv.expected_low_breach?'1':''}"
  data-origin-url="${esc(inv.origin_url||"")}" data-origin-label="${esc(inv.origin_label||"")}">
  ${liquidLayer(inv, sCls, col.is_daylight)}
  <div class="sb-inv-plate">
@@ -2765,6 +2767,25 @@
  ? `<a class="sb-origin sb-dc-origin" data-portal="${esc(d.vendor||"")}" href="${esc(originUrl)}" target="_blank" rel="noopener">Open in ${esc(originLabel||"portal")} ↗</a>`
  : "";
 
+ // EXPECTED-LOW (shading) control — only for a signed-in owner on a real inverter.
+ // Marking an inverter expected-low re-baselines it (holds it to its current level
+ // instead of the peer floor) so a permanently-shaded unit stops reading
+ // "underperforming" — but still flags + alerts if it drops below. The Energy Agent
+ // is the guided path; this is the manual one.
+ const _elId = d.invId;
+ const _canShade = !!authHeaders() && _elId && /^\d+$/.test(String(_elId));
+ const _elPct = isFinite(parseFloat(d.elBaseline)) ? Math.round(parseFloat(d.elBaseline) * 100) : null;
+ const shadeHTML = !_canShade ? "" : (
+ d.expectedLow
+ ? `<div class="sb-dc-shade on">
+ <span class="sb-dc-shade-lbl">☂ Expected lower${d.elReason ? " — " + esc(d.elReason) : ""}${_elPct != null ? " · held to ~" + _elPct + "% of peers" : ""}</span>
+ <button type="button" class="sb-dc-shade-btn" data-el-action="clear" data-el-id="${esc(_elId)}">Resume normal grading</button>
+ </div>`
+ : `<div class="sb-dc-shade">
+ <button type="button" class="sb-dc-shade-btn" data-el-action="mark" data-el-id="${esc(_elId)}">☂ This one's shaded — mark expected-low…</button>
+ </div>`
+ );
+
  // ---- ENRICHED stats for the blown-up card: $ at stake, peer index, last-seen,
  // nameplate, 14-day kWh, peak/low day, model. $ at stake is computed from this
  // inverter's shortfall vs its FAIR SHARE of the array's production (same model
@@ -2837,6 +2858,7 @@
  <h2 class="sb-dc-title">${esc(invTitle)}</h2>
  ${diagHTML}
  <div class="sb-dc-stats">${statsHTML}</div>
+ ${shadeHTML}
  ${originRow ? `<div class="sb-dc-actions">${originRow}</div>` : ""}
  </div>
  </div>
@@ -2870,6 +2892,48 @@
  close();
  });
  card.addEventListener("click", e => e.stopPropagation());
+
+ // Expected-low (shading) toggle — mark/clear via the owner endpoint, then refresh.
+ card.querySelectorAll("[data-el-action]").forEach(btn => {
+ btn.addEventListener("click", async (e) => {
+ e.stopPropagation();
+ const id = btn.dataset.elId, action = btn.dataset.elAction, h = authHeaders();
+ if(!h || !id) return;
+ const _orig = btn.textContent;
+ try {
+ let body;
+ if(action === "mark"){
+ const reason = await AODialog.prompt(
+ "Tell me why this one runs low — a neighbor's tree, a chimney, a north-facing roof. I'll hold it to its current level and stop flagging it, and still alert you if it drops below that.",
+ "", { title: "Mark inverter as expected-low", placeholder: "e.g. Afternoon shade from neighbor's maple", confirmLabel: "Mark expected-low" });
+ if(reason === null) return;                      // cancelled
+ body = { expected_low: true, reason: String(reason || "").trim() };
+ } else {
+ const ok = await AODialog.confirm("It goes back to normal peer grading and can flag as underperforming again.", { title: "Resume normal grading?", confirmLabel: "Resume" });
+ if(!ok) return;
+ body = { expected_low: false };
+ }
+ btn.disabled = true; btn.textContent = "Saving…";
+ const r = await fetch(`/v1/array-owners/inverters/${id}/expected-low`, {
+ method: "POST",
+ headers: Object.assign({ "Content-Type": "application/json" }, h),
+ body: JSON.stringify(body),
+ });
+ const dd = await r.json().catch(() => ({}));
+ if(!r.ok || !dd.ok){
+ btn.disabled = false; btn.textContent = _orig;
+ toast((dd && (dd.detail || dd.error)) || "Couldn't update — try again.", "warn");
+ return;
+ }
+ toast(body.expected_low ? "Marked expected-low — it won't flag while it holds its level." : "Back to normal grading.", "ok");
+ close();
+ if(window.FleetStore) FleetStore.load();
+ } catch(err){
+ btn.disabled = false; btn.textContent = _orig;
+ toast("Something went wrong — try again.", "warn");
+ }
+ });
+ });
 
  host.innerHTML = "";
  // #sbWrap has a CSS transform — reparent to <body> so fixed centers on viewport.

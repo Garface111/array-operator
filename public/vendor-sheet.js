@@ -206,6 +206,20 @@
  }
  function invStatus(iv, cohort, isDaylight, parentCol) {
  const s = iv.status || "ok";
+ // EXPECTED-LOW (owner-confirmed shading/obstruction): this unit is SUPPOSED to run
+ // below its peers, so it reads calm — never "underperforming" — while it holds its
+ // baseline. A breach (dropped below the baseline) flips it back to a real warn.
+ if (iv.expected_low && !iv.expected_low_breach) {
+ const pct = iv.expected_low_baseline != null ? Math.round(iv.expected_low_baseline * 100) : null;
+ return { label: "Expected lower", cls: "muted",
+ tip: "Marked expected-low" + (iv.expected_low_reason ? " — " + iv.expected_low_reason : "")
+ + (pct != null ? ". Held to ~" + pct + "% of peers" : "")
+ + "; not a fault. We still alert if it drops below that level." };
+ }
+ if (iv.expected_low && iv.expected_low_breach) {
+ return { label: "Below its baseline", cls: "warn",
+ tip: "This unit is marked expected-low, but it has dropped BELOW its established level — a new issue on top of the known shading. Worth a look." };
+ }
  // NO ENERGY REGISTER (e.g. Tannery #7): live power but a dead cumulative-energy
  // meter → ungradeable, and its per-inverter power is an unreliable energy-share
  // split. A metering DEFECT at the vendor, not an outage, its own neutral label,
