@@ -1601,65 +1601,188 @@
  wireVsEditable(node, "inverters", node.getAttribute("data-edit-inv")));
  }
 
- // Make one name cell editable in place. Mirrors sandbox.js makeEditable: click →
- // contenteditable; Enter / blur commits; Escape / empty reverts. The commit goes
- // through FleetStore.rename{Array,Inverter} which notify()s → both views repaint
- // and the backend persists. mousedown/pointerdown/click are stopped so editing a
- // name never toggles the enclosing row's expand/collapse.
+ // ── Rename (Spreadsheet) ─────────────────────────────────────────────────
+ // contenteditable was unreliable: Space got eaten by row key handlers, mid-
+ // edit FleetStore re-renders destroyed the caret, and multi-word names were
+ // awkward with select-all. Use a real <input type="text"> overlay instead.
+ let _vsRenameActive = false;
+ try { window.__vsRenameActive = false; } catch (_) {}
+
+ function _normalizeName(s) {
+ // Preserve internal spaces (incl. multiple); only trim ends.
+ // contenteditable / paste often leaves NBSP — normalize to regular space.
+ return String(s == null ? "" : s)
+ .replace(/\u00a0/g, " ")
+ .replace(/[\u200b\u200c\u200d\ufeff]/g, "") // zero-width junk
+ .replace(/\s+$/g, "")
+ .replace(/^\s+/g, "");
+ }
+
+ function _vsToast(msg, kind) {
+ try {
+ if (window.__aoToast) return window.__aoToast(msg, kind || "err");
+ } catch (_) {}
+ // Lightweight fallback
+ let t = document.getElementById("vsToast");
+ if (!t) {
+ t = document.createElement("div");
+ t.id = "vsToast";
+ t.setAttribute("role", "status");
+ t.style.cssText = "position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);" +
+ "z-index:9999;padding:.55rem 1rem;border-radius:10px;font:600 13px/1.3 system-ui,sans-serif;" +
+ "background:#0f172a;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:min(90vw,28rem);" +
+ "opacity:0;transition:opacity .15s";
+ document.body.appendChild(t);
+ }
+ t.textContent = msg;
+ t.style.background = kind === "ok" ? "#065f46" : "#0f172a";
+ t.style.opacity = "1";
+ clearTimeout(t._hide);
+ t._hide = setTimeout(() => { t.style.opacity = "0"; }, 3200);
+ }
+
+ // Make one name cell editable in place via a text input (spaces + paste work).
+ // mousedown/pointerdown/click/keydown are stopped so editing never toggles the
+ // enclosing row's expand/collapse or opens inverter Details.
  function wireVsEditable(node, kind, id) {
  if (!node || node._editWired) return;
  node._editWired = true;
+ node.setAttribute("tabindex", "0");
+ node.setAttribute("role", "button");
+ node.setAttribute("aria-label", "Rename " + (kind === "arrays" ? "array" : "inverter"));
+
  ["mousedown", "pointerdown"].forEach(ev =>
  node.addEventListener(ev, e => e.stopPropagation()));
  node.addEventListener("click", e => {
  e.stopPropagation();
  e.preventDefault();
- if (node.isContentEditable) return;
+ if (_vsRenameActive) return;
  beginEdit();
  });
- // The row is keyboard-activatable (Enter/Space toggles it); swallow those keys
- // on the name when NOT editing so focus landing here doesn't toggle the row.
+ // Row is keyboard-activatable (Enter/Space); swallow those on the name when
+ // idle so focus landing here doesn't open Details / toggle expand.
  node.addEventListener("keydown", e => {
- if (!node.isContentEditable && (e.key === "Enter" || e.key === " ")) e.stopPropagation();
+ if (_vsRenameActive) return;
+ if (e.key === "Enter" || e.key === " ") {
+ e.stopPropagation();
+ e.preventDefault();
+ beginEdit();
+ }
  });
 
  function beginEdit() {
- const original = node.textContent;
- node.dataset.orig = original;
- node.setAttribute("contenteditable", "true");
- node.classList.add("vs-editing");
- node.focus();
+ if (_vsRenameActive || !node.isConnected) return;
+ // Prefer live FleetStore name over DOM text (DOM can lag or include junk)
+ let original = node.textContent || "";
  try {
- const r = document.createRange(); r.selectNodeContents(node);
- const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+ if (window.FleetStore) {
+ if (kind === "arrays" && FleetStore.findArray) {
+ const a = FleetStore.findArray(id);
+ if (a && a.name) original = a.name;
+ } else if (kind === "inverters" && FleetStore.findInv) {
+ const hit = FleetStore.findInv(id);
+ if (hit && hit.i && hit.i.name) original = hit.i.name;
+ }
+ }
  } catch (_) {}
+ original = _normalizeName(original);
+
+ const input = document.createElement("input");
+ input.type = "text";
+ input.className = "vs-name-input";
+ input.value = original;
+ input.setAttribute("aria-label", "Rename");
+ input.autocomplete = "off";
+ input.spellcheck = true;
+ // Size roughly to content so layout doesn't jump
+ input.style.width = Math.max(8, Math.min(42, (original.length || 8) + 2)) + "ch";
+
+ _vsRenameActive = true;
+ try { window.__vsRenameActive = true; } catch (_) {}
+ node.classList.add("vs-editing");
+ node.replaceWith(input);
+ input.focus();
+ // Caret at END so multi-word names are easy to extend (not select-all)
+ try {
+ const len = input.value.length;
+ input.setSelectionRange(len, len);
+ } catch (_) {}
+
  let done = false;
  const finish = (commit) => {
- if (done) return; done = true;
- node.removeAttribute("contenteditable");
- node.classList.remove("vs-editing");
- node.removeEventListener("keydown", onKey);
- node.removeEventListener("blur", onBlur);
- const val = node.textContent.trim();
- if (commit && val && val !== (node.dataset.orig || original)) {
- node.textContent = val;
+ if (done) return;
+ done = true;
+ input.removeEventListener("keydown", onKey);
+ input.removeEventListener("blur", onBlur);
+ input.removeEventListener("input", onInput);
+
+ let val = _normalizeName(input.value);
+ // Allow internal spaces; reject empty
+ if (commit && val && val !== original) {
+ // Put a span back with optimistic name before store notify repaints
+ const next = document.createElement("span");
+ next.className = node.className.replace(/\bvs-editing\b/g, "").trim();
+ if (kind === "arrays") next.setAttribute("data-edit-arr", String(id));
+ else next.setAttribute("data-edit-inv", String(id));
+ next.title = node.title || "Click to rename";
+ next.textContent = val;
+ if (input.isConnected) input.replaceWith(next);
+ // Re-wire the replacement (render may also replace it shortly)
+ try { wireVsEditable(next, kind, id); } catch (_) {}
+
  if (id != null && id !== "" && window.FleetStore) {
- if (kind === "arrays" && FleetStore.renameArray) FleetStore.renameArray(id, val);
- else if (kind === "inverters" && FleetStore.renameInverter) FleetStore.renameInverter(id, val);
+ const ren = kind === "arrays" ? FleetStore.renameArray : FleetStore.renameInverter;
+ if (typeof ren === "function") {
+ Promise.resolve(ren(id, val)).then((res) => {
+ if (res && res.ok === false) {
+ _vsToast(res.error || "Couldn't save that name", "err");
+ }
+ }).catch((err) => {
+ _vsToast((err && err.message) || "Couldn't save that name", "err");
+ });
+ }
  }
  } else {
- node.textContent = node.dataset.orig || original; // revert (cancel / empty / unchanged)
+ // Cancel / empty / unchanged — restore original label
+ const next = document.createElement("span");
+ next.className = node.className.replace(/\bvs-editing\b/g, "").trim();
+ if (kind === "arrays") next.setAttribute("data-edit-arr", String(id));
+ else next.setAttribute("data-edit-inv", String(id));
+ next.title = node.title || "Click to rename";
+ next.textContent = original;
+ if (input.isConnected) input.replaceWith(next);
+ try { wireVsEditable(next, kind, id); } catch (_) {}
  }
- delete node.dataset.orig;
+
+ _vsRenameActive = false;
+ try { window.__vsRenameActive = false; } catch (_) {}
  };
+
  const onKey = e => {
+ // Critical: stop Space/Enter from bubbling to the row (which opens Details)
  e.stopPropagation();
- if (e.key === "Enter") { e.preventDefault(); node.blur(); }
- else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+ if (e.key === "Enter") {
+ e.preventDefault();
+ finish(true);
+ } else if (e.key === "Escape") {
+ e.preventDefault();
+ finish(false);
+ }
+ // Space and all other typing: let the input handle natively
  };
  const onBlur = () => finish(true);
- node.addEventListener("keydown", onKey);
- node.addEventListener("blur", onBlur);
+ const onInput = () => {
+ // Grow field as the owner types multi-word names
+ const n = Math.max(8, Math.min(48, (input.value.length || 8) + 2));
+ input.style.width = n + "ch";
+ };
+
+ input.addEventListener("keydown", onKey);
+ input.addEventListener("blur", onBlur);
+ input.addEventListener("input", onInput);
+ // Swallow pointer events so parent row never sees them mid-edit
+ ["mousedown", "pointerdown", "click"].forEach(ev =>
+ input.addEventListener(ev, e => e.stopPropagation()));
  }
  }
 
@@ -1883,6 +2006,9 @@
  // (in the persistent shell) untouched, so a live refresh never steals focus.
  FleetStore.subscribe((s, kind) => {
  if (_view !== "spreadsheet" || kind === "live" || kind === "triage") return;
+ // Never rebuild the body mid-rename — that kills the input and drops multi-word
+ // names mid-type (Ford 2026-07-16).
+ if (_vsRenameActive || window.__vsRenameActive) return;
  // While only showing Connecting… skeletons, soft-update, don't rebuild HTML.
  const pending = _pendingFeeds();
  const mon = _monitoredCols();

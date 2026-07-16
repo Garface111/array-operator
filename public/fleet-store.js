@@ -491,7 +491,20 @@ window.FleetStore = (function(){
     return _trackWrite(fetch(path, { method:"POST",
       headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s },
       body: body!=null ? JSON.stringify(body) : "{}" })
-      .then(r => { if(!r.ok) throw new Error(path+" "+r.status); return r.json().catch(()=>({})); }));
+      .then(async r => {
+        if(!r.ok){
+          let detail = "";
+          try {
+            const j = await r.json();
+            detail = (j && (j.detail || j.error || j.message)) || "";
+            if(Array.isArray(detail)) detail = detail.map(x => x.msg || x).join("; ");
+          } catch(_){ /* ignore */ }
+          const err = new Error((detail ? String(detail) : path) + " " + r.status);
+          err.status = r.status;
+          throw err;
+        }
+        return r.json().catch(()=>({}));
+      }));
   }
   function apiDelete(path){
     const s = getSession();
@@ -554,48 +567,92 @@ window.FleetStore = (function(){
     }
   }
 
+  // Normalize owner-facing names: keep internal spaces (incl. multi-word), trim
+  // ends, convert NBSP from paste/contenteditable, drop zero-width junk.
+  function _normName(name){
+    return String(name == null ? "" : name)
+      .replace(/\u00a0/g, " ")
+      .replace(/[\u200b\u200c\u200d\ufeff]/g, "")
+      .replace(/[ \t\f\v]+/g, " ")   // collapse runs of horizontal space to one
+      .replace(/^\s+|\s+$/g, "");
+  }
+
   // Rename an array (inline edit in EITHER dashboard view). Optimistic local
   // update + notify (so the OTHER view repaints the new name instantly), records
   // an undoable inverse, then persists to the backend; a refetch reconciles to
   // the authoritative name. No-op when empty or unchanged. Mirrors the backend's
   // per-tenant name-uniqueness, a 409 clash reverts via the catch→refetch.
-  function renameArray(id, name){
-    const a = findArray(id); if(!a) return;
-    const next = String(name == null ? "" : name).trim();
-    if(!next || next === a.name) return;                   // empty / unchanged → no-op
+  // Returns a Promise<{ok,name?,error?}> so the spreadsheet UI can toast failures.
+  function renameArray(id, name, opts){
+    opts = opts || {};
+    const a = findArray(id); if(!a) return Promise.resolve({ ok:false, error:"Array not found" });
+    const next = _normName(name).slice(0, 200);
+    if(!next) return Promise.resolve({ ok:false, error:"Name cannot be empty" });
+    if(next === a.name) return Promise.resolve({ ok:true, name: next, unchanged:true });
     const prev = a.name;
     a.name = next;
     notify();
-    pushHistory({
-      redo: () => renameArray(id, next),
-      undo: () => renameArray(id, prev),
-    });
-    if(isLive()){
-      apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/name", { name: next })
-        .then(() => refetch()).catch(() => refetch());
+    if(!opts.skipHistory){
+      pushHistory({
+        redo: () => renameArray(id, next, { skipHistory: true }),
+        undo: () => renameArray(id, prev, { skipHistory: true }),
+      });
     }
+    if(!isLive()) return Promise.resolve({ ok:true, name: next });
+    return apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/name", { name: next })
+      .then((body) => {
+        if(body && body.name) a.name = body.name;
+        // Soft reconcile without yanking mid-session — full refetch still queued
+        // after writes settle. Prefer returned name.
+        return { ok:true, name: a.name };
+      })
+      .catch((err) => {
+        a.name = prev;
+        notify();
+        const msg = (err && err.message) || "Rename failed";
+        // 409 clash → friendlier copy
+        const friendly = /409/.test(msg)
+          ? "Another array already has that name"
+          : (/400/.test(msg) ? "Couldn't save that name" : "Couldn't save that name — check your connection");
+        return { ok:false, error: friendly };
+      });
   }
 
   // Rename an inverter (inline edit in EITHER view). Same optimistic-then-persist
   // shape as renameArray. Inverter names may repeat across arrays, so there is no
   // uniqueness check; the backend marks the name owner-set so a telemetry sync
   // never clobbers it.
-  function renameInverter(id, name){
-    const hit = findInv(id); if(!hit) return;
+  function renameInverter(id, name, opts){
+    opts = opts || {};
+    const hit = findInv(id); if(!hit) return Promise.resolve({ ok:false, error:"Inverter not found" });
     const { i } = hit;
-    const next = String(name == null ? "" : name).trim();
-    if(!next || next === i.name) return;                   // empty / unchanged → no-op
+    const next = _normName(name).slice(0, 200);
+    if(!next) return Promise.resolve({ ok:false, error:"Name cannot be empty" });
+    if(next === i.name) return Promise.resolve({ ok:true, name: next, unchanged:true });
     const prev = i.name;
     i.name = next;
     notify();
-    pushHistory({
-      redo: () => renameInverter(id, next),
-      undo: () => renameInverter(id, prev),
-    });
-    if(isLive()){
-      apiPost("/v1/array-owners/inverters/" + encodeURIComponent(id) + "/name", { name: next })
-        .then(() => refetch()).catch(() => refetch());
+    if(!opts.skipHistory){
+      pushHistory({
+        redo: () => renameInverter(id, next, { skipHistory: true }),
+        undo: () => renameInverter(id, prev, { skipHistory: true }),
+      });
     }
+    if(!isLive()) return Promise.resolve({ ok:true, name: next });
+    return apiPost("/v1/array-owners/inverters/" + encodeURIComponent(id) + "/name", { name: next })
+      .then((body) => {
+        if(body && body.name) i.name = body.name;
+        return { ok:true, name: i.name };
+      })
+      .catch((err) => {
+        i.name = prev;
+        notify();
+        const msg = (err && err.message) || "Rename failed";
+        const friendly = /400|409/.test(msg)
+          ? "Couldn't save that name"
+          : "Couldn't save that name — check your connection";
+        return { ok:false, error: friendly };
+      });
   }
 
   // Assign/clear an array's portfolio label (Analysis-tab grouping). Optimistic
@@ -1064,6 +1121,7 @@ window.FleetStore = (function(){
     focusIsNarrowed, clearFocus,
     reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
     renameArray, renameInverter, setArrayPortfolio, setArrayReminder,
+    findArray, findInv,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
     undo, redo, canUndo, canRedo, clearHistory,

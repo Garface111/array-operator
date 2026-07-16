@@ -745,53 +745,71 @@
  });
 
  function beginEdit(){
- const original = node.textContent;
- node.dataset.orig = original;
- if(dragEl) dragEl.setAttribute("draggable", "false");
- node.setAttribute("contenteditable", "true");
- node.classList.add("sb-editing");
- node.focus();
- // place caret at end / select all for quick overwrite
+ // Prefer FleetStore name (authoritative) over DOM text
+ let original = node.textContent || "";
  try {
- const r = document.createRange(); r.selectNodeContents(node);
- const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+ const id0 = getId && getId();
+ if(id0 != null && window.FleetStore){
+ if(kind === "arrays" && FleetStore.findArray){
+ const a = FleetStore.findArray(id0); if(a && a.name) original = a.name;
+ } else if(kind === "inverters" && FleetStore.findInv){
+ const hit = FleetStore.findInv(id0); if(hit && hit.i && hit.i.name) original = hit.i.name;
+ }
+ }
  } catch(_){}
+ original = String(original).replace(/\u00a0/g, " ").replace(/^\s+|\s+$/g, "");
+ if(dragEl) dragEl.setAttribute("draggable", "false");
+
+ // Real <input> so Space / multi-word names work (contenteditable was flaky)
+ const input = document.createElement("input");
+ input.type = "text";
+ input.className = "sb-name-input";
+ input.value = original;
+ input.autocomplete = "off";
+ input.spellcheck = true;
+ input.style.cssText = "font:inherit;font-weight:inherit;color:inherit;border:1px solid var(--good,#3fd68a);"
+  + "border-radius:6px;background:rgba(63,214,138,.08);padding:2px 6px;min-width:8ch;max-width:min(42ch,70vw);"
+  + "outline:none;box-shadow:0 0 0 2px rgba(63,214,138,.18);white-space:pre;";
+ node.replaceWith(input);
+ input.focus();
+ try { const n = input.value.length; input.setSelectionRange(n, n); } catch(_){}
 
  let done = false;
  const finish = (commit) => {
  if(done) return; done = true;
- node.removeAttribute("contenteditable");
- node.classList.remove("sb-editing");
+ input.removeEventListener("keydown", onKey);
+ input.removeEventListener("blur", onBlur);
  if(dragEl) dragEl.setAttribute("draggable", "true");
- node.removeEventListener("keydown", onKey);
- node.removeEventListener("blur", onBlur);
- const val = node.textContent.trim();
- if(commit && val){
- node.textContent = val;
+ let val = String(input.value || "").replace(/\u00a0/g, " ").replace(/[ \t\f\v]+/g, " ").replace(/^\s+|\s+$/g, "");
+ const restore = (text) => {
+ const next = node.cloneNode(false);
+ next.textContent = text;
+ next.classList.remove("sb-editing");
+ if(input.isConnected) input.replaceWith(next);
+ try { makeEditable(next, kind, idEl, getId, dragEl); } catch(_){}
+ };
+ if(commit && val && val !== original){
+ restore(val);
  const id = getId && getId();
- // Persist through FleetStore → backend (was localStorage-only). This
- // updates shared state + notify()s, so the OTHER view (Spreadsheet)
- // repaints the new name instantly, and a reload reads it from the
- // backend. The store no-ops an unchanged value, so re-committing the
- // same text is harmless.
  if(id != null && id !== "" && window.FleetStore){
  if(kind === "arrays" && FleetStore.renameArray) FleetStore.renameArray(id, val);
  else if(kind === "inverters" && FleetStore.renameInverter) FleetStore.renameInverter(id, val);
  }
- if(kind === "inverters" && idEl) idEl.dataset.name = val; // keep detail-line in sync
+ if(kind === "inverters" && idEl) idEl.dataset.name = val;
  } else {
- node.textContent = node.dataset.orig || original; // revert (cancel / empty)
+ restore(original);
  }
- delete node.dataset.orig;
  };
  const onKey = e => {
  e.stopPropagation();
- if(e.key === "Enter"){ e.preventDefault(); node.blur(); }
+ if(e.key === "Enter"){ e.preventDefault(); finish(true); }
  else if(e.key === "Escape"){ e.preventDefault(); finish(false); }
  };
  const onBlur = () => finish(true);
- node.addEventListener("keydown", onKey);
- node.addEventListener("blur", onBlur);
+ input.addEventListener("keydown", onKey);
+ input.addEventListener("blur", onBlur);
+ ["mousedown","pointerdown","click"].forEach(ev =>
+  input.addEventListener(ev, e => e.stopPropagation()));
  }
  }
 
