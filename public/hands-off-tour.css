@@ -4,11 +4,13 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root{
-  --ho-rail: 380px;
+  /* Twin of Energy Agent rail — same width language + inset chrome */
+  --ho-rail: 360px;
+  --ho-inset: 12px; /* floating gap around dock card (matches EA companion) */
   --ho-ink:#0E1420;
   --ho-muted:#4C596B;
   --ho-faint:#6B7789;
-  --ho-line:rgba(20,60,120,.14);
+  --ho-line:rgba(14,165,233,.16);
   --ho-blue:#2196F3;
   --ho-blue-deep:#1976D2;
   --ho-green:#178A4E;
@@ -16,7 +18,12 @@
   --ho-amber:#B45309;
   --ho-amber-soft:rgba(217,119,6,.12);
   --ho-glass:rgba(255,255,255,.78);
-  --ho-r:28px;
+  --ho-r:18px; /* match EA companion radius */
+  --ho-edge:rgba(14,165,233,.2);
+  --ho-glass-bg:linear-gradient(180deg, rgba(255,255,255,.92), rgba(240,249,255,.88));
+  --ho-glass-shadow:
+    0 20px 50px -20px rgba(15,40,80,.4),
+    0 0 0 1px rgba(255,255,255,.5) inset;
 }
 
 /* ── bottom-left FAB — twin of Alerts (.ao-al-fab), left instead of right ────
@@ -118,27 +125,32 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
 }
 #hoTour.ho-mode-dock{
   align-items:stretch; justify-content:flex-start;
-  padding:0;
+  /* Inset padding = floating companion card, same geometry as EA beside setup */
+  padding:var(--ho-inset);
   pointer-events:none; /* pass clicks to .wrap / tabs / canvas */
 }
 #hoTour.ho-mode-dock .ho-backdrop{
   display:none; /* no scrim — site must feel fully clickable */
   pointer-events:none;
 }
+/* Dock = twin of #eaPanel companion chrome (glass, radius, edge, shadow) */
 #hoTour.ho-mode-dock .ho-sheet{
   pointer-events:auto; /* only the rail is interactive */
   position:relative;
   z-index:1;
   width:var(--ho-rail);
-  max-width:min(var(--ho-rail), 100vw);
+  max-width:min(var(--ho-rail), calc(100vw - (var(--ho-inset) * 2)));
   height:100%;
   max-height:100%;
-  border-radius:0;
-  border-right:1px solid var(--ho-line);
-  box-shadow:8px 0 40px -16px rgba(15,40,80,.28);
+  border-radius:var(--ho-r);
+  border:1px solid var(--ho-edge);
+  border-right:1px solid var(--ho-edge);
+  box-shadow:var(--ho-glass-shadow);
   animation:none;
-  /* Solid enough to read on the sky background */
-  background:rgba(255,255,255,.96);
+  background:var(--ho-glass-bg);
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  overflow:hidden; /* clip inner scroll to rounded corners */
 }
 
 .ho-sheet{
@@ -146,60 +158,79 @@ body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
   width:min(440px, 100%);
   max-height:min(920px, calc(100vh - 32px));
   overflow:auto;
-  /* Solid card — no glass blur (blur was lagging first paint) */
-  background:#fff;
-  border:1px solid rgba(20,60,120,.12);
+  background:var(--ho-glass-bg);
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--ho-edge);
   border-radius:var(--ho-r);
-  box-shadow:
-    0 28px 80px -28px rgba(15,40,80,.45),
-    0 0 0 1px rgba(255,255,255,.4) inset;
+  box-shadow:var(--ho-glass-shadow);
   display:flex; flex-direction:column;
+  color:var(--ho-ink);
 }
 
 html.sky #hoTour.ho-mode-dock .ho-sheet{
-  background:#fff;
+  background:var(--sky-glass-chrome, var(--ho-glass-bg));
+  border-color:var(--sky-glass-edge, var(--ho-edge));
+  box-shadow:
+    0 22px 56px -18px rgba(20,60,120,.38),
+    0 0 0 1px rgba(255,255,255,.55) inset;
+}
+html:not(.sky) #hoTour.ho-mode-dock .ho-sheet{
+  background:linear-gradient(180deg, var(--card,#111827), var(--card2,#0b1220));
+  border-color:var(--line, rgba(255,255,255,.1));
+  color:var(--ink, #e5e7eb);
+  box-shadow:12px 0 40px -20px rgba(0,0,0,.55);
 }
 
-/* header */
+/* header — twin of .ea-head */
 .ho-top{
-  display:flex; align-items:center; gap:12px;
-  padding:14px 14px 10px 16px;
-  border-bottom:1px solid var(--ho-line);
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  padding:16px 16px 12px;
+  border-bottom:1px solid rgba(14,165,233,.14);
   flex:0 0 auto;
+  background:transparent;
 }
-.ho-top-right{ display:flex; align-items:center; gap:6px; flex:0 0 auto }
+.ho-top-right{ display:flex; align-items:center; gap:6px; flex:0 0 auto; padding-top:1px }
 .ho-brand{ display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto }
 .ho-brand-mark{
   width:28px; height:28px; border-radius:999px; flex:0 0 auto;
-  background:radial-gradient(circle at 35% 30%, #7dd3fc, #2196F3 55%, #1565C0);
-  box-shadow:0 0 0 3px rgba(33,150,243,.18);
+  background:
+    radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 32%, transparent 48%),
+    radial-gradient(circle at 50% 55%, #38bdf8 0%, #0ea5e9 60%, #0369a1 100%);
+  box-shadow:0 0 0 3px rgba(56,189,248,.18);
   position:relative;
 }
 .ho-brand-mark::after{
   content:""; position:absolute; inset:-3px; border-radius:999px;
-  border:1.5px solid rgba(33,150,243,.25);
+  border:1.5px solid rgba(14,165,233,.22);
 }
-.ho-brand b{ font-size:13.5px; font-weight:760; letter-spacing:-.02em; display:block; line-height:1.2 }
+.ho-brand b{
+  font-size:15px; font-weight:760; letter-spacing:-.01em;
+  display:block; line-height:1.2; color:inherit;
+}
 .ho-brand span{
   font-size:11.5px; font-weight:600; color:var(--ho-muted);
-  display:block; line-height:1.25; margin-top:1px;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;
+  display:block; line-height:1.35; margin-top:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:28ch;
 }
 
-/* Close — clean square, no ring crowding it */
+/* Close — twin of .ea-x (ghost, no hard border box) */
 .ho-close{
-  width:32px; height:32px; border-radius:10px;
-  border:1px solid var(--ho-line);
-  background:rgba(255,255,255,.7);
+  width:auto; height:auto; min-width:28px; min-height:28px;
+  border-radius:8px;
+  border:0;
+  background:transparent;
   color:var(--ho-muted);
   font-size:18px; line-height:1; cursor:pointer;
   display:grid; place-items:center;
-  transition:background .12s, color .12s, border-color .12s;
+  padding:2px 6px;
+  transition:background .12s, color .12s;
   flex:0 0 auto;
 }
 .ho-close:hover{
-  background:#fff; color:var(--ho-ink);
-  border-color:rgba(20,60,120,.28);
+  background:rgba(14,165,233,.08);
+  color:var(--ho-ink);
+  border-color:transparent;
 }
 
 /* step pills */
@@ -262,10 +293,10 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 
 .ho-main{ padding:8px 16px 18px; flex:1 1 auto; min-height:0; overflow:auto }
 
-#hoTour.ho-mode-dock .ho-main{ padding:14px 14px 20px }
-#hoTour.ho-mode-dock .ho-sheet{
-  background:rgba(255,255,255,.94);
-}
+#hoTour.ho-mode-dock .ho-main{ padding:14px 16px 20px }
+#hoTour.ho-mode-dock .ho-steps{ padding:10px 14px 4px }
+/* Inner scroll lives on .ho-main so the card chrome + rounded corners stay put */
+#hoTour.ho-mode-dock .ho-sheet{ overflow:hidden; display:flex; flex-direction:column }
 
 .ho-kicker{
   display:inline-flex; align-items:center; gap:6px;
@@ -607,10 +638,13 @@ html.sky #hoTour.ho-mode-dock .ho-sheet{
 .ho-done-item.is-on{ border-color:rgba(23,138,78,.3); background:var(--ho-green-soft) }
 .ho-done-item b{ display:block; font-size:11px; color:var(--ho-muted); font-weight:700; margin-bottom:2px }
 
-/* body.ho-shell-open — shift main wrap for dock mode (no slow slide) */
+/* body.ho-shell-open — shift main wrap for floating dock card
+   Occupied width = left inset + rail + right gap before content */
 body.ho-shell-open .wrap{
-  margin-left:var(--ho-rail);
-  transition:none;
+  margin-left:calc(var(--ho-rail) + (var(--ho-inset) * 2));
+  max-width:calc(100vw - var(--ho-rail) - (var(--ho-inset) * 2));
+  min-width:0;
+  transition:margin-left .22s ease;
 }
 /* When EA is also open, energy-agent.css owns the combined margin (setup + agent).
    Ensure setup rail stays on top of site content and under/beside EA cleanly. */
@@ -619,12 +653,19 @@ body.ho-shell-open #hoTour.ho-mode-dock{
 }
 body.ho-shell-open #hoTour.ho-mode-dock .ho-sheet{
   z-index:2;
-  box-shadow:8px 0 40px -16px rgba(15,40,80,.32);
+  /* keep glass companion shadow from dock rules above — don't flatten to hard rail */
 }
 @media(max-width:900px){
-  body.ho-shell-open .wrap{ margin-left:0 }
+  body.ho-shell-open .wrap{ margin-left:0; max-width:none }
+  #hoTour.ho-mode-dock{
+    padding:0; /* full-height sheet on narrow — match EA mobile rail */
+  }
   #hoTour.ho-mode-dock .ho-sheet{
     width:min(var(--ho-rail), 100vw);
+    max-width:min(var(--ho-rail), 100vw);
+    border-radius:0;
+    height:100%;
+    max-height:100%;
   }
 }
 

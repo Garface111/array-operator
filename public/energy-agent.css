@@ -238,7 +238,8 @@ body.ho-shell-open:not(.ea-shell-open) .ao-overlay,
 body.ho-shell-open:not(.ea-shell-open) .sb-ov,
 body.ho-shell-open:not(.ea-shell-open) .cl-modal-back,
 body.ho-shell-open:not(.ea-shell-open) .sb-detail-host.sb-dc-open{
-  left: var(--ho-rail, 380px) !important;
+  /* Floating setup card: rail + left/right insets */
+  left: calc(var(--ho-rail, 360px) + (var(--ho-inset, 12px) * 2)) !important;
   right: 0 !important;
   width: auto !important;
 }
@@ -250,7 +251,8 @@ body.ho-ea-sidebyside.ea-shell-open .ao-overlay,
 body.ho-ea-sidebyside.ea-shell-open .sb-ov,
 body.ho-ea-sidebyside.ea-shell-open .cl-modal-back,
 body.ho-ea-sidebyside.ea-shell-open .sb-detail-host.sb-dc-open{
-  left: calc(var(--ho-rail, 380px) + var(--ea-rail, 360px) + 18px) !important;
+  /* setup inset + rail + gap + EA rail + trailing gap */
+  left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px + var(--ea-rail, 360px) + 12px) !important;
   right: 0 !important;
   width: auto !important;
 }
@@ -303,16 +305,16 @@ body.ea-shell-open #tabbar .tab.ea-tab{
 }
 
 /* ── Beside hands-off setup (step 17 Open Energy Agent) ────────────────────
-   Setup keeps the LEFT rail; EA spawns as a slick companion window to its RIGHT
-   instead of covering the tour (Ford 2026-07-14). */
+   Setup is a floating glass card (inset); EA is an identical companion to its
+   RIGHT — same radius, edge, shadow (Ford 2026-07-16 design match). */
 body.ho-shell-open.ea-shell-open #eaPanel,
 body.ho-ea-sidebyside.ea-shell-open #eaPanel{
-  left: calc(var(--ho-rail, 380px) + 10px);
+  left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px);
   top: 12px;
   bottom: 12px;
   height: auto;
-  width: min(var(--ea-rail), calc(100vw - var(--ho-rail, 380px) - 28px));
-  max-width: min(380px, calc(100vw - var(--ho-rail, 380px) - 28px));
+  width: min(var(--ea-rail), calc(100vw - var(--ho-rail, 360px) - (var(--ho-inset, 12px) * 2) - 28px));
+  max-width: min(380px, calc(100vw - var(--ho-rail, 360px) - (var(--ho-inset, 12px) * 2) - 28px));
   border-radius: 18px;
   border: 1px solid rgba(14,165,233,.2);
   box-shadow:
@@ -327,15 +329,15 @@ html.sky body.ho-ea-sidebyside.ea-shell-open #eaPanel{
     0 22px 56px -18px rgba(20,60,120,.38),
     0 0 0 1px rgba(255,255,255,.55) inset;
 }
-/* Main content clears BOTH rails */
+/* Main content clears BOTH floating cards */
 body.ho-shell-open.ea-shell-open .wrap{
-  margin-left: calc(var(--ho-rail, 380px) + var(--ea-rail) + 18px);
-  max-width: calc(100vw - var(--ho-rail, 380px) - var(--ea-rail) - 18px);
+  margin-left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px + var(--ea-rail) + 12px);
+  max-width: calc(100vw - var(--ho-inset, 12px) - var(--ho-rail, 360px) - 10px - var(--ea-rail) - 12px);
   min-width: 0;
 }
 /* Mic gate sits above the companion panel */
 body.ho-shell-open.ea-shell-open .ea-mic-gate{
-  left: calc(var(--ho-rail, 380px) + var(--ea-rail) + 28px);
+  left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px + var(--ea-rail) + 16px);
 }
 @media (max-width: 900px){
   /* Narrow: keep EA as bottom sheet / default mobile; don't stack two rails */
