@@ -2479,25 +2479,25 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center;
   gap:4px; min-width:0; max-width:100%;
 }
-/* Dedicated 14-day graph column — fixed width, air to the right of bars */
+/* Dedicated 14-day graph column — fluid within track, gap before Status */
 .vs-c-spark{
   display:flex;
   align-items:center;
   justify-content:flex-start;
-  width:148px;
-  min-width:148px;
-  max-width:148px;
-  padding-right:8px; /* breathing room before Status pill */
+  min-width:0;
+  max-width:100%;
+  padding-right:6px;
   box-sizing:border-box;
   line-height:0;
+  overflow:hidden;
 }
 .vs-colhead .vs-c-spark{
-  font-size:10.5px;
-  letter-spacing:.07em;
+  font-size:10px;
+  letter-spacing:.06em;
   text-transform:uppercase;
   font-weight:700;
   color:var(--faint);
-  line-height:1.2;
+  line-height:1.15;
   justify-content:flex-start;
 }
 /* "latest data 36m ago" used to render gold+bold, which read as an ALARM when
@@ -2515,7 +2515,10 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   box-sizing:border-box;
   font-size:12px; font-weight:800; letter-spacing:.02em; text-transform:uppercase;
   padding:5px 12px; border-radius:999px; white-space:nowrap; line-height:1.2;
-  width:max-content; max-width:none;
+  /* auto + max-width 100% so Status track can shrink when EA rail is open
+     (max-content forced horizontal overflow / hideous scroll) */
+  width:auto; max-width:100%; min-width:0;
+  overflow:hidden; text-overflow:ellipsis;
 }
 /* Vendor/array status: single-line pill (ellipsis if squeezed). Multi-issue
    vendors render as separate .vs-pill siblings (see vendorStatusHtml) instead
@@ -2558,11 +2561,11 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   background:transparent; border:1px solid transparent; border-radius:7px; padding:4px 8px; white-space:nowrap;
   transition:background .12s, border-color .12s; }
 .vs-inv-details:hover{ background:rgba(37,99,235,.08); border-color:rgba(37,99,235,.4); }
-/* Spark lives in .vs-c-spark (own grid column). Never co-located with .vs-pill. */
+/* Spark lives in .vs-c-spark (own grid column). Scales to track width. */
 .vs-inv-rowspark-wrap{
-  width:132px;
-  max-width:132px;
-  min-width:132px;
+  width:100%;
+  max-width:104px;
+  min-width:0;
   display:flex;
   align-items:center;
   justify-content:flex-start;
@@ -2571,36 +2574,47 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   overflow:hidden;
 }
 .vs-c-status .vs-pill{
-  max-width:none;
-  width:max-content;
+  max-width:100%;
+  width:auto;
+  max-width:100%;
   white-space:nowrap;
-  flex-shrink:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  flex-shrink:1;
+  min-width:0;
 }
-.vs-inv-rowspark{ display:block; width:132px; height:28px; flex-shrink:0; }
+.vs-inv-rowspark{
+  display:block;
+  width:100%;
+  max-width:104px;
+  height:24px;
+  flex-shrink:1;
+}
 .vs-inv-rowspark rect{ fill:var(--good,#2563eb); opacity:.78; }
 .vs-inv-rowspark .vs-spark-empty{ fill:var(--line,#e6e9ef); opacity:1; }
 .vs-inv:hover .vs-inv-rowspark rect{ opacity:.92; }
-.vs-inv-nospark{ font-size:10.5px; line-height:1.2; white-space:normal; color:var(--faint); font-style:italic; }
+.vs-inv-nospark{ font-size:10px; line-height:1.2; white-space:normal; color:var(--faint); font-style:italic; }
+/* Phones: drop spark + densify — still no horizontal scroll */
 @media(max-width:760px){
   .vs-row{
     grid-template-columns:
-      minmax(110px,1.2fr) minmax(72px,.65fr) 60px 44px
-      minmax(64px,.75fr) minmax(70px,.8fr)
-      100px minmax(100px,1fr) minmax(72px,.6fr);
-    min-width:880px; gap:10px;
+      minmax(0,1.3fr) minmax(0,.65fr) 48px 34px
+      minmax(56px,.8fr) minmax(64px,.85fr)
+      minmax(64px,88px) minmax(0,1.1fr) minmax(0,.65fr);
+    gap:6px; padding:8px 10px;
+    width:100%; min-width:0;
   }
-  .vs-c-spark{ width:100px; min-width:100px; max-width:100px; padding-right:4px; }
-  .vs-inv-rowspark-wrap{ width:96px; max-width:96px; min-width:96px; }
-  .vs-inv-rowspark{ width:96px; height:24px; }
+  .vs-inv-rowspark-wrap, .vs-inv-rowspark{ max-width:80px; height:22px; }
 }
-@media(max-width:640px){ .vs-inv-name{ padding-left:26px; }
-  .vs-c-spark, .vs-inv-rowspark-wrap{ display:none; } /* phones: pill only */
+@media(max-width:640px){
+  .vs-inv-name{ padding-left:26px; }
+  .vs-c-spark, .vs-colhead .vs-c-spark, .vs-inv-rowspark-wrap{ display:none !important; }
   .vs-row{
     grid-template-columns:
-      minmax(100px,1.2fr) minmax(70px,.7fr) 56px 40px
-      minmax(60px,.8fr) minmax(64px,.85fr)
-      0px minmax(90px,1fr) minmax(70px,.65fr);
-    min-width:720px;
+      minmax(0,1.4fr) minmax(0,.7fr) 44px 32px
+      minmax(56px,.85fr) minmax(60px,.9fr)
+      0px minmax(0,1.15fr) minmax(0,.7fr);
+    gap:6px; width:100%; min-width:0;
   }
 }
 
@@ -3085,49 +3099,53 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .ao-pay-inner .acct-msg{ margin-top:10px; }
 
 /* ── Energy Agent / hands-off rail open ───────────────────────────────────
-   Rail shrinks .wrap. Sheet must SCROLL, not reflow columns into "kWkWh" or
-   overlapping LIVE NOW / TODAY headers (Ford 2026-07-15/16 screenshots). */
+   Densify so the FULL table still fits in the remaining width — no horizontal
+   scroll (Ford 2026-07-16: scrolling is hideous). Live/Today stay separate
+   columns with nowrap so they never become "kWkWh". */
 body.ea-shell-open #sheetWrap,
 body.ho-shell-open #sheetWrap{
   max-width:none;
   width:100%;
   min-width:0;
-  padding-left:10px;
-  padding-right:10px;
+  padding:12px 8px 40px;
   overflow:hidden;
 }
 body.ea-shell-open .vs-scroll,
 body.ho-shell-open .vs-scroll{
-  overflow:auto;
+  overflow-x:hidden;
+  overflow-y:auto;
   width:100%;
   max-width:100%;
   min-width:0;
-  /* Visible cue that more columns exist to the right */
-  background:
-    linear-gradient(90deg, var(--card,#fff) 85%, rgba(255,255,255,0)) left center / 28px 100% no-repeat,
-    linear-gradient(270deg, var(--card,#fff) 85%, rgba(255,255,255,0)) right center / 28px 100% no-repeat,
-    var(--card,#fff);
-  background-attachment: local, local, scroll;
 }
 body.ea-shell-open .vs-row,
 body.ho-shell-open .vs-row{
-  /* Compact but SAFE track floors — never below readable kW / kWh */
   grid-template-columns:
-    minmax(110px,1.2fr)
-    minmax(76px,.65fr)
-    60px
-    44px
-    96px     /* live — hard */
-    104px    /* today — hard */
-    128px    /* spark slightly tighter when rail open */
-    minmax(112px,1.1fr)
-    88px;
-  width:max-content;
-  min-width:1080px;
-  gap:10px;
-  padding:10px 12px;
+    minmax(0,1.35fr)     /* name */
+    minmax(0,.55fr)      /* vendor — tight */
+    48px                 /* gauge */
+    32px                 /* inv */
+    minmax(58px,.8fr)    /* live */
+    minmax(66px,.85fr)   /* today */
+    minmax(64px,88px)    /* spark compact */
+    minmax(0,1.1fr)      /* status */
+    minmax(0,.6fr);      /* synced */
+  width:100%;
+  min-width:0;
+  gap:6px;
+  padding:8px 8px;
 }
-/* Live / Today cells: never wrap units onto a second line */
+body.ea-shell-open .vs-c-spark,
+body.ho-shell-open .vs-c-spark{
+  padding-right:4px;
+}
+body.ea-shell-open .vs-inv-rowspark-wrap,
+body.ea-shell-open .vs-inv-rowspark,
+body.ho-shell-open .vs-inv-rowspark-wrap,
+body.ho-shell-open .vs-inv-rowspark{
+  max-width:80px;
+  height:22px;
+}
 body.ea-shell-open .vs-c-pow,
 body.ea-shell-open .vs-c-today,
 body.ho-shell-open .vs-c-pow,
@@ -3136,13 +3154,46 @@ body.ho-shell-open .vs-c-today{
   overflow:hidden;
   text-overflow:ellipsis;
   min-width:0;
+  font-size:12.5px;
+}
+body.ea-shell-open .vs-colhead,
+body.ho-shell-open .vs-colhead{
+  font-size:9.5px;
+  letter-spacing:.05em;
+  gap:6px;
+  padding:8px;
 }
 body.ea-shell-open .vs-colhead .vs-c-pow,
 body.ea-shell-open .vs-colhead .vs-c-today,
 body.ho-shell-open .vs-colhead .vs-c-pow,
 body.ho-shell-open .vs-colhead .vs-c-today{
   white-space:normal;
-  line-height:1.15;
-  font-size:10px;
-  letter-spacing:.04em;
+  line-height:1.1;
+  font-size:9px;
+  letter-spacing:.03em;
+}
+body.ea-shell-open .vs-pill,
+body.ho-shell-open .vs-pill{
+  font-size:10.5px;
+  padding:4px 8px;
+  max-width:100%;
+}
+body.ea-shell-open .vs-inv-details,
+body.ho-shell-open .vs-inv-details{
+  font-size:11px;
+  padding:3px 6px;
+}
+/* Very tight remaining width (small laptop + EA): hide spark, keep metrics */
+@media(max-width:1100px){
+  body.ea-shell-open .vs-c-spark,
+  body.ea-shell-open .vs-colhead .vs-c-spark,
+  body.ea-shell-open .vs-inv-rowspark-wrap{
+    display:none !important;
+  }
+  body.ea-shell-open .vs-row{
+    grid-template-columns:
+      minmax(0,1.4fr) minmax(0,.6fr) 48px 32px
+      minmax(60px,.85fr) minmax(68px,.9fr)
+      0px minmax(0,1.2fr) minmax(0,.65fr);
+  }
 }
