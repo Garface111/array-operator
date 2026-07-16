@@ -144,7 +144,9 @@ document.documentElement.setAttribute("data-theme","day");
  /* Trial card-capture nudge, deliberately quiet. A signed-in trialing owner
  with no card on file, within ~7 days of trial end. Dismissible; reappears
  once when it turns urgent (<=2 days). Shown by app.js updateTrialNudge. */
- .trial-nudge{margin:12px 0 4px;border-radius:12px;border:1px solid var(--line);background:var(--card);overflow:hidden}
+ /* mb 0: leave the free air under the bar for .ao-subnav so sub-nav pills can
+    sit mid tabbar→card (was 4px and stacked with strip pad, sitting the pill low) */
+ .trial-nudge{margin:8px 0 0;border-radius:12px;border:1px solid var(--line);background:var(--card);overflow:hidden}
  .trial-nudge[hidden]{display:none}
  .trial-nudge-row{display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap}
  .trial-nudge-copy{flex:1 1 280px;min-width:0;color:var(--muted);font-size:12.5px;line-height:1.45}
@@ -531,10 +533,10 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js?v=20260715live1"></script>
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
-<link rel="stylesheet" href="energy-agent.css?v=20260716coexist1">
+<link rel="stylesheet" href="energy-agent.css?v=20260716buildFix1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716squircle1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260716journeyMini1"></script>
+<script src="energy-agent.js?v=20260716buildFix1"></script>
 <script src="sovereign-desk.js?v=20260716squircle1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260715vaultLogin1">

@@ -234,7 +234,9 @@ html.sky .vs-seg{
   align-items:center;
 }
 html.sky .ao-subnav{
-  padding:14px 0;
+  /* Match command-center: light top / heavier bottom so pill sits mid
+     tabbar→card (tabbar mb 10px counts as upper air). */
+  padding:4px 0 18px;
 }
 html.sky .vs-seg-btn{
   border-radius:var(--sky-r-pill) !important;

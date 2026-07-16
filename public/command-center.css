@@ -2292,10 +2292,11 @@ html[data-theme="day"] .rep-fld.req > select{
 /* Sub-view toggle (Sandbox | Spreadsheet) — floats at the top of the Vendor-data tab. */
 #panelArrays{ position:relative; }
 
-/* Sub-nav strip (Ford 2026-07-16): equal top/bottom padding + flex center so the
-   pill is truly vertically centered in its row — not margin-asymmetric float
-   above content that adds its own margin-top (sheetWrap was +14px and sat the
-   Inverters pill high in the band). Same strip for Analysis / Invoices. */
+/* Sub-nav strip (Ford 2026-07-16): flex-centers the pill in the band between
+   the tabbar bottom and the main content card top.
+   Tabbar has margin-bottom ~10–14px of empty air that counts as "above" the
+   pill; equal strip padding then sits the pill low. Use LIGHTER top / HEAVIER
+   bottom padding so: tabbarMb + padTop ≈ padBottom → geometric mid of the band. */
 .ao-subnav{
   display: flex;
   justify-content: center;
@@ -2303,7 +2304,8 @@ html[data-theme="day"] .rep-fld.req > select{
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 14px 0;
+  /* 4 top + ~10–14 tabbar mb ≈ 14–18; 18 bottom balances the band */
+  padding: 4px 0 18px;
   position: relative;
   z-index: 55;
   min-height: 0;

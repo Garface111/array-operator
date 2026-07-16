@@ -253,7 +253,9 @@ html.sky ::selection{background:rgba(33,150,243,.22)}
    just adopts the glass material. ─────────────────────────────────────── */
 @media (min-width:601px){
   html.sky .tabbar{
-    margin:20px 0 14px; padding:6px; gap:4px;
+    /* mb 10 (was 14): less dead air under tabs so sub-nav pills can sit mid
+       the tabbar→content-card band without sitting low (Ford 2026-07-16). */
+    margin:20px 0 10px; padding:6px; gap:4px;
     background:var(--sky-glass-chrome);
     -webkit-backdrop-filter:blur(24px) saturate(1.5);
     backdrop-filter:blur(24px) saturate(1.5);
