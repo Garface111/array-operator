@@ -413,6 +413,88 @@ window.FleetStore = (function(){
   }
 
   /* ===========================================================================
+   * ARRAY-LEVEL STATUS — the SINGLE canonical rollup that BOTH the overview grid
+   * (sandbox.js) and the spreadsheet (vendor-sheet.js) render, so the two views
+   * can never again disagree about an array (Ford: "the two should show the same
+   * information"). One classifier, one label, one tone. Worst-first tiers:
+   *   down    ≥1 confirmed 14-day fault (dead/fault)              cls "bad"
+   *   under   ≥1 confirmed 14-day underperformer / gone-quiet     cls "warn"
+   *   asleep  night, nothing producing, no flags                  cls "muted"
+   *   feed    vendor feed behind (stale source in daylight)       cls "watch"  (soft — data, not fault)
+   *   watch   ≥1 LIVE-only dip (dark/low now, 14-day still ok)    cls "watch"  (soft — momentary)
+   *   new     brand-new array, hard 0 W, nothing gradeable yet    cls "warn"
+   *   ok      everything pulling its weight                       cls "ok"
+   * The soft "watch" tone (cyan) is what keeps a passing-cloud dip or a lagging
+   * feed from wearing the same alarm colour as a confirmed fault — the exact
+   * conflation that made Bruce's cards contradict each other and his own eyes.
+   * ==========================================================================*/
+  // The monitoring FEED is behind — a DATA problem, not a hardware fault. Kept in
+  // sync with vendor-sheet.js's old _vendorIssue so the overview and the spreadsheet
+  // agree on "feed behind": (1) source clock stale in daylight, incl. the SolarEdge/
+  // Locus ≥6h age belt (their state flag lags), and (2) a whole array dark in daylight
+  // while OTHER fleet arrays produce (feed lying/broken, never a green "all clear").
+  function _feedBehind(col){
+    if(col.is_daylight === false) return false;      // night = asleep, handled separately
+    const ss = col.source_status;
+    if(ss && ss.state === "stale") return true;
+    const v = (col.vendor || "").toLowerCase();
+    if((v === "solaredge" || v === "locus") && ss && ss.age_hours != null && ss.age_hours >= 6) return true;
+    const liveDead = col.current_power_w == null || col.current_power_w <= 25;
+    const todayDead = col.produced_today_kwh == null || col.produced_today_kwh <= 0.05;
+    if(liveDead && todayDead){
+      const peers = (state.arrays || []).some(a =>
+        a && a.id !== col.array_id && a.is_daylight !== false
+        && a.current_power_w != null && a.current_power_w > 100);
+      if(peers) return true;
+    }
+    return false;
+  }
+  function arrayStatus(col){
+    const invs = col.inverters || [];
+    const daylight = col.is_daylight !== false;
+    const vendorOut = _feedBehind(col);
+    const srcOk = !vendorOut;
+    let hard = 0, crit = 0, under = 0, quiet = 0, watch = 0;
+    for(const inv of invs){
+      const s = inv.status;
+      if(s === "ok"){
+        const lv = liveVerdict(inv, invs, col.is_daylight, srcOk);
+        if(lv === "dark" || lv === "low") watch++;
+        continue;
+      }
+      if(s === "monitoring") continue;               // neutral — never a flag
+      hard++;
+      if(s === "dead" || s === "fault") crit++;
+      else if(s === "underperforming") under++;
+      else if(s === "comm_gap") quiet++;
+    }
+    const total = invs.length;
+    const mk = (key, cls, label, count, tip) =>
+      ({ key, cls, label, count, tip, hard, crit, under, quiet, watch, vendorOut, total });
+    if(crit)   return mk("down",  "bad",  `${crit} down`, crit,
+      `${crit} inverter${crit===1?"":"s"} stopped earning — a confirmed fault over the last 14 days.`);
+    if(hard)   return mk("under", "warn",
+      under ? `${hard} underperforming` : `${hard} gone quiet`, hard,
+      `${hard} of ${total} inverter${total===1?"":"s"} flagged over the last 14 days.`);
+    // A normal night (nothing producing) is rest, not an issue — checked before feed/watch.
+    if(!daylight && !invs.some(isProducing))
+      return mk("asleep", "muted", "Asleep", 0, "The sun is down — the array is resting.");
+    if(vendorOut) return mk("feed", "watch", "Feed behind", 1,
+      "The monitoring vendor has stopped sending fresh data for this site. That's a data-freshness gap, not a hardware fault — live status is paused until the feed catches up.");
+    if(watch)  return mk("watch", "watch", `Watching ${watch}`, watch,
+      `${watch} inverter${watch===1?"":"s"} dipped below ${watch===1?"its":"their"} neighbors in the latest reading — a momentary live watch, not a confirmed problem. The 14-day health still looks healthy.`);
+    // Unverified new zero: a brand-new array reading a hard 0 W in daylight with no
+    // gradeable peer yet — "All clear" there would be a false green.
+    const anyOk = invs.some(iv => iv.status === "ok");
+    const newZero = !anyOk && invs.some(iv =>
+      iv.status === "monitoring" && iv.current_power_w === 0 && !iv.no_energy_register);
+    if(newZero && daylight)
+      return mk("new", "warn", "New, no output yet", 0,
+        "Freshly connected and reading 0 W in daylight — not enough history to grade it yet.");
+    return mk("ok", "ok", "All clear", 0, "Every inverter is pulling its weight over the last 14 days.");
+  }
+
+  /* ===========================================================================
    * SELECTORS, shape the canonical fleet for each consumer
    * ==========================================================================*/
 
@@ -1170,6 +1252,7 @@ window.FleetStore = (function(){
     findArray, findInv,
     setTriage, setTriageBatch, triageState, isLive,
     liveVerdict, isProducing, isLiveAnomaly,   // shared live-liveness classifier (all 3 surfaces)
+    arrayStatus,   // shared array-level rollup — overview grid + spreadsheet render THIS one
     undo, redo, canUndo, canRedo, clearHistory,
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,

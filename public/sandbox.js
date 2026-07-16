@@ -882,53 +882,34 @@
  // grounded in the same peer-shortfall math the command center uses.
  function arrayHealth(col){
  const invs = col.inverters || [];
+ // ONE classifier for the array's status tier + label + tone: FleetStore.arrayStatus,
+ // the SAME function the spreadsheet renders, so the overview grid and the spreadsheet
+ // can never disagree about an array (Ford: "the two should show the same information").
+ const st = (window.FleetStore && FleetStore.arrayStatus)
+ ? FleetStore.arrayStatus(col)
+ : { key:"ok", cls:"ok", label:"All clear", tip:"", hard:0, crit:0, watch:0, vendorOut:false, total:invs.length };
+ // $ at stake — computed HERE because it needs the local rate; claimed ONLY for a
+ // CONFIRMED hard loss (dead/underperforming), never a live watch or a stale feed.
  const totalNp = invs.reduce((t,i)=>t+(i.nameplate_kw||0),0) || 1;
  const fleetWin = invs.reduce((t,i)=>t+(i.window_kwh||0),0);
- // THREE honest, SEPARATE tiers — never conflated (that conflation is what made
- // Bruce's tiles read "N flagged" for a passing-cloud dip that contradicted the
- // 14-day "pulling its weight"):
- //   hard  = a CONFIRMED 14-day peer verdict (dead / fault / underperforming /
- //           comm_gap) — a real, sustained problem worth money language.
- //   watch = a LIVE-only anomaly (dark/low right now) on an inverter the 14-day
- //           verdict still calls healthy — momentary, unconfirmed, soft.
- //   vendorOut = the monitoring FEED itself is behind (data freshness, not a
- //           hardware fault) — we can't even see live truth, so we don't guess.
- let hard = 0, crit = 0, watch = 0, lostKwh = 0;
- // Vendor-side outage (source_status.state === "stale" in daylight): the monitoring
- // vendor stopped reporting. Real, but it's a DATA problem, not "your inverter died"
- // — and while the feed is behind we must NOT trust the stale readings for a live
- // verdict (Ford 2026-07-13; the stale-SolarEdge false-flag). Overnight = "asleep".
- const _srcStale = col && col.source_status && col.source_status.state === "stale";
- const vendorOut = !!(_srcStale && col.is_daylight !== false);
- const srcOk = !vendorOut;   // gate live verdicts on a fresh feed
+ let lostKwh = 0;
  for(const inv of invs){
- if(inv.status === "ok"){
- // Shared classifier, now gated on fresh+real readings + feed freshness so an
- // estimated site-split or stale reading can't fake a live anomaly.
- const lv = window.FleetStore && FleetStore.liveVerdict
- ? FleetStore.liveVerdict(inv, invs, col.is_daylight, srcOk) : null;
- if(lv === "dark" || lv === "low") watch++;   // soft, live-only — NOT a hard flag
- continue;
- }
- // "monitoring" = not enough evidence to judge yet, neutral, never flagged.
- if(inv.status === "monitoring") continue;
- hard++;
- if(inv.status === "dead" || inv.status === "fault") crit++;
+ if(inv.status === "dead" || inv.status === "fault"){
  const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
- if(inv.status === "dead" || inv.status === "fault") lostKwh += Math.max(0, fair-(inv.window_kwh||0));
- else if(inv.status === "underperforming" && inv.peer_index) lostKwh += Math.max(0, fair/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
- // comm_gap = unknown until it reports, no $ claimed
+ lostKwh += Math.max(0, fair-(inv.window_kwh||0));
+ } else if(inv.status === "underperforming" && inv.peer_index){
+ const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
+ lostKwh += Math.max(0, fair/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
+ }
  }
  const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
- // Card TINT tone stays the legacy 3-value space {ok,warn,bad} so the canvas-card
- // consumers are unchanged: red only for a confirmed fault, amber for a confirmed
- // 14-day underperformer or a stalled feed. A LIVE-only watch NEVER tints the card
- // amber — it's surfaced softly (the canvas card still shows its live "Not
- // producing" state via arrayLiveState/liveAnoms independently).
- const tone = crit ? "bad" : (hard || vendorOut) ? "warn" : "ok";
- // `flagged`/`liveAnoms` kept for back-compat: flagged is now HARD (14-day) only.
- return { tone, flagged: hard, hard, crit, watch, lossMo, total: invs.length,
- liveAnoms: watch, vendorOut };
+ // Legacy card TINT tone {ok,warn,bad} for the canvas-card consumers: red only for a
+ // confirmed fault, amber for a confirmed 14-day flag. A soft watch/feed/asleep never
+ // tints the canvas amber — the canvas surfaces those via arrayLiveState independently.
+ const tone = st.crit ? "bad" : st.hard ? "warn" : "ok";
+ return { tone, cls: st.cls, label: st.label, tip: st.tip, key: st.key,
+ flagged: st.hard, hard: st.hard, crit: st.crit, watch: st.watch,
+ liveAnoms: st.watch, vendorOut: st.vendorOut, lossMo, total: st.total };
  }
 
  function el(html){ const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -2472,27 +2453,15 @@
  const cols = filterColsByStream((window.FleetStore && FleetStore.toColumns)
  ? (FleetStore.toColumns().columns || [])
  : []);
- // The honest status of ONE array tile. FIVE distinct states, never conflated —
- // a live/data blip must never wear the same badge as a confirmed 14-day fault
- // (that conflation is exactly why Bruce saw "flagged" on arrays his own eyes
- // and the SolarEdge portal said were fine).
- const tileStatus = (h) => {
- if(h.crit)      return { cls:"bad",   label:`${h.crit} down`,
-   tip:`${h.crit} inverter${h.crit===1?"":"s"} stopped earning — a confirmed fault over the last 14 days.` };
- if(h.hard)      return { cls:"warn",  label:`${h.hard} underperforming`,
-   tip:`${h.hard} of ${h.total} inverter${h.total===1?"":"s"} ran below their neighbors over the last 14 days.` };
- if(h.vendorOut) return { cls:"watch", label:"feed behind",
-   tip:`The monitoring vendor has stopped sending fresh data for this site. That's a data-freshness gap, not a hardware fault — live status is paused until the feed catches up.` };
- if(h.watch)     return { cls:"watch", label:`watching ${h.watch}`,
-   tip:`${h.watch} inverter${h.watch===1?"":"s"} dipped below ${h.watch===1?"its":"their"} neighbors in the latest reading — a momentary live watch, not a confirmed problem. The 14-day health still looks healthy.` };
- return                 { cls:"ok",    label:"all good",
-   tip:`Every inverter is pulling its weight over the last 14 days.` };
- };
- // Sort worst-first so real problems surface top-left: fault → underperforming →
- // watch (live/feed, soft) → all good; then by $ at stake, then name.
- const rank = { bad:0, warn:1, watch:2, ok:3 };
- const tiles = cols.map(col => { const h = arrayHealth(col); return { col, h, st: tileStatus(h) }; })
- .sort((a,b) => (rank[a.st.cls]-rank[b.st.cls]) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
+ // The array's status label + tone comes straight from arrayHealth → the SHARED
+ // FleetStore.arrayStatus, so every overview tile reads IDENTICALLY to its row in the
+ // spreadsheet. A live/data blip (cyan "watch") can never wear the same badge as a
+ // confirmed fault — the conflation that made Bruce's cards contradict his own eyes.
+ // Sort worst-first: fault → underperforming → watch (live/feed, soft) → asleep → ok;
+ // then by $ at stake, then name.
+ const rank = { bad:0, warn:1, watch:2, muted:3, ok:4 };
+ const tiles = cols.map(col => { const h = arrayHealth(col); return { col, h, st: { cls:h.cls, label:h.label, tip:h.tip } }; })
+ .sort((a,b) => ((rank[a.st.cls]??9)-(rank[b.st.cls]??9)) || (b.h.lossMo-a.h.lossMo) || String(a.col.array_name).localeCompare(String(b.col.array_name)));
 
  const tilesHTML = tiles.map(({col, h, st}) => {
  // $ at stake is claimed ONLY for confirmed hard loss (dead/underperforming) —

@@ -2665,6 +2665,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-pill.ok{ color:#065f46; background:rgba(16,185,129,.20); }
 .vs-pill.warn{ color:#92400e; background:rgba(217,119,6,.28); }
 .vs-pill.bad{ color:#991b1b; background:rgba(220,38,38,.22); }
+/* watch = soft live/feed state (cyan) — deliberately calmer than amber warn, matches
+   the overview grid's "Watching N" / "Feed behind" chip so the two views read alike. */
+.vs-pill.watch{ color:#0e7490; background:rgba(8,145,178,.20); }
 .vs-pill.muted{ color:var(--muted); background:var(--day-chip,#eef2f7); }
 /* Expanded inverter list. The vendor color is carried ONLY by the group's left bar
    (.vs-vgroup border-left) — NO background flood (Ford: "just hold the little line on

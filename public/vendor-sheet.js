@@ -81,7 +81,7 @@
  // anyone could see). The gauge still shows the true output fraction via needle
  // position + fill, but its COLOR now matches the row's own verdict (ok/warn/bad/
  // muted), the same classification already driving the status pill beside it.
- const GAUGE_STATUS_COLOR = { ok: "#16a34a", warn: "#d97706", bad: "#dc2626", muted: "#94a3b8" };
+ const GAUGE_STATUS_COLOR = { ok: "#16a34a", warn: "#d97706", bad: "#dc2626", watch: "#0891b2", muted: "#94a3b8" };
  function gauge(frac, opts) {
  opts = opts || {};
  if (frac == null) return `<span class="vs-gauge vs-gauge-empty" title="No nameplate on file, can't gauge output"></span>`;
@@ -182,63 +182,27 @@
  // failing harvest while the rest of the fleet produces, NEVER badge "All clear".
  // The 14-day peer verdict can still say "ok" on frozen history; the status column
  // must read the LIVE feed honesty layer and name the vendor.
+ // The array's Status pill is the SHARED FleetStore.arrayStatus — the exact same
+ // classifier + label + tone the Sandbox OVERVIEW grid renders, so the spreadsheet
+ // and the overview can never disagree about an array (Ford: "the two should show the
+ // same information"). down/under (14-day) · asleep · feed behind · watching N (soft
+ // cyan live-only) · new · all clear. The vendor-issue breadth Ford added 2026-07-13
+ // (stale SolarEdge, dark-while-fleet-peers) lives in arrayStatus's _feedBehind now.
  function arrStatus(c) {
+ if (window.FleetStore && FleetStore.arrayStatus) {
+ const s = FleetStore.arrayStatus(c);
+ return { label: s.label, cls: s.cls, count: s.count, tip: s.tip };
+ }
+ // Fallback only when FleetStore is absent (isolated render test).
  const a = c.alert || {};
- if (a.level === "critical") return { label: a.headline || "Fault", cls: "bad", count: a.count || 1 };
- if (a.level === "warn") return { label: a.count ? a.count + " need attention" : (a.headline || "Attention"), cls: "warn", count: a.count || 1 };
- // Dark overnight with a healthy login → asleep, not an issue (muted, not warn).
- // Checked BEFORE vendor-issue so a normal night doesn't read as a vendor outage.
- if (_nightAsleep(c)) return { label: "Asleep", cls: "muted", count: 0 };
- // Vendor-side outage / feed failure (stale source, failed harvest, whole array
- // dark in daylight while fleet peers produce). Label is always "Vendor issue"
- // so the operator doesn't need to decode "Source paused" vs "All clear".
- const vIssue = _vendorIssue(c);
- if (vIssue) return { label: "Vendor issue", cls: "warn", count: 1, tip: vIssue.tip };
- // A live anomaly (dark, or low vs peers, RIGHT NOW while >=2 daylight peers produce) the
- // 14-day alert hasn't flagged yet should still surface here, otherwise the array reads
- // "All clear" while a card inside shows "Dark now" / "Low vs peers" (Ford's Waterford case:
- // one Fronius at 42% but the array said ALL CLEAR). Checked AFTER vendor-issue so a stale
- // feed's 0 isn't mistaken for a live anomaly. Same FleetStore.liveVerdict classifier; each
- // inverter has exactly one verdict, so dark and low never double-count.
- const _invs = c.inverters || [];
- let _dark = 0, _low = 0;
- if (window.FleetStore && FleetStore.liveVerdict) {
- _invs.forEach(iv => {
- if (iv.status !== "ok" && iv.status != null) return;
- const _lv = FleetStore.liveVerdict(iv, _invs, c.is_daylight);
- if (_lv === "dark") _dark++;
- else if (_lv === "low") _low++;
- });
- }
- const _attn = _dark + _low;
- if (_attn) {
- // Name the dominant kind when it's homogeneous; otherwise a combined "N need attention".
- const label = _dark && _low ? _attn + " need attention"
- : _dark ? _dark + " dark now"
- : _low + " low vs peers";
- return { label, cls: "warn", count: _attn };
- }
- // UNVERIFIED-ZERO: a brand-new array whose only signal so far is "monitoring"
- // (too new for 14-day grading, the dark/low overlay above SKIPS non-"ok"
- // inverters by design) can report a hard 0 W in daylight with zero evidence
- // it's actually clear. "All clear" there is a false green, live-confirmed on
- // a real account: a fresh CHINT connection read 0 kW at midday, freshly
- // synced (not stale), badged "All clear" with no data to support it. Say what
- // it actually is: unverified, not fine. Checked only when nothing already
- // graded "ok" (a mixed fleet with a healthy peer stays "All clear").
- const _anyOk = _invs.some(iv => iv.status === "ok");
- const _newZero = !_anyOk && _invs.some(iv =>
- iv.status === "monitoring" && iv.current_power_w === 0 && !iv.no_energy_register);
- if (_newZero && c.is_daylight !== false) {
- return { label: "New, no output yet", cls: "warn", count: 0 };
- }
+ if (a.level === "critical") return { label: (a.count || 1) + " down", cls: "bad", count: a.count || 1 };
+ if (a.level === "warn") return { label: (a.count || 1) + " underperforming", cls: "warn", count: a.count || 1 };
  return { label: "All clear", cls: "ok", count: 0 };
  }
+ const _CLS_RANK = { bad: 3, warn: 2, watch: 1, muted: 0, ok: 0 };
  function statusRank(c) {
- const a = c.alert || {};
- if (a.level === "critical") return 3;
- if (a.level === "warn" || _vendorIssue(c) || _sourceIssue(c)) return 2;
- return 0;
+ const cls = (window.FleetStore && FleetStore.arrayStatus) ? FleetStore.arrayStatus(c).cls : "ok";
+ return _CLS_RANK[cls] || 0;
  }
  function invStatus(iv, cohort, isDaylight, parentCol) {
  const s = iv.status || "ok";
@@ -249,29 +213,29 @@
  // can't drag it into a warn. Mirrors the card's "No energy data" + the digest.
  if (iv.no_energy_register) return { label: "No energy data", cls: "muted",
  tip: "Reports live power but no cumulative energy, a metering issue at the vendor, not an outage. Can't be peer-graded until the energy register is fixed." };
- // Parent array has a vendor-side outage → don't leave inverters as green "OK"
- // (Londonderry SolarEdge: 6× OK while the source clock is 15h stale).
- if (parentCol && _vendorIssue(parentCol)) {
- return { label: "Vendor issue", cls: "warn",
- tip: "The monitoring vendor isn't delivering a usable live feed for this array right now, not an inverter fault we can grade." };
+ // Parent array's feed is behind → don't leave inverters as green "OK" (Londonderry
+ // SolarEdge: 6× OK while the source clock is 15h stale). Uses the SAME shared
+ // arrayStatus feed detection the array pill shows, so row and array agree, and the
+ // SAME soft "watch" (cyan) tone as the array's "Feed behind" pill.
+ const _pStat = (parentCol && window.FleetStore && FleetStore.arrayStatus) ? FleetStore.arrayStatus(parentCol) : null;
+ if (_pStat && _pStat.key === "feed") {
+ return { label: "Feed behind", cls: "watch",
+ tip: "The monitoring vendor isn't delivering a usable live feed for this array right now, a data-freshness gap, not an inverter fault we can grade." };
  }
- // LIVE-DARK overlay: an inverter the 14-day peer verdict calls "ok" but that is producing ZERO
- // right now while >=2 of its daylight neighbors ARE producing, the exact live anomaly the
- // email alert fires on. Without this the table shows a bare "OK" for the very inverter we just
- // emailed about going dark (the contradiction Bruce hit). Shared FleetStore.liveVerdict, same
- // classifier as command-center.js + the sandbox cards. Deliberately a WATCH-level "Dark now",
- // not a red fault: the 14-day health is still fine, so it's likely a brief outage.
+ // LIVE-DARK / LIVE-LOW overlay: an inverter the 14-day verdict calls "ok" but that is
+ // dark or >15% below its live peers RIGHT NOW. Shared FleetStore.liveVerdict — same
+ // gated classifier as the overview + command center. Deliberately a soft WATCH-level
+ // "watch" (cyan), NOT amber: the 14-day health is still fine, so it's momentary/likely
+ // brief — the same soft tone the overview's "Watching N" tile uses.
  if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict) {
- const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight);
+ const _srcOk = !(_pStat && _pStat.vendorOut);
+ const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight, _srcOk);
  if (_lv === "dark") {
- return { label: "Dark now", cls: "warn",
+ return { label: "Dark now", cls: "watch",
  tip: "Producing nothing right now while its neighbors are, the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
  }
- // LIVE-LOW overlay: producing, but >15% below the peer median for its nameplate, a
- // peer-level gap the DARK check misses (Ford's Waterford case: one Fronius at 42% while
- // 11 peers run ~101%). Same watch-level treatment as Dark now, not a red fault.
  if (_lv === "low") {
- return { label: "Low vs peers", cls: "warn",
+ return { label: "Low vs peers", cls: "watch",
  tip: "Producing well below its neighbors right now (>15% under the peer median for its nameplate), check for shading, a tripped string, or a failing inverter. Its 14-day health hasn't flagged yet; if the gap persists the verdict escalates." };
  }
  }
@@ -465,8 +429,11 @@
  list.forEach(c => {
  const st = arrStatus(c);
  if (st.cls === "ok" || st.cls === "muted") return; // "muted" = Asleep overnight, not an issue
+ // Precedence bad > warn > watch (soft): a live/feed watch must not lift the whole
+ // vendor row to amber when nothing is actually a confirmed 14-day problem.
  if (st.cls === "bad") worstCls = "bad";
- else if (worstCls !== "bad") worstCls = "warn";
+ else if (st.cls === "warn" && worstCls !== "bad") worstCls = "warn";
+ else if (st.cls === "watch" && worstCls !== "bad" && worstCls !== "warn") worstCls = "watch";
  issues.push(st);
  });
  if (!issues.length) return { label: "All clear", cls: "ok", pills: [{ label: "All clear", cls: "ok" }] };
@@ -997,7 +964,7 @@
  // Only columns that vary per inverter reorder them; Synced is array-level (uniform across
  // an array's inverters) and Inverters is a count, so those leave the captured order.
  const _INV_SORT_KEYS = { pow: 1, today: 1, status: 1, name: 1 };
- const _INV_STATUS_RANK = { bad: 3, warn: 2, muted: 1, ok: 0 };
+ const _INV_STATUS_RANK = { bad: 4, warn: 3, watch: 2, muted: 1, ok: 0 };
  function invSortVal(iv, key, cohort, isDaylight) {
  switch (key) {
  case "pow": return iv.current_power_w == null ? -1 : iv.current_power_w;
