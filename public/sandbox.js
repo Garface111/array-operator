@@ -7629,7 +7629,71 @@
  }
  applyTabGating();
  _firstApply = false;
+ // Next frame: sub-nav pills mid of tabbar bottom → content-card top
+ try { requestAnimationFrame(function(){ centerAoSubnav(); }); } catch(_){ try{ centerAoSubnav(); }catch(__){} }
  }
+
+ /* Sub-nav pills (Spreadsheet|Sandbox, Fleet analysis|…, Offtakers|…): shift
+  so the pill midpoint sits on the geometric middle of [tabbar bottom, main
+  content card top]. CSS pad alone can't account for the extension/trial
+  nudge eating the upper half of that band (Ford 2026-07-16). */
+ function centerAoSubnav(){
+ try{
+  const tabbar = document.getElementById("tabbar");
+  if(!tabbar) return;
+  // Clear prior shifts
+  document.querySelectorAll(".ao-subnav .vs-seg").forEach(function(p){
+   p.style.transform = "";
+  });
+  const strip = Array.prototype.find.call(
+   document.querySelectorAll(".ao-subnav"),
+   function(el){
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== "none";
+   }
+  );
+  if(!strip) return;
+  const pill = strip.querySelector(".vs-seg");
+  if(!pill) return;
+  const panel = strip.parentElement;
+  if(!panel) return;
+  const card = Array.prototype.find.call(panel.children, function(c){
+   if(c === strip) return false;
+   if(getComputedStyle(c).display === "none") return false;
+   return c.getBoundingClientRect().height > 16;
+  });
+  if(!card) return;
+  const tabB = tabbar.getBoundingClientRect().bottom;
+  const cardT = card.getBoundingClientRect().top;
+  if(!(cardT > tabB + 8)) return;
+  const ideal = (tabB + cardT) / 2;
+  const pr = pill.getBoundingClientRect();
+  const cur = (pr.top + pr.bottom) / 2;
+  let dy = ideal - cur;
+  // Keep the pill fully inside the band (don't cover tabbar or card)
+  if(pr.top + dy < tabB + 2) dy = tabB + 2 - pr.top;
+  if(pr.bottom + dy > cardT - 2) dy = cardT - 2 - pr.bottom;
+  if(Math.abs(dy) < 0.5) return;
+  pill.style.transform = "translateY(" + dy.toFixed(1) + "px)";
+ }catch(_){}
+ }
+ try{
+  window.addEventListener("resize", function(){
+   try{ centerAoSubnav(); }catch(_){}
+  });
+  // Nudge/banner show/hide also changes the band
+  if(window.MutationObserver){
+   const mo = new MutationObserver(function(){
+    try{ requestAnimationFrame(centerAoSubnav); }catch(_){}
+   });
+   ["extLiveNudge","trialNudge","vaultLoginNudge","gmpGate"].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) mo.observe(el, { attributes:true, attributeFilter:["hidden","style","class"] });
+   });
+  }
+ }catch(_){}
+ try{ window.__aoCenterSubnav = centerAoSubnav; }catch(_){}
+
  /* ==========================================================================
  * PRODUCT SURFACE, Jul 2026: no monitoring/invoicing plan picker.
  * Regular AO = full product (fleet + offtaker invoices). AI Pro is the only add-on.
