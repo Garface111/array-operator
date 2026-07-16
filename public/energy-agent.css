@@ -728,7 +728,9 @@ body.mh-os .ea-tools{
   text-transform: uppercase; color: var(--ea-sky2); margin-bottom: 3px;
 }
 .ea-msg{
-  max-width: 94%; font-size: 13px; line-height: 1.5; padding: 10px 13px; border-radius: 14px;
+  max-width: 94%; font-size: 13px; line-height: 1.5;
+  /* right 26px always reserves the copy-icon corner — no hover reflow */
+  padding: 10px 26px 10px 13px; border-radius: 14px;
   letter-spacing: -.005em;
   position: relative;
 }
@@ -742,7 +744,7 @@ body.mh-os .ea-tools{
 }
 html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: var(--line); }
 
-/* Tiny corner copy control (icon only) */
+/* Tiny corner copy control (icon only) — absolute, never shifts text */
 .ea-msg .chat-msg-copy{
   appearance: none;
   position: absolute;
@@ -762,15 +764,20 @@ html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: v
   font: inherit;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none; /* invisible = no hit target, no layout fight */
   transition: opacity .12s, background .12s, border-color .12s, color .12s;
   box-sizing: border-box;
   line-height: 0;
 }
 .ea-msg:hover .chat-msg-copy,
 .ea-msg:focus-within .chat-msg-copy,
-.ea-msg .chat-msg-copy:focus-visible{ opacity: .85; }
+.ea-msg .chat-msg-copy:focus-visible{
+  opacity: .85;
+  pointer-events: auto;
+}
 .ea-msg .chat-msg-copy:hover{
   opacity: 1;
+  pointer-events: auto;
   background: rgba(255,255,255,.95);
   border-color: rgba(14,165,233,.35);
   color: #0369a1;
@@ -818,13 +825,19 @@ html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: v
   background: #fff;
   color: #0369a1;
 }
-/* Small inset so text doesn't collide with the 18px control */
+/*
+ * Always reserve the corner for the 18px copy control — do NOT change
+ * padding on hover (that reflowed text when the button appeared).
+ */
+.ea-msg{
+  /* corner gutter for absolute copy btn; same hovered or not */
+  padding-right: 26px;
+}
 .ea-msg .ea-msg-body,
 .ea-msg .ea-sov-body,
-.ea-msg .ea-email-body{ padding-right: 4px; }
-.ea-msg:hover .ea-msg-body,
-.ea-msg:hover .ea-sov-body,
-.ea-msg:hover .ea-email-body{ padding-right: 22px; }
+.ea-msg .ea-email-body{
+  padding-right: 0;
+}
 
 .ea-chip-ic-svg{
   display: grid;
