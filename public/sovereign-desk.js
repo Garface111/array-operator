@@ -462,59 +462,169 @@
     throw lastErr || new Error("Access check failed");
   }
 
+  /** NEVER write document.body — that wiped the whole Array Operator app for
+   * every owner when desk was disabled (lockout bug, 2026-07-16).
+   * All status UI stays inside #panelSovereign only. */
+  function deskPanel() {
+    return document.getElementById("panelSovereign");
+  }
+
+  function hideDeskAndLeave() {
+    state.allowed = false;
+    var p = deskPanel();
+    if (p) {
+      p.hidden = true;
+      p.classList.remove("active");
+      // Clear any prior status markup; leave empty hidden panel
+      // Do NOT put customer-facing "access not enabled" on the main stage.
+    }
+    // If user is on #sovereign, bounce them back to the normal app
+    if ((location.hash || "") === "#sovereign") {
+      try {
+        location.hash = "#arrays";
+      } catch (e) {}
+    }
+  }
+
+  function showDeskPanelStatus(html) {
+    var p = deskPanel();
+    if (!p) return;
+    p.hidden = false;
+    p.removeAttribute("hidden");
+    p.classList.add("active");
+    p.innerHTML =
+      '<div class="sd-gate" style="padding:2rem;max-width:36rem;margin:2rem auto;color:var(--muted,#64748b)">' +
+      html +
+      "</div>";
+  }
+
   async function checkAccess() {
+    // Not signed in → silent no-op on normal tabs; only gate if on #sovereign
     if (!hasSession()) {
-      document.body.innerHTML =
-        '<div style="padding:2rem;color:var(--muted)">Please log in to access Sovereign Desk.</div>';
-      return;
+      if ((location.hash || "") === "#sovereign") {
+        hideDeskAndLeave();
+      }
+      return false;
     }
 
     try {
       var data = await fetchAccessWithRetry();
 
-      if (!data.desk) {
-        document.body.innerHTML =
-          '<div style="padding:2rem;color:var(--muted)">Sovereign Desk access not enabled for your account.</div>';
-        return;
+      if (!data || !data.desk) {
+        // Desk off / not allowlisted: never brick the app
+        hideDeskAndLeave();
+        return false;
       }
 
       state.allowed = true;
       state.email = data.email;
+      // Only build chat UI once allowed
+      ensureDeskChrome();
+      initUI();
       await loadHistory();
+      return true;
     } catch (err) {
-      var msg = (err && err.message) || "Access check failed";
-      // AbortError → friendlier copy
-      if (err && err.name === "AbortError") {
-        msg = "API timed out — backend may be restarting. Refresh in a moment.";
+      // Network / API failure: do NOT replace the app shell.
+      // Only surface a message if they deliberately opened #sovereign.
+      if ((location.hash || "") === "#sovereign") {
+        var msg = (err && err.message) || "Access check failed";
+        if (err && err.name === "AbortError") {
+          msg = "API timed out — try again in a moment.";
+        }
+        showDeskPanelStatus(
+          "Desk unavailable: " +
+            esc(msg) +
+            ' <button type="button" id="sdRetryAccess" style="margin-left:0.75rem;cursor:pointer">Retry</button>' +
+            ' <button type="button" id="sdLeaveDesk" style="margin-left:0.5rem;cursor:pointer">Back to app</button>'
+        );
+        var rb = document.getElementById("sdRetryAccess");
+        if (rb) {
+          rb.addEventListener("click", function () {
+            state.booted = false;
+            boot({ force: true });
+          });
+        }
+        var leave = document.getElementById("sdLeaveDesk");
+        if (leave) {
+          leave.addEventListener("click", function () {
+            hideDeskAndLeave();
+          });
+        }
+      } else {
+        hideDeskAndLeave();
       }
-      document.body.innerHTML =
-        '<div style="padding:2rem;color:var(--bad)">Failed to verify access: ' +
-        esc(msg) +
-        ' <button type="button" id="sdRetryAccess" style="margin-left:0.75rem;cursor:pointer">Retry</button></div>';
-      var rb = document.getElementById("sdRetryAccess");
-      if (rb) {
-        rb.addEventListener("click", function () {
-          document.body.innerHTML =
-            '<div style="padding:2rem;color:var(--muted)">Checking access…</div>';
-          // Allow re-boot path
-          state.booted = false;
-          boot();
-        });
-      }
+      return false;
     }
   }
 
-  function boot() {
-    if (state.booted) return;
-    state.booted = true;
-    initUI();
-    checkAccess();
+  function ensureDeskChrome() {
+    var p = deskPanel();
+    if (!p) return;
+    // If panel was replaced with a gate message, restore minimal chat chrome
+    if (!document.getElementById("sdMsgs") || !document.getElementById("sdInput")) {
+      p.innerHTML =
+        '<div class="sd-shell">' +
+        '<div class="sd-head"><strong>Energy Agent Prime</strong> <span class="sd-sub">private desk</span></div>' +
+        '<div id="sdError" class="sd-error" style="display:none"></div>' +
+        '<div id="sdMsgs" class="sd-msgs"></div>' +
+        '<div class="sd-compose">' +
+        '<textarea id="sdInput" class="sd-input" rows="3" placeholder="Message…"></textarea>' +
+        '<div class="sd-actions">' +
+        '<button type="button" id="sdCancel" class="sd-btn">Stop</button>' +
+        '<button type="button" id="sdSend" class="sd-btn sd-btn-primary">Send</button>' +
+        "</div></div></div>";
+    }
+    p.hidden = false;
+    p.removeAttribute("hidden");
+    p.classList.add("active");
   }
 
+  /**
+   * Safe boot: never auto-destroy the owner app.
+   * - Normal tabs: no access probe that can brick the page.
+   * - #sovereign only: check access; if denied, leave silently.
+   */
+  async function boot(opts) {
+    opts = opts || {};
+    var onSov = (location.hash || "") === "#sovereign" || opts.force;
+    if (!onSov) {
+      // Idle: do not call access, do not touch the DOM shell
+      return false;
+    }
+    if (state.booted && state.allowed && !opts.force) return true;
+    state.booted = true;
+    return !!(await checkAccess());
+  }
+
+  // Public hooks used by sandbox applyView()
+  window.__aoSovereignDeskBoot = function () {
+    return boot({ force: (location.hash || "") === "#sovereign" });
+  };
+  window.__aoOpenSovereignDesk = function () {
+    if (!state.allowed) return;
+    ensureDeskChrome();
+    initUI();
+  };
+
+  // Hash changes: only engage desk on #sovereign
+  window.addEventListener("hashchange", function () {
+    if ((location.hash || "") === "#sovereign") {
+      state.booted = false;
+      boot({ force: true });
+    }
+  });
+
+  // Do NOT auto-boot on every page load (that caused the lockout).
+  // Only if the user landed directly on #sovereign.
+  function maybeBootIfSovereign() {
+    if ((location.hash || "") === "#sovereign") {
+      boot({ force: true });
+    }
+  }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", maybeBootIfSovereign);
   } else {
-    boot();
+    maybeBootIfSovereign();
   }
 
   // Cleanup on page unload
