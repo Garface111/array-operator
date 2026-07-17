@@ -626,6 +626,10 @@
  if (fin) fin.style.display = v === "trends" ? "" : "none";
  if (gen) gen.style.display = v === "genreports" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
+ // The KPI glance-line is offtaker-invoicing chrome ("N offtakers · billed
+ // arrays · don't match GMP") — it leaked onto the other sub-views' heads.
+ const kpis = document.getElementById("rb2Kpis");
+ if (kpis) kpis.style.display = (v === "offtakers") ? "" : "none";
  // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on others
  if (head) {
  const id = head.querySelector(".rb2-id h1");

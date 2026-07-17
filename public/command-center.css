@@ -2347,7 +2347,9 @@ html[data-theme="day"] .rep-fld.req > select{
   z-index: 20; /* well under #eaPanel (99970) */
   padding: 4px;
   gap: 2px;
-  max-width: min(100%, 420px);
+  /* Four pills since THE FOLD (Offtakers | Bill audit | Trends | Generation
+     reports) — the old 420px cap made the 4th spill out of the track. */
+  max-width: min(100%, 640px);
   box-sizing: border-box;
   position: relative;
   align-items: center;
