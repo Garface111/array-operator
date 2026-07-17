@@ -277,6 +277,19 @@ html.sky .vs-scroll{
   height:auto !important;
   max-height:max(340px, calc(100vh - 310px));
   overflow-y:auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa transparent;
+}
+html.sky .vs-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+html.sky .vs-scroll::-webkit-scrollbar-track{ background:transparent; margin:6px 0; }
+html.sky .vs-scroll::-webkit-scrollbar-thumb{
+  background:linear-gradient(180deg,#93c5fd 0%,#3b82f6 55%,#2563eb 100%);
+  border-radius:999px; border:2px solid transparent; background-clip:padding-box;
+  min-height:36px;
+}
+html.sky .vs-scroll::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(180deg,#60a5fa 0%,#2563eb 100%);
+  border:1px solid transparent; background-clip:padding-box;
 }
 /* generous row height (brief: tables breathe) + ink hairlines */
 html.sky .vs-row{ padding:13px 16px; }
