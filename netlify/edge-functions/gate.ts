@@ -76,7 +76,7 @@ export default async (request, context) => {
   return new Response(gatePage(requestEmail), {
     status: 401,
     headers: {
-      "WWW-Authenticate": 'Basic realm="Array Operator — Private Preview", charset="UTF-8"',
+      "WWW-Authenticate": 'Basic realm="Array Operator Private Preview", charset="UTF-8"',
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "x-robots-tag": "noindex, nofollow",
