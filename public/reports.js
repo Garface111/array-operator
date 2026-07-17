@@ -687,32 +687,16 @@
  return localStorage.getItem("ao_genrep") === "1";
  } catch (e) { return false; }
  }
- let _genrepOn = false;
+ // The pill is ALWAYS visible (AO demo philosophy: every capability shows;
+ // states are honest). World-gating happens at render time — the embed only
+ // mounts for accounts whose generation-reports world is live.
+ const _genrepOn = true;
  function revealGenrepPill() {
  const b = document.getElementById("invTabGenrep");
- if (!b) return;
- // Reveal = drop the inline display:none!important (the important flag is
- // required: a .vs-seg-btn stylesheet rule sets display:flex!important,
- // which beats plain inline styles — the classic [hidden]-vs-flex trap).
- const show = () => b.style.removeProperty("display");
- if (genrepFlag()) { _genrepOn = true; show(); return; }
- // Default-on when this account's generation-reports world is live (the
- // fold migration set Tenant.generation_reports; nepool-product accounts
- // are always live). Anonymous demo + unmigrated AO tenants stay hidden.
- const h = authHeaders();
- if (!h) return;
- // Capture the deep-link intent NOW — applyInvoicesSub runs right after us
- // and rewrites the hash to #reports before the account fetch resolves.
- const wantedGenrep = /#reports\/generation/i.test(location.hash || "");
- fetch("/v1/account", { headers: h })
- .then(r => (r.ok ? r.json() : null))
- .then(a => {
- if (!a || a.generation_reports !== true) return;
- _genrepOn = true;
- show();
- if (wantedGenrep) applyInvoicesSub("genreports");
- })
- .catch(() => {});
+ // Drop the inline display:none!important (the important flag is required:
+ // a .vs-seg-btn stylesheet rule sets display:flex!important, which beats
+ // plain inline styles — the classic [hidden]-vs-flex trap).
+ if (b) b.style.removeProperty("display");
  }
  let _genrepMounted = false;
  function renderGenReports() {
@@ -720,9 +704,26 @@
  if (!host || _genrepMounted) return;
  if (!session()) {
  // Anonymous demo stays honest: no fabricated NEPOOL data, just the door.
- host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — sign in to use them.</div>';
+ host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — automated quarterly NEPOOL-GIS workbooks, emailed to each client. Sign in or start a trial to use them.</div>';
  return;
  }
+ // World check: unmigrated accounts get an honest state, never an embed
+ // showing their capture-created clients as report clients.
+ host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
+ fetch("/v1/account", { headers: authHeaders() })
+ .then(r => (r.ok ? r.json() : null))
+ .then(a => {
+ if (!a) { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; return; }
+ if (a.generation_reports !== true && !genrepFlag()) {
+ host.innerHTML = '<div class="rb-au-empty">Generation reports aren\'t set up for this account yet. They automate NEPOOL/REC reporting — quarterly generation workbooks built from your utility data and emailed to each client. Ask us to enable them for your fleet.</div>';
+ return;
+ }
+ mountGenrepEmbed(host);
+ })
+ .catch(() => { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; });
+ }
+ function mountGenrepEmbed(host) {
+ if (_genrepMounted) return;
  _genrepMounted = true;
  host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
  const fail = (e) => {
