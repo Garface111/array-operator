@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260716eastamp1";
+ var EA_BUILD = "20260716micfix1";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -4783,9 +4783,17 @@
  state._micHeldForSpeak = true;
  // Full hold ONLY for the short greeting intro — never for normal answers
  // (that killed GPT-Live interruptibility).
- state._holdMicFull = !!(
- opts.holdMicFull === true && opts.source === "greeting"
- ) || opts.source === "greeting";
+ // Full-hold the mic for the WHOLE utterance in mouth-only mode. Her own
+ // speaker audio was bleeding into the mic (reopened ~550ms in), getting
+ // transcribed as GARBLED "user" speech that slipped past the echo filter and
+ // self-interrupted her mid-sentence — "the mouth pops, then it just gives up"
+ // (Ford 2026-07-16). Turn-taking, not barge-in: the mic reopens 400ms after
+ // she finishes. Greeting always full-holds; weave keeps GPT-Live barge-in.
+ // window.__EA_MIC_BARGE_IN=true restores the old reopen-mid-answer behavior.
+ var _forceBarge = (window.__EA_MIC_BARGE_IN === true);
+ state._holdMicFull = !_forceBarge && (
+ opts.source === "greeting" || !VOICE_WEAVE || opts.holdMicFull === true
+ );
  try {
  if (state.micStream) {
  state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
@@ -6244,6 +6252,16 @@
  }
 
  // ── Legacy mouth-only path ──────────────────────────────────────────
+ // Defense in depth: while SHE is delivering a driven read, a transcript is
+ // almost certainly her own speaker audio bleeding back (garbled STT that slips
+ // past the echo filter). Do NOT let that self-interrupt her — she must finish
+ // the thought. A real "stop" already returned above (isStopCommand).
+ if (state._drivenSpeak && isAgentMouthBusy()) {
+ if (state.dc && state.dc.readyState === "open") {
+ try { state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" })); } catch (e) {}
+ }
+ return;
+ }
  stopSpeak({ reason: "barge_in" });
  if (state.dc && state.dc.readyState === "open") {
  try {
