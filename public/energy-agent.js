@@ -5,11 +5,37 @@
 (function () {
  "use strict";
 
+ /**
+  * Long turns MUST NOT go through the Netlify proxy.
+  *
+  * public/_redirects proxies /v1/* -> Railway, and that proxy BUFFERS the
+  * upstream response and abandons it at ~26s with a bare "HTTP 504". Measured
+  * live 2026-07-16 with one heavy repair question:
+  *   through Netlify : 504 @ 28-32s, ZERO bytes delivered (buffered, then binned)
+  *   direct to Railway: 200 @ 43s, 9 heartbeats, full tool-grounded answer
+  * So the cap is on total duration, not time-to-first-byte — streaming through
+  * the proxy does not help. The API already sends
+  * `access-control-allow-origin: https://arrayoperator.com`, so the browser can
+  * talk to Railway directly (same as the extension and Stripe webhooks do).
+  *
+  * ONLY the known prod host bypasses. Staging/preview/dev stay same-origin so a
+  * preview can never be pointed at the production API by accident.
+  */
+ var LONG_API_ORIGIN = (function () {
+ if (typeof window.__EA_API_ORIGIN === "string") return window.__EA_API_ORIGIN;
+ var h = (location.hostname || "").toLowerCase();
+ if (h === "arrayoperator.com" || h === "www.arrayoperator.com") {
+ return "https://web-production-49c83.up.railway.app";
+ }
+ return "";
+ })();
+
  var API = {
  session: "/v1/energy-agent/session",
- chat: "/v1/energy-agent/chat",
- chatStream: "/v1/energy-agent/chat-stream",
- voiceConsultStream: "/v1/energy-agent/voice-consult-stream",
+ // These three can outrun the proxy's ~26s cap → go straight to the API.
+ chat: LONG_API_ORIGIN + "/v1/energy-agent/chat",
+ chatStream: LONG_API_ORIGIN + "/v1/energy-agent/chat-stream",
+ voiceConsultStream: LONG_API_ORIGIN + "/v1/energy-agent/voice-consult-stream",
  upload: "/v1/energy-agent/upload",
  confirm: "/v1/energy-agent/confirm",
  realtime: "/v1/energy-agent/realtime-session",
@@ -5955,6 +5981,34 @@
  }
  return;
  }
+ // ── The mouth may not author ──────────────────────────────────────────
+ // Mouth-only: every legitimate line is driven by us through speakNow, which
+ // sets _drivenSpeak. A response we did NOT drive is GPT answering on its
+ // own — it has no tools and no fleet data, so it guesses, and the guess
+ // contradicts the brain: it denied sending emails the brain had just sent,
+ // and spoke while the panel read "Text only, voice off" (Ford 2026-07-16).
+ // Config cannot prevent this on its own — session.update is fire-and-forget,
+ // and if it never lands the session keeps OpenAI's create_response default
+ // (ON); the "only speak lines the app sends" instruction is persuasion, not
+ // enforcement. So kill any undriven response before a word reaches the ear.
+ if (
+ !VOICE_WEAVE &&
+ !state._drivenSpeak &&
+ (ev.type === "response.created" || ev.type === "output_audio_buffer.started")
+ ) {
+ try {
+ if (state.dc && state.dc.readyState === "open") {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ }
+ } catch (eFs) {}
+ state.rtResponseActive = false;
+ state.speaking = false;
+ if (window.console && console.warn) {
+ console.warn("[EA] killed an undriven Realtime response (mouth-only: GPT must not author)");
+ }
+ return;
+ }
  // Track whether a Realtime response is in flight (so cancel is safe)
  if (ev.type === "response.created" || ev.type === "response.output_item.added") {
  state.rtResponseActive = true;
@@ -6338,6 +6392,28 @@
  sess.tool_choice = "required";
  }
  dcSend({ type: "session.update", session: sess });
+ // session.update is fire-and-forget over the data channel. If it never lands,
+ // the session silently keeps OpenAI's defaults — including create_response ON,
+ // which turns the mouth into a second, tool-less author that contradicts the
+ // brain. Re-send until the server confirms session.updated; say so loudly if
+ // it never does (the undriven-response guard above is the backstop).
+ (function ensureSessionUpdate(tries) {
+ if (state._sessionUpdated) return;
+ if (tries >= 6) {
+ if (window.console && console.warn) {
+ console.warn("[EA] session.update never confirmed — mouth config unverified; " +
+ "undriven-response guard is holding the line");
+ }
+ return;
+ }
+ setTimeout(function () {
+ if (state._sessionUpdated) return;
+ if (state.dc && state.dc.readyState === "open") {
+ try { state.dc.send(JSON.stringify({ type: "session.update", session: sess })); } catch (e) {}
+ }
+ ensureSessionUpdate(tries + 1);
+ }, 700);
+ })(0);
  // Single greeting per panel open
  if (!state.greeted && !state.voiceMuted) {
  state.greeted = true;
