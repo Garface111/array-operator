@@ -3557,6 +3557,7 @@
  // customer_name + array_id + allocation_pct (percent_of_array model). The
  // customer's invoice each cycle = allocation_pct × the array's generation.
  let MANUAL_OPEN = false;
+ let MANUAL_SAVING = false; // in-flight guard for saveManual (blocks double-submit → duplicate offtaker)
  // When the add form is opened from a master group's "+ Add offtaker" button, the
  // master's array_id is parked here; wireArrayFirst applies it once the net-meter
  // group picker has populated (async), pre-selecting that master. Cleared on apply.
@@ -4425,6 +4426,11 @@
 
  async function saveManual() {
  const st = $("#rbmStatus");
+ const saveBtn = $("#rbmSave");
+ // Double-submit guard: a second click before the POST /subscriptions round-trip
+ // returns would create a duplicate offtaker (corrupts allocation %/billing). Bail
+ // if a save is already in flight; the flag + button are cleared in the finally below.
+ if (MANUAL_SAVING) return;
  const name = $("#rbmName").value.trim();
  let arrayId = $("#rbmArray") ? $("#rbmArray").value : "";
  // A directly-chosen unmatched utility account (value "u:<id>") binds by ACCOUNT
@@ -4526,6 +4532,8 @@
  if ((mode === "to_client" || mode === "to_both") && !clientEmail) {
  st.className = "rb-status rb-err"; st.textContent = "Add the client's email to send to them."; return;
  }
+ MANUAL_SAVING = true;
+ if (saveBtn) saveBtn.disabled = true;
  st.className = "rb-status rb-busy"; st.textContent = "Adding offtaker…";
  const fd = new FormData(); // no file → manual path
  fd.append("customer_name", name);
@@ -4583,6 +4591,9 @@
  if (newSubId != null) { try { await selectOfftaker(String(newSubId), true); } catch (e) { /* the list already refreshed */ } }
  } catch (e) {
  st.className = "rb-status rb-err"; st.textContent = "Network error while adding.";
+ } finally {
+ MANUAL_SAVING = false;
+ if (saveBtn) saveBtn.disabled = false;
  }
  }
 
