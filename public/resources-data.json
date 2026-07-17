@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-16",
+  "updated": "2026-07-17",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
@@ -33,7 +33,7 @@
       "name": "New Hampshire",
       "comp": "NEM 2.0 credits exports at ≈ 85% of retail (100% of supply + transmission + 25% of distribution). Eversource retail ≈ $0.25/kWh.",
       "how": "The NEM 2.0 credit formula is locked through Jan 1, 2041 (Docket DE 16-576) — unusually long-term stability for the region.",
-      "note": "",
+      "note": "Two 2026 laws extend the edges of net metering: SB 540 (effective July 27, 2026) legalizes plug-in 'balcony' solar, and HB 1718 (signed July 10, 2026) directs the Dept. of Energy and PUC to credit exports from renewable-charged batteries.",
       "utils": ["Eversource", "Liberty Utilities", "New Hampshire Electric Cooperative", "Unitil"],
       "reg": "NH PUC affirmed the Eversource rate case (monthly customer charge ≈ $14 → $19.81, ROE 9.5%) but on reconsideration (Jan 6, 2026 order) threw out the automatic annual increases; the Dept. of Energy has appealed the alternative-regulation framework (Docket DE 24-070) to the NH Supreme Court.",
       "sources": [
@@ -85,7 +85,7 @@
       "name": "Massachusetts",
       "comp": "1:1 retail-rate net metering for residential ≤ 25 kW (Class I) — credits ≈ $0.2836/kWh (Eversource), ≈ $0.32/kWh (National Grid).",
       "how": "On top of net metering, SMART 3.0 (PY2026) pays a flat $0.03/kWh incentive (residential ≤ 25 kW; $0.06/kWh low-income).",
-      "note": "",
+      "note": "DPU Docket 25-200 (delivery rate design) is examining whether to reduce the value of net-metering credits; no changes have been ordered and existing systems are expected to be grandfathered.",
       "utils": ["Eversource", "National Grid", "Unitil"],
       "reg": "MA Dept. of Public Utilities (DPU); the SMART incentive is administered by DOER.",
       "sources": [
@@ -136,7 +136,7 @@
       "name": "Rhode Island",
       "comp": "Net metering ≈ 80% of retail (≈ $0.232/kWh) for new systems, 125% annual cap, protected through 2039. The separate REG program pays ≈ $0.2723/kWh for 15 years.",
       "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
-      "note": "The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
+      "note": "The 2026 legislative session (ended June 11) killed a proposed solar 'grid access fee' on systems ≥ 1 MW but set up lower virtual-net-metering compensation for large projects. The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
       "utils": ["Rhode Island Energy"],
       "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) is pending, and Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
       "sources": [
@@ -167,7 +167,7 @@
       "price_display": "≈ $30–40 / MWh",
       "price_usd_per_mwh_low": 30,
       "price_usd_per_mwh_high": 40,
-      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The MA Class I Alternative Compliance Payment (ACP) — fixed at $40/MWh (225 CMR 14.08) since 2023 — is the hard ceiling, and Class I has recently traded up toward it. Prices have historically swung from single digits to the cap.",
+      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The MA Class I Alternative Compliance Payment (ACP) — $40/MWh (225 CMR 14.08), the industry-referenced ceiling since 2023 — caps the market. As of the May 2026 MassCEC/Evolution Markets auction, 2025-vintage MA Class I was trading near the top of this range, toward the $40 ACP, in a supply-constrained market ahead of the 2025 compliance deadline. Prices have historically swung from single digits to the cap.",
       "registry": "NEPOOL-GIS",
       "mint_lag": "Issued quarterly, roughly one quarter after generation (e.g. Q1 generation mints mid-year).",
       "eligible_states": ["ma", "ct", "ri", "nh", "me", "vt"]
@@ -199,6 +199,7 @@
     "sources": [
       { "l": "NEPOOL GIS", "u": "https://nepoolgis.com/" },
       { "l": "Xpansiv · MA Class I", "u": "https://www.ms.xpansiv.com/markets/rps/class-1/massachusetts" },
+      { "l": "Evolution Markets · May 2026 MassCEC REC auction", "u": "https://www.xpansiv.com/blogs/evolution-markets-to-auction-4629-ma-class-i-and-67-sco-ii-recs-for-massachusetts-clean-energy-center-on-may-14" },
       { "l": "MassCEC · RECs", "u": "https://www.masscec.com/production-tracking-system-pts/renewable-energy-certificates" },
       { "l": "SEA · Class I overview", "u": "https://www.seadvantage.com/blog-post/dont-be-rec-less/" }
     ]
