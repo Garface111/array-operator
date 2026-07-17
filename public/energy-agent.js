@@ -4943,10 +4943,11 @@
  type: "function",
  name: "consult_deep_brain",
  description:
- "Ask the deep mind (Claude with full Array Operator tools) about THIS " +
- "tenant's fleet, invoices, repairs, account, or to take a screen/data action. " +
- "Use for any real numbers, status, offtakers, production, tickets, navigation, " +
- "or when the owner confirms/cancels a pending change. Do NOT use for pure small talk.",
+ "DEFAULT TOOL — call this on almost every turn. It is your smart brain for THIS " +
+ "tenant: full product map, fleet tools, invoices, repairs, screen tours/navigation. " +
+ "ALWAYS call for: walkthroughs, tabs (Analysis/Invoices/Inverters/etc), fleet health, " +
+ "kWh/$, offtakers, repairs, how something works, what to do next, confirmations. " +
+ "ONLY skip for pure social (hi/thanks/mm-hmm/are you there).",
  parameters: {
  type: "object",
  properties: {
@@ -4954,11 +4955,12 @@
  type: "string",
  description:
  "What to investigate or do, in clear English. Include the owner's " +
- "intent and any names/sites they mentioned.",
+ "exact ask and any tab/site names. For UI tours, say e.g. " +
+ "'Walk the owner through the Analysis tab step by step using product_map.'",
  },
  reason: {
  type: "string",
- description: "Why the deep mind is needed (e.g. fleet_health, money, repair).",
+ description: "Why (e.g. ui_tour, fleet_health, money, product_how).",
  },
  },
  required: ["question"],
@@ -4969,14 +4971,85 @@
 
  function realtimeWeaveInstructions() {
  return (
- "You are Energy Agent — the live voice of Array Operator for THIS signed-in owner. " +
- "YOU control the conversation. Speak English, warm and sharp like GPT Live. " +
- "You have exactly ONE tool: consult_deep_brain — call it for any real numbers, " +
- "fleet status, invoices, repairs, screen actions, or confirmations. " +
- "Never invent kWh, dollars, or status. For pure small talk / 'are you there?' / thanks, " +
- "answer yourself without the tool. After the tool returns, speak the answer naturally " +
- "(use spoken_answer if provided). Do not narrate tool names. Be one person."
+ "You are Energy Agent — live voice of Array Operator. Warm, sharp, brief like GPT Live. " +
+ "CRITICAL RULE — you are NOT smart enough alone about this product. Your intelligence " +
+ "comes from consult_deep_brain. DEFAULT: call consult_deep_brain EVERY turn before " +
+ "answering. That includes walkthroughs, any tab name (Analysis, Invoices, Inverters, " +
+ "Fleet Triage, Repairs, Account), fleet status, money, repairs, how-to, what-is-this. " +
+ "You may say a half-second 'one second' then CALL THE TOOL — never invent UI labels, " +
+ "button names, steps, kWh, or $. After the tool returns, speak spoken_answer faithfully. " +
+ "ONLY answer without the tool for pure social: hi, thanks, ok, mm-hmm, are you there, bye. " +
+ "Never narrate tool names. Be one person."
  );
+ }
+
+ /** Pure social — Realtime may answer alone. Everything else → deep brain. */
+ function isPureSocialVoice(said) {
+ var t = String(said || "")
+ .toLowerCase()
+ .replace(/[^\w\s']/g, " ")
+ .replace(/\s+/g, " ")
+ .trim();
+ if (!t) return true;
+ if (isStopCommand(said)) return false;
+ // Explicit social / presence / backchannels only
+ if (
+ /^(hi|hello|hey|yo|thanks|thank you|thx|ty|ok|okay|k|cool|nice|great|awesome|bye|goodbye|see you|good night|good morning|good evening|are you there|you there|can you hear me|you hear me|still there|got it|gotcha|i see|mm hmm|mhm|uh huh|yeah|yep|yup|nah|nope|hmm|hm)$/.test(
+ t
+ )
+ ) {
+ return true;
+ }
+ // 1–2 word pure acks
+ var words = t.split(" ").filter(Boolean);
+ if (words.length <= 2 && /^(yes|no|ok|okay|sure|thanks|hi|hey|hello|right|alright)$/.test(words[0])) {
+ return true;
+ }
+ return false;
+ }
+
+ /**
+ * Client-enforced deep consult (Option D hard mode). Realtime freestyles too often;
+ * for any non-social ask we cancel freestyle, call Claude, then speak the result.
+ */
+ function weaveForceDeepConsult(userSaid) {
+ var q = String(userSaid || "").trim();
+ if (!q || state._consultInFlight || state._clientForcedConsult) return;
+ // Kill freestyle answer Realtime may already be generating
+ try {
+ cancelRealtimeIfActive();
+ } catch (e) {}
+ setTimeout(function () {
+ try {
+ cancelRealtimeIfActive();
+ } catch (e2) {}
+ }, 120);
+ state._clientForcedConsult = true;
+ state._consultInFlight = true;
+ setStatus("Thinking…", "think");
+ consultDeepBrain(q)
+ .then(function (result) {
+ state._consultInFlight = false;
+ state._clientForcedConsult = false;
+ var line =
+ (result && result.spoken_answer) ||
+ (result && result.panel_text) ||
+ "I checked — want me to try that again?";
+ // Reliable mouth: deep brain line, not Realtime freestyle
+ enqueueSpeak(String(line).slice(0, 1400), {
+ source: "chat",
+ force: true,
+ holdMicFull: true,
+ }).catch(function () {});
+ })
+ .catch(function () {
+ state._consultInFlight = false;
+ state._clientForcedConsult = false;
+ enqueueSpeak("I lost the deep check for a second — say that once more?", {
+ source: "chat",
+ force: true,
+ }).catch(function () {});
+ });
  }
 
  /**
@@ -5070,7 +5143,8 @@
  });
  }
 
- function sendFunctionCallOutput(callId, outputObj) {
+ function sendFunctionCallOutput(callId, outputObj, opts) {
+ opts = opts || {};
  if (!callId || !state.dc || state.dc.readyState !== "open") return;
  var out =
  typeof outputObj === "string" ? outputObj : JSON.stringify(outputObj || {});
@@ -5085,7 +5159,8 @@
  },
  })
  );
- // Let Realtime speak the tool result in her own voice
+ // Client-forced path already speaks via enqueueSpeak — don't double-talk
+ if (opts.createResponse === false) return;
  state.dc.send(JSON.stringify({ type: "response.create" }));
  } catch (e) {}
  }
@@ -5099,15 +5174,20 @@
  }
  var nm = String(name || "").toLowerCase();
  if (nm === "consult_deep_brain" || nm === "consult_brain" || nm === "deep_brain") {
- var question = args.question || args.query || args.message || "";
- // Avoid double-consult storms
- if (state._consultInFlight) {
- sendFunctionCallOutput(callId, {
- ok: false,
- spoken_answer: "Still working on the last check — one moment.",
- });
+ // Client already force-consulted this user turn — ack tool, no second speak
+ if (state._clientForcedConsult || state._consultInFlight) {
+ sendFunctionCallOutput(
+ callId,
+ {
+ ok: true,
+ spoken_answer: "Handled by deep brain.",
+ note: "Client already consulted; do not invent a second answer.",
+ },
+ { createResponse: false }
+ );
  return;
  }
+ var question = args.question || args.query || args.message || "";
  state._consultInFlight = true;
  consultDeepBrain(question, callId)
  .then(function (result) {
@@ -5126,7 +5206,6 @@
  });
  return;
  }
- // Unknown tool — don't hang the Realtime turn
  sendFunctionCallOutput(callId, {
  ok: false,
  spoken_answer: "I can't use that tool from here.",
@@ -5693,7 +5772,7 @@
  }
 
  if (VOICE_WEAVE) {
- // Log user line + meter airtime; Realtime owns the reply (or calls consult).
+ // Log user line + meter airtime.
  addMsg("user", said);
  if (state.sessionId) {
  fetch(API.transcript, {
@@ -5715,9 +5794,12 @@
  })
  .catch(function () {});
  }
- // Don't cancel Realtime's own response — she is generating it.
- // Don't call turn() — that was the second agent grabbing the reins.
  if (state.touring) state.touring = false;
+ // Hard mode: non-social → ALWAYS deep brain (Realtime alone hallucinates UI).
+ // Pure social (hi/thanks/are you there) → let Realtime answer alone (alive + fast).
+ if (!isPureSocialVoice(said)) {
+ weaveForceDeepConsult(said);
+ }
  return;
  }
 
@@ -5883,7 +5965,8 @@
  };
  if (VOICE_WEAVE) {
  sess.tools = realtimeWeaveTools();
- sess.tool_choice = "auto";
+ // Prefer tool use when Realtime answers alone (client also force-consults non-social).
+ sess.tool_choice = "required";
  }
  dcSend({ type: "session.update", session: sess });
  // Single greeting per panel open
