@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260716voiceguard1";
+ var EA_BUILD = "20260716voiceguard2";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -158,6 +158,10 @@
  _chatAbort: null,
  // Serializes voice/text turns so double STT events can't start two replies
  _turnBusy: false,
+ // Owner barged mid-turn (voice or text) — next packContext flags user_interrupted
+ _userInterrupted: false,
+ _userInterruptedReason: null,
+ _userInterruptedAt: 0,
  // True after we sent response.cancel until audio is confirmed stopped
  _rtCancelPending: false,
  _budgetPollTimer: null,
@@ -393,6 +397,12 @@
  title: document.title,
  selection: sel,
  viewport: { w: innerWidth, h: innerHeight },
+ // What is actually rendered right now (cards/chips/tables) — not just tab/hash
+ live_ui_digest: buildLiveUiDigest(hash),
+ // Mid-turn barge-in: owner interrupted Realtime / prior answer
+ user_interrupted: !!state._userInterrupted,
+ voice_interrupted: !!state._userInterrupted,
+ barge_in: !!state._userInterrupted,
  // Capture / extension ground truth for this browser session
  extension_present: extPresent,
  extension_name: "EnergyAgent",
@@ -422,7 +432,131 @@
  }
  }
  } catch (e) {}
+ // One-shot: clear interrupt flag after packaging so only the next turn sees it
+ if (state._userInterrupted) {
+   try { state._userInterrupted = false; } catch (e) {}
+ }
  return ctx;
+ }
+
+ /**
+  * Compact digest of ON-SCREEN cards / chips / table rows so the agent can see
+  * broken inverter cards, status chips, and table cells the owner is looking at.
+  * Prefer data-* attributes + short innerText; cap size hard for the prompt budget.
+  */
+ function buildLiveUiDigest(hash) {
+   var out = {
+     hash: hash || (location.hash || ""),
+     cards: [],
+     chips: [],
+     table_rows: [],
+     panels: [],
+     note: "Visible UI text/status on the active surface — trust for 'what am I looking at'.",
+   };
+   try {
+     var roots = [];
+     var activePanel = document.querySelector(".panel.active") || document.querySelector("[data-panel].active");
+     if (activePanel) roots.push(activePanel);
+     // Sandbox / triage always worth sampling when present
+     ["#sandbox", "#sbWrap", "#panelArrays", "#panelDashboard", "#panelReports",
+      "#panelOps", "#panelAccount", "#analysisRoot", ".cc-root", ".ops-root"].forEach(function (sel) {
+       var el = document.querySelector(sel);
+       if (el && roots.indexOf(el) < 0) roots.push(el);
+     });
+     if (!roots.length) roots.push(document.body);
+
+     function pushUnique(arr, item, key) {
+       var k = key || JSON.stringify(item);
+       if (arr._seen && arr._seen[k]) return;
+       if (!arr._seen) arr._seen = {};
+       arr._seen[k] = 1;
+       arr.push(item);
+     }
+
+     var cardSels = [
+       "[data-array-id]", "[data-inverter-id]", "[data-inv-id]",
+       ".sb-card", ".sb-inv", ".fc-tile", ".cc-row", ".ops-case",
+       ".ops-ticket", ".rb-offtaker", ".ansg-table tr",
+       "[data-status]", ".inv-card", ".array-card",
+     ].join(",");
+     var chipSels = [
+       ".status-chip", ".pill", ".badge", "[data-tone]",
+       ".sb-status", ".fc-pill", ".ops-stage", ".ea-chip",
+     ].join(",");
+
+     roots.forEach(function (root) {
+       if (!root || !root.querySelectorAll) return;
+       // Cards
+       try {
+         root.querySelectorAll(cardSels).forEach(function (el) {
+           if (out.cards.length >= 24) return;
+           // Skip hidden
+           try {
+             var r = el.getBoundingClientRect();
+             if (r.width < 4 || r.height < 4) return;
+             if (r.bottom < 0 || r.top > (window.innerHeight || 800) + 40) return;
+           } catch (e) {}
+           var text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+           if (!text || text.length < 2) return;
+           pushUnique(out.cards, {
+             array_id: el.getAttribute("data-array-id") || null,
+             inverter_id: el.getAttribute("data-inverter-id") || el.getAttribute("data-inv-id") || null,
+             status: el.getAttribute("data-status") || el.getAttribute("data-tone") || null,
+             text: text.slice(0, 220),
+           }, text.slice(0, 80));
+         });
+       } catch (e) {}
+       // Status chips
+       try {
+         root.querySelectorAll(chipSels).forEach(function (el) {
+           if (out.chips.length >= 20) return;
+           var t = (el.innerText || "").replace(/\s+/g, " ").trim();
+           if (!t || t.length > 80) return;
+           try {
+             var r2 = el.getBoundingClientRect();
+             if (r2.width < 2 || r2.bottom < 0 || r2.top > (window.innerHeight || 800)) return;
+           } catch (e) {}
+           pushUnique(out.chips, {
+             text: t.slice(0, 60),
+             tone: el.getAttribute("data-tone") || el.className || null,
+           }, t);
+         });
+       } catch (e) {}
+       // Table body rows (Analysis sites, spreadsheet, invoices)
+       try {
+         root.querySelectorAll("table tbody tr, .ss-row, .ansg-table tbody tr").forEach(function (tr) {
+           if (out.table_rows.length >= 16) return;
+           var cells = [];
+           tr.querySelectorAll("td, th").forEach(function (td) {
+             var c = (td.innerText || "").replace(/\s+/g, " ").trim();
+             if (c) cells.push(c.slice(0, 40));
+           });
+           if (!cells.length) return;
+           try {
+             var r3 = tr.getBoundingClientRect();
+             if (r3.height < 2 || r3.bottom < 0 || r3.top > (window.innerHeight || 800)) return;
+           } catch (e) {}
+           pushUnique(out.table_rows, { cells: cells.slice(0, 8) }, cells.join("|").slice(0, 100));
+         });
+       } catch (e) {}
+     });
+
+     // Panel headings / empty states
+     try {
+       document.querySelectorAll(".panel.active h1, .panel.active h2, .panel.active .empty, .panel.active .lede").forEach(function (el) {
+         if (out.panels.length >= 6) return;
+         var t = (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 120);
+         if (t) out.panels.push(t);
+       });
+     } catch (e) {}
+   } catch (e) {
+     out.error = String(e && e.message || e).slice(0, 80);
+   }
+   // Drop internal _seen
+   delete out.cards._seen;
+   delete out.chips._seen;
+   delete out.table_rows._seen;
+   return out;
  }
 
  // ── DOM ──────────────────────────────────────────────────────────────────
@@ -2897,9 +3031,13 @@
  /**
  * Abort an in-flight LLM/voice turn without painting "Stopped." Used when the
  * user barges in with a NEW question mid-think / mid-speech.
+ * Sets user_interrupted so the next turn's context tells the model to course-correct.
  */
  function abortInFlightTurn(reason) {
  state._turnAbortGen = (state._turnAbortGen || 0) + 1;
+ state._userInterrupted = true;
+ state._userInterruptedReason = reason || "barge_in";
+ state._userInterruptedAt = Date.now();
  if (state._chatAbort) {
  try { state._chatAbort.abort(); } catch (e) {}
  state._chatAbort = null;
@@ -2910,6 +3048,8 @@
  state._interimSpoken = false;
  state._turnBusy = false;
  if (state.touring) state.touring = false;
+ // Always cancel Realtime so the mouth stops; model will see user_interrupted next turn
+ try { cancelRealtimeIfActive(); } catch (e) {}
  stopSpeak({ reason: reason || "barge_in" });
  }
 
@@ -4848,6 +4988,37 @@
  return !!(state.speaking || state.rtResponseActive);
  }
 
+ // ── Pure-voice freestyle backstop (mouth-only) ────────────────────────
+ // Silence the WEBRTC audio element itself, so a freestyle is never HEARD even
+ // if the Realtime API ignores response.cancel or create_response leaked ON.
+ function _muteMouthEl() {
+ try { if (state.audioEl) { state.audioEl.muted = true; state.audioEl.volume = 0; } } catch (e) {}
+ }
+ function _unmuteMouthEl() {
+ // Respect the user's own voice-mute; otherwise restore audible.
+ try {
+ if (state.audioEl) {
+ state.audioEl.muted = !!state.voiceMuted;
+ state.audioEl.volume = state.voiceMuted ? 0 : 1;
+ }
+ } catch (e) {}
+ }
+ function _killFreestyle(rid) {
+ _muteMouthEl();
+ try {
+ if (state.dc && state.dc.readyState === "open") {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ }
+ } catch (e) {}
+ state.rtResponseActive = false;
+ state.speaking = false;
+ state._freestyleId = rid || state._freestyleId || null;
+ if (window.console && console.warn) {
+ console.warn("[EA] muted+killed undriven pure-voice response", rid || "");
+ }
+ }
+
  /** Hard stop / hold phrases, always interrupt, even mid-think / mid-tour / mid-speech. */
  function isStopCommand(said) {
  var t = String(said || "")
@@ -5618,6 +5789,9 @@
 
  function stopSpeak(opts) {
  opts = opts || {};
+ // Restore the speaker each turn so a freestyle-mute can never get stuck if
+ // our own answer never arrives (respects the user's voice-mute).
+ try { _unmuteMouthEl(); } catch (e) {}
  // Protect first intro: only hard "stop" / panel close may cut it
  if (
  state._greetingPlaying &&
@@ -6020,48 +6194,42 @@
  // and if it never lands the session keeps OpenAI's create_response default
  // (ON); the "only speak lines the app sends" instruction is persuasion, not
  // enforcement. So kill any undriven response before a word reaches the ear.
- // One-shot gate: EVERY legitimate response is one WE sent (sendCreate sets
- // _weSentCreate right before response.create). A response.created without a
- // pending _weSentCreate is the pure-voice model authoring on its own — even
- // if session.update never landed and create_response leaked to OpenAI's
- // default ON. This is race-proof where the old !_drivenSpeak check wasn't:
- // on turn 2 the voice model answered fast from context, then the brain's real
- // answer cut in — "dumb blonde, then smart restart" (Ford 2026-07-16).
- if (!VOICE_WEAVE && ev.type === "response.created") {
+ // Track OUR response by ID, not a race-prone flag. sendCreate sets
+ // _weSentCreate synchronously right before response.create, so the very next
+ // response.created is ours — we record its id. EVERY response/audio event for
+ // any OTHER id is the pure-voice model authoring on its own: cancel it AND
+ // mute the audio element so it's never heard, even if the API ignores cancel
+ // or create_response leaked ON. Diagnostics logged so the event stream is
+ // visible in the console (Ford 2026-07-16 — freestyle still slipping through).
+ if (!VOICE_WEAVE && (/^response[.]/.test(ev.type) || /^output_audio/.test(ev.type))) {
+ var _rid = (ev.response && ev.response.id) || ev.response_id ||
+ (ev.item && ev.item.id) || null;
+ if (window.__EA_VOICE_DIAG !== false && window.console) {
+ try {
+ console.log("[EA-DIAG]", ev.type, "rid=" + _rid,
+ "weSent=" + !!state._weSentCreate, "ourId=" + (state._ourResponseId || "-"),
+ "driven=" + !!state._drivenSpeak);
+ } catch (eD) {}
+ }
+ if (ev.type === "response.created") {
  if (state._weSentCreate) {
- state._weSentCreate = false; // consume — this one is ours
- state._ourResponseId = (ev.response && ev.response.id) || null;
+ state._weSentCreate = false; // consume — this response is ours
+ state._ourResponseId = _rid;
+ _unmuteMouthEl(); // our own answer must be audible
  } else {
- try {
- if (state.dc && state.dc.readyState === "open") {
- state.dc.send(JSON.stringify({ type: "response.cancel" }));
- state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
- }
- } catch (eFs) {}
- state.rtResponseActive = false;
- state.speaking = false;
- if (window.console && console.warn) {
- console.warn("[EA] killed an undriven Realtime response (pure-voice model must not author)");
- }
+ // Pure-voice model authoring on its own → mute the speaker + cancel.
+ // The mute persists (nothing un-mutes it) until OUR next answer's
+ // response.created fires above, so even a cancel the API ignores is
+ // never heard.
+ _killFreestyle(_rid);
  return;
  }
- }
- // Backstop: audio started for a response that is NOT ours → clear it (catches
- // a freestyle whose response.created we somehow missed).
- if (
- !VOICE_WEAVE &&
- ev.type === "output_audio_buffer.started" &&
- !state._drivenSpeak && !state._weSentCreate
- ) {
- try {
- if (state.dc && state.dc.readyState === "open") {
- state.dc.send(JSON.stringify({ type: "response.cancel" }));
- state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
- }
- } catch (eFs2) {}
- state.rtResponseActive = false;
- state.speaking = false;
+ } else if (ev.type === "output_audio_buffer.started" &&
+ !state._weSentCreate && _rid && _rid !== state._ourResponseId) {
+ // Backstop: freestyle audio whose response.created we somehow missed.
+ _killFreestyle(_rid);
  return;
+ }
  }
  // Track whether a Realtime response is in flight (so cancel is safe)
  if (ev.type === "response.created" || ev.type === "response.output_item.added") {
