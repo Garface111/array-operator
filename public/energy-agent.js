@@ -90,6 +90,7 @@
  _speakQueue: Promise.resolve(),
  _speakSeq: 0,
  _lastSpokenPlain: "",
+ _speakEndedAt: 0, // ms of last speech-end — echo filter only guards a brief tail after this
  // Mic hold during TTS attack only (guarded barge-in after ~0.5s)
  _micHeldForSpeak: false,
  _unmuteAfterSpeakTimer: null,
@@ -4795,9 +4796,23 @@
  if (isStopCommand(said)) return true;
  // First intro must finish, speaker bleed was cutting it every time
  if (state._greetingPlaying) return false;
- if (looksLikeEchoOfLastSpeech(said)) return false;
- if (isGarbageTranscript(said)) return false;
  var now = Date.now();
+ // Echo is our OWN audio bleeding into the mic — physically possible only while
+ // she is speaking or within a brief tail after playback stops. Outside that
+ // window a transcript is the user genuinely talking, even an on-topic follow-up
+ // that reuses words from the long answer she just gave. Time-box the echo
+ // filter so real follow-ups are never eaten as "echo." (Bug, Ford 2026-07-16:
+ // _lastSpokenPlain was never cleared, so every topical follow-up matched the
+ // whole prior answer at 40% word-overlap and was dropped — while off-topic
+ // complaints, which don't overlap, were the only thing getting through.)
+ var echoGuardMs = parseInt(window.__EA_ECHO_GUARD_MS, 10);
+ if (!echoGuardMs || echoGuardMs < 300) echoGuardMs = 1200;
+ var withinEchoWindow =
+ isAgentMouthBusy() ||
+ state._micHeldForSpeak ||
+ (state._speakEndedAt && now - state._speakEndedAt < echoGuardMs);
+ if (withinEchoWindow && looksLikeEchoOfLastSpeech(said)) return false;
+ if (isGarbageTranscript(said)) return false;
  var saidKey = said.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
  // Stronger dedupe: double STT events were starting two full replies
  if (
@@ -5508,6 +5523,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._speakStartedAt = 0;
+ state._speakEndedAt = Date.now();
  if (
  opts.reason === "barge_in" ||
  opts.reason === "new_turn" ||
@@ -5906,6 +5922,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._rtCancelPending = false;
+ state._speakEndedAt = Date.now();
  if (state._greetingPlaying) state._greetingPlaying = false;
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
@@ -5928,6 +5945,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._rtCancelPending = false;
+ state._speakEndedAt = Date.now();
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
  } else {
