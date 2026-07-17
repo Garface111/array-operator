@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260716voiceguard2";
+ var EA_BUILD = "20260717onevoice1";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -3529,9 +3529,17 @@
  if (!state.thinking || state.voiceMuted) return;
  if (state._interimSpoken) return;
  var line = pickThinkingFiller(userText);
+ setStatus(line, "think");
+ // VOICE FILLER OFF by default (Ford 2026-07-16). Speaking a contextual
+ // "one second" line and then cancelling it for the real answer was the
+ // "dumb blonde, then smart restart": a SECOND driven response per turn,
+ // stacking up over the conversation ("start clean, later chaos"). The log
+ // proved every response was weSent=true — us, not the pure-voice model.
+ // Show the line as status TEXT; never speak it. One spoken response per
+ // turn = the answer. window.__EA_VOICE_FILLER=true re-arms spoken fillers.
+ if (window.__EA_VOICE_FILLER !== true) return;
  state._interimSpoken = true;
  state._thinkingFillerActive = true;
- setStatus(line, "think");
  enqueueSpeak(line, {
  source: "thinking_filler",
  force: true,
@@ -3567,6 +3575,12 @@
  if (sd.mind) onMindPlanFromChat(sd.mind);
  // Only use mind line if we haven't started a filler yet
  if (!state.thinking || state.voiceMuted) return;
+ // Voice filler OFF (see above): show the mind's steer line as status TEXT,
+ // never speak it — a spoken filler here is the same second-response bug.
+ if (window.__EA_VOICE_FILLER !== true) {
+ setStatus(sd.speak, "think");
+ return;
+ }
  if (state._interimSpoken || state._thinkingFillerActive) {
  setStatus(sd.speak, "think");
  return;
