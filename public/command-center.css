@@ -3298,18 +3298,24 @@ button.vs-vbadge:hover{ text-decoration:underline; }
    Densify so the FULL table still fits in the remaining width — no horizontal
    scroll. Column order MUST match the base grid:
    Vendor | Name | Output | Units | Live kW | Today | 14-day | Status | Synced
-   (Ford 2026-07-16: EA-open CSS was still Name-first and crushed headers.) */
+
+   Important: media queries use *viewport* width, but the EA rail steals ~388px of
+   content. So viewport-based "drop spark under 1280" never fires on a 1440 laptop
+   with the rail open — Synced was minmax(0,…) and got clipped to "…" / "ago".
+   Always densify on shell-open; give Synced a hard min-width. */
 body.ea-shell-open #sheetWrap,
 body.ho-shell-open #sheetWrap{
   max-width:none;
   width:100%;
   min-width:0;
-  padding:10px 8px 32px;
-  overflow:hidden;
+  padding:8px 6px 28px;
+  overflow-x:hidden;
+  overflow-y:visible;
+  box-sizing:border-box;
 }
 body.ea-shell-open .vs-topbar,
 body.ho-shell-open .vs-topbar{
-  margin-bottom:8px;
+  margin-bottom:6px;
 }
 body.ea-shell-open .vs-hint,
 body.ho-shell-open .vs-hint{
@@ -3323,22 +3329,47 @@ body.ho-shell-open .vs-scroll{
   max-width:100%;
   min-width:0;
 }
+/* Always drop 14-day spark when the rail is open — free ~80px for Synced */
+body.ea-shell-open .vs-c-spark,
+body.ea-shell-open .vs-colhead .vs-c-spark,
+body.ea-shell-open .vs-inv-rowspark-wrap,
+body.ho-shell-open .vs-c-spark,
+body.ho-shell-open .vs-colhead .vs-c-spark,
+body.ho-shell-open .vs-inv-rowspark-wrap{
+  display:none !important;
+}
 body.ea-shell-open .vs-row,
 body.ho-shell-open .vs-row{
   grid-template-columns:
-    minmax(72px,.55fr)    /* vendor */
-    minmax(0,1.45fr)      /* name */
-    44px                  /* gauge */
-    minmax(40px,.5fr)     /* units */
-    minmax(56px,.75fr)    /* live kW */
-    minmax(62px,.8fr)     /* today */
-    minmax(56px,80px)     /* spark compact */
-    minmax(0,1.05fr)      /* status */
-    minmax(0,.55fr);      /* synced */
+    minmax(58px,.42fr)    /* vendor */
+    minmax(0,1.35fr)      /* name */
+    40px                  /* gauge */
+    minmax(32px,.38fr)    /* units */
+    minmax(50px,.68fr)    /* live kW */
+    minmax(54px,.72fr)    /* today */
+    0px                   /* spark hidden */
+    minmax(68px,.95fr)    /* status */
+    minmax(92px,.88fr);   /* synced — hard min so "synced 12m" / "25d ago" never clips */
   width:100%;
   min-width:0;
-  gap:5px;
-  padding:8px 8px;
+  gap:4px;
+  padding:7px 6px;
+  box-sizing:border-box;
+}
+/* Synced / Details: never ellipsize into "ago" alone — hard min + no overflow hide */
+body.ea-shell-open .vs-c-fresh,
+body.ho-shell-open .vs-c-fresh{
+  min-width:92px;
+  max-width:100%;
+  overflow:visible;
+  text-overflow:clip;
+  white-space:nowrap;
+  font-size:11px;
+  font-variant-numeric:tabular-nums;
+}
+body.ea-shell-open .vs-colhead .vs-c-fresh,
+body.ho-shell-open .vs-colhead .vs-c-fresh{
+  overflow:hidden; /* header label "Synced" is short */
 }
 /* Expand-all: icon-only when cramped so it doesn't become "EX" mid-header */
 body.ea-shell-open .vs-expandall,
@@ -3348,6 +3379,7 @@ body.ho-shell-open .vs-expandall{
   padding:3px 7px;
   min-width:28px;
   width:auto;
+  flex-shrink:0;
 }
 body.ea-shell-open .vs-expandall::before,
 body.ho-shell-open .vs-expandall::before{
@@ -3362,16 +3394,27 @@ body.ho-shell-open .vs-namehead{
   gap:4px;
   min-width:0;
 }
-body.ea-shell-open .vs-c-spark,
-body.ho-shell-open .vs-c-spark{
-  padding-right:2px;
+/* Compact "Open vendor to sync" chip — full label was eating the Name track */
+body.ea-shell-open .vs-vlag,
+body.ho-shell-open .vs-vlag{
+  font-size:0;
+  letter-spacing:0;
+  padding:2px 7px;
+  gap:0;
+  max-width:4.5rem;
 }
-body.ea-shell-open .vs-inv-rowspark-wrap,
-body.ea-shell-open .vs-inv-rowspark,
-body.ho-shell-open .vs-inv-rowspark-wrap,
-body.ho-shell-open .vs-inv-rowspark{
-  max-width:72px;
-  height:20px;
+body.ea-shell-open .vs-vlag::before,
+body.ho-shell-open .vs-vlag::before{
+  content:"↗ sync";
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+body.ea-shell-open .vs-vlag .vs-vlag-ic,
+body.ea-shell-open .vs-vlag .vs-vlag-sub,
+body.ho-shell-open .vs-vlag .vs-vlag-ic,
+body.ho-shell-open .vs-vlag .vs-vlag-sub{
+  display:none;
 }
 body.ea-shell-open .vs-gauge,
 body.ea-shell-open .vs-gauge svg,
@@ -3379,8 +3422,8 @@ body.ea-shell-open .vs-gauge-empty,
 body.ho-shell-open .vs-gauge,
 body.ho-shell-open .vs-gauge svg,
 body.ho-shell-open .vs-gauge-empty{
-  width:44px;
-  height:23px;
+  width:40px;
+  height:21px;
 }
 body.ea-shell-open .vs-c-pow,
 body.ea-shell-open .vs-c-today,
@@ -3396,8 +3439,8 @@ body.ea-shell-open .vs-colhead,
 body.ho-shell-open .vs-colhead{
   font-size:9px;
   letter-spacing:.04em;
-  gap:5px;
-  padding:7px 8px;
+  gap:4px;
+  padding:6px;
 }
 body.ea-shell-open .vs-colhead .vs-c-pow,
 body.ea-shell-open .vs-colhead .vs-c-today,
@@ -3413,44 +3456,25 @@ body.ho-shell-open .vs-colhead .vs-c-spark{
 body.ea-shell-open .vs-pill,
 body.ho-shell-open .vs-pill{
   font-size:10px;
-  padding:3px 7px;
+  padding:3px 6px;
   max-width:100%;
+}
+body.ea-shell-open .vs-c-status,
+body.ho-shell-open .vs-c-status{
+  min-width:0;
 }
 body.ea-shell-open .vs-inv-details,
 body.ho-shell-open .vs-inv-details{
   font-size:10.5px;
   padding:2px 5px;
+  white-space:nowrap;
 }
 body.ea-shell-open .vs-inv-sub,
 body.ho-shell-open .vs-inv-sub{
   font-size:10px;
 }
-/* Tight remaining width (EA rail + smaller viewport): drop spark column */
-@media(max-width:1280px){
-  body.ea-shell-open .vs-c-spark,
-  body.ea-shell-open .vs-colhead .vs-c-spark,
-  body.ea-shell-open .vs-inv-rowspark-wrap,
-  body.ho-shell-open .vs-c-spark,
-  body.ho-shell-open .vs-colhead .vs-c-spark,
-  body.ho-shell-open .vs-inv-rowspark-wrap{
-    display:none !important;
-  }
-  body.ea-shell-open .vs-row,
-  body.ho-shell-open .vs-row{
-    grid-template-columns:
-      minmax(68px,.5fr)     /* vendor */
-      minmax(0,1.5fr)       /* name */
-      42px                  /* gauge */
-      minmax(38px,.48fr)    /* units */
-      minmax(54px,.78fr)    /* live kW */
-      minmax(60px,.82fr)    /* today */
-      0px                   /* spark hidden */
-      minmax(0,1.15fr)      /* status */
-      minmax(0,.58fr);      /* synced */
-  }
-}
-/* Very tight: also hide Output gauge — keep Live kW + status readable */
-@media(max-width:1020px){
+/* Narrower desktops + rail: also drop Output gauge */
+@media(max-width:1500px){
   body.ea-shell-open .vs-c-gauge,
   body.ea-shell-open .vs-colhead .vs-c-gauge,
   body.ho-shell-open .vs-c-gauge,
@@ -3460,14 +3484,36 @@ body.ho-shell-open .vs-inv-sub{
   body.ea-shell-open .vs-row,
   body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(64px,.48fr)
-      minmax(0,1.55fr)
+      minmax(56px,.4fr)     /* vendor */
+      minmax(0,1.45fr)      /* name */
+      0px                   /* gauge hidden */
+      minmax(32px,.38fr)    /* units */
+      minmax(50px,.7fr)     /* live kW */
+      minmax(54px,.75fr)    /* today */
+      0px                   /* spark hidden */
+      minmax(68px,1fr)      /* status */
+      minmax(92px,.9fr);    /* synced hard min */
+  }
+}
+/* Very tight remaining content (≈ laptop + EA rail): drop Units too */
+@media(max-width:1180px){
+  body.ea-shell-open .vs-c-inv,
+  body.ea-shell-open .vs-colhead .vs-c-inv,
+  body.ho-shell-open .vs-c-inv,
+  body.ho-shell-open .vs-colhead .vs-c-inv{
+    display:none !important;
+  }
+  body.ea-shell-open .vs-row,
+  body.ho-shell-open .vs-row{
+    grid-template-columns:
+      minmax(52px,.38fr)
+      minmax(0,1.5fr)
       0px
-      minmax(36px,.45fr)
-      minmax(52px,.8fr)
-      minmax(58px,.85fr)
       0px
-      minmax(0,1.2fr)
-      minmax(0,.55fr);
+      minmax(48px,.72fr)
+      minmax(52px,.78fr)
+      0px
+      minmax(64px,1fr)
+      minmax(88px,.95fr);
   }
 }

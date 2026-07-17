@@ -361,11 +361,11 @@
  function syncFreshness(c) {
  const src = _ageMin(c), syn = _syncAgeMin(c);
  if (src != null && src < _liveWindowMin(c)) return "live"; // the source data itself is current
- // Source is STALE → show the SOURCE-data age, but framed as "the latest reading
- // WE pulled" (we sync every few minutes; the age is the vendor's own publish gap,
- // not our lag), never "synced now". e.g. "latest data 21h ago".
+ // Source is STALE → lead with SOURCE age (never "synced now"). Column is narrow
+ // (especially with EA rail open), so keep the visible label short; full honesty
+ // lives in the tooltip via freshTip(). e.g. "21h ago" not "latest data 21h ago".
  if (isStale(c)) {
- return "latest data " + _fmtAgeShort(src) + " ago";
+ return _fmtAgeShort(src) + " ago";
  }
  if (syn != null) return syn < 1 ? "synced now" : "synced " + _fmtAgeShort(syn); // our capture recency (updates every sync)
  if (src != null) return _fmtAgeShort(src) + " ago"; // legacy rows without a sync clock
@@ -406,7 +406,8 @@
  // reads "…is 21h old", not "…is 21h ago old".
  const longAge = _fmtAge(oldestSrc).replace(/ ago$/, "");
  return {
- text: "latest data " + _fmtAgeShort(oldestSrc) + " ago",
+ // Compact cell label (EA rail + 9-col grid); full sentence stays in title.
+ text: _fmtAgeShort(oldestSrc) + " ago",
  stale: true,
  title: (list.length > 1
  ? "We sync these every few minutes, but the " + n + " of " + list.length
@@ -418,7 +419,8 @@
  if (!ages.length) return null;
  const oldest = Math.max(...ages);
  return {
- text: "Synced " + _fmtAge(oldest),
+ // Short form matches per-array cells ("synced 3m") — "Synced 48 min ago" clipped under EA.
+ text: oldest < 1 ? "synced now" : "synced " + _fmtAgeShort(oldest),
  stale: oldest >= 30,
  title: (list.length > 1
  ? "Oldest sync among these " + list.length + " arrays: "
