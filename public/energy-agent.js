@@ -3320,7 +3320,9 @@
  resolve();
  return;
  }
- enqueueSpeak(mouthLine, { source: "chat", force: true })
+ // holdMicFull implied by source "chat" — she finishes the whole line
+ // before the mic re-opens (no mid-answer self-interrupt from speaker bleed).
+ enqueueSpeak(mouthLine, { source: "chat", force: true, holdMicFull: true })
  .then(resolve)
  .catch(function () { resolve(); });
  }, settleMs);
@@ -4612,10 +4614,14 @@
  /**
  * Guarded barge-in (GPT Live style):
  * - Mute mic at TTS attack so speaker bleed doesn't cancel the lead-in.
- * - Greeting / holdMicFull: keep mic OFF until speech fully ends (intro was
- * always getting cut when mute reopened ~1.4s mid-sentence).
- * - Other speech: re-open after a long attack mute for real barge-in.
+ * - Greeting / holdMicFull / chat answers: keep mic OFF until speech fully
+ * ends. Re-opening ~1.4–3s mid-sentence was the #1 cause of mid-reply cutoffs
+ * (speaker bleed → false barge-in). Ford 2026-07-16.
+ * - Short fillers with partial hold: re-open only after most of the utterance
+ * (word-count estimate), never a flat 1.4s cap.
  * Does NOT flip state.listening, user still shows as Live.
+ * Intentional interrupt while mic is held: type "stop" / click mute, or wait
+ * and say "stop" — voice barge-in is available again once she finishes.
  */
  function holdMicWhileSpeaking(hold, opts) {
  opts = opts || {};
@@ -4626,7 +4632,12 @@
  if (hold) {
  state._speakStartedAt = Date.now();
  state._micHeldForSpeak = true;
- state._holdMicFull = !!(opts.holdMicFull || opts.source === "greeting");
+ state._holdMicFull = !!(
+ opts.holdMicFull ||
+ opts.source === "greeting" ||
+ opts.source === "chat" ||
+ opts.source === "thinking_filler"
+ );
  try {
  if (state.micStream) {
  state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
@@ -4637,15 +4648,18 @@
  state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
  } catch (e) {}
  }
- // Greeting: NEVER re-open mic until done(), bleed was killing the intro
+ // Full hold until done() — no mid-utterance re-open (bleed was killing her)
  if (state._holdMicFull) return;
- // Longer mute for long answers so the whole first phrase (and more) is safe
- var muteMs = 1400;
- try {
- var wcount = (state._lastSpokenPlain || "").split(/\s+/).filter(Boolean).length;
- if (wcount > 40) muteMs = 2200;
- if (wcount > 80) muteMs = 3000;
- } catch (e) {}
+ // Partial hold path (tours/acks): mute for ~90% of estimated speech, not 1.4s
+ var wcount = Math.max(
+ 1,
+ parseInt(opts.wordCount, 10) ||
+ (state._lastSpokenPlain || "").split(/\s+/).filter(Boolean).length ||
+ 1
+ );
+ // ~480ms/word + pad; protect almost the whole line
+ var estMs = Math.max(2800, Math.round(wcount * 480) + 800);
+ var muteMs = Math.min(180000, Math.max(2500, Math.round(estMs * 0.92)));
  state._unmuteAfterSpeakTimer = setTimeout(function () {
  state._unmuteAfterSpeakTimer = null;
  state._micHeldForSpeak = false;
@@ -4781,12 +4795,18 @@
  if (isAgentMouthBusy() || state._micHeldForSpeak) {
  var t = said.trim().replace(/[.!?]+$/, "").toLowerCase();
  // Listening backchannels — never a barge-in while she's talking.
- var isBackchannel = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|k|sure|right|alright|uh ?huh|mm ?hmm|mhm|hmm|got it|i see|gotcha|makes sense|nice|cool|wow|nvm|hey|go on|keep going|continue|and\??|so\??)$/.test(t);
+ var isBackchannel = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|k|sure|right|alright|uh ?huh|mm ?hmm|mhm|hmm|got it|i see|gotcha|makes sense|nice|cool|wow|nvm|hey|go on|keep going|continue|and\??|so\??|uh|um|ah)$/.test(t);
  if (isBackchannel) return false;
- // A real interruption is a clear, multi-word cut-in. Below that bar, keep
- // talking — the user can always say "stop" to hard-halt.
- var minWords = parseInt((window.__EA_BARGE_MIN_WORDS || 5), 10) || 5;
- if (words.length < minWords || said.trim().length < 22) {
+ // A real interruption is a clear, multi-word cut-in. Default bar is high so
+ // speaker bleed / partial echoes don't kill mid-sentence answers.
+ // Override: window.__EA_BARGE_MIN_WORDS = 4 (more interruptible).
+ var minWords = parseInt((window.__EA_BARGE_MIN_WORDS || 8), 10) || 8;
+ var minChars = parseInt((window.__EA_BARGE_MIN_CHARS || 36), 10) || 36;
+ if (words.length < minWords || said.trim().length < minChars) {
+ return false;
+ }
+ // If most of the "user" words already appear in what she just said, it's echo.
+ if (transcriptOverlapsSpeech(said, state._lastSpokenPlain, 0.45)) {
  return false;
  }
  return true;
@@ -4805,7 +4825,37 @@
  var aw = a.split(" ").slice(0, 8).join(" ");
  var bw = b.split(" ").slice(0, 8).join(" ");
  if (aw.length >= 10 && (bw.indexOf(aw) !== -1 || aw.indexOf(bw) !== -1)) return true;
+ // Word-set overlap (mid-utterance bleed often matches later words, not the lead)
+ if (transcriptOverlapsSpeech(a, b, 0.4)) return true;
  return false;
+ }
+
+ /** True when ≥frac of transcript content-words appear in the spoken line. */
+ function transcriptOverlapsSpeech(said, spoken, frac) {
+ var aw = String(said || "")
+ .toLowerCase()
+ .replace(/[^\w\s']/g, " ")
+ .replace(/\s+/g, " ")
+ .trim()
+ .split(" ")
+ .filter(function (w) {
+ return w.length > 2 && !/^(the|and|for|that|this|with|you|your|are|was|has|have|its|from|into|about)$/.test(w);
+ });
+ var bw = String(spoken || "")
+ .toLowerCase()
+ .replace(/[^\w\s']/g, " ")
+ .replace(/\s+/g, " ")
+ .trim()
+ .split(" ")
+ .filter(Boolean);
+ if (aw.length < 2 || !bw.length) return false;
+ var set = {};
+ for (var i = 0; i < bw.length; i++) set[bw[i]] = true;
+ var hit = 0;
+ for (var j = 0; j < aw.length; j++) {
+ if (set[aw[j]]) hit++;
+ }
+ return hit / aw.length >= (frac || 0.45);
  }
 
  /**
@@ -4848,13 +4898,14 @@
  function realtimeVadConfig() {
  return {
  type: "server_vad",
- // Higher = less sensitive (default 0.5 is jumpy with fans/keys/speakers)
- threshold: 0.78,
+ // Higher = less sensitive (default 0.5 is jumpy with fans/keys/speakers).
+ // 0.85 ignores more room hiss / speaker bleed ghosts (Ford 2026-07-16 mid-cut).
+ threshold: 0.85,
  prefix_padding_ms: 320,
  // Wait longer before declaring end-of-speech so multi-clause asks
  // ("I'm looking at X and Y and it doesn't look good, can we fix…")
  // aren't cut mid-thought (Ford 2026-07-14).
- silence_duration_ms: 1400,
+ silence_duration_ms: 1600,
  create_response: false,
  // Client owns replies; we cancel explicitly on barge-in / stop
  interrupt_response: false,
@@ -5141,13 +5192,16 @@
  state._speakEarlyDoneTimer = earlyDoneTimer;
  };
 
- // Attack mute, full hold for greeting / short fillers so bleed doesn't barge-in
+ // Attack mute: full hold for greeting / fillers / chat answers so speaker
+ // bleed cannot barge-in mid-sentence (Ford 2026-07-16 mid-reply cutoffs).
  var isGreeting = opts.source === "greeting";
  var isFiller = opts.source === "thinking_filler";
+ var isChatAnswer = opts.source === "chat";
  if (isGreeting) state._greetingPlaying = true;
  holdMicWhileSpeaking(true, {
- holdMicFull: isGreeting || isFiller || opts.holdMicFull,
+ holdMicFull: isGreeting || isFiller || isChatAnswer || !!opts.holdMicFull,
  source: opts.source,
+ wordCount: words,
  });
 
  // ── GPT Realtime mouth ────────────────────────────────────────────
