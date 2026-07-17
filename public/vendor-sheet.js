@@ -538,6 +538,7 @@
  function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
 
  const _expanded = {}; // array_id -> bool (survives re-renders)
+ let _focusFlashKey = null; // "array_id:inverter_id" to flash-highlight (deep-link from Fleet Triage); survives re-renders
  const _vendorCollapsed = {}; // vendor code -> bool, collapses ALL its arrays at once
  // (Ford: "I have 56 arrays in Chint, I should be able to
  // click next to Chint and collapse all of them")
@@ -1540,7 +1541,7 @@
  cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
- h += `<div class="vs-row vs-inv" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
+ h += `<div class="vs-row vs-inv${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
  <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
  <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
  <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
@@ -2103,6 +2104,49 @@
  // recency ("live" / "synced Xm").
  window.VendorSheet.freshness = freshness;
  window.VendorSheet.syncFreshness = syncFreshness;
+
+ // Deep-link from the Fleet Triage queue (command-center.js): jump to THIS
+ // inverter in the spreadsheet — switch to the table sub-view, expand its vendor
+ // group + array, then scroll to and flash the row. (arrayId, inverterId) match
+ // the data-inv-row key built at render time: array_id + ":" + inverter_id.
+ function focusInverter(arrayId, inverterId) {
+ if (arrayId == null) return;
+ arrayId = String(arrayId);
+ let vendor = null;
+ try {
+ const cols = (window.FleetStore && FleetStore.toColumns().columns) || [];
+ const col = cols.find(c => String(c.array_id) === arrayId);
+ if (col) vendor = (col.vendor || "other").toLowerCase();
+ } catch (_) {}
+ // Make sure the Inverters tab is showing (the router keys off the hash).
+ if (location.hash !== "#arrays" && location.hash !== "#sandbox") {
+ try { location.hash = "#arrays"; } catch (_) {}
+ }
+ showView("table"); // ensure the spreadsheet sub-view, not the canvas
+ if (vendor) _vendorCollapsed[vendor] = false; // un-collapse the vendor group
+ _expanded[arrayId] = true; // expand the array's inverters
+ // Persist the flash target as module state (like _expanded) so it SURVIVES the
+ // re-render the tab-switch (hashchange → applyView) fires right after — a class
+ // added to a one-off element would otherwise be wiped when the body rebuilds.
+ const key = arrayId + ":" + (inverterId == null ? "" : inverterId);
+ _focusFlashKey = inverterId == null ? null : key;
+ render();
+ const sel = s => { try { return document.querySelector(s); } catch (_) { return null; } };
+ // Scroll the row into view once things settle (past the tab-switch re-render),
+ // and clear the flash key after the animation so it doesn't re-trigger later.
+ let tries = 0;
+ (function settle() {
+ const row = (inverterId != null && sel('#vendorSheet [data-inv-row="' + key.replace(/["\\]/g, "\\$&") + '"]'))
+ || sel('#vendorSheet [data-arr="' + arrayId.replace(/["\\]/g, "\\$&") + '"]');
+ if (row) { try { row.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {} }
+ else if (++tries < 8) { setTimeout(settle, 60); return; }
+ setTimeout(() => {
+ _focusFlashKey = null;
+ document.querySelectorAll("#vendorSheet .vs-row-flash").forEach(el => el.classList.remove("vs-row-flash"));
+ }, 2400);
+ })();
+ }
+ window.VendorSheet.focusInverter = focusInverter;
 
  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
  else init();

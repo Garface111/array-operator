@@ -5,10 +5,49 @@
 (function () {
  "use strict";
 
+ // Build stamp — so "am I on stale code?" is never a guess again. Prints on
+ // load and is readable any time via window.__EA_BUILD. Bump BUILD with the
+ // ?v= token in index.html. If the console shows an OLD build while voice
+ // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
+ // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
+ var EA_BUILD = "20260716micfix1";
+ try {
+ window.__EA_BUILD = EA_BUILD;
+ // voice mode is decided below; log it too once VOICE_WEAVE is known.
+ console.info("[EnergyAgent] build " + EA_BUILD + " loaded");
+ } catch (e) {}
+
+ /**
+  * Long turns MUST NOT go through the Netlify proxy.
+  *
+  * public/_redirects proxies /v1/* -> Railway, and that proxy BUFFERS the
+  * upstream response and abandons it at ~26s with a bare "HTTP 504". Measured
+  * live 2026-07-16 with one heavy repair question:
+  *   through Netlify : 504 @ 28-32s, ZERO bytes delivered (buffered, then binned)
+  *   direct to Railway: 200 @ 43s, 9 heartbeats, full tool-grounded answer
+  * So the cap is on total duration, not time-to-first-byte — streaming through
+  * the proxy does not help. The API already sends
+  * `access-control-allow-origin: https://arrayoperator.com`, so the browser can
+  * talk to Railway directly (same as the extension and Stripe webhooks do).
+  *
+  * ONLY the known prod host bypasses. Staging/preview/dev stay same-origin so a
+  * preview can never be pointed at the production API by accident.
+  */
+ var LONG_API_ORIGIN = (function () {
+ if (typeof window.__EA_API_ORIGIN === "string") return window.__EA_API_ORIGIN;
+ var h = (location.hostname || "").toLowerCase();
+ if (h === "arrayoperator.com" || h === "www.arrayoperator.com") {
+ return "https://web-production-49c83.up.railway.app";
+ }
+ return "";
+ })();
+
  var API = {
  session: "/v1/energy-agent/session",
- chat: "/v1/energy-agent/chat",
- voiceConsultStream: "/v1/energy-agent/voice-consult-stream",
+ // These three can outrun the proxy's ~26s cap → go straight to the API.
+ chat: LONG_API_ORIGIN + "/v1/energy-agent/chat",
+ chatStream: LONG_API_ORIGIN + "/v1/energy-agent/chat-stream",
+ voiceConsultStream: LONG_API_ORIGIN + "/v1/energy-agent/voice-consult-stream",
  upload: "/v1/energy-agent/upload",
  confirm: "/v1/energy-agent/confirm",
  realtime: "/v1/energy-agent/realtime-session",
@@ -38,6 +77,11 @@
  } catch (e) {}
  return false;
  })();
+ try {
+ window.__EA_VOICE_MODE = VOICE_WEAVE ? "weave" : "mouth-only";
+ console.info("[EnergyAgent] voice mode: " + window.__EA_VOICE_MODE +
+ (VOICE_WEAVE ? "" : " (the mouth cannot author; it only reads driven lines)"));
+ } catch (e) {}
 
  // Live thinking-narration (Ford 2026-07-16): stream the deep brain's real tool
  // calls and speak them out loud AS it works, then the answer. __EA_VOICE_NARRATE
@@ -2974,6 +3018,76 @@
  );
  }
 
+ /**
+  * POST a chat turn and return {httpOk, status, d} — same shape a plain
+  * fetch+json gave, so callers are unchanged.
+  *
+  * Goes through the STREAMING endpoint. /v1/* reaches the API via the Netlify
+  * proxy, which abandons a blocking upstream at ~26s and hands back a bare
+  * "HTTP 504" — and a heavy turn (several Claude tool rounds) routinely runs
+  * longer, so a finished answer got thrown away after the brain had already
+  * done the work (Ford 2026-07-16: the voice, which streams, spoke a full
+  * answer while the text died at 504). Streaming keeps first byte immediate
+  * and heartbeats the wire, so long turns survive the proxy.
+  *
+  * Falls back to the blocking endpoint if chat-stream isn't there yet.
+  */
+ async function postChatTurn(chatBody, fetchOpts) {
+ var opts = Object.assign({}, fetchOpts || {}, {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify(chatBody),
+ });
+ var r;
+ try {
+ r = await fetch(API.chatStream, opts);
+ } catch (e) {
+ if (e && e.name === "AbortError") throw e;
+ r = null;
+ }
+ // Older backend (no chat-stream yet) → blocking endpoint, still better than nothing
+ if (!r || r.status === 404 || r.status === 405) {
+ var rb = await fetch(API.chat, opts);
+ var db_ = await rb.json().catch(function () { return null; });
+ return { httpOk: rb.ok, status: rb.status, d: db_ };
+ }
+ if (!r.ok || !r.body || typeof r.body.getReader !== "function") {
+ var d0 = await r.json().catch(function () { return null; });
+ return { httpOk: r.ok, status: r.status, d: d0 };
+ }
+ var reader = r.body.getReader();
+ var dec = new TextDecoder();
+ var buf = "";
+ var out = null;
+ var errEv = null;
+ for (;;) {
+ var step = await reader.read();
+ if (step.done) break;
+ buf += dec.decode(step.value, { stream: true });
+ var lines = buf.split("\n");
+ buf = lines.pop(); // trailing partial line
+ for (var i = 0; i < lines.length; i++) {
+ var line = lines[i].trim();
+ if (!line) continue;
+ var ev;
+ try { ev = JSON.parse(line); } catch (e2) { continue; }
+ if (!ev || ev.type === "ping") continue; // heartbeat, keeps the proxy open
+ if (ev.type === "done") out = ev.payload || {};
+ else if (ev.type === "error") errEv = ev;
+ }
+ }
+ if (errEv) {
+ return {
+ httpOk: false,
+ status: errEv.status || 500,
+ d: { detail: errEv.detail },
+ };
+ }
+ if (out) return { httpOk: true, status: 200, d: out };
+ // Stream ended with no answer — say so honestly, don't fake success
+ return { httpOk: false, status: 502, d: { detail: "The answer stream ended early — try that once more?" } };
+ }
+
  async function turn(text, source, opts) {
  opts = opts || {};
  var pendingAttach = (state.attachments || []).slice();
@@ -3141,20 +3255,16 @@
  source: source || "text",
  };
  if (attachIds.length) chatBody.attachment_ids = attachIds;
- var fetchOpts = {
- method: "POST",
- headers: authHeaders(),
- body: JSON.stringify(chatBody),
- };
+ var fetchOpts = {};
  if (state._chatAbort) fetchOpts.signal = state._chatAbort.signal;
- var r = await fetch(API.chat, fetchOpts);
+ var pack = await postChatTurn(chatBody, fetchOpts);
  // Aborted by "stop" while waiting on the model
  if (turnGen !== (state._turnAbortGen || 0)) return;
- var d = await r.json().catch(function () { return null; });
+ var d = pack.d;
  if (turnGen !== (state._turnAbortGen || 0)) return;
- if (!r.ok) {
- var err = (d && (d.detail || d.error)) || ("HTTP " + r.status);
- if (r.status === 402 || /budget|allowance|weekly/i.test(String(err))) {
+ if (!pack.httpOk) {
+ var err = (d && (d.detail || d.error)) || ("HTTP " + pack.status);
+ if (pack.status === 402 || /budget|allowance|weekly/i.test(String(err))) {
  var eb = d && d.budget ? d.budget : (d && d.detail && d.detail.budget);
  if (eb) setBudget(Object.assign({}, eb, { ok: false, pct_used: 100 }));
  else refreshBudget().then(function (rb) {
@@ -3163,7 +3273,7 @@
  }
  addMsg("agent", typeof err === "string" ? err : (err && err.error) || JSON.stringify(err));
  clearTools();
- setStatus(r.status === 402 ? "Weekly limit reached" : "Error", "warn");
+ setStatus(pack.status === 402 ? "Weekly limit reached" : "Error", "warn");
  return;
  }
  setBudget(d.budget);
@@ -4673,9 +4783,17 @@
  state._micHeldForSpeak = true;
  // Full hold ONLY for the short greeting intro — never for normal answers
  // (that killed GPT-Live interruptibility).
- state._holdMicFull = !!(
- opts.holdMicFull === true && opts.source === "greeting"
- ) || opts.source === "greeting";
+ // Full-hold the mic for the WHOLE utterance in mouth-only mode. Her own
+ // speaker audio was bleeding into the mic (reopened ~550ms in), getting
+ // transcribed as GARBLED "user" speech that slipped past the echo filter and
+ // self-interrupted her mid-sentence — "the mouth pops, then it just gives up"
+ // (Ford 2026-07-16). Turn-taking, not barge-in: the mic reopens 400ms after
+ // she finishes. Greeting always full-holds; weave keeps GPT-Live barge-in.
+ // window.__EA_MIC_BARGE_IN=true restores the old reopen-mid-answer behavior.
+ var _forceBarge = (window.__EA_MIC_BARGE_IN === true);
+ state._holdMicFull = !_forceBarge && (
+ opts.source === "greeting" || !VOICE_WEAVE || opts.holdMicFull === true
+ );
  try {
  if (state.micStream) {
  state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
@@ -5300,20 +5418,11 @@
  var chatCtx = packContext() || {};
  chatCtx.voice_active = true;
  chatCtx.voice_weave = true;
- return fetch(API.chat, {
- method: "POST",
- headers: authHeaders(),
- body: JSON.stringify({
+ return postChatTurn({
  session_id: state.sessionId,
  message: q,
  context: chatCtx,
  source: "voice_consult",
- }),
- })
- .then(function (r) {
- return r.json().then(function (d) {
- return { httpOk: r.ok, status: r.status, d: d };
- });
  })
  .then(function (pack) {
  state.thinking = false;
@@ -5897,6 +6006,34 @@
  }
  return;
  }
+ // ── The mouth may not author ──────────────────────────────────────────
+ // Mouth-only: every legitimate line is driven by us through speakNow, which
+ // sets _drivenSpeak. A response we did NOT drive is GPT answering on its
+ // own — it has no tools and no fleet data, so it guesses, and the guess
+ // contradicts the brain: it denied sending emails the brain had just sent,
+ // and spoke while the panel read "Text only, voice off" (Ford 2026-07-16).
+ // Config cannot prevent this on its own — session.update is fire-and-forget,
+ // and if it never lands the session keeps OpenAI's create_response default
+ // (ON); the "only speak lines the app sends" instruction is persuasion, not
+ // enforcement. So kill any undriven response before a word reaches the ear.
+ if (
+ !VOICE_WEAVE &&
+ !state._drivenSpeak &&
+ (ev.type === "response.created" || ev.type === "output_audio_buffer.started")
+ ) {
+ try {
+ if (state.dc && state.dc.readyState === "open") {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ }
+ } catch (eFs) {}
+ state.rtResponseActive = false;
+ state.speaking = false;
+ if (window.console && console.warn) {
+ console.warn("[EA] killed an undriven Realtime response (mouth-only: GPT must not author)");
+ }
+ return;
+ }
  // Track whether a Realtime response is in flight (so cancel is safe)
  if (ev.type === "response.created" || ev.type === "response.output_item.added") {
  state.rtResponseActive = true;
@@ -6115,6 +6252,16 @@
  }
 
  // ── Legacy mouth-only path ──────────────────────────────────────────
+ // Defense in depth: while SHE is delivering a driven read, a transcript is
+ // almost certainly her own speaker audio bleeding back (garbled STT that slips
+ // past the echo filter). Do NOT let that self-interrupt her — she must finish
+ // the thought. A real "stop" already returned above (isStopCommand).
+ if (state._drivenSpeak && isAgentMouthBusy()) {
+ if (state.dc && state.dc.readyState === "open") {
+ try { state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" })); } catch (e) {}
+ }
+ return;
+ }
  stopSpeak({ reason: "barge_in" });
  if (state.dc && state.dc.readyState === "open") {
  try {
@@ -6280,6 +6427,28 @@
  sess.tool_choice = "required";
  }
  dcSend({ type: "session.update", session: sess });
+ // session.update is fire-and-forget over the data channel. If it never lands,
+ // the session silently keeps OpenAI's defaults — including create_response ON,
+ // which turns the mouth into a second, tool-less author that contradicts the
+ // brain. Re-send until the server confirms session.updated; say so loudly if
+ // it never does (the undriven-response guard above is the backstop).
+ (function ensureSessionUpdate(tries) {
+ if (state._sessionUpdated) return;
+ if (tries >= 6) {
+ if (window.console && console.warn) {
+ console.warn("[EA] session.update never confirmed — mouth config unverified; " +
+ "undriven-response guard is holding the line");
+ }
+ return;
+ }
+ setTimeout(function () {
+ if (state._sessionUpdated) return;
+ if (state.dc && state.dc.readyState === "open") {
+ try { state.dc.send(JSON.stringify({ type: "session.update", session: sess })); } catch (e) {}
+ }
+ ensureSessionUpdate(tries + 1);
+ }, 700);
+ })(0);
  // Single greeting per panel open
  if (!state.greeted && !state.voiceMuted) {
  state.greeted = true;

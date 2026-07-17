@@ -1,58 +1,85 @@
 {
-  "updated": "2026-07-16",
+  "updated": "2026-07-17",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
-      "date": "2026-07-15",
+      "date": "2026-07-14",
       "state": "ct",
       "tag": "Rate case",
-      "title": "Eversource files CT rate case seeking ~18% residential increase",
-      "summary": "Eversource filed a distribution rate application with PURA on July 14, 2026 seeking roughly $727 million in added annual revenue — about an 18% jump for typical residential bills (≈11% excluding storm-cost recovery), its first formal rate case in nine years. New rates would take effect July 1, 2027; AG William Tong called the request a 'tone-deaf insult.'",
+      "title": "Eversource files ~$727M CT electric rate case seeking ~18% residential hike",
+      "summary": "The Connecticut Light and Power Company (Eversource) filed its first electric distribution rate review in nearly a decade with PURA, seeking roughly $727 million in added annual revenue and an estimated 18% increase for the typical residential customer, driven largely by 2018–2025 storm costs. If approved, new rates would take effect July 1, 2027; Attorney General William Tong called the request a 'tone-deaf insult.'",
       "source": "WFSB",
       "url": "https://www.wfsb.com/2026/07/15/eversource-seeks-18-rate-increase-attorney-general-calls-it-tone-deaf-insult/"
     },
     {
-      "date": "2026-07-08",
+      "date": "2026-07-10",
       "state": "nh",
       "tag": "Law",
-      "title": "New Hampshire legalizes plug-in 'balcony' solar under SB 540",
-      "summary": "Gov. Kelly Ayotte signed SB 540 (Chapter 89), legalizing portable socket-compatible solar devices capped at one unit per metered customer and 1,200 watts each, and barring utilities from requiring interconnection agreements or charging fees for them. The law takes effect July 27, 2026.",
+      "title": "NH enacts HB 1718 creating net-metering credits for solar-charged batteries",
+      "summary": "Gov. Kelly Ayotte signed HB 1718 on July 10, 2026, directing the Department of Energy and PUC to build a framework compensating customers for electricity exported to the grid from batteries charged by renewable generators, clarifying that storage can pair with net-metered solar without affecting system-size limits.",
       "source": "New Hampshire Public Radio",
-      "url": "https://www.nhpr.org/nh-news/2026-07-08/new-hampshire-states-laws-plug-in-solar"
+      "url": "https://www.nhpr.org/nh-news/2026-05-20/solar-charged-batteries-net-metering-heads-to-ayotte-nh"
+    },
+    {
+      "date": "2026-07-07",
+      "state": "nh",
+      "tag": "Law",
+      "title": "New Hampshire joins states with plug-in ('balcony') solar law under SB 540",
+      "summary": "SB 540, signed May 28, 2026 and effective July 27, 2026, legalizes portable plug-in solar devices capped at one unit per meter and 1,200 watts, exempting them from interconnection agreements and net-metering rules while requiring UL-type safety certification.",
+      "source": "New Hampshire Bulletin",
+      "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
     },
     {
       "date": "2026-07-01",
       "state": "ri",
-      "tag": "Advocacy",
-      "title": "RI 2026 session ends: solar 'grid access fee' killed, large-solar credits cut",
-      "summary": "Rhode Island's General Assembly adjourned June 11, 2026; Gov. McKee's proposed solar grid-access fee was eliminated after developer and labor pushback, replaced by a working-group deal to lower virtual net-metering compensation for large solar. Balcony-solar and Solar Cost Reduction Act bills passed the House but died in the Senate.",
+      "tag": "Law",
+      "title": "RI 2026 session recap: solar 'grid access fee' killed, large-solar credits cut",
+      "summary": "Gov. McKee's proposed grid-access fee on net-metering systems of at least 1 MW was eliminated after pushback from developers, unions, and clean-energy advocates; a working-group deal instead lowers virtual-net-metering compensation for large solar. The session ended June 11, 2026, and Solar Cost Reduction Act and balcony-solar bills passed the House but stalled in the Senate.",
       "source": "Acadia Center",
       "url": "https://acadiacenter.org/rhode-islands-2026-legislative-session-recap"
     },
     {
-      "date": "2026-06-18",
-      "state": "ri",
-      "tag": "Rate case",
-      "title": "Rhode Island Energy base distribution rate case (Docket 25-45-GE) in hearings",
-      "summary": "RI Energy's first base-distribution rate case in about eight years (filed Nov 26, 2025) held evidentiary and public-comment hearings in June 2026. The two-year plan seeks roughly $65.9M (electric) and $114.7M (gas) in year one, proposed to take effect in fall 2026.",
-      "source": "Rhode Island PUC",
-      "url": "https://ripuc.ri.gov/Docket-25-45-GE"
+      "date": "2026-06-25",
+      "state": "me",
+      "tag": "Rulemaking",
+      "title": "Maine DOER holds first public webinar on front-of-the-meter DER successor program",
+      "summary": "Maine's Department of Energy Resources held Public Webinar #1 on June 25, 2026, presenting its approach and timeline for a new front-of-the-meter distributed energy resources program to replace community-solar NEB. The proposed successor program must be submitted to the MPUC by the statutory deadline of September 30, 2026.",
+      "source": "Maine Department of Energy Resources",
+      "url": "https://www.maine.gov/energy/divisions/planning-and-policy/ftm-der"
+    },
+    {
+      "date": "2026-06-11",
+      "state": "vt",
+      "tag": "Rulemaking",
+      "title": "Vermont PUC's 2026 net-metering order cuts solar compensation for a 7th straight year",
+      "summary": "In Case 26-0291-INV the Public Utility Commission's late-May biennial order reduces net-metering adjustors for all new systems by about 2¢/kWh and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. Over 1,000 Vermonters and more than 50 House members had urged the PUC to reject the cuts.",
+      "source": "VTDigger",
+      "url": "https://vtdigger.org/2026/06/11/opinion-vermonts-net-metering-decision-just-made-solar-harder/"
     },
     {
       "date": "2026-06-10",
       "state": "nh",
-      "tag": "Advocacy",
-      "title": "Net metering's future in NH stays murky as session closes",
-      "summary": "SB 538 (Sen. David Watters), which would extend the term municipal group projects can participate in net metering beyond the 2040 sunset, emerged from conference committee awaiting the governor's signature, while SB 449 — to extend eligibility for 1–5 MW arrays to commercial/industrial customers — was killed as 'inexpedient to legislate' by the House in April.",
+      "tag": "Update",
+      "title": "NH net metering's future stays murky as legislative session closes",
+      "summary": "SB 538, extending net-metering eligibility for municipal group projects already in the interconnection queue, cleared a committee of conference and headed to the governor, while SB 449 (net metering for 1–5 MW commercial/industrial arrays) was voted inexpedient to legislate. Existing net-metering terms still expire in 2040.",
       "source": "Valley News",
       "url": "https://vnews.com/2026/06/10/new-hampshire-net-metering-uncertainty/"
+    },
+    {
+      "date": "2026-06-10",
+      "state": "ri",
+      "tag": "Rate case",
+      "title": "Rhode Island Energy base distribution rate case (Docket 25-45-GE) holds public hearing",
+      "summary": "Rhode Island Energy's application (filed Nov 26, 2025) seeks a two-year rate plan with a first-year base-distribution increase of roughly $65.9M electric and $114.7M gas; Docket 25-33-GE was consolidated into it in April 2026. The PUC held a public comment hearing June 10, 2026, in Warwick.",
+      "source": "Rhode Island PUC",
+      "url": "https://ripuc.ri.gov/Docket-25-45-GE"
     },
     {
       "date": "2026-06-08",
       "state": "me",
       "tag": "Rate case",
-      "title": "Maine PUC holds hearings on CMP's revised one-year distribution rate plan",
-      "summary": "Central Maine Power is seeking a $69 million increase in temporary distribution rates; the Maine PUC held public witness hearings in June 2026. CMP says the combined filings net a roughly $4/month bill decrease for the average residential customer starting July 1, 2026, with no distribution increases through April 2027.",
+      "title": "Maine PUC holds hearings on CMP's distribution rate proposal",
+      "summary": "Central Maine Power, which serves about 670,000 customers, is seeking a $69 million temporary distribution rate increase in a case expected to run roughly 11 months. Public witness hearings were held June 9 (South Portland) and June 23 (Lewiston).",
       "source": "Maine Public",
       "url": "https://www.mainepublic.org/climate/2026-06-08/maine-utility-regulators-to-hold-hearings-on-cmp-rate-proposal"
     },
@@ -60,89 +87,71 @@
       "date": "2026-06-01",
       "state": "vt",
       "tag": "Advocacy",
-      "title": "REV: 2026 net-metering cuts will further slow Vermont solar",
-      "summary": "Renewable Energy Vermont criticized the PUC's May 29, 2026 biennial order, which cuts adjustors and raises the small-solar siting charge from 4¢ to 5¢/kWh (effective Aug 1, 2026–Jul 31, 2028). REV cited a 24% drop in net-metering applications for systems under 150 kW from 2024 to 2025.",
+      "title": "Renewable Energy Vermont blasts PUC net-metering cuts in biennial rate update",
+      "summary": "REV's press statement criticizes the PUC's biennial order for raising the small-solar siting charge from 4¢ to 5¢/kWh (effective Aug 1, 2026–Jul 31, 2028) and cutting adjustors, noting net-metering applications for systems under 150 kW fell 24% from 2024 to 2025.",
       "source": "Renewable Energy Vermont",
       "url": "https://www.revermont.org/rev-press-statement-on-net-metering-cuts-in-the-pucs-biennial-rate-update/"
-    },
-    {
-      "date": "2026-05-29",
-      "state": "vt",
-      "tag": "Rulemaking",
-      "title": "Vermont PUC cuts net-metering adjustors 2¢/kWh — Case 26-0291-INV",
-      "summary": "In its 2026 biennial update (Case 26-0291-INV), the Public Utility Commission adopted the Department of Public Service's recommendation to reduce net-metering adjustors for all new systems by about 2¢/kWh — the seventh consecutive reduction to net-metering compensation since 2017. Existing arrays keep their locked-in rate.",
-      "source": "Vermont PUC",
-      "url": "https://puc.vermont.gov/news/2026-biennial-update-net-metering-program"
     },
     {
       "date": "2026-05-21",
       "state": "region",
       "tag": "Update",
       "title": "ISO New England says grid ready for summer; 8,000+ MW of behind-the-meter solar",
-      "summary": "ISO-NE forecasts a normal-weather summer peak of 25,228 MW against 28,717 MW of available resources, and reports more than 8,000 MW of behind-the-meter solar expected to cut demand by over 1,700 MW at the peak hour, pushing the daily peak to 5–6 p.m.",
+      "summary": "ISO-NE forecasts a normal-weather summer peak of 25,228 MW (26,473 MW under above-average heat) against 28,717 MW of available resources, and reports more than 8,000 MW of behind-the-meter solar expected to cut demand by over 1,700 MW at the peak hour, pushing the daily peak to 5–6 p.m.",
       "source": "ISO Newswire",
       "url": "https://isonewswire.com/2026/05/21/new-england-power-system-prepared-for-summer-heat/"
-    },
-    {
-      "date": "2026-05-20",
-      "state": "nh",
-      "tag": "Law",
-      "title": "NH HB 1718 adds solar-charged batteries to net metering",
-      "summary": "HB 1718 directs the NH Department of Energy and PUC to build a framework crediting customers for power exported from batteries charged by renewables, clarifying that storage can pair with net-metered solar without affecting system size limits. Gov. Ayotte signed it into law in July 2026.",
-      "source": "New Hampshire Public Radio",
-      "url": "https://www.nhpr.org/nh-news/2026-05-20/solar-charged-batteries-net-metering-heads-to-ayotte-nh"
-    },
-    {
-      "date": "2026-05-20",
-      "state": "ct",
-      "tag": "Rate case",
-      "title": "Eversource signals ~11% CT rate hike ahead of formal filing",
-      "summary": "Eversource notified PURA on May 20, 2026 of its intent to open a formal distribution rate case seeking about $503 million more per year — roughly 11% on average and about 13% for typical residential customers — its first CT rate case since 2018, with rates targeted for July 2027.",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/05/20/eversource-ct-11-percent-rate-hike/"
     },
     {
       "date": "2026-05-19",
       "state": "ma",
       "tag": "Rulemaking",
       "title": "Massachusetts DPU approves SMART 3.0 solar incentive redesign",
-      "summary": "On May 19, 2026 the DPU approved updated model tariffs, including a new SMART 3.0 Provision that replaces the declining-block structure with annually adjusted incentive rates and capacity allocations set by DOER. Utilities project ~$4.5 billion in ratepayer cost over 20 years for 2025–2026 enrollments.",
+      "summary": "On May 19, 2026 the DPU approved a redesigned SMART incentive that replaces the declining-block structure with rates DOER adjusts annually, plus capacity allocations. Utilities estimate the revised program will cost ratepayers about $4.5 billion over 20 years for projects enrolling in program years 2025 and 2026.",
       "source": "Solar Power World",
       "url": "https://www.solarpowerworldonline.com/2026/06/explained-massachusetts-smart-program-changes-in-2026/"
+    },
+    {
+      "date": "2026-05-11",
+      "state": "region",
+      "tag": "Update",
+      "title": "ISO-NE adds behind-the-meter batteries to its 2026 forecast",
+      "summary": "The 2026 CELT Report for the first time includes behind-the-meter battery storage (sub-1 MW paired with solar), currently about 111 MW region-wide, and projects behind-the-meter PV reaching 5,500 MW by end of 2026 and 7,950 MW by 2035, cutting grid energy use by more than 7,000 GWh this year.",
+      "source": "ISO Newswire",
+      "url": "https://isonewswire.com/2026/05/11/iso-ne-expands-behind-the-meter-forecast-to-include-batteries/"
+    },
+    {
+      "date": "2026-05-07",
+      "state": "rec",
+      "tag": "RECs",
+      "title": "MA Class I RECs trend toward the $40 ACP as MassCEC auctions 2025-vintage certificates",
+      "summary": "MassCEC's May 14, 2026 REC auction offered 4,629 Vintage 2025 MA Class I RECs and 67 Solar Carve-Out II RECs; Evolution Markets said Class I 2025 REC pricing has been trending toward the $40/MWh Alternative Compliance Payment in a supply-constrained market ahead of the 2025 compliance deadline.",
+      "source": "Xpansiv / Evolution Markets",
+      "url": "https://www.xpansiv.com/blogs/evolution-markets-to-auction-4629-ma-class-i-and-67-sco-ii-recs-for-massachusetts-clean-energy-center-on-may-14"
     },
     {
       "date": "2026-04-22",
       "state": "ct",
       "tag": "Rates",
       "title": "PURA cuts Eversource and UI rates effective May 1, 2026",
-      "summary": "PURA conditionally approved rate decreases effective May 1, 2026 through April 30, 2027 via its Rate Adjustment Mechanism: Eversource residential rates fall about 4.3¢/kWh (~$30/month, Docket 26-01-03) and United Illuminating about 4.9¢/kWh (~$34/month, Docket 26-01-04).",
-      "source": "Connecticut PURA",
-      "url": "https://portal.ct.gov/pura/press-releases/2026/pura-announces-electric-rate-adjustments-to-take-effect-may-1"
+      "summary": "PURA conditionally approved lower electric rates for Eversource and United Illuminating via their annual Rate Adjustment Mechanisms, effective May 1, 2026 through April 30, 2027 — cutting Eversource residential rates about 4.3¢/kWh (~$30/month) and UI about 4.9¢/kWh (~$34/month), driven mainly by the public-benefits charge turning into a credit tied to Millstone/Seabrook contract savings.",
+      "source": "CT Mirror",
+      "url": "https://ctmirror.org/2026/04/22/pura-cut-public-benefits-charge-electric-bills/"
     },
     {
       "date": "2026-04-02",
       "state": "me",
       "tag": "Law",
       "title": "LD 1777 effectively halts new community solar in Maine",
-      "summary": "Reforms under LD 1777 bar Maine utilities from accepting new community solar projects, cut payments to existing arrays, and impose new monthly charges ($2.80/kW-AC for 1–3 MW-AC and $6/kW-AC for 3–5 MW-AC) effective Jan 1, 2026. Developers Nautilus Solar and Nexamp said they will not bring new projects to Maine.",
+      "summary": "Under LD 1777, Maine utilities are barred from accepting new community solar projects and existing 1–5 MW-AC arrays face new monthly charges ($2.80/kW-AC for 1–3 MW-AC, $6/kW-AC for 3–5 MW-AC) effective Jan 1, 2026. Nautilus Solar and Nexamp said they will not develop new Maine community solar, and the industry has sued the MPUC over the fees.",
       "source": "Solar Power World",
       "url": "https://www.solarpowerworldonline.com/2026/04/policy-change-virtually-stops-new-community-solar-development-in-maine/"
-    },
-    {
-      "date": "2026-03-05",
-      "state": "rec",
-      "tag": "RECs",
-      "title": "Massachusetts DOER publishes 2026 RPS load obligations and ACP rates",
-      "summary": "DOER published 2026 RPS Alternative Compliance Payment rates and retail-supplier load obligations. The Class I ACP remains fixed at $40/MWh (set by 225 CMR 14.08 since Compliance Year 2023), anchoring the ceiling for New England Class I REC prices.",
-      "source": "Sustainable Energy Advantage",
-      "url": "https://sea-ee.com/doer-publishes-2023-load-obligations-adds-2026-rps-acp-rates/"
     },
     {
       "date": "2026-01-16",
       "state": "ma",
       "tag": "Rulemaking",
       "title": "MA DPU opens net-metering investigation — Docket 25-200",
-      "summary": "The DPU opened Docket 25-200 (filed Dec 15, 2025) to examine electric delivery rate design and whether to reduce the value of net-metering credits, comparing Massachusetts crediting to lower-compensation jurisdictions. No changes have been ordered; existing systems are expected to be grandfathered.",
+      "summary": "The DPU opened Docket 25-200 to examine electric delivery rate design and whether to reduce the value of net-metering credits, comparing Massachusetts crediting to lower-compensation jurisdictions. No changes have been ordered; existing systems are expected to be grandfathered.",
       "source": "Northeast Solar",
       "url": "https://www.northeast-solar.com/post/the-dpu-just-opened-an-investigation-into-net-metering-here-s-what-s-at-stake"
     }

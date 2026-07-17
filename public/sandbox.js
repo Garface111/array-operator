@@ -7313,6 +7313,25 @@
  `</div>`;
  return;
  }
+ // Generation reports (THE FOLD): METERED usage, not a roster subscription —
+ // $15 per ARRAY, once per quarter, charged the first time you report that
+ // array. Nothing reported yet is NOT "not on plan" (the feature is on for
+ // everyone and building/previewing is free) — it's simply nothing billed yet,
+ // so show the rate instead of a scary $0-not-on-plan row.
+ if(ln.id === "generation_reports"){
+ const q = Number(ln.quantity || 0);
+ const rate = Number(ln.unit_cents || 1500);
+ const gamt = Number(ln.amount_cents || 0);
+ if(q > 0) total += gamt;
+ const gcalc = q > 0
+ ? `${q} array${q===1?"":"s"} reported this quarter × ${usdFromCents(rate)}`
+ : `${usdFromCents(rate)} per array · only when you report one`;
+ const gamtHtml = q > 0
+ ? usdFromCents(gamt)
+ : `<span class="ao-bill-soft" title="Building and previewing are free — nothing reported yet this quarter">none yet</span>`;
+ lines += billLine(ln.kind || "Generation reports", gcalc, gamtHtml, ln.desc || "");
+ return;
+ }
  const amt = Number(ln.amount_cents || 0);
  // Skip null amount lines (shouldn't reach here)
  if(ln.amount_cents == null && ln.included_in_monthly_total === false) return;
@@ -7748,14 +7767,25 @@
  const isSov = location.hash === "#sovereign";
  // Tab pager (Ford 2026-07-16): when the top content panel changes, slide the
  // outgoing panel out and the incoming in (via tab-slide.js) instead of an
- // instant swap. Falls back to instant on first paint, Sovereign, sub-view
- // deep-links (#trends/#resources), mobile, reduced motion, or any error.
+ // instant swap. Falls back to instant on first paint, Sovereign, Analysis
+ // sub-view hops (#trends/#resources/#analysis among themselves), mobile,
+ // reduced motion, or any error.
+ //
+ // Analysis sub-views (Fleet analysis | Trends | Resources) share one top tab
+ // and must NEVER slide. Hash guards alone only skip slides *to* #trends /
+ // #resources — going back to #analysis (Fleet) still looked like a panel
+ // change (panelTrends → panelAnalysis) and animated. Block that family.
+ const _anSubPanel = {panelAnalysis:1, panelTrends:1, panelResources:1};
  const _slideOK = !_firstApply && !isSov && typeof window.__aoTabSlide === "function"
  && location.hash !== "#trends" && location.hash !== "#resources";
  const _prevPanel = _slideOK ? document.querySelector(
  "#panelDashboard.active,#panelArrays.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelOps.active,#panelAccount.active") : null;
  const _toPanel = (!isSov && TABS[active]) ? document.getElementById(TABS[active].panel) : null;
- const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel);
+ const _anSubHop = !!(
+  _prevPanel && _toPanel &&
+  _anSubPanel[_prevPanel.id] && _anSubPanel[_toPanel.id]
+ );
+ const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel && !_anSubHop);
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);

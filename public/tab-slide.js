@@ -99,9 +99,13 @@
           el.style.marginLeft = (-pinW / 2) + "px";
         });
       }
-      // Measure heights now (both are display:block at the pinned width) to ease
-      // the stage's vertical resize instead of snapping when panels differ.
+      // Measure heights now (both are display:block at the pinned width). Stage
+      // height SNAP-locks to max(from, to) for the whole slide — never eases.
+      // Easing height + overflow:clip made the incoming panel look like it was
+      // unfurling/expanding from the top (Ford 2026-07-17). Horizontal transform
+      // only; panel arrives already full-size.
       var fromH = fromEl.offsetHeight || 0, toH = toEl.offsetHeight || 0;
+      var stageH = Math.max(fromH, toH);
       // Commit the LOGICAL active state immediately — only `to` is .active. Both
       // panels stay visible during the slide via .ao-slide-from/.ao-slide-to, so a
       // rapid re-switch mid-slide reads `to` as the current panel (no two-active
@@ -109,20 +113,19 @@
       toEl.classList.add("active");
       fromEl.classList.remove("active");
 
-      // Place at start with transitions OFF, force a reflow, then play.
+      // Place at start with transitions OFF, force a reflow, then play transform only.
       fromEl.style.transition = "none";
       toEl.style.transition = "none";
       s.style.transition = "none";
       fromEl.style.transform = "translateX(0)";
       toEl.style.transform = "translateX(" + enter + ")";
-      if(fromH > 0) s.style.height = fromH + "px";
+      if(stageH > 0) s.style.height = stageH + "px";
       void s.offsetWidth;                       // commit the start frame
       fromEl.style.transition = "";             // hand easing back to tab-slide.css
       toEl.style.transition = "";
-      s.style.transition = "";
+      // Stage height stays put (no transition) — only the panels move.
       fromEl.style.transform = "translateX(" + exit + ")";
       toEl.style.transform = "translateX(0)";
-      if(toH > 0) s.style.height = toH + "px";   // eases via .ao-sliding transition
 
       var done = false, timer = 0;
       function cleanup(){
@@ -146,7 +149,7 @@
         try{ fromEl.classList.remove("active"); toEl.classList.add("active"); }catch(e){}
         sliding = false; activeCleanup = null;
       }
-      // Cleanup fires on the panel transform finishing; the height eases in parallel.
+      // Cleanup fires when the horizontal transform finishes.
       function onEnd(e){ if(e.target === toEl && e.propertyName === "transform") cleanup(); }
       activeCleanup = cleanup;
       toEl.addEventListener("transitionend", onEnd);

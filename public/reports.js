@@ -626,14 +626,23 @@
  if (fin) fin.style.display = v === "trends" ? "" : "none";
  if (gen) gen.style.display = v === "genreports" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
+ // Generation reports owns its OWN header (title + description + Clients/Reports
+ // switch, rendered by the embed), and wants a tighter sheet that reveals more
+ // of the sky. Flag the sheet so theme-sky-reports.css can narrow it + hide the
+ // AO title band for this sub-view only; every other sub-view is untouched.
+ const sheet = document.getElementById("rbSubInvoice");
+ if (sheet) sheet.classList.toggle("rb2-genrep", v === "genreports");
  // The KPI glance-line is offtaker-invoicing chrome ("N offtakers · billed
  // arrays · don't match GMP") — it leaked onto the other sub-views' heads.
  const kpis = document.getElementById("rb2Kpis");
  if (kpis) kpis.style.display = (v === "offtakers") ? "" : "none";
- // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on others
+ // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on
+ // others. Generation reports renders its OWN title inside the embed, so the AO
+ // band is hidden outright for it (no duplicate "Generation reports").
  if (head) {
  const id = head.querySelector(".rb2-id h1");
  const sub = head.querySelector(".rb2-id #rb2Sub, .rb2-id p");
+ head.style.display = (v === "genreports") ? "none" : "";
  if (v === "offtakers") {
  if (id) id.textContent = "Offtaker invoicing";
  if (sub) sub.style.display = "";
@@ -642,9 +651,6 @@
  if (sub) sub.style.display = "none";
  } else if (v === "trends") {
  if (id) id.textContent = "Invoice trends";
- if (sub) sub.style.display = "none";
- } else if (v === "genreports") {
- if (id) id.textContent = "Generation reports";
  if (sub) sub.style.display = "none";
  }
  }
@@ -685,7 +691,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260716m";
+ const GENREP_V = "20260717aiOpen2";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -1992,6 +1998,8 @@
  const ES_SIGNOFF_CHIPS = [
  { label: "Just my name", value: "<p>Thank you,<br>{{tenant_name}}</p>" },
  { label: "Name + email", value: "<p>Thank you,<br>{{tenant_name}}<br>{{tenant_email}}</p>" },
+ // Parity with Generation reports EmailTemplateStudio sign-off starters.
+ { label: "Full signature", value: "<p>Thank you,<br><strong>{{tenant_name}}</strong><br>Solar consultant<br>{{tenant_email}}</p>" },
  ];
 
  async function esApi(path, opts) {
@@ -2020,6 +2028,9 @@
  // across a (re)load, it would re-save stale content over fresh state.
  clearTimeout(ES.saveT); clearTimeout(ES.prevT);
  ES.dirty = { subject: false, body: false, signoff: false };
+ // Always land with the AI assistant OPEN so operators are encouraged to talk
+ // to it first (same on Generation reports email studio).
+ esSetChatOpen(true);
  esStatus("Loading…");
  try {
  const d = await esApi("");
@@ -2037,8 +2048,35 @@
  esStatus("Saved");
  esRenderChat();
  await esPreview();
+ // Focus the AI prompt after load so typing goes straight to the assistant.
+ requestAnimationFrame(() => {
+ const input = document.getElementById("esChatInput");
+ if (input && !document.getElementById("esChatPanel")?.hidden) {
+ try { input.focus(); } catch (_) { /* ok */ }
+ }
+ });
  } catch (e) {
  esStatus("Couldn't load, " + e.message, "rb-es-err");
+ }
+ }
+
+ function esSetChatOpen(open) {
+ const p = document.getElementById("esChatPanel");
+ const pill = document.getElementById("esAiPill");
+ if (p) {
+ p.hidden = !open;
+ // Force visibility — [hidden] alone can lose to host CSS in edge cases.
+ p.style.display = open ? "flex" : "none";
+ p.setAttribute("aria-hidden", open ? "false" : "true");
+ }
+ if (pill) {
+ pill.hidden = !!open;
+ pill.style.display = open ? "none" : "";
+ }
+ if (open) {
+ esRenderChat();
+ const input = document.getElementById("esChatInput");
+ if (input) setTimeout(() => { try { input.focus(); } catch (_) { /* ok */ } }, 50);
  }
  }
 
@@ -2052,20 +2090,37 @@
  }
 
  // ─── Master email card (inline on Offtakers tab) ───────────────────────────
- // Generation reports surfaces a live email-template preview + "Customize"
- // CTA in Delivery settings. Offtakers now get the same element: a fleet
- // master letter that overrides every offtaker invoice email (per-offtaker
- // notes still win for a single send). Studio = existing openEmailStudio().
+ // 1-1 with Generation reports Delivery settings → Email template region:
+ // sample preview + full-width "Customize email template" → studio.
+ // Studio writes Tenant.offtaker_email_* so EVERY offtaker invoice email uses
+ // the new letter (merge tags personalize; per-offtaker notes still win one send).
+ //
+ // Demo gate: ONLY !authHeaders(). window.AO_DEMO is always defined by
+ // demo-data.js even when signed in — never use `|| window.AO_DEMO` here
+ // (that was treating Ford's real account as a demo and blocking the studio).
  function wireMasterEmail() {
- const open = () => openEmailStudio();
+ const signedIn = !!authHeaders();
+ const open = (e) => {
+ if (e) { e.preventDefault(); e.stopPropagation(); }
+ if (!signedIn) { demoNudge(e && e.currentTarget); return; }
+ openEmailStudio();
+ };
  const cardBtn = $("#rbMasterEmailOpen");
  if (cardBtn) cardBtn.onclick = open;
  const esBtn = $("#rbEmailStudio");
  if (esBtn) esBtn.onclick = open;
- // Demo / signed-out: never hit the live template API.
- if (!authHeaders() || window.AO_DEMO) {
- if (cardBtn) cardBtn.onclick = () => demoNudge(cardBtn);
- if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
+ // Whole preview pane is also a hit target (gen-reports UX: click to customize).
+ const prev = $("#rbMasterEmailPreview");
+ if (prev) {
+ prev.setAttribute("role", "button");
+ prev.setAttribute("tabindex", "0");
+ prev.setAttribute("title", "Open the email template studio");
+ prev.onclick = open;
+ prev.onkeydown = (e) => {
+ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
+ };
+ }
+ if (!signedIn) {
  const subjEl = $("#rbMmSubj");
  const bodyEl = $("#rbMmBody");
  const fromEl = $("#rbMmFrom");
@@ -2278,8 +2333,8 @@
  ov.innerHTML = `
  <div class="rb-es-head">
  <div>
- <b>Customize offtaker email</b>
- <span class="rb-es-sub">Applies to every offtaker invoice email, merge tags personalize each one. A per-offtaker edited note still overrides it.</span>
+ <b>Customize email template</b>
+ <span class="rb-es-sub">Master letter for <b>every offtaker invoice email</b>. Save once and all offtakers get the new wording — merge tags ({{greeting}}, {{amount}}, {{period}}…) personalize each send intelligently. A per-offtaker edited note still overrides one send only.</span>
  </div>
  <span class="rb-es-status" id="esStatus">Saved</span>
  <button type="button" class="rb-es-x" id="esClose" aria-label="Close email studio">✕</button>
@@ -2318,8 +2373,8 @@
  </div>
  </div>
  </div>
- <button type="button" class="rb-es-ai" id="esAiPill">✦ Ask AI</button>
- <div class="rb-es-chat" id="esChatPanel" hidden>
+ <button type="button" class="rb-es-ai" id="esAiPill" hidden>✦ Ask AI</button>
+ <div class="rb-es-chat" id="esChatPanel">
  <div class="rb-es-chat-head">AI assistant <button type="button" class="rb-es-x" id="esChatClose" aria-label="Close AI assistant">✕</button></div>
  <div class="rb-es-chat-msgs" id="esChatMsgs"></div>
  <div class="rb-es-chat-in">
@@ -2347,12 +2402,9 @@
  });
  ov.querySelector("#esTest").onclick = (e) => esTestSend(e.currentTarget);
  ov.querySelector("#esReset").onclick = (e) => esReset(e.currentTarget);
- ov.querySelector("#esAiPill").onclick = () => {
- const p = ov.querySelector("#esChatPanel");
- p.hidden = !p.hidden;
- if (!p.hidden) { esRenderChat(); ov.querySelector("#esChatInput").focus(); }
- };
- ov.querySelector("#esChatClose").onclick = () => { ov.querySelector("#esChatPanel").hidden = true; };
+ // Pill re-opens the panel after the operator closes it; studio open defaults open.
+ ov.querySelector("#esAiPill").onclick = () => esSetChatOpen(true);
+ ov.querySelector("#esChatClose").onclick = () => esSetChatOpen(false);
  ov.querySelector("#esChatSend").onclick = esChatSend;
  const _esIn = ov.querySelector("#esChatInput");
  _esIn.addEventListener("keydown", (e) => {
@@ -2794,22 +2846,22 @@
  </div>
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
- <!-- Master offtaker email template (fleet override) — same idea as Generation
-      reports' delivery settings email region: live sample preview + full studio.
-      Wired by wireMasterEmail() → GET/POST /email-template*. Per-offtaker notes
-      still override for a single send. -->
+ <!-- Master offtaker email — 1-1 with Generation reports Delivery settings
+      "Email template" region (AutoReportsSettingsCard): section label, sample
+      preview card, full-width Customize CTA → full studio. Saves to
+      Tenant.offtaker_email_* so every offtaker invoice email updates. -->
  <div class="rb-mastermail rep-card" id="rbMasterEmail">
+ <div class="rb-mm-sectionlab">Email template</div>
  <div class="rb-mm-head">
  <div class="rb-mm-main">
  <h3>Master offtaker email</h3>
- <p><b>Fleet-wide letter</b> on every offtaker invoice email. Merge tags
- personalize each send ({{greeting}}, {{amount}}, {{period}}…). A
- per-offtaker edited note still overrides this for that one send.</p>
+ <p>Edit once — <b>every offtaker</b> receives this letter on their invoice email.
+ Merge tags personalize each send ({{greeting}}, {{amount}}, {{period}}…).
+ A per-offtaker edited note still overrides this for that one send only.</p>
  </div>
- <button class="ao-btn ao-btn-primary rb-btn" id="rbMasterEmailOpen" type="button"
- title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist.">✉ Customize email template</button>
  </div>
- <div class="rb-mm-eyebrow">Sample preview · what offtakers actually receive</div>
+ <div class="rb-mm-stage">
+ <div class="rb-mm-eyebrow">✦ Sample preview · what your offtakers actually receive</div>
  <div class="rb-mm-preview" id="rbMasterEmailPreview">
  <div class="rb-mm-env">
  <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
@@ -2817,6 +2869,9 @@
  </div>
  <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
  <div class="rb-mm-foot" id="rbMmFoot"></div>
+ </div>
+ <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
+ title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist. Changes apply to every offtaker invoice email.">Customize email template</button>
  </div>
  <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
  </div>

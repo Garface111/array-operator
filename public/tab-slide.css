@@ -4,12 +4,12 @@
    The panels are moved (once, by tab-slide.js) into a .panel-stage. During a
    slide the stage goes FULL-BLEED (100vw) and clips BOTH axes (overflow:clip):
    horizontally at the viewport (so panels travel edge-to-edge and are clipped at
-   the screen edges, not the content column) and VERTICALLY at the stage's
-   animating height (so a taller panel can't spill below and shove the layout —
-   the vertical glitch). The two panels are position:absolute, centered (left:50%
-   + a negative inline margin = pinned content width so nothing stretches to
-   100vw), and slide on transform. The stage HEIGHT eases from the outgoing to the
-   incoming panel's height so the vertical resize is smooth, not a snap. */
+   the screen edges, not the content column) and VERTICALLY at a FIXED stage
+   height = max(from, to) so neither panel spills or shoves the layout. The two
+   panels are position:absolute, centered (left:50% + a negative inline margin =
+   pinned content width so nothing stretches to 100vw), and slide on transform
+   ONLY. Stage height does NOT animate — easing it made the new tab look like it
+   was unfurling/expanding from the top (Ford 2026-07-17). */
 
 html.ao-tab-sliding{ overflow-x: clip; }   /* guard vs a 100vw scrollbar */
 
@@ -32,7 +32,7 @@ html.ao-tab-sliding{ overflow-x: clip; }   /* guard vs a 100vw scrollbar */
   width: 100vw;
   margin-left: calc(50% - 50vw);            /* break out to full viewport width */
   overflow: clip;                            /* clip horiz @viewport + vert @height */
-  transition: height .5s cubic-bezier(.4, 0, .2, 1);
+  /* No height transition — height is snap-set by tab-slide.js for the whole slide. */
 }
 .panel-stage.ao-sliding > .panel.ao-slide-from,
 .panel-stage.ao-sliding > .panel.ao-slide-to{

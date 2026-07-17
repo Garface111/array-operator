@@ -1,22 +1,44 @@
 // version-check.js, surface a fresh deploy so nobody is stuck on a cached old bundle.
 // Ford 2026-07-09: a soft refresh kept serving a STALE reports.js, so shipped fixes
 // looked "not applied" until a manual hard-refresh. This polls the LIVE app-shell for a
-// newer reports.js cache-bust version than the one THIS page loaded, and offers a
-// one-click reload. It NEVER auto-reloads, an operator may be mid-edit / mid-approval,
-// so the reload is always the user's explicit click (dismissible).
+// newer cache-bust version than the one THIS page loaded, and offers a one-click reload.
+// It NEVER auto-reloads, an operator may be mid-edit / mid-approval, so the reload is
+// always the user's explicit click (dismissible).
+//
+// Ford 2026-07-16: it only ever watched reports.js. The shell versions ~15 assets, so a
+// deploy that bumped energy-agent.js (or app.js, or any stylesheet) was INVISIBLE — the
+// tab sat on stale code for hours with no banner and no signal. Worse than useless: it
+// looked like staleness was covered. It now compares EVERY versioned asset this page
+// actually loaded against the live shell, and speaks up if any of them moved.
 (function () {
   "use strict";
 
-  function loadedVersion() {
+  var ASSET_RE = /([A-Za-z0-9_.-]+\.(?:js|css))\?v=([^&"'\s>]+)/g;
+
+  /** file -> token for every versioned asset THIS page loaded. */
+  function myTokens() {
+    var out = {};
     try {
-      var s = document.querySelector('script[src*="reports.js"]');
-      var m = s && /[?&]v=([^&"'\s]+)/.exec(s.getAttribute("src") || "");
-      return m ? m[1] : null;
-    } catch (_) { return null; }
+      var nodes = document.querySelectorAll("script[src], link[href]");
+      for (var i = 0; i < nodes.length; i++) {
+        var url = nodes[i].getAttribute("src") || nodes[i].getAttribute("href") || "";
+        var m = /([A-Za-z0-9_.-]+\.(?:js|css))\?v=([^&"'\s]+)/.exec(url);
+        if (m) out[m[1]] = m[2];
+      }
+    } catch (_) {}
+    return out;
   }
 
-  var MINE = loadedVersion();
-  if (!MINE) return;                        // can't determine our version → stay inert
+  /** file -> token from the live shell HTML. */
+  function liveTokens(html) {
+    var out = {}, m;
+    ASSET_RE.lastIndex = 0;
+    while ((m = ASSET_RE.exec(html))) out[m[1]] = m[2];
+    return out;
+  }
+
+  var MINE = myTokens();
+  if (!Object.keys(MINE).length) return;     // can't determine our version → stay inert
   var shown = false, timer = null;
 
   function showBanner() {
@@ -63,9 +85,14 @@
       .then(function (r) { return r.ok ? r.text() : null; })
       .then(function (html) {
         if (!html) return;
-        var m = /reports\.js\?v=([^&"'\s]+)/.exec(html);
-        var live = m ? m[1] : null;
-        if (live && live !== MINE) showBanner();
+        var live = liveTokens(html);
+        // Only compare assets we ACTUALLY loaded: a file merely added or removed upstream
+        // shouldn't nag someone mid-approval, but any asset of ours that moved means this
+        // tab is running code that no longer exists on the server.
+        for (var file in MINE) {
+          if (!Object.prototype.hasOwnProperty.call(MINE, file)) continue;
+          if (live[file] && live[file] !== MINE[file]) { showBanner(); return; }
+        }
       })
       .catch(function () { /* offline / transient, try again next tick */ });
   }

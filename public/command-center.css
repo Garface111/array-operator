@@ -108,6 +108,19 @@
 .cc-vendor-link{ display:inline-block; margin-top:5px; font-size:11.5px; font-weight:650;
   color:#3b82f6; text-decoration:none; white-space:nowrap; }
 .cc-vendor-link:hover{ text-decoration:underline; }
+/* two parallel "open in…" links per row: the vendor portal + OUR inverter view */
+.cc-inv-links{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; }
+.cc-inv-links .cc-vendor-link{ margin-top:0; }
+/* the inverter-view link is a <button> — strip native chrome so it reads as a link */
+button.cc-inv-link{ background:none; border:0; padding:0; font:inherit; cursor:pointer; color:var(--ao-oct,#7c3aed); }
+button.cc-inv-link:hover{ text-decoration:underline; }
+/* per-row primary action button (was a dead label) */
+.cc-actcell{ white-space:nowrap; }
+.cc-actbtn{ border:0; border-radius:8px; padding:7px 12px; font-size:12px; font-weight:680;
+  cursor:pointer; white-space:nowrap; line-height:1.1; transition:filter .14s ease, transform .14s ease; }
+.cc-actbtn:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+.cc-actbtn.ea{ background:var(--ao-oct,#7c3aed); color:#fff; }
+.cc-actbtn.claim{ background:var(--good,#2563eb); color:#fff; }
 .cc-verdict{ font-size:12.5px; }
 .cc-verdict.crit{ color:var(--bad); } .cc-verdict.under{ color:var(--warn); } .cc-verdict.quiet{ color:var(--sky); }
 .cc-pi{ font-weight:700; color:var(--ink); }
@@ -132,9 +145,25 @@
 .cc-evidence .e{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:9px 11px; }
 .cc-evidence .en{ font-size:18px; font-weight:760; color:var(--ink); font-variant-numeric:tabular-nums; }
 .cc-evidence .ec{ font-size:11px; color:var(--faint); margin-top:1px; }
-.cc-rec{ background:rgba(63,214,138,.06); border-left:3px solid var(--good); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--ink); line-height:1.5; }
+.cc-rec{ display:flex; gap:10px; align-items:baseline; background:var(--day-tile,rgba(255,255,255,.03));
+  border-left:3px solid var(--ao-oct,#7c3aed); border-radius:8px; padding:10px 12px; margin:2px 0 2px;
+  font-size:12.5px; color:var(--ink); line-height:1.5; }
 .cc-rec b{ color:var(--good2); }
-.cc-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.cc-rec-k{ flex:none; font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ao-oct,#7c3aed); padding-top:1px; }
+/* drawer action toolbar: EA repair (octarine = the AI), deep-links, workflow */
+.cc-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:4px; }
+.cc-act{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:9px;
+  background:var(--card,#fff); color:var(--ink); padding:8px 13px; font-size:12.5px; font-weight:640;
+  cursor:pointer; text-decoration:none; white-space:nowrap; transition:border-color .14s ease, transform .14s ease, background .14s ease; }
+.cc-act:hover{ transform:translateY(-1px); border-color:var(--ao-oct,#7c3aed); }
+.cc-act.ea{ background:var(--ao-oct,#7c3aed); border-color:var(--ao-oct,#7c3aed); color:#fff; }
+.cc-act.ea:hover{ filter:brightness(1.06); border-color:var(--ao-oct,#7c3aed); }
+.cc-act.ghost{ background:transparent; color:var(--muted); font-weight:600; }
+.cc-act.ghost:hover{ color:var(--ink); }
+.cc-act.ghost.on{ color:var(--good2); border-color:var(--good); }
+.cc-act-sp{ flex:1 1 auto; }
+@media (max-width:600px){ .cc-act-sp{ flex-basis:100%; height:0; } }
 
 .cc-empty{ padding:34px 16px; text-align:center; color:var(--faint); font-size:13.5px; }
 .cc-foot{ color:var(--faint); font-size:12px; margin-top:10px; line-height:1.6; }
@@ -476,33 +505,51 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:72ch; margin:0; }
 .rb-globalrate .rb-gr-main p b{ color:var(--ink); font-weight:650; }
 
-/* ── Master offtaker email (fleet template) — mirrors gen-reports Delivery
-   settings email region: live sample preview + Customize studio CTA. */
+/* ── Master offtaker email — 1-1 with gen-reports Delivery settings email
+   region: section label, roomy padding, sample preview, full-width CTA. */
 .rb-mastermail{
-  margin:0 0 14px; padding:18px 20px;
+  margin:10px 0 18px;
+  padding:22px 24px 24px;
   border-radius:16px; border:1px solid var(--line);
   background:linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
   max-width:none; width:100%; box-sizing:border-box;
 }
-.rb-mm-head{
-  display:flex; align-items:flex-start; justify-content:space-between;
-  gap:16px; flex-wrap:wrap; margin-bottom:14px;
+.rb-mm-sectionlab{
+  font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--faint); margin:0 0 10px;
 }
-.rb-mm-main{ flex:1 1 280px; min-width:0; }
-.rb-mm-main h3{ font-size:15.5px; margin:0 0 .25em; font-weight:750; letter-spacing:-.01em; }
-.rb-mm-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:72ch; margin:0; }
+.rb-mm-head{ margin-bottom:14px; }
+.rb-mm-main{ min-width:0; }
+.rb-mm-main h3{ font-size:15.5px; margin:0 0 .35em; font-weight:750; letter-spacing:-.01em; }
+.rb-mm-main p{ font-size:12.5px; color:var(--faint); line-height:1.55; max-width:78ch; margin:0; }
 .rb-mm-main p b{ color:var(--ink); font-weight:650; }
+/* Soft stage around preview + CTA (matches gen-reports primary-50 wrap) */
+.rb-mm-stage{
+  border-radius:16px;
+  padding:16px 16px 18px;
+  background:rgba(37,99,235,.04);
+  border:1px solid rgba(37,99,235,.12);
+}
 .rb-mm-eyebrow{
-  font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--faint); margin:0 0 8px;
+  font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--faint); margin:0 0 10px;
 }
 .rb-mm-preview{
-  border:1px solid var(--line); border-radius:14px; overflow:hidden;
+  border:1px solid var(--line); border-radius:12px; overflow:hidden;
   background:var(--card,#fff); box-shadow:0 1px 0 rgba(15,23,42,.03);
+  cursor:pointer;
+  transition:box-shadow .15s, border-color .15s;
+}
+.rb-mm-preview:hover{
+  border-color:rgba(37,99,235,.35);
+  box-shadow:0 6px 18px -12px rgba(37,99,235,.35);
+}
+.rb-mm-preview:focus-visible{
+  outline:2px solid var(--good,#2563eb); outline-offset:2px;
 }
 .rb-mm-env{
-  padding:12px 16px; font-size:12.5px; color:var(--muted);
-  border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:6px;
+  padding:14px 18px; font-size:12.5px; color:var(--muted);
+  border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:7px;
 }
 .rb-mm-envlab{
   display:inline-block; min-width:4.5rem; font-size:10px; font-weight:700;
@@ -510,22 +557,40 @@ body.sb-fs-lock{ overflow:hidden; }
 }
 .rb-mm-subj{ color:var(--ink); font-weight:650; }
 .rb-mm-body{
-  padding:14px 16px; font-size:13px; line-height:1.55; color:var(--ink);
-  max-height:220px; overflow-y:auto;
+  padding:16px 18px; font-size:13px; line-height:1.55; color:var(--ink);
+  max-height:240px; overflow-y:auto; min-height:88px;
 }
 .rb-mm-body p{ margin:0 0 .65em; }
 .rb-mm-body p:last-child{ margin-bottom:0; }
 .rb-mm-mute{ color:var(--faint); font-size:12.5px; }
 .rb-mm-foot{
-  padding:8px 16px 12px; font-size:11.5px; color:var(--faint);
+  padding:10px 18px 12px; font-size:11.5px; color:var(--faint);
   border-top:1px solid var(--line);
 }
-.rb-mm-status{ margin-top:8px; font-size:12px; color:var(--faint); min-height:1em; }
+/* Full-width CTA under preview — gen-reports emerald pattern */
+.rb-mm-cta,
+#rbMasterEmailOpen.rb-mm-cta{
+  display:flex; width:100%; box-sizing:border-box;
+  margin-top:14px; padding:12px 18px;
+  justify-content:center; align-items:center; gap:8px;
+  font-weight:650; font-size:13.5px;
+  background:rgba(16,185,129,.10);
+  color:#047857;
+  border:1px solid rgba(16,185,129,.28);
+  border-radius:12px;
+  cursor:pointer;
+  transition:background .12s, border-color .12s;
+}
+.rb-mm-cta:hover,
+#rbMasterEmailOpen.rb-mm-cta:hover{
+  background:rgba(16,185,129,.18);
+  border-color:rgba(16,185,129,.42);
+}
+.rb-mm-status{ margin-top:10px; font-size:12px; color:var(--faint); min-height:1em; }
 .rb-mm-retry{
   background:none; border:0; padding:0; color:var(--good,#2563eb);
   font:inherit; font-weight:650; cursor:pointer; text-decoration:underline;
 }
-#rbMasterEmailOpen{ flex:0 0 auto; white-space:nowrap; }
 /* invoice-template upload card — operator's own format */
 .rb-tpl{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }
 .rb-tpl .rb-tpl-main h3{ font-size:15.5px; margin:.2em 0 .15em; }
@@ -2787,6 +2852,14 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
+/* flash a row when deep-linked here from the Fleet Triage queue (focusInverter) */
+.vs-row-flash{ animation:vsRowFlash 2.1s ease-out 1; border-radius:8px; }
+@keyframes vsRowFlash{
+  0%{ background:var(--ao-oct-soft,rgba(124,58,237,.16)); box-shadow:inset 0 0 0 2px var(--ao-oct,#7c3aed); }
+  70%{ background:var(--ao-oct-soft,rgba(124,58,237,.10)); box-shadow:inset 0 0 0 2px rgba(124,58,237,.35); }
+  100%{ background:transparent; box-shadow:inset 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion:reduce){ .vs-row-flash{ animation:none; box-shadow:inset 0 0 0 2px var(--ao-oct,#7c3aed); } }
 /* Inverter name sits in the Name column only (col 2). An empty Vendor cell keeps
    Live kW / Today / Status under the correct headers — spanning cols 1–2 was why
    "Live now" drifted and labels clipped (Ford 2026-07-16). */
@@ -3380,27 +3453,28 @@ body.ho-shell-open .vs-scroll{
   max-width:100%;
   min-width:0;
 }
-/* Always drop 14-day spark when the rail is open — free ~80px for Synced */
-body.ea-shell-open .vs-c-spark,
-body.ea-shell-open .vs-colhead .vs-c-spark,
-body.ea-shell-open .vs-inv-rowspark-wrap,
-body.ho-shell-open .vs-c-spark,
-body.ho-shell-open .vs-colhead .vs-c-spark,
-body.ho-shell-open .vs-inv-rowspark-wrap{
-  display:none !important;
-}
+/* KEEP the 14-day graph when the rail is open (Ford 2026-07-16). This used to
+   `display:none` the spark column + every per-inverter rowspark "to free ~80px",
+   which also killed the graphs on expanded inverters and left the freed space
+   inflating the other tracks into dead columns. The dock is a floating card now
+   and the content column only loses ~200px, so the graphs fit — they're the point
+   of this view. Narrower tiers below drop the gauge/units first instead. */
 body.ea-shell-open .vs-row,
 body.ho-shell-open .vs-row{
+  /* Metric columns are sized to their CONTENT and Name (the only variable-length
+     cell) absorbs all the slack. The old `fr` share on every column is what made
+     the dead space: each metric track grew far wider than the "—" / "OK" /
+     "synced 2m" / 104px graph inside it. */
   grid-template-columns:
-    minmax(58px,.42fr)    /* vendor */
-    minmax(0,1.35fr)      /* name */
+    72px                  /* vendor */
+    minmax(0,1fr)         /* name — takes the slack */
     40px                  /* gauge */
-    minmax(32px,.38fr)    /* units */
-    minmax(50px,.68fr)    /* live kW */
-    minmax(54px,.72fr)    /* today */
-    0px                   /* spark hidden */
-    minmax(68px,.95fr)    /* status */
-    minmax(92px,.88fr);   /* synced — hard min so "synced 12m" / "25d ago" never clips */
+    44px                  /* units */
+    64px                  /* live kW */
+    66px                  /* today */
+    108px                 /* spark — fits the 14-day graph exactly */
+    88px                  /* status */
+    94px;                 /* synced — "synced 12m" / "25d ago" never clips */
   width:100%;
   min-width:0;
   gap:4px;
@@ -3422,23 +3496,18 @@ body.ea-shell-open .vs-colhead .vs-c-fresh,
 body.ho-shell-open .vs-colhead .vs-c-fresh{
   overflow:hidden; /* header label "Synced" is short */
 }
-/* Expand-all: icon-only when cramped so it doesn't become "EX" mid-header */
+/* Expand-all stays a REAL, labelled button with the rail open (Ford 2026-07-16:
+   "the expand button is now just this little arrow instead of a nice expand
+   button"). It was font-size:0 + a ::before "↕" glyph; the Name track has ample
+   room now that the spark keeps its own column, so the label fits. */
 body.ea-shell-open .vs-expandall,
 body.ho-shell-open .vs-expandall{
-  font-size:0;
-  letter-spacing:0;
-  padding:3px 7px;
-  min-width:28px;
+  font-size:9.5px;
+  letter-spacing:.03em;
+  padding:3px 8px;
   width:auto;
   flex-shrink:0;
-}
-body.ea-shell-open .vs-expandall::before,
-body.ho-shell-open .vs-expandall::before{
-  content:"↕";
-  font-size:12px;
-  font-weight:800;
-  letter-spacing:0;
-  line-height:1;
+  white-space:nowrap;
 }
 body.ea-shell-open .vs-namehead,
 body.ho-shell-open .vs-namehead{
@@ -3524,8 +3593,9 @@ body.ea-shell-open .vs-inv-sub,
 body.ho-shell-open .vs-inv-sub{
   font-size:10px;
 }
-/* Narrower desktops + rail: also drop Output gauge */
-@media(max-width:1500px){
+/* Tighter desktops + rail: drop the Output gauge first (least informative — it's
+   blank at night anyway), but KEEP the 14-day graph. */
+@media(max-width:1360px){
   body.ea-shell-open .vs-c-gauge,
   body.ea-shell-open .vs-colhead .vs-c-gauge,
   body.ho-shell-open .vs-c-gauge,
@@ -3535,19 +3605,20 @@ body.ho-shell-open .vs-inv-sub{
   body.ea-shell-open .vs-row,
   body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(56px,.4fr)     /* vendor */
-      minmax(0,1.45fr)      /* name */
+      68px                  /* vendor */
+      minmax(0,1fr)         /* name — takes the slack */
       0px                   /* gauge hidden */
-      minmax(32px,.38fr)    /* units */
-      minmax(50px,.7fr)     /* live kW */
-      minmax(54px,.75fr)    /* today */
-      0px                   /* spark hidden */
-      minmax(68px,1fr)      /* status */
-      minmax(92px,.9fr);    /* synced hard min */
+      42px                  /* units */
+      62px                  /* live kW */
+      64px                  /* today */
+      104px                 /* spark — kept */
+      86px                  /* status */
+      92px;                 /* synced */
   }
 }
-/* Very tight remaining content (≈ laptop + EA rail): drop Units too */
-@media(max-width:1180px){
+/* Very tight remaining content (≈ laptop + rail): drop Units too — the 14-day
+   graph still survives, it's the reason to be on this screen. */
+@media(max-width:1150px){
   body.ea-shell-open .vs-c-inv,
   body.ea-shell-open .vs-colhead .vs-c-inv,
   body.ho-shell-open .vs-c-inv,
@@ -3557,14 +3628,14 @@ body.ho-shell-open .vs-inv-sub{
   body.ea-shell-open .vs-row,
   body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(52px,.38fr)
-      minmax(0,1.5fr)
-      0px
-      0px
-      minmax(48px,.72fr)
-      minmax(52px,.78fr)
-      0px
-      minmax(64px,1fr)
-      minmax(88px,.95fr);
+      64px                  /* vendor */
+      minmax(0,1fr)         /* name — takes the slack */
+      0px                   /* gauge hidden */
+      0px                   /* units hidden */
+      60px                  /* live kW */
+      62px                  /* today */
+      96px                  /* spark — kept */
+      82px                  /* status */
+      90px;                 /* synced */
   }
 }
