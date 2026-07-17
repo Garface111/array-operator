@@ -28,12 +28,15 @@
  };
 
  // Option D (Ford 2026-07-16): Realtime owns live voice; consult_deep_brain → Claude.
- // Set window.__EA_VOICE_WEAVE = false to force legacy mouth-only dual path.
+ // TEMPORARILY DEFAULT OFF (2026-07-16): the weave leaked GPT's own instruction
+ // recitations into chat and blocked audio — reverted to the reliable mouth-only
+ // path (brain authors the [SPOKEN] line) while the weave is hardened. Opt back
+ // in per-session with window.__EA_VOICE_WEAVE = true.
  var VOICE_WEAVE = (function () {
  try {
  if (typeof window.__EA_VOICE_WEAVE === "boolean") return window.__EA_VOICE_WEAVE;
  } catch (e) {}
- return true;
+ return false;
  })();
 
  // Live thinking-narration (Ford 2026-07-16): stream the deep brain's real tool
@@ -5978,21 +5981,14 @@
  ) {
  var agentSaid = (ev.transcript || "").trim();
  if (agentSaid) {
- // Drop filler / panic lines while deep brain is working (never paint them)
- if (state._silenceUntilDeepAnswer || state._consultInFlight) {
- state._lastAgentTranscript = agentSaid;
- return;
- }
  state._lastSpokenPlain = agentSaid;
  state._lastAgentTranscript = agentSaid;
- // Deep-brain already painted the panel for this turn — don't double-bubble
- if (state._suppressNextAgentTranscript) {
  state._suppressNextAgentTranscript = false;
- } else if (!state._consultInFlight) {
- // Small-talk / native Realtime replies still need a chat line
- addMsg("agent", agentSaid);
- state._lastAgentBubble = agentSaid.slice(0, 200);
- }
+ // In weave mode the PANEL is authored by the deep brain (addMsg from the
+ // consult) — never post GPT's own audio transcript to chat. GPT sometimes
+ // verbalizes its instructions ("I'll stay quiet…") or freestyle recovery
+ // lines; those must NEVER pollute the panel (Ford 2026-07-16 screenshot).
+ // The audio still plays; we just don't bubble the Realtime transcript.
  }
  if (state._greetingPlaying) {
  state._greetingPlaying = false;
