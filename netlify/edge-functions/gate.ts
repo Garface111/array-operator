@@ -10,6 +10,11 @@
 //
 // Site env vars (preprod site only): PREPROD_ALLOW_IPS (comma-sep IP allowlist),
 // PREPROD_REQUEST_EMAIL (where the "request access" mailto points).
+//
+// Allowlist entries can be an exact IP ("73.63.234.141") OR a PREFIX ending in
+// "." or ":" ("2601:646:a201:9040:" = an IPv6 /64). Prefixes matter because a
+// residential IPv6 rotates its lower 64 bits (privacy extensions) while the /64
+// stays put.
 
 function getEnv(k) {
   try {
@@ -19,7 +24,18 @@ function getEnv(k) {
   return "";
 }
 
-function gatePage(requestEmail) {
+function ipAllowed(ip, allow) {
+  for (var j = 0; j < allow.length; j++) {
+    var e = allow[j];
+    if (!e) continue;
+    if (ip === e) return true; // exact
+    var last = e.charAt(e.length - 1);
+    if ((last === ":" || last === ".") && ip.indexOf(e) === 0) return true; // prefix (IPv6 /64 or IPv4)
+  }
+  return false;
+}
+
+function gatePage(requestEmail, ip) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
@@ -42,8 +58,8 @@ function gatePage(requestEmail) {
     <div class="eyebrow">Array Operator</div>
     <h1>Private preview</h1>
     <p>This is the Array Operator <b>preprod</b> environment — where new changes are tested before they reach the live product. Access is limited to approved networks.</p>
-    <a class="cta" href="mailto:${requestEmail}?subject=Array%20Operator%20preview%20access">Request access →</a>
-    <div class="hint">The live product is at <a href="https://arrayoperator.com" style="color:var(--blue)">arrayoperator.com</a>.</div>
+    <a class="cta" href="mailto:${requestEmail}?subject=Array%20Operator%20preview%20access%20(IP%20${encodeURIComponent(ip || "")})">Request access →</a>
+    <div class="hint">The live product is at <a href="https://arrayoperator.com" style="color:var(--blue)">arrayoperator.com</a>.<br><span style="opacity:.6">Your IP: <code style="font-size:11px">${ip || "unknown"}</code></span></div>
   </div>
 </body></html>`;
 }
@@ -54,10 +70,10 @@ export default async (request, context) => {
 
   const ip = (context && context.ip) || request.headers.get("x-nf-client-connection-ip") || "";
 
-  // Allowlisted IP -> pass silently. Everyone else -> branded page (no prompt).
-  if (allow.length && ip && allow.indexOf(ip) !== -1) return;
+  // Allowlisted IP/prefix -> pass silently. Everyone else -> branded page.
+  if (allow.length && ip && ipAllowed(ip, allow)) return;
 
-  return new Response(gatePage(requestEmail), {
+  return new Response(gatePage(requestEmail, ip), {
     status: 403,
     headers: {
       "content-type": "text/html; charset=utf-8",
