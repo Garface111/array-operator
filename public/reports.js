@@ -626,14 +626,23 @@
  if (fin) fin.style.display = v === "trends" ? "" : "none";
  if (gen) gen.style.display = v === "genreports" ? "" : "none";
  if (pipe) pipe.style.display = (v === "offtakers") ? "" : "none";
+ // Generation reports owns its OWN header (title + description + Clients/Reports
+ // switch, rendered by the embed), and wants a tighter sheet that reveals more
+ // of the sky. Flag the sheet so theme-sky-reports.css can narrow it + hide the
+ // AO title band for this sub-view only; every other sub-view is untouched.
+ const sheet = document.getElementById("rbSubInvoice");
+ if (sheet) sheet.classList.toggle("rb2-genrep", v === "genreports");
  // The KPI glance-line is offtaker-invoicing chrome ("N offtakers · billed
  // arrays · don't match GMP") — it leaked onto the other sub-views' heads.
  const kpis = document.getElementById("rb2Kpis");
  if (kpis) kpis.style.display = (v === "offtakers") ? "" : "none";
- // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on others
+ // Title band is offtaker-invoicing chrome; keep it for offtakers, soft-hide on
+ // others. Generation reports renders its OWN title inside the embed, so the AO
+ // band is hidden outright for it (no duplicate "Generation reports").
  if (head) {
  const id = head.querySelector(".rb2-id h1");
  const sub = head.querySelector(".rb2-id #rb2Sub, .rb2-id p");
+ head.style.display = (v === "genreports") ? "none" : "";
  if (v === "offtakers") {
  if (id) id.textContent = "Offtaker invoicing";
  if (sub) sub.style.display = "";
@@ -642,9 +651,6 @@
  if (sub) sub.style.display = "none";
  } else if (v === "trends") {
  if (id) id.textContent = "Invoice trends";
- if (sub) sub.style.display = "none";
- } else if (v === "genreports") {
- if (id) id.textContent = "Generation reports";
  if (sub) sub.style.display = "none";
  }
  }

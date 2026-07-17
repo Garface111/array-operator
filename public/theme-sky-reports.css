@@ -720,3 +720,24 @@ html:not(.sky) .rb-fin-num{ text-align:right; font-variant-numeric:tabular-nums;
 html:not(.sky) .rb-fin-bartrack{ height:10px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden; }
 html:not(.sky) .rb-fin-barfill{ height:100%; background:var(--accent,#2563eb); }
 html:not(.sky) .rb-fin-barrow{ display:grid; grid-template-columns:72px 1fr 88px 72px; gap:8px; align-items:center; margin:6px 0; }
+
+/* ═══ THE FOLD — Generation reports: a tighter sheet that reveals the sky ═══
+   Ford 2026-07-16: the generation-reports sub-view was as wide as the dense
+   Offtakers tables, leaving only a sliver of the mountain photo. It has its own
+   header (title + description + Clients/Reports switch, rendered by the embed)
+   and its content (a client roster) reads better narrower. Scope EVERYTHING to
+   #rbSubInvoice.rb2-genrep (set by reports.js applyInvoicesSub) so Offtakers /
+   Bill audit / Trends are untouched. */
+html.sky #rbSubInvoice.rb2-genrep{
+  /* Pull the sheet in so the sky breathes on both sides; centered. Below this
+     width (tablet/phone) max-width is a no-op and it stays full-bleed. */
+  max-width:1080px;
+  margin-left:auto;
+  margin-right:auto;
+  /* Flush to the cards: the embed brings its own inner rhythm, so the sheet
+     needs only a hair of gutter. */
+  padding:14px 16px 20px;
+}
+/* The AO title band is hidden for this sub-view (reports.js) — belt-and-braces
+   in case JS is mid-swap, so there's never a duplicate "Generation reports". */
+html.sky #rbSubInvoice.rb2-genrep > .rb2-head{display:none}
