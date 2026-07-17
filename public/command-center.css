@@ -475,6 +475,57 @@ body.sb-fs-lock{ overflow:hidden; }
 .rb-globalrate .rb-gr-main h3{ font-size:15.5px; margin:0 0 .25em; font-weight:750; letter-spacing:-.01em; }
 .rb-globalrate .rb-gr-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:72ch; margin:0; }
 .rb-globalrate .rb-gr-main p b{ color:var(--ink); font-weight:650; }
+
+/* ── Master offtaker email (fleet template) — mirrors gen-reports Delivery
+   settings email region: live sample preview + Customize studio CTA. */
+.rb-mastermail{
+  margin:0 0 14px; padding:18px 20px;
+  border-radius:16px; border:1px solid var(--line);
+  background:linear-gradient(165deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  max-width:none; width:100%; box-sizing:border-box;
+}
+.rb-mm-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:16px; flex-wrap:wrap; margin-bottom:14px;
+}
+.rb-mm-main{ flex:1 1 280px; min-width:0; }
+.rb-mm-main h3{ font-size:15.5px; margin:0 0 .25em; font-weight:750; letter-spacing:-.01em; }
+.rb-mm-main p{ font-size:12.5px; color:var(--faint); line-height:1.5; max-width:72ch; margin:0; }
+.rb-mm-main p b{ color:var(--ink); font-weight:650; }
+.rb-mm-eyebrow{
+  font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--faint); margin:0 0 8px;
+}
+.rb-mm-preview{
+  border:1px solid var(--line); border-radius:14px; overflow:hidden;
+  background:var(--card,#fff); box-shadow:0 1px 0 rgba(15,23,42,.03);
+}
+.rb-mm-env{
+  padding:12px 16px; font-size:12.5px; color:var(--muted);
+  border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:6px;
+}
+.rb-mm-envlab{
+  display:inline-block; min-width:4.5rem; font-size:10px; font-weight:700;
+  letter-spacing:.05em; color:var(--faint); margin-right:6px;
+}
+.rb-mm-subj{ color:var(--ink); font-weight:650; }
+.rb-mm-body{
+  padding:14px 16px; font-size:13px; line-height:1.55; color:var(--ink);
+  max-height:220px; overflow-y:auto;
+}
+.rb-mm-body p{ margin:0 0 .65em; }
+.rb-mm-body p:last-child{ margin-bottom:0; }
+.rb-mm-mute{ color:var(--faint); font-size:12.5px; }
+.rb-mm-foot{
+  padding:8px 16px 12px; font-size:11.5px; color:var(--faint);
+  border-top:1px solid var(--line);
+}
+.rb-mm-status{ margin-top:8px; font-size:12px; color:var(--faint); min-height:1em; }
+.rb-mm-retry{
+  background:none; border:0; padding:0; color:var(--good,#2563eb);
+  font:inherit; font-weight:650; cursor:pointer; text-decoration:underline;
+}
+#rbMasterEmailOpen{ flex:0 0 auto; white-space:nowrap; }
 /* invoice-template upload card — operator's own format */
 .rb-tpl{ display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }
 .rb-tpl .rb-tpl-main h3{ font-size:15.5px; margin:.2em 0 .15em; }
@@ -2387,12 +2438,19 @@ body.ea-shell-open #panelResources{
   box-sizing: border-box;
   overflow-x: hidden;
 }
-/* Analysis / Invoices secondary nav: same safe sizing when EA open */
+/* Analysis secondary nav (3 items): safe sizing when EA open */
 body.ea-shell-open .ao-subnav .an-sub-seg,
-body.ea-shell-open .ao-subnav .inv-sub-seg,
-body.ea-shell-open .an-sub-seg,
-body.ea-shell-open #panelReports .inv-sub-seg{
+body.ea-shell-open .an-sub-seg{
   max-width: min(100%, 400px);
+}
+/* Invoices secondary nav has FOUR pills since THE FOLD (Offtakers | Bill audit
+   | Trends | Generation reports). The old 400px cap clipped the 'Generation
+   reports' pill when the EA shell narrows the column. Use the full column and
+   scroll on the pathological narrow case rather than clip. */
+body.ea-shell-open .ao-subnav .inv-sub-seg,
+body.ea-shell-open #panelReports .inv-sub-seg{
+  max-width: 100%;
+  overflow-x: auto;
 }
 /* Content sheets sit flush under the sub-nav strip (no extra top margin that
    un-centers the pill in the banner→card band). */
@@ -2476,8 +2534,8 @@ body.ea-shell-open #panelReports .inv-sub-seg{
    (Vendor first — Ford 2026-07-16). Name gets the flex room so inverter labels don't clip. */
 .vs-row{ display:grid;
   grid-template-columns:
-    minmax(88px,.62fr)    /* vendor */
-    minmax(0,1.65fr)      /* name / array / inverter */
+    minmax(118px,.72fr)   /* vendor — fits long uppercased names (SolarEdge, AlsoEnergy) */
+    minmax(0,1.5fr)       /* name / array / inverter */
     56px                  /* gauge (Output) */
     minmax(48px,.55fr)    /* units count / peer */
     minmax(68px,.8fr)     /* live kW */
@@ -3289,15 +3347,30 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 
 /* ── Energy Agent / hands-off rail open ───────────────────────────────────
    Densify so the FULL table still fits in the remaining width — no horizontal
-   scroll (Ford 2026-07-16: scrolling is hideous). Live/Today stay separate
-   columns with nowrap so they never become "kWkWh". */
+   scroll. Column order MUST match the base grid:
+   Vendor | Name | Output | Units | Live kW | Today | 14-day | Status | Synced
+
+   Important: media queries use *viewport* width, but the EA rail steals ~388px of
+   content. So viewport-based "drop spark under 1280" never fires on a 1440 laptop
+   with the rail open — Synced was minmax(0,…) and got clipped to "…" / "ago".
+   Always densify on shell-open; give Synced a hard min-width. */
 body.ea-shell-open #sheetWrap,
 body.ho-shell-open #sheetWrap{
   max-width:none;
   width:100%;
   min-width:0;
-  padding:12px 8px 40px;
-  overflow:hidden;
+  padding:8px 6px 28px;
+  overflow-x:hidden;
+  overflow-y:visible;
+  box-sizing:border-box;
+}
+body.ea-shell-open .vs-topbar,
+body.ho-shell-open .vs-topbar{
+  margin-bottom:6px;
+}
+body.ea-shell-open .vs-hint,
+body.ho-shell-open .vs-hint{
+  display:none; /* reclaim vertical room when rail is open */
 }
 body.ea-shell-open .vs-scroll,
 body.ho-shell-open .vs-scroll{
@@ -3307,33 +3380,101 @@ body.ho-shell-open .vs-scroll{
   max-width:100%;
   min-width:0;
 }
+/* Always drop 14-day spark when the rail is open — free ~80px for Synced */
+body.ea-shell-open .vs-c-spark,
+body.ea-shell-open .vs-colhead .vs-c-spark,
+body.ea-shell-open .vs-inv-rowspark-wrap,
+body.ho-shell-open .vs-c-spark,
+body.ho-shell-open .vs-colhead .vs-c-spark,
+body.ho-shell-open .vs-inv-rowspark-wrap{
+  display:none !important;
+}
 body.ea-shell-open .vs-row,
 body.ho-shell-open .vs-row{
   grid-template-columns:
-    minmax(0,1.35fr)     /* name */
-    minmax(0,.55fr)      /* vendor — tight */
-    48px                 /* gauge */
-    32px                 /* inv */
-    minmax(58px,.8fr)    /* live */
-    minmax(66px,.85fr)   /* today */
-    minmax(64px,88px)    /* spark compact */
-    minmax(0,1.1fr)      /* status */
-    minmax(0,.6fr);      /* synced */
+    minmax(58px,.42fr)    /* vendor */
+    minmax(0,1.35fr)      /* name */
+    40px                  /* gauge */
+    minmax(32px,.38fr)    /* units */
+    minmax(50px,.68fr)    /* live kW */
+    minmax(54px,.72fr)    /* today */
+    0px                   /* spark hidden */
+    minmax(68px,.95fr)    /* status */
+    minmax(92px,.88fr);   /* synced — hard min so "synced 12m" / "25d ago" never clips */
   width:100%;
   min-width:0;
-  gap:6px;
-  padding:8px 8px;
+  gap:4px;
+  padding:7px 6px;
+  box-sizing:border-box;
 }
-body.ea-shell-open .vs-c-spark,
-body.ho-shell-open .vs-c-spark{
-  padding-right:4px;
+/* Synced / Details: never ellipsize into "ago" alone — hard min + no overflow hide */
+body.ea-shell-open .vs-c-fresh,
+body.ho-shell-open .vs-c-fresh{
+  min-width:92px;
+  max-width:100%;
+  overflow:visible;
+  text-overflow:clip;
+  white-space:nowrap;
+  font-size:11px;
+  font-variant-numeric:tabular-nums;
 }
-body.ea-shell-open .vs-inv-rowspark-wrap,
-body.ea-shell-open .vs-inv-rowspark,
-body.ho-shell-open .vs-inv-rowspark-wrap,
-body.ho-shell-open .vs-inv-rowspark{
-  max-width:80px;
-  height:22px;
+body.ea-shell-open .vs-colhead .vs-c-fresh,
+body.ho-shell-open .vs-colhead .vs-c-fresh{
+  overflow:hidden; /* header label "Synced" is short */
+}
+/* Expand-all: icon-only when cramped so it doesn't become "EX" mid-header */
+body.ea-shell-open .vs-expandall,
+body.ho-shell-open .vs-expandall{
+  font-size:0;
+  letter-spacing:0;
+  padding:3px 7px;
+  min-width:28px;
+  width:auto;
+  flex-shrink:0;
+}
+body.ea-shell-open .vs-expandall::before,
+body.ho-shell-open .vs-expandall::before{
+  content:"↕";
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:0;
+  line-height:1;
+}
+body.ea-shell-open .vs-namehead,
+body.ho-shell-open .vs-namehead{
+  gap:4px;
+  min-width:0;
+}
+/* Compact "Open vendor to sync" chip — full label was eating the Name track */
+body.ea-shell-open .vs-vlag,
+body.ho-shell-open .vs-vlag{
+  font-size:0;
+  letter-spacing:0;
+  padding:2px 7px;
+  gap:0;
+  max-width:4.5rem;
+}
+body.ea-shell-open .vs-vlag::before,
+body.ho-shell-open .vs-vlag::before{
+  content:"↗ sync";
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+body.ea-shell-open .vs-vlag .vs-vlag-ic,
+body.ea-shell-open .vs-vlag .vs-vlag-sub,
+body.ho-shell-open .vs-vlag .vs-vlag-ic,
+body.ho-shell-open .vs-vlag .vs-vlag-sub{
+  display:none;
+}
+body.ea-shell-open .vs-gauge,
+body.ea-shell-open .vs-gauge svg,
+body.ea-shell-open .vs-gauge-empty,
+body.ho-shell-open .vs-gauge,
+body.ho-shell-open .vs-gauge svg,
+body.ho-shell-open .vs-gauge-empty{
+  width:40px;
+  height:21px;
 }
 body.ea-shell-open .vs-c-pow,
 body.ea-shell-open .vs-c-today,
@@ -3343,46 +3484,87 @@ body.ho-shell-open .vs-c-today{
   overflow:hidden;
   text-overflow:ellipsis;
   min-width:0;
-  font-size:12.5px;
+  font-size:12px;
 }
 body.ea-shell-open .vs-colhead,
 body.ho-shell-open .vs-colhead{
-  font-size:9.5px;
-  letter-spacing:.05em;
-  gap:6px;
-  padding:8px;
+  font-size:9px;
+  letter-spacing:.04em;
+  gap:4px;
+  padding:6px;
 }
 body.ea-shell-open .vs-colhead .vs-c-pow,
 body.ea-shell-open .vs-colhead .vs-c-today,
+body.ea-shell-open .vs-colhead .vs-c-spark,
 body.ho-shell-open .vs-colhead .vs-c-pow,
-body.ho-shell-open .vs-colhead .vs-c-today{
-  white-space:normal;
-  line-height:1.1;
-  font-size:9px;
-  letter-spacing:.03em;
+body.ho-shell-open .vs-colhead .vs-c-today,
+body.ho-shell-open .vs-colhead .vs-c-spark{
+  white-space:nowrap;
+  line-height:1.15;
+  font-size:8.5px;
+  letter-spacing:.02em;
 }
 body.ea-shell-open .vs-pill,
 body.ho-shell-open .vs-pill{
-  font-size:10.5px;
-  padding:4px 8px;
+  font-size:10px;
+  padding:3px 6px;
   max-width:100%;
+}
+body.ea-shell-open .vs-c-status,
+body.ho-shell-open .vs-c-status{
+  min-width:0;
 }
 body.ea-shell-open .vs-inv-details,
 body.ho-shell-open .vs-inv-details{
-  font-size:11px;
-  padding:3px 6px;
+  font-size:10.5px;
+  padding:2px 5px;
+  white-space:nowrap;
 }
-/* Very tight remaining width (small laptop + EA): hide spark, keep metrics */
-@media(max-width:1100px){
-  body.ea-shell-open .vs-c-spark,
-  body.ea-shell-open .vs-colhead .vs-c-spark,
-  body.ea-shell-open .vs-inv-rowspark-wrap{
+body.ea-shell-open .vs-inv-sub,
+body.ho-shell-open .vs-inv-sub{
+  font-size:10px;
+}
+/* Narrower desktops + rail: also drop Output gauge */
+@media(max-width:1500px){
+  body.ea-shell-open .vs-c-gauge,
+  body.ea-shell-open .vs-colhead .vs-c-gauge,
+  body.ho-shell-open .vs-c-gauge,
+  body.ho-shell-open .vs-colhead .vs-c-gauge{
     display:none !important;
   }
-  body.ea-shell-open .vs-row{
+  body.ea-shell-open .vs-row,
+  body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(0,1.4fr) minmax(0,.6fr) 48px 32px
-      minmax(60px,.85fr) minmax(68px,.9fr)
-      0px minmax(0,1.2fr) minmax(0,.65fr);
+      minmax(56px,.4fr)     /* vendor */
+      minmax(0,1.45fr)      /* name */
+      0px                   /* gauge hidden */
+      minmax(32px,.38fr)    /* units */
+      minmax(50px,.7fr)     /* live kW */
+      minmax(54px,.75fr)    /* today */
+      0px                   /* spark hidden */
+      minmax(68px,1fr)      /* status */
+      minmax(92px,.9fr);    /* synced hard min */
+  }
+}
+/* Very tight remaining content (≈ laptop + EA rail): drop Units too */
+@media(max-width:1180px){
+  body.ea-shell-open .vs-c-inv,
+  body.ea-shell-open .vs-colhead .vs-c-inv,
+  body.ho-shell-open .vs-c-inv,
+  body.ho-shell-open .vs-colhead .vs-c-inv{
+    display:none !important;
+  }
+  body.ea-shell-open .vs-row,
+  body.ho-shell-open .vs-row{
+    grid-template-columns:
+      minmax(52px,.38fr)
+      minmax(0,1.5fr)
+      0px
+      0px
+      minmax(48px,.72fr)
+      minmax(52px,.78fr)
+      0px
+      minmax(64px,1fr)
+      minmax(88px,.95fr);
   }
 }

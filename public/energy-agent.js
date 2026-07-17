@@ -28,12 +28,15 @@
  };
 
  // Option D (Ford 2026-07-16): Realtime owns live voice; consult_deep_brain → Claude.
- // Set window.__EA_VOICE_WEAVE = false to force legacy mouth-only dual path.
+ // TEMPORARILY DEFAULT OFF (2026-07-16): the weave leaked GPT's own instruction
+ // recitations into chat and blocked audio — reverted to the reliable mouth-only
+ // path (brain authors the [SPOKEN] line) while the weave is hardened. Opt back
+ // in per-session with window.__EA_VOICE_WEAVE = true.
  var VOICE_WEAVE = (function () {
  try {
  if (typeof window.__EA_VOICE_WEAVE === "boolean") return window.__EA_VOICE_WEAVE;
  } catch (e) {}
- return true;
+ return false;
  })();
 
  // Live thinking-narration (Ford 2026-07-16): stream the deep brain's real tool
@@ -87,6 +90,7 @@
  _speakQueue: Promise.resolve(),
  _speakSeq: 0,
  _lastSpokenPlain: "",
+ _speakEndedAt: 0, // ms of last speech-end — echo filter only guards a brief tail after this
  // Mic hold during TTS attack only (guarded barge-in after ~0.5s)
  _micHeldForSpeak: false,
  _unmuteAfterSpeakTimer: null,
@@ -2730,6 +2734,12 @@
  tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
  } catch (e) {}
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
+ // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
+ try {
+ requestAnimationFrame(function () {
+ try { window.dispatchEvent(new Event("resize")); } catch (e2) {}
+ });
+ } catch (e) {}
  if (state.open) {
  await ensureSession();
  // Hard-refresh fix: if the rail is still empty after session attach, force
@@ -4786,9 +4796,23 @@
  if (isStopCommand(said)) return true;
  // First intro must finish, speaker bleed was cutting it every time
  if (state._greetingPlaying) return false;
- if (looksLikeEchoOfLastSpeech(said)) return false;
- if (isGarbageTranscript(said)) return false;
  var now = Date.now();
+ // Echo is our OWN audio bleeding into the mic — physically possible only while
+ // she is speaking or within a brief tail after playback stops. Outside that
+ // window a transcript is the user genuinely talking, even an on-topic follow-up
+ // that reuses words from the long answer she just gave. Time-box the echo
+ // filter so real follow-ups are never eaten as "echo." (Bug, Ford 2026-07-16:
+ // _lastSpokenPlain was never cleared, so every topical follow-up matched the
+ // whole prior answer at 40% word-overlap and was dropped — while off-topic
+ // complaints, which don't overlap, were the only thing getting through.)
+ var echoGuardMs = parseInt(window.__EA_ECHO_GUARD_MS, 10);
+ if (!echoGuardMs || echoGuardMs < 300) echoGuardMs = 1200;
+ var withinEchoWindow =
+ isAgentMouthBusy() ||
+ state._micHeldForSpeak ||
+ (state._speakEndedAt && now - state._speakEndedAt < echoGuardMs);
+ if (withinEchoWindow && looksLikeEchoOfLastSpeech(said)) return false;
+ if (isGarbageTranscript(said)) return false;
  var saidKey = said.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
  // Stronger dedupe: double STT events were starting two full replies
  if (
@@ -5499,6 +5523,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._speakStartedAt = 0;
+ state._speakEndedAt = Date.now();
  if (
  opts.reason === "barge_in" ||
  opts.reason === "new_turn" ||
@@ -5897,6 +5922,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._rtCancelPending = false;
+ state._speakEndedAt = Date.now();
  if (state._greetingPlaying) state._greetingPlaying = false;
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
@@ -5919,6 +5945,7 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._rtCancelPending = false;
+ state._speakEndedAt = Date.now();
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
  } else {
@@ -5978,21 +6005,14 @@
  ) {
  var agentSaid = (ev.transcript || "").trim();
  if (agentSaid) {
- // Drop filler / panic lines while deep brain is working (never paint them)
- if (state._silenceUntilDeepAnswer || state._consultInFlight) {
- state._lastAgentTranscript = agentSaid;
- return;
- }
  state._lastSpokenPlain = agentSaid;
  state._lastAgentTranscript = agentSaid;
- // Deep-brain already painted the panel for this turn — don't double-bubble
- if (state._suppressNextAgentTranscript) {
  state._suppressNextAgentTranscript = false;
- } else if (!state._consultInFlight) {
- // Small-talk / native Realtime replies still need a chat line
- addMsg("agent", agentSaid);
- state._lastAgentBubble = agentSaid.slice(0, 200);
- }
+ // In weave mode the PANEL is authored by the deep brain (addMsg from the
+ // consult) — never post GPT's own audio transcript to chat. GPT sometimes
+ // verbalizes its instructions ("I'll stay quiet…") or freestyle recovery
+ // lines; those must NEVER pollute the panel (Ford 2026-07-16 screenshot).
+ // The audio still plays; we just don't bubble the Realtime transcript.
  }
  if (state._greetingPlaying) {
  state._greetingPlaying = false;

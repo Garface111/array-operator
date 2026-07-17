@@ -141,10 +141,22 @@
       autoNav: true,
     },
     {
+      id: "genreports",
+      rail: "Generation reports",
+      railSub: "",
+      kicker: "10",
+      title: "Generation reports",
+      lede:
+        "Save a client's utility login once — we pull the bills, assign the NEPOOL-GIS IDs, and email each client their quarterly generation report on cadence.",
+      kind: "guide",
+      cta: { label: "Open →", hash: "#reports", openGenreports: true },
+      autoNav: true,
+    },
+    {
       id: "bulkimport",
       rail: "Bulk import",
       railSub: "",
-      kicker: "10",
+      kicker: "11",
       title: "Bulk import",
       lede: "",
       kind: "guide",
@@ -155,7 +167,7 @@
       id: "billaudit",
       rail: "Bill audit",
       railSub: "",
-      kicker: "11",
+      kicker: "12",
       title: "Bill audit",
       lede: "",
       kind: "guide",
@@ -166,7 +178,7 @@
       id: "autosend",
       rail: "Delivery",
       railSub: "",
-      kicker: "12",
+      kicker: "13",
       title: "Delivery",
       lede: "",
       kind: "dream",
@@ -179,7 +191,7 @@
       id: "onlinepay",
       rail: "Online pay",
       railSub: "",
-      kicker: "13",
+      kicker: "14",
       title: "Online pay",
       lede: "",
       kind: "step",
@@ -192,7 +204,7 @@
       id: "repairs",
       rail: "Repairs",
       railSub: "",
-      kicker: "14",
+      kicker: "15",
       title: "Repair contact",
       lede: "",
       kind: "step",
@@ -205,7 +217,7 @@
       id: "resources",
       rail: "Resources",
       railSub: "",
-      kicker: "15",
+      kicker: "16",
       title: "Resources",
       lede: "",
       kind: "guide",
@@ -216,7 +228,7 @@
       id: "account",
       rail: "Account",
       railSub: "",
-      kicker: "16",
+      kicker: "17",
       title: "Account",
       lede: "",
       kind: "guide",
@@ -227,7 +239,7 @@
       id: "agent",
       rail: "Agent",
       railSub: "",
-      kicker: "17",
+      kicker: "18",
       title: "Energy Agent",
       lede: "",
       kind: "guide",
@@ -1002,6 +1014,7 @@
  cta.openBulk ||
  cta.openAudit ||
  cta.openOfftakers ||
+ cta.openGenreports ||
  cta.openAgent
  ) {
  goHash(
@@ -1018,6 +1031,7 @@
  openBulk: !!cta.openBulk,
  openAudit: !!cta.openAudit,
  openOfftakers: !!cta.openOfftakers,
+ openGenreports: !!cta.openGenreports,
  openAgent: !!cta.openAgent,
  }
  );
@@ -1720,6 +1734,7 @@
  (step.cta.openBulk ? ' data-bulk="1"' : "") +
  (step.cta.openAudit ? ' data-audit="1"' : "") +
  (step.cta.openOfftakers ? ' data-offtakers="1"' : "") +
+ (step.cta.openGenreports ? ' data-genreports="1"' : "") +
  (step.cta.openAgent ? ' data-agent="1"' : "") +
  ">" +
  esc(step.cta.label) +
@@ -1897,6 +1912,14 @@
  setTimeout(function () {
  clickWhenReady('#rbGenTabs [data-gentab="offtakers"]', 18);
  }, 420);
+ }
+ if (extras.openGenreports) {
+ setTimeout(function () {
+ // Invoices sub-nav lives in index.html as .inv-sub-seg; the Generation
+ // reports pill is #invTabGenrep (data-gentab="genreports"). clickWhenReady
+ // no-ops if the pill isn't present for this tenant, which is correct.
+ clickWhenReady('#invTabGenrep, .inv-sub-seg [data-gentab="genreports"]', 22);
+ }, 480);
  }
  if (extras.openAgent) {
  setTimeout(function () {
@@ -2437,6 +2460,7 @@
  openBulk: btn.getAttribute("data-bulk") === "1",
  openAudit: btn.getAttribute("data-audit") === "1",
  openOfftakers: btn.getAttribute("data-offtakers") === "1",
+ openGenreports: btn.getAttribute("data-genreports") === "1",
  openAgent: btn.getAttribute("data-agent") === "1",
  };
  if (state.mode === "modal") {
@@ -2619,6 +2643,7 @@
  openBulk: !!opts.openBulk,
  openAudit: !!opts.openAudit,
  openOfftakers: !!opts.openOfftakers,
+ openGenreports: !!opts.openGenreports,
  openAgent: !!opts.openAgent,
  }
  );

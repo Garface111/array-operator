@@ -660,6 +660,8 @@
  if ((location.hash || "").toLowerCase() !== want) {
  history.replaceState(null, "", want);
  }
+ // replaceState fires no hashchange, so record the sub-tab memory explicitly.
+ if (window.__aoRememberSub) window.__aoRememberSub();
  } catch (e) {}
  }
  function wireGenTabs() {
@@ -683,7 +685,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260716e";
+ const GENREP_V = "20260716m";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -711,20 +713,10 @@
  host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — automated quarterly NEPOOL-GIS workbooks, emailed to each client. Sign in or start a trial to use them.</div>';
  return;
  }
- // World check: unmigrated accounts get an honest state, never an embed
- // showing their capture-created clients as report clients.
- host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
- fetch("/v1/account", { headers: authHeaders() })
- .then(r => (r.ok ? r.json() : null))
- .then(a => {
- if (!a) { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; return; }
- if (a.generation_reports !== true && !genrepFlag()) {
- host.innerHTML = '<div class="rb-au-empty">Generation reports aren\'t set up for this account yet. They automate NEPOOL/REC reporting — quarterly generation workbooks built from your utility data and emailed to each client. Ask us to enable them for your fleet.</div>';
- return;
- }
+ // Enabled for EVERY operator (Ford 2026-07-16). Mount the embed directly; a
+ // fresh tenant is guided through setup by the embed's own progress spine. No
+ // per-account "not set up" wall — generation reports is a standard AO feature.
  mountGenrepEmbed(host);
- })
- .catch(() => { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; });
  }
  function mountGenrepEmbed(host) {
  if (_genrepMounted) return;
@@ -1257,9 +1249,8 @@
  if (window.__aoLinkUtility) { window.__aoLinkUtility(); }
  else { location.hash = "#arrays"; } // defensive: sandbox owns the modal
  };
- // "✉ Customize email", the MASS offtaker-email template studio.
- const esBtn = $("#rbEmailStudio");
- if (esBtn) esBtn.onclick = openEmailStudio;
+ // Master email card + toolbar "✉ Customize email" both open the mass studio.
+ wireMasterEmail();
  // "⬇ Export to QuickBooks / Xero", this reaches shell() only on the signed-in
  // path (the signed-out/demo branch returns earlier), so revealing + wiring the
  // export box here inherently gates it to authed operators.
@@ -1873,6 +1864,7 @@
  if (!_demoBuilt) {
  el.innerHTML = shell();
  wireGenTabs(); // the "Offtakers | Bill audit" toggle works in the demo too (audit shows the sign-in state)
+ wireMasterEmail(); // sample preview card + Customize CTA (demo-nudged)
  _demoBuilt = true;
  }
  // Demo note, big-operator snapshot (scale from AO_DEMO.meta when present).
@@ -1958,6 +1950,7 @@
  const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
  const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
  const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
+ const mmBtn = $("#rbMasterEmailOpen"); if (mmBtn) mmBtn.onclick = () => demoNudge(mmBtn);
  const exBtn = $("#rb2ExportBtn"); if (exBtn) exBtn.onclick = () => demoNudge(exBtn);
  }
 
@@ -2054,6 +2047,85 @@
  const ov = document.getElementById("esOverlay");
  if (ov) ov.hidden = true;
  document.body.style.overflow = "";
+ // Refresh the in-page master email card so the sample preview matches the studio.
+ try { loadMasterEmailPreview(); } catch (_) { /* non-fatal */ }
+ }
+
+ // ─── Master email card (inline on Offtakers tab) ───────────────────────────
+ // Generation reports surfaces a live email-template preview + "Customize"
+ // CTA in Delivery settings. Offtakers now get the same element: a fleet
+ // master letter that overrides every offtaker invoice email (per-offtaker
+ // notes still win for a single send). Studio = existing openEmailStudio().
+ function wireMasterEmail() {
+ const open = () => openEmailStudio();
+ const cardBtn = $("#rbMasterEmailOpen");
+ if (cardBtn) cardBtn.onclick = open;
+ const esBtn = $("#rbEmailStudio");
+ if (esBtn) esBtn.onclick = open;
+ // Demo / signed-out: never hit the live template API.
+ if (!authHeaders() || window.AO_DEMO) {
+ if (cardBtn) cardBtn.onclick = () => demoNudge(cardBtn);
+ if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
+ const subjEl = $("#rbMmSubj");
+ const bodyEl = $("#rbMmBody");
+ const fromEl = $("#rbMmFrom");
+ if (fromEl) fromEl.textContent = "you · via Array Operator";
+ if (subjEl) subjEl.textContent = "Your solar credit invoice — sample period";
+ if (bodyEl) {
+ bodyEl.innerHTML = "<p>Hi there,</p><p>Please find your solar credit invoice attached, "
+ + "along with the utility bill behind the figures.</p>"
+ + "<p class='rb-mm-mute'>Sign in to customize this letter for every offtaker.</p>";
+ }
+ return;
+ }
+ loadMasterEmailPreview();
+ }
+
+ async function loadMasterEmailPreview() {
+ const fromEl = $("#rbMmFrom");
+ const subjEl = $("#rbMmSubj");
+ const bodyEl = $("#rbMmBody");
+ const footEl = $("#rbMmFoot");
+ const statEl = $("#rbMmStatus");
+ if (!subjEl || !bodyEl) return;
+ if (!authHeaders()) {
+ subjEl.textContent = "Sign in to preview your offtaker email.";
+ bodyEl.innerHTML = "";
+ return;
+ }
+ if (statEl) statEl.textContent = "";
+ try {
+ const d = await esApi("");
+ if (fromEl) {
+ const fe = d.from_email || "admin@solaroperator.org";
+ fromEl.textContent = fe + " · via Array Operator";
+ }
+ // Preview with current (saved) templates — null body means server uses tenant defaults.
+ const r = await esApi("/preview", {
+ method: "POST",
+ body: JSON.stringify({
+ subject_template: d.subject_template || null,
+ body_template: d.body_template || null,
+ signoff: d.signoff || null,
+ }),
+ });
+ subjEl.textContent = r.subject_rendered || "(subject)";
+ bodyEl.innerHTML = r.body_rendered
+ || "<p class='rb-mm-mute'>Preview will appear here once a template is set.</p>";
+ if (footEl) {
+ const who = r.sample_client || null;
+ footEl.textContent = who
+ ? "Previewing with " + who + "'s figures — every offtaker gets their own."
+ : "Add an offtaker with an email to see a personalized sample.";
+ }
+ } catch (e) {
+ subjEl.textContent = "Couldn't load preview";
+ bodyEl.innerHTML = "<p class='rb-mm-mute'>" + esc(e.message || "Preview failed") +
+ " · <button type='button' class='rb-mm-retry' id='rbMmRetry'>Try again</button></p>";
+ const retry = $("#rbMmRetry");
+ if (retry) retry.onclick = () => loadMasterEmailPreview();
+ if (statEl) statEl.textContent = "";
+ }
  }
 
  async function esPreview() {
@@ -2721,6 +2793,32 @@
  <span class="rb-status" id="rbGrStatus"></span>
  </div>
  <div class="rb-gr-eff" id="rbGrEff"></div>
+ </div>
+ <!-- Master offtaker email template (fleet override) — same idea as Generation
+      reports' delivery settings email region: live sample preview + full studio.
+      Wired by wireMasterEmail() → GET/POST /email-template*. Per-offtaker notes
+      still override for a single send. -->
+ <div class="rb-mastermail rep-card" id="rbMasterEmail">
+ <div class="rb-mm-head">
+ <div class="rb-mm-main">
+ <h3>Master offtaker email</h3>
+ <p><b>Fleet-wide letter</b> on every offtaker invoice email. Merge tags
+ personalize each send ({{greeting}}, {{amount}}, {{period}}…). A
+ per-offtaker edited note still overrides this for that one send.</p>
+ </div>
+ <button class="ao-btn ao-btn-primary rb-btn" id="rbMasterEmailOpen" type="button"
+ title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist.">✉ Customize email template</button>
+ </div>
+ <div class="rb-mm-eyebrow">Sample preview · what offtakers actually receive</div>
+ <div class="rb-mm-preview" id="rbMasterEmailPreview">
+ <div class="rb-mm-env">
+ <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
+ <div><span class="rb-mm-envlab">SUBJECT</span> <span id="rbMmSubj" class="rb-mm-subj">Loading…</span></div>
+ </div>
+ <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
+ <div class="rb-mm-foot" id="rbMmFoot"></div>
+ </div>
+ <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
  </div>
  <div class="rb-listwrap rb2-listwrap">
  <div class="rb2-controls">
