@@ -8,6 +8,7 @@
  var API = {
  session: "/v1/energy-agent/session",
  chat: "/v1/energy-agent/chat",
+ voiceConsultStream: "/v1/energy-agent/voice-consult-stream",
  upload: "/v1/energy-agent/upload",
  confirm: "/v1/energy-agent/confirm",
  realtime: "/v1/energy-agent/realtime-session",
@@ -31,6 +32,16 @@
  var VOICE_WEAVE = (function () {
  try {
  if (typeof window.__EA_VOICE_WEAVE === "boolean") return window.__EA_VOICE_WEAVE;
+ } catch (e) {}
+ return true;
+ })();
+
+ // Live thinking-narration (Ford 2026-07-16): stream the deep brain's real tool
+ // calls and speak them out loud AS it works, then the answer. __EA_VOICE_NARRATE
+ // = false → single-shot consult (no narration). Only active under the weave.
+ var VOICE_NARRATE = (function () {
+ try {
+ if (typeof window.__EA_VOICE_NARRATE === "boolean") return window.__EA_VOICE_NARRATE;
  } catch (e) {}
  return true;
  })();
@@ -5029,9 +5040,12 @@
  var n = 0;
  function poke() {
  if (!state._silenceUntilDeepAnswer) return;
+ // Don't cancel OUR own driven narration/answer — only GPT freestyle.
+ if (!state._drivenSpeak) {
  try {
  cancelRealtimeIfActive();
  } catch (e4) {}
+ }
  n += 1;
  if (n < 6) {
  state._silenceCancelTimer = setTimeout(poke, 150);
@@ -5056,6 +5070,132 @@
  }
 
  /**
+ * Handle one streamed consult event: a "thinking" line (spoken live in GPT's
+ * voice as the brain works) or the final "answer" (paint panel + speak + drive UI).
+ */
+ function handleConsultEvent(ev, gen) {
+ if (!ev || gen !== state._consultGen) return;
+ if (ev.type === "thinking") {
+ var txt = ownerFacingSpeak(ev.text || "");
+ if (!txt) return;
+ setStatus("Thinking…", "think");
+ // Driven speech: the silence guard lets this play (state._drivenSpeak).
+ enqueueSpeak(txt, { source: "narration", force: true, holdMicFull: false })
+ .catch(function () {});
+ } else if (ev.type === "answer") {
+ if (ev.budget) setBudget(ev.budget);
+ if (ev.pending) showPending(ev.pending);
+ else showPending(null);
+ var reply = ownerFacingText(ev.panel || "");
+ var spoken =
+ ownerFacingSpeak((ev.spoken && String(ev.spoken).trim()) || reply) || reply;
+ if (reply) {
+ addMsg("agent", reply);
+ state._lastAgentBubble = reply.slice(0, 200);
+ state._suppressNextAgentTranscript = true;
+ }
+ clearTools();
+ var cmds = ev.ui_commands || [];
+ cmds = coerceTourCommands(cmds, "");
+ (async function () {
+ for (var i = 0; i < cmds.length; i++) {
+ try {
+ await runCommand(cmds[i]);
+ } catch (e) {}
+ }
+ })();
+ if (spoken) {
+ enqueueSpeak(String(spoken).slice(0, 1400), {
+ source: "chat",
+ force: true,
+ holdMicFull: false,
+ }).catch(function () {});
+ }
+ }
+ }
+
+ /**
+ * Streamed deep consult (Option D + live narration). NDJSON: "thinking" lines
+ * are spoken as the brain calls each tool; the final "answer" is Claude's
+ * tool-grounded reply. Returns a promise that resolves when the stream ends.
+ */
+ function consultDeepBrainStream(q, gen) {
+ var question = String(q || "").trim() || "Help with what the owner just asked.";
+ if (!state.sessionId) {
+ return consultDeepBrain(question).then(function (res) {
+ var line = (res && res.spoken_answer) || (res && res.panel_text) || "";
+ if (line && gen === state._consultGen) {
+ enqueueSpeak(String(line).slice(0, 1400), { source: "chat", force: true });
+ }
+ });
+ }
+ setStatus("Thinking…", "think");
+ state.thinking = true;
+ state._turnBusy = true;
+ state._consultInFlight = true;
+ var chatCtx = packContext() || {};
+ chatCtx.voice_active = true;
+ chatCtx.voice_weave = true;
+ var gotAnswer = false;
+ return fetch(API.voiceConsultStream, {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify({
+ session_id: state.sessionId,
+ message: question,
+ context: chatCtx,
+ source: "voice_consult",
+ }),
+ })
+ .then(function (r) {
+ if (!r.ok || !r.body || !r.body.getReader) {
+ // Stream unsupported/failed → single-shot fallback
+ return consultDeepBrain(question).then(function (res) {
+ if (gen !== state._consultGen) return;
+ var line = (res && res.spoken_answer) || (res && res.panel_text) || "";
+ if (line) enqueueSpeak(String(line).slice(0, 1400), { source: "chat", force: true });
+ });
+ }
+ var reader = r.body.getReader();
+ var dec = new TextDecoder();
+ var buf = "";
+ function pump() {
+ return reader.read().then(function (res) {
+ if (res.done) return;
+ if (gen !== state._consultGen) {
+ try { reader.cancel(); } catch (e) {}
+ return;
+ }
+ buf += dec.decode(res.value, { stream: true });
+ var lines = buf.split("\n");
+ buf = lines.pop();
+ for (var i = 0; i < lines.length; i++) {
+ var ln = (lines[i] || "").trim();
+ if (!ln) continue;
+ var ev;
+ try { ev = JSON.parse(ln); } catch (e) { continue; }
+ if (ev.type === "answer") gotAnswer = true;
+ handleConsultEvent(ev, gen);
+ }
+ return pump();
+ });
+ }
+ return pump();
+ })
+ .catch(function () {
+ if (gen === state._consultGen && !gotAnswer) {
+ enqueueSpeak("Sorry — try that once more?", { source: "chat", force: true })
+ .catch(function () {});
+ }
+ })
+ .then(function () {
+ state.thinking = false;
+ state._turnBusy = false;
+ state._consultInFlight = false;
+ });
+ }
+
+ /**
  * Client-enforced deep consult (Option D hard mode). Realtime freestyles too often;
  * for any non-social ask we stay quiet, call Claude, then speak only the result.
  * Barge-in bumps _consultGen so a superseded fetch never speaks late.
@@ -5067,6 +5207,20 @@
  state._consultGen = (state._consultGen || 0) + 1;
  var gen = state._consultGen;
  beginDeepThinkSilence();
+ // Live thinking-narration: stream the brain's real tool calls and speak them
+ // out loud AS it works, then the answer. Falls back to single-shot on error.
+ if (VOICE_NARRATE) {
+ consultDeepBrainStream(q, gen)
+ .then(function () {
+ if (gen !== state._consultGen) return;
+ endDeepThinkSilence();
+ })
+ .catch(function () {
+ if (gen !== state._consultGen) return;
+ endDeepThinkSilence();
+ });
+ return;
+ }
  consultDeepBrain(q)
  .then(function (result) {
  if (gen !== state._consultGen) return; // interrupted by newer ask
@@ -5505,6 +5659,7 @@
  state._speakEarlyDoneTimer = null;
  state.speaking = false;
  state.rtResponseActive = false;
+ state._drivenSpeak = false;
  if (opts.source === "greeting") {
  state._greetingPlaying = false;
  state._pendingGreetingSend = null;
@@ -5603,6 +5758,9 @@
  state.speaking = true;
  state._speakStartedAt = Date.now();
  state._rtCancelPending = false;
+ // Mark THIS response as our own driven speech so the deep-think silence
+ // guard lets narration/answers play while still killing GPT freestyle.
+ state._drivenSpeak = true;
  state.dc.send(JSON.stringify({
  type: "response.create",
  response: {
@@ -5695,9 +5853,11 @@
  try { gfn(); } catch (e) {}
  }
  }
- // While deep brain is working: kill any freestyle / filler / fake-fail speech
+ // While deep brain is working: kill any GPT freestyle / filler / fake-fail
+ // speech — but let OUR driven narration/answer (state._drivenSpeak) play.
  if (
  state._silenceUntilDeepAnswer &&
+ !state._drivenSpeak &&
  (ev.type === "response.created" ||
  ev.type === "response.output_item.added" ||
  ev.type === "output_audio_buffer.started" ||
