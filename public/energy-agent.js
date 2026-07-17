@@ -4974,10 +4974,12 @@
  "You are Energy Agent — live voice of Array Operator. Warm, sharp, brief like GPT Live. " +
  "CRITICAL RULE — you are NOT smart enough alone about this product. Your intelligence " +
  "comes from consult_deep_brain. DEFAULT: call consult_deep_brain EVERY turn before " +
- "answering. That includes walkthroughs, any tab name (Analysis, Invoices, Inverters, " +
- "Fleet Triage, Repairs, Account), fleet status, money, repairs, how-to, what-is-this. " +
- "You may say a half-second 'one second' then CALL THE TOOL — never invent UI labels, " +
- "button names, steps, kWh, or $. After the tool returns, speak spoken_answer faithfully. " +
+ "answering (walkthroughs, tabs, fleet, money, how-to). " +
+ "SILENCE WHILE WORKING: when you need the tool, call it immediately and stay COMPLETELY " +
+ "QUIET until the tool result arrives. Do NOT say 'one second', 'thinking', 'just a moment', " +
+ "'let me check', or anything else while waiting. Do NOT narrate failures or 'that didn't work' " +
+ "while a tool is in flight. After the tool returns, speak spoken_answer faithfully. " +
+ "Never invent UI labels, buttons, steps, kWh, or $. " +
  "ONLY answer without the tool for pure social: hi, thanks, ok, mm-hmm, are you there, bye. " +
  "Never narrate tool names. Be one person."
  );
@@ -5008,34 +5010,79 @@
  return false;
  }
 
+ /** Quiet while deep brain runs — no filler, no fake "didn't work" monologues. */
+ function beginDeepThinkSilence() {
+ state._silenceUntilDeepAnswer = true;
+ state._clientForcedConsult = true;
+ state._consultInFlight = true;
+ // Kill freestyle / "one second" / panic-recovery speech
+ try {
+ cancelRealtimeIfActive();
+ } catch (e) {}
+ try {
+ stopSpeak({ reason: "deep_think_silence" });
+ } catch (e2) {}
+ // Re-cancel races: create_response may start after we cancel once
+ if (state._silenceCancelTimer) {
+ try {
+ clearTimeout(state._silenceCancelTimer);
+ } catch (e3) {}
+ }
+ var n = 0;
+ function poke() {
+ if (!state._silenceUntilDeepAnswer) return;
+ try {
+ cancelRealtimeIfActive();
+ } catch (e4) {}
+ n += 1;
+ if (n < 6) {
+ state._silenceCancelTimer = setTimeout(poke, 150);
+ } else {
+ state._silenceCancelTimer = null;
+ }
+ }
+ state._silenceCancelTimer = setTimeout(poke, 80);
+ setStatus("Thinking…", "think");
+ }
+
+ function endDeepThinkSilence() {
+ state._silenceUntilDeepAnswer = false;
+ state._clientForcedConsult = false;
+ state._consultInFlight = false;
+ if (state._silenceCancelTimer) {
+ try {
+ clearTimeout(state._silenceCancelTimer);
+ } catch (e) {}
+ state._silenceCancelTimer = null;
+ }
+ }
+
  /**
  * Client-enforced deep consult (Option D hard mode). Realtime freestyles too often;
- * for any non-social ask we cancel freestyle, call Claude, then speak the result.
+ * for any non-social ask we stay quiet, call Claude, then speak only the result.
  */
  function weaveForceDeepConsult(userSaid) {
  var q = String(userSaid || "").trim();
  if (!q || state._consultInFlight || state._clientForcedConsult) return;
- // Kill freestyle answer Realtime may already be generating
- try {
- cancelRealtimeIfActive();
- } catch (e) {}
- setTimeout(function () {
- try {
- cancelRealtimeIfActive();
- } catch (e2) {}
- }, 120);
- state._clientForcedConsult = true;
- state._consultInFlight = true;
- setStatus("Thinking…", "think");
+ beginDeepThinkSilence();
  consultDeepBrain(q)
  .then(function (result) {
- state._consultInFlight = false;
- state._clientForcedConsult = false;
+ endDeepThinkSilence();
+ if (result && result.ok === false && !result.spoken_answer) {
+ // Real failure only — keep it short, no drama
+ enqueueSpeak("Sorry — I didn't get that through. Try once more?", {
+ source: "chat",
+ force: true,
+ holdMicFull: true,
+ }).catch(function () {});
+ return;
+ }
  var line =
  (result && result.spoken_answer) ||
  (result && result.panel_text) ||
- "I checked — want me to try that again?";
- // Reliable mouth: deep brain line, not Realtime freestyle
+ "";
+ if (!line) return; // stay quiet rather than invent a failure monologue
+ // Only now speak — the deep answer, nothing interim
  enqueueSpeak(String(line).slice(0, 1400), {
  source: "chat",
  force: true,
@@ -5043,9 +5090,8 @@
  }).catch(function () {});
  })
  .catch(function () {
- state._consultInFlight = false;
- state._clientForcedConsult = false;
- enqueueSpeak("I lost the deep check for a second — say that once more?", {
+ endDeepThinkSilence();
+ enqueueSpeak("Sorry — try that once more?", {
  source: "chat",
  force: true,
  }).catch(function () {});
@@ -5066,6 +5112,7 @@
  ok: false,
  });
  }
+ // Status only — never voice filler while tools run
  setStatus("Thinking…", "think");
  state.thinking = true;
  state._turnBusy = true;
@@ -5094,9 +5141,10 @@
  if (!pack.httpOk) {
  var err = (d && (d.detail || d.error)) || ("HTTP " + pack.status);
  if (typeof err !== "string") err = JSON.stringify(err);
+ // Short spoken line only on real HTTP failure (no "snag/hiccup" theater)
  return {
  ok: false,
- spoken_answer: "I hit a snag checking that — try once more?",
+ spoken_answer: "Sorry — try that once more?",
  panel_text: String(err).slice(0, 400),
  };
  }
@@ -5137,7 +5185,7 @@
  state._turnBusy = false;
  return {
  ok: false,
- spoken_answer: "Network hiccup — say that again?",
+ spoken_answer: "Sorry — try that once more?",
  panel_text: String((e && e.message) || e || "error").slice(0, 200),
  };
  });
@@ -5174,35 +5222,58 @@
  }
  var nm = String(name || "").toLowerCase();
  if (nm === "consult_deep_brain" || nm === "consult_brain" || nm === "deep_brain") {
- // Client already force-consulted this user turn — ack tool, no second speak
- if (state._clientForcedConsult || state._consultInFlight) {
+ // Client already force-consulted this user turn — ack tool, stay silent
+ if (state._clientForcedConsult || state._silenceUntilDeepAnswer) {
  sendFunctionCallOutput(
  callId,
  {
  ok: true,
- spoken_answer: "Handled by deep brain.",
- note: "Client already consulted; do not invent a second answer.",
+ spoken_answer: "",
+ note: "Client handling; stay silent until spoken_answer is delivered by the app.",
  },
  { createResponse: false }
  );
  return;
  }
  var question = args.question || args.query || args.message || "";
- state._consultInFlight = true;
+ // Realtime-initiated consult: silent until result, then speak once
+ beginDeepThinkSilence();
  consultDeepBrain(question, callId)
  .then(function (result) {
- state._consultInFlight = false;
- sendFunctionCallOutput(callId, result);
- if (state.listening && !state.touring) {
- setStatus("Speaking…", "speak");
+ endDeepThinkSilence();
+ // Prefer app-side speak so we don't get a double monologue
+ var line =
+ (result && result.spoken_answer) ||
+ (result && result.panel_text) ||
+ "";
+ sendFunctionCallOutput(
+ callId,
+ {
+ ok: !!(result && result.ok !== false),
+ spoken_answer: line,
+ note: "App will speak; stay silent.",
+ },
+ { createResponse: false }
+ );
+ if (line) {
+ enqueueSpeak(String(line).slice(0, 1400), {
+ source: "chat",
+ force: true,
+ holdMicFull: true,
+ }).catch(function () {});
  }
  })
  .catch(function () {
- state._consultInFlight = false;
- sendFunctionCallOutput(callId, {
- ok: false,
- spoken_answer: "I lost the deep check — ask me again?",
- });
+ endDeepThinkSilence();
+ sendFunctionCallOutput(
+ callId,
+ { ok: false, spoken_answer: "", note: "failed" },
+ { createResponse: false }
+ );
+ enqueueSpeak("Sorry — try that once more?", {
+ source: "chat",
+ force: true,
+ }).catch(function () {});
  });
  return;
  }
@@ -5622,6 +5693,23 @@
  try { gfn(); } catch (e) {}
  }
  }
+ // While deep brain is working: kill any freestyle / filler / fake-fail speech
+ if (
+ state._silenceUntilDeepAnswer &&
+ (ev.type === "response.created" ||
+ ev.type === "response.output_item.added" ||
+ ev.type === "output_audio_buffer.started" ||
+ ev.type === "response.output_audio.delta")
+ ) {
+ try {
+ cancelRealtimeIfActive();
+ } catch (eSil) {}
+ // Keep thinking status; do not flip to Speaking
+ if (state.thinking || state._consultInFlight) {
+ setStatus("Thinking…", "think");
+ }
+ return;
+ }
  // Track whether a Realtime response is in flight (so cancel is safe)
  if (ev.type === "response.created" || ev.type === "response.output_item.added") {
  state.rtResponseActive = true;
@@ -5728,6 +5816,11 @@
  ) {
  var agentSaid = (ev.transcript || "").trim();
  if (agentSaid) {
+ // Drop filler / panic lines while deep brain is working (never paint them)
+ if (state._silenceUntilDeepAnswer || state._consultInFlight) {
+ state._lastAgentTranscript = agentSaid;
+ return;
+ }
  state._lastSpokenPlain = agentSaid;
  state._lastAgentTranscript = agentSaid;
  // Deep-brain already painted the panel for this turn — don't double-bubble
