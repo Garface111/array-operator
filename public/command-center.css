@@ -2387,12 +2387,19 @@ body.ea-shell-open #panelResources{
   box-sizing: border-box;
   overflow-x: hidden;
 }
-/* Analysis / Invoices secondary nav: same safe sizing when EA open */
+/* Analysis secondary nav (3 items): safe sizing when EA open */
 body.ea-shell-open .ao-subnav .an-sub-seg,
-body.ea-shell-open .ao-subnav .inv-sub-seg,
-body.ea-shell-open .an-sub-seg,
-body.ea-shell-open #panelReports .inv-sub-seg{
+body.ea-shell-open .an-sub-seg{
   max-width: min(100%, 400px);
+}
+/* Invoices secondary nav has FOUR pills since THE FOLD (Offtakers | Bill audit
+   | Trends | Generation reports). The old 400px cap clipped the 'Generation
+   reports' pill when the EA shell narrows the column. Use the full column and
+   scroll on the pathological narrow case rather than clip. */
+body.ea-shell-open .ao-subnav .inv-sub-seg,
+body.ea-shell-open #panelReports .inv-sub-seg{
+  max-width: 100%;
+  overflow-x: auto;
 }
 /* Content sheets sit flush under the sub-nav strip (no extra top margin that
    un-centers the pill in the banner→card band). */
