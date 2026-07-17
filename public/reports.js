@@ -711,20 +711,10 @@
  host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — automated quarterly NEPOOL-GIS workbooks, emailed to each client. Sign in or start a trial to use them.</div>';
  return;
  }
- // World check: unmigrated accounts get an honest state, never an embed
- // showing their capture-created clients as report clients.
- host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
- fetch("/v1/account", { headers: authHeaders() })
- .then(r => (r.ok ? r.json() : null))
- .then(a => {
- if (!a) { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; return; }
- if (a.generation_reports !== true && !genrepFlag()) {
- host.innerHTML = '<div class="rb-au-empty">Generation reports aren\'t set up for this account yet. They automate NEPOOL/REC reporting — quarterly generation workbooks built from your utility data and emailed to each client. Ask us to enable them for your fleet.</div>';
- return;
- }
+ // Enabled for EVERY operator (Ford 2026-07-16). Mount the embed directly; a
+ // fresh tenant is guided through setup by the embed's own progress spine. No
+ // per-account "not set up" wall — generation reports is a standard AO feature.
  mountGenrepEmbed(host);
- })
- .catch(() => { host.innerHTML = '<div class="rb-au-empty">Couldn\'t check this account — reload the page to retry.</div>'; });
  }
  function mountGenrepEmbed(host) {
  if (_genrepMounted) return;
