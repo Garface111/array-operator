@@ -2733,6 +2733,12 @@
  tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
  } catch (e) {}
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
+ // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
+ try {
+ requestAnimationFrame(function () {
+ try { window.dispatchEvent(new Event("resize")); } catch (e2) {}
+ });
+ } catch (e) {}
  if (state.open) {
  await ensureSession();
  // Hard-refresh fix: if the rail is still empty after session attach, force
