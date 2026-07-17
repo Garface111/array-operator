@@ -5,6 +5,18 @@
 (function () {
  "use strict";
 
+ // Build stamp — so "am I on stale code?" is never a guess again. Prints on
+ // load and is readable any time via window.__EA_BUILD. Bump BUILD with the
+ // ?v= token in index.html. If the console shows an OLD build while voice
+ // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
+ // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
+ var EA_BUILD = "20260716eastamp1";
+ try {
+ window.__EA_BUILD = EA_BUILD;
+ // voice mode is decided below; log it too once VOICE_WEAVE is known.
+ console.info("[EnergyAgent] build " + EA_BUILD + " loaded");
+ } catch (e) {}
+
  /**
   * Long turns MUST NOT go through the Netlify proxy.
   *
@@ -65,6 +77,11 @@
  } catch (e) {}
  return false;
  })();
+ try {
+ window.__EA_VOICE_MODE = VOICE_WEAVE ? "weave" : "mouth-only";
+ console.info("[EnergyAgent] voice mode: " + window.__EA_VOICE_MODE +
+ (VOICE_WEAVE ? "" : " (the mouth cannot author; it only reads driven lines)"));
+ } catch (e) {}
 
  // Live thinking-narration (Ford 2026-07-16): stream the deep brain's real tool
  // calls and speak them out loud AS it works, then the answer. __EA_VOICE_NARRATE
