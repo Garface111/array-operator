@@ -205,39 +205,49 @@ html.sky .rb-gr-eff{color:var(--muted)}
 html.sky .rb-gr-eff b{color:var(--sky-primary)}
 html.sky .rb-gr-src{color:var(--sky-primary);font-weight:600;font-size:11.5px}
 
-/* Master offtaker email — same solid glass band as master solar credit rate */
+/* Master offtaker email — roomy glass band (gen-reports email template parity) */
 html.sky .rb-mastermail,
 html.sky .rb2 .rep-card.rb-mastermail{
   background:rgba(255,255,255,.88);
   border:1px solid var(--sky-glass-edge);
   border-radius:18px;
   box-shadow:var(--sky-shadow-card);
-  padding:18px 24px;
-  margin:0;
+  padding:24px 26px 26px;
+  margin:12px 0 4px;
   max-width:none;
   width:100%;
   box-sizing:border-box;
 }
+html.sky .rb-mm-sectionlab{color:var(--muted)}
 html.sky .rb-mm-main h3{color:var(--ink);font-weight:750}
 html.sky .rb-mm-main p{color:var(--muted)}
 html.sky .rb-mm-main p b{color:var(--ink)}
+html.sky .rb-mm-stage{
+  background:rgba(33,150,243,.06);
+  border:1px solid rgba(33,150,243,.14);
+}
 html.sky .rb-mm-preview{
-  background:rgba(255,255,255,.96);
+  background:rgba(255,255,255,.98);
   border-color:rgba(20,60,120,.12);
   box-shadow:0 6px 18px -14px rgba(14,60,120,.28);
+}
+html.sky .rb-mm-preview:hover{
+  border-color:rgba(33,150,243,.4);
 }
 html.sky .rb-mm-env{border-color:rgba(20,60,120,.08)}
 html.sky .rb-mm-foot{border-color:rgba(20,60,120,.08);color:var(--muted)}
 html.sky .rb-mm-subj{color:var(--ink)}
-html.sky #rbMasterEmailOpen{
-  background:rgba(16,185,129,.10);
+html.sky .rb-mm-cta,
+html.sky #rbMasterEmailOpen.rb-mm-cta{
+  background:rgba(16,185,129,.12);
   color:#047857;
   border:1px solid rgba(16,185,129,.28);
   font-weight:650;
 }
-html.sky #rbMasterEmailOpen:hover{
-  background:rgba(16,185,129,.18);
-  border-color:rgba(16,185,129,.42);
+html.sky .rb-mm-cta:hover,
+html.sky #rbMasterEmailOpen.rb-mm-cta:hover{
+  background:rgba(16,185,129,.2);
+  border-color:rgba(16,185,129,.45);
 }
 
 /* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────

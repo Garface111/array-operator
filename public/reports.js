@@ -1992,6 +1992,8 @@
  const ES_SIGNOFF_CHIPS = [
  { label: "Just my name", value: "<p>Thank you,<br>{{tenant_name}}</p>" },
  { label: "Name + email", value: "<p>Thank you,<br>{{tenant_name}}<br>{{tenant_email}}</p>" },
+ // Parity with Generation reports EmailTemplateStudio sign-off starters.
+ { label: "Full signature", value: "<p>Thank you,<br><strong>{{tenant_name}}</strong><br>Solar consultant<br>{{tenant_email}}</p>" },
  ];
 
  async function esApi(path, opts) {
@@ -2052,20 +2054,37 @@
  }
 
  // ─── Master email card (inline on Offtakers tab) ───────────────────────────
- // Generation reports surfaces a live email-template preview + "Customize"
- // CTA in Delivery settings. Offtakers now get the same element: a fleet
- // master letter that overrides every offtaker invoice email (per-offtaker
- // notes still win for a single send). Studio = existing openEmailStudio().
+ // 1-1 with Generation reports Delivery settings → Email template region:
+ // sample preview + full-width "Customize email template" → studio.
+ // Studio writes Tenant.offtaker_email_* so EVERY offtaker invoice email uses
+ // the new letter (merge tags personalize; per-offtaker notes still win one send).
+ //
+ // Demo gate: ONLY !authHeaders(). window.AO_DEMO is always defined by
+ // demo-data.js even when signed in — never use `|| window.AO_DEMO` here
+ // (that was treating Ford's real account as a demo and blocking the studio).
  function wireMasterEmail() {
- const open = () => openEmailStudio();
+ const signedIn = !!authHeaders();
+ const open = (e) => {
+ if (e) { e.preventDefault(); e.stopPropagation(); }
+ if (!signedIn) { demoNudge(e && e.currentTarget); return; }
+ openEmailStudio();
+ };
  const cardBtn = $("#rbMasterEmailOpen");
  if (cardBtn) cardBtn.onclick = open;
  const esBtn = $("#rbEmailStudio");
  if (esBtn) esBtn.onclick = open;
- // Demo / signed-out: never hit the live template API.
- if (!authHeaders() || window.AO_DEMO) {
- if (cardBtn) cardBtn.onclick = () => demoNudge(cardBtn);
- if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
+ // Whole preview pane is also a hit target (gen-reports UX: click to customize).
+ const prev = $("#rbMasterEmailPreview");
+ if (prev) {
+ prev.setAttribute("role", "button");
+ prev.setAttribute("tabindex", "0");
+ prev.setAttribute("title", "Open the email template studio");
+ prev.onclick = open;
+ prev.onkeydown = (e) => {
+ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
+ };
+ }
+ if (!signedIn) {
  const subjEl = $("#rbMmSubj");
  const bodyEl = $("#rbMmBody");
  const fromEl = $("#rbMmFrom");
@@ -2278,8 +2297,8 @@
  ov.innerHTML = `
  <div class="rb-es-head">
  <div>
- <b>Customize offtaker email</b>
- <span class="rb-es-sub">Applies to every offtaker invoice email, merge tags personalize each one. A per-offtaker edited note still overrides it.</span>
+ <b>Customize email template</b>
+ <span class="rb-es-sub">Master letter for <b>every offtaker invoice email</b>. Save once and all offtakers get the new wording — merge tags ({{greeting}}, {{amount}}, {{period}}…) personalize each send intelligently. A per-offtaker edited note still overrides one send only.</span>
  </div>
  <span class="rb-es-status" id="esStatus">Saved</span>
  <button type="button" class="rb-es-x" id="esClose" aria-label="Close email studio">✕</button>
@@ -2794,22 +2813,22 @@
  </div>
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
- <!-- Master offtaker email template (fleet override) — same idea as Generation
-      reports' delivery settings email region: live sample preview + full studio.
-      Wired by wireMasterEmail() → GET/POST /email-template*. Per-offtaker notes
-      still override for a single send. -->
+ <!-- Master offtaker email — 1-1 with Generation reports Delivery settings
+      "Email template" region (AutoReportsSettingsCard): section label, sample
+      preview card, full-width Customize CTA → full studio. Saves to
+      Tenant.offtaker_email_* so every offtaker invoice email updates. -->
  <div class="rb-mastermail rep-card" id="rbMasterEmail">
+ <div class="rb-mm-sectionlab">Email template</div>
  <div class="rb-mm-head">
  <div class="rb-mm-main">
  <h3>Master offtaker email</h3>
- <p><b>Fleet-wide letter</b> on every offtaker invoice email. Merge tags
- personalize each send ({{greeting}}, {{amount}}, {{period}}…). A
- per-offtaker edited note still overrides this for that one send.</p>
+ <p>Edit once — <b>every offtaker</b> receives this letter on their invoice email.
+ Merge tags personalize each send ({{greeting}}, {{amount}}, {{period}}…).
+ A per-offtaker edited note still overrides this for that one send only.</p>
  </div>
- <button class="ao-btn ao-btn-primary rb-btn" id="rbMasterEmailOpen" type="button"
- title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist.">✉ Customize email template</button>
  </div>
- <div class="rb-mm-eyebrow">Sample preview · what offtakers actually receive</div>
+ <div class="rb-mm-stage">
+ <div class="rb-mm-eyebrow">✦ Sample preview · what your offtakers actually receive</div>
  <div class="rb-mm-preview" id="rbMasterEmailPreview">
  <div class="rb-mm-env">
  <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
@@ -2817,6 +2836,9 @@
  </div>
  <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
  <div class="rb-mm-foot" id="rbMmFoot"></div>
+ </div>
+ <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
+ title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist. Changes apply to every offtaker invoice email.">Customize email template</button>
  </div>
  <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
  </div>
