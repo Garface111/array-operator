@@ -2483,8 +2483,8 @@ body.ea-shell-open #panelReports .inv-sub-seg{
    (Vendor first — Ford 2026-07-16). Name gets the flex room so inverter labels don't clip. */
 .vs-row{ display:grid;
   grid-template-columns:
-    minmax(88px,.62fr)    /* vendor */
-    minmax(0,1.65fr)      /* name / array / inverter */
+    minmax(118px,.72fr)   /* vendor — fits long uppercased names (SolarEdge, AlsoEnergy) */
+    minmax(0,1.5fr)       /* name / array / inverter */
     56px                  /* gauge (Output) */
     minmax(48px,.55fr)    /* units count / peer */
     minmax(68px,.8fr)     /* live kW */

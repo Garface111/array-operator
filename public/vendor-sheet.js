@@ -655,6 +655,41 @@
  : "Daily output, last 14 days, against the neighbor average";
  return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${aria}">${bars}${peerLine}</svg>`;
  }
+ // ── Aggregate sparkline for the ARRAY + VENDOR rollup rows (Ford 2026-07-16:
+ // "there should be the aggregate of the array as a graph, and the aggregate of
+ // the vendor"). Sums the child daily series by date into one total-kWh series,
+ // then draws it self-scaled (no cohort/peer line — a rollup has no peers). The
+ // per-inverter rows keep their nameplate-normalized, cohort-scaled sparkline.
+ function _dailyOrd(dateStr){
+ const s = String(dateStr);
+ const m = s.match(/^d-?(\d+)$/);          // demo/relative "d-N" = N days ago
+ if(m) return 1e12 - parseInt(m[1], 10);   // larger = more recent → sorts ascending (old→new)
+ const t = Date.parse(s);                   // real ISO date
+ return isNaN(t) ? 0 : t;
+ }
+ function _sumDaily(items){
+ const byDate = {};
+ (items || []).forEach(it => ((it && it.daily) || []).forEach(d => {
+ if(!d || d.kwh == null || d.date == null) return;
+ const k = String(d.date);
+ byDate[k] = (byDate[k] || 0) + (+d.kwh || 0);
+ }));
+ const keys = Object.keys(byDate);
+ if(!keys.length) return [];
+ keys.sort((a, b) => _dailyOrd(a) - _dailyOrd(b));   // ascending, as _slots14 expects
+ return keys.map(k => ({ date: k, kwh: byDate[k] }));
+ }
+ // Best daily series for one array: sum its inverters (always present for the
+ // per-inverter sparklines); fall back to the backend array-level series (e.g.
+ // Chint's weekETrend) when an array has no per-inverter history.
+ function _arrayDaily(c){
+ const s = _sumDaily(c && c.inverters);
+ return s.length ? s : ((c && c.daily) || []);
+ }
+ function _aggSpark(daily){
+ const spark = sparkline(daily, null, { cls: "vs-inv-rowspark", w: 132, h: 28, mini: true });
+ return `<span class="vs-inv-rowspark-wrap" title="14-day daily production (total kWh across this rollup)">${spark}</span>`;
+ }
  // ── Full-screen inverter detail (Ford + Martin 2026-07-12): each inverter row has a
  // "Details" button that opens a big, interactive 14-column daily-output chart the owner
  // can hover, plus the stats + live diagnosis. Replaces the cramped inline panel; the
@@ -1340,6 +1375,11 @@
  _paintedPendingSig = _pendingSig(pending);
  vendors.forEach(v => {
  const list = sortCols(byVendor[v]);
+ // Aggregate 14-day sparklines for the rollup rows: per-array (sum of its
+ // inverters) + per-vendor (sum of its arrays). Computed once; the array daily
+ // is reused for each array row below.
+ const _arrDailies = list.map(_arrayDaily);
+ const _venSparkHtml = _aggSpark(_sumDaily(_arrDailies.map(d => ({ daily: d }))));
  // Honest rollups: sum only arrays that actually carry a reading, and show null → "—"
  // when NONE do (mirroring the array-level rule). The old `|| 0` sum printed a fake
  // "0.0 kW / 0 kWh" on the vendor header while every array row under it read
@@ -1397,12 +1437,12 @@
  <span class="vs-c-inv">${nInv}</span>
  <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
  <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
- <span class="vs-c-spark" aria-hidden="true"></span>
+ <span class="vs-c-spark">${_venSparkHtml}</span>
  <span class="vs-c-status">${statusPillsHtml(vStatus)}</span>
  <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
  </div>${vnote}
  <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
- list.forEach(c => {
+ list.forEach((c, _ci) => {
  const st = arrStatus(c);
  // Frozen feed: a reading older than the vendor's live window. Dim the (stale)
  // live number and flag its age so a paused feed never masquerades as current.
@@ -1420,7 +1460,7 @@
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${c.current_power_w == null ? "—" : ((allocArr ? "~" : "") + kw(c.current_power_w))}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
- <span class="vs-c-spark" aria-hidden="true"></span>
+ <span class="vs-c-spark">${_aggSpark(_arrDailies[_ci])}</span>
  <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
  <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
  </button>`;
