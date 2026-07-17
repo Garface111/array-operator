@@ -2,15 +2,14 @@
 //
 // Runs on every request to the preprod preview site:
 //   1. Allowlisted IP (Ford's computer/network) -> pass silently.
-//   2. Otherwise require HTTP Basic-Auth matching the beta credentials.
-//   3. Otherwise -> branded 401 "Private Preview" page + Basic-Auth challenge.
+//   2. Everyone else -> branded 403 "Private Preview" page (no login prompt).
 //
 // Registered via netlify.toml ([[edge_functions]] path="/*" function="gate").
 // Structurally preprod-only: prod deploys only public/ via the REST helper, so
 // this file is never part of the prod artifact.
 //
-// Site env vars (preprod site only): PREPROD_ALLOW_IPS (comma-sep),
-// PREPROD_BETA_USER (default "beta"), PREPROD_BETA_PASS, PREPROD_REQUEST_EMAIL.
+// Site env vars (preprod site only): PREPROD_ALLOW_IPS (comma-sep IP allowlist),
+// PREPROD_REQUEST_EMAIL (where the "request access" mailto points).
 
 function getEnv(k) {
   try {
@@ -37,46 +36,30 @@ function gatePage(requestEmail) {
   p{color:var(--muted);margin:.4em 0}
   .cta{display:inline-block;margin-top:16px;padding:11px 18px;border-radius:11px;background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;text-decoration:none;font-weight:650;box-shadow:0 8px 22px -12px rgba(37,99,235,.8)}
   .hint{margin-top:20px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
-  code{background:rgba(37,99,235,.10);padding:1px 6px;border-radius:6px;font-size:12.5px}
 </style></head><body>
   <div class="card">
     <div class="orb"></div>
     <div class="eyebrow">Array Operator</div>
     <h1>Private preview</h1>
-    <p>This is the Array Operator <b>preprod</b> environment — where new changes are tested before they reach the live product. It's invite-only.</p>
-    <p>If you have beta access, your browser will prompt for it. Otherwise, ask to join the beta program.</p>
-    <a class="cta" href="mailto:${requestEmail}?subject=Array%20Operator%20beta%20access">Request beta access →</a>
-    <div class="hint">Already in the beta? Reload and enter your <code>beta</code> credentials when prompted. The live product is at <a href="https://arrayoperator.com" style="color:var(--blue)">arrayoperator.com</a>.</div>
+    <p>This is the Array Operator <b>preprod</b> environment — where new changes are tested before they reach the live product. Access is limited to approved networks.</p>
+    <a class="cta" href="mailto:${requestEmail}?subject=Array%20Operator%20preview%20access">Request access →</a>
+    <div class="hint">The live product is at <a href="https://arrayoperator.com" style="color:var(--blue)">arrayoperator.com</a>.</div>
   </div>
 </body></html>`;
 }
 
 export default async (request, context) => {
   const allow = getEnv("PREPROD_ALLOW_IPS").split(",").map((s) => s.trim()).filter(Boolean);
-  const betaUser = getEnv("PREPROD_BETA_USER") || "beta";
-  const betaPass = getEnv("PREPROD_BETA_PASS");
   const requestEmail = getEnv("PREPROD_REQUEST_EMAIL") || "ford.genereaux@gmail.com";
 
   const ip = (context && context.ip) || request.headers.get("x-nf-client-connection-ip") || "";
 
-  // 1. Silent IP allowlist
+  // Allowlisted IP -> pass silently. Everyone else -> branded page (no prompt).
   if (allow.length && ip && allow.indexOf(ip) !== -1) return;
 
-  // 2. Basic-Auth beta credentials
-  const auth = request.headers.get("authorization") || "";
-  if (betaPass && auth.indexOf("Basic ") === 0) {
-    try {
-      const decoded = atob(auth.slice(6));
-      const i = decoded.indexOf(":");
-      if (decoded.slice(0, i) === betaUser && decoded.slice(i + 1) === betaPass) return;
-    } catch (_e) { /* fall through */ }
-  }
-
-  // 3. Challenge + branded page
   return new Response(gatePage(requestEmail), {
-    status: 401,
+    status: 403,
     headers: {
-      "WWW-Authenticate": 'Basic realm="Array Operator Private Preview", charset="UTF-8"',
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "x-robots-tag": "noindex, nofollow",
