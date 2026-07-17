@@ -89,6 +89,71 @@
  } catch(_){}
  return `<a class="cc-vendor-link ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener" title="Open the ${esc(lbl)} monitoring portal in a new tab">Open in ${esc(lbl)} ↗</a>`;
  }
+ // Sibling to the vendor-portal link (Ford 2026-07-17): jump straight to THIS
+ // inverter in OUR Inverters spreadsheet — expanded + scrolled + flashed — not
+ // only the manufacturer's portal. vendor-sheet.js owns that DOM (focusInverter).
+ function inverterViewLinkHTML(r){
+ if(r.invId == null) return "";
+ return `<button type="button" class="cc-vendor-link cc-inv-link" data-do="openinv" data-key="${esc(r.key)}" title="Open this inverter in the Inverters spreadsheet">Open in Inverters ↗</button>`;
+ }
+ // The vendor portal as a drawer toolbar button (mirrors the row's inline link).
+ function vendorPortalBtnHTML(r){
+ const v = (r.vendor||"").toLowerCase();
+ const url = VENDOR_PORTAL[v];
+ if(!url) return "";
+ try { if(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()) return ""; } catch(_){}
+ return `<a class="cc-act" href="${esc(url)}" target="_blank" rel="noopener">↗ Open in ${esc(vendorLabel(v))}</a>`;
+ }
+ // The single most useful action for a row, as a real button (was a dead label):
+ // a money action for a stopped/faulted unit (draft the claim), otherwise hand it
+ // to the Energy Agent to diagnose — the AI path Ford built for exactly this.
+ function primaryActionBtnHTML(r){
+ const isClaim = r.status==="dead" || r.status==="fault";
+ if(isClaim){
+ const lbl = r.status==="fault" ? "Draft service request" : "Draft warranty claim";
+ return `<button type="button" class="cc-actbtn claim" data-do="claim" data-key="${esc(r.key)}">✉️ ${lbl}</button>`;
+ }
+ return `<button type="button" class="cc-actbtn ea" data-do="ea" data-key="${esc(r.key)}">🤖 Ask Energy Agent</button>`;
+ }
+
+ // Build a grounded, one-paragraph repair prompt for the Energy Agent from a
+ // flagged row — everything the agent needs to speak to THIS unit without a tool
+ // round-trip (it can still verify/expand via its fleet tools).
+ function eaRepairPrompt(r){
+ const p = [];
+ p.push(`I need help with a flagged inverter on my "${r.site}" array${r.region&&r.region!=="—"?` (${r.region})`:""}.`);
+ const spec = [vendorLabel(r.vendor), r.model].filter(Boolean).join(" ");
+ p.push(`Inverter: ${r.inv}${spec?` — ${spec}`:""}${r.nameplate?`, ${r.nameplate} kW`:""}.`);
+ p.push(`Our monitoring flags it as "${STATUS_LABEL[r.status]||r.status}".`);
+ if(r.pi!=null) p.push(`Peer index ${r.pi.toFixed(2)} (~${Math.round((1-r.pi)*100)}% below its array neighbors over ${WINDOW_DAYS} days under the same sky).`);
+ if(r.lossMo>=1) p.push(`About ${usd0(r.lossMo)}/mo at risk${r.lostKwh>=1?`, ~${Math.round(r.lostKwh)} kWh lost in ${WINDOW_DAYS} days`:""}.`);
+ if(r.stale!=null) p.push(`No telemetry for about ${r.stale}h.`);
+ p.push(`What's the most likely cause and what should I do next? If a warranty claim or service request is warranted, draft it. Keep it specific to this inverter.`);
+ return p.join(" ");
+ }
+ // Open the Energy Agent dock and send the grounded repair turn. Falls back to
+ // staging (composer only) then a bare open if the agent build is older.
+ function askEnergyAgent(r){
+ if(!r) return;
+ const prompt = eaRepairPrompt(r);
+ try {
+ if(typeof window.__eaSendText === "function"){ window.__eaSendText(prompt, { source:"fleet-triage" }); return; }
+ if(typeof window.__eaStagePrompt === "function"){ window.__eaStagePrompt(prompt); return; }
+ if(typeof window.__eaOpen === "function"){ window.__eaOpen(); return; }
+ } catch(_){}
+ toast("Energy Agent isn't available on this page.");
+ }
+ // Deep-link into the Inverters tab, expanded + scrolled to this exact unit.
+ function openInInverters(r){
+ if(!r) return;
+ try {
+ if(window.VendorSheet && typeof window.VendorSheet.focusInverter === "function"){
+ window.VendorSheet.focusInverter(r.arrayId, r.invId); return;
+ }
+ } catch(_){}
+ try { location.hash = "#arrays"; } catch(_){}
+ try { if(FleetStore.setFocus) FleetStore.setFocus([r.arrayId]); } catch(_){}
+ }
 
  /* ===========================================================================
  * 1. DATA, normalize to a flat list of flagged inverters w/ $ at stake.
@@ -143,7 +208,7 @@
  const lk = (status === "live_dark" || status === "live_low") ? 0 : lostKwh(inv, fleetWin, totalNp);
  const lossMo = val(lk)/WINDOW_DAYS*30;
  rows.push({
- key:`${a.id}|${inv.name}`, arrayId:a.id, site:a.name, region:a.region, host:a.host, vendor:a.vendor,
+ key:`${a.id}|${inv.name}`, arrayId:a.id, invId:(inv.id!=null?inv.id:inv.inverter_id), site:a.name, region:a.region, host:a.host, vendor:a.vendor,
  inv:inv.name, model:inv.model, nameplate:inv.nameplate_kw, status,
  sev:SEV[status], pi:inv.peer_index, stale:inv.stale_hours,
  lossMo, lossYr:lossMo*12, lostKwh:lk, windowKwh:inv.window_kwh,
@@ -484,11 +549,11 @@
  <tr class="row sev-${r.sev} ${sel?"sel":""}" data-key="${esc(r.key)}">
  <td class="shrink"><input type="checkbox" class="cc-check ccRow" data-key="${esc(r.key)}" ${sel?"checked":""}></td>
  <td><span class="cc-site">${esc(r.site)}</span><small>${esc(r.region)}${r.host?` · ${esc(r.host)}`:""}</small></td>
- <td class="cc-inv"><b>${esc(r.inv)}</b> · ${esc(r.model)}${vendorLinkHTML(r)}</td>
+ <td class="cc-inv"><b>${esc(r.inv)}</b> · ${esc(r.model)}<span class="cc-inv-links">${vendorLinkHTML(r)}${inverterViewLinkHTML(r)}</span></td>
  <td><span class="cc-verdict ${r.sev}"><span class="cc-sevdot ${r.sev}"></span> ${STATUS_LABEL[r.status]}</span></td>
  <td class="num">${piTxt}</td>
  <td class="num">${r.lossMo>=1?`<span class="cc-loss">${usd0(r.lossMo)}</span>`:`<span style="color:var(--faint)">—</span>`}</td>
- <td><span class="cc-verdict ${r.sev}" style="font-weight:650">${ACTION[r.status]} →</span></td>
+ <td class="cc-actcell">${primaryActionBtnHTML(r)}</td>
  <td class="shrink"><span class="cc-state ${st}">${st==="progress"?"In progress":st==="snoozed"?"Snoozed":"New"}</span></td>
  </tr>`;
  const drawer = UI.expanded===r.key ? drawerHTML(r) : "";
@@ -519,6 +584,8 @@
  : r.status==="underperforming"
  ? `Schedule a visual + IV-curve check on this inverter's strings. A failed module or cleaning is usually a fast-payback fix.`
  : `Send the drafted ${r.status==="fault"?"service request":"warranty claim"} to the manufacturer, evidence is attached and dated.`;
+ const st = wfState(r.key);
+ const isClaim = r.status==="dead" || r.status==="fault";
  return `
  <tr class="cc-drawer" data-key="${esc(r.key)}"><td colspan="8"><div class="inner">
  <div>
@@ -528,6 +595,16 @@
  <div class="e"><div class="en">${r.pi!=null?r.pi.toFixed(2):"—"}</div><div class="ec">peer index</div></div>
  <div class="e"><div class="en">${r.lostKwh>=1?Math.round(r.lostKwh):"—"}</div><div class="ec">kWh lost / ${WINDOW_DAYS}d</div></div>
  <div class="e"><div class="en">${r.lossYr>=1?usd0(r.lossYr):"—"}</div><div class="ec">slipping / yr</div></div>
+ </div>
+ <div class="cc-rec"><span class="cc-rec-k">Recommended</span><span>${rec}</span></div>
+ <div class="cc-actions">
+ <button type="button" class="cc-act ea" data-do="ea" data-key="${esc(r.key)}">🤖 Repair with Energy Agent</button>
+ ${r.invId!=null?`<button type="button" class="cc-act" data-do="openinv" data-key="${esc(r.key)}">🔍 Open in Inverters</button>`:""}
+ ${vendorPortalBtnHTML(r)}
+ ${isClaim?`<button type="button" class="cc-act" data-do="claim" data-key="${esc(r.key)}">✉️ ${r.status==="fault"?"Draft service request":"Draft warranty claim"}</button>`:""}
+ <span class="cc-act-sp"></span>
+ <button type="button" class="cc-act ghost${st==="progress"?" on":""}" data-do="progress" data-key="${esc(r.key)}">${st==="progress"?"In progress ✓":"Mark in progress"}</button>
+ <button type="button" class="cc-act ghost${st==="snoozed"?" on":""}" data-do="snooze" data-key="${esc(r.key)}">${st==="snoozed"?"Snoozed ✓":"Snooze"}</button>
  </div>
  </div>
  </div></td></tr>`;
@@ -589,6 +666,8 @@
  const r = MODEL.rows.find(x=>x.key===key);
  // mutating shared state notifies the store → this view (and any other) re-renders
  if(act==="claim"){ openClaim(r); FleetStore.setTriage(key,"progress"); }
+ else if(act==="ea" && r){ askEnergyAgent(r); FleetStore.setTriage(key,"progress"); }
+ else if(act==="openinv" && r){ openInInverters(r); }
  else if(act==="progress"){ FleetStore.setTriage(key,"progress"); }
  else if(act==="snooze"){ FleetStore.setTriage(key,"snoozed"); }
  else if(act==="focus" && r){

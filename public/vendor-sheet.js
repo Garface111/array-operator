@@ -2104,6 +2104,44 @@
  window.VendorSheet.freshness = freshness;
  window.VendorSheet.syncFreshness = syncFreshness;
 
+ // Deep-link from the Fleet Triage queue (command-center.js): jump to THIS
+ // inverter in the spreadsheet — switch to the table sub-view, expand its vendor
+ // group + array, then scroll to and flash the row. (arrayId, inverterId) match
+ // the data-inv-row key built at render time: array_id + ":" + inverter_id.
+ function focusInverter(arrayId, inverterId) {
+ if (arrayId == null) return;
+ arrayId = String(arrayId);
+ let vendor = null;
+ try {
+ const cols = (window.FleetStore && FleetStore.toColumns().columns) || [];
+ const col = cols.find(c => String(c.array_id) === arrayId);
+ if (col) vendor = (col.vendor || "other").toLowerCase();
+ } catch (_) {}
+ // Make sure the Inverters tab is showing (the router keys off the hash).
+ if (location.hash !== "#arrays" && location.hash !== "#sandbox") {
+ try { location.hash = "#arrays"; } catch (_) {}
+ }
+ showView("table"); // ensure the spreadsheet sub-view, not the canvas
+ if (vendor) _vendorCollapsed[vendor] = false; // un-collapse the vendor group
+ _expanded[arrayId] = true; // expand the array's inverters
+ render();
+ // After paint, scroll to + flash the exact inverter row (fall back to the array
+ // header row if the inverter id didn't resolve).
+ const key = arrayId + ":" + (inverterId == null ? "" : inverterId);
+ requestAnimationFrame(() => setTimeout(() => {
+ let row = null;
+ const sel = s => { try { return document.querySelector(s); } catch (_) { return null; } };
+ if (inverterId != null) row = sel('#vendorSheet [data-inv-row="' + key.replace(/["\\]/g, "\\$&") + '"]');
+ if (!row) row = sel('#vendorSheet [data-arr="' + arrayId.replace(/["\\]/g, "\\$&") + '"]');
+ if (row) {
+ try { row.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_) {}
+ row.classList.add("vs-row-flash");
+ setTimeout(() => row.classList.remove("vs-row-flash"), 2200);
+ }
+ }, 70));
+ }
+ window.VendorSheet.focusInverter = focusInverter;
+
  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
  else init();
 })();

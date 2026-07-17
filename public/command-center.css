@@ -108,6 +108,19 @@
 .cc-vendor-link{ display:inline-block; margin-top:5px; font-size:11.5px; font-weight:650;
   color:#3b82f6; text-decoration:none; white-space:nowrap; }
 .cc-vendor-link:hover{ text-decoration:underline; }
+/* two parallel "open in…" links per row: the vendor portal + OUR inverter view */
+.cc-inv-links{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:5px; }
+.cc-inv-links .cc-vendor-link{ margin-top:0; }
+/* the inverter-view link is a <button> — strip native chrome so it reads as a link */
+button.cc-inv-link{ background:none; border:0; padding:0; font:inherit; cursor:pointer; color:var(--ao-oct,#7c3aed); }
+button.cc-inv-link:hover{ text-decoration:underline; }
+/* per-row primary action button (was a dead label) */
+.cc-actcell{ white-space:nowrap; }
+.cc-actbtn{ border:0; border-radius:8px; padding:7px 12px; font-size:12px; font-weight:680;
+  cursor:pointer; white-space:nowrap; line-height:1.1; transition:filter .14s ease, transform .14s ease; }
+.cc-actbtn:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+.cc-actbtn.ea{ background:var(--ao-oct,#7c3aed); color:#fff; }
+.cc-actbtn.claim{ background:var(--good,#2563eb); color:#fff; }
 .cc-verdict{ font-size:12.5px; }
 .cc-verdict.crit{ color:var(--bad); } .cc-verdict.under{ color:var(--warn); } .cc-verdict.quiet{ color:var(--sky); }
 .cc-pi{ font-weight:700; color:var(--ink); }
@@ -132,9 +145,25 @@
 .cc-evidence .e{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:9px 11px; }
 .cc-evidence .en{ font-size:18px; font-weight:760; color:var(--ink); font-variant-numeric:tabular-nums; }
 .cc-evidence .ec{ font-size:11px; color:var(--faint); margin-top:1px; }
-.cc-rec{ background:rgba(63,214,138,.06); border-left:3px solid var(--good); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--ink); line-height:1.5; }
+.cc-rec{ display:flex; gap:10px; align-items:baseline; background:var(--day-tile,rgba(255,255,255,.03));
+  border-left:3px solid var(--ao-oct,#7c3aed); border-radius:8px; padding:10px 12px; margin:2px 0 2px;
+  font-size:12.5px; color:var(--ink); line-height:1.5; }
 .cc-rec b{ color:var(--good2); }
-.cc-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.cc-rec-k{ flex:none; font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ao-oct,#7c3aed); padding-top:1px; }
+/* drawer action toolbar: EA repair (octarine = the AI), deep-links, workflow */
+.cc-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:4px; }
+.cc-act{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:9px;
+  background:var(--card,#fff); color:var(--ink); padding:8px 13px; font-size:12.5px; font-weight:640;
+  cursor:pointer; text-decoration:none; white-space:nowrap; transition:border-color .14s ease, transform .14s ease, background .14s ease; }
+.cc-act:hover{ transform:translateY(-1px); border-color:var(--ao-oct,#7c3aed); }
+.cc-act.ea{ background:var(--ao-oct,#7c3aed); border-color:var(--ao-oct,#7c3aed); color:#fff; }
+.cc-act.ea:hover{ filter:brightness(1.06); border-color:var(--ao-oct,#7c3aed); }
+.cc-act.ghost{ background:transparent; color:var(--muted); font-weight:600; }
+.cc-act.ghost:hover{ color:var(--ink); }
+.cc-act.ghost.on{ color:var(--good2); border-color:var(--good); }
+.cc-act-sp{ flex:1 1 auto; }
+@media (max-width:600px){ .cc-act-sp{ flex-basis:100%; height:0; } }
 
 .cc-empty{ padding:34px 16px; text-align:center; color:var(--faint); font-size:13.5px; }
 .cc-foot{ color:var(--faint); font-size:12px; margin-top:10px; line-height:1.6; }
@@ -2823,6 +2852,14 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
+/* flash a row when deep-linked here from the Fleet Triage queue (focusInverter) */
+.vs-row-flash{ animation:vsRowFlash 2.1s ease-out 1; border-radius:8px; }
+@keyframes vsRowFlash{
+  0%{ background:var(--ao-oct-soft,rgba(124,58,237,.16)); box-shadow:inset 0 0 0 2px var(--ao-oct,#7c3aed); }
+  70%{ background:var(--ao-oct-soft,rgba(124,58,237,.10)); box-shadow:inset 0 0 0 2px rgba(124,58,237,.35); }
+  100%{ background:transparent; box-shadow:inset 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion:reduce){ .vs-row-flash{ animation:none; box-shadow:inset 0 0 0 2px var(--ao-oct,#7c3aed); } }
 /* Inverter name sits in the Name column only (col 2). An empty Vendor cell keeps
    Live kW / Today / Status under the correct headers — spanning cols 1–2 was why
    "Live now" drifted and labels clipped (Ford 2026-07-16). */
