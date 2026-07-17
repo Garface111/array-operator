@@ -3344,9 +3344,8 @@
  resolve();
  return;
  }
- // holdMicFull implied by source "chat" — she finishes the whole line
- // before the mic re-opens (no mid-answer self-interrupt from speaker bleed).
- enqueueSpeak(mouthLine, { source: "chat", force: true, holdMicFull: true })
+ // Attack mute only — mic reopens so the owner can barge-in (GPT Live).
+ enqueueSpeak(mouthLine, { source: "chat", force: true, holdMicFull: false })
  .then(resolve)
  .catch(function () { resolve(); });
  }, settleMs);
@@ -4636,16 +4635,11 @@
  }
 
  /**
- * Guarded barge-in (GPT Live style):
- * - Mute mic at TTS attack so speaker bleed doesn't cancel the lead-in.
- * - Greeting / holdMicFull / chat answers: keep mic OFF until speech fully
- * ends. Re-opening ~1.4–3s mid-sentence was the #1 cause of mid-reply cutoffs
- * (speaker bleed → false barge-in). Ford 2026-07-16.
- * - Short fillers with partial hold: re-open only after most of the utterance
- * (word-count estimate), never a flat 1.4s cap.
- * Does NOT flip state.listening, user still shows as Live.
- * Intentional interrupt while mic is held: type "stop" / click mute, or wait
- * and say "stop" — voice barge-in is available again once she finishes.
+ * Guarded barge-in (GPT Live style — Ford 2026-07-16):
+ * - Short attack mute so speaker lead-in doesn't self-interrupt.
+ * - Then mic OPEN so the owner can cut in mid-sentence (real conversation).
+ * - Greeting only: full hold (intro was always killed by bleed).
+ * - Echo / backchannels filtered in acceptUserTranscript, not by muting forever.
  */
  function holdMicWhileSpeaking(hold, opts) {
  opts = opts || {};
@@ -4656,12 +4650,11 @@
  if (hold) {
  state._speakStartedAt = Date.now();
  state._micHeldForSpeak = true;
+ // Full hold ONLY for the short greeting intro — never for normal answers
+ // (that killed GPT-Live interruptibility).
  state._holdMicFull = !!(
- opts.holdMicFull ||
- opts.source === "greeting" ||
- opts.source === "chat" ||
- opts.source === "thinking_filler"
- );
+ opts.holdMicFull === true && opts.source === "greeting"
+ ) || opts.source === "greeting";
  try {
  if (state.micStream) {
  state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
@@ -4672,22 +4665,17 @@
  state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
  } catch (e) {}
  }
- // Full hold until done() — no mid-utterance re-open (bleed was killing her)
  if (state._holdMicFull) return;
- // Partial hold path (tours/acks): mute for ~90% of estimated speech, not 1.4s
- var wcount = Math.max(
- 1,
- parseInt(opts.wordCount, 10) ||
- (state._lastSpokenPlain || "").split(/\s+/).filter(Boolean).length ||
- 1
- );
- // ~480ms/word + pad; protect almost the whole line
- var estMs = Math.max(2800, Math.round(wcount * 480) + 800);
- var muteMs = Math.min(180000, Math.max(2500, Math.round(estMs * 0.92)));
+ // Attack mute only (~0.55s), then open for real barge-in
+ var muteMs = parseInt(window.__EA_ATTACK_MUTE_MS, 10);
+ if (!muteMs || muteMs < 200) muteMs = 550;
+ if (muteMs > 2000) muteMs = 2000;
  state._unmuteAfterSpeakTimer = setTimeout(function () {
  state._unmuteAfterSpeakTimer = null;
  state._micHeldForSpeak = false;
  if (!state.listening || !state.micStream) return;
+ // Don't reopen mic while deep brain is thinking-silent (we open there explicitly)
+ if (state._silenceUntilDeepAnswer) return;
  try {
  state.micStream.getTracks().forEach(function (t) { t.enabled = true; });
  } catch (e) {}
@@ -4810,27 +4798,26 @@
  if (words.length < 2 && said.trim().length < 12) return false;
  return true;
  }
- // Mid-speech: LET HER FINISH. She's mid-thought in a real conversation, so
- // only an explicit STOP (already accepted above) or a genuine, sustained
- // interruption cuts in. Backchannels people say while listening ("yeah", "ok",
- // "mm-hmm", "right", "go on"), short noise, and speaker echo must NOT stop her
- // mid-sentence (Ford 2026-07-16: "she stops halfway through / let her hold a
- // whole conversation").
- if (isAgentMouthBusy() || state._micHeldForSpeak) {
+ // Mid-speech / mid-think: GPT Live interruptibility — real speech cuts in.
+ // Backchannels + echo still blocked so speaker bleed doesn't self-cancel.
+ if (
+ isAgentMouthBusy() ||
+ state._micHeldForSpeak ||
+ state._silenceUntilDeepAnswer ||
+ state._consultInFlight
+ ) {
  var t = said.trim().replace(/[.!?]+$/, "").toLowerCase();
- // Listening backchannels — never a barge-in while she's talking.
  var isBackchannel = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|k|sure|right|alright|uh ?huh|mm ?hmm|mhm|hmm|got it|i see|gotcha|makes sense|nice|cool|wow|nvm|hey|go on|keep going|continue|and\??|so\??|uh|um|ah)$/.test(t);
  if (isBackchannel) return false;
- // A real interruption is a clear, multi-word cut-in. Default bar is high so
- // speaker bleed / partial echoes don't kill mid-sentence answers.
- // Override: window.__EA_BARGE_MIN_WORDS = 4 (more interruptible).
- var minWords = parseInt((window.__EA_BARGE_MIN_WORDS || 8), 10) || 8;
- var minChars = parseInt((window.__EA_BARGE_MIN_CHARS || 36), 10) || 36;
+ // Weave: lower bar (3 words) so natural cut-ins work. Override if needed.
+ var defWords = VOICE_WEAVE ? 3 : 5;
+ var defChars = VOICE_WEAVE ? 10 : 18;
+ var minWords = parseInt((window.__EA_BARGE_MIN_WORDS || defWords), 10) || defWords;
+ var minChars = parseInt((window.__EA_BARGE_MIN_CHARS || defChars), 10) || defChars;
  if (words.length < minWords || said.trim().length < minChars) {
  return false;
  }
- // If most of the "user" words already appear in what she just said, it's echo.
- if (transcriptOverlapsSpeech(said, state._lastSpokenPlain, 0.45)) {
+ if (transcriptOverlapsSpeech(said, state._lastSpokenPlain, 0.5)) {
  return false;
  }
  return true;
@@ -5010,7 +4997,8 @@
  return false;
  }
 
- /** Quiet while deep brain runs — no filler, no fake "didn't work" monologues. */
+ /** Quiet while deep brain runs — no filler, no fake "didn't work" monologues.
+ * Mic stays OPEN so the owner can barge-in mid-think (GPT Live). */
  function beginDeepThinkSilence() {
  state._silenceUntilDeepAnswer = true;
  state._clientForcedConsult = true;
@@ -5022,7 +5010,17 @@
  try {
  stopSpeak({ reason: "deep_think_silence" });
  } catch (e2) {}
- // Re-cancel races: create_response may start after we cancel once
+ // Mic live for interrupts while she thinks
+ state._micHeldForSpeak = false;
+ state._holdMicFull = false;
+ if (state.listening && state.micStream) {
+ try {
+ state.micStream.getTracks().forEach(function (t) {
+ t.enabled = true;
+ });
+ } catch (eMic) {}
+ }
+ // Re-cancel freestyle races only (do not re-mute mic)
  if (state._silenceCancelTimer) {
  try {
  clearTimeout(state._silenceCancelTimer);
@@ -5060,20 +5058,24 @@
  /**
  * Client-enforced deep consult (Option D hard mode). Realtime freestyles too often;
  * for any non-social ask we stay quiet, call Claude, then speak only the result.
+ * Barge-in bumps _consultGen so a superseded fetch never speaks late.
  */
  function weaveForceDeepConsult(userSaid) {
  var q = String(userSaid || "").trim();
- if (!q || state._consultInFlight || state._clientForcedConsult) return;
+ if (!q) return;
+ // Allow barge-in mid-consult: supersede the in-flight one
+ state._consultGen = (state._consultGen || 0) + 1;
+ var gen = state._consultGen;
  beginDeepThinkSilence();
  consultDeepBrain(q)
  .then(function (result) {
+ if (gen !== state._consultGen) return; // interrupted by newer ask
  endDeepThinkSilence();
  if (result && result.ok === false && !result.spoken_answer) {
- // Real failure only — keep it short, no drama
  enqueueSpeak("Sorry — I didn't get that through. Try once more?", {
  source: "chat",
  force: true,
- holdMicFull: true,
+ holdMicFull: false,
  }).catch(function () {});
  return;
  }
@@ -5081,19 +5083,20 @@
  (result && result.spoken_answer) ||
  (result && result.panel_text) ||
  "";
- if (!line) return; // stay quiet rather than invent a failure monologue
- // Only now speak — the deep answer, nothing interim
+ if (!line) return;
  enqueueSpeak(String(line).slice(0, 1400), {
  source: "chat",
  force: true,
- holdMicFull: true,
+ holdMicFull: false,
  }).catch(function () {});
  })
  .catch(function () {
+ if (gen !== state._consultGen) return;
  endDeepThinkSilence();
  enqueueSpeak("Sorry — try that once more?", {
  source: "chat",
  force: true,
+ holdMicFull: false,
  }).catch(function () {});
  });
  }
@@ -5259,7 +5262,7 @@
  enqueueSpeak(String(line).slice(0, 1400), {
  source: "chat",
  force: true,
- holdMicFull: true,
+ holdMicFull: false,
  }).catch(function () {});
  }
  })
@@ -5273,6 +5276,7 @@
  enqueueSpeak("Sorry — try that once more?", {
  source: "chat",
  force: true,
+ holdMicFull: false,
  }).catch(function () {});
  });
  return;
@@ -5563,14 +5567,12 @@
  state._speakEarlyDoneTimer = earlyDoneTimer;
  };
 
- // Attack mute: full hold for greeting / fillers / chat answers so speaker
- // bleed cannot barge-in mid-sentence (Ford 2026-07-16 mid-reply cutoffs).
+ // Attack mute: full hold ONLY for greeting. Chat/answers reopen mic for barge-in.
  var isGreeting = opts.source === "greeting";
  var isFiller = opts.source === "thinking_filler";
- var isChatAnswer = opts.source === "chat";
  if (isGreeting) state._greetingPlaying = true;
  holdMicWhileSpeaking(true, {
- holdMicFull: isGreeting || isFiller || isChatAnswer || !!opts.holdMicFull,
+ holdMicFull: isGreeting ? true : !!opts.holdMicFull && isGreeting,
  source: opts.source,
  wordCount: words,
  });
@@ -5720,9 +5722,9 @@
  state.rtResponseActive = true;
  // Mark speak start once; attack mute already armed in speakNow, don't re-mute forever
  if (!state._speakStartedAt) state._speakStartedAt = Date.now();
- // Weave: mute mic for full native Realtime utterance (speaker bleed)
- if (VOICE_WEAVE) {
- holdMicWhileSpeaking(true, { holdMicFull: true, source: "chat" });
+ // Weave: short attack mute then open mic for barge-in (not full hold)
+ if (VOICE_WEAVE && !state._silenceUntilDeepAnswer) {
+ holdMicWhileSpeaking(true, { holdMicFull: false, source: "chat" });
  }
  setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
  }
@@ -5865,7 +5867,44 @@
  }
 
  if (VOICE_WEAVE) {
- // Log user line + meter airtime.
+ // Barge-in: cut her speech / mid-think work immediately (GPT Live feel)
+ if (
+ wasSpeaking ||
+ wasThinking ||
+ state._silenceUntilDeepAnswer ||
+ state._consultInFlight ||
+ state.speaking ||
+ state.rtResponseActive
+ ) {
+ // Invalidate any in-flight deep consult so it can't speak after redirect
+ state._consultGen = (state._consultGen || 0) + 1;
+ try {
+ stopSpeak({ reason: "barge_in" });
+ } catch (eBi) {}
+ try {
+ endDeepThinkSilence();
+ } catch (eEd) {}
+ try {
+ abortInFlightTurn("barge_in");
+ } catch (eAb) {}
+ if (state.dc && state.dc.readyState === "open") {
+ try {
+ state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+ // Native Realtime interrupt (create_response sessions)
+ try {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ } catch (eRc) {}
+ } catch (eCl) {}
+ }
+ if (state.listening && state.micStream) {
+ try {
+ state.micStream.getTracks().forEach(function (t) {
+ t.enabled = true;
+ });
+ } catch (eM) {}
+ }
+ setStatus("Listening…", "listen");
+ }
  addMsg("user", said);
  if (state.sessionId) {
  fetch(API.transcript, {
@@ -5888,8 +5927,7 @@
  .catch(function () {});
  }
  if (state.touring) state.touring = false;
- // Hard mode: non-social → ALWAYS deep brain (Realtime alone hallucinates UI).
- // Pure social (hi/thanks/are you there) → let Realtime answer alone (alive + fast).
+ // Non-social → deep brain. Social → Realtime answers alone (create_response).
  if (!isPureSocialVoice(said)) {
  weaveForceDeepConsult(said);
  }
