@@ -188,13 +188,20 @@
  }
  });
  var srcSt = ((a.source_status || {}).state || "").toLowerCase();
+ var isDay = a.is_daylight !== false;
+ // Night: overnight source quiet is sleep (matches FleetStore._feedBehind).
+ // Only multi-day silence (>36h) is a real overnight data problem.
+ var srcAgeH = (a.source_status || {}).age_hours;
  if (srcSt === "stale" || srcSt === "dark" || srcSt === "offline") {
+ var ageNum = typeof srcAgeH === "number" ? srcAgeH : parseFloat(srcAgeH);
+ if (isDay || (isFinite(ageNum) && ageNum >= 36)) {
  issues.push({
  name: a.name || "array",
  kind: "source",
  status: srcSt,
- age_hours: (a.source_status || {}).age_hours,
+ age_hours: srcAgeH,
  });
+ }
  }
  if (issues.length) {
  var n14 = issues.filter(function (x) { return x.kind === "health_14d"; }).length;
@@ -207,6 +214,8 @@
  vendor: a.vendor || null,
  power_w: a.current_power_w,
  today_kwh: a.produced_today_kwh,
+ is_daylight: isDay,
+ solar_state: isDay ? "daylight" : "night",
  issue_count: issues.length,
  issues: issues.slice(0, 16),
  });
@@ -217,12 +226,18 @@
  attnArrays.sort(function (x, y) {
  return (y.issue_count || 0) - (x.issue_count || 0);
  });
+ var anyDay = (snap.arrays || []).some(function (a) {
+ return a && a.is_daylight !== false;
+ });
  fleetAttentionSnapshot = {
  totals: totals,
  attention: attnArrays.slice(0, 24),
+ solar_state: anyDay ? "daylight" : "night",
  note:
  "Matches Spreadsheet NEED ATTENTION: 14-day peer health + live dark/low overlays. " +
- "Use this as ground truth for 'how is my fleet' answers.",
+ "Use this as ground truth for 'how is my fleet' answers. " +
+ "When solar_state is night: zero live power is normal sleep — not an outage. " +
+ "Overnight source quiet is NOT attention unless age is multi-day.",
  };
  }
  } catch (e) {}
