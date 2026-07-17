@@ -7,8 +7,9 @@
 #   1. Stages the committed tree of the preprod branch (default: staging).
 #   2. Rewrites public/_redirects so /v1/* and /accounts proxy to the STAGING
 #      backend instead of prod.
-#   3. Deploys from the repo root so Netlify bundles the edge-function access
-#      gate (netlify.toml + netlify/edge_functions/gate.ts); publish dir = public.
+#   3. Injects the preprod auto-login snippet into index.html (preview only).
+#   4. Deploys from the repo root so Netlify bundles the edge-function access
+#      gate (netlify.toml + netlify/edge-functions/gate.ts); publish dir = public.
 #
 # The gate + staging-API rewrite are applied ONLY here, never to prod.
 #
@@ -43,6 +44,29 @@ if [ -f "$S/public/_redirects" ]; then
   else
     echo "[preprod] WARNING: staging origin not found in _redirects after rewrite" >&2
   fi
+fi
+
+# Inject the preprod auto-login snippet (preview build ONLY — never committed
+# with a real key, never in the prod artifact). Key from a local secret file;
+# the matching DEV_AUTOLOGIN_KEY lives on the staging backend.
+AUTOLOGIN_KEY_FILE="${AO_PREPROD_AUTOLOGIN_KEY_FILE:-$HOME/.hermes/secrets/ao_preprod_autologin_key}"
+SNIP_TMPL="$HERE/scripts/preprod/autologin-snippet.html"
+if [ -s "$AUTOLOGIN_KEY_FILE" ] && [ -f "$SNIP_TMPL" ] && [ -f "$S/public/index.html" ]; then
+  AK="$(cat "$AUTOLOGIN_KEY_FILE")" IDX="$S/public/index.html" TMPL="$SNIP_TMPL" python3 - <<'PY'
+import os, io
+idx, tmpl, key = os.environ["IDX"], os.environ["TMPL"], os.environ["AK"].strip()
+snip = io.open(tmpl, encoding="utf-8").read().strip().replace("__AUTOLOGIN_KEY__", key)
+html = io.open(idx, encoding="utf-8").read()
+if "/v1/dev/auto-login" in html:
+    print("[preprod] auto-login already present")
+elif "</head>" in html:
+    io.open(idx, "w", encoding="utf-8").write(html.replace("</head>", snip + "\n</head>", 1))
+    print("[preprod] auto-login snippet injected")
+else:
+    print("[preprod] WARNING: no </head> in index.html; auto-login not injected")
+PY
+else
+  echo "[preprod] no auto-login key file -> skipping auto-login injection (site will require normal login)"
 fi
 
 cd "$S"

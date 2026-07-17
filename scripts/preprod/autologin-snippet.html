@@ -1,0 +1,13 @@
+<script>/* Array Operator preprod auto-login — injected into the PREVIEW build only by
+   scripts/deploy-preprod.sh (never committed with a real key, never in prod).
+   On the gated preview, an allowlisted computer with no session fetches a
+   session for the seeded sandbox tenant so there's no login friction. */
+(function(){try{
+  if(location.hostname!=="ao-owner-web-preview.netlify.app")return;
+  var s=null;try{s=localStorage.getItem("so_session");}catch(e){}
+  if(s)return;
+  fetch("/v1/dev/auto-login?key=__AUTOLOGIN_KEY__")
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(d){if(d&&d.session_token){var ok=false;try{localStorage.setItem("so_session",d.session_token);ok=true;}catch(e){}if(ok)location.reload();}})
+    .catch(function(){});
+}catch(e){}})();</script>
