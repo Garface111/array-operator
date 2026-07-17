@@ -8,6 +8,7 @@
  var API = {
  session: "/v1/energy-agent/session",
  chat: "/v1/energy-agent/chat",
+ chatStream: "/v1/energy-agent/chat-stream",
  voiceConsultStream: "/v1/energy-agent/voice-consult-stream",
  upload: "/v1/energy-agent/upload",
  confirm: "/v1/energy-agent/confirm",
@@ -2974,6 +2975,76 @@
  );
  }
 
+ /**
+  * POST a chat turn and return {httpOk, status, d} — same shape a plain
+  * fetch+json gave, so callers are unchanged.
+  *
+  * Goes through the STREAMING endpoint. /v1/* reaches the API via the Netlify
+  * proxy, which abandons a blocking upstream at ~26s and hands back a bare
+  * "HTTP 504" — and a heavy turn (several Claude tool rounds) routinely runs
+  * longer, so a finished answer got thrown away after the brain had already
+  * done the work (Ford 2026-07-16: the voice, which streams, spoke a full
+  * answer while the text died at 504). Streaming keeps first byte immediate
+  * and heartbeats the wire, so long turns survive the proxy.
+  *
+  * Falls back to the blocking endpoint if chat-stream isn't there yet.
+  */
+ async function postChatTurn(chatBody, fetchOpts) {
+ var opts = Object.assign({}, fetchOpts || {}, {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify(chatBody),
+ });
+ var r;
+ try {
+ r = await fetch(API.chatStream, opts);
+ } catch (e) {
+ if (e && e.name === "AbortError") throw e;
+ r = null;
+ }
+ // Older backend (no chat-stream yet) → blocking endpoint, still better than nothing
+ if (!r || r.status === 404 || r.status === 405) {
+ var rb = await fetch(API.chat, opts);
+ var db_ = await rb.json().catch(function () { return null; });
+ return { httpOk: rb.ok, status: rb.status, d: db_ };
+ }
+ if (!r.ok || !r.body || typeof r.body.getReader !== "function") {
+ var d0 = await r.json().catch(function () { return null; });
+ return { httpOk: r.ok, status: r.status, d: d0 };
+ }
+ var reader = r.body.getReader();
+ var dec = new TextDecoder();
+ var buf = "";
+ var out = null;
+ var errEv = null;
+ for (;;) {
+ var step = await reader.read();
+ if (step.done) break;
+ buf += dec.decode(step.value, { stream: true });
+ var lines = buf.split("\n");
+ buf = lines.pop(); // trailing partial line
+ for (var i = 0; i < lines.length; i++) {
+ var line = lines[i].trim();
+ if (!line) continue;
+ var ev;
+ try { ev = JSON.parse(line); } catch (e2) { continue; }
+ if (!ev || ev.type === "ping") continue; // heartbeat, keeps the proxy open
+ if (ev.type === "done") out = ev.payload || {};
+ else if (ev.type === "error") errEv = ev;
+ }
+ }
+ if (errEv) {
+ return {
+ httpOk: false,
+ status: errEv.status || 500,
+ d: { detail: errEv.detail },
+ };
+ }
+ if (out) return { httpOk: true, status: 200, d: out };
+ // Stream ended with no answer — say so honestly, don't fake success
+ return { httpOk: false, status: 502, d: { detail: "The answer stream ended early — try that once more?" } };
+ }
+
  async function turn(text, source, opts) {
  opts = opts || {};
  var pendingAttach = (state.attachments || []).slice();
@@ -3141,20 +3212,16 @@
  source: source || "text",
  };
  if (attachIds.length) chatBody.attachment_ids = attachIds;
- var fetchOpts = {
- method: "POST",
- headers: authHeaders(),
- body: JSON.stringify(chatBody),
- };
+ var fetchOpts = {};
  if (state._chatAbort) fetchOpts.signal = state._chatAbort.signal;
- var r = await fetch(API.chat, fetchOpts);
+ var pack = await postChatTurn(chatBody, fetchOpts);
  // Aborted by "stop" while waiting on the model
  if (turnGen !== (state._turnAbortGen || 0)) return;
- var d = await r.json().catch(function () { return null; });
+ var d = pack.d;
  if (turnGen !== (state._turnAbortGen || 0)) return;
- if (!r.ok) {
- var err = (d && (d.detail || d.error)) || ("HTTP " + r.status);
- if (r.status === 402 || /budget|allowance|weekly/i.test(String(err))) {
+ if (!pack.httpOk) {
+ var err = (d && (d.detail || d.error)) || ("HTTP " + pack.status);
+ if (pack.status === 402 || /budget|allowance|weekly/i.test(String(err))) {
  var eb = d && d.budget ? d.budget : (d && d.detail && d.detail.budget);
  if (eb) setBudget(Object.assign({}, eb, { ok: false, pct_used: 100 }));
  else refreshBudget().then(function (rb) {
@@ -3163,7 +3230,7 @@
  }
  addMsg("agent", typeof err === "string" ? err : (err && err.error) || JSON.stringify(err));
  clearTools();
- setStatus(r.status === 402 ? "Weekly limit reached" : "Error", "warn");
+ setStatus(pack.status === 402 ? "Weekly limit reached" : "Error", "warn");
  return;
  }
  setBudget(d.budget);
@@ -5300,20 +5367,11 @@
  var chatCtx = packContext() || {};
  chatCtx.voice_active = true;
  chatCtx.voice_weave = true;
- return fetch(API.chat, {
- method: "POST",
- headers: authHeaders(),
- body: JSON.stringify({
+ return postChatTurn({
  session_id: state.sessionId,
  message: q,
  context: chatCtx,
  source: "voice_consult",
- }),
- })
- .then(function (r) {
- return r.json().then(function (d) {
- return { httpOk: r.ok, status: r.status, d: d };
- });
  })
  .then(function (pack) {
  state.thinking = false;
