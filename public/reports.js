@@ -683,7 +683,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260716i";
+ const GENREP_V = "20260716j";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
