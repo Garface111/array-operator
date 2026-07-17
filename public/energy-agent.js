@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260716micfix1";
+ var EA_BUILD = "20260716voiceguard1";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -5895,6 +5895,10 @@
  // Mark THIS response as our own driven speech so the deep-think silence
  // guard lets narration/answers play while still killing GPT freestyle.
  state._drivenSpeak = true;
+ // One-shot: the VERY NEXT response.created is ours (we're sending it now).
+ // Set synchronously right before the send so no freestyle can slip a
+ // response.created in between — the mouth guard consumes this flag.
+ state._weSentCreate = true;
  state.dc.send(JSON.stringify({
  type: "response.create",
  response: {
@@ -6016,11 +6020,18 @@
  // and if it never lands the session keeps OpenAI's create_response default
  // (ON); the "only speak lines the app sends" instruction is persuasion, not
  // enforcement. So kill any undriven response before a word reaches the ear.
- if (
- !VOICE_WEAVE &&
- !state._drivenSpeak &&
- (ev.type === "response.created" || ev.type === "output_audio_buffer.started")
- ) {
+ // One-shot gate: EVERY legitimate response is one WE sent (sendCreate sets
+ // _weSentCreate right before response.create). A response.created without a
+ // pending _weSentCreate is the pure-voice model authoring on its own — even
+ // if session.update never landed and create_response leaked to OpenAI's
+ // default ON. This is race-proof where the old !_drivenSpeak check wasn't:
+ // on turn 2 the voice model answered fast from context, then the brain's real
+ // answer cut in — "dumb blonde, then smart restart" (Ford 2026-07-16).
+ if (!VOICE_WEAVE && ev.type === "response.created") {
+ if (state._weSentCreate) {
+ state._weSentCreate = false; // consume — this one is ours
+ state._ourResponseId = (ev.response && ev.response.id) || null;
+ } else {
  try {
  if (state.dc && state.dc.readyState === "open") {
  state.dc.send(JSON.stringify({ type: "response.cancel" }));
@@ -6030,8 +6041,26 @@
  state.rtResponseActive = false;
  state.speaking = false;
  if (window.console && console.warn) {
- console.warn("[EA] killed an undriven Realtime response (mouth-only: GPT must not author)");
+ console.warn("[EA] killed an undriven Realtime response (pure-voice model must not author)");
  }
+ return;
+ }
+ }
+ // Backstop: audio started for a response that is NOT ours → clear it (catches
+ // a freestyle whose response.created we somehow missed).
+ if (
+ !VOICE_WEAVE &&
+ ev.type === "output_audio_buffer.started" &&
+ !state._drivenSpeak && !state._weSentCreate
+ ) {
+ try {
+ if (state.dc && state.dc.readyState === "open") {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ }
+ } catch (eFs2) {}
+ state.rtResponseActive = false;
+ state.speaking = false;
  return;
  }
  // Track whether a Realtime response is in flight (so cancel is safe)
