@@ -1,0 +1,18 @@
+# Array Operator — PREPROD-ONLY Netlify config.
+#
+# This file only takes effect when scripts/deploy-preprod.sh runs
+# `netlify deploy` from the repo root against the preprod preview site.
+#
+# Production (arrayoperator.com) is deployed by a DIFFERENT path — the REST
+# helper uploads only `git archive HEAD public` (the public/ dir), so it never
+# sees this root-level file or the edge-function gate. That is deliberate: the
+# access gate must never apply to the live product.
+
+[build]
+  publish = "public"
+
+# Gate every request through the preprod access control (IP allowlist + beta
+# Basic-Auth). See netlify/edge_functions/gate.ts.
+[[edge_functions]]
+  path = "/*"
+  function = "gate"
