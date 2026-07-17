@@ -15,6 +15,19 @@ html.ao-tab-sliding{ overflow-x: clip; }   /* guard vs a 100vw scrollbar */
 
 .panel-stage{ position: relative; }
 
+/* Kill the settle "bump" (Ford 2026-07-16). While a panel slides it is
+   position:absolute — a block-formatting context, so its first child's top
+   margin is CONTAINED (content sits a few px lower). At rest, in normal flow,
+   that same margin COLLAPSES OUT and the content sits higher — so the instant a
+   slide ends the content snaps UP. Only bites when landing on a panel whose
+   first element has a collapsing top margin, i.e. one WITHOUT a flush sub-tab
+   bar (Fleet / Account / Repairs) — exactly the tabs Ford saw bump.
+   Fix: make the RESTING panel a BFC too (display:flow-root), so the margin is
+   contained in BOTH states → nothing to collapse → no snap. Invisible where the
+   first child has no top margin (the sub-tab panels); everywhere else it just
+   holds the content at the same "lower" spot it already occupies mid-slide. */
+.panel-stage > .panel.active{ display: flow-root; }
+
 .panel-stage.ao-sliding{
   width: 100vw;
   margin-left: calc(50% - 50vw);            /* break out to full viewport width */
