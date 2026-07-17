@@ -2141,6 +2141,22 @@
  return copyBtn;
  }
 
+ // Normalize a line for spoken-vs-panel comparison: strip light markdown,
+ // collapse whitespace, drop trailing punctuation, lowercase. Used to skip the
+ // 🔊 block when the narrated line is just the panel text repeated.
+ function normSpokenLine(s) {
+ return String(s == null ? "" : s)
+ .replace(/[*_`#>~]/g, "")
+ .replace(/\s+/g, " ")
+ .replace(/[.!?…]+$/, "")
+ .trim()
+ .toLowerCase();
+ }
+ function spokenIsDistinct(spoken, body) {
+ var a = normSpokenLine(spoken);
+ return !!a && a !== normSpokenLine(body);
+ }
+
  function addMsg(role, text, opts) {
  opts = opts || {};
  var host = document.getElementById("eaMsgs");
@@ -2216,6 +2232,24 @@
  else rbody.textContent = t;
  d.appendChild(rbody);
  } else {
+ // Spoken conclusion vs panel detail: when the mind narrated a tight line
+ // distinct from the written answer, lift it into a 🔊 block on top so the
+ // owner immediately sees "what was said" above the supporting detail.
+ var spokenLine = String(opts.spoken == null ? "" : opts.spoken).trim();
+ if (role === "agent" && spokenIsDistinct(spokenLine, t)) {
+ var sb = document.createElement("div");
+ sb.className = "ea-spoken-block";
+ var sbIc = document.createElement("span");
+ sbIc.className = "ea-spoken-ic";
+ sbIc.setAttribute("aria-hidden", "true");
+ sbIc.textContent = "🔊";
+ var sbTx = document.createElement("span");
+ sbTx.className = "ea-spoken-text";
+ sbTx.textContent = spokenLine;
+ sb.appendChild(sbIc);
+ sb.appendChild(sbTx);
+ d.appendChild(sb);
+ }
  var bodyWrap = document.createElement("div");
  bodyWrap.className = "ea-msg-body";
  if (rich) bodyWrap.innerHTML = formatMsg(t);
@@ -3439,7 +3473,7 @@
  var mouthLine = ownerFacingSpeak(
  (d.speak && String(d.speak).trim()) || reply
  );
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: mouthLine });
  clearTools();
 
  // Cut interim "one second…" filler, then deliver the real answer immediately
@@ -5427,7 +5461,7 @@
  var spoken =
  ownerFacingSpeak((ev.spoken && String(ev.spoken).trim()) || reply) || reply;
  if (reply) {
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: spoken });
  state._lastAgentBubble = reply.slice(0, 200);
  state._suppressNextAgentTranscript = true;
  }
@@ -5643,7 +5677,7 @@
  // Panel gets the full deep-brain write-up once; suppress Realtime's re-spoken
  // transcript bubble so we don't double-post (weave fix).
  if (reply) {
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: spoken });
  state._lastAgentBubble = reply.slice(0, 200);
  state._suppressNextAgentTranscript = true;
  }
