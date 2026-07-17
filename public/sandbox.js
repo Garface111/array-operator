@@ -7313,6 +7313,25 @@
  `</div>`;
  return;
  }
+ // Generation reports (THE FOLD): METERED usage, not a roster subscription —
+ // $15 per ARRAY, once per quarter, charged the first time you report that
+ // array. Nothing reported yet is NOT "not on plan" (the feature is on for
+ // everyone and building/previewing is free) — it's simply nothing billed yet,
+ // so show the rate instead of a scary $0-not-on-plan row.
+ if(ln.id === "generation_reports"){
+ const q = Number(ln.quantity || 0);
+ const rate = Number(ln.unit_cents || 1500);
+ const gamt = Number(ln.amount_cents || 0);
+ if(q > 0) total += gamt;
+ const gcalc = q > 0
+ ? `${q} array${q===1?"":"s"} reported this quarter × ${usdFromCents(rate)}`
+ : `${usdFromCents(rate)} per array · only when you report one`;
+ const gamtHtml = q > 0
+ ? usdFromCents(gamt)
+ : `<span class="ao-bill-soft" title="Building and previewing are free — nothing reported yet this quarter">none yet</span>`;
+ lines += billLine(ln.kind || "Generation reports", gcalc, gamtHtml, ln.desc || "");
+ return;
+ }
  const amt = Number(ln.amount_cents || 0);
  // Skip null amount lines (shouldn't reach here)
  if(ln.amount_cents == null && ln.included_in_monthly_total === false) return;
