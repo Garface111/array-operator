@@ -685,7 +685,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260716m";
+ const GENREP_V = "20260716esAiOpen1";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -2022,6 +2022,9 @@
  // across a (re)load, it would re-save stale content over fresh state.
  clearTimeout(ES.saveT); clearTimeout(ES.prevT);
  ES.dirty = { subject: false, body: false, signoff: false };
+ // Always land with the AI assistant OPEN so operators are encouraged to talk
+ // to it first (same on Generation reports email studio).
+ esSetChatOpen(true);
  esStatus("Loading…");
  try {
  const d = await esApi("");
@@ -2039,8 +2042,27 @@
  esStatus("Saved");
  esRenderChat();
  await esPreview();
+ // Focus the AI prompt after load so typing goes straight to the assistant.
+ requestAnimationFrame(() => {
+ const input = document.getElementById("esChatInput");
+ if (input && !document.getElementById("esChatPanel")?.hidden) {
+ try { input.focus(); } catch (_) { /* ok */ }
+ }
+ });
  } catch (e) {
  esStatus("Couldn't load, " + e.message, "rb-es-err");
+ }
+ }
+
+ function esSetChatOpen(open) {
+ const p = document.getElementById("esChatPanel");
+ const pill = document.getElementById("esAiPill");
+ if (p) p.hidden = !open;
+ if (pill) pill.hidden = !!open;
+ if (open) {
+ esRenderChat();
+ const input = document.getElementById("esChatInput");
+ if (input) setTimeout(() => { try { input.focus(); } catch (_) { /* ok */ } }, 0);
  }
  }
 
@@ -2337,8 +2359,8 @@
  </div>
  </div>
  </div>
- <button type="button" class="rb-es-ai" id="esAiPill">✦ Ask AI</button>
- <div class="rb-es-chat" id="esChatPanel" hidden>
+ <button type="button" class="rb-es-ai" id="esAiPill" hidden>✦ Ask AI</button>
+ <div class="rb-es-chat" id="esChatPanel">
  <div class="rb-es-chat-head">AI assistant <button type="button" class="rb-es-x" id="esChatClose" aria-label="Close AI assistant">✕</button></div>
  <div class="rb-es-chat-msgs" id="esChatMsgs"></div>
  <div class="rb-es-chat-in">
@@ -2366,12 +2388,9 @@
  });
  ov.querySelector("#esTest").onclick = (e) => esTestSend(e.currentTarget);
  ov.querySelector("#esReset").onclick = (e) => esReset(e.currentTarget);
- ov.querySelector("#esAiPill").onclick = () => {
- const p = ov.querySelector("#esChatPanel");
- p.hidden = !p.hidden;
- if (!p.hidden) { esRenderChat(); ov.querySelector("#esChatInput").focus(); }
- };
- ov.querySelector("#esChatClose").onclick = () => { ov.querySelector("#esChatPanel").hidden = true; };
+ // Pill re-opens the panel after the operator closes it; studio open defaults open.
+ ov.querySelector("#esAiPill").onclick = () => esSetChatOpen(true);
+ ov.querySelector("#esChatClose").onclick = () => esSetChatOpen(false);
  ov.querySelector("#esChatSend").onclick = esChatSend;
  const _esIn = ov.querySelector("#esChatInput");
  _esIn.addEventListener("keydown", (e) => {
