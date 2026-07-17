@@ -804,7 +804,13 @@
  document.body.appendChild(ov);
  }
  let _sort = { key: "name", dir: "asc" }; // sort within each vendor group
- let _view = (() => { try { return localStorage.getItem("ao_vendor_view") || "spreadsheet"; } catch (e) { return "spreadsheet"; } })();
+ // "table" is the product name (was "spreadsheet"); keep reading the old key.
+ let _view = (() => {
+   try {
+     const v = localStorage.getItem("ao_vendor_view") || "table";
+     return v === "spreadsheet" ? "table" : v;
+   } catch (e) { return "table"; }
+ })();
 
  let _extPresent = false; // EnergyAgent extension detected on this page (routes "Open to sync" through it)
  // Cloud Capture mode (server-side harvest) vs device mode (extension). Shares the
@@ -934,19 +940,20 @@
  return null;
  }
 
- // The sortable columns (Vendor is the grouping, not sortable).
- // Spark is its OWN column (not crammed into Status) so graphs never intersect
- // the UNDERPERFORMING / OK pill — Ford 2026-07-16.
+ // Column order (Ford 2026-07-16): Vendor first (grouping), then Name, then
+ // metrics that line up for vendor / array / inverter rows. Every row MUST emit
+ // the same 9 cells (incl. empty placeholders) or Live kW etc. drift sideways.
+ // Labels are short so headers never clip to "INVE…".
  const COLS = [
- { key: "name", cls: "vs-c-name", label: "Array" },
- { key: null, cls: "vs-c-vendor", label: "Vendor" },
- { key: null, cls: "vs-c-gauge", label: "Output" },
- { key: "inv", cls: "vs-c-inv", label: "Inverters" },
- { key: "pow", cls: "vs-c-pow", label: "Live now" },
- { key: "today", cls: "vs-c-today", label: "Today" },
- { key: null, cls: "vs-c-spark", label: "14-day" },
- { key: "status", cls: "vs-c-status", label: "Status" },
- { key: "fresh", cls: "vs-c-fresh", label: "Synced" },
+ { key: null, cls: "vs-c-vendor", label: "Vendor", tip: "Monitoring brand (grouping)" },
+ { key: "name", cls: "vs-c-name", label: "Name", tip: "Array or inverter name — click to rename" },
+ { key: null, cls: "vs-c-gauge", label: "Output", tip: "Live output as % of nameplate" },
+ { key: "inv", cls: "vs-c-inv", label: "Units", tip: "Inverter count (array) · peer index (inverter)" },
+ { key: "pow", cls: "vs-c-pow", label: "Live kW", tip: "Instant power now (— at night or when feed is offline)" },
+ { key: "today", cls: "vs-c-today", label: "Today", tip: "Energy produced today (kWh)" },
+ { key: null, cls: "vs-c-spark", label: "14-day", tip: "Daily yield sparkline (last 14 days)" },
+ { key: "status", cls: "vs-c-status", label: "Status", tip: "Health: 14-day peer + live anomalies" },
+ { key: "fresh", cls: "vs-c-fresh", label: "Synced", tip: "When we last received data" },
  ];
  function sortVal(c, key) {
  switch (key) {
@@ -1169,15 +1176,16 @@
 
  function buildShell(host) {
  const heads = COLS.map(col => {
- // The ARRAY (name) header also carries the Expand-all / Collapse-all toggle.
+ const tip = col.tip ? ` title="${esc(col.tip)}"` : "";
+ // Name header carries Expand-all so it sits with the hierarchy column.
  if (col.cls === "vs-c-name") {
  const lbl = col.key
- ? `<span class="vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`
- : `<span>${col.label}</span>`;
+ ? `<span class="vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="${esc(col.tip || ("Sort by " + col.label))}">${col.label}<i class="vs-sc"></i></span>`
+ : `<span${tip}>${col.label}</span>`;
  return `<span class="${col.cls} vs-namehead">${lbl}<button type="button" class="vs-expandall" id="vsExpandAll" title="Expand every vendor and array to show all inverters">Expand all</button></span>`;
  }
- if (!col.key) return `<span class="${col.cls}">${col.label}</span>`;
- return `<span class="${col.cls} vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="Sort by ${col.label}">${col.label}<i class="vs-sc"></i></span>`;
+ if (!col.key) return `<span class="${col.cls}"${tip}>${col.label}</span>`;
+ return `<span class="${col.cls} vs-sortable" data-sort="${col.key}" role="button" tabindex="0" title="${esc(col.tip || ("Sort by " + col.label))}">${col.label}<i class="vs-sc"></i></span>`;
  }).join("");
  const _cloud = _cloudMode();
  const _hint = _cloud
@@ -1189,7 +1197,7 @@
  : "Opens each vendor's portal in the background, captures the latest readings, and closes it, one click to refresh every vendor.";
  host.innerHTML = `
  <div class="vs-topbar">
- <div class="vs-headrow"><h2>All vendor data</h2><div class="vs-sub" id="vsCount"></div>
+ <div class="vs-headrow"><h2>Table view</h2><div class="vs-sub" id="vsCount"></div>
  <div class="vs-hint">${_hint}</div></div>
  <div class="vs-actions">
  <button type="button" class="vs-addbtn" id="vsAddVendor">+ Add vendor</button>
@@ -1381,9 +1389,8 @@
  h += `<div class="vs-vgroup${vCollapsed ? " collapsed" : ""}">
  <div class="vs-row vs-vhead" data-vcollapse="${esc(v)}" role="button" tabindex="0"
  aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
- <span class="vs-c-name"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}
- <span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span></span>
- <span class="vs-c-vendor">${lagChip}</span>
+ <span class="vs-c-vendor"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}</span>
+ <span class="vs-c-name"><span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span>${lagChip ? ` ${lagChip}` : ""}</span>
  <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", statusCls: vStatus.cls, statusLabel: vStatus.label })}</span>
  <span class="vs-c-inv">${nInv}</span>
  <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
@@ -1405,11 +1412,11 @@
  : "";
  const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
  h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
- <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
  <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
+ <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
  <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
- <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${allocArr ? "~" : ""}${kw(c.current_power_w)}</span>
+ <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${c.current_power_w == null ? "—" : ((allocArr ? "~" : "") + kw(c.current_power_w))}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
  <span class="vs-c-spark" aria-hidden="true"></span>
  <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
@@ -1467,30 +1474,36 @@
  const _nm = iv.name || iv.sn || "Inverter";
  const _model = iv.model || "";
  const _nameIsModel = _model && _nm.trim().toLowerCase() === _model.trim().toLowerCase();
- const _sub = [
- (_model && !_nameIsModel) ? esc(_model) : null,
- iv.nameplate_kw != null ? esc(iv.nameplate_kw + " kW") : null,
- iv.sn ? "SN " + esc(iv.sn) : null,
- ].filter(Boolean).join(" · ");
+ // Second line only — never cram model+SN into the primary name (was clipping
+ // as "S/N 1912… · STP 20KTL-US-…" mid-glyph, Ford 2026-07-16).
+ const _subParts = [
+ (_model && !_nameIsModel) ? _model : null,
+ iv.nameplate_kw != null ? (iv.nameplate_kw + " kW") : null,
+ iv.sn ? ("SN " + iv.sn) : null,
+ ].filter(Boolean);
+ const _sub = _subParts.map(esc).join(" · ");
  const _al = isAllocatedPower(iv);
- const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "";
- const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "";
- // Peer index only when we have one, blank, not "—", keeps the row clean.
- const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "";
- const _liveTip = _al ? ` title="${esc(ALLOC_TIP(iv.vendor))}"` : "";
- const _peerTip = iv.peer_index != null ? ` title="14-day output vs its neighbors, 1.00× is right at the group median"` : "";
- // Inverter rows share the SAME grid as vendor/array rows. Spark has its OWN
- // column (left of Status) so the graph never intersects the OK/UNDERPERFORMING
- // pill — roomy gap, glance-aligned edges (Ford 2026-07-16).
+ const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "—";
+ const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
+ // Peer index only when we have one; "—" keeps the Units column aligned.
+ const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";
+ const _liveTip = _al ? ` title="${esc(ALLOC_TIP(iv.vendor))}"`
+ : (iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : "");
+ const _peerTip = iv.peer_index != null
+ ? ` title="14-day peer index vs neighbors (1.00× = median)"`
+ : ` title="Peer index needs a few days of history"`;
+ // Inverter rows MUST emit all 9 cells (incl. empty Vendor) so Live kW / Today
+ // line up under the header — missing Vendor used to shift every column left.
  const _rowspark = sparkline(iv.daily, cohortScale, {
  cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
  h += `<div class="vs-row vs-inv" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
- <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? ` <span class="vs-inv-sub">${_sub}</span>` : ""}</span>
+ <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
+ <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
  <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
  <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
- <span class="vs-c-pow${stale ? " vs-stale" : ""}"${iv.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : _liveTip}>${_live}</span>
+ <span class="vs-c-pow${stale ? " vs-stale" : ""}"${_liveTip}>${_live}</span>
  <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
  <span class="vs-c-spark"><span class="vs-inv-rowspark-wrap" title="14-day daily yield (kWh per kW nameplate) vs neighbors, fair across different inverter sizes. Click for the full chart.">${_rowspark}</span></span>
  <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
@@ -1961,16 +1974,18 @@
  }
 
  function showView(v) {
+ // Accept legacy "spreadsheet" as "table"
+ if (v === "spreadsheet") v = "table";
  _view = v;
  try { localStorage.setItem("ao_vendor_view", v); } catch (e) {}
  const sb = $("#sbWrap"), sheet = $("#sheetWrap");
  const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet");
  if (sb) sb.hidden = (v !== "sandbox");
- if (sheet) sheet.hidden = (v !== "spreadsheet");
- [["sandbox", segSb], ["spreadsheet", segSheet]].forEach(([name, el]) => {
+ if (sheet) sheet.hidden = (v !== "table");
+ [["sandbox", segSb], ["table", segSheet]].forEach(([name, el]) => {
  if (el) { el.classList.toggle("on", v === name); el.setAttribute("aria-pressed", String(v === name)); }
  });
- if (v === "spreadsheet" && window.FleetStore) {
+ if (v === "table" && window.FleetStore) {
  if (!FleetStore.isLoaded()) FleetStore.load();
  render();
  }
@@ -1980,13 +1995,13 @@
  const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet");
  if (!segSb || !segSheet) return;
  segSb.onclick = () => showView("sandbox");
- segSheet.onclick = () => showView("spreadsheet");
+ segSheet.onclick = () => showView("table");
  if (window.FleetStore && FleetStore.subscribe) {
  // Re-render on real fleet changes; skip the high-frequency "live" beat + triage so
  // the body doesn't rebuild every few seconds. renderBody() leaves the search input
  // (in the persistent shell) untouched, so a live refresh never steals focus.
  FleetStore.subscribe((s, kind) => {
- if (_view !== "spreadsheet" || kind === "live" || kind === "triage") return;
+ if (_view !== "table" || kind === "live" || kind === "triage") return;
  // Never rebuild the body mid-rename — that kills the input and drops multi-word
  // names mid-type (Ford 2026-07-16).
  if (_vsRenameActive || window.__vsRenameActive) return;
@@ -2003,12 +2018,12 @@
  // Pending vendor cards, only when the vendor set changes (mark/clear/reconcile).
  // Quiet poll ticks no longer fire this event (pending-feeds.js write signature).
  window.addEventListener("ao:pending-feeds", () => {
- if (_view !== "spreadsheet") return;
+ if (_view !== "table") return;
  if ($("#vsSearch")) renderBody(); else render();
  });
  // Soft-refresh wait-copy every ~8s without remounting the card
  setInterval(() => {
- if (_view !== "spreadsheet") return;
+ if (_view !== "table") return;
  const pending = _pendingFeeds();
  if (!pending.length) return;
  const bodyEl = $("#vsBody");
@@ -2029,7 +2044,7 @@
  }
 
  window.__aoLoadVendorSheet = function () {
- if (_view === "spreadsheet" && window.FleetStore) {
+ if (_view === "table" && window.FleetStore) {
  if (!FleetStore.isLoaded()) FleetStore.load();
  render();
  }

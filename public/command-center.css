@@ -2449,21 +2449,42 @@ body.ea-shell-open #panelReports .inv-sub-seg{
   min-width:0;
   border:1px solid var(--line); border-radius:14px;
   background:var(--card,#fff); box-shadow:0 1px 3px rgba(15,23,42,.06);
+  /* Branded thin blue scrollbar (not the fat OS grey track) */
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa transparent;
 }
-/* 9 columns fill 100% of the card. Flexible name/vendor/status shrink with
-   ellipsis; live/today/spark stay separate so units never stack as "kWkWh" and
-   graphs never share a cell with the status pill. */
+.vs-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+.vs-scroll::-webkit-scrollbar-track{
+  background: transparent;
+  margin: 6px 0;
+  border-radius: 999px;
+}
+.vs-scroll::-webkit-scrollbar-thumb{
+  background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 55%, #2563eb 100%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  min-height: 36px;
+}
+.vs-scroll::-webkit-scrollbar-thumb:hover{
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+.vs-scroll::-webkit-scrollbar-corner{ background: transparent; }
+/* 9 columns: Vendor | Name | Output | Units | Live kW | Today | 14-day | Status | Synced
+   (Vendor first — Ford 2026-07-16). Name gets the flex room so inverter labels don't clip. */
 .vs-row{ display:grid;
   grid-template-columns:
-    minmax(0,1.45fr)      /* array — ellipsis */
-    minmax(0,.7fr)        /* vendor — ellipsis */
-    56px                  /* gauge */
-    40px                  /* inv count / peer */
-    minmax(64px,.85fr)    /* live now */
-    minmax(72px,.9fr)     /* today */
-    minmax(72px,104px)    /* 14-day spark (own col, scales down) */
-    minmax(0,1.15fr)      /* status pill */
-    minmax(0,.7fr);       /* synced */
+    minmax(88px,.62fr)    /* vendor */
+    minmax(0,1.65fr)      /* name / array / inverter */
+    56px                  /* gauge (Output) */
+    minmax(48px,.55fr)    /* units count / peer */
+    minmax(68px,.8fr)     /* live kW */
+    minmax(72px,.85fr)    /* today */
+    minmax(72px,104px)    /* 14-day spark */
+    minmax(0,1.1fr)       /* status */
+    minmax(0,.72fr);      /* synced / details */
   align-items:center; gap:8px; padding:10px 12px;
   box-sizing:border-box; text-align:left;
   width:100%;
@@ -2560,7 +2581,34 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-caret{ display:inline-block; width:17px; min-width:17px; text-align:center; font-size:12.5px;
   line-height:1; color:var(--muted,#64748b); transition:transform var(--motion-fast) var(--ease-out); flex:none; }
 .vs-arr.open .vs-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
-.vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vs-c-name{ font-weight:650; display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; }
+/* Two-line inverter label: primary name + meta under it (no more mid-word clip of
+   "S/N … · STP 20KTL…" jammed on one ellipsis line). */
+.vs-inv-name{ align-items:flex-start; padding-top:1px; }
+.vs-inv-name-stack{
+  display:flex; flex-direction:column; gap:1px; min-width:0; flex:1 1 auto;
+}
+.vs-inv-name-stack .vs-editable{
+  display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vs-inv-sub{
+  display:block; font-size:11px; font-weight:500; line-height:1.25;
+  color:var(--muted,#64748b);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  max-width:100%;
+}
+.vs-c-vendor{ min-width:0; display:flex; align-items:center; gap:6px; overflow:hidden; }
+.vs-c-vendor-empty{ /* spacer so inverter rows keep the 9-col grid aligned */ }
+.vs-colhead .vs-c-vendor,
+.vs-colhead .vs-c-name,
+.vs-colhead .vs-c-inv,
+.vs-colhead .vs-c-pow,
+.vs-colhead .vs-c-today,
+.vs-colhead .vs-c-spark,
+.vs-colhead .vs-c-status,
+.vs-colhead .vs-c-fresh{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 /* Row-TYPE glyphs (Ford 2026-07-13): a 2×2-panel mark on array rows, a device+sine mark on
    inverter rows, so you can see what you're looking at. Sized to the text, centered on the
    line (works inside the inverter name's baseline flex too), muted so they're a quiet cue —
@@ -2681,17 +2729,19 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
-/* Inverter names run as long as they need to: the name cell SPANS the (empty on inverter
-   rows) Vendor column too, reclaiming the dead space to its right. Every later column still
-   auto-places at grid cols 3-8, so the row stays aligned with the array/vendor rows above
-   (Ford 2026-07-13: "make the inverter name go all the way — there's dead space to the
-   right"). The empty <span class="vs-c-vendor"> was removed from the inverter row markup so
-   the gauge lands at col 3, not col 4. */
-.vs-inv-name{ padding-left:40px; align-items:baseline; grid-column:1 / 3; }
-.vs-inv-name .vs-editable{ font-weight:600; color:var(--ink,#0f172a);
-  flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vs-inv-sub{ font-size:11px; color:var(--faint); font-weight:400; flex:0 1 auto;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Inverter name sits in the Name column only (col 2). An empty Vendor cell keeps
+   Live kW / Today / Status under the correct headers — spanning cols 1–2 was why
+   "Live now" drifted and labels clipped (Ford 2026-07-16). */
+.vs-inv-name{
+  padding-left:12px;
+  align-items:flex-start;
+  /* do NOT set grid-column — must stay in Name track */
+}
+.vs-inv-name .vs-editable,
+.vs-inv-name-stack .vs-editable{
+  font-weight:600; color:var(--ink,#0f172a);
+  max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 .vs-inv-peercol{ font-variant-numeric:tabular-nums; color:var(--muted); }
 .vs-inv-nospark{ font-size:10.5px; color:var(--faint); font-style:italic; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
@@ -2737,22 +2787,22 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 @media(max-width:760px){
   .vs-row{
     grid-template-columns:
-      minmax(0,1.3fr) minmax(0,.65fr) 48px 34px
-      minmax(56px,.8fr) minmax(64px,.85fr)
-      minmax(64px,88px) minmax(0,1.1fr) minmax(0,.65fr);
+      minmax(72px,.55fr) minmax(0,1.4fr) 48px minmax(40px,.5fr)
+      minmax(56px,.75fr) minmax(64px,.8fr)
+      minmax(64px,88px) minmax(0,1.05fr) minmax(0,.65fr);
     gap:6px; padding:8px 10px;
     width:100%; min-width:0;
   }
   .vs-inv-rowspark-wrap, .vs-inv-rowspark{ max-width:80px; height:22px; }
 }
 @media(max-width:640px){
-  .vs-inv-name{ padding-left:26px; }
+  .vs-inv-name{ padding-left:8px; }
   .vs-c-spark, .vs-colhead .vs-c-spark, .vs-inv-rowspark-wrap{ display:none !important; }
   .vs-row{
     grid-template-columns:
-      minmax(0,1.4fr) minmax(0,.7fr) 44px 32px
-      minmax(56px,.85fr) minmax(60px,.9fr)
-      0px minmax(0,1.15fr) minmax(0,.7fr);
+      minmax(64px,.5fr) minmax(0,1.45fr) 44px minmax(36px,.45fr)
+      minmax(56px,.8fr) minmax(60px,.85fr)
+      0px minmax(0,1.1fr) minmax(0,.65fr);
     gap:6px; width:100%; min-width:0;
   }
 }

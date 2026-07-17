@@ -69,7 +69,7 @@ document.documentElement.setAttribute("data-theme","day");
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260716focus1">
-<link rel="stylesheet" href="command-center.css?v=20260716genrep9">
+<link rel="stylesheet" href="command-center.css?v=20260716table2">
 <link rel="stylesheet" href="ops.css?v=20260715eaMatch2">
 <link rel="stylesheet" href="theme-day.css?v=20260716overview1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
@@ -363,11 +363,11 @@ document.documentElement.setAttribute("data-theme","day");
  table, no sub-headers, just the at-a-glance health + the canvas. -->
  <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverters">
 
- <!-- Sub-view toggle: SPREADSHEET | SANDBOX (left→right). Same FleetStore data;
+ <!-- Sub-view toggle: TABLE | SANDBOX (left→right). Same FleetStore data;
  vendor-sheet.js flips between them. .ao-subnav = equal vertical strip, pill centered. -->
  <div class="ao-subnav">
  <div class="vs-seg" role="group" aria-label="Inverters view">
- <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Spreadsheet</button>
+ <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Table</button>
  <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
  </div>
  </div>
@@ -380,8 +380,8 @@ document.documentElement.setAttribute("data-theme","day");
  <div id="sandbox"></div>
  </section>
 
- <!-- SPREADSHEET, structured rows of every array by vendor (vendor-sheet.js →
- #vendorSheet). Hidden until the Spreadsheet sub-tab is selected. -->
+ <!-- TABLE view, structured rows of every array by vendor (vendor-sheet.js →
+ #vendorSheet). Hidden until the Table sub-tab is selected. -->
  <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
 
  </section>
@@ -472,7 +472,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
 <script src="sandbox.js?v=20260716focus1"></script>
-<script src="vendor-sheet.js?v=20260716shading1"></script>
+<script src="vendor-sheet.js?v=20260716table2"></script>
 <script src="command-center.js?v=20260714pro1"></script>
 <script src="reports.js?v=20260716genrep9"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
