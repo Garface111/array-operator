@@ -685,7 +685,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260716esAiOpen1";
+ const GENREP_V = "20260717aiOpen2";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -2057,12 +2057,20 @@
  function esSetChatOpen(open) {
  const p = document.getElementById("esChatPanel");
  const pill = document.getElementById("esAiPill");
- if (p) p.hidden = !open;
- if (pill) pill.hidden = !!open;
+ if (p) {
+ p.hidden = !open;
+ // Force visibility — [hidden] alone can lose to host CSS in edge cases.
+ p.style.display = open ? "flex" : "none";
+ p.setAttribute("aria-hidden", open ? "false" : "true");
+ }
+ if (pill) {
+ pill.hidden = !!open;
+ pill.style.display = open ? "none" : "";
+ }
  if (open) {
  esRenderChat();
  const input = document.getElementById("esChatInput");
- if (input) setTimeout(() => { try { input.focus(); } catch (_) { /* ok */ } }, 0);
+ if (input) setTimeout(() => { try { input.focus(); } catch (_) { /* ok */ } }, 50);
  }
  }
 
