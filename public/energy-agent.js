@@ -10,7 +10,17 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260717onevoice1";
+ var EA_BUILD = "20260717sttvocab1";
+
+ // Domain vocabulary fed to the speech-to-text so it transcribes the product's
+ // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
+ // "offtaker" -> "off taker", vendor names, etc.). Ford 2026-07-17.
+ var EA_STT_PROMPT =
+ "Array Operator is a solar fleet platform; its AI is the Energy Agent. " +
+ "Expect these terms: Array Operator, Energy Agent, offtaker, offtakers, " +
+ "NEPOOL, REC, RECs, generation report, net metering, solar credit, kWh, " +
+ "kW nameplate, inverter, array, fleet, specific yield, SolarEdge, Fronius, " +
+ "Chint, SMA, Enphase, Locus, GMP, Green Mountain Power, VEC, SmartHub.";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -6626,7 +6636,13 @@
  "Never cut yourself off mid-sentence.",
  audio: {
  input: {
- transcription: { model: "gpt-4o-mini-transcribe" },
+ transcription: {
+ model: "gpt-4o-mini-transcribe",
+ // Bias the STT toward product vocabulary so it stops hearing
+ // "Array Operator" as "ray operator" and mangling vendor names
+ // (Ford 2026-07-17). gpt-4o-mini-transcribe takes a prompt hint.
+ prompt: EA_STT_PROMPT,
+ },
  noise_reduction: { type: "near_field" },
  turn_detection: realtimeVadConfig(),
  },
