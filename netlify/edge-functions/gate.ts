@@ -58,7 +58,6 @@ export default async (request, context) => {
   const requestEmail = getEnv("PREPROD_REQUEST_EMAIL") || "ford.genereaux@gmail.com";
 
   const ip = (context && context.ip) || request.headers.get("x-nf-client-connection-ip") || "";
-  console.log("gate debug", JSON.stringify({ allowN: allow.length, hasPass: !!betaPass, passLen: betaPass.length, betaUser, ip, hasAuth: !!request.headers.get("authorization") }));
 
   // 1. Silent IP allowlist
   if (allow.length && ip && allow.indexOf(ip) !== -1) return;
