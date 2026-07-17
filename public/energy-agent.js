@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260717sttvocab1";
+ var EA_BUILD = "20260717screenvision1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -726,6 +726,8 @@
  '</svg></span><span class="ea-chip-lbl">Mic</span></button>' +
  ' <button type="button" class="ea-chip ea-mute ea-chip-icon" id="eaMute" title="Mute agent voice" aria-label="Mute agent voice">' +
  ' <span class="ea-chip-ic" aria-hidden="true">🔊</span><span class="ea-chip-lbl">Mute</span></button>' +
+ ' <button type="button" class="ea-chip ea-screen ea-chip-icon" id="eaScreenBtn" title="Let Energy Agent see your screen" aria-label="Let Energy Agent see your screen" aria-pressed="false">' +
+ ' <span class="ea-chip-ic" aria-hidden="true">👁</span><span class="ea-chip-lbl">See screen</span></button>' +
  ' <span class="ea-compose-spacer"></span>' +
  ' <button type="button" class="ea-send" id="eaSend" title="Send message" aria-label="Send message">' +
  ' <span class="ea-send-lbl">Send</span><span class="ea-send-ic" aria-hidden="true">↑</span></button>' +
@@ -781,6 +783,19 @@
  e.preventDefault();
  setVoiceMuted(!state.voiceMuted);
  };
+ var screenBtn = document.getElementById("eaScreenBtn");
+ if (screenBtn) {
+ screenBtn.onclick = function (e) {
+ e.preventDefault();
+ if (screenVisionLive()) { stopScreenVision(); }
+ else {
+ grantScreenVision().then(function (ok) {
+ if (ok) addMsg("agent", "I can see your screen now. Ask me about anything on it, or say “take a look.”");
+ });
+ }
+ };
+ }
+ syncScreenBtn();
  syncMuteBtn();
  syncMicBtn();
  applyVoiceMuteToAudio();
@@ -3856,6 +3871,119 @@
  return cmds;
  }
 
+ // ── Live screen vision (request 60, the agent's own capability request) ────
+ // Grant screen-share ONCE, keep the stream, snapshot a frame on demand and hand
+ // it to the brain as an image (Claude vision) so she SEES the rendered UI instead
+ // of guessing from a text digest. Fully opt-in: nothing is captured until the
+ // owner approves the browser prompt, and the see_screen tool is a dormant skill.
+ function screenVisionLive() {
+ try {
+ return !!(state.screenStream &&
+ state.screenStream.getVideoTracks().some(function (t) { return t.readyState === "live"; }));
+ } catch (e) { return false; }
+ }
+ async function grantScreenVision() {
+ if (screenVisionLive()) return true;
+ if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+ addMsg("agent", "This browser can't share the screen for me to see — try Chrome or Edge.");
+ return false;
+ }
+ try {
+ var stream = await navigator.mediaDevices.getDisplayMedia({
+ video: { frameRate: 2 },
+ audio: false,
+ preferCurrentTab: true, // Chrome hint: default to THIS tab
+ selfBrowserSurface: "include",
+ });
+ state.screenStream = stream;
+ var vt = stream.getVideoTracks()[0];
+ if (vt) vt.addEventListener("ended", function () { state.screenStream = null; syncScreenBtn(); });
+ syncScreenBtn();
+ return true;
+ } catch (e) {
+ return false; // denied / cancelled
+ }
+ }
+ function stopScreenVision() {
+ try { state.screenStream && state.screenStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+ state.screenStream = null;
+ syncScreenBtn();
+ }
+ async function captureScreenBlob() {
+ if (!screenVisionLive()) return null;
+ var track = state.screenStream.getVideoTracks()[0];
+ var src = null, vw = 0, vh = 0, videoEl = null;
+ try {
+ if (window.ImageCapture) {
+ var bmp = await new window.ImageCapture(track).grabFrame();
+ src = bmp; vw = bmp.width; vh = bmp.height;
+ }
+ } catch (e) { src = null; }
+ if (!src) {
+ videoEl = document.createElement("video");
+ videoEl.muted = true; videoEl.srcObject = state.screenStream;
+ try { await videoEl.play(); } catch (e) {}
+ await new Promise(function (res) {
+ if (videoEl.videoWidth) return res();
+ videoEl.onloadedmetadata = res; setTimeout(res, 700);
+ });
+ src = videoEl; vw = videoEl.videoWidth || 1280; vh = videoEl.videoHeight || 720;
+ }
+ if (!vw || !vh) return null;
+ var maxW = 1400;
+ var scale = vw > maxW ? maxW / vw : 1;
+ var cw = Math.max(1, Math.round(vw * scale)), ch = Math.max(1, Math.round(vh * scale));
+ var canvas = document.createElement("canvas");
+ canvas.width = cw; canvas.height = ch;
+ try { canvas.getContext("2d").drawImage(src, 0, 0, cw, ch); } catch (e) { return null; }
+ if (videoEl) { try { videoEl.pause(); videoEl.srcObject = null; } catch (e) {} }
+ return await new Promise(function (res) {
+ try { canvas.toBlob(function (b) { res(b); }, "image/jpeg", 0.75); }
+ catch (e) { res(null); }
+ });
+ }
+ async function uploadScreenBlob(blob) {
+ var fd = new FormData();
+ fd.append("file", blob, "screen-" + Date.now() + ".jpg");
+ var headers = authHeaders(); delete headers["Content-Type"];
+ try {
+ var r = await fetch(API.upload, { method: "POST", headers: headers, body: fd });
+ var d = await r.json().catch(function () { return {}; });
+ return (r.ok && d && d.asset) ? d.asset : null;
+ } catch (e) { return null; }
+ }
+ /** Full flow: ensure grant → capture → upload → re-invoke the brain WITH the image. */
+ async function runSeeScreen(reason) {
+ var ok = screenVisionLive() || (await grantScreenVision());
+ if (!ok) {
+ addMsg("agent", "I need permission to see your screen — click the 👁 button below and choose “This Tab.”");
+ return;
+ }
+ setStatus("Looking at your screen…", "think");
+ var blob = await captureScreenBlob();
+ if (!blob) { addMsg("agent", "I couldn't grab the screen just now — try once more?"); return; }
+ var asset = await uploadScreenBlob(blob);
+ if (!asset) { addMsg("agent", "The screen capture didn't upload — try once more?"); return; }
+ if (!state.attachments) state.attachments = [];
+ state.attachments.push(asset);
+ var note = "Here's my screen right now — take a look" + (reason ? (" (" + reason + ")") : "") + ".";
+ turn(note, "screen_vision", {}).catch(function () {});
+ }
+ function syncScreenBtn() {
+ var btn = document.getElementById("eaScreenBtn");
+ if (!btn) return;
+ var on = screenVisionLive();
+ btn.classList.toggle("ea-screen-on", on);
+ btn.setAttribute("aria-pressed", on ? "true" : "false");
+ btn.title = on ? "Energy Agent can see your screen — click to stop" : "Let Energy Agent see your screen";
+ // Octarine "live" glow when granted (no separate stylesheet needed).
+ try {
+ btn.style.color = on ? "#7b5cff" : "";
+ btn.style.borderColor = on ? "rgba(123,92,255,.55)" : "";
+ btn.style.boxShadow = on ? "0 0 0 1px rgba(123,92,255,.35), 0 0 12px -4px rgba(123,92,255,.6)" : "";
+ } catch (e) {}
+ }
+
  // ── browser driver ───────────────────────────────────────────────────────
  async function runCommand(cmd) {
  if (!cmd) return;
@@ -3983,6 +4111,11 @@
  if (cmd.args && cmd.args.suggestion_id) watchBuild(cmd.args.suggestion_id);
  ok = true;
  detail = cmd.args || {};
+ } else if (cmd.type === "see_screen") {
+ // Brain asked to see the screen: capture → upload → re-turn with the image.
+ runSeeScreen(cmd.reason || (cmd.args && cmd.args.reason) || "");
+ ok = true;
+ detail = { reason: cmd.reason || "" };
  } else {
  detail = { error: "unknown command type" };
  }
