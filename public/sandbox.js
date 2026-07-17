@@ -7829,9 +7829,50 @@
  }
  applyTabGating();
  _firstApply = false;
+ try { rememberSubtab(); } catch(_){}
  // Next frame: sub-nav pills mid of tabbar bottom → content-card top
  try { requestAnimationFrame(function(){ centerAoSubnav(); }); } catch(_){ try{ centerAoSubnav(); }catch(__){} }
  }
+
+ /* ── Sub-tab memory (Ford 2026-07-16) ──────────────────────────────────────
+  * Returning to a top tab reopens the sub-view you last had there. Analysis
+  * (#analysis|#trends|#resources) and Invoices (#reports|#reports/audit|
+  * #reports/trends|#reports/generation) keep sub-state in the hash; we remember
+  * the last hash per tab and, on a tab CLICK, restore it instead of resetting to
+  * the default. (Inverters' Spreadsheet|Sandbox already persists via
+  * localStorage 'ao_vendor_view', so it needs no help here.) */
+ const SUBTAB_DEFAULT = { analysis: "#analysis", reports: "#reports" };
+ let _subtabMem = {};
+ try { _subtabMem = JSON.parse(localStorage.getItem("ao_subtab_mem") || "{}") || {}; } catch(_){ _subtabMem = {}; }
+ function _subtabTabForHash(h){
+ h = (h || "").toLowerCase();
+ if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
+ if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
+ return null;
+ }
+ function rememberSubtab(){
+ const t = _subtabTabForHash(location.hash);
+ if(!t) return;
+ _subtabMem[t] = location.hash || SUBTAB_DEFAULT[t];
+ try { localStorage.setItem("ao_subtab_mem", JSON.stringify(_subtabMem)); } catch(_){}
+ }
+ // reports.js applyInvoicesSub swaps the invoice sub via history.replaceState
+ // (no hashchange → applyView doesn't run), so let it record too.
+ try { window.__aoRememberSub = rememberSubtab; } catch(_){}
+ // Restore on a top-tab click, before the anchor's default navigation runs.
+ document.addEventListener("click", function(e){
+ try{
+ const a = e.target && e.target.closest ? e.target.closest("#tabAnalysis, #tabReports") : null;
+ if(!a) return;
+ const targetTab = a.id === "tabAnalysis" ? "analysis" : "reports";
+ const mem = _subtabMem[targetTab];
+ if(mem && _subtabTabForHash(mem) === targetTab && mem.toLowerCase() !== SUBTAB_DEFAULT[targetTab]){
+ e.preventDefault();
+ if((location.hash || "").toLowerCase() === mem.toLowerCase()) applyView();
+ else location.hash = mem;
+ }
+ }catch(_){}
+ }, true);
 
  /* Sub-nav pills (Spreadsheet|Sandbox, Fleet analysis|…, Offtakers|…): shift
   so the pill midpoint sits on the geometric middle of [tabbar bottom, main

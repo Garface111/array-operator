@@ -660,6 +660,8 @@
  if ((location.hash || "").toLowerCase() !== want) {
  history.replaceState(null, "", want);
  }
+ // replaceState fires no hashchange, so record the sub-tab memory explicitly.
+ if (window.__aoRememberSub) window.__aoRememberSub();
  } catch (e) {}
  }
  function wireGenTabs() {
