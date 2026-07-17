@@ -816,6 +816,37 @@ body.mh-os .ea-tools{
 }
 html:not(.sky) .ea-msg.agent{ background: rgba(255,255,255,.04); border-color: var(--line); }
 
+/* ── Spoken conclusion block ───────────────────────────────────────────────
+   The tight line the Energy Agent narrates aloud, lifted above the panel
+   detail so owners see "what was said" vs the backup numbers/evidence. */
+.ea-spoken-block{
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(14,165,233,.22);
+  border-left: 3px solid var(--ea-sky2, #0284c7);
+  background: linear-gradient(180deg, rgba(14,165,233,.10), rgba(14,165,233,.045));
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink, #0f172a);
+}
+.ea-spoken-block .ea-spoken-ic{
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: .9;
+}
+.ea-spoken-block .ea-spoken-text{ flex: 1 1 auto; }
+html:not(.sky) .ea-spoken-block{
+  border-color: rgba(100,150,255,.32);
+  border-left-color: #5b8dff;
+  background: linear-gradient(180deg, rgba(80,130,255,.16), rgba(80,130,255,.07));
+  color: #dce8ff;
+}
+
 /* Tiny corner copy control (icon only) — absolute, never shifts text */
 .ea-msg .chat-msg-copy{
   appearance: none;
