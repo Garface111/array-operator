@@ -26,6 +26,15 @@
  mindVoiceSteer: "/v1/energy-agent/mind/voice-steer",
  };
 
+ // Option D (Ford 2026-07-16): Realtime owns live voice; consult_deep_brain → Claude.
+ // Set window.__EA_VOICE_WEAVE = false to force legacy mouth-only dual path.
+ var VOICE_WEAVE = (function () {
+ try {
+ if (typeof window.__EA_VOICE_WEAVE === "boolean") return window.__EA_VOICE_WEAVE;
+ } catch (e) {}
+ return true;
+ })();
+
  var state = {
  open: false,
  sessionId: null,
@@ -4921,10 +4930,207 @@
  // ("I'm looking at X and Y and it doesn't look good, can we fix…")
  // aren't cut mid-thought (Ford 2026-07-14).
  silence_duration_ms: 1600,
- create_response: false,
- // Client owns replies; we cancel explicitly on barge-in / stop
- interrupt_response: false,
+ // Option D weave: Realtime answers on its own; legacy mouth-only = false
+ create_response: !!VOICE_WEAVE,
+ interrupt_response: !!VOICE_WEAVE,
  };
+ }
+
+ /** Option D Realtime session tools — one tool: consult the deep Claude brain. */
+ function realtimeWeaveTools() {
+ return [
+ {
+ type: "function",
+ name: "consult_deep_brain",
+ description:
+ "Ask the deep mind (Claude with full Array Operator tools) about THIS " +
+ "tenant's fleet, invoices, repairs, account, or to take a screen/data action. " +
+ "Use for any real numbers, status, offtakers, production, tickets, navigation, " +
+ "or when the owner confirms/cancels a pending change. Do NOT use for pure small talk.",
+ parameters: {
+ type: "object",
+ properties: {
+ question: {
+ type: "string",
+ description:
+ "What to investigate or do, in clear English. Include the owner's " +
+ "intent and any names/sites they mentioned.",
+ },
+ reason: {
+ type: "string",
+ description: "Why the deep mind is needed (e.g. fleet_health, money, repair).",
+ },
+ },
+ required: ["question"],
+ },
+ },
+ ];
+ }
+
+ function realtimeWeaveInstructions() {
+ return (
+ "You are Energy Agent — the live voice of Array Operator for THIS signed-in owner. " +
+ "YOU control the conversation. Speak English, warm and sharp like GPT Live. " +
+ "You have exactly ONE tool: consult_deep_brain — call it for any real numbers, " +
+ "fleet status, invoices, repairs, screen actions, or confirmations. " +
+ "Never invent kWh, dollars, or status. For pure small talk / 'are you there?' / thanks, " +
+ "answer yourself without the tool. After the tool returns, speak the answer naturally " +
+ "(use spoken_answer if provided). Do not narrate tool names. Be one person."
+ );
+ }
+
+ /**
+ * Option D: deep brain consult. Paints the panel from Claude, returns a compact
+ * payload for Realtime to speak — never starts a second parallel monologue.
+ */
+ function consultDeepBrain(question, callId) {
+ var q = String(question || "").trim();
+ if (!q) q = "Help with what the owner just asked.";
+ if (!state.sessionId) {
+ return Promise.resolve({
+ spoken_answer: "I need a session first — open the panel and try again.",
+ panel_text: "",
+ ok: false,
+ });
+ }
+ setStatus("Thinking…", "think");
+ state.thinking = true;
+ state._turnBusy = true;
+ var chatCtx = packContext() || {};
+ chatCtx.voice_active = true;
+ chatCtx.voice_weave = true;
+ return fetch(API.chat, {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify({
+ session_id: state.sessionId,
+ message: q,
+ context: chatCtx,
+ source: "voice_consult",
+ }),
+ })
+ .then(function (r) {
+ return r.json().then(function (d) {
+ return { httpOk: r.ok, status: r.status, d: d };
+ });
+ })
+ .then(function (pack) {
+ state.thinking = false;
+ state._turnBusy = false;
+ var d = pack.d || {};
+ if (!pack.httpOk) {
+ var err = (d && (d.detail || d.error)) || ("HTTP " + pack.status);
+ if (typeof err !== "string") err = JSON.stringify(err);
+ return {
+ ok: false,
+ spoken_answer: "I hit a snag checking that — try once more?",
+ panel_text: String(err).slice(0, 400),
+ };
+ }
+ if (d.budget) setBudget(d.budget);
+ if (d.mind) onMindPlanFromChat(d.mind);
+ if (d.pending) showPending(d.pending);
+ else showPending(null);
+ var reply = ownerFacingText(d.reply || "…");
+ var spoken =
+ ownerFacingSpeak((d.speak && String(d.speak).trim()) || reply) || reply;
+ // Panel gets the full deep-brain write-up once; suppress Realtime's re-spoken
+ // transcript bubble so we don't double-post (weave fix).
+ if (reply) {
+ addMsg("agent", reply);
+ state._lastAgentBubble = reply.slice(0, 200);
+ state._suppressNextAgentTranscript = true;
+ }
+ clearTools();
+ var cmds = d.ui_commands || [];
+ cmds = coerceTourCommands(cmds, q);
+ // Run UI commands without blocking the function-output ack too long
+ (async function () {
+ for (var i = 0; i < cmds.length; i++) {
+ try {
+ await runCommand(cmds[i]);
+ } catch (e) {}
+ }
+ })();
+ return {
+ ok: true,
+ spoken_answer: spoken.slice(0, 1200),
+ panel_text: reply.slice(0, 2000),
+ pending: !!d.pending,
+ };
+ })
+ .catch(function (e) {
+ state.thinking = false;
+ state._turnBusy = false;
+ return {
+ ok: false,
+ spoken_answer: "Network hiccup — say that again?",
+ panel_text: String((e && e.message) || e || "error").slice(0, 200),
+ };
+ });
+ }
+
+ function sendFunctionCallOutput(callId, outputObj) {
+ if (!callId || !state.dc || state.dc.readyState !== "open") return;
+ var out =
+ typeof outputObj === "string" ? outputObj : JSON.stringify(outputObj || {});
+ try {
+ state.dc.send(
+ JSON.stringify({
+ type: "conversation.item.create",
+ item: {
+ type: "function_call_output",
+ call_id: callId,
+ output: out.slice(0, 8000),
+ },
+ })
+ );
+ // Let Realtime speak the tool result in her own voice
+ state.dc.send(JSON.stringify({ type: "response.create" }));
+ } catch (e) {}
+ }
+
+ function handleRealtimeFunctionCall(name, argsStr, callId) {
+ var args = {};
+ try {
+ args = JSON.parse(argsStr || "{}") || {};
+ } catch (e) {
+ args = { question: String(argsStr || "") };
+ }
+ var nm = String(name || "").toLowerCase();
+ if (nm === "consult_deep_brain" || nm === "consult_brain" || nm === "deep_brain") {
+ var question = args.question || args.query || args.message || "";
+ // Avoid double-consult storms
+ if (state._consultInFlight) {
+ sendFunctionCallOutput(callId, {
+ ok: false,
+ spoken_answer: "Still working on the last check — one moment.",
+ });
+ return;
+ }
+ state._consultInFlight = true;
+ consultDeepBrain(question, callId)
+ .then(function (result) {
+ state._consultInFlight = false;
+ sendFunctionCallOutput(callId, result);
+ if (state.listening && !state.touring) {
+ setStatus("Speaking…", "speak");
+ }
+ })
+ .catch(function () {
+ state._consultInFlight = false;
+ sendFunctionCallOutput(callId, {
+ ok: false,
+ spoken_answer: "I lost the deep check — ask me again?",
+ });
+ });
+ return;
+ }
+ // Unknown tool — don't hang the Realtime turn
+ sendFunctionCallOutput(callId, {
+ ok: false,
+ spoken_answer: "I can't use that tool from here.",
+ });
  }
 
  function stopVoice(keepMic) {
@@ -5347,6 +5553,10 @@
  state.rtResponseActive = true;
  // Mark speak start once; attack mute already armed in speakNow, don't re-mute forever
  if (!state._speakStartedAt) state._speakStartedAt = Date.now();
+ // Weave: mute mic for full native Realtime utterance (speaker bleed)
+ if (VOICE_WEAVE) {
+ holdMicWhileSpeaking(true, { holdMicFull: true, source: "chat" });
+ }
  setStatus(state.touring ? "Tour… speaking" : "Speaking…", "speak");
  }
  if (ev.type === "response.output_audio.delta") {
@@ -5358,10 +5568,19 @@
  state.speaking = false;
  state.rtResponseActive = false;
  state._rtCancelPending = false;
+ if (state._greetingPlaying) state._greetingPlaying = false;
  if (typeof state._onSpeakDone === "function") {
  try { state._onSpeakDone(); } catch (e) {}
  } else {
  holdMicWhileSpeaking(false);
+ // Weave: Realtime owns mic; just re-enable tracks after speech
+ if (VOICE_WEAVE && state.listening && state.micStream) {
+ try {
+ state.micStream.getTracks().forEach(function (t) {
+ t.enabled = true;
+ });
+ } catch (e) {}
+ }
  if (state.listening && !state.touring) {
  setStatus("Listening…", "listen");
  }
@@ -5401,8 +5620,55 @@
  state._scheduleSpeakSafetyDrain(45000);
  }
  }
- // User finished speaking, ONE path: show once, then agent turn (tools + speak).
- // Guarded barge-in: while agent talks, accept real interrupts (not noise/echo).
+ // ── Option D: Realtime function calls → deep brain ───────────────────
+ // response.function_call_arguments.done (common) or item-done with function_call
+ if (ev.type === "response.function_call_arguments.done") {
+ var fcName = ev.name || (ev.item && ev.item.name) || "";
+ var fcArgs = ev.arguments != null ? ev.arguments : "";
+ var fcId = ev.call_id || (ev.item && ev.item.call_id) || ev.id;
+ if (fcId) handleRealtimeFunctionCall(fcName, fcArgs, fcId);
+ }
+ if (
+ ev.type === "response.output_item.done" &&
+ ev.item &&
+ (ev.item.type === "function_call" || ev.item.type === "function_call_output")
+ ) {
+ if (ev.item.type === "function_call") {
+ handleRealtimeFunctionCall(
+ ev.item.name,
+ ev.item.arguments || "",
+ ev.item.call_id || ev.item.id
+ );
+ }
+ }
+ // Assistant speech transcript → panel (weave: Realtime is the speaker of record)
+ if (
+ VOICE_WEAVE &&
+ (ev.type === "response.audio_transcript.done" ||
+ ev.type === "response.output_audio_transcript.done")
+ ) {
+ var agentSaid = (ev.transcript || "").trim();
+ if (agentSaid) {
+ state._lastSpokenPlain = agentSaid;
+ state._lastAgentTranscript = agentSaid;
+ // Deep-brain already painted the panel for this turn — don't double-bubble
+ if (state._suppressNextAgentTranscript) {
+ state._suppressNextAgentTranscript = false;
+ } else if (!state._consultInFlight) {
+ // Small-talk / native Realtime replies still need a chat line
+ addMsg("agent", agentSaid);
+ state._lastAgentBubble = agentSaid.slice(0, 200);
+ }
+ }
+ if (state._greetingPlaying) {
+ state._greetingPlaying = false;
+ }
+ }
+
+ // User finished speaking.
+ // Option D weave: Realtime answers (create_response true) — do NOT call turn().
+ // That dual path was the "two agents fighting" Ford saw (2026-07-16).
+ // Legacy: transcription → turn() → force-speak.
  if (ev.type === "conversation.item.input_audio_transcription.completed") {
  var said = (ev.transcript || "").trim();
  if (!acceptUserTranscript(said)) return;
@@ -5412,7 +5678,50 @@
  state._lastUserSaidAt = nowTs;
  var wasSpeaking = isAgentMouthBusy();
  var wasThinking = !!(state.thinking || state._turnBusy);
- // Barge-in or idle: stop agent mouth, drop remaining speak queue chunks
+
+ // Hard stop always (both modes)
+ if (isStopCommand(said)) {
+ stopSpeak({ reason: "barge_in" });
+ if (state.dc && state.dc.readyState === "open") {
+ try {
+ state.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+ } catch (e) {}
+ }
+ addMsg("user", said);
+ handleStopCommand();
+ return;
+ }
+
+ if (VOICE_WEAVE) {
+ // Log user line + meter airtime; Realtime owns the reply (or calls consult).
+ addMsg("user", said);
+ if (state.sessionId) {
+ fetch(API.transcript, {
+ method: "POST",
+ headers: authHeaders(),
+ body: JSON.stringify({
+ session_id: state.sessionId,
+ lines: [{ role: "user", text: said }],
+ voice_seconds: Math.max(4, said.split(/\s+/).length * 0.55 + 2),
+ }),
+ })
+ .then(function (r) {
+ return r.json().catch(function () {
+ return null;
+ });
+ })
+ .then(function (d) {
+ if (d && d.budget) setBudget(d.budget);
+ })
+ .catch(function () {});
+ }
+ // Don't cancel Realtime's own response — she is generating it.
+ // Don't call turn() — that was the second agent grabbing the reins.
+ if (state.touring) state.touring = false;
+ return;
+ }
+
+ // ── Legacy mouth-only path ──────────────────────────────────────────
  stopSpeak({ reason: "barge_in" });
  if (state.dc && state.dc.readyState === "open") {
  try {
@@ -5422,17 +5731,9 @@
  if (wasSpeaking) {
  setStatus("Listening…", "listen");
  }
- // Hard stop, never start a new LLM monologue after "stop"
- if (isStopCommand(said)) {
- addMsg("user", said);
- handleStopCommand();
- return;
- }
- // Mid-think / mid-speech redirect: abort prior work without "Stopped." ack
  if (wasThinking || wasSpeaking) {
  abortInFlightTurn("barge_in");
  }
- // Mid-tour redirect: cancel tour so we hear the new ask
  if (state.touring) state.touring = false;
  addMsg("user", said);
  if (state.sessionId) {
@@ -5442,7 +5743,6 @@
  body: JSON.stringify({
  session_id: state.sessionId,
  lines: [{ role: "user", text: said }],
- // Charge closer to real airtime (user speech + short pause); bar must move
  voice_seconds: Math.max(4, said.split(/\s+/).length * 0.55 + 2),
  }),
  })
@@ -5452,10 +5752,8 @@
  })
  .catch(function () {});
  }
- // userAlreadyShown: do not paint the same user line again in turn()
  turn(said, "voice", { userAlreadyShown: true }).catch(function () {});
  }
- // Do NOT addMsg for assistant Realtime transcripts, agent bubble comes only from turn()
  if (ev.type === "error") {
  var msg = (ev.error && (ev.error.message || ev.error)) || "Realtime error";
  // Benign: cancel when nothing is speaking, ignore, do not alarm the user
@@ -5563,15 +5861,14 @@
  try { handleRealtimeEvent(JSON.parse(e.data)); } catch (err) {}
  });
  dc.addEventListener("open", function () {
- // One system: Realtime = ears + mouth only. create_response false = we reply via /chat.
- // VAD: less sensitive than OpenAI defaults so room noise / keys don't start turns.
+ // Option D (default): Realtime owns the conversation + consult_deep_brain.
+ // Legacy: mouth-only, create_response false, app drives every reply via /chat.
  state._sessionUpdated = false;
- dcSend({
- type: "session.update",
- session: {
+ var sess = {
  type: "realtime",
- instructions:
- "You are Energy Agent's MOUTH only, continuous cognition steers you. " +
+ instructions: VOICE_WEAVE
+ ? realtimeWeaveInstructions()
+ : "You are Energy Agent's MOUTH only, continuous cognition steers you. " +
  "Only speak lines the app sends via response.create. " +
  "Do not invent answers; the deeper mind reasons with tools and steers what you say. " +
  "Start from the first word, speak completely, never speak over yourself. " +
@@ -5583,31 +5880,72 @@
  turn_detection: realtimeVadConfig(),
  },
  },
- },
- });
- // Single greeting per panel open, hold mic full duration so speaker bleed
- // cannot barge-in and cut the intro (Ford 2026-07-14).
+ };
+ if (VOICE_WEAVE) {
+ sess.tools = realtimeWeaveTools();
+ sess.tool_choice = "auto";
+ }
+ dcSend({ type: "session.update", session: sess });
+ // Single greeting per panel open
  if (!state.greeted && !state.voiceMuted) {
  state.greeted = true;
  state._greetingPlaying = true;
- // Disable mic tracks immediately until greeting finishes
  try {
  if (state.micStream) {
- state.micStream.getTracks().forEach(function (t) { t.enabled = false; });
+ state.micStream.getTracks().forEach(function (t) {
+ t.enabled = false;
+ });
  }
  } catch (e) {}
+ if (VOICE_WEAVE) {
+ // Native Realtime greeting — one mind, no forced script fight
+ var greetCreate = function () {
+ if (!state.dc || state.dc.readyState !== "open") {
+ state._greetingPlaying = false;
+ return;
+ }
+ try {
+ state.rtResponseActive = true;
+ state.speaking = true;
+ state.dc.send(
+ JSON.stringify({
+ type: "response.create",
+ response: {
+ instructions:
+ "Greet the owner in one short friendly line as Energy Agent. " +
+ "Say you're listening whenever they're ready. Then stop and wait.",
+ },
+ })
+ );
+ } catch (e2) {
+ state._greetingPlaying = false;
+ }
+ };
+ if (state._sessionUpdated) setTimeout(greetCreate, 180);
+ else state._pendingGreetingSend = greetCreate;
+ setStatus("Speaking…", "speak");
+ // Safety: clear greeting flag when audio ends (also handled by buffer events)
+ setTimeout(function () {
+ if (state._greetingPlaying && !state.rtResponseActive) {
+ state._greetingPlaying = false;
+ }
+ }, 12000);
+ } else {
  enqueueSpeak(
  "Hi, Energy Agent here. I'm listening whenever you're ready.",
  { source: "greeting", force: true, holdMicFull: true }
- ).then(function () {
+ )
+ .then(function () {
  state._greetingPlaying = false;
  if (state.listening && !state.voiceMuted) {
  setStatus("Listening…", "listen");
  }
- }).catch(function () {
+ })
+ .catch(function () {
  state._greetingPlaying = false;
  });
  setStatus("Speaking…", "speak");
+ }
  } else if (state.voiceMuted) {
  setStatus("Text only, voice off", "on");
  } else {
