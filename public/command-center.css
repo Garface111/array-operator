@@ -3416,27 +3416,28 @@ body.ho-shell-open .vs-scroll{
   max-width:100%;
   min-width:0;
 }
-/* Always drop 14-day spark when the rail is open — free ~80px for Synced */
-body.ea-shell-open .vs-c-spark,
-body.ea-shell-open .vs-colhead .vs-c-spark,
-body.ea-shell-open .vs-inv-rowspark-wrap,
-body.ho-shell-open .vs-c-spark,
-body.ho-shell-open .vs-colhead .vs-c-spark,
-body.ho-shell-open .vs-inv-rowspark-wrap{
-  display:none !important;
-}
+/* KEEP the 14-day graph when the rail is open (Ford 2026-07-16). This used to
+   `display:none` the spark column + every per-inverter rowspark "to free ~80px",
+   which also killed the graphs on expanded inverters and left the freed space
+   inflating the other tracks into dead columns. The dock is a floating card now
+   and the content column only loses ~200px, so the graphs fit — they're the point
+   of this view. Narrower tiers below drop the gauge/units first instead. */
 body.ea-shell-open .vs-row,
 body.ho-shell-open .vs-row{
+  /* Metric columns are sized to their CONTENT and Name (the only variable-length
+     cell) absorbs all the slack. The old `fr` share on every column is what made
+     the dead space: each metric track grew far wider than the "—" / "OK" /
+     "synced 2m" / 104px graph inside it. */
   grid-template-columns:
-    minmax(58px,.42fr)    /* vendor */
-    minmax(0,1.35fr)      /* name */
+    72px                  /* vendor */
+    minmax(0,1fr)         /* name — takes the slack */
     40px                  /* gauge */
-    minmax(32px,.38fr)    /* units */
-    minmax(50px,.68fr)    /* live kW */
-    minmax(54px,.72fr)    /* today */
-    0px                   /* spark hidden */
-    minmax(68px,.95fr)    /* status */
-    minmax(92px,.88fr);   /* synced — hard min so "synced 12m" / "25d ago" never clips */
+    44px                  /* units */
+    64px                  /* live kW */
+    66px                  /* today */
+    108px                 /* spark — fits the 14-day graph exactly */
+    88px                  /* status */
+    94px;                 /* synced — "synced 12m" / "25d ago" never clips */
   width:100%;
   min-width:0;
   gap:4px;
@@ -3458,23 +3459,18 @@ body.ea-shell-open .vs-colhead .vs-c-fresh,
 body.ho-shell-open .vs-colhead .vs-c-fresh{
   overflow:hidden; /* header label "Synced" is short */
 }
-/* Expand-all: icon-only when cramped so it doesn't become "EX" mid-header */
+/* Expand-all stays a REAL, labelled button with the rail open (Ford 2026-07-16:
+   "the expand button is now just this little arrow instead of a nice expand
+   button"). It was font-size:0 + a ::before "↕" glyph; the Name track has ample
+   room now that the spark keeps its own column, so the label fits. */
 body.ea-shell-open .vs-expandall,
 body.ho-shell-open .vs-expandall{
-  font-size:0;
-  letter-spacing:0;
-  padding:3px 7px;
-  min-width:28px;
+  font-size:9.5px;
+  letter-spacing:.03em;
+  padding:3px 8px;
   width:auto;
   flex-shrink:0;
-}
-body.ea-shell-open .vs-expandall::before,
-body.ho-shell-open .vs-expandall::before{
-  content:"↕";
-  font-size:12px;
-  font-weight:800;
-  letter-spacing:0;
-  line-height:1;
+  white-space:nowrap;
 }
 body.ea-shell-open .vs-namehead,
 body.ho-shell-open .vs-namehead{
@@ -3560,8 +3556,9 @@ body.ea-shell-open .vs-inv-sub,
 body.ho-shell-open .vs-inv-sub{
   font-size:10px;
 }
-/* Narrower desktops + rail: also drop Output gauge */
-@media(max-width:1500px){
+/* Tighter desktops + rail: drop the Output gauge first (least informative — it's
+   blank at night anyway), but KEEP the 14-day graph. */
+@media(max-width:1360px){
   body.ea-shell-open .vs-c-gauge,
   body.ea-shell-open .vs-colhead .vs-c-gauge,
   body.ho-shell-open .vs-c-gauge,
@@ -3571,19 +3568,20 @@ body.ho-shell-open .vs-inv-sub{
   body.ea-shell-open .vs-row,
   body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(56px,.4fr)     /* vendor */
-      minmax(0,1.45fr)      /* name */
+      68px                  /* vendor */
+      minmax(0,1fr)         /* name — takes the slack */
       0px                   /* gauge hidden */
-      minmax(32px,.38fr)    /* units */
-      minmax(50px,.7fr)     /* live kW */
-      minmax(54px,.75fr)    /* today */
-      0px                   /* spark hidden */
-      minmax(68px,1fr)      /* status */
-      minmax(92px,.9fr);    /* synced hard min */
+      42px                  /* units */
+      62px                  /* live kW */
+      64px                  /* today */
+      104px                 /* spark — kept */
+      86px                  /* status */
+      92px;                 /* synced */
   }
 }
-/* Very tight remaining content (≈ laptop + EA rail): drop Units too */
-@media(max-width:1180px){
+/* Very tight remaining content (≈ laptop + rail): drop Units too — the 14-day
+   graph still survives, it's the reason to be on this screen. */
+@media(max-width:1150px){
   body.ea-shell-open .vs-c-inv,
   body.ea-shell-open .vs-colhead .vs-c-inv,
   body.ho-shell-open .vs-c-inv,
@@ -3593,14 +3591,14 @@ body.ho-shell-open .vs-inv-sub{
   body.ea-shell-open .vs-row,
   body.ho-shell-open .vs-row{
     grid-template-columns:
-      minmax(52px,.38fr)
-      minmax(0,1.5fr)
-      0px
-      0px
-      minmax(48px,.72fr)
-      minmax(52px,.78fr)
-      0px
-      minmax(64px,1fr)
-      minmax(88px,.95fr);
+      64px                  /* vendor */
+      minmax(0,1fr)         /* name — takes the slack */
+      0px                   /* gauge hidden */
+      0px                   /* units hidden */
+      60px                  /* live kW */
+      62px                  /* today */
+      96px                  /* spark — kept */
+      82px                  /* status */
+      90px;                 /* synced */
   }
 }
