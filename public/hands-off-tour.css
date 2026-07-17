@@ -640,7 +640,8 @@ html:not(.sky) #hoTour.ho-mode-dock .ho-sheet{
 
 /* body.ho-shell-open — shift main wrap for floating dock card
    Occupied width = left inset + rail + right gap before content */
-body.ho-shell-open .wrap{
+/* ONLY body > .wrap — Resources injects a nested .wrap that must not shift */
+body.ho-shell-open > .wrap{
   margin-left:calc(var(--ho-rail) + (var(--ho-inset) * 2));
   max-width:calc(100vw - var(--ho-rail) - (var(--ho-inset) * 2));
   min-width:0;
@@ -656,7 +657,7 @@ body.ho-shell-open #hoTour.ho-mode-dock .ho-sheet{
   /* keep glass companion shadow from dock rules above — don't flatten to hard rail */
 }
 @media(max-width:900px){
-  body.ho-shell-open .wrap{ margin-left:0; max-width:none }
+  body.ho-shell-open > .wrap{ margin-left:0; max-width:none }
   #hoTour.ho-mode-dock{
     padding:0; /* full-height sheet on narrow — match EA mobile rail */
   }

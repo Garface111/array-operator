@@ -211,11 +211,21 @@ html.sky #eaPanel{
    stuttered while the panel (transform) glided. The desktop transform lives in
    the ≥961px block below, on the SAME curve/duration/trigger as the panel, so
    the two move as one. Here we keep only the non-animated guards. */
-body.ea-shell-open .wrap{
+/* ONLY the app shell wrap (body > .wrap). Resources injects a nested
+   #rsHost > .wrap from resources.html — the old descendant selector
+   double-applied transform/max-width and shoved the briefing off-center
+   whenever Energy Agent was open (Ford 2026-07-17). */
+body.ea-shell-open > .wrap{
   min-width: 0;
   box-sizing: border-box;
   /* Clip any child that still tries 100vw breakout beside the card */
   overflow-x: clip;
+}
+/* Nested content wraps (Resources briefing, etc.) must never inherit the shell shift */
+body.ea-shell-open #rsHost > .wrap,
+body.ea-shell-open #panelResources .wrap{
+  transform: none !important;
+  margin-left: auto !important; /* cancel any shell margin-left bleed */
 }
 body.ea-shell-open{
   /* keep fixed bottom mobile nav clear of rail if needed */
@@ -226,7 +236,8 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-.wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
+/* Shell-only transition — not nested content .wrap (Resources) */
+body > .wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
 
 /* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
    The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
@@ -265,7 +276,7 @@ body.ea-shell-open .panel.active{
      the tabbar/account email never clip. On wide screens the cap already equals
      the resting 1440px width, so opening is a pure composited slide with ZERO
      reflow; narrower desktops take a single width reflow, then glide. */
-  body.ea-shell-open .wrap{
+  body.ea-shell-open > .wrap{
     max-width: min(1440px, calc(100vw - var(--ea-footprint) - 24px));
     transform: translateX(calc(var(--ea-footprint) / 2));
     transition: transform .34s cubic-bezier(.2,.8,.2,1);
@@ -273,8 +284,8 @@ body.ea-shell-open .panel.active{
   }
 }
 @media (prefers-reduced-motion: reduce){
-  body.ea-shell-open .wrap,
-  .wrap{ transition: none; }
+  body.ea-shell-open > .wrap,
+  body > .wrap{ transition: none; }
   #eaPanel,
   #eaPanel.open{ transition: none; }
 }
@@ -391,7 +402,7 @@ html.sky body.ho-ea-sidebyside.ea-shell-open #eaPanel{
 }
 /* Main content clears BOTH floating cards. This side-by-side combo positions via
    margin-left, so cancel the EA-only transform re-center or it would double-shift. */
-body.ho-shell-open.ea-shell-open .wrap{
+body.ho-shell-open.ea-shell-open > .wrap{
   margin-left: calc(var(--ho-inset, 12px) + var(--ho-rail, 360px) + 10px + var(--ea-rail) + 12px);
   max-width: calc(100vw - var(--ho-inset, 12px) - var(--ho-rail, 360px) - 10px - var(--ea-rail) - 12px);
   min-width: 0;
@@ -411,7 +422,7 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
     border-radius: 0;
     height: auto;
   }
-  body.ho-shell-open.ea-shell-open .wrap{
+  body.ho-shell-open.ea-shell-open > .wrap{
     margin-left: 0;
   }
 }
@@ -1701,7 +1712,7 @@ html.ea-merged #fsWrap{ display: none !important; }
   }
 
   /* No content shift — bubble overlays, site stays full-width */
-  body.ea-shell-open .wrap{
+  body.ea-shell-open > .wrap{
     margin-left: 0 !important;
     width: auto !important;
   }
