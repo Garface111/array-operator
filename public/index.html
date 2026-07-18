@@ -76,6 +76,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260715opsRes1"><!-- Resources briefing; scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
+<link rel="stylesheet" href="marketplace.css?v=20260717exch1"><!-- Offtaker Exchange (Marketplace tab); scoped #panelMarketplace/.mk-* -->
 <!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
  it parser-blocking (no FOUC) and positions it AFTER mobile.css so it is the
@@ -255,6 +256,10 @@ document.documentElement.setAttribute("data-theme","day");
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
  <a class="tab" id="tabReports" href="#reports" role="tab" title="Invoice offtakers for their share of solar credits">Invoices</a>
+ <!-- Marketplace: the Offtaker Exchange — surface unallocated group-net-metering
+ excess (vacancy) + collect demand. Owns #panelMarketplace; sub-tabs render from
+ the shared window.__aoMarketplace registry (marketplace.js). -->
+ <a class="tab" id="tabMarketplace" href="#marketplace" role="tab" title="Offtaker Exchange — unallocated credits, expiry alerts, demand waitlist">Marketplace</a>
  <!-- Repairs: command center for parallel repair pipelines + Resources sub-view. -->
  <a class="tab" id="tabOps" href="#ops" role="tab"
  title="Repair command center — detect, draft outreach, coordinate, verify">Repairs<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
@@ -452,6 +457,15 @@ document.documentElement.setAttribute("data-theme","day");
  <div id="reportsRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading reports…</div></div>
  </section>
 
+ <!-- ============================ TAB: MARKETPLACE (Offtaker Exchange) ============================ -->
+ <!-- Unallocated group-net-metering excess made visible + a demand waitlist Ford
+ brokers by hand (v0). Sub-tabs (Credit Exchange, + Array Market from a parallel
+ lane) render from the shared window.__aoMarketplace registry in marketplace.js;
+ __aoLoadMarketplace() fills #marketplaceRoot when the tab activates. -->
+ <section class="panel" id="panelMarketplace" role="tabpanel" aria-label="Marketplace">
+ <div id="marketplaceRoot"><div class="empty" style="padding:34px 0;color:var(--faint)">Loading the exchange…</div></div>
+ </section>
+
  <!-- ============================ TAB: REPAIRS ============================ -->
  <!-- Full-bleed agent-centric surface. No nested sub-tabs. Energy Agent opens
  with a staged prompt; setup (team + array map) happens in chat. -->
@@ -471,14 +485,15 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260717anSubNoSlide1"></script>
+<script src="sandbox.js?v=20260717exch1"></script>
 <script src="vendor-sheet.js?v=20260717triage1"></script>
 <script src="command-center.js?v=20260717triage1"></script>
-<script src="reports.js?v=20260716gentoast"></script>
+<script src="reports.js?v=20260717exch1"></script>
+<script src="marketplace.js?v=20260717exch1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260715agent1" defer></script>
+<script src="mobile-nav.js?v=20260717exch1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=20260716shellwatch1"></script>

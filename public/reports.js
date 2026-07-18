@@ -76,6 +76,26 @@
  let RECON = null; // full /reconcile-bills payload (cached)
  let RECON_BY_SUB = {}; // sub_id -> subscription reconcile row
  let _reconPromise = null; // in-flight fetch (dedupe concurrent callers)
+ // Offtaker Exchange: per-array unallocated-excess vacancy, keyed by array_id.
+ // Feeds the small "money leak" chip on each group header (integrate in place).
+ let VACANCY_BY_ARRAY = {};
+ let _vacLoaded = false;
+ // Fetch the tenant's vacancy once; on first success run `cb` so the group-header
+ // chips repaint with the measured $ (collapse state persists in module maps, so
+ // a re-render is safe). Fails soft — the chip just falls back to the % unassigned.
+ function loadVacancyOnce(cb) {
+ if (_vacLoaded || !authHeaders()) return;
+ _vacLoaded = true;
+ fetch(API + "/vacancy", { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null)
+ .then(j => {
+ if (j && Array.isArray(j.arrays)) {
+ j.arrays.forEach(a => { if (a.array_id != null) VACANCY_BY_ARRAY[String(a.array_id)] = a; });
+ if (typeof cb === "function") { try { cb(); } catch (_) {} }
+ }
+ })
+ .catch(() => {});
+ }
  function reconIndex() {
  RECON_BY_SUB = {};
  if (RECON && Array.isArray(RECON.subscriptions))
@@ -5661,6 +5681,9 @@
  // Pay-link chips (V2), best-effort, never block the offtaker list.
  try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
  renderAccordion(subs, arrs, utilAccts, drafts);
+ // Offtaker Exchange: fetch per-array vacancy once; repaint the header chips
+ // with the measured $ when it lands (best-effort, never blocks the list).
+ loadVacancyOnce(() => renderAccordion(subs, arrs, utilAccts, drafts));
  // Bill accuracy check: fetch the reconcile payload (once, cached) alongside the
  // list. When it lands, paint the top-level summary chip and, if a card is
  // already open, fill its "Bill accuracy check" section, no reload needed.
@@ -5854,6 +5877,29 @@
  // breakdown popover ("show me how it was calculated"): every offtaker's share,
  // listed, then summed. A small epsilon absorbs float/rounding noise from
  // percent-entry; real over/under-allocation still shows as a warning.
+ // The "money leak" chip: this group's UNALLOCATED excess as a dollar/expiry
+ // read, surfaced right in the header next to the % pill (Offtaker Exchange).
+ // Prefers the measured bill-side number (VACANCY_BY_ARRAY); falls back to the
+ // registry % (100 − Σ shares) until it lands. Links into the Marketplace tab.
+ function vacancyChip(group) {
+ const aid = (group.rows && group.rows[0]) ? group.rows[0].array_id : null;
+ const v = aid != null ? VACANCY_BY_ARRAY[String(aid)] : null;
+ const regUnassigned = Math.max(0, 1 - (group.pctSum || 0));
+ if (v && v.vacancy_frac != null && (v.vacancy_usd || 0) >= 1) {
+ const exp = (v.expiring_soon_usd || 0) > 0
+ ? ` · ${money0(v.expiring_soon_usd)} nearing expiry` : "";
+ const est = v.confidence === "high" ? "" : " · est.";
+ return `<a class="rb-grp-vac${exp ? " rb-grp-vac--exp" : ""}" href="#marketplace"
+ title="Unallocated credit on this net-meter group — open the Marketplace">↯ ${money0(v.vacancy_usd)}/yr unallocated${exp}${est}</a>`;
+ }
+ // No measured figure yet (or none): only nudge when a real slice is unassigned.
+ if (regUnassigned > 0.005) {
+ return `<a class="rb-grp-vac rb-grp-vac--reg" href="#marketplace"
+ title="Some of this group's excess is unassigned — open the Marketplace">↯ ${(regUnassigned * 100).toFixed(0)}% unallocated</a>`;
+ }
+ return "";
+ }
+
  function pctSumPill(group) {
  const pctNum = (group.pctSum || 0) * 100; // exact percent (number, for the logic below)
  const pct = pctNum.toFixed(2); // 2-decimal display string (Ford: .00, not 0)
@@ -6054,6 +6100,7 @@
  <span class="rb-grp-count">${g.rows.length} offtaker${g.rows.length === 1 ? "" : "s"}</span>
  ${addBtn}
  ${pctSumPill(g)}
+ ${vacancyChip(g)}
  </div>
  <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
  ${collapsed ? "" : g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
