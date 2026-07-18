@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260717screenvision1";
+ var EA_BUILD = "20260717uiquestion1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3738,6 +3738,13 @@
  function isVisualFixIntent(text) {
  var t = String(text || "").toLowerCase();
  if (!t || t.length < 8) return false;
+ // A QUESTION about the UI ("what's the point of this button", "what does X
+ // do", "why is this here") is an ASK, not a fix request — let the agent
+ // answer it (with screen vision), never auto-open the build flow.
+ // Ford 2026-07-17: asked what a button did and it kicked off an improvement.
+ if (/(^|\b)(what('?s| is| are| does| do)?|why|how|where|which|who|explain|describe|tell me|point of|purpose of)\b/.test(t)) {
+ return false;
+ }
  // Exclude pure data/ops asks
  if (/\b(share|percent|kwh|invoice|offtaker|underperform|fault|login password)\b/.test(t)
  && !/\b(button|color|colour|look|ugly|style|design|theme)\b/.test(t)) {
