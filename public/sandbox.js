@@ -5390,6 +5390,19 @@
  return code.toUpperCase();
  }
  const _arAddedUtils = new Set(); // utility codes the operator picked this session (show an empty card to fill)
+ const _arAddedInv = new Set(); // inverter vendor codes picked this session (same picker→tile idiom)
+ // The inverter vendors offered in "+ Add an inverter login". Same condensed
+ // picker→tile pattern the utility panel already uses (Ford 2026-07-18): the
+ // panel shows only what you've CONNECTED, everything else waits behind the
+ // picker so attention lands on one action instead of six vendor forms.
+ const AR_INV_PICK = [
+ { code:"solaredge", label:"SolarEdge", sub:"API key · every site on the account" },
+ { code:"alsoenergy", label:"AlsoEnergy (PowerTrack)", sub:"One login · every site on the account" },
+ { code:"locus", label:"Locus Energy (SolarNOC)", sub:"One login · every site on the account" },
+ { code:"fronius", label:"Fronius (Solar.web)", sub:"Portal login" },
+ { code:"sma", label:"SMA (Sunny Portal)", sub:"Portal login" },
+ { code:"chint", label:"Chint", sub:"Portal login" },
+ ];
  // Utilities the operator asked us to ADD (not in the catalog yet). Queued locally so
  // they can fire off a bunch fast, then submitted as one batch to /v1/utility-requests
  // → an agent researches + wires each one in. Persisted so a reload doesn't lose them.
@@ -6234,6 +6247,25 @@
  Object.keys(utilByCode).sort().forEach(pushCode);
  (_arAddedUtils || []).forEach(pushCode);
 
+ // Which INVERTER vendors get a tile: anything you've actually CONNECTED (a
+ // saved vault login, or arrays already attached via an API key), plus anything
+ // picked this session. Everything else waits behind the picker, so the panel
+ // opens calm instead of six credential forms deep. Nothing is lost: a connected
+ // vendor always shows itself, with its logins, status, on/off and Remove.
+ const _invArrayCount = (code) => {
+ try {
+ return (window.FleetStore && FleetStore.snapshot().arrays || [])
+ .filter(a => (a.vendor || a.source_vendor) === code).length;
+ } catch(e){ return 0; }
+ };
+ const shownInvCodes = [];
+ const pushInv = (c) => { if(c && shownInvCodes.indexOf(c) === -1) shownInvCodes.push(c); };
+ AR_INV_PICK.forEach(v => {
+ const st = status[v.code];
+ if(invByCode[v.code] || (st && st.hasCreds) || _invArrayCount(v.code) > 0) pushInv(v.code);
+ });
+ (_arAddedInv || []).forEach(pushInv);
+
  const utilCard = (code) => {
  const logins = utilByCode[code] || [];
  const name = utilLabelFor(code, catalog);
@@ -6360,12 +6392,21 @@
  };
 
  // Vault inverter cards (Fronius / SMA / Chint), same markup for cloud vs device.
- const vaultInvHTML = mode === "cloud"
- ? AR_INVERTERS.map(invCard).join("")
- : AR_INVERTERS.map(v => {
+ const vaultInvCard = (v) => {
+ if(mode === "cloud") return invCard(v);
  const st = status[v.id] || { hasCreds:false, enabled:true };
  return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
- }).join("");
+ };
+ // One tile per SHOWN inverter vendor. Each returns the SAME card markup the
+ // panel used before, so every behaviour (multi-login, status pill, on/off,
+ // Remove, SolarEdge's key list) is untouched, only *when* it renders changed.
+ const invTileFor = (code) => {
+ if(code === "alsoenergy") return alsoEnergyCardHTML();
+ if(code === "locus") return locusCardHTML();
+ if(code === "solaredge") return solarEdgeCardHTML();
+ const v = AR_INVERTERS.find(x => x.id === code);
+ return v ? vaultInvCard(v) : "";
+ };
 
  listEl.innerHTML = `
  <div class="ar-card ar-card-live">${buildLiveBoardHTML(status, mode, catalog)}</div>
@@ -6373,13 +6414,17 @@
  <div class="ar-card ar-card-group">
  <div class="ar-group ar-group-inv">
  <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
- <div class="ar-inv-row ar-inv-api">
- ${alsoEnergyCardHTML()}
- ${locusCardHTML()}
- ${solarEdgeCardHTML()}
+ <div class="ar-inv-row ar-inv-slots">
+ ${shownInvCodes.map(invTileFor).join("")}
  </div>
- <div class="ar-inv-row ar-inv-vault">
- ${vaultInvHTML}
+ <div class="ar-addutil ar-addinv">
+ <button type="button" class="acct-btn ar-addinv-btn">+ Add an inverter login</button>
+ <div class="ar-picker ar-picker-inv" hidden>
+ <div class="ar-picker-shell">
+ <input type="text" class="ar-picker-search ar-invpicker-search" autocomplete="off" placeholder="Search SolarEdge, AlsoEnergy, Locus, Fronius, SMA, Chint…" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arInvPickerList">
+ <div class="ar-picker-results" id="arInvPickerList" role="listbox"></div>
+ </div>
+ </div>
  </div>
  </div>
  </div>
@@ -6793,12 +6838,66 @@
  // never swaps into a vanishing strip. No-match → a pickable "Request …" row
  // in the same style as catalog hits; keyboard ↑↓/Enter works; queueing shows
  // a clear ✓ flash so it feels like the action landed.
- const addBtn = listEl.querySelector(".ar-addutil-btn");
- const picker = listEl.querySelector(".ar-picker");
- const searchEl = listEl.querySelector(".ar-picker-search");
- const resultsEl = listEl.querySelector(".ar-picker-results");
- const queueEl = listEl.querySelector(".ar-req-queue");
+ // Scoped to the UTILITY group: the inverter picker below reuses the same
+ // .ar-picker markup and sits ABOVE this one in the DOM, so an unscoped
+ // querySelector would grab the wrong panel.
+ const addBtn = listEl.querySelector(".ar-group-util .ar-addutil-btn");
+ const picker = listEl.querySelector(".ar-group-util .ar-picker");
+ const searchEl = listEl.querySelector(".ar-group-util .ar-picker-search");
+ const resultsEl = listEl.querySelector(".ar-group-util .ar-picker-results");
+ const queueEl = listEl.querySelector(".ar-group-util .ar-req-queue");
  const codes = Object.keys(catalog);
+
+ // ── Inverter portals picker: same component, fixed 6-vendor catalog. Picking
+ // a vendor drops its (unchanged) card in below and focuses it — identical
+ // idiom to the utility picker, so it inherits the visual language for free.
+ const invAddBtn = listEl.querySelector(".ar-addinv-btn");
+ const invPicker = listEl.querySelector(".ar-picker-inv");
+ const invSearchEl = listEl.querySelector(".ar-invpicker-search");
+ const invResultsEl = listEl.querySelector("#arInvPickerList");
+ function renderInvResults(){
+ if(!invResultsEl) return;
+ const q = (invSearchEl && invSearchEl.value || "").trim().toLowerCase();
+ const avail = AR_INV_PICK.filter(v => shownInvCodes.indexOf(v.code) === -1);
+ const hits = q
+ ? avail.filter(v => v.label.toLowerCase().includes(q) || v.code.includes(q))
+ : avail;
+ invResultsEl.innerHTML = hits.length
+ ? hits.map(v =>
+ `<button type="button" class="ar-picker-item" role="option" data-inv="${esc(v.code)}">` +
+ `<span class="ar-picker-item-name">${esc(v.label)}</span>` +
+ `<span class="ar-picker-state">${esc(v.sub)}</span>` +
+ `</button>`).join("")
+ : `<div class="ar-picker-queued" role="status"><span class="ar-picker-queued-check">✓</span>` +
+ `<span>${avail.length ? "No match — try SolarEdge, Fronius, SMA…" : "Every inverter brand you use is already showing."}</span></div>`;
+ invResultsEl.querySelectorAll(".ar-picker-item[data-inv]").forEach(it => {
+ it.addEventListener("click", () => {
+ _arAddedInv.add(it.dataset.inv);
+ _vaultStatusCache = null;
+ it.classList.add("ar-picker-item-picked");
+ wireAutoRefreshRow().then(() => {
+ const card = listEl.querySelector(`.ar-util[data-code="${CSS.escape(it.dataset.inv)}"]`);
+ if(card){
+ card.scrollIntoView({ behavior:"smooth", block:"center" });
+ const f = card.querySelector("input:not([type=hidden])");
+ if(f) f.focus();
+ }
+ });
+ });
+ });
+ }
+ if(invAddBtn && invPicker){
+ invAddBtn.addEventListener("click", () => {
+ invPicker.hidden = !invPicker.hidden;
+ if(!invPicker.hidden){ setTimeout(() => invSearchEl && invSearchEl.focus(), 30); renderInvResults(); }
+ });
+ }
+ if(invSearchEl){
+ invSearchEl.addEventListener("input", renderInvResults);
+ invSearchEl.addEventListener("keydown", (e) => {
+ if(e.key === "Escape"){ invPicker.hidden = true; invAddBtn && invAddBtn.focus(); }
+ });
+ }
  let _pickIdx = -1; // keyboard highlight index into current .ar-picker-item nodes
  let _flashTimer = null;
 
