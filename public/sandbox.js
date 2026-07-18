@@ -7698,6 +7698,7 @@
  /* Trends is a SUB-VIEW of Analysis now (Ford 2026-07-13), panelTrends is
  toggled manually inside the analysis branch of applyView, not via this map. */
  reports: { panel: "panelReports", tab: "tabReports" },
+ marketplace: { panel: "panelMarketplace", tab: "tabMarketplace" },
  ops: { panel: "panelOps", tab: "tabOps" },
  /* Resources is a sub-view of Analysis (#resources → panelResources). */
  /* Sovereign desk is developer-only (#sovereign) — panel toggled separately. */
@@ -7709,6 +7710,7 @@
  if(h === "#arrays" || h === "#sandbox") return "arrays";
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
+ if(h === "#marketplace" || h.indexOf("#marketplace/") === 0) return "marketplace";
  if(h === "#dashboard") return "dashboard";
  if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
  return "arrays";
@@ -7779,7 +7781,7 @@
  const _slideOK = !_firstApply && !isSov && typeof window.__aoTabSlide === "function"
  && location.hash !== "#trends" && location.hash !== "#resources";
  const _prevPanel = _slideOK ? document.querySelector(
- "#panelDashboard.active,#panelArrays.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelOps.active,#panelAccount.active") : null;
+ "#panelDashboard.active,#panelArrays.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelMarketplace.active,#panelOps.active,#panelAccount.active") : null;
  const _toPanel = (!isSov && TABS[active]) ? document.getElementById(TABS[active].panel) : null;
  const _anSubHop = !!(
   _prevPanel && _toPanel &&
@@ -7798,7 +7800,7 @@
  if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
  });
  if(_willSlide){
- const _ord = {panelDashboard:0,panelArrays:1,panelAnalysis:2,panelTrends:2,panelResources:2,panelReports:3,panelOps:4,panelAccount:5};
+ const _ord = {panelDashboard:0,panelArrays:1,panelAnalysis:2,panelTrends:2,panelResources:2,panelReports:3,panelMarketplace:4,panelOps:5,panelAccount:6};
  const _fi = (_ord[_prevPanel.id] != null ? _ord[_prevPanel.id] : 0);
  const _ti = (_ord[_toPanel.id] != null ? _ord[_toPanel.id] : 0);
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
@@ -7849,6 +7851,8 @@
  if(window.__aoApplyInvoicesSub) window.__aoApplyInvoicesSub();
  }, 0);
  } catch(_){}
+ } else if(active === "marketplace"){
+ try { if(window.__aoLoadMarketplace) window.__aoLoadMarketplace(); } catch(_){}
  } else if(active === "ops"){
  try { if(window.__aoLoadOps) window.__aoLoadOps(); } catch(_){}
  try {
