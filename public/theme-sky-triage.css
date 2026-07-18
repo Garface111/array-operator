@@ -385,10 +385,13 @@ html.sky .vs-dc-diag{ background:rgba(233,243,253,.7); border-color:rgba(20,60,1
    sit ON the already-blurred sheet (one blur budget, per the Sky perf guardrail).
    The left spine and every chip colour stay untouched: they are SEMANTIC (who the
    cause points at, fact vs estimate), not decoration, so the theme must not tint them. */
+/* NB: --sky-r-pill (999px) would stadium-round a multi-line row, and --sky-r-card
+   (22px) is the big-surface radius — an episode is a compact row, so it takes a
+   middle value. Caught in live DOM verification, not by eye. */
 html.sky .vs-dc-ep{
   background:rgba(255,255,255,.6);
   border-color:rgba(20,60,120,.1);
-  border-radius:var(--sky-r-pill, 12px);
+  border-radius:14px;
 }
 html.sky .vs-dc-ep.live{ background:rgba(254,235,235,.72); border-color:rgba(220,38,38,.24); }
 html.sky .vs-dc-chip{ background:rgba(255,255,255,.72); border-color:rgba(20,60,120,.14); }
