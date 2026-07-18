@@ -248,11 +248,11 @@ document.documentElement.setAttribute("data-theme","day");
  </div>
  </div>
 
- <!-- Top tab bar. Fleet Triage owns Dashboard | Table | Sandbox sub-tabs
+ <!-- Top tab bar. Fleet owns Triage | Table | Sandbox sub-tabs
  (Inverters no longer a separate top tab — Marketplace took that slot).
- #arrays → Table, #sandbox → Sandbox, #dashboard → Dashboard. -->
+ #arrays → Table, #sandbox → Sandbox, #dashboard → Triage. -->
  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
- <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Triage</a>
+ <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet</a>
  <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13), see #panelAnalysis's
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
@@ -336,27 +336,24 @@ document.documentElement.setAttribute("data-theme","day");
  <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
  <!-- All business: one flat list of horizontal rows, identity, login & billing.
  Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
- <!-- ============================ TAB: FLEET TRIAGE ============================ -->
+ <!-- ============================ TAB: FLEET ============================ -->
  <!-- One top tab, three sub-views (same pattern as Analysis):
- Dashboard = health + needs-attention queue (was the whole tab)
- Table / Sandbox = former Inverters top-tab surfaces
- Hashes: #dashboard · #arrays (table) · #sandbox
- command-center.js → #fleetCommander + #ccQueue; vendor-sheet.js → table;
- sandbox.js → #sandbox. -->
- <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Triage">
+ Triage = health + needs-attention queue · Table / Sandbox = equipment.
+ Hashes: #dashboard · #arrays (table) · #sandbox -->
+ <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet">
  <div class="ao-subnav">
- <div class="vs-seg ft-sub-seg" role="group" aria-label="Fleet Triage view">
- <button class="vs-seg-btn on" type="button" data-ftsub="dashboard" id="vsSegDashboard" aria-pressed="true">Dashboard</button>
+ <div class="vs-seg ft-sub-seg" role="group" aria-label="Fleet view">
+ <button class="vs-seg-btn on" type="button" data-ftsub="dashboard" id="vsSegDashboard" aria-pressed="true">Triage</button>
  <button class="vs-seg-btn" type="button" data-ftsub="table" id="vsSegSheet" aria-pressed="false">Table</button>
  <button class="vs-seg-btn" type="button" data-ftsub="sandbox" id="vsSegSandbox" aria-pressed="false">Sandbox</button>
  </div>
  </div>
 
- <!-- Sub: Dashboard (fleet health + attention queue) -->
+ <!-- Sub: Triage (fleet health + attention queue) -->
  <div id="ftDash" class="ft-sub">
  <div class="dash-wrap">
  <div class="dash-head">
- <h2>Fleet triage</h2>
+ <h2>Triage</h2>
  <div class="dash-prod" id="dashProd"></div>
  </div>
  <section id="fleetCommander"></section>
@@ -478,21 +475,21 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260717ftSub1"></script>
+<script src="sandbox.js?v=20260718fleet1"></script>
 <script src="vendor-sheet.js?v=20260717ftSub1"></script>
-<script src="command-center.js?v=20260717ftSub1"></script>
+<script src="command-center.js?v=20260718fleet1"></script>
 <script src="reports.js?v=20260717market1"></script>
 <script src="marketplace.js?v=20260718desk1"></script>
 <script src="rec-desk.js?v=20260718desk1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
 <!-- Array Prospectus + the Array Market sub-tab (secondary-market v0). Registers
  into the shared Marketplace sub-tab registry (window.__aoMarketplace); exposes
- window.AOProspectus.open() for the Fleet Triage drawer. Self-contained (own
+ window.AOProspectus.open() for the Fleet drawer. Self-contained (own
  injected styles). -->
 <script src="prospectus.js?v=20260718desk1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260717triageInv1" defer></script>
+<script src="mobile-nav.js?v=20260718fleet1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=20260716shellwatch1"></script>
@@ -558,13 +555,13 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260717resWrap1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716deskfix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260717ftSub1"></script>
+<script src="energy-agent.js?v=20260718fleet1"></script>
 <script src="sovereign-desk.js?v=20260716deskfix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260717resWrap1">
-<script src="hands-off-tour.js?v=20260716genrep1"></script>
+<script src="hands-off-tour.js?v=20260718fleet1"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
-<script src="mobile-os.js?v=20260716repairs1"></script>
+<script src="mobile-os.js?v=20260718fleet1"></script>
 <!-- Tab pager: horizontal slide between top-tab panels (desktop) -->
 <link rel="stylesheet" href="tab-slide.css?v=20260717noUnfurl1">
 <script src="tab-slide.js?v=20260717triageInv1"></script>

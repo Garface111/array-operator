@@ -209,11 +209,11 @@
     {
       id: "triage",
       story: "fleet",
-      label: "Fleet Triage",
+      label: "Fleet",
       sub: "Who needs me now",
       why: "Fleet summary and priority attention list.",
       prompt:
-        "Walk me through Fleet Triage, what the health cards mean and how I drill into a problem array.",
+        "Walk me through Fleet, what the health cards mean and how I drill into a problem array.",
       hash: "#dashboard",
       openLabel: "Open Triage",
     },

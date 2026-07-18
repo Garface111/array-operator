@@ -331,8 +331,8 @@
  surface_topic: "surface_fleet_triage",
  },
  "#arrays": {
- // Legacy hash — Inverters now live under Fleet Triage (#dashboard).
- macro: "Equipment map under Fleet Triage, Tenant→Array→Inverter made visible and rearrangeable.",
+ // Legacy hash — Inverters now live under Fleet (#dashboard).
+ macro: "Equipment map under Fleet, Tenant→Array→Inverter made visible and rearrangeable.",
  meso: "Scroll past Needs attention; Sandbox spatial vs Table rows; Add array.",
  surface_topic: "surface_inverters",
  },
@@ -376,7 +376,7 @@
  tab_label: tabLabel(hash),
  // Always remind the model of live nav labels (hashes are internal only)
  nav_tabs: [
- { label: "Fleet Triage", hash: "#dashboard", note: "Sub-views: Dashboard · Table · Sandbox" },
+ { label: "Fleet", hash: "#dashboard", note: "Sub-views: Triage · Table · Sandbox" },
  { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
  { label: "Invoices", hash: "#reports" },
  { label: "Marketplace", hash: "#marketplace", note: "Credit Exchange + Array Market" },
@@ -386,7 +386,7 @@
  // 3-level page understanding for this hash (see product_map topic=surface)
  surface: surface,
  product_jobs: [
- "Watch the fleet (Fleet Triage: Dashboard/Table/Sandbox + Analysis)",
+ "Watch the fleet (Fleet: Triage/Table/Sandbox + Analysis)",
  "Invoice offtakers (Invoices; utility bills × share)",
  "Complete O&M roster + heal down sites (Repairs)",
  ],
@@ -574,7 +574,7 @@
  function ensureUi() {
  if (document.getElementById("eaPanel")) return;
 
- // Tab-style control: inject at LEFT of #tabbar (in line with Fleet Triage)
+ // Tab-style control: inject at LEFT of #tabbar (in line with Fleet)
  // Desktop entry point. On mobile this is CSS-hidden; #eaFab is the bubble.
  var tabbar = document.getElementById("tabbar");
  var orb = document.getElementById("eaOrb");
@@ -3207,7 +3207,7 @@
  function tabsCheatSheet() {
  return (
  "**Array Operator tabs** — exactly as labeled in the top bar:\n\n" +
- "1. **Fleet Triage** — fleet health at a glance; who needs attention\n" +
+ "1. **Fleet** — fleet health at a glance; who needs attention\n" +
  "2. **Inverters** — live canvas of every inverter; columns are sites\n" +
  "3. **Analysis** — deeper digs; *Through time* / trends live here as a sub-view. " +
  "There is no separate Trends tab.\n" +
@@ -3396,7 +3396,7 @@
  addMsg("agent", tabsCheatSheet());
  try {
  enqueueSpeak(
- "Those are the six tabs in the top bar, Fleet Triage, Inverters, Analysis, Invoices, Resources, and Account.",
+ "Those are the tabs in the top bar: Fleet, Analysis, Invoices, Marketplace, Repairs, and Account.",
  { source: "chat", force: true }
  );
  } catch (e) {}
@@ -4277,7 +4277,7 @@
  * Map known hashes to tab/control labels; drop the rest.
  */
  var HASH_LABELS = {
- "#dashboard": "Fleet Triage",
+ "#dashboard": "Fleet",
  "#arrays": "Inverters",
  "#sandbox": "Inverters",
  "#analysis": "Analysis",
@@ -4400,7 +4400,7 @@
 
  /** User-visible tab names, must match the top tabbar labels exactly. */
  var TAB_LABELS = {
- "#dashboard": "Fleet Triage",
+ "#dashboard": "Fleet",
  "#arrays": "Inverters",
  "#analysis": "Analysis",
  "#reports": "Invoices",
@@ -4763,24 +4763,24 @@
  ];
  }
 
- // ── Fleet Triage sub-views: Dashboard | Table | Sandbox ───────────────
+ // ── Fleet sub-views: Triage | Table | Sandbox ───────────────
  if (key === "arrays" || key === "inverters" || key === "sandbox" || key === "spreadsheet" || key === "dashboard") {
  return [
  {
  hash: "#dashboard",
- say: "**Fleet Triage** has three sub-views: **Dashboard** (who needs attention), **Table** (rows by vendor), and **Sandbox** (spatial fleet tree).",
+ say: "**Fleet** has three sub-views: **Triage** (who needs attention), **Table** (rows by vendor), and **Sandbox** (spatial fleet tree).",
  },
  {
  selector: "#tabDashboard",
- say: "You're on **Fleet Triage** in the top bar.",
+ say: "You're on **Fleet** in the top bar.",
  },
  {
  selector: "#panelDashboard .ft-sub-seg, #panelDashboard .vs-seg",
- say: "Sub-views: **Dashboard** · **Table** · **Sandbox**. Same fleet data, different lenses.",
+ say: "Sub-views: **Triage** · **Table** · **Sandbox**. Same fleet data, different lenses.",
  },
  {
  selector: "#vsSegDashboard",
- say: "**Dashboard**, whole-fleet health and the Needs attention queue.",
+ say: "**Triage**, whole-fleet health and the Needs attention queue.",
  optional: true,
  },
  {
@@ -4862,20 +4862,20 @@
  ];
  }
 
- // ── Fleet Triage (#dashboard), command-center.js ──────────────────────
+ // ── Fleet (#dashboard), command-center.js ──────────────────────
  if (key === "dashboard" || key === "fleet_triage" || key === "triage" || key === "fleet") {
  return [
  {
  hash: "#dashboard",
- say: "Fleet Triage, who needs attention across the whole fleet, worst first.",
+ say: "Fleet → Triage, who needs attention across the whole fleet, worst first.",
  },
  {
  selector: "#tabDashboard",
- say: "You're on **Fleet Triage** in the top bar.",
+ say: "You're on **Fleet** in the top bar.",
  },
  {
  selector: "#panelDashboard .dash-head, #dashProd",
- say: "The header is **Fleet triage** plus a live production strip, kilowatts now, kilowatt-hours today, arrays producing.",
+ say: "The header is **Triage** plus a live production strip, kilowatts now, kilowatt-hours today, arrays producing.",
  waitMs: 6000,
  },
  {
@@ -4907,7 +4907,7 @@
  optional: true,
  },
  {
- say: "That's Fleet Triage. Ask about a flagged site if you want a diagnosis.",
+ say: "That's Fleet. Ask about a flagged site if you want a diagnosis.",
  },
  ];
  }

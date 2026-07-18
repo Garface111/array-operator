@@ -37,7 +37,7 @@
  // to the More sheet. Order here is the bar order.
  var MAP = [
  { id: "tabDashboard", short: "Fleet", ic: "fleet", primary: true },
- // Inverters folded into Fleet Triage — Marketplace takes the free primary slot
+ // Inverters folded into Fleet — Marketplace takes the free primary slot
  // so the phone bar stays at 5 thumb targets.
  { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
  { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },

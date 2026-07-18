@@ -1,7 +1,7 @@
 /* ============================================================================
  * Hands-Off Walkthrough, full product guided tour
  * Shows after first onboarding lands on the real site (?fresh=1 / ?tour=hands-off).
- * Goal: walk every major surface (Fleet Triage → Inverters → Analysis → Invoices
+ * Goal: walk every major surface (Fleet → Analysis → Invoices
  * → Resources → Account → Alerts → Energy Agent) while still completing the
  * hands-off pillars (auto-refresh, utility, offtakers, send mode, online pay).
  * ========================================================================== */
@@ -65,10 +65,10 @@
     },
     {
       id: "triage",
-      rail: "Fleet Triage",
+      rail: "Fleet",
       railSub: "",
       kicker: "4",
-      title: "Fleet Triage",
+      title: "Fleet",
       lede: "",
       kind: "guide",
       cta: { label: "Open →", hash: "#dashboard" },
@@ -1709,7 +1709,7 @@
  html +=
  '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Done →</button>';
  html +=
- '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#dashboard">Open Fleet Triage</button>';
+ '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#dashboard">Open Fleet</button>';
  html +=
  '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Auto-refresh</button>';
  } else {
