@@ -853,7 +853,163 @@
  : "Daily output · kWh · last 14 days"
  }${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average (same units)</span>` : ""}</div>
  ${invChartHTML(iv, cohort)}
- </div>`;
+ </div>
+ <div class="vs-dc-chartwrap vs-dc-ol" id="vsDcOutages">${_olLoadingHTML()}</div>`;
+ }
+
+ /* ── OUTAGE LOG ────────────────────────────────────────────────────────────────
+  * "When did it go offline, and why?" — the episode history for this one inverter,
+  * lazily fetched when the detail overlay opens.
+  *
+  * The honesty contract is carried end-to-end from the API (see solar-operator
+  * api/inverter_outage_log.py): a vendor fault code is FACT and is shown verbatim as
+  * a chip; everything else is inference and says so in its sentence; a feed gap reads
+  * "production unknown", never "the inverter was down"; lost kWh is always marked
+  * `est.`; and `unknown` is rendered plainly rather than dressed up as a diagnosis.
+  * We never re-word the server's cause sentence — the API is the single place that
+  * wording is governed, so the app and the Energy Agent can never disagree. */
+ const OL_DAYS = 180;
+ const _olCache = new Map();        // inverter_id -> payload (re-open paints instantly)
+
+ function _olLoadingHTML(){
+   return `<div class="vs-dc-chart-h">Outage log</div>
+   <div class="vs-dc-ol-load">Reading the outage history…</div>`;
+ }
+
+ // "Mar 3" — with the year only when it isn't the current one (a 180-day window can
+ // straddle New Year, and a bare "Dec 28" would then be ambiguous).
+ function _olDate(iso){
+   if(!iso) return "";
+   const p = String(iso).split("-");
+   const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+   if(isNaN(d)) return esc(iso);
+   const opts = d.getFullYear() === new Date().getFullYear()
+     ? { month:"short", day:"numeric" } : { month:"short", day:"numeric", year:"numeric" };
+   return d.toLocaleDateString(undefined, opts);
+ }
+ function _olDays(n){ return n === 1 ? "1 day" : `${n} days`; }
+
+ // The "when" line: a closed episode reads as a range, a live one as "Since …".
+ function _olWhen(ep){
+   if(ep.ongoing){
+     return `<span class="vs-dc-ep-range">Since ${esc(_olDate(ep.started_on))}</span>` +
+            `<span class="vs-dc-ep-live">● Ongoing · ${esc(_olDays(ep.days))}</span>`;
+   }
+   const a = _olDate(ep.started_on), b = _olDate(ep.ended_on || ep.started_on);
+   const range = (a === b) ? a : `${a} – ${b}`;
+   return `<span class="vs-dc-ep-range">${esc(range)}</span>` +
+          `<span class="vs-dc-ep-dur">${esc(_olDays(ep.days))}</span>`;
+ }
+
+ const OL_KIND_LABEL = {
+   vendor_code: "Vendor fault code",
+   site_wide:   "Site-wide",
+   no_data:     "No data",
+   unit:        "This inverter",
+   unknown:     "Cause unknown",
+ };
+
+ function _olEpisodeHTML(ep){
+   const chips = [];
+   // Vendor codes/statuses are FACT — they get the strong chip. Everything else is ours.
+   (ep.vendor_codes || []).forEach(c =>
+     chips.push(`<span class="vs-dc-chip code" title="Reported by the vendor">${esc(c)}</span>`));
+   (ep.vendor_statuses || []).forEach(s =>
+     chips.push(`<span class="vs-dc-chip code" title="Vendor status during this outage">${esc(s)}</span>`));
+   if(ep.lost_kwh_est != null){
+     chips.push(`<span class="vs-dc-chip est" title="${esc(ep.lost_kwh_basis || "Estimated from neighbouring inverters")}">` +
+                `est. ${esc(Math.round(ep.lost_kwh_est).toLocaleString())} kWh lost</span>`);
+   }
+   if(ep.ticket){
+     const sev = String(ep.ticket.severity || "warning").replace(/[^a-z]/gi, "");
+     chips.push(`<span class="vs-dc-chip tick sev-${esc(sev)}" title="${esc(ep.ticket.note || "Linked alert")}">` +
+                `${esc(ep.ticket.title)} · ${esc(ep.ticket.status || "open")}</span>`);
+   }
+   const kind = String(ep.cause_kind || "unknown").replace(/[^a-z_]/gi, "");
+   return `<li class="vs-dc-ep${ep.ongoing ? " live" : ""}" data-kind="${esc(kind)}">
+     <div class="vs-dc-ep-when">${_olWhen(ep)}</div>
+     <div class="vs-dc-ep-body">
+       <div class="vs-dc-ep-kind">${esc(OL_KIND_LABEL[kind] || "Cause unknown")}</div>
+       <p class="vs-dc-ep-cause">${esc(ep.cause || "")}</p>
+       ${chips.length ? `<div class="vs-dc-ep-meta">${chips.join("")}</div>` : ""}
+     </div>
+   </li>`;
+ }
+
+ function outageLogHTML(data){
+   const s = (data && data.summary) || {};
+   const eps = (data && data.episodes) || [];
+   const win = (data && data.window) || {};
+   const head = `<div class="vs-dc-chart-h">Outage log` +
+     (win.days ? ` <span class="vs-dc-legend">— last ${esc(win.days)} days, complete days only</span>` : "") +
+     `</div>`;
+
+   if(!eps.length){
+     // Two very different empty states, and the difference matters: "clean" is good
+     // news; "no_history" means we haven't been watching and must not read as good.
+     const cls = s.state === "no_history" ? "vs-dc-nohist" : "vs-dc-ol-clean";
+     return `${head}<div class="${cls}">${esc(s.headline || "No outages recorded.")}</div>`;
+   }
+
+   const stat = (k, v) => v == null || v === "" ? "" :
+     `<div class="vs-dc-stat"><span class="vs-dc-k">${k}</span><span class="vs-dc-v">${v}</span></div>`;
+   const lost = s.lost_kwh_est != null
+     ? `~${esc(Math.round(s.lost_kwh_est).toLocaleString())} kWh` : null;
+   const stats = [
+     stat("Days offline", esc(String(s.outage_days))),
+     stat(s.episode_count === 1 ? "Outage" : "Outages", esc(String(s.episode_count))),
+     stat("Est. lost", lost),
+     stat("Longest", s.longest ? esc(_olDays(s.longest.days)) : null),
+   ].join("");
+
+   return `${head}
+   <div class="vs-dc-diag${s.ongoing ? " warn" : ""}">${esc(s.headline || "")}</div>
+   <div class="vs-dc-stats">${stats}</div>
+   <ul class="vs-dc-eps">${eps.map(_olEpisodeHTML).join("")}</ul>`;
+ }
+
+ // Fetch + paint the log into an already-open overlay. Never throws into the caller:
+ // a failure paints a real, named error state with a Retry (silence would be the bug).
+ function _mountOutageLog(root, iv){
+   const host = root.querySelector("#vsDcOutages");
+   if(!host) return;
+   const invId = iv && iv.inverter_id;
+   let session = null;
+   try { session = localStorage.getItem("so_session"); } catch(e){ session = null; }
+
+   if(invId == null || !session){
+     host.innerHTML = `<div class="vs-dc-chart-h">Outage log</div>` +
+       `<div class="vs-dc-nohist">The outage log reads from your own fleet — sign in to see it.</div>`;
+     return;
+   }
+   if(_olCache.has(invId)){ host.innerHTML = outageLogHTML(_olCache.get(invId)); return; }
+
+   host.innerHTML = _olLoadingHTML();
+   fetch(`/v1/array-owners/inverters/${encodeURIComponent(invId)}/outages?days=${OL_DAYS}`,
+         { headers: { Authorization: "Bearer " + session } })
+     .then(async r => {
+       if(!r.ok){
+         let detail = "";
+         try { const j = await r.json(); detail = (j && (j.detail || j.error)) || ""; } catch(_){}
+         const err = new Error(detail ? String(detail) : `HTTP ${r.status}`);
+         err.status = r.status;
+         throw err;
+       }
+       return r.json();
+     })
+     .then(data => {
+       _olCache.set(invId, data);
+       if(host.isConnected) host.innerHTML = outageLogHTML(data);
+     })
+     .catch(err => {
+       if(!host.isConnected) return;
+       const why = esc((err && err.message) || "the request failed");
+       host.innerHTML = `<div class="vs-dc-chart-h">Outage log</div>
+       <div class="vs-dc-ol-err">Couldn't load the outage log — ${why}.
+         <button type="button" class="vs-dc-ol-retry">Try again</button></div>`;
+       const btn = host.querySelector(".vs-dc-ol-retry");
+       if(btn) btn.addEventListener("click", () => _mountOutageLog(root, iv));
+     });
  }
  // Build + open the full-screen detail overlay for one inverter: its header + live
  // diagnosis + stats + the 14-day daily-output chart (with the neighbor-average line).
@@ -874,6 +1030,9 @@
  ov.querySelector(".vs-dc-x").addEventListener("click", close);
  document.addEventListener("keydown", onKey);
  document.body.appendChild(ov);
+ // The outage log is the one part of this sheet that needs its own round-trip, so it
+ // paints after the chart rather than holding the overlay closed while it loads.
+ _mountOutageLog(ov, iv);
  }
  let _sort = { key: "name", dir: "asc" }; // sort within each vendor group
  // "table" is the product name (was "spreadsheet"); keep reading the old key.
