@@ -58,6 +58,20 @@
  // RIGHT NOW as a fraction of its nameplate. Glanceable, green needle swung right =
  // near capacity, amber straight up = middling, red swung left = barely producing.
  function _capW(iv) { return (iv && iv.nameplate_kw) ? iv.nameplate_kw * 1000 : 0; }
+ // An ARRAY's rated ceiling = the sum of its inverters' nameplates. Only honest
+ // when we know EVERY unit's rating — a partial sum would understate the ceiling
+ // and make a healthy array look like it's over-producing ("5 / 3 kW"), so a
+ // single unknown nameplate returns 0 and the row falls back to the bare live kW.
+ function arrCapKw(c) {
+ const invs = (c && c.inverters) || [];
+ if (!invs.length) return 0;
+ let sum = 0;
+ for (const iv of invs) {
+ if (!iv || !iv.nameplate_kw || !(iv.nameplate_kw > 0)) return 0;
+ sum += iv.nameplate_kw;
+ }
+ return sum;
+ }
  function _arrCapW(c) { return (c.inverters || []).reduce((t, iv) => t + _capW(iv), 0); }
  function _arrPowW(c) {
  return c.current_power_w != null ? c.current_power_w
@@ -131,6 +145,26 @@
  if (w == null) return "—";
  const k = w / 1000;
  return (k >= 10 ? k.toFixed(0) : k.toFixed(1)) + " kW";
+ }
+ // Bare number (no unit) — used as the LEFT half of "4.2 / 7.6 kW" so the unit
+ // is written once, at the end.
+ function kwNum(w) {
+ if (w == null) return "—";
+ const k = w / 1000;
+ return k >= 10 ? k.toFixed(0) : k.toFixed(1);
+ }
+ // "Producing X of Y" (Ford 2026-07-18): the live reading is meaningless without
+ // the ceiling next to it — an operator should read one cell and know whether
+ // 4 kW is great or terrible. Renders "4.2 / 7.6 kW" with the max muted; falls
+ // back to the plain live value when no nameplate is on file (never invents a
+ // ceiling), and to "—" when there's no live reading at all.
+ // `capKw` = rated nameplate in kW (NOT watts).
+ function powOfMax(w, capKw, opts) {
+ const o = opts || {};
+ const tilde = o.alloc ? "~" : "";
+ if (w == null) return "—";
+ if (!capKw || !(capKw > 0)) return tilde + kw(w);
+ return `${tilde}${kwNum(w)}<span class="vs-pow-max"> / ${kwNum(capKw * 1000)} kW</span>`;
  }
  // Empty cells stay blank (not "—") so missing today/kWh never clutters the row
  // next to the sparklines (Ford 2026-07-14: little dashes in the way of the graphs).
@@ -987,7 +1021,7 @@
  { key: "name", cls: "vs-c-name", label: "Name", tip: "Array or inverter name — click to rename" },
  { key: null, cls: "vs-c-gauge", label: "Output", tip: "Live output as % of nameplate" },
  { key: "inv", cls: "vs-c-inv", label: "Units", tip: "Inverter count (array) · peer index (inverter)" },
- { key: "pow", cls: "vs-c-pow", label: "Live kW", tip: "Instant power now (— at night or when feed is offline)" },
+ { key: "pow", cls: "vs-c-pow", label: "Live / max", tip: "Instant power now vs the rated nameplate ceiling — read it as \"producing X of Y\". (— at night or when the feed is offline; the max is hidden when no nameplate is on file.)" },
  { key: "today", cls: "vs-c-today", label: "Today", tip: "Energy produced today (kWh)" },
  { key: null, cls: "vs-c-spark", label: "14-day", tip: "Daily yield sparkline (last 14 days)" },
  { key: "status", cls: "vs-c-status", label: "Status", tip: "Health: 14-day peer + live anomalies" },
@@ -1459,7 +1493,7 @@
  <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
  <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
- <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${c.current_power_w == null ? "—" : ((allocArr ? "~" : "") + kw(c.current_power_w))}</span>
+ <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${powOfMax(c.current_power_w, arrCapKw(c), { alloc: allocArr })}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
  <span class="vs-c-spark">${_aggSpark(_arrDailies[_ci])}</span>
  <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
@@ -1526,7 +1560,7 @@
  ].filter(Boolean);
  const _sub = _subParts.map(esc).join(" · ");
  const _al = isAllocatedPower(iv);
- const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "—";
+ const _live = powOfMax(iv.current_power_w, iv.nameplate_kw, { alloc: _al });
  const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
  // Peer index only when we have one; "—" keeps the Units column aligned.
  const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";
