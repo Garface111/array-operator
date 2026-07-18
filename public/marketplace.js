@@ -91,7 +91,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
   });
 
   // ── Credit Exchange sub ─────────────────────────────────────────────────────
-  let _vac = null, _leads = null;
+  let _vac = null, _leads = null, _sugg = null;
 
   function confChip(v){
     const c = v.confidence;
@@ -115,7 +115,6 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         '</div>'
       : "";
     const rate = v.credit_rate != null ? ' · '+('$'+Number(v.credit_rate).toFixed(3))+'/kWh' : "";
-    // Only surface a "find a taker" action when there's real vacancy to place.
     const action = (hasNum && frac > 0.02)
       ? '<button type="button" class="mk-find" data-mk-find="'+esc(provider.toLowerCase())+'">Find a taker →</button>'
       : "";
@@ -153,13 +152,53 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     );
   }
 
+  function statusSelect(l){
+    const cur = (l.status || "new").toLowerCase();
+    const opts = ["new","suggested","drafted","utility_pending","live","dead"];
+    return '<select class="mk-status-sel" data-mk-status="'+esc(l.id)+'" aria-label="Lead status">'+
+      opts.map(function(s){
+        return '<option value="'+s+'"'+(s===cur?" selected":"")+'>'+s.replace(/_/g," ")+'</option>';
+      }).join("")+
+    '</select>';
+  }
+
   function leadRow(l){
     const who = l.contact_name || l.contact_email || "(unnamed)";
-    const bits = [l.utility ? String(l.utility).toUpperCase() : null, l.desired_band, l.monthly_bill_usd ? money0(l.monthly_bill_usd)+"/mo" : null]
+    const bits = [l.utility ? String(l.utility).toUpperCase() : null, l.desired_band,
+      l.desired_kwh_mo ? ("~"+Math.round(l.desired_kwh_mo)+" kWh/mo parsed") : null,
+      l.monthly_bill_usd ? money0(l.monthly_bill_usd)+"/mo" : null]
       .filter(Boolean).join(" · ");
-    return '<div class="mk-lead"><span class="mk-lead-who">'+esc(who)+'</span>'+
-      (bits?'<span class="mk-lead-meta">'+esc(bits)+'</span>':"")+
-      '<span class="mk-lead-status">'+esc(l.status||"new")+'</span></div>';
+    const drafted = l.linked_subscription_id
+      ? '<a class="mk-lead-link" href="#reports">Offtaker #'+esc(l.linked_subscription_id)+' →</a>'
+      : '<button type="button" class="mk-lead-draft" data-mk-draft="'+esc(l.id)+'"'
+        +(l.suggested_array_id ? ' data-mk-array="'+esc(l.suggested_array_id)+'"' : '')+
+        '>Draft offtaker →</button>';
+    return '<div class="mk-lead" data-lead-id="'+esc(l.id)+'">'+
+      '<div class="mk-lead-main"><span class="mk-lead-who">'+esc(who)+'</span>'+
+      (bits?'<span class="mk-lead-meta">'+esc(bits)+'</span>':"")+'</div>'+
+      '<div class="mk-lead-actions">'+statusSelect(l)+drafted+'</div></div>';
+  }
+
+  function suggCard(s){
+    const who = s.lead_name || s.lead_email || ("Lead #"+s.lead_id);
+    const alloc = s.suggested_allocation_pct != null
+      ? (Math.round(s.suggested_allocation_pct*1000)/10).toFixed(1)+"%"
+      : "—";
+    const reasons = (s.reasons || []).slice(0, 3).map(function(r){
+      return '<li>'+esc(r)+'</li>';
+    }).join("");
+    return '<div class="mk-sugg">'+
+      '<div class="mk-sugg-head"><b>'+esc(who)+'</b> → <b>'+esc(s.array_name || ("Array "+s.array_id))+'</b>'+
+        (s.provider ? '<span class="mk-vac-prov">'+esc(String(s.provider).toUpperCase())+'</span>' : '')+
+      '</div>'+
+      '<div class="mk-sugg-meta">Suggested share <b>'+esc(alloc)+'</b> · vacancy ~'+money0(s.vacancy_usd)+'/yr'+
+        (s.expiring_soon_kwh ? ' · <span class="mk-expiry-inline">expiry risk</span>' : '')+
+      '</div>'+
+      (reasons ? '<ul class="mk-sugg-why">'+reasons+'</ul>' : '')+
+      '<button type="button" class="mk-submit mk-sugg-go" data-mk-draft="'+esc(s.lead_id)+'" data-mk-array="'+esc(s.array_id)+'"'
+        +(s.suggested_allocation_pct!=null?' data-mk-alloc="'+esc(s.suggested_allocation_pct)+'"':'')+
+        '>Draft this offtaker →</button>'+
+    '</div>';
   }
 
   function intakeForm(){
@@ -184,10 +223,15 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     const totals = (_vac && _vac.totals) || { vacancy_usd:0, vacancy_kwh:0, expiring_soon_usd:0 };
     const arrays = (_vac && _vac.arrays) || [];
     const leads = (_leads && _leads.leads) || [];
+    const suggs = (_sugg && _sugg.suggestions) || [];
 
     const vacBlock = arrays.length
       ? '<div class="mk-vac-grid">'+arrays.map(vacancyCard).join("")+'</div>'
       : '<div class="mk-empty">No arrays with measurable vacancy yet. Connect a host utility login so we can read each bill’s retained excess.</div>';
+
+    const suggBlock = suggs.length
+      ? '<div class="mk-sugg-grid">'+suggs.slice(0, 8).map(suggCard).join("")+'</div>'
+      : '<div class="mk-empty mk-empty-sm">No pairings yet — add waitlist leads in the same utility as your vacant arrays.</div>';
 
     container.innerHTML =
       '<div class="mk-wrap">'+
@@ -197,8 +241,14 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
           vacBlock+
         '</section>'+
 
+        '<section class="mk-sec mk-sec-sugg">'+
+          '<div class="mk-sec-head"><h3>Suggested pairings</h3>'+
+            '<span class="mk-sec-sub">Same utility · size fit · expiry first. You confirm every draft.</span></div>'+
+          suggBlock+
+        '</section>'+
+
         '<section class="mk-sec mk-sec-demand">'+
-          '<div class="mk-sec-head"><h3>Waitlist</h3><span class="mk-sec-sub">People who want bill credits in your territory.</span></div>'+
+          '<div class="mk-sec-head"><h3>Waitlist</h3><span class="mk-sec-sub">People who want bill credits in your territory. Draft → Invoices pipeline.</span></div>'+
           intakeForm()+
           (leads.length
             ? '<div class="mk-leads">'+leads.map(leadRow).join("")+'</div>'
@@ -208,12 +258,12 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         '<section class="mk-sec mk-sec-board">'+
           '<div class="mk-board">'+
             '<div class="mk-board-ic" aria-hidden="true">⚙</div>'+
-            '<div class="mk-board-copy"><b>Matches are brokered by hand.</b> Add takers to your waitlist and we pair them with your vacancy inside the same utility territory. Automatic matching comes next.</div>'+
+            '<div class="mk-board-copy"><b>Host confirms. Utility files.</b> Suggestions never auto-enroll. Drafting creates an offtaker in Invoices — you still submit the GNM membership change to the utility.</div>'+
           '</div>'+
         '</section>'+
       '</div>';
 
-    wireIntake(container);
+    wireCredit(container);
   }
 
   function renderSignedOut(container){
@@ -226,52 +276,120 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
       '</div></div>';
   }
 
-  function wireIntake(container){
+  function wireCredit(container){
     const form = container.querySelector("#mkIntake");
-    if(!form || form._wired) return;
-    form._wired = true;
-    // A per-array "Find a taker" jumps to the form + preselects the utility.
+    if(form && !form._wired){
+      form._wired = true;
+      form.addEventListener("submit", function(e){
+        e.preventDefault();
+        const hdrs = authHeaders();
+        const hint = container.querySelector("#mkIntakeHint");
+        if(!hdrs){ if(hint){ hint.textContent = "Sign in to save a lead."; } return; }
+        const body = {
+          contact_name: (container.querySelector("#mkName")||{}).value || "",
+          contact_email: (container.querySelector("#mkEmail")||{}).value || "",
+          contact_phone: (container.querySelector("#mkPhone")||{}).value || "",
+          utility: (container.querySelector("#mkUtil")||{}).value || "",
+          desired_band: (container.querySelector("#mkBand")||{}).value || "",
+          monthly_bill_usd: parseFloat((container.querySelector("#mkBill")||{}).value) || null,
+          notes: (container.querySelector("#mkNotes")||{}).value || ""
+        };
+        if(!body.contact_name.trim() && !body.contact_email.trim()){
+          if(hint){ hint.textContent = "Add at least a name or an email."; }
+          return;
+        }
+        const btn = form.querySelector(".mk-submit");
+        if(btn){ btn.disabled = true; btn.textContent = "Adding…"; }
+        fetch(API + "/exchange/demand", {
+          method: "POST",
+          headers: Object.assign({ "Content-Type": "application/json" }, hdrs),
+          body: JSON.stringify(body)
+        }).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(){
+          _leads = null; _sugg = null;
+          loadData(document.getElementById("mkSubContent"), { keepVac: true });
+        }).catch(function(){
+          if(btn){ btn.disabled = false; btn.textContent = "Add to waitlist"; }
+          if(hint){ hint.textContent = "Couldn’t save that — try again."; }
+        });
+      });
+    }
+
+    if(container._mkClickWired) return;
+    container._mkClickWired = true;
     container.addEventListener("click", function(e){
-      const b = e.target && e.target.closest ? e.target.closest("[data-mk-find]") : null;
-      if(!b) return;
-      const u = b.getAttribute("data-mk-find");
-      const sel = container.querySelector("#mkUtil");
-      if(sel && (u === "gmp" || u === "vec")) sel.value = u;
-      const nm = container.querySelector("#mkName");
-      if(nm) nm.focus();
-      form.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    form.addEventListener("submit", function(e){
-      e.preventDefault();
-      const hdrs = authHeaders();
-      const hint = container.querySelector("#mkIntakeHint");
-      if(!hdrs){ if(hint){ hint.textContent = "Sign in to save a lead."; } return; }
-      const body = {
-        contact_name: (container.querySelector("#mkName")||{}).value || "",
-        contact_email: (container.querySelector("#mkEmail")||{}).value || "",
-        contact_phone: (container.querySelector("#mkPhone")||{}).value || "",
-        utility: (container.querySelector("#mkUtil")||{}).value || "",
-        desired_band: (container.querySelector("#mkBand")||{}).value || "",
-        monthly_bill_usd: parseFloat((container.querySelector("#mkBill")||{}).value) || null,
-        notes: (container.querySelector("#mkNotes")||{}).value || ""
-      };
-      if(!body.contact_name.trim() && !body.contact_email.trim()){
-        if(hint){ hint.textContent = "Add at least a name or an email."; }
+      const findBtn = e.target && e.target.closest ? e.target.closest("[data-mk-find]") : null;
+      if(findBtn){
+        const u = findBtn.getAttribute("data-mk-find");
+        const sel = container.querySelector("#mkUtil");
+        if(sel && (u === "gmp" || u === "vec")) sel.value = u;
+        const nm = container.querySelector("#mkName");
+        if(nm) nm.focus();
+        const f = container.querySelector("#mkIntake");
+        if(f) f.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
-      const btn = form.querySelector(".mk-submit");
-      if(btn){ btn.disabled = true; btn.textContent = "Adding…"; }
-      fetch(API + "/exchange/demand", {
-        method: "POST",
+      const draftBtn = e.target && e.target.closest ? e.target.closest("[data-mk-draft]") : null;
+      if(draftBtn){
+        e.preventDefault();
+        runDraft(draftBtn, container);
+      }
+    });
+    container.addEventListener("change", function(e){
+      const sel = e.target && e.target.closest ? e.target.closest("[data-mk-status]") : null;
+      if(!sel) return;
+      const hdrs = authHeaders();
+      if(!hdrs) return;
+      const id = sel.getAttribute("data-mk-status");
+      fetch(API + "/exchange/demand/" + encodeURIComponent(id), {
+        method: "PATCH",
         headers: Object.assign({ "Content-Type": "application/json" }, hdrs),
-        body: JSON.stringify(body)
-      }).then(r => r.json().catch(()=>({}))).then(() => {
-        _leads = null;                       // force refetch
-        loadData(document.getElementById("mkSubContent"), { keepVac: true });
-      }).catch(() => {
-        if(btn){ btn.disabled = false; btn.textContent = "Add to waitlist"; }
-        if(hint){ hint.textContent = "Couldn’t save that — try again."; }
-      });
+        body: JSON.stringify({ status: sel.value })
+      }).then(function(r){
+        if(!r.ok) throw new Error("status");
+        _leads = null; _sugg = null;
+        return loadData(document.getElementById("mkSubContent"), { keepVac: true });
+      }).catch(function(){ /* leave UI; next refresh fixes */ });
+    });
+  }
+
+  function runDraft(btn, container){
+    const hdrs = authHeaders();
+    if(!hdrs){ alert("Sign in to draft an offtaker."); return; }
+    const leadId = btn.getAttribute("data-mk-draft");
+    const arrayId = btn.getAttribute("data-mk-array");
+    const allocRaw = btn.getAttribute("data-mk-alloc");
+    const body = {};
+    if(arrayId) body.array_id = parseInt(arrayId, 10);
+    if(allocRaw != null && allocRaw !== "") body.allocation_pct = parseFloat(allocRaw);
+    if(!body.array_id){
+      // No array pinned — pick top vacancy if any
+      const arrays = (_vac && _vac.arrays) || [];
+      const top = arrays.find(function(a){ return (a.vacancy_frac || 0) > 0.02; }) || arrays[0];
+      if(!top){ alert("No array with vacancy to attach. Connect a host bill first."); return; }
+      body.array_id = top.array_id;
+    }
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Drafting…";
+    fetch(API + "/exchange/demand/" + encodeURIComponent(leadId) + "/draft-offtaker", {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, hdrs),
+      body: JSON.stringify(body)
+    }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j, status: r.status }; }); })
+    .then(function(res){
+      if(!res.ok){
+        const msg = (res.j && (res.j.detail || res.j.message)) || ("HTTP "+res.status);
+        alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+        btn.disabled = false; btn.textContent = prev;
+        return;
+      }
+      _leads = null; _sugg = null;
+      // Land in Invoices so the operator finishes share / utility paper.
+      try { location.hash = "#reports"; } catch(_){}
+      loadData(document.getElementById("mkSubContent"), { keepVac: true });
+    }).catch(function(err){
+      alert("Draft failed: " + (err && err.message ? err.message : "network"));
+      btn.disabled = false; btn.textContent = prev;
     });
   }
 
@@ -279,16 +397,16 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     opts = opts || {};
     const hdrs = authHeaders();
     if(!hdrs){ renderSignedOut(container); return; }
-    // Paint a light loading state only on a cold load (keep content on refresh).
     if(!_vac && !opts.keepVac){
       container.innerHTML = '<div class="mk-wrap"><div class="mk-empty">Measuring your fleet’s unallocated credits…</div></div>';
     }
     const needVac = !opts.keepVac || !_vac;
     const pVac = needVac
-      ? fetch(API + "/vacancy", { headers: hdrs }).then(r => r.ok ? r.json() : null).then(j => { if(j) _vac = j; }).catch(()=>{})
+      ? fetch(API + "/vacancy", { headers: hdrs }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){ if(j) _vac = j; }).catch(function(){})
       : Promise.resolve();
-    const pLeads = fetch(API + "/exchange/demand", { headers: hdrs }).then(r => r.ok ? r.json() : null).then(j => { _leads = j || { leads:[] }; }).catch(()=>{ _leads = { leads:[] }; });
-    Promise.all([pVac, pLeads]).then(() => renderCredit(container));
+    const pLeads = fetch(API + "/exchange/demand", { headers: hdrs }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){ _leads = j || { leads:[] }; }).catch(function(){ _leads = { leads:[] }; });
+    const pSugg = fetch(API + "/exchange/suggestions", { headers: hdrs }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){ _sugg = j || { suggestions:[] }; }).catch(function(){ _sugg = { suggestions:[] }; });
+    return Promise.all([pVac, pLeads, pSugg]).then(function(){ renderCredit(container); });
   }
 
   function mountCreditExchange(container){
