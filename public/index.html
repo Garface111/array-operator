@@ -76,7 +76,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260715opsRes1"><!-- Resources briefing; scoped to #panelResources -->
 <link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
-<link rel="stylesheet" href="marketplace.css?v=20260717exch1"><!-- Offtaker Exchange (Marketplace tab); scoped #panelMarketplace/.mk-* -->
+<link rel="stylesheet" href="marketplace.css?v=20260717market1"><!-- Marketplace tab: Credit Exchange + Array Market -->
 <!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
  it parser-blocking (no FOUC) and positions it AFTER mobile.css so it is the
@@ -487,10 +487,15 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="app.js?v=20260715eaModal2"></script>
 <script src="sandbox.js?v=20260717exch1"></script>
 <script src="vendor-sheet.js?v=20260717triage1"></script>
-<script src="command-center.js?v=20260717triage1"></script>
-<script src="reports.js?v=20260717exch1"></script>
-<script src="marketplace.js?v=20260717exch1"></script>
+<script src="command-center.js?v=20260717market1"></script>
+<script src="reports.js?v=20260717market1"></script>
+<script src="marketplace.js?v=20260717market1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
+<!-- Array Prospectus + the Array Market sub-tab (secondary-market v0). Registers
+ into the shared Marketplace sub-tab registry (window.__aoMarketplace); exposes
+ window.AOProspectus.open() for the Fleet Triage drawer. Self-contained (own
+ injected styles). -->
+<script src="prospectus.js?v=20260717market1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
 <script src="mobile-nav.js?v=20260717exch1" defer></script>
