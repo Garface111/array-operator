@@ -7801,6 +7801,15 @@
  const _ord = {panelDashboard:0,panelArrays:1,panelAnalysis:2,panelTrends:2,panelResources:2,panelReports:3,panelOps:4,panelAccount:5};
  const _fi = (_ord[_prevPanel.id] != null ? _ord[_prevPanel.id] : 0);
  const _ti = (_ord[_toPanel.id] != null ? _ord[_toPanel.id] : 0);
+ // Pre-paint Fleet Triage before the slide measures height so the incoming
+ // panel is already full-length on frame 0 (queue used to fill only after
+ // .active + __ccRender, which ran after the measure).
+ if(active === "dashboard"){
+ try {
+ _toPanel.classList.add("active");
+ if(window.__ccRender) window.__ccRender();
+ } catch(_pre){}
+ }
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
  catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
  }

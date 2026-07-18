@@ -83,8 +83,23 @@
 
       // Pin the content column width BEFORE the stage goes full-bleed, so the
       // absolutely-positioned panels stay their normal width (not stretched to
-      // 100vw). Measured off the outgoing panel, which is currently in flow.
+      // 100vw). Measured off the outgoing panel WHILE it is still in normal flow
+      // (before .ao-sliding makes both absolute — absolute w/o width is shrink-to-fit).
       var pinW = fromEl.offsetWidth || toEl.offsetWidth || 0;
+
+      // Commit the LOGICAL active state BEFORE measuring height. Only `to` is
+      // .active. Active-gated content (Fleet Triage attention queue used to paint
+      // only when .active) and display:flow-root on .panel.active must be in place
+      // so toH is the real full-length height — not a short empty shell that then
+      // "grows" mid-slide (Ford 2026-07-17: Inverters → Fleet Triage).
+      toEl.classList.add("active");
+      fromEl.classList.remove("active");
+      // Optional last-paint hook for the destination (callers may fill lazy DOM).
+      try{
+        if(typeof window.__aoTabBeforeSlide === "function"){
+          window.__aoTabBeforeSlide(toEl, fromEl);
+        }
+      }catch(e){}
 
       // Reveal both via the slide classes (CSS: stage full-bleed + clip both axes;
       // panels position:absolute, left:50%, transform-eased).
@@ -99,19 +114,12 @@
           el.style.marginLeft = (-pinW / 2) + "px";
         });
       }
-      // Measure heights now (both are display:block at the pinned width). Stage
-      // height SNAP-locks to max(from, to) for the whole slide — never eases.
-      // Easing height + overflow:clip made the incoming panel look like it was
-      // unfurling/expanding from the top (Ford 2026-07-17). Horizontal transform
-      // only; panel arrives already full-size.
+      // Measure heights now (both are display:block at the pinned width, active
+      // content already painted). Stage height SNAP-locks to max(from, to) for the
+      // whole slide — never eases. Horizontal transform only; panel arrives at
+      // full size from frame 0.
       var fromH = fromEl.offsetHeight || 0, toH = toEl.offsetHeight || 0;
       var stageH = Math.max(fromH, toH);
-      // Commit the LOGICAL active state immediately — only `to` is .active. Both
-      // panels stay visible during the slide via .ao-slide-from/.ao-slide-to, so a
-      // rapid re-switch mid-slide reads `to` as the current panel (no two-active
-      // limbo that would feed the wrong "from" into the next slide).
-      toEl.classList.add("active");
-      fromEl.classList.remove("active");
 
       // Place at start with transitions OFF, force a reflow, then play transform only.
       fromEl.style.transition = "none";
