@@ -2419,18 +2419,9 @@ html[data-theme="day"] .rep-fld.req > select{
 /* ============================ VENDOR-DATA SPREADSHEET VIEW ============================ */
 /* Sub-view toggle (Sandbox | Spreadsheet) — floats at the top of the Vendor-data tab. */
 #panelDashboard{ position:relative; }
-/* Inverters block stacked under the triage queue (was #panelArrays). */
-#panelDashboard .triage-inverters{
-  max-width: 100%;
-  margin: 8px auto 0;
-  padding: 0 12px 28px;
-  box-sizing: border-box;
-}
-#panelDashboard .triage-inv-head{
-  max-width: 1120px;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 8px;
+/* Fleet Triage sub-nav: Dashboard | Table | Sandbox (3 pills). */
+#panelDashboard .ft-sub-seg{
+  max-width: min(100%, 420px);
 }
 
 /* Sub-nav strip (Ford 2026-07-16): flex-centers the pill in the band between
@@ -2532,10 +2523,9 @@ body.ea-shell-open #panelReports .inv-sub-seg{
 }
 /* Content sheets sit flush under the sub-nav strip (no extra top margin that
    un-centers the pill in the banner→card band). */
-#panelDashboard .triage-inverters > #sheetWrap,
-#panelDashboard .triage-inverters > #sbWrap,
 #panelDashboard > #sheetWrap,
-#panelDashboard > #sbWrap{
+#panelDashboard > #sbWrap,
+#panelDashboard > #ftDash{
   margin-top: 0 !important;
 }
 #panelAnalysis > #analysisRoot,

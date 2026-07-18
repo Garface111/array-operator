@@ -2019,15 +2019,25 @@
  function showView(v) {
  // Accept legacy "spreadsheet" as "table"
  if (v === "spreadsheet") v = "table";
+ // "dashboard" is a Fleet Triage sub-view owned by sandbox.js applyFleetTriageSub —
+ // only table/sandbox belong here.
+ if (v === "dashboard") return;
  _view = v;
  try { localStorage.setItem("ao_vendor_view", v); } catch (e) {}
  const sb = $("#sbWrap"), sheet = $("#sheetWrap");
- const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet");
+ const dash = $("#ftDash");
+ const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet"), segDash = $("#vsSegDashboard");
+ if (dash) dash.hidden = true; // table/sandbox always hide the dashboard sub
  if (sb) sb.hidden = (v !== "sandbox");
  if (sheet) sheet.hidden = (v !== "table");
- [["sandbox", segSb], ["table", segSheet]].forEach(([name, el]) => {
+ [["sandbox", segSb], ["table", segSheet], ["dashboard", segDash]].forEach(([name, el]) => {
  if (el) { el.classList.toggle("on", v === name); el.setAttribute("aria-pressed", String(v === name)); }
  });
+ // Dashboard pill must be off when table/sandbox is on
+ if (segDash && (v === "table" || v === "sandbox")) {
+ segDash.classList.remove("on");
+ segDash.setAttribute("aria-pressed", "false");
+ }
  if (v === "table" && window.FleetStore) {
  if (!FleetStore.isLoaded()) FleetStore.load();
  render();
@@ -2037,8 +2047,22 @@
  function init() {
  const segSb = $("#vsSegSandbox"), segSheet = $("#vsSegSheet");
  if (!segSb || !segSheet) return;
- segSb.onclick = () => showView("sandbox");
- segSheet.onclick = () => showView("table");
+ // Hash-driven Fleet Triage sub-tabs (sandbox.js .ft-sub-seg) own navigation.
+ // Keep these as fallbacks when the click didn't go through hash routing.
+ segSb.onclick = () => {
+ if (location.hash !== "#sandbox") location.hash = "#sandbox";
+ else showView("sandbox");
+ };
+ segSheet.onclick = () => {
+ if (location.hash !== "#arrays") location.hash = "#arrays";
+ else showView("table");
+ };
+ const segDash = $("#vsSegDashboard");
+ if (segDash) {
+ segDash.onclick = () => {
+ if (location.hash !== "#dashboard") location.hash = "#dashboard";
+ };
+ }
  if (window.FleetStore && FleetStore.subscribe) {
  // Re-render on real fleet changes; skip the high-frequency "live" beat + triage so
  // the body doesn't rebuild every few seconds. renderBody() leaves the search input
@@ -2083,7 +2107,21 @@
  try { window.postMessage({ type: "SO_STATUS_REQUEST", reqId: "vs-detect-" + Date.now() }, window.location.origin); } catch (_) {}
  window.addEventListener("resize", sizeScroll);
  window.addEventListener("scroll", sizeScrollSoon, { passive: true });
- showView(_view);
+ // Prefer URL hash for Fleet Triage sub-view; don't force table over Dashboard.
+ try {
+  const h = location.hash || "";
+  if (h === "#sandbox") showView("sandbox");
+  else if (h === "#arrays" || h === "#table") showView("table");
+  else {
+   // #dashboard or empty: leave Dashboard visible; sheet/sandbox stay hidden
+   const sb = $("#sbWrap"), sheet = $("#sheetWrap"), dash = $("#ftDash");
+   if (dash) dash.hidden = false;
+   if (sb) sb.hidden = true;
+   if (sheet) sheet.hidden = true;
+  }
+ } catch (_) {
+  showView(_view);
+ }
  }
 
  window.__aoLoadVendorSheet = function () {
@@ -2097,6 +2135,7 @@
  // "kW now" production strip in command-center.js) agree with the spreadsheet on
  // which feeds are frozen, a single billing basis for "is this reading stale".
  window.VendorSheet = window.VendorSheet || {};
+ window.VendorSheet.showView = showView;
  window.VendorSheet.isStale = isStale;
  // …and the freshness texts, so those surfaces annotate a frozen reading with the
  // SAME clocks the sheet renders instead of reinventing them: freshness(c) is the

@@ -376,7 +376,7 @@
  tab_label: tabLabel(hash),
  // Always remind the model of live nav labels (hashes are internal only)
  nav_tabs: [
- { label: "Fleet Triage", hash: "#dashboard", note: "Triage queue + Inverters (Table | Sandbox) stacked below" },
+ { label: "Fleet Triage", hash: "#dashboard", note: "Sub-views: Dashboard · Table · Sandbox" },
  { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
  { label: "Invoices", hash: "#reports" },
  { label: "Marketplace", hash: "#marketplace", note: "Credit Exchange + Array Market" },
@@ -386,7 +386,7 @@
  // 3-level page understanding for this hash (see product_map topic=surface)
  surface: surface,
  product_jobs: [
- "Watch the fleet (Fleet Triage includes inverters + Analysis)",
+ "Watch the fleet (Fleet Triage: Dashboard/Table/Sandbox + Analysis)",
  "Invoice offtakers (Invoices; utility bills × share)",
  "Complete O&M roster + heal down sites (Repairs)",
  ],
@@ -4763,20 +4763,25 @@
  ];
  }
 
- // ── Inverters (under Fleet Triage), sandbox + vendor-sheet ────────────
- if (key === "arrays" || key === "inverters" || key === "sandbox" || key === "spreadsheet") {
+ // ── Fleet Triage sub-views: Dashboard | Table | Sandbox ───────────────
+ if (key === "arrays" || key === "inverters" || key === "sandbox" || key === "spreadsheet" || key === "dashboard") {
  return [
  {
  hash: "#dashboard",
- say: "Inverters live under **Fleet Triage** — scroll past Needs attention for the live fleet canvas. Sandbox is spatial; Table is every array as rows.",
+ say: "**Fleet Triage** has three sub-views: **Dashboard** (who needs attention), **Table** (rows by vendor), and **Sandbox** (spatial fleet tree).",
  },
  {
  selector: "#tabDashboard",
- say: "**Fleet Triage** in the top bar holds triage *and* the inverters surface.",
+ say: "You're on **Fleet Triage** in the top bar.",
  },
  {
- selector: "#triageInverters .vs-seg, #panelDashboard .vs-seg",
- say: "Two sub-views: **Sandbox** (the spatial canvas) and **Table** (rows by vendor). Same data either way.",
+ selector: "#panelDashboard .ft-sub-seg, #panelDashboard .vs-seg",
+ say: "Sub-views: **Dashboard** · **Table** · **Sandbox**. Same fleet data, different lenses.",
+ },
+ {
+ selector: "#vsSegDashboard",
+ say: "**Dashboard**, whole-fleet health and the Needs attention queue.",
+ optional: true,
  },
  {
  selector: "#vsSegSandbox",
@@ -4784,7 +4789,7 @@
  },
  {
  selector: "#vsSegSheet",
- say: "**Spreadsheet**, every vendor and array as expandable rows: today, peers, status, without moving cards around.",
+ say: "**Table**, every vendor and array as expandable rows: today, peers, status.",
  },
  {
  selector: "#sbWrap .sb-head, #sbViewMode",

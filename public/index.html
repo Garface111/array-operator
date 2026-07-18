@@ -69,7 +69,7 @@ document.documentElement.setAttribute("data-theme","day");
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260716focus1">
-<link rel="stylesheet" href="command-center.css?v=20260717triageInv1">
+<link rel="stylesheet" href="command-center.css?v=20260717ftSub1">
 <link rel="stylesheet" href="ops.css?v=20260715eaMatch2">
 <link rel="stylesheet" href="theme-day.css?v=20260716overview1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
@@ -248,9 +248,9 @@ document.documentElement.setAttribute("data-theme","day");
  </div>
  </div>
 
- <!-- Top tab bar. Inverters content lives under Fleet Triage (no separate
- Inverters tab — Marketplace took that slot). #arrays / #sandbox deep-links
- still open Fleet Triage and scroll to the fleet tree. -->
+ <!-- Top tab bar. Fleet Triage owns Dashboard | Table | Sandbox sub-tabs
+ (Inverters no longer a separate top tab — Marketplace took that slot).
+ #arrays → Table, #sandbox → Sandbox, #dashboard → Dashboard. -->
  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
  <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Triage</a>
  <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13), see #panelAnalysis's
@@ -336,12 +336,24 @@ document.documentElement.setAttribute("data-theme","day");
  <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
  <!-- All business: one flat list of horizontal rows, identity, login & billing.
  Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
- <!-- ============================ TAB: FLEET TRIAGE (+ inverters) ============================ -->
- <!-- Front door: whole-fleet health, production now/today, $ recoverable, the
- COMBINED "needs attention" queue — then the full Inverters surface (Table |
- Sandbox) stacked below so triage + hardware live on one scroll. command-center.js
- fills #fleetCommander + #ccQueue; sandbox.js / vendor-sheet.js own the fleet tree. -->
+ <!-- ============================ TAB: FLEET TRIAGE ============================ -->
+ <!-- One top tab, three sub-views (same pattern as Analysis):
+ Dashboard = health + needs-attention queue (was the whole tab)
+ Table / Sandbox = former Inverters top-tab surfaces
+ Hashes: #dashboard · #arrays (table) · #sandbox
+ command-center.js → #fleetCommander + #ccQueue; vendor-sheet.js → table;
+ sandbox.js → #sandbox. -->
  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Triage">
+ <div class="ao-subnav">
+ <div class="vs-seg ft-sub-seg" role="group" aria-label="Fleet Triage view">
+ <button class="vs-seg-btn on" type="button" data-ftsub="dashboard" id="vsSegDashboard" aria-pressed="true">Dashboard</button>
+ <button class="vs-seg-btn" type="button" data-ftsub="table" id="vsSegSheet" aria-pressed="false">Table</button>
+ <button class="vs-seg-btn" type="button" data-ftsub="sandbox" id="vsSegSandbox" aria-pressed="false">Sandbox</button>
+ </div>
+ </div>
+
+ <!-- Sub: Dashboard (fleet health + attention queue) -->
+ <div id="ftDash" class="ft-sub">
  <div class="dash-wrap">
  <div class="dash-head">
  <h2>Fleet triage</h2>
@@ -354,27 +366,15 @@ document.documentElement.setAttribute("data-theme","day");
  <div class="dash-attn"><h3 id="dashAttnH">Needs attention</h3></div>
  <section id="ccQueue"></section>
  </div>
-
- <!-- Inverters (was its own top tab). Same FleetStore data; Table | Sandbox
- sub-view. Anchor #triageInverters for deep-links from triage rows / #arrays. -->
- <div class="triage-inverters" id="triageInverters">
- <div class="dash-attn triage-inv-head"><h3>Inverters</h3></div>
- <!-- Sub-view toggle: TABLE | SANDBOX. .ao-subnav = equal vertical strip, pill centered. -->
- <div class="ao-subnav">
- <div class="vs-seg" role="group" aria-label="Inverters view">
- <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Table</button>
- <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
- </div>
  </div>
 
- <!-- SANDBOX — live fleet tree. -->
- <section id="sbWrap" class="sb-fullscreen">
+ <!-- Sub: Table (vendor-sheet.js → #vendorSheet) -->
+ <section id="sheetWrap" class="ft-sub" hidden><div id="vendorSheet"></div></section>
+
+ <!-- Sub: Sandbox (live fleet tree) -->
+ <section id="sbWrap" class="sb-fullscreen ft-sub" hidden>
  <div id="sandbox"></div>
  </section>
-
- <!-- TABLE view (vendor-sheet.js → #vendorSheet). Hidden until Table is selected. -->
- <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
- </div>
  </section>
 
  <section class="panel" id="panelAccount" role="tabpanel" aria-label="Account">
@@ -478,9 +478,9 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260717triageInv1"></script>
-<script src="vendor-sheet.js?v=20260717triage1"></script>
-<script src="command-center.js?v=20260717triageInv1"></script>
+<script src="sandbox.js?v=20260717ftSub1"></script>
+<script src="vendor-sheet.js?v=20260717ftSub1"></script>
+<script src="command-center.js?v=20260717ftSub1"></script>
 <script src="reports.js?v=20260717market1"></script>
 <script src="marketplace.js?v=20260717market1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
@@ -557,7 +557,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260717resWrap1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716deskfix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260717triageInv1"></script>
+<script src="energy-agent.js?v=20260717ftSub1"></script>
 <script src="sovereign-desk.js?v=20260716deskfix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260717resWrap1">

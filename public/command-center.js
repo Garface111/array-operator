@@ -143,7 +143,7 @@
  } catch(_){}
  toast("Energy Agent isn't available on this page.");
  }
- // Deep-link into the Inverters section under Fleet Triage, scrolled to this unit.
+ // Deep-link into Fleet Triage → Table, focused on this inverter row.
  function openInInverters(r){
  if(!r) return;
  try {
@@ -153,12 +153,6 @@
  } catch(_){}
  try { location.hash = "#arrays"; } catch(_){}
  try { if(FleetStore.setFocus) FleetStore.setFocus([r.arrayId]); } catch(_){}
- try {
- requestAnimationFrame(function(){
- var el = document.getElementById("triageInverters") || document.getElementById("sbWrap");
- if(el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
- });
- } catch(_){}
  }
 
  /* ===========================================================================

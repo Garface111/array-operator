@@ -7686,9 +7686,9 @@
  }
 
  /* ===========================================================================
- * TOP TABS: Fleet Triage (#dashboard, DEFAULT — includes Inverters below the
- * triage queue) · Analysis · Invoices · Marketplace · Repairs · Account.
- * Legacy #arrays / #sandbox / empty / #fleet / #pricing → Fleet Triage.
+ * TOP TABS: Fleet Triage (#dashboard | #arrays table | #sandbox) · Analysis ·
+ * Invoices · Marketplace · Repairs · Account.
+ * Fleet Triage sub-views: Dashboard · Table · Sandbox (former Inverters tab).
  * ==========================================================================*/
  const TABS = {
  dashboard: { panel: "panelDashboard", tab: "tabDashboard" },
@@ -7701,18 +7701,16 @@
  ops: { panel: "panelOps", tab: "tabOps" },
  /* Resources is a sub-view of Analysis (#resources → panelResources). */
  /* Sovereign desk is developer-only (#sovereign) — panel toggled separately. */
- /* Inverters are no longer a top tab — content lives under Fleet Triage. */
  };
  function tabFromHash(){
  const h = location.hash;
  if(h === "#account") return "account";
  if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
- // #arrays / #sandbox deep-links open Fleet Triage (inverters section is there)
- if(h === "#arrays" || h === "#sandbox") return "dashboard";
+ // Fleet Triage family: Dashboard | Table (#arrays|#table) | Sandbox
+ if(h === "#arrays" || h === "#table" || h === "#sandbox" || h === "#dashboard") return "dashboard";
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
  if(h === "#marketplace" || h.indexOf("#marketplace/") === 0) return "marketplace";
- if(h === "#dashboard") return "dashboard";
  if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
  return "dashboard";
  }
@@ -7764,6 +7762,57 @@
  else location.hash = target;
  });
 
+ /* Fleet Triage: Dashboard | Table | Sandbox (Ford 2026-07-17).
+ * One top tab; sub-views swap content inside #panelDashboard (no slide). */
+ function fleetTriageSubFromHash(){
+ const h = location.hash;
+ if(h === "#sandbox") return "sandbox";
+ if(h === "#arrays" || h === "#table") return "table";
+ return "dashboard"; // #dashboard, empty, or anything else in the FT family
+ }
+ function applyFleetTriageSub(){
+ const sub = fleetTriageSubFromHash();
+ const dash = document.getElementById("ftDash");
+ const sheet = document.getElementById("sheetWrap");
+ const sb = document.getElementById("sbWrap");
+ if(dash){ dash.hidden = (sub !== "dashboard"); }
+ if(sheet){ sheet.hidden = (sub !== "table"); }
+ if(sb){ sb.hidden = (sub !== "sandbox"); }
+ document.querySelectorAll(".ft-sub-seg [data-ftsub]").forEach(b => {
+ const on = b.getAttribute("data-ftsub") === sub;
+ b.classList.toggle("on", on);
+ b.setAttribute("aria-pressed", on ? "true" : "false");
+ });
+ // Keep VendorSheet's internal _view + localStorage in sync (table/sandbox).
+ // Do NOT call showView on dashboard — that would re-hide/show and fight ft pills.
+ try {
+ if(sub === "table" || sub === "sandbox"){
+ if(window.VendorSheet && typeof window.VendorSheet.showView === "function"){
+ window.VendorSheet.showView(sub);
+ }
+ }
+ } catch(_){}
+ if(sub === "dashboard"){
+ if(window.FleetStore) FleetStore.load();
+ if(window.__ccRender) window.__ccRender();
+ } else if(sub === "table"){
+ if(window.FleetStore && !FleetStore.isLoaded()) FleetStore.load();
+ } else if(sub === "sandbox"){
+ load();
+ if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
+ }
+ }
+ try { window.__aoApplyFleetTriageSub = applyFleetTriageSub; } catch(_){}
+ document.addEventListener("click", function(e){
+ const b = e.target && e.target.closest ? e.target.closest(".ft-sub-seg [data-ftsub]") : null;
+ if(!b) return;
+ e.preventDefault();
+ const k = b.getAttribute("data-ftsub");
+ const target = k === "sandbox" ? "#sandbox" : k === "table" ? "#arrays" : "#dashboard";
+ if(location.hash === target) applyFleetTriageSub();
+ else location.hash = target;
+ });
+
  let _firstApply = true;
  function applyView(){
  const active = tabFromHash();
@@ -7788,6 +7837,7 @@
   _prevPanel && _toPanel &&
   _anSubPanel[_prevPanel.id] && _anSubPanel[_toPanel.id]
  );
+ // Fleet Triage Dashboard|Table|Sandbox share one panel — same-panel hop never slides.
  const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel && !_anSubHop);
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
@@ -7833,20 +7883,7 @@
  }
 
  if(active === "dashboard"){
- // Triage queue + full Inverters surface (Table | Sandbox) share this tab.
- if(window.FleetStore) FleetStore.load();
- if(window.__ccRender) window.__ccRender();
- load();
- if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
- // Legacy #arrays / #sandbox: scroll the inverters block into view after paint.
- if(location.hash === "#arrays" || location.hash === "#sandbox"){
- try {
- requestAnimationFrame(function(){
- var el = document.getElementById("triageInverters") || document.getElementById("sbWrap");
- if(el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
- });
- } catch(_){}
- }
+ applyFleetTriageSub();
  } else if(active === "account"){
  loadAccount();
  try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
@@ -7879,19 +7916,17 @@
  }
 
  /* ── Sub-tab memory (Ford 2026-07-16) ──────────────────────────────────────
-  * Returning to a top tab reopens the sub-view you last had there. Analysis
-  * (#analysis|#trends|#resources) and Invoices (#reports|#reports/audit|
-  * #reports/trends|#reports/generation) keep sub-state in the hash; we remember
-  * the last hash per tab and, on a tab CLICK, restore it instead of resetting to
-  * the default. (Inverters' Spreadsheet|Sandbox already persists via
-  * localStorage 'ao_vendor_view', so it needs no help here.) */
- const SUBTAB_DEFAULT = { analysis: "#analysis", reports: "#reports" };
+  * Returning to a top tab reopens the sub-view you last had there. Analysis,
+  * Invoices, and Fleet Triage (#dashboard|#arrays|#sandbox) keep sub-state in
+  * the hash; we remember the last hash per tab and restore on top-tab click. */
+ const SUBTAB_DEFAULT = { analysis: "#analysis", reports: "#reports", dashboard: "#dashboard" };
  let _subtabMem = {};
  try { _subtabMem = JSON.parse(localStorage.getItem("ao_subtab_mem") || "{}") || {}; } catch(_){ _subtabMem = {}; }
  function _subtabTabForHash(h){
  h = (h || "").toLowerCase();
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
+ if(h === "#dashboard" || h === "#arrays" || h === "#table" || h === "#sandbox") return "dashboard";
  return null;
  }
  function rememberSubtab(){
@@ -7906,9 +7941,10 @@
  // Restore on a top-tab click, before the anchor's default navigation runs.
  document.addEventListener("click", function(e){
  try{
- const a = e.target && e.target.closest ? e.target.closest("#tabAnalysis, #tabReports") : null;
+ const a = e.target && e.target.closest ? e.target.closest("#tabAnalysis, #tabReports, #tabDashboard") : null;
  if(!a) return;
- const targetTab = a.id === "tabAnalysis" ? "analysis" : "reports";
+ const targetTab = a.id === "tabAnalysis" ? "analysis"
+  : a.id === "tabReports" ? "reports" : "dashboard";
  const mem = _subtabMem[targetTab];
  if(mem && _subtabTabForHash(mem) === targetTab && mem.toLowerCase() !== SUBTAB_DEFAULT[targetTab]){
  e.preventDefault();
