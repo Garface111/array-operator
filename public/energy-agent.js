@@ -469,7 +469,7 @@
      var activePanel = document.querySelector(".panel.active") || document.querySelector("[data-panel].active");
      if (activePanel) roots.push(activePanel);
      // Sandbox / triage always worth sampling when present
-     ["#sandbox", "#sbWrap", "#triageInverters", "#panelDashboard", "#panelReports",
+     ["#sandbox", "#sbWrap", "#ftDash", "#vendorSheet", "#panelDashboard", "#panelReports",
       "#panelOps", "#panelAccount", "#analysisRoot", ".cc-root", ".ops-root"].forEach(function (sel) {
        var el = document.querySelector(sel);
        if (el && roots.indexOf(el) < 0) roots.push(el);
