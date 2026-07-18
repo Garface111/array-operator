@@ -13,7 +13,7 @@
   "use strict";
 
   var STAGE_IDS = [
-    "panelDashboard","panelAccount","panelSovereign","panelArrays",
+    "panelDashboard","panelAccount","panelSovereign",
     "panelAnalysis","panelTrends","panelResources","panelReports","panelOps"
   ];
   var DUR_MS = 500;

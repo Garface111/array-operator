@@ -331,8 +331,9 @@
  surface_topic: "surface_fleet_triage",
  },
  "#arrays": {
- macro: "Equipment map, Tenant→Array→Inverter made visible and rearrangeable.",
- meso: "See every inverter; Sandbox spatial vs Spreadsheet rows; Add array.",
+ // Legacy hash — Inverters now live under Fleet Triage (#dashboard).
+ macro: "Equipment map under Fleet Triage, Tenant→Array→Inverter made visible and rearrangeable.",
+ meso: "Scroll past Needs attention; Sandbox spatial vs Table rows; Add array.",
  surface_topic: "surface_inverters",
  },
  "#analysis": {
@@ -368,24 +369,24 @@
  };
  var hKey = String(hash || "").toLowerCase();
  if (hKey.charAt(0) !== "#") hKey = "#" + hKey;
- var surface = SURFACE_MESO[hKey] || SURFACE_MESO["#arrays"];
+ var surface = SURFACE_MESO[hKey] || SURFACE_MESO["#dashboard"] || SURFACE_MESO["#arrays"];
 
  var ctx = {
  hash: hash,
  tab_label: tabLabel(hash),
  // Always remind the model of live nav labels (hashes are internal only)
  nav_tabs: [
- { label: "Fleet Triage", hash: "#dashboard" },
- { label: "Inverters", hash: "#arrays" },
+ { label: "Fleet Triage", hash: "#dashboard", note: "Triage queue + Inverters (Table | Sandbox) stacked below" },
  { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
  { label: "Invoices", hash: "#reports" },
+ { label: "Marketplace", hash: "#marketplace", note: "Credit Exchange + Array Market" },
  { label: "Repairs", hash: "#ops", note: "Chat-first O&M — hunger for full repair roster; agent watches faults" },
  { label: "Account", hash: "#account" },
  ],
  // 3-level page understanding for this hash (see product_map topic=surface)
  surface: surface,
  product_jobs: [
- "Watch the fleet (Triage + Inverters + Analysis)",
+ "Watch the fleet (Fleet Triage includes inverters + Analysis)",
  "Invoice offtakers (Invoices; utility bills × share)",
  "Complete O&M roster + heal down sites (Repairs)",
  ],
@@ -468,7 +469,7 @@
      var activePanel = document.querySelector(".panel.active") || document.querySelector("[data-panel].active");
      if (activePanel) roots.push(activePanel);
      // Sandbox / triage always worth sampling when present
-     ["#sandbox", "#sbWrap", "#panelArrays", "#panelDashboard", "#panelReports",
+     ["#sandbox", "#sbWrap", "#triageInverters", "#panelDashboard", "#panelReports",
       "#panelOps", "#panelAccount", "#analysisRoot", ".cc-root", ".ops-root"].forEach(function (sel) {
        var el = document.querySelector(sel);
        if (el && roots.indexOf(el) < 0) roots.push(el);
@@ -4417,7 +4418,8 @@
  function panelSelectorForHash(hash) {
  var map = {
  "#dashboard": "#panelDashboard",
- "#arrays": "#panelArrays",
+ "#arrays": "#panelDashboard",
+ "#sandbox": "#panelDashboard",
  "#analysis": "#panelAnalysis",
  "#reports": "#panelReports",
  "#ops": "#panelOps",
@@ -4761,20 +4763,20 @@
  ];
  }
 
- // ── Inverters (#arrays), sandbox + vendor-sheet ───────────────────────
+ // ── Inverters (under Fleet Triage), sandbox + vendor-sheet ────────────
  if (key === "arrays" || key === "inverters" || key === "sandbox" || key === "spreadsheet") {
  return [
  {
- hash: "#arrays",
- say: "Inverters, live fleet canvas. Sandbox is spatial; Spreadsheet is every array as rows.",
+ hash: "#dashboard",
+ say: "Inverters live under **Fleet Triage** — scroll past Needs attention for the live fleet canvas. Sandbox is spatial; Table is every array as rows.",
  },
  {
- selector: "#tabArrays",
- say: "You're on **Inverters** in the top bar.",
+ selector: "#tabDashboard",
+ say: "**Fleet Triage** in the top bar holds triage *and* the inverters surface.",
  },
  {
- selector: "#panelArrays .vs-seg",
- say: "Two sub-views: **Sandbox** (the spatial canvas) and **Spreadsheet** (rows by vendor). Same data either way.",
+ selector: "#triageInverters .vs-seg, #panelDashboard .vs-seg",
+ say: "Two sub-views: **Sandbox** (the spatial canvas) and **Table** (rows by vendor). Same data either way.",
  },
  {
  selector: "#vsSegSandbox",

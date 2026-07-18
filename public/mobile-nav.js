@@ -37,15 +37,14 @@
  // to the More sheet. Order here is the bar order.
  var MAP = [
  { id: "tabDashboard", short: "Fleet", ic: "fleet", primary: true },
- { id: "tabArrays", short: "Arrays", ic: "arrays", primary: true },
+ // Inverters folded into Fleet Triage — Marketplace takes the free primary slot
+ // so the phone bar stays at 5 thumb targets.
  { id: "tabAnalysis", short: "Analysis", ic: "analysis", primary: true },
  { id: "tabReports", short: "Invoices", ic: "invoices", primary: true },
- { id: "tabOps", short: "Repairs", ic: "ops", primary: true }, // Repairs command center
- // Marketplace + Account live in the "More" sheet — keeps the phone bar at 5
- // primary thumb targets (the mobile overhaul's sizing).
- { id: "tabMarketplace", short: "Market", ic: "market", primary: false },
+ { id: "tabMarketplace", short: "Market", ic: "market", primary: true },
+ { id: "tabOps", short: "Repairs", ic: "ops", primary: true },
  { id: "tabAccount", short: "Account", ic: "account", primary: false },
- /* Resources is a sub-view under Repairs (#resources). Trends → Analysis. */
+ /* Resources is a sub-view under Analysis. Trends → Analysis. */
  ];
 
  MAP.forEach(function (m) {

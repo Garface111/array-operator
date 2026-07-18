@@ -69,13 +69,13 @@ document.documentElement.setAttribute("data-theme","day");
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260716focus1">
-<link rel="stylesheet" href="command-center.css?v=20260717triage1">
+<link rel="stylesheet" href="command-center.css?v=20260717triageInv1">
 <link rel="stylesheet" href="ops.css?v=20260715eaMatch2">
 <link rel="stylesheet" href="theme-day.css?v=20260716overview1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
 <link rel="stylesheet" href="analysis.css?v=2"><!-- PowerTrack-style Analysis tab (fleet NOC) -->
 <link rel="stylesheet" href="resources.css?v=20260715opsRes1"><!-- Resources briefing; scoped to #panelResources -->
-<link rel="stylesheet" href="mobile.css?v=20260714alertsL"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
+<link rel="stylesheet" href="mobile.css?v=20260717triageInv1"><!-- phone + foldable overhaul; loaded LAST so it overrides every desktop sheet -->
 <link rel="stylesheet" href="marketplace.css?v=20260717market1"><!-- Marketplace tab: Credit Exchange + Array Market -->
 <!-- AI-as-OS home (≤960, signed-in) -->
 <!-- SKY THEME, default-on (see the pre-paint script above). document.write keeps
@@ -248,10 +248,11 @@ document.documentElement.setAttribute("data-theme","day");
  </div>
  </div>
 
- <!-- THREE-TAB APP BAR, mirrors the NEPOOL Operator tab bar. Arrays is the default. -->
+ <!-- Top tab bar. Inverters content lives under Fleet Triage (no separate
+ Inverters tab — Marketplace took that slot). #arrays / #sandbox deep-links
+ still open Fleet Triage and scroll to the fleet tree. -->
  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
  <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet Triage</a>
- <a class="tab" id="tabArrays" href="#arrays" role="tab">Inverters</a>
  <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13), see #panelAnalysis's
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
@@ -335,11 +336,11 @@ document.documentElement.setAttribute("data-theme","day");
  <!-- ============================ TAB: MASTER ACCOUNT ============================ -->
  <!-- All business: one flat list of horizontal rows, identity, login & billing.
  Rendered by renderAccountList()/renderBilling() in sandbox.js into #acctList. -->
- <!-- ============================ TAB: DASHBOARD (owner health at a glance) ============================ -->
- <!-- The owner's front door: whole-fleet health in one screen, production now/today,
- fleet-healthy %, $ recoverable, and the COMBINED "needs attention" list (every
- flagged inverter across the fleet, worst-first). Reuses command-center.js: it
- fills #fleetCommander (the health card) + #ccQueue (the attention queue). -->
+ <!-- ============================ TAB: FLEET TRIAGE (+ inverters) ============================ -->
+ <!-- Front door: whole-fleet health, production now/today, $ recoverable, the
+ COMBINED "needs attention" queue — then the full Inverters surface (Table |
+ Sandbox) stacked below so triage + hardware live on one scroll. command-center.js
+ fills #fleetCommander + #ccQueue; sandbox.js / vendor-sheet.js own the fleet tree. -->
  <section class="panel" id="panelDashboard" role="tabpanel" aria-label="Fleet Triage">
  <div class="dash-wrap">
  <div class="dash-head">
@@ -353,6 +354,27 @@ document.documentElement.setAttribute("data-theme","day");
  <div class="dash-attn"><h3 id="dashAttnH">Needs attention</h3></div>
  <section id="ccQueue"></section>
  </div>
+
+ <!-- Inverters (was its own top tab). Same FleetStore data; Table | Sandbox
+ sub-view. Anchor #triageInverters for deep-links from triage rows / #arrays. -->
+ <div class="triage-inverters" id="triageInverters">
+ <div class="dash-attn triage-inv-head"><h3>Inverters</h3></div>
+ <!-- Sub-view toggle: TABLE | SANDBOX. .ao-subnav = equal vertical strip, pill centered. -->
+ <div class="ao-subnav">
+ <div class="vs-seg" role="group" aria-label="Inverters view">
+ <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Table</button>
+ <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
+ </div>
+ </div>
+
+ <!-- SANDBOX — live fleet tree. -->
+ <section id="sbWrap" class="sb-fullscreen">
+ <div id="sandbox"></div>
+ </section>
+
+ <!-- TABLE view (vendor-sheet.js → #vendorSheet). Hidden until Table is selected. -->
+ <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
+ </div>
  </section>
 
  <section class="panel" id="panelAccount" role="tabpanel" aria-label="Account">
@@ -361,35 +383,6 @@ document.documentElement.setAttribute("data-theme","day");
 
  <!-- Energy Agent Prime desk (Ford developer only) — product mind, not owner chat -->
  <section class="panel" id="panelSovereign" role="tabpanel" aria-label="Energy Agent Prime desk" hidden></section>
-
- <!-- ============================ TAB: ARRAYS (default) ============================ -->
- <!-- One job: the sandbox, almost full-screen, with a single pinned COMMANDER
- card that gives whole-fleet health at a glance. No KPI strip, no triage
- table, no sub-headers, just the at-a-glance health + the canvas. -->
- <section class="panel" id="panelArrays" role="tabpanel" aria-label="Inverters">
-
- <!-- Sub-view toggle: TABLE | SANDBOX (left→right). Same FleetStore data;
- vendor-sheet.js flips between them. .ao-subnav = equal vertical strip, pill centered. -->
- <div class="ao-subnav">
- <div class="vs-seg" role="group" aria-label="Inverters view">
- <button class="vs-seg-btn" id="vsSegSheet" type="button" aria-pressed="false">Table</button>
- <button class="vs-seg-btn on" id="vsSegSandbox" type="button" aria-pressed="true">Sandbox</button>
- </div>
- </div>
-
- <!-- SANDBOX, the live fleet tree, almost full-screen. The fleet commander
- (whole-fleet health at a glance) is rendered as the FIRST CARD INSIDE the
- canvas by sandbox.js (a card in the scene, above the stacked arrays) and
- filled by command-center.js → #fleetCommander. -->
- <section id="sbWrap" class="sb-fullscreen">
- <div id="sandbox"></div>
- </section>
-
- <!-- TABLE view, structured rows of every array by vendor (vendor-sheet.js →
- #vendorSheet). Hidden until the Table sub-tab is selected. -->
- <section id="sheetWrap" hidden><div id="vendorSheet"></div></section>
-
- </section>
 
  <!-- ============================ TAB: ANALYSIS ============================ -->
  <!-- PowerTrack-style fleet NOC: a portfolio rollup strip, a sortable Sites grid
@@ -485,9 +478,9 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260717exch1"></script>
+<script src="sandbox.js?v=20260717triageInv1"></script>
 <script src="vendor-sheet.js?v=20260717triage1"></script>
-<script src="command-center.js?v=20260717market1"></script>
+<script src="command-center.js?v=20260717triageInv1"></script>
 <script src="reports.js?v=20260717market1"></script>
 <script src="marketplace.js?v=20260717market1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
@@ -498,7 +491,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="prospectus.js?v=20260717market1"></script>
 <!-- Mobile bottom-nav enhancer: adorns the tab bar with icons + a More sheet on
  phones (progressive; no-op on desktop, safe if it throws). See mobile.css. -->
-<script src="mobile-nav.js?v=20260717exch1" defer></script>
+<script src="mobile-nav.js?v=20260717triageInv1" defer></script>
 <!-- Surface a fresh deploy (one-click reload) so nobody is stuck on a cached old bundle.
  Loaded AFTER reports.js so it can read the loaded cache-bust version. -->
 <script src="version-check.js?v=20260716shellwatch1"></script>
@@ -564,7 +557,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260717resWrap1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716deskfix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260717autoscreen1"></script>
+<script src="energy-agent.js?v=20260717triageInv1"></script>
 <script src="sovereign-desk.js?v=20260716deskfix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260717resWrap1">
@@ -573,7 +566,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="mobile-os.js?v=20260716repairs1"></script>
 <!-- Tab pager: horizontal slide between top-tab panels (desktop) -->
 <link rel="stylesheet" href="tab-slide.css?v=20260717noUnfurl1">
-<script src="tab-slide.js?v=20260717noUnfurl1"></script>
+<script src="tab-slide.js?v=20260717triageInv1"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */

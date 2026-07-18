@@ -293,7 +293,7 @@
   .tabbar > .tab.ea-tab { display: none !important; }
 
   /* ── Shared: every tab's root sheet fills the wrap (no half-empty left column) ─ */
-  #panelDashboard, #panelArrays, #panelAnalysis, #panelTrends,
+  #panelDashboard, #panelAnalysis, #panelTrends,
   #panelReports, #panelAccount, #panelResources,
   #reportsRoot, #analysisRoot, #trendsRoot, #rsHost, .rb2, .an-wrap {
     width: 100%;

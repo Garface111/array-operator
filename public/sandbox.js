@@ -7686,14 +7686,13 @@
  }
 
  /* ===========================================================================
- * THREE-TAB SYSTEM, Master Account (#account) · Arrays (#arrays, DEFAULT) ·
- * Reports (#reports). Anything else (empty hash, old #sandbox / #dashboard /
- * #fleet / #pricing links) resolves to Arrays for backward compatibility.
+ * TOP TABS: Fleet Triage (#dashboard, DEFAULT — includes Inverters below the
+ * triage queue) · Analysis · Invoices · Marketplace · Repairs · Account.
+ * Legacy #arrays / #sandbox / empty / #fleet / #pricing → Fleet Triage.
  * ==========================================================================*/
  const TABS = {
  dashboard: { panel: "panelDashboard", tab: "tabDashboard" },
  account: { panel: "panelAccount", tab: "tabAccount" },
- arrays: { panel: "panelArrays", tab: "tabArrays" },
  analysis:{ panel: "panelAnalysis",tab: "tabAnalysis"},
  /* Trends is a SUB-VIEW of Analysis now (Ford 2026-07-13), panelTrends is
  toggled manually inside the analysis branch of applyView, not via this map. */
@@ -7702,18 +7701,20 @@
  ops: { panel: "panelOps", tab: "tabOps" },
  /* Resources is a sub-view of Analysis (#resources → panelResources). */
  /* Sovereign desk is developer-only (#sovereign) — panel toggled separately. */
+ /* Inverters are no longer a top tab — content lives under Fleet Triage. */
  };
  function tabFromHash(){
  const h = location.hash;
  if(h === "#account") return "account";
  if(h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
- if(h === "#arrays" || h === "#sandbox") return "arrays";
+ // #arrays / #sandbox deep-links open Fleet Triage (inverters section is there)
+ if(h === "#arrays" || h === "#sandbox") return "dashboard";
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
  if(h === "#marketplace" || h.indexOf("#marketplace/") === 0) return "marketplace";
  if(h === "#dashboard") return "dashboard";
  if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
- return "arrays";
+ return "dashboard";
  }
 
  // Master Account "you have something to do here" dot. Shown only to a SIGNED-IN
@@ -7781,7 +7782,7 @@
  const _slideOK = !_firstApply && !isSov && typeof window.__aoTabSlide === "function"
  && location.hash !== "#trends" && location.hash !== "#resources";
  const _prevPanel = _slideOK ? document.querySelector(
- "#panelDashboard.active,#panelArrays.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelMarketplace.active,#panelOps.active,#panelAccount.active") : null;
+ "#panelDashboard.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelMarketplace.active,#panelOps.active,#panelAccount.active") : null;
  const _toPanel = (!isSov && TABS[active]) ? document.getElementById(TABS[active].panel) : null;
  const _anSubHop = !!(
   _prevPanel && _toPanel &&
@@ -7800,7 +7801,7 @@
  if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
  });
  if(_willSlide){
- const _ord = {panelDashboard:0,panelArrays:1,panelAnalysis:2,panelTrends:2,panelResources:2,panelReports:3,panelMarketplace:4,panelOps:5,panelAccount:6};
+ const _ord = {panelDashboard:0,panelAnalysis:1,panelTrends:1,panelResources:1,panelReports:2,panelMarketplace:3,panelOps:4,panelAccount:5};
  const _fi = (_ord[_prevPanel.id] != null ? _ord[_prevPanel.id] : 0);
  const _ti = (_ord[_toPanel.id] != null ? _ord[_toPanel.id] : 0);
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
@@ -7832,11 +7833,20 @@
  }
 
  if(active === "dashboard"){
+ // Triage queue + full Inverters surface (Table | Sandbox) share this tab.
  if(window.FleetStore) FleetStore.load();
  if(window.__ccRender) window.__ccRender();
- } else if(active === "arrays"){
  load();
  if(!_firstApply && window.__aoLoadDashboard) window.__aoLoadDashboard();
+ // Legacy #arrays / #sandbox: scroll the inverters block into view after paint.
+ if(location.hash === "#arrays" || location.hash === "#sandbox"){
+ try {
+ requestAnimationFrame(function(){
+ var el = document.getElementById("triageInverters") || document.getElementById("sbWrap");
+ if(el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+ });
+ } catch(_){}
+ }
  } else if(active === "account"){
  loadAccount();
  try { localStorage.setItem("ao_seen_account", "1"); } catch(_){}
@@ -8062,10 +8072,8 @@
  window.__aoLoadEntitlement = loadEntitlement;
 
  window.addEventListener("hashchange", applyView);
- // First-visit landing: with NO explicit hash (no deep-link), a brand-new owner
- // should land on the Inverter Dashboard (#arrays → Spreadsheet sub-view), not Fleet
- // Health, that's where they see their arrays appear. An explicit #dashboard /
- // #account / #reports deep-link is always respected (we only default the EMPTY hash).
+ // First-visit landing: empty hash → Fleet Triage (triage + inverters on one page).
+ // Explicit #dashboard / #account / #reports / #marketplace deep-links are respected.
  function landDefaultTab(){
  if(!location.hash){
  try {
@@ -8074,9 +8082,9 @@
  if (q.get("setup") === "offtakers" || q.get("bulk") === "1") {
  location.replace("#reports");
  } else {
- location.replace("#arrays"); // replace → no extra Back-button history entry
+ location.replace("#dashboard");
  }
- } catch(_){ location.hash = "#arrays"; }
+ } catch(_){ location.hash = "#dashboard"; }
  }
  }
  document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); ensureAlertsWidget(); });
