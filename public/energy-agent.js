@@ -10,7 +10,17 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260716micfix1";
+ var EA_BUILD = "20260717autoscreen1";
+
+ // Domain vocabulary fed to the speech-to-text so it transcribes the product's
+ // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
+ // "offtaker" -> "off taker", vendor names, etc.). Ford 2026-07-17.
+ var EA_STT_PROMPT =
+ "Array Operator is a solar fleet platform; its AI is the Energy Agent. " +
+ "Expect these terms: Array Operator, Energy Agent, offtaker, offtakers, " +
+ "NEPOOL, REC, RECs, generation report, net metering, solar credit, kWh, " +
+ "kW nameplate, inverter, array, fleet, specific yield, SolarEdge, Fronius, " +
+ "Chint, SMA, Enphase, Locus, GMP, Green Mountain Power, VEC, SmartHub.";
  try {
  window.__EA_BUILD = EA_BUILD;
  // voice mode is decided below; log it too once VOICE_WEAVE is known.
@@ -158,6 +168,10 @@
  _chatAbort: null,
  // Serializes voice/text turns so double STT events can't start two replies
  _turnBusy: false,
+ // Owner barged mid-turn (voice or text) — next packContext flags user_interrupted
+ _userInterrupted: false,
+ _userInterruptedReason: null,
+ _userInterruptedAt: 0,
  // True after we sent response.cancel until audio is confirmed stopped
  _rtCancelPending: false,
  _budgetPollTimer: null,
@@ -393,6 +407,12 @@
  title: document.title,
  selection: sel,
  viewport: { w: innerWidth, h: innerHeight },
+ // What is actually rendered right now (cards/chips/tables) — not just tab/hash
+ live_ui_digest: buildLiveUiDigest(hash),
+ // Mid-turn barge-in: owner interrupted Realtime / prior answer
+ user_interrupted: !!state._userInterrupted,
+ voice_interrupted: !!state._userInterrupted,
+ barge_in: !!state._userInterrupted,
  // Capture / extension ground truth for this browser session
  extension_present: extPresent,
  extension_name: "EnergyAgent",
@@ -422,7 +442,131 @@
  }
  }
  } catch (e) {}
+ // One-shot: clear interrupt flag after packaging so only the next turn sees it
+ if (state._userInterrupted) {
+   try { state._userInterrupted = false; } catch (e) {}
+ }
  return ctx;
+ }
+
+ /**
+  * Compact digest of ON-SCREEN cards / chips / table rows so the agent can see
+  * broken inverter cards, status chips, and table cells the owner is looking at.
+  * Prefer data-* attributes + short innerText; cap size hard for the prompt budget.
+  */
+ function buildLiveUiDigest(hash) {
+   var out = {
+     hash: hash || (location.hash || ""),
+     cards: [],
+     chips: [],
+     table_rows: [],
+     panels: [],
+     note: "Visible UI text/status on the active surface — trust for 'what am I looking at'.",
+   };
+   try {
+     var roots = [];
+     var activePanel = document.querySelector(".panel.active") || document.querySelector("[data-panel].active");
+     if (activePanel) roots.push(activePanel);
+     // Sandbox / triage always worth sampling when present
+     ["#sandbox", "#sbWrap", "#panelArrays", "#panelDashboard", "#panelReports",
+      "#panelOps", "#panelAccount", "#analysisRoot", ".cc-root", ".ops-root"].forEach(function (sel) {
+       var el = document.querySelector(sel);
+       if (el && roots.indexOf(el) < 0) roots.push(el);
+     });
+     if (!roots.length) roots.push(document.body);
+
+     function pushUnique(arr, item, key) {
+       var k = key || JSON.stringify(item);
+       if (arr._seen && arr._seen[k]) return;
+       if (!arr._seen) arr._seen = {};
+       arr._seen[k] = 1;
+       arr.push(item);
+     }
+
+     var cardSels = [
+       "[data-array-id]", "[data-inverter-id]", "[data-inv-id]",
+       ".sb-card", ".sb-inv", ".fc-tile", ".cc-row", ".ops-case",
+       ".ops-ticket", ".rb-offtaker", ".ansg-table tr",
+       "[data-status]", ".inv-card", ".array-card",
+     ].join(",");
+     var chipSels = [
+       ".status-chip", ".pill", ".badge", "[data-tone]",
+       ".sb-status", ".fc-pill", ".ops-stage", ".ea-chip",
+     ].join(",");
+
+     roots.forEach(function (root) {
+       if (!root || !root.querySelectorAll) return;
+       // Cards
+       try {
+         root.querySelectorAll(cardSels).forEach(function (el) {
+           if (out.cards.length >= 24) return;
+           // Skip hidden
+           try {
+             var r = el.getBoundingClientRect();
+             if (r.width < 4 || r.height < 4) return;
+             if (r.bottom < 0 || r.top > (window.innerHeight || 800) + 40) return;
+           } catch (e) {}
+           var text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+           if (!text || text.length < 2) return;
+           pushUnique(out.cards, {
+             array_id: el.getAttribute("data-array-id") || null,
+             inverter_id: el.getAttribute("data-inverter-id") || el.getAttribute("data-inv-id") || null,
+             status: el.getAttribute("data-status") || el.getAttribute("data-tone") || null,
+             text: text.slice(0, 220),
+           }, text.slice(0, 80));
+         });
+       } catch (e) {}
+       // Status chips
+       try {
+         root.querySelectorAll(chipSels).forEach(function (el) {
+           if (out.chips.length >= 20) return;
+           var t = (el.innerText || "").replace(/\s+/g, " ").trim();
+           if (!t || t.length > 80) return;
+           try {
+             var r2 = el.getBoundingClientRect();
+             if (r2.width < 2 || r2.bottom < 0 || r2.top > (window.innerHeight || 800)) return;
+           } catch (e) {}
+           pushUnique(out.chips, {
+             text: t.slice(0, 60),
+             tone: el.getAttribute("data-tone") || el.className || null,
+           }, t);
+         });
+       } catch (e) {}
+       // Table body rows (Analysis sites, spreadsheet, invoices)
+       try {
+         root.querySelectorAll("table tbody tr, .ss-row, .ansg-table tbody tr").forEach(function (tr) {
+           if (out.table_rows.length >= 16) return;
+           var cells = [];
+           tr.querySelectorAll("td, th").forEach(function (td) {
+             var c = (td.innerText || "").replace(/\s+/g, " ").trim();
+             if (c) cells.push(c.slice(0, 40));
+           });
+           if (!cells.length) return;
+           try {
+             var r3 = tr.getBoundingClientRect();
+             if (r3.height < 2 || r3.bottom < 0 || r3.top > (window.innerHeight || 800)) return;
+           } catch (e) {}
+           pushUnique(out.table_rows, { cells: cells.slice(0, 8) }, cells.join("|").slice(0, 100));
+         });
+       } catch (e) {}
+     });
+
+     // Panel headings / empty states
+     try {
+       document.querySelectorAll(".panel.active h1, .panel.active h2, .panel.active .empty, .panel.active .lede").forEach(function (el) {
+         if (out.panels.length >= 6) return;
+         var t = (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 120);
+         if (t) out.panels.push(t);
+       });
+     } catch (e) {}
+   } catch (e) {
+     out.error = String(e && e.message || e).slice(0, 80);
+   }
+   // Drop internal _seen
+   delete out.cards._seen;
+   delete out.chips._seen;
+   delete out.table_rows._seen;
+   return out;
  }
 
  // ── DOM ──────────────────────────────────────────────────────────────────
@@ -582,6 +726,8 @@
  '</svg></span><span class="ea-chip-lbl">Mic</span></button>' +
  ' <button type="button" class="ea-chip ea-mute ea-chip-icon" id="eaMute" title="Mute agent voice" aria-label="Mute agent voice">' +
  ' <span class="ea-chip-ic" aria-hidden="true">🔊</span><span class="ea-chip-lbl">Mute</span></button>' +
+ ' <button type="button" class="ea-chip ea-screen ea-chip-icon" id="eaScreenBtn" title="Let Energy Agent see your screen" aria-label="Let Energy Agent see your screen" aria-pressed="false">' +
+ ' <span class="ea-chip-ic" aria-hidden="true">👁</span><span class="ea-chip-lbl">See screen</span></button>' +
  ' <span class="ea-compose-spacer"></span>' +
  ' <button type="button" class="ea-send" id="eaSend" title="Send message" aria-label="Send message">' +
  ' <span class="ea-send-lbl">Send</span><span class="ea-send-ic" aria-hidden="true">↑</span></button>' +
@@ -637,6 +783,19 @@
  e.preventDefault();
  setVoiceMuted(!state.voiceMuted);
  };
+ var screenBtn = document.getElementById("eaScreenBtn");
+ if (screenBtn) {
+ screenBtn.onclick = function (e) {
+ e.preventDefault();
+ if (screenVisionLive()) { stopScreenVision(); }
+ else {
+ grantScreenVision().then(function (ok) {
+ if (ok) addMsg("agent", "I can see your screen now. Ask me about anything on it, or say “take a look.”");
+ });
+ }
+ };
+ }
+ syncScreenBtn();
  syncMuteBtn();
  syncMicBtn();
  applyVoiceMuteToAudio();
@@ -1997,6 +2156,22 @@
  return copyBtn;
  }
 
+ // Normalize a line for spoken-vs-panel comparison: strip light markdown,
+ // collapse whitespace, drop trailing punctuation, lowercase. Used to skip the
+ // 🔊 block when the narrated line is just the panel text repeated.
+ function normSpokenLine(s) {
+ return String(s == null ? "" : s)
+ .replace(/[*_`#>~]/g, "")
+ .replace(/\s+/g, " ")
+ .replace(/[.!?…]+$/, "")
+ .trim()
+ .toLowerCase();
+ }
+ function spokenIsDistinct(spoken, body) {
+ var a = normSpokenLine(spoken);
+ return !!a && a !== normSpokenLine(body);
+ }
+
  function addMsg(role, text, opts) {
  opts = opts || {};
  var host = document.getElementById("eaMsgs");
@@ -2072,6 +2247,24 @@
  else rbody.textContent = t;
  d.appendChild(rbody);
  } else {
+ // Spoken conclusion vs panel detail: when the mind narrated a tight line
+ // distinct from the written answer, lift it into a 🔊 block on top so the
+ // owner immediately sees "what was said" above the supporting detail.
+ var spokenLine = String(opts.spoken == null ? "" : opts.spoken).trim();
+ if (role === "agent" && spokenIsDistinct(spokenLine, t)) {
+ var sb = document.createElement("div");
+ sb.className = "ea-spoken-block";
+ var sbIc = document.createElement("span");
+ sbIc.className = "ea-spoken-ic";
+ sbIc.setAttribute("aria-hidden", "true");
+ sbIc.textContent = "🔊";
+ var sbTx = document.createElement("span");
+ sbTx.className = "ea-spoken-text";
+ sbTx.textContent = spokenLine;
+ sb.appendChild(sbIc);
+ sb.appendChild(sbTx);
+ d.appendChild(sb);
+ }
  var bodyWrap = document.createElement("div");
  bodyWrap.className = "ea-msg-body";
  if (rich) bodyWrap.innerHTML = formatMsg(t);
@@ -2897,9 +3090,13 @@
  /**
  * Abort an in-flight LLM/voice turn without painting "Stopped." Used when the
  * user barges in with a NEW question mid-think / mid-speech.
+ * Sets user_interrupted so the next turn's context tells the model to course-correct.
  */
  function abortInFlightTurn(reason) {
  state._turnAbortGen = (state._turnAbortGen || 0) + 1;
+ state._userInterrupted = true;
+ state._userInterruptedReason = reason || "barge_in";
+ state._userInterruptedAt = Date.now();
  if (state._chatAbort) {
  try { state._chatAbort.abort(); } catch (e) {}
  state._chatAbort = null;
@@ -2910,6 +3107,8 @@
  state._interimSpoken = false;
  state._turnBusy = false;
  if (state.touring) state.touring = false;
+ // Always cancel Realtime so the mouth stops; model will see user_interrupted next turn
+ try { cancelRealtimeIfActive(); } catch (e) {}
  stopSpeak({ reason: reason || "barge_in" });
  }
 
@@ -3127,9 +3326,31 @@
  state._turnBusy = false;
  return;
  }
+ // Live screen vision (request 60): when the owner has granted screen access,
+ // AUTO-ATTACH a fresh screenshot to this turn so the brain ALWAYS sees the
+ // current screen — no see_screen round-trip, no "want me to look?" (Ford
+ // 2026-07-17: vision was granted but she answered from the text digest and
+ // only OFFERED to look). Skip the see_screen re-turn (already carries a shot)
+ // and any turn where the owner attached their own file. Marked _autoScreen so
+ // it feeds vision but never shows as a 📎 chip in the message.
+ if (source !== "screen_vision" && !pendingAttach.length && screenVisionLive()) {
+ setStatus("Looking at your screen…", "think");
+ try {
+ var _shotBlob = await captureScreenBlob();
+ if (turnGen === (state._turnAbortGen || 0) && _shotBlob) {
+ var _shotAsset = await uploadScreenBlob(_shotBlob);
+ if (_shotAsset && turnGen === (state._turnAbortGen || 0)) {
+ _shotAsset._autoScreen = true;
+ pendingAttach.push(_shotAsset);
+ }
+ }
+ } catch (e) {}
+ }
  // Capture attachments for this turn, clear UI immediately so a retry doesn't double-send
  var attachIds = pendingAttach.map(function (a) { return a.id; }).filter(Boolean);
- var attachNames = pendingAttach.map(function (a) { return a.filename || "file"; });
+ var attachNames = pendingAttach
+ .filter(function (a) { return !a._autoScreen; })
+ .map(function (a) { return a.filename || "file"; });
  if (attachIds.length) {
  state.attachments = [];
  renderEaAttachments();
@@ -3243,6 +3464,11 @@
  var chatCtx = packContext() || {};
  // Backend uses source + voice_source for tight spoken replies (less barge-in cutoffs)
  if (isVoiceTurn) chatCtx.voice_source = true;
+ // Live screen vision: the attached image IS the owner's current screen — tell
+ // the brain so it LOOKS and answers directly instead of offering to look.
+ if (pendingAttach.some(function (a) { return a && a._autoScreen; })) {
+ chatCtx.screen_vision_active = true;
+ }
  // Voice OUTPUT live (spoken aloud) even for a typed turn → backend spends the
  // humanizer pass so the mouth gets a real one-liner, not a truncated wall.
  if (!state.voiceMuted && (state.listening || state.micStream || isVoiceTurn)) {
@@ -3289,7 +3515,7 @@
  var mouthLine = ownerFacingSpeak(
  (d.speak && String(d.speak).trim()) || reply
  );
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: mouthLine });
  clearTools();
 
  // Cut interim "one second…" filler, then deliver the real answer immediately
@@ -3389,9 +3615,17 @@
  if (!state.thinking || state.voiceMuted) return;
  if (state._interimSpoken) return;
  var line = pickThinkingFiller(userText);
+ setStatus(line, "think");
+ // VOICE FILLER OFF by default (Ford 2026-07-16). Speaking a contextual
+ // "one second" line and then cancelling it for the real answer was the
+ // "dumb blonde, then smart restart": a SECOND driven response per turn,
+ // stacking up over the conversation ("start clean, later chaos"). The log
+ // proved every response was weSent=true — us, not the pure-voice model.
+ // Show the line as status TEXT; never speak it. One spoken response per
+ // turn = the answer. window.__EA_VOICE_FILLER=true re-arms spoken fillers.
+ if (window.__EA_VOICE_FILLER !== true) return;
  state._interimSpoken = true;
  state._thinkingFillerActive = true;
- setStatus(line, "think");
  enqueueSpeak(line, {
  source: "thinking_filler",
  force: true,
@@ -3427,6 +3661,12 @@
  if (sd.mind) onMindPlanFromChat(sd.mind);
  // Only use mind line if we haven't started a filler yet
  if (!state.thinking || state.voiceMuted) return;
+ // Voice filler OFF (see above): show the mind's steer line as status TEXT,
+ // never speak it — a spoken filler here is the same second-response bug.
+ if (window.__EA_VOICE_FILLER !== true) {
+ setStatus(sd.speak, "think");
+ return;
+ }
  if (state._interimSpoken || state._thinkingFillerActive) {
  setStatus(sd.speak, "think");
  return;
@@ -3525,6 +3765,13 @@
  function isVisualFixIntent(text) {
  var t = String(text || "").toLowerCase();
  if (!t || t.length < 8) return false;
+ // A QUESTION about the UI ("what's the point of this button", "what does X
+ // do", "why is this here") is an ASK, not a fix request — let the agent
+ // answer it (with screen vision), never auto-open the build flow.
+ // Ford 2026-07-17: asked what a button did and it kicked off an improvement.
+ if (/(^|\b)(what('?s| is| are| does| do)?|why|how|where|which|who|explain|describe|tell me|point of|purpose of)\b/.test(t)) {
+ return false;
+ }
  // Exclude pure data/ops asks
  if (/\b(share|percent|kwh|invoice|offtaker|underperform|fault|login password)\b/.test(t)
  && !/\b(button|color|colour|look|ugly|style|design|theme)\b/.test(t)) {
@@ -3658,6 +3905,119 @@
  return cmds;
  }
 
+ // ── Live screen vision (request 60, the agent's own capability request) ────
+ // Grant screen-share ONCE, keep the stream, snapshot a frame on demand and hand
+ // it to the brain as an image (Claude vision) so she SEES the rendered UI instead
+ // of guessing from a text digest. Fully opt-in: nothing is captured until the
+ // owner approves the browser prompt, and the see_screen tool is a dormant skill.
+ function screenVisionLive() {
+ try {
+ return !!(state.screenStream &&
+ state.screenStream.getVideoTracks().some(function (t) { return t.readyState === "live"; }));
+ } catch (e) { return false; }
+ }
+ async function grantScreenVision() {
+ if (screenVisionLive()) return true;
+ if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+ addMsg("agent", "This browser can't share the screen for me to see — try Chrome or Edge.");
+ return false;
+ }
+ try {
+ var stream = await navigator.mediaDevices.getDisplayMedia({
+ video: { frameRate: 2 },
+ audio: false,
+ preferCurrentTab: true, // Chrome hint: default to THIS tab
+ selfBrowserSurface: "include",
+ });
+ state.screenStream = stream;
+ var vt = stream.getVideoTracks()[0];
+ if (vt) vt.addEventListener("ended", function () { state.screenStream = null; syncScreenBtn(); });
+ syncScreenBtn();
+ return true;
+ } catch (e) {
+ return false; // denied / cancelled
+ }
+ }
+ function stopScreenVision() {
+ try { state.screenStream && state.screenStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+ state.screenStream = null;
+ syncScreenBtn();
+ }
+ async function captureScreenBlob() {
+ if (!screenVisionLive()) return null;
+ var track = state.screenStream.getVideoTracks()[0];
+ var src = null, vw = 0, vh = 0, videoEl = null;
+ try {
+ if (window.ImageCapture) {
+ var bmp = await new window.ImageCapture(track).grabFrame();
+ src = bmp; vw = bmp.width; vh = bmp.height;
+ }
+ } catch (e) { src = null; }
+ if (!src) {
+ videoEl = document.createElement("video");
+ videoEl.muted = true; videoEl.srcObject = state.screenStream;
+ try { await videoEl.play(); } catch (e) {}
+ await new Promise(function (res) {
+ if (videoEl.videoWidth) return res();
+ videoEl.onloadedmetadata = res; setTimeout(res, 700);
+ });
+ src = videoEl; vw = videoEl.videoWidth || 1280; vh = videoEl.videoHeight || 720;
+ }
+ if (!vw || !vh) return null;
+ var maxW = 1400;
+ var scale = vw > maxW ? maxW / vw : 1;
+ var cw = Math.max(1, Math.round(vw * scale)), ch = Math.max(1, Math.round(vh * scale));
+ var canvas = document.createElement("canvas");
+ canvas.width = cw; canvas.height = ch;
+ try { canvas.getContext("2d").drawImage(src, 0, 0, cw, ch); } catch (e) { return null; }
+ if (videoEl) { try { videoEl.pause(); videoEl.srcObject = null; } catch (e) {} }
+ return await new Promise(function (res) {
+ try { canvas.toBlob(function (b) { res(b); }, "image/jpeg", 0.75); }
+ catch (e) { res(null); }
+ });
+ }
+ async function uploadScreenBlob(blob) {
+ var fd = new FormData();
+ fd.append("file", blob, "screen-" + Date.now() + ".jpg");
+ var headers = authHeaders(); delete headers["Content-Type"];
+ try {
+ var r = await fetch(API.upload, { method: "POST", headers: headers, body: fd });
+ var d = await r.json().catch(function () { return {}; });
+ return (r.ok && d && d.asset) ? d.asset : null;
+ } catch (e) { return null; }
+ }
+ /** Full flow: ensure grant → capture → upload → re-invoke the brain WITH the image. */
+ async function runSeeScreen(reason) {
+ var ok = screenVisionLive() || (await grantScreenVision());
+ if (!ok) {
+ addMsg("agent", "I need permission to see your screen — click the 👁 button below and choose “This Tab.”");
+ return;
+ }
+ setStatus("Looking at your screen…", "think");
+ var blob = await captureScreenBlob();
+ if (!blob) { addMsg("agent", "I couldn't grab the screen just now — try once more?"); return; }
+ var asset = await uploadScreenBlob(blob);
+ if (!asset) { addMsg("agent", "The screen capture didn't upload — try once more?"); return; }
+ if (!state.attachments) state.attachments = [];
+ state.attachments.push(asset);
+ var note = "Here's my screen right now — take a look" + (reason ? (" (" + reason + ")") : "") + ".";
+ turn(note, "screen_vision", {}).catch(function () {});
+ }
+ function syncScreenBtn() {
+ var btn = document.getElementById("eaScreenBtn");
+ if (!btn) return;
+ var on = screenVisionLive();
+ btn.classList.toggle("ea-screen-on", on);
+ btn.setAttribute("aria-pressed", on ? "true" : "false");
+ btn.title = on ? "Energy Agent can see your screen — click to stop" : "Let Energy Agent see your screen";
+ // Octarine "live" glow when granted (no separate stylesheet needed).
+ try {
+ btn.style.color = on ? "#7b5cff" : "";
+ btn.style.borderColor = on ? "rgba(123,92,255,.55)" : "";
+ btn.style.boxShadow = on ? "0 0 0 1px rgba(123,92,255,.35), 0 0 12px -4px rgba(123,92,255,.6)" : "";
+ } catch (e) {}
+ }
+
  // ── browser driver ───────────────────────────────────────────────────────
  async function runCommand(cmd) {
  if (!cmd) return;
@@ -3785,6 +4145,11 @@
  if (cmd.args && cmd.args.suggestion_id) watchBuild(cmd.args.suggestion_id);
  ok = true;
  detail = cmd.args || {};
+ } else if (cmd.type === "see_screen") {
+ // Brain asked to see the screen: capture → upload → re-turn with the image.
+ runSeeScreen(cmd.reason || (cmd.args && cmd.args.reason) || "");
+ ok = true;
+ detail = { reason: cmd.reason || "" };
  } else {
  detail = { error: "unknown command type" };
  }
@@ -4848,6 +5213,37 @@
  return !!(state.speaking || state.rtResponseActive);
  }
 
+ // ── Pure-voice freestyle backstop (mouth-only) ────────────────────────
+ // Silence the WEBRTC audio element itself, so a freestyle is never HEARD even
+ // if the Realtime API ignores response.cancel or create_response leaked ON.
+ function _muteMouthEl() {
+ try { if (state.audioEl) { state.audioEl.muted = true; state.audioEl.volume = 0; } } catch (e) {}
+ }
+ function _unmuteMouthEl() {
+ // Respect the user's own voice-mute; otherwise restore audible.
+ try {
+ if (state.audioEl) {
+ state.audioEl.muted = !!state.voiceMuted;
+ state.audioEl.volume = state.voiceMuted ? 0 : 1;
+ }
+ } catch (e) {}
+ }
+ function _killFreestyle(rid) {
+ _muteMouthEl();
+ try {
+ if (state.dc && state.dc.readyState === "open") {
+ state.dc.send(JSON.stringify({ type: "response.cancel" }));
+ state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ }
+ } catch (e) {}
+ state.rtResponseActive = false;
+ state.speaking = false;
+ state._freestyleId = rid || state._freestyleId || null;
+ if (window.console && console.warn) {
+ console.warn("[EA] muted+killed undriven pure-voice response", rid || "");
+ }
+ }
+
  /** Hard stop / hold phrases, always interrupt, even mid-think / mid-tour / mid-speech. */
  function isStopCommand(said) {
  var t = String(said || "")
@@ -5232,7 +5628,7 @@
  var spoken =
  ownerFacingSpeak((ev.spoken && String(ev.spoken).trim()) || reply) || reply;
  if (reply) {
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: spoken });
  state._lastAgentBubble = reply.slice(0, 200);
  state._suppressNextAgentTranscript = true;
  }
@@ -5448,7 +5844,7 @@
  // Panel gets the full deep-brain write-up once; suppress Realtime's re-spoken
  // transcript bubble so we don't double-post (weave fix).
  if (reply) {
- addMsg("agent", reply);
+ addMsg("agent", reply, { spoken: spoken });
  state._lastAgentBubble = reply.slice(0, 200);
  state._suppressNextAgentTranscript = true;
  }
@@ -5618,6 +6014,9 @@
 
  function stopSpeak(opts) {
  opts = opts || {};
+ // Restore the speaker each turn so a freestyle-mute can never get stuck if
+ // our own answer never arrives (respects the user's voice-mute).
+ try { _unmuteMouthEl(); } catch (e) {}
  // Protect first intro: only hard "stop" / panel close may cut it
  if (
  state._greetingPlaying &&
@@ -5895,6 +6294,10 @@
  // Mark THIS response as our own driven speech so the deep-think silence
  // guard lets narration/answers play while still killing GPT freestyle.
  state._drivenSpeak = true;
+ // One-shot: the VERY NEXT response.created is ours (we're sending it now).
+ // Set synchronously right before the send so no freestyle can slip a
+ // response.created in between — the mouth guard consumes this flag.
+ state._weSentCreate = true;
  state.dc.send(JSON.stringify({
  type: "response.create",
  response: {
@@ -6016,23 +6419,42 @@
  // and if it never lands the session keeps OpenAI's create_response default
  // (ON); the "only speak lines the app sends" instruction is persuasion, not
  // enforcement. So kill any undriven response before a word reaches the ear.
- if (
- !VOICE_WEAVE &&
- !state._drivenSpeak &&
- (ev.type === "response.created" || ev.type === "output_audio_buffer.started")
- ) {
+ // Track OUR response by ID, not a race-prone flag. sendCreate sets
+ // _weSentCreate synchronously right before response.create, so the very next
+ // response.created is ours — we record its id. EVERY response/audio event for
+ // any OTHER id is the pure-voice model authoring on its own: cancel it AND
+ // mute the audio element so it's never heard, even if the API ignores cancel
+ // or create_response leaked ON. Diagnostics logged so the event stream is
+ // visible in the console (Ford 2026-07-16 — freestyle still slipping through).
+ if (!VOICE_WEAVE && (/^response[.]/.test(ev.type) || /^output_audio/.test(ev.type))) {
+ var _rid = (ev.response && ev.response.id) || ev.response_id ||
+ (ev.item && ev.item.id) || null;
+ if (window.__EA_VOICE_DIAG !== false && window.console) {
  try {
- if (state.dc && state.dc.readyState === "open") {
- state.dc.send(JSON.stringify({ type: "response.cancel" }));
- state.dc.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+ console.log("[EA-DIAG]", ev.type, "rid=" + _rid,
+ "weSent=" + !!state._weSentCreate, "ourId=" + (state._ourResponseId || "-"),
+ "driven=" + !!state._drivenSpeak);
+ } catch (eD) {}
  }
- } catch (eFs) {}
- state.rtResponseActive = false;
- state.speaking = false;
- if (window.console && console.warn) {
- console.warn("[EA] killed an undriven Realtime response (mouth-only: GPT must not author)");
- }
+ if (ev.type === "response.created") {
+ if (state._weSentCreate) {
+ state._weSentCreate = false; // consume — this response is ours
+ state._ourResponseId = _rid;
+ _unmuteMouthEl(); // our own answer must be audible
+ } else {
+ // Pure-voice model authoring on its own → mute the speaker + cancel.
+ // The mute persists (nothing un-mutes it) until OUR next answer's
+ // response.created fires above, so even a cancel the API ignores is
+ // never heard.
+ _killFreestyle(_rid);
  return;
+ }
+ } else if (ev.type === "output_audio_buffer.started" &&
+ !state._weSentCreate && _rid && _rid !== state._ourResponseId) {
+ // Backstop: freestyle audio whose response.created we somehow missed.
+ _killFreestyle(_rid);
+ return;
+ }
  }
  // Track whether a Realtime response is in flight (so cancel is safe)
  if (ev.type === "response.created" || ev.type === "response.output_item.added") {
@@ -6415,7 +6837,13 @@
  "Never cut yourself off mid-sentence.",
  audio: {
  input: {
- transcription: { model: "gpt-4o-mini-transcribe" },
+ transcription: {
+ model: "gpt-4o-mini-transcribe",
+ // Bias the STT toward product vocabulary so it stops hearing
+ // "Array Operator" as "ray operator" and mangling vendor names
+ // (Ford 2026-07-17). gpt-4o-mini-transcribe takes a prompt hint.
+ prompt: EA_STT_PROMPT,
+ },
  noise_reduction: { type: "near_field" },
  turn_detection: realtimeVadConfig(),
  },
