@@ -3019,8 +3019,11 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 
 /* Ongoing = a live problem. Loud enough to separate from history, quiet enough that a
    log of five old outages doesn't turn the sheet into a wall of red. */
-.vs-dc-ep.live{ border-left-color:var(--bad,#dc2626); background:rgba(220,38,38,.05);
-  border-color:rgba(220,38,38,.22); }
+/* border-left-color MUST come after the border-color shorthand — the shorthand resets
+   all four sides, so declaring the spine first silently loses it (it rendered a pale
+   rgba(220,38,38,.24) instead of solid red until live DOM verification caught it). */
+.vs-dc-ep.live{ background:rgba(220,38,38,.05); border-color:rgba(220,38,38,.22);
+  border-left-color:var(--bad,#dc2626); }
 .vs-dc-ep.live .vs-dc-ep-range{ color:var(--bad,#dc2626); }
 .vs-dc-ep.live .vs-dc-ep-cause{ color:var(--ink,#0f172a); }
 .vs-dc-ep.live .vs-dc-ep-live{ animation:vsDcPulse 2.4s ease-in-out infinite; }
