@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260717uiquestion1";
+ var EA_BUILD = "20260717autoscreen1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3326,9 +3326,31 @@
  state._turnBusy = false;
  return;
  }
+ // Live screen vision (request 60): when the owner has granted screen access,
+ // AUTO-ATTACH a fresh screenshot to this turn so the brain ALWAYS sees the
+ // current screen — no see_screen round-trip, no "want me to look?" (Ford
+ // 2026-07-17: vision was granted but she answered from the text digest and
+ // only OFFERED to look). Skip the see_screen re-turn (already carries a shot)
+ // and any turn where the owner attached their own file. Marked _autoScreen so
+ // it feeds vision but never shows as a 📎 chip in the message.
+ if (source !== "screen_vision" && !pendingAttach.length && screenVisionLive()) {
+ setStatus("Looking at your screen…", "think");
+ try {
+ var _shotBlob = await captureScreenBlob();
+ if (turnGen === (state._turnAbortGen || 0) && _shotBlob) {
+ var _shotAsset = await uploadScreenBlob(_shotBlob);
+ if (_shotAsset && turnGen === (state._turnAbortGen || 0)) {
+ _shotAsset._autoScreen = true;
+ pendingAttach.push(_shotAsset);
+ }
+ }
+ } catch (e) {}
+ }
  // Capture attachments for this turn, clear UI immediately so a retry doesn't double-send
  var attachIds = pendingAttach.map(function (a) { return a.id; }).filter(Boolean);
- var attachNames = pendingAttach.map(function (a) { return a.filename || "file"; });
+ var attachNames = pendingAttach
+ .filter(function (a) { return !a._autoScreen; })
+ .map(function (a) { return a.filename || "file"; });
  if (attachIds.length) {
  state.attachments = [];
  renderEaAttachments();
@@ -3442,6 +3464,11 @@
  var chatCtx = packContext() || {};
  // Backend uses source + voice_source for tight spoken replies (less barge-in cutoffs)
  if (isVoiceTurn) chatCtx.voice_source = true;
+ // Live screen vision: the attached image IS the owner's current screen — tell
+ // the brain so it LOOKS and answers directly instead of offering to look.
+ if (pendingAttach.some(function (a) { return a && a._autoScreen; })) {
+ chatCtx.screen_vision_active = true;
+ }
  // Voice OUTPUT live (spoken aloud) even for a typed turn → backend spends the
  // humanizer pass so the mouth gets a real one-liner, not a truncated wall.
  if (!state.voiceMuted && (state.listening || state.micStream || isVoiceTurn)) {
