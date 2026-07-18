@@ -602,6 +602,7 @@
  ${r.invId!=null?`<button type="button" class="cc-act" data-do="openinv" data-key="${esc(r.key)}">🔍 Open in Inverters</button>`:""}
  ${vendorPortalBtnHTML(r)}
  ${isClaim?`<button type="button" class="cc-act" data-do="claim" data-key="${esc(r.key)}">✉️ ${r.status==="fault"?"Draft service request":"Draft warranty claim"}</button>`:""}
+ ${r.arrayId!=null?`<button type="button" class="cc-act" data-do="prospectus" data-key="${esc(r.key)}" title="Build a shareable data-room prospectus for this array">📄 Prepare prospectus</button>`:""}
  <span class="cc-act-sp"></span>
  <button type="button" class="cc-act ghost${st==="progress"?" on":""}" data-do="progress" data-key="${esc(r.key)}">${st==="progress"?"In progress ✓":"Mark in progress"}</button>
  <button type="button" class="cc-act ghost${st==="snoozed"?" on":""}" data-do="snooze" data-key="${esc(r.key)}">${st==="snoozed"?"Snoozed ✓":"Snooze"}</button>
@@ -668,6 +669,7 @@
  if(act==="claim"){ openClaim(r); FleetStore.setTriage(key,"progress"); }
  else if(act==="ea" && r){ askEnergyAgent(r); FleetStore.setTriage(key,"progress"); }
  else if(act==="openinv" && r){ openInInverters(r); }
+ else if(act==="prospectus" && r){ if(window.AOProspectus){ window.AOProspectus.open(r.arrayId, r.site); } }
  else if(act==="progress"){ FleetStore.setTriage(key,"progress"); }
  else if(act==="snooze"){ FleetStore.setTriage(key,"snoozed"); }
  else if(act==="focus" && r){
