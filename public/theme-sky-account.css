@@ -356,21 +356,8 @@ html.sky .ar-picker-request.ar-picker-item-on{
 }
 html.sky .ar-picker-req-ico{background:linear-gradient(180deg,#6F5CE8,#5847D2)}
 html.sky .ar-picker-queued-check{background:var(--good)}
-/* "+ Add a utility login": a dashed glass card, not a pill (theme-sky's blanket
-   .acct-btn pill radius reads wrong on a 52px full-width card button) */
-html.sky .ar-addutil-btn{
-  border-radius:14px !important;
-  border:1.5px dashed rgba(70,101,140,.5) !important;
-  background:rgba(33,150,243,.04) !important;
-  color:#46658C !important;
-  font-weight:650 !important;
-  box-shadow:none !important;
-}
-html.sky .ar-addutil-btn:hover{
-  border-color:var(--ao-oct) !important;
-  color:var(--ao-oct) !important;
-  background:var(--ao-oct-soft) !important;
-}
+/* "+ Add utility login" keeps theme-sky's standard .acct-btn pill so it is
+   identical to "+ Add inverter login" (Ford 2026-07-19). */
 html.sky .ar-req-send{
   border-radius:11px;
   background:linear-gradient(180deg,#6F5CE8,#5847D2);

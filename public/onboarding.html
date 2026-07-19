@@ -1189,7 +1189,7 @@ async function wireCloudVault(){
  <div class="cv-group-s">Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor.</div>
  ${shownInvs.map(invCard).join("")}
  ${pickableInvs.length ? `<div class="cv-addutil" data-kind="inv">
- <button type="button" class="cv-addutil-btn">+ Add an inverter login</button>
+ <button type="button" class="cv-addutil-btn">+ Add inverter login</button>
  <div class="cv-picker" hidden>
  <div class="cv-picker-results">${pickableInvs.map(v => `<button type="button" class="cv-picker-item" data-code="${esc(v.id)}">${esc(v.label)}</button>`).join("")}</div>
  </div>
@@ -1200,7 +1200,7 @@ async function wireCloudVault(){
  <div class="cv-group-s">Utility bills, refreshed daily, powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</div>
  ${shownCodes.map(utilCard).join("")}
  <div class="cv-addutil" data-kind="util">
- <button type="button" class="cv-addutil-btn">+ Add a utility login</button>
+ <button type="button" class="cv-addutil-btn">+ Add utility login</button>
  <div class="cv-picker" hidden>
  <input type="text" class="cv-picker-search" autocomplete="off" placeholder="Search your utility, GMP, a co-op, a city…">
  <div class="cv-picker-results"></div>

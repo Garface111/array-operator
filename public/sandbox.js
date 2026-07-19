@@ -5418,7 +5418,7 @@
  }
  const _arAddedUtils = new Set(); // utility codes the operator picked this session (show an empty card to fill)
  const _arAddedInv = new Set(); // inverter vendor codes picked this session (same picker→tile idiom)
- // The inverter vendors offered in "+ Add an inverter login". Same condensed
+ // The inverter vendors offered in "+ Add inverter login". Same condensed
  // picker→tile pattern the utility panel already uses (Ford 2026-07-18): the
  // panel shows only what you've CONNECTED, everything else waits behind the
  // picker so attention lands on one action instead of six vendor forms.
@@ -6454,7 +6454,7 @@
  <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
  ${shownInvCodes.map(invTileFor).join("")}
  <div class="ar-addutil ar-addinv">
- <button type="button" class="acct-btn ar-addinv-btn">+ Add an inverter login</button>
+ <button type="button" class="acct-btn ar-addinv-btn">+ Add inverter login</button>
  <div class="ar-picker ar-picker-inv" hidden>
  <div class="ar-picker-shell">
  <input type="text" class="ar-picker-search ar-invpicker-search" autocomplete="off" placeholder="Search SolarEdge, AlsoEnergy, Locus, Fronius, SMA, Chint…" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arInvPickerList">
@@ -6469,7 +6469,7 @@
  <div class="ar-group-head"><span class="ar-group-title">Utility portals</span><span class="ar-group-sub">Utility bills, refreshed daily, powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</span></div>
  ${shownCodes.map(utilCard).join("")}
  <div class="ar-addutil">
- <button type="button" class="acct-btn ar-addutil-btn">+ Add a utility login</button>
+ <button type="button" class="acct-btn ar-addutil-btn">+ Add utility login</button>
  <div class="ar-picker" hidden>
  <div class="ar-picker-shell">
  <input type="text" class="ar-picker-search" autocomplete="off" placeholder="Search your utility, GMP, a co-op, a city…" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arPickerList">

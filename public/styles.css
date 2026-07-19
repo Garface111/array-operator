@@ -413,7 +413,8 @@
   .ar-util-name{font-size:13.5px;font-weight:700;color:var(--ink)}
   .ar-util .ar-row{border-color:rgba(255,255,255,.08);background:transparent;padding:9px 10px}
   .ar-addutil{margin-top:2px}
-  .ar-addutil-btn{width:100%;border-style:dashed;color:var(--muted);font-weight:600}
+  /* '+ Add utility login' matches '+ Add inverter login': both are plain
+     .acct-btn pills (Ford 2026-07-19). No width:100%/dashed card treatment. */
   .ar-picker{margin-top:8px}
   .ar-picker-shell{border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--bg);
     box-shadow:0 10px 32px -16px rgba(20,40,80,.28)}
@@ -476,7 +477,6 @@
      lone utility) and only spans full-width once its search picker is open. */
   .ar-panel .ar-addutil{grid-column:auto;display:flex;flex-direction:column}
   .ar-panel .ar-addutil:has(.ar-picker:not([hidden])){grid-column:1/-1}
-  .ar-addutil-btn{min-height:52px;border-radius:12px}
 
   /* ══ LIVE DATA BOARD — "what we have + what we're doing", the watch-it-run instrument.
      A dense operator board: one row per connected portal, a pulsing green dot when it's
