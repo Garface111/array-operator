@@ -7980,7 +7980,10 @@
  try{ window.__aoSlideDebug = {firstApply:_firstApply, slideOK:_slideOK,
    prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
    anSubHop:_anSubHop, willSlide:_willSlide, hash:location.hash,
-   fn:typeof window.__aoTabSlide}; }catch(_d){}
+   fn:typeof window.__aoTabSlide,
+   activeAtEntry:[].slice.call(document.querySelectorAll(".panel.active")).map(function(p){return p.id;}),
+   anyActive:[].slice.call(document.querySelectorAll(".active")).map(function(p){return p.id||p.className;}).slice(0,8)
+ }; }catch(_d){}
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
