@@ -40,6 +40,12 @@ this file is the *look, feel, and conduct* of the product.)
   TOP-LEVEL bands only (nav, sub-tab pill bar, sheet edges); content cards are
   near-solid (`~.86` alpha) so text never sits on mush. Everything content
   lives inside the safe-zone sheet; nothing floats naked on the photo.
+  **Attach the sheet to the CONTAINER, never to one view's own wrapper.** In
+  Marketplace it lives on `.mk-pane` (the per-sub pane every sub mounts into),
+  so a new sub is inside the safe zone for free. It was pinned to `.mk-wrap` —
+  a class only Credit Exchange rendered — which left Array Market and the REC
+  desk floating on the photo until 2026-07-19. If you add a sheet, ask which
+  element *every* view is guaranteed to have.
 - **Octarine (violet) is the AI's signature — and ONLY the AI's.** Octarine
   marks Energy Agent presence/actions (Ask Energy Agent, agent chips, vacancy
   insights she computed). A human CRUD button is never octarine. If everything
