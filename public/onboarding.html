@@ -1022,6 +1022,7 @@ const CLOUD_INVERTERS = [
 const CLOUD_INV_IDS = new Set(CLOUD_INVERTERS.map(v=>v.id));
 let _cloudCatalog = null;
 let _cloudAddedUtils = []; // utility codes picked this session (show an empty card to fill)
+let _cloudAddedInvs = [];  // inverter vendor ids picked this session (same idea, inverter side)
 
 // cloudApi mirrors sandbox.js cloudOp, but authed with the freshly-minted onboarding
 // session (state.sessionToken) instead of the dashboard's authHeaders().
@@ -1170,13 +1171,15 @@ async function wireCloudVault(){
  return `<div class="cv-portal" data-code="${esc(code)}"><div class="cv-portal-name">${esc(name)}</div>${saved}${add}</div>`;
  };
 
- // Defaults always visible: GMP + Eversource + CMP (newly live), then any
- // saved logins + anything just picked from the catalog.
+ // Only what the account actually has gets a tile: saved logins first, then
+ // anything picked from a picker this session. A clean account starts empty and
+ // adds one portal at a time, instead of a wall of six blank credential cards.
+ const shownInvs = CLOUD_INVERTERS.filter(v => (byCode[v.id]||[]).length > 0 || (_cloudAddedInvs||[]).indexOf(v.id)!==-1);
+ const shownInvIds = new Set(shownInvs.map(v=>v.id));
+ const pickableInvs = CLOUD_INVERTERS.filter(v => !shownInvIds.has(v.id));
+
  const shownCodes = [];
  const pushCode = (c) => { if(c && shownCodes.indexOf(c)===-1) shownCodes.push(c); };
- pushCode("gmp");
- pushCode("eversource");
- pushCode("cmp");
  Object.keys(byCode).filter(c => byCode[c].some(l=>l.utility)).sort().forEach(pushCode);
  (_cloudAddedUtils||[]).forEach(pushCode);
 
@@ -1184,13 +1187,19 @@ async function wireCloudVault(){
  <div class="cv-group">
  <div class="cv-group-h">Inverter portals</div>
  <div class="cv-group-s">Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor.</div>
- ${CLOUD_INVERTERS.map(invCard).join("")}
+ ${shownInvs.map(invCard).join("")}
+ ${pickableInvs.length ? `<div class="cv-addutil" data-kind="inv">
+ <button type="button" class="cv-addutil-btn">+ Add an inverter login</button>
+ <div class="cv-picker" hidden>
+ <div class="cv-picker-results">${pickableInvs.map(v => `<button type="button" class="cv-picker-item" data-code="${esc(v.id)}">${esc(v.label)}</button>`).join("")}</div>
+ </div>
+ </div>` : ""}
  </div>
  <div class="cv-group">
  <div class="cv-group-h">Utility portals</div>
  <div class="cv-group-s">Utility bills, refreshed daily, powers automatic offtaker invoices and billing reports. Add a login for each utility you bill through.</div>
  ${shownCodes.map(utilCard).join("")}
- <div class="cv-addutil">
+ <div class="cv-addutil" data-kind="util">
  <button type="button" class="cv-addutil-btn">+ Add a utility login</button>
  <div class="cv-picker" hidden>
  <input type="text" class="cv-picker-search" autocomplete="off" placeholder="Search your utility, GMP, a co-op, a city…">
@@ -1303,31 +1312,72 @@ async function wireCloudVault(){
  if(optEl) optEl.addEventListener("change", async () => { await cloudApi("toggle", { provider:saveCode, username:(userEl.value||"").trim(), enable: !optEl.checked }); wireCloudVault(); });
  });
 
- // ── wire the searchable utility picker over the whole live catalog ──
- const addBtn = listEl.querySelector(".cv-addutil-btn");
- const picker = listEl.querySelector(".cv-picker");
- const searchEl = listEl.querySelector(".cv-picker-search");
- const resultsEl = listEl.querySelector(".cv-picker-results");
- if(addBtn && picker){ addBtn.addEventListener("click", () => { picker.hidden = !picker.hidden; if(!picker.hidden) setTimeout(()=>searchEl&&searchEl.focus(),30); }); }
+ // ── pickers ──
+ // Same affordance on both sides: a dashed "+ Add …" button that reveals a
+ // .cv-picker. The utility one searches the whole live catalog; the inverter one
+ // is a short fixed list, so it needs no search box. `onPick(code)` records the
+ // choice, re-renders, and drops the cursor in the new card's first field.
+ const pickPortal = (code, bucket) => {
+ if(bucket.indexOf(code)===-1) bucket.push(code);
+ wireCloudVault().then(() => {
+ const card = listEl.querySelector(`.cv-portal[data-code="${CSS.escape(code)}"]`);
+ if(card){ card.scrollIntoView({behavior:"smooth",block:"center"}); const u = card.querySelector(".cv-row:last-child .cv-user"); if(u) u.focus(); }
+ });
+ };
+ // Open/close + keyboard for one picker box. Escape closes and returns focus to
+ // the button; ↑/↓ walk the results; Enter fires the focused item natively.
+ const wirePickerBox = (box, onRender) => {
+ if(!box) return;
+ const addBtn = box.querySelector(".cv-addutil-btn");
+ const picker = box.querySelector(".cv-picker");
+ const searchEl = box.querySelector(".cv-picker-search");
+ if(!addBtn || !picker) return;
+ const close = (refocus) => { picker.hidden = true; if(refocus) addBtn.focus(); };
+ addBtn.addEventListener("click", () => {
+ picker.hidden = !picker.hidden;
+ if(!picker.hidden) setTimeout(()=>{
+ const first = searchEl || picker.querySelector(".cv-picker-item");
+ if(first) first.focus();
+ },30);
+ });
+ box.addEventListener("keydown", (e) => {
+ if(picker.hidden) return;
+ if(e.key === "Escape"){ e.stopPropagation(); close(true); return; }
+ if(e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+ const items = Array.prototype.slice.call(picker.querySelectorAll(".cv-picker-item"));
+ if(!items.length) return;
+ e.preventDefault();
+ const at = items.indexOf(document.activeElement);
+ if(e.key === "ArrowDown") items[at < 0 ? 0 : Math.min(at+1, items.length-1)].focus();
+ else if(at <= 0){ if(searchEl) searchEl.focus(); else items[0].focus(); }
+ else items[at-1].focus();
+ });
+ if(onRender) onRender(picker, searchEl);
+ };
+
+ // Inverter picker: fixed short list, already in the markup, just bind the picks.
+ wirePickerBox(listEl.querySelector('.cv-addutil[data-kind="inv"]'), (picker) => {
+ picker.querySelectorAll(".cv-picker-item").forEach(it =>
+ it.addEventListener("click", () => pickPortal(it.dataset.code, _cloudAddedInvs)));
+ });
+
+ // Utility picker: searchable over the whole live catalog.
  const codes = Object.keys(catalog);
- if(searchEl && resultsEl){
+ wirePickerBox(listEl.querySelector('.cv-addutil[data-kind="util"]'), (picker, searchEl) => {
+ const resultsEl = picker.querySelector(".cv-picker-results");
+ if(!searchEl || !resultsEl) return;
  const renderResults = () => {
  const q = (searchEl.value||"").trim().toLowerCase();
  if(!q){ resultsEl.innerHTML = `<div class="cv-picker-hint">Type your utility's name (e.g. “Green Mountain”, “Washington Electric”, a city, or a state).</div>`; return; }
  const hits = codes.filter(c => { const l=(catalog[c].label||"").toLowerCase(); return l.includes(q) || c.includes(q) || (catalog[c].state||"").toLowerCase()===q; }).slice(0,25);
  if(!hits.length){ resultsEl.innerHTML = `<div class="cv-picker-hint">No match. Not seeing your utility? It may need to be added, tell us and we'll wire it up.</div>`; return; }
  resultsEl.innerHTML = hits.map(c => `<button type="button" class="cv-picker-item" data-code="${esc(c)}">${esc(catalog[c].label)}${catalog[c].state?` <span class="cv-picker-state">${esc(catalog[c].state)}</span>`:""}</button>`).join("");
- resultsEl.querySelectorAll(".cv-picker-item").forEach(it => it.addEventListener("click", () => {
- if(_cloudAddedUtils.indexOf(it.dataset.code)===-1) _cloudAddedUtils.push(it.dataset.code);
- wireCloudVault().then(() => {
- const card = listEl.querySelector(`.cv-portal[data-code="${CSS.escape(it.dataset.code)}"]`);
- if(card){ card.scrollIntoView({behavior:"smooth",block:"center"}); const u = card.querySelector(".cv-row:last-child .cv-user"); if(u) u.focus(); }
- });
- }));
+ resultsEl.querySelectorAll(".cv-picker-item").forEach(it =>
+ it.addEventListener("click", () => pickPortal(it.dataset.code, _cloudAddedUtils)));
  };
  searchEl.addEventListener("input", renderResults);
  renderResults();
- }
+ });
 }
 
 function cloudFinish(skipped){

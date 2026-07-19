@@ -4384,11 +4384,24 @@
  </span>
  <span class="sb-login-go">Log in <span class="sb-login-arrow">→</span></span>
  </button>`;
- const section = (title, note, codes) => `
+ // Condensed (Ford 2026-07-18): show the few most-used platforms, tuck the rest
+ // behind "More platforms". These are one-click LOGIN actions, so they stay
+ // buttons (a dropdown would add a step to the fastest path) — we just stop
+ // showing ten at once. Same markup + same data-login wiring for every card.
+ const section = (title, note, codes, showFirst) => {
+ const n = typeof showFirst === "number" ? showFirst : codes.length;
+ const head = codes.slice(0, n), rest = codes.slice(n);
+ return `
  <div class="sb-login-sec">
  <div class="sb-login-sec-h">${title}${note ? `<span>${note}</span>` : ""}</div>
- <div class="sb-login-grid">${codes.map(card).join("")}</div>
+ <div class="sb-login-grid">${head.map(card).join("")}</div>
+ ${rest.length ? `
+ <details class="sb-login-more">
+ <summary style="cursor:pointer;font-size:13px;color:var(--muted,#64748b);margin-top:.5rem">More platforms (${rest.length})</summary>
+ <div class="sb-login-grid" style="margin-top:.5rem">${rest.map(card).join("")}</div>
+ </details>` : ""}
  </div>`;
+ };
  // Utility meter quick-picks, defaults always visible (incl. newly live
  // Eversource + CMP). Search covers the other ~470 live utilities.
  const utilFeatured = ["gmp","vec","wec","eversource","cmp"];
@@ -4404,7 +4417,12 @@
  const utilSection = `
  <div class="sb-login-sec">
  <div class="sb-login-sec-h">Utility meter<span>whole-array production · for arrays with no inverter portal</span></div>
- <div class="sb-login-grid">${utilFeatured.map(card).join("")}</div>
+ <div class="sb-login-grid">${utilFeatured.slice(0,3).map(card).join("")}</div>
+ ${utilFeatured.length > 3 ? `
+ <details class="sb-login-more">
+ <summary style="cursor:pointer;font-size:13px;color:var(--muted,#64748b);margin-top:.5rem">More utilities (${utilFeatured.length - 3})</summary>
+ <div class="sb-login-grid" style="margin-top:.5rem">${utilFeatured.slice(3).map(card).join("")}</div>
+ </details>` : ""}
  <div style="margin-top:.55rem">
  <input type="text" id="sbUtilSearch" placeholder="Other utility? Search your co-op or company name…" autocomplete="off" spellcheck="false"
  style="width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid var(--line,#dbe4ee);border-radius:10px;font-size:14px;background:var(--card,#fff);color:var(--ink,#1e293b)">
@@ -4415,7 +4433,7 @@
  const invFeatured = ["solaredge","alsoenergy","fronius","sma","chint"];
  const loginSections = utilityOnly
  ? utilSection
- : section("Inverter monitoring", "", invFeatured) + utilSection;
+ : section("Inverter monitoring", "", invFeatured, 3) + utilSection;
  // Warm the catalog, then backfill the live utility count into the lede (no
  // hardcoded number, it grows as discovery wires more SmartHub hosts).
  getProviders().then(() => {
@@ -4552,23 +4570,32 @@
  const connectBtn = foot.querySelector("#sbConnect");
 
  function renderGrid(){
- grid.innerHTML = VENDORS.map(vd => {
- const sel = vd.code===vendor ? " sel" : "";
- const soon = vd.available ? "" : " soon";
- const tag = vd.discover ? `<span class="vtag">1 key</span>` : (vd.available ? "" : `<span class="vtag">soon</span>`);
- return `<button type="button" class="sb-vend${sel}${soon}" data-code="${esc(vd.code)}" ${vd.available?"":'aria-disabled="true"'}>
- ${tag}<span class="vn">${esc(vd.label)}</span><span class="vmeta">${esc(vd.meta||"")}</span>
- </button>`;
- }).join("");
- grid.querySelectorAll(".sb-vend").forEach(b => {
- b.onclick = () => {
- const vd = vendorByCode(b.dataset.code);
+ // Condensed: one dropdown instead of a 7-tile grid (Ford 2026-07-18). This
+ // flow was already "select one → its fields appear"; the grid just spent a
+ // screenful saying so. renderFields() below is unchanged.
+ grid.innerHTML =
+ `<label class="sb-fld sb-vendpick">
+ <span class="lab">Monitoring platform</span>
+ <select id="sbVendSel" autocomplete="off"
+ style="width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid var(--line,#dbe4ee);border-radius:10px;font-size:14px;background:var(--card,#fff);color:var(--ink,#1e293b)">
+ ${VENDORS.map(vd => {
+ const bits = [];
+ if(vd.discover) bits.push("1 key");
+ else if(vd.meta) bits.push(vd.meta);
+ if(!vd.available) bits.push("coming soon");
+ const suffix = bits.length ? ` — ${bits.join(" · ")}` : "";
+ return `<option value="${esc(vd.code)}"${vd.code===vendor?" selected":""}${vd.available?"":" disabled"}>${esc(vd.label)}${esc(suffix)}</option>`;
+ }).join("")}
+ </select>
+ </label>`;
+ const selEl = grid.querySelector("#sbVendSel");
+ if(selEl) selEl.onchange = () => {
+ const vd = vendorByCode(selEl.value);
  if(!vd.available) return;
  vendor = vd.code;
  note.className = "sb-note"; note.textContent = "";
  renderGrid(); renderFields();
  };
- });
  }
  function renderFields(){
  const v = vendorByCode(vendor);
@@ -6249,11 +6276,12 @@
  });
  // Which utilities to show as cards: GMP + Eversource (common defaults) + every
  // one with a saved login + anything the operator just picked this session.
+ // Only utilities you've actually SAVED a login for, plus anything picked this
+ // session. GMP/Eversource/CMP used to be force-shown as three empty cards even
+ // for operators who bill through none of them (Ford 2026-07-18) — they're in
+ // the picker's popular list instead, one click away.
  const shownCodes = [];
  const pushCode = (c) => { if(c && shownCodes.indexOf(c) === -1) shownCodes.push(c); };
- pushCode("gmp");
- pushCode("eversource");
- pushCode("cmp");
  Object.keys(utilByCode).sort().forEach(pushCode);
  (_arAddedUtils || []).forEach(pushCode);
 

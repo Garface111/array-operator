@@ -4355,6 +4355,23 @@
  }
 
  let ADD_MODE = "manual"; // "manual" | "upload", active tab in the add panel
+ // Progressive disclosure (Ford 2026-07-19): the manual add form showed ELEVEN
+ // fields at once when only four are required, so the eye had nowhere to land.
+ // The optional billing overrides now fold into an "Advanced billing" <details>,
+ // collapsed by default. Sticky across repaints of the panel (a tab switch
+ // re-renders it wholesale), and forced OPEN by syncAdvOpen() whenever one of
+ // the folded fields already carries a value.
+ let MANUAL_ADV_OPEN = false;
+ // Force the Advanced-billing drawer open when anything inside it is already
+ // set (e.g. the commissioning date prefilled from the picked master array, or
+ // a value the operator typed before a repaint). Only ever OPENS: nothing the
+ // user already set may hide behind a collapsed summary.
+ function syncAdvOpen() {
+ const dt = $("#rbmAdv");
+ if (!dt || dt.open) return;
+ const dirty = [...dt.querySelectorAll("input")].some(i => String(i.value || "").trim() !== "");
+ if (dirty) { dt.open = true; MANUAL_ADV_OPEN = true; }
+ }
  function renderManual() {
  const host = $("#" + MANUAL_HOST_ID);
  if (!host) return;
@@ -4398,9 +4415,20 @@
  <input type="email" id="rbmEmail" placeholder="offtaker@example.com"></label>
  <!-- Money cluster (Bruce C5): share → rate → discount → cross-check read
  as one block, "get the solar credit rate right next to or below the
- share of array". -->
+ share of array". The share stays here (it's required); rate, discount
+ and cross-check sit directly below it in the Advanced drawer, so the
+ reading order survives the fold. -->
  <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
  <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
+ </div>
+ <!-- Everything below is OPTIONAL and saves blank, so it folds away by
+ default (mirrors the offtaker-edit card's .rb-fadv drawer). Native
+ <details> keeps every field IN THE DOM, so saveManual() still reads
+ #rbmCreditRate / #rbmRate / #rbmXThresh / #rbmCommDate / #rbmInvStart
+ / #rbmBudget exactly as before. -->
+ <details class="rb-fadv" id="rbmAdv"${MANUAL_ADV_OPEN ? " open" : ""}>
+ <summary>Advanced billing, solar credit rate, discount, flag threshold, commissioning, invoice numbering, budget</summary>
+ <div class="rb-mform-grid" style="padding:0 15px 15px">
  <!-- Solar credit rate (Ford 2026-07-07): an EDITABLE $/kWh override for
  every offtaker, defaulting to the bill's own rate. This slot is
  provider-aware (paintRateField): GMP/unknown → an input that
@@ -4426,6 +4454,7 @@
  <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = use the calculated amount">
  <span class="rb-fld-hint">Set a flat amount this offtaker pays, overrides the calculated total (line items still show).</span></label>
  </div>
+ </details>
  <div class="rb-controls">
  <div class="rb-ctl">
  <span class="rl">When a report is ready</span>
@@ -4493,6 +4522,11 @@
  if (autoNote) autoNote.hidden = b.getAttribute("data-v") !== "auto";
  }));
  $("#rbmSave").onclick = saveManual;
+ // Advanced-billing drawer: remember the operator's own toggle across
+ // repaints, and open it immediately if anything inside is already set.
+ const advDt = $("#rbmAdv");
+ if (advDt) advDt.addEventListener("toggle", () => { MANUAL_ADV_OPEN = advDt.open; });
+ syncAdvOpen();
  // Record an explicit sub-account pick (so a repaint never clobbers it) and
  // repaint the rate field to the picked account's provider.
  const utilElAM = $("#rbmUtility");
@@ -4510,7 +4544,10 @@
  commDateEl.addEventListener("input", () => { commDateEl.dataset.userEdited = "1"; });
  commArrSel.addEventListener("change", () => {
  if (commDateEl.dataset.userEdited) return;
- prefillCommissioningDate(commArrSel.value, commDateEl, $("#rbmRateHint"), commDefHint, true);
+ // The prefill can land a real commissioning date into the folded
+ // drawer, so re-check the fold once it resolves.
+ Promise.resolve(prefillCommissioningDate(commArrSel.value, commDateEl, $("#rbmRateHint"), commDefHint, true))
+ .then(syncAdvOpen, syncAdvOpen);
  });
  }
  // Array-FIRST flow: the operator picks the ARRAY, and we resolve which
