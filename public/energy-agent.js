@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260717autoscreen1";
+ var EA_BUILD = "20260719cleanchat1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -2733,6 +2733,29 @@
  });
  }
 
+ /**
+  * Internal steering text must NEVER render as a user bubble. Two leaks seen
+  * live (Ford 2026-07-19): (1) the tour-wrap instruction ("Call ONLY
+  * account_summary…") is sent as a plain message so it lands in history and
+  * repaints as "you"; (2) on SILENCE the transcriber hallucinates its own
+  * vocabulary prompt (EA_STT_PROMPT) as if the owner spoke it. Filter both by
+  * signature here — also hides ones already stored in old history.
+  */
+ function isInternalSteeringText(t) {
+ t = String(t || "");
+ if (!t) return false;
+ if (/Call ONLY account_summary|Do NOT call ui_navigate|visual .*tour just finished/i.test(t)) return true;
+ if (/Expect these terms:|is a solar fleet platform; its AI/i.test(t)) return true;
+ if (/^\[SPOKEN\]|^\[PANEL\]/i.test(t)) return true;
+ if (/^Analysis only - do NOT send/i.test(t)) return true;
+ // Heavy overlap with the STT vocab prompt = hallucinated prompt echo
+ try {
+ if (typeof EA_STT_PROMPT === "string" &&
+ transcriptOverlapsSpeech(t, EA_STT_PROMPT, 0.6) && t.length > 60) return true;
+ } catch (e) {}
+ return false;
+ }
+
  /** Paint prior turns from the server (no TTS spam on restore). */
  function paintHistory(messages) {
  var host = document.getElementById("eaMsgs");
@@ -2744,6 +2767,8 @@
  if (!m || !m.content) return;
  // Server uses "assistant"; accept either for safety
  var role = m.role === "user" ? "user" : "agent";
+ // Internal steering prompts stored in history must not repaint as "you"
+ if (role === "user" && isInternalSteeringText(m.content)) return;
  // Email-channel turns (repair mailbox) are the same mind surface as chat
  var fromEmail = m.channel === "email" || m.origin === "repair" || !!m.mindUpdate;
  // skipDedup + history: every server turn is kept
@@ -5334,6 +5359,11 @@
  (state._speakEndedAt && now - state._speakEndedAt < echoGuardMs);
  if (withinEchoWindow && looksLikeEchoOfLastSpeech(said)) return false;
  if (isGarbageTranscript(said)) return false;
+ // On SILENCE the transcriber can hallucinate its own vocabulary prompt
+ // (EA_STT_PROMPT) as if the owner spoke it — Ford opened the panel, said
+ // nothing, and the whole vocab list posted as "him" (2026-07-19). Reject any
+ // transcript that is really the prompt echoing back.
+ if (isInternalSteeringText(said)) return false;
  var saidKey = said.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
  // Stronger dedupe: double STT events were starting two full replies
  if (
