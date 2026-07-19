@@ -5536,6 +5536,10 @@
  // password because of exactly this, see solar-operator cloud_capture.py).
  _cloudOk: c.last_harvest_ok, _cloudAt: c.last_harvest_at, _cloudFails: c.harvest_fails || 0,
  _cloudStatus: c.last_harvest_status || null,
+ // T2-1 trust tripwire — how often we actually signed in this calendar month
+ _signIns: c.sign_ins_this_month || 0,
+ _attempts: c.attempts_this_month || 0,
+ _okMonth: c.ok_this_month || 0,
  };
  });
  return shape;
@@ -6175,11 +6179,17 @@
  let cloudLine = "";
  if(mode === "cloud" && hasCreds){
  const cs = cloudStat || {};
- if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>`;
- else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in, check the password</div>`;
- else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine, the last data pull hit a snag, retrying automatically</div>`;
- else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected, refreshing automatically</div>`;
- else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved, first refresh starting…</div>`;
+ // Trust tripwire: count of full username/password logins this UTC month
+ // (warm session reuse is NOT a sign-in). Shown only when we have activity.
+ const signIns = Number(cs.signIns || 0);
+ const activity = signIns > 0
+  ? `<div class="ar-cloud-stat" style="color:var(--faint);font-size:.85em">We signed into this portal <b>${signIns}</b> time${signIns===1?"":"s"} this month</div>`
+  : "";
+ if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>` + activity;
+ else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in, check the password</div>` + activity;
+ else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine, the last data pull hit a snag, retrying automatically</div>` + activity;
+ else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected, refreshing automatically</div>` + activity;
+ else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved, first refresh starting…</div>` + activity;
  }
  // data-origuser = the username this row already owns (case-insensitive match
  // skips self when checking for a duplicate against other saved logins).
@@ -6210,7 +6220,7 @@
  const s = status[k];
  if(!s || !s.utility || !s.hasCreds) return;
  const code = s.code || k;
- (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus });
+ (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Same grouping for INVERTER logins so a vendor card can list N logins (Ford
  // 2026-07-10). Only cloud mode reports slotted inverter entries; on-device
@@ -6222,7 +6232,7 @@
  const s = status[k];
  if(!s || !s.inverter || !s.hasCreds) return;
  const code = s.code || k;
- (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus });
+ (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Which utilities to show as cards: GMP + Eversource (common defaults) + every
  // one with a saved login + anything the operator just picked this session.
@@ -6240,7 +6250,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: code, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: code + "::__new__", saveCode: code, label: "",
@@ -6262,7 +6272,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: v.id, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: v.id + "::__new__", saveCode: v.id, label: "",
@@ -6364,7 +6374,7 @@
  ? AR_INVERTERS.map(invCard).join("")
  : AR_INVERTERS.map(v => {
  const st = status[v.id] || { hasCreds:false, enabled:true };
- return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus } });
+ return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus, signIns: st._signIns || 0, attempts: st._attempts || 0 } });
  }).join("");
 
  listEl.innerHTML = `
@@ -7919,7 +7929,8 @@
   * Returning to a top tab reopens the sub-view you last had there. Analysis,
   * Invoices, and Fleet Triage (#dashboard|#arrays|#sandbox) keep sub-state in
   * the hash; we remember the last hash per tab and restore on top-tab click. */
- const SUBTAB_DEFAULT = { analysis: "#analysis", reports: "#reports", dashboard: "#dashboard" };
+ // Fleet default sub-view = Table (#arrays), not Triage — matches post-onboarding land.
+ const SUBTAB_DEFAULT = { analysis: "#analysis", reports: "#reports", dashboard: "#arrays" };
  let _subtabMem = {};
  try { _subtabMem = JSON.parse(localStorage.getItem("ao_subtab_mem") || "{}") || {}; } catch(_){ _subtabMem = {}; }
  function _subtabTabForHash(h){
@@ -8108,20 +8119,37 @@
  window.__aoLoadEntitlement = loadEntitlement;
 
  window.addEventListener("hashchange", applyView);
- // First-visit landing: empty hash → Fleet Triage (triage + inverters on one page).
- // Explicit #dashboard / #account / #reports / #marketplace deep-links are respected.
+ // First-visit landing: empty hash → Fleet → Table (#arrays). Post-onboarding
+ // owners should see the fleet table first, not Invoices/Triage (Ford 2026-07-18).
+ // Explicit deep-links (#reports, #account, #dashboard, #marketplace, …) respected.
+ // setup=offtakers / bulk=1 still open Invoices bulk import.
  function landDefaultTab(){
  if(!location.hash){
  try {
- // Onboarding "Upload offtaker spreadsheet" → Invoices bulk import
  const q = new URLSearchParams(location.search || "");
  if (q.get("setup") === "offtakers" || q.get("bulk") === "1") {
  location.replace("#reports");
+ } else if (q.get("setup") === "autorefresh") {
+ location.replace("#account");
  } else {
- location.replace("#dashboard");
+ location.replace("#arrays");
  }
- } catch(_){ location.hash = "#dashboard"; }
+ } catch(_){ location.hash = "#arrays"; }
  }
+ // Fresh exit from onboarding: force Fleet table even if a stale hash lingered
+ // (e.g. browser restored #reports from a prior session / bfcache).
+ try {
+ const q = new URLSearchParams(location.search || "");
+ if (q.get("fresh") === "1" && q.get("setup") !== "offtakers" && q.get("bulk") !== "1"
+ && q.get("setup") !== "autorefresh") {
+ const h = (location.hash || "").toLowerCase();
+ // Only override empty / fleet-family / accidental invoices landings.
+ if (!h || h === "#reports" || h.indexOf("#reports/") === 0
+ || h === "#dashboard" || h === "#") {
+ location.replace("#arrays");
+ }
+ }
+ } catch(_){}
  }
  document.addEventListener("DOMContentLoaded", () => { landDefaultTab(); applyView(); wireTabGateClicks(); loadEntitlement(); updateAccountDot(); ensureAlertsWidget(); });
  // expose for external callers (and post-add reloads)
