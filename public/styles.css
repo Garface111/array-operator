@@ -35,12 +35,14 @@
      open, the main "jumpy" Ford flagged. Progressive enhancement: buttery in Chromium via
      ::details-content + interpolate-size; unchanged (instant) where unsupported. */
   @supports selector(::details-content){
-    .rb-sec::details-content, .rb-arch::details-content, .rb-fadv::details-content{
+    .rb-sec::details-content, .rb-arch::details-content{
       height:0; overflow:clip;
       transition:height var(--motion-slow) var(--ease-standard),
                  content-visibility var(--motion-slow) allow-discrete; }
-    .rb-sec[open]::details-content, .rb-arch[open]::details-content,
-    .rb-fadv[open]::details-content{ height:auto; }
+    .rb-sec[open]::details-content, .rb-arch[open]::details-content{ height:auto; }
+    /* .rb-fadv (Advanced billing / Advanced overrides) is deliberately NOT in the
+       animated clip: it holds real billing inputs, and a drawer that fails to
+       expand makes them unreachable. Native instant open, always correct. */
   }
   *{box-sizing:border-box;margin:0;padding:0}
   /* Global keyboard-focus ring (default/night theme). theme-day.css already ships
