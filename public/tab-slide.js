@@ -12,9 +12,17 @@
 (function(){
   "use strict";
 
+  /* Every top-level panel that participates in the pager. A panel missing from
+     this list is NOT moved into the stage, so __aoTabSlide's parent check bails
+     to instant() and that tab silently loses its animation.
+     panelMarketplace was missing from the Marketplace launch until 2026-07-19:
+     sandbox.js's direction map (_ord) got the new tab, this list did not, so
+     every hop into or out of Marketplace snapped instead of sliding. If you add
+     a top tab, add it BOTH places — the check below shouts if you forget. */
   var STAGE_IDS = [
     "panelDashboard","panelAccount","panelSovereign",
-    "panelAnalysis","panelTrends","panelResources","panelReports","panelOps"
+    "panelAnalysis","panelTrends","panelResources","panelReports",
+    "panelMarketplace","panelOps"
   ];
   var DUR_MS = 500;
   var stage = null, sliding = false, activeCleanup = null;
@@ -48,8 +56,32 @@
       panels[0].parentNode.insertBefore(s, panels[0]);
       panels.forEach(function(p){ s.appendChild(p); });
       stage = s;
+      warnUnstaged();
       return s;
     }catch(e){ return null; }
+  }
+
+  /* Drift alarm. The pager degrades SILENTLY: an unstaged panel just snaps, and
+     nobody notices for weeks (Marketplace shipped 2026-07-19 with no slide and
+     was only caught by eye). If a top-level panel exists in the DOM but is not
+     in STAGE_IDS, say so out loud instead of quietly dropping its animation. */
+  function warnUnstaged(){
+    try{
+      var missing = [];
+      var els = document.querySelectorAll('[id^="panel"]');
+      for(var i=0;i<els.length;i++){
+        var id = els[i].id;
+        // Only top-level tab panels live directly under the shell .wrap/stage.
+        if(STAGE_IDS.indexOf(id) === -1 && els[i].parentNode === stage.parentNode){
+          missing.push(id);
+        }
+      }
+      if(missing.length && window.console && console.warn){
+        console.warn("[tab-slide] these panels are NOT staged, so they will not "
+          + "animate — add them to STAGE_IDS in tab-slide.js (and to _ord in "
+          + "sandbox.js applyView): " + missing.join(", "));
+      }
+    }catch(e){}
   }
   try{ if(document.readyState !== "loading") ensureStage();
        else document.addEventListener("DOMContentLoaded", ensureStage); }catch(e){}
