@@ -161,7 +161,7 @@ function setMode(m){
 }
 
 function go(url){ window.location.assign(url); }
-function enterDashboard(){ go("/?fresh=1&t=" + Date.now()); }
+function enterDashboard(){ go("/?fresh=1&t=" + Date.now() + "#arrays"); }
 
 async function doPassword(e){
  e.preventDefault();

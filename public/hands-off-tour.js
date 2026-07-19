@@ -28,27 +28,31 @@
       lede: "",
       kind: "welcome",
     },
+    // Fleet tab = Triage · Table · Sandbox (former top-level Inverters).
+    // Every CTA uses the Fleet hash + openSheet/openSandbox/openTriage extras.
     {
       id: "arrays",
-      rail: "Inverters",
-      railSub: "",
+      rail: "Fleet",
+      railSub: "Table",
       kicker: "1",
-      title: "Inverters",
-      lede: "",
+      title: "Fleet · Table",
+      lede:
+        "Your sites and inverters live under <b>Fleet → Table</b>. Stale on SMA/Fronius/Chint usually means the portal needs a re-login — not a dead inverter. Check the freshness chip, or <b>Open to sync</b>.",
       kind: "step",
-      cta: { label: "Open →", hash: "#arrays", openSandbox: true },
+      cta: { label: "Open Fleet · Table →", hash: "#arrays", openSheet: true },
       statusKey: "arrays",
       autoNav: true,
     },
     {
       id: "spreadsheet",
-      rail: "Spreadsheet",
-      railSub: "",
+      rail: "Fleet",
+      railSub: "Sandbox",
       kicker: "2",
-      title: "Spreadsheet",
-      lede: "",
+      title: "Fleet · Sandbox",
+      lede:
+        "Same fleet as the table, laid out as a canvas — drag inverters between sites. <b>Fleet → Sandbox</b>.",
       kind: "guide",
-      cta: { label: "Open →", hash: "#arrays", openSheet: true },
+      cta: { label: "Open Fleet · Sandbox →", hash: "#sandbox", openSandbox: true },
       autoNav: true,
     },
     {
@@ -58,7 +62,7 @@
       kicker: "3",
       title: "Add array — save your monitoring login",
       lede:
-        "Arrays come in on their own once you save your monitoring login. On the Account page under <b>Inverter portals</b>, add your SolarEdge, AlsoEnergy, Locus, Fronius, SMA or Chint login — we discover and attach every site for you. No browser extension needed.",
+        "Arrays land in <b>Fleet → Table</b> once you save a monitoring login. Account → <b>Inverter portals</b>: SolarEdge, AlsoEnergy, Locus, Fronius, SMA, or Chint — we discover every site. No browser extension needed.",
       kind: "guide",
       cta: { label: "Open Inverter portals →", hash: "#account", openAr: true, arFocus: "inverter" },
       autoNav: true,
@@ -66,23 +70,25 @@
     {
       id: "triage",
       rail: "Fleet",
-      railSub: "",
+      railSub: "Triage",
       kicker: "4",
-      title: "Fleet",
-      lede: "",
+      title: "Fleet · Triage",
+      lede:
+        "What needs attention across the fleet — health queue and live production. <b>Fleet → Triage</b>.",
       kind: "guide",
-      cta: { label: "Open →", hash: "#dashboard" },
+      cta: { label: "Open Fleet · Triage →", hash: "#dashboard", openTriage: true },
       autoNav: true,
     },
     {
       id: "alerts",
       rail: "Alerts",
-      railSub: "",
+      railSub: "Fleet · Triage",
       kicker: "5",
       title: "Alerts",
-      lede: "",
+      lede:
+        "Alert settings live on Fleet Triage — open them from here when something needs a crew.",
       kind: "guide",
-      cta: { label: "Open →", hash: "#dashboard", openAlerts: true },
+      cta: { label: "Open Alerts →", hash: "#dashboard", openTriage: true, openAlerts: true },
       autoNav: true,
     },
     {
@@ -1009,6 +1015,7 @@
  cta.openPreview ||
  cta.openSheet ||
  cta.openSandbox ||
+ cta.openTriage ||
  cta.openAddArray ||
  cta.openAlerts ||
  cta.openBulk ||
@@ -1026,6 +1033,7 @@
  arFocus: cta.arFocus || null,
  openSheet: !!cta.openSheet,
  openSandbox: !!cta.openSandbox,
+ openTriage: !!cta.openTriage,
  openAddArray: !!cta.openAddArray,
  openAlerts: !!cta.openAlerts,
  openBulk: !!cta.openBulk,
@@ -1709,7 +1717,7 @@
  html +=
  '<button type="button" class="ho-btn ho-btn-primary" data-ho="finish">Done →</button>';
  html +=
- '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#dashboard">Open Fleet</button>';
+ '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#arrays" data-sheet="1">Open Fleet · Table</button>';
  html +=
  '<button type="button" class="ho-btn ho-btn-ghost" data-ho="cta" data-hash="#account" data-ar="1">Auto-refresh</button>';
  } else {
@@ -1729,6 +1737,7 @@
  (step.cta.openPreview ? ' data-preview="1"' : "") +
  (step.cta.openSheet ? ' data-sheet="1"' : "") +
  (step.cta.openSandbox ? ' data-sandbox="1"' : "") +
+ (step.cta.openTriage ? ' data-triage="1"' : "") +
  (step.cta.openAddArray ? ' data-addarray="1"' : "") +
  (step.cta.openAlerts ? ' data-alerts="1"' : "") +
  (step.cta.openBulk ? ' data-bulk="1"' : "") +
@@ -1862,13 +1871,21 @@
 
  if (extras.openSandbox) {
  setTimeout(function () {
- clickWhenReady("#vsSegSandbox", 12);
+ // Fleet sub-seg: Sandbox (hash #sandbox already selects it; click keeps pill in sync).
+ clickWhenReady('.ft-sub-seg [data-ftsub="sandbox"], #vsSegSandbox', 12);
  }, 280);
  }
  if (extras.openSheet) {
  setTimeout(function () {
- clickWhenReady("#vsSegSheet", 18);
+ // Fleet sub-seg: Table
+ clickWhenReady('.ft-sub-seg [data-ftsub="table"], #vsSegSheet', 18);
  }, 320);
+ }
+ if (extras.openTriage) {
+ setTimeout(function () {
+ // Fleet sub-seg: Triage
+ clickWhenReady('.ft-sub-seg [data-ftsub="dashboard"], #vsSegDashboard', 12);
+ }, 280);
  }
  if (extras.openAddArray) {
  setTimeout(function () {
@@ -2204,7 +2221,7 @@
  }
  if (passEl) passEl.value = "";
  setMsg(
- "✓ " + label + " saved, starting cloud harvest. Watch Inverters for Connecting…",
+ "✓ " + label + " saved, starting cloud harvest. Watch Fleet → Table for Connecting…",
  true
  );
  btn.textContent = "✓ " + label + " saved";
@@ -2455,6 +2472,7 @@
  arFocus: btn.getAttribute("data-ar-focus") || null,
  openSheet: btn.getAttribute("data-sheet") === "1",
  openSandbox: btn.getAttribute("data-sandbox") === "1",
+ openTriage: btn.getAttribute("data-triage") === "1",
  openAddArray: btn.getAttribute("data-addarray") === "1",
  openAlerts: btn.getAttribute("data-alerts") === "1",
  openBulk: btn.getAttribute("data-bulk") === "1",
@@ -2638,6 +2656,7 @@
  arFocus: opts.arFocus || null,
  openSheet: !!opts.openSheet,
  openSandbox: !!opts.openSandbox,
+ openTriage: !!opts.openTriage,
  openAddArray: !!opts.openAddArray,
  openAlerts: !!opts.openAlerts,
  openBulk: !!opts.openBulk,
