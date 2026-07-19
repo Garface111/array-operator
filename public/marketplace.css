@@ -135,15 +135,40 @@ html.sky .rb-grp-vac{ backdrop-filter:blur(6px); }
 
 /* ===================== SKY THEME — safe-zone (glass) ======================= */
 /* One calm content sheet wrapping the whole tab + near-solid cards on top, per
- * the Analysis reference (ao-sky-redesign-brief STATUS 3 / glass-opacity rule). */
-html.sky #panelMarketplace .mk-wrap{
+ * the Analysis reference (ao-sky-redesign-brief STATUS 3 / glass-opacity rule).
+ *
+ * THE SHEET LIVES ON THE PANE, NOT ON ANY ONE SUB'S WRAPPER (Ford 2026-07-19:
+ * "this array market page needs a background frosted glass so things don't look
+ * like they are floating"). It used to be pinned to .mk-wrap — a class only the
+ * Credit Exchange sub renders — so Array Market (.aopx-wrap) and the REC desk
+ * got NO safe zone and sat naked on the mountain photo, violating the
+ * foundation's own rule ("nothing floats naked on the photo", DESIGN.md).
+ * .mk-pane is the container EVERY sub mounts into by construction, so putting
+ * the sheet here means a future 4th sub is inside the safe zone for free. */
+html.sky #panelMarketplace .mk-pane{
   background:var(--sky-glass-content, rgba(255,255,255,.56));
   -webkit-backdrop-filter:var(--sky-sheet-blur, blur(18px) saturate(1.7));
   backdrop-filter:var(--sky-sheet-blur, blur(18px) saturate(1.7));
+  border:1px solid var(--sky-glass-edge, rgba(255,255,255,.55));
   border-radius:var(--sky-r-sheet, 32px);
   box-shadow:var(--sky-shadow-sheet, 0 18px 50px -12px rgba(20,60,120,.16));
-  padding:22px 22px 40px; margin-top:8px;
+  padding:22px 22px 40px;
+  margin:8px auto 0;
   max-width:1120px;
+  box-sizing:border-box;
+}
+/* .mk-wrap WAS the sheet; now it's a pass-through inside the pane. Stacking two
+ * blurred glass planes reads as mush and doubles the paint cost. */
+html.sky #panelMarketplace .mk-wrap{
+  background:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  border:0;
+  box-shadow:none;
+  border-radius:0;
+  padding:0;
+  margin-top:0;
+  max-width:100%;
 }
 html.sky #panelMarketplace .mk-hero,
 html.sky #panelMarketplace .mk-vac-card,
@@ -242,5 +267,6 @@ html.sky #panelMarketplace .mk-rec-card{
   .mk-sugg-grid{ grid-template-columns:1fr; }
   .mk-hero{ padding:16px; }
   .mk-hero-num{ font-size:28px; }
-  html.sky #panelMarketplace .mk-wrap{ padding:16px 12px 34px; border-radius:24px; }
+  /* phone safe zone: tighten the SHEET (now the pane), not the pass-through wrap */
+  html.sky #panelMarketplace .mk-pane{ padding:16px 12px 34px; border-radius:24px; }
 }
