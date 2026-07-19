@@ -71,23 +71,71 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     }
     if(force || _mountedSub !== _activeSub) mountActive();
   }
+  // Each sub owns a PERSISTENT pane. A late async write from a sub you've
+  // switched away from lands in ITS OWN hidden pane instead of painting over the
+  // active view — that race is what swapped RECs back to Credit Exchange while
+  // the pill still read RECs (Ford 2026-07-19). Panes also make re-switching
+  // instant: the DOM is already built, we just toggle visibility.
+  function paneFor(subId){
+    const c = document.getElementById("mkSubContent");
+    if(!c) return null;
+    let p = c.querySelector('[data-mkpane="'+subId+'"]');
+    if(!p){
+      p = document.createElement("div");
+      p.className = "mk-pane";
+      p.setAttribute("data-mkpane", subId);
+      c.appendChild(p);
+    }
+    return p;
+  }
   function mountActive(){
     const list = window.__aoMarketplace.list();
     const sub = list.find(s=>s.id===_activeSub) || list[0];
     const c = document.getElementById("mkSubContent");
     if(!sub || !c) return;
     _mountedSub = sub.id;
-    try { sub.mount(c); }
-    catch(e){ c.innerHTML = '<div class="mk-empty">Something went wrong loading this view.</div>'; if(window.console) console.warn("marketplace sub mount failed:", e); }
+    list.forEach(function(s){
+      const p = paneFor(s.id);
+      if(!p) return;
+      const on = (s.id === sub.id);
+      p.hidden = !on;
+      p.setAttribute("aria-hidden", on ? "false" : "true");
+    });
+    const pane = paneFor(sub.id);
+    if(!pane) return;
+    // Mount into the sub's OWN pane. Subs guard their loading states on cached
+    // data, so a re-mount refreshes in place without flashing a spinner.
+    try { sub.mount(pane); }
+    catch(e){
+      pane.innerHTML = '<div class="mk-empty">Couldn’t load this view. '+
+        '<button type="button" class="mk-submit" data-mkretry="'+esc(sub.id)+'">Retry</button></div>';
+      if(window.console) console.warn("marketplace sub mount failed:", e);
+    }
   }
   document.addEventListener("click", function(e){
-    const b = e.target && e.target.closest ? e.target.closest(".mk-subnav [data-mksub]") : null;
-    if(!b) return;
-    const id = b.getAttribute("data-mksub");
-    if(id === _activeSub) return;
-    _activeSub = id;
-    try { localStorage.setItem("ao_mk_subtab", id); } catch(_){}
-    renderSubtabs(true);
+    const t = e.target;
+    if(!t || !t.closest) return;
+    const b = t.closest(".mk-subnav [data-mksub]");
+    if(b){
+      const id = b.getAttribute("data-mksub");
+      if(id === _activeSub) return;
+      _activeSub = id;
+      try { localStorage.setItem("ao_mk_subtab", id); } catch(_){}
+      // Repaint the pills IMMEDIATELY so the bar never lags the content, then
+      // swap panes (already-rendered panes appear instantly).
+      renderSubtabs(true);
+      return;
+    }
+    const rb = t.closest("[data-mkretry]");
+    if(rb){
+      const rid = rb.getAttribute("data-mkretry");
+      const sub = window.__aoMarketplace.list().find(s=>s.id===rid);
+      const pane = paneFor(rid);
+      if(sub && pane){
+        pane.innerHTML = '<div class="mk-empty">Loading…</div>';
+        try { sub.mount(pane); } catch(_){}
+      }
+    }
   });
 
   // ── Credit Exchange sub ─────────────────────────────────────────────────────

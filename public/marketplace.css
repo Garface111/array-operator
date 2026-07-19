@@ -7,6 +7,11 @@
  * sheet + near-solid cards) so the panel reads clearly over the alpine photo.
  * ==========================================================================*/
 
+/* Per-sub panes: each Marketplace sub-tab renders into its OWN persistent pane
+   so a late fetch can never paint over the view you switched to, and switching
+   back is instant. [hidden] must WIN over any display rule in the cascade. */
+#panelMarketplace .mk-pane[hidden]{ display:none !important; }
+
 #panelMarketplace .mk-wrap{ max-width:1080px; margin:0 auto; padding:8px 0 40px; }
 
 /* sub-nav bar reuses the app's .ao-subnav / .vs-seg pill (see index.html). */
