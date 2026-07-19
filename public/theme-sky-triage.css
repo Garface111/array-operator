@@ -379,6 +379,37 @@ html.sky .vs-dc-x{
 }
 html.sky .vs-dc-diag{ background:rgba(233,243,253,.7); border-color:rgba(20,60,120,.12); }
 /* .vs-dc-diag.warn amber + chart bar/status colors untouched — semantic */
+
+/* Outage-log episodes read as light glass tiles on the frosted modal — same treatment
+   as the comparison deck below, and for the same reason: no backdrop-filter here, they
+   sit ON the already-blurred sheet (one blur budget, per the Sky perf guardrail).
+   The left spine and every chip colour stay untouched: they are SEMANTIC (who the
+   cause points at, fact vs estimate), not decoration, so the theme must not tint them.
+   NB --sky-r-pill (999px) would stadium-round a multi-line row and --sky-r-card (22px)
+   is the big-surface radius, so a compact episode row takes a middle value.
+   Three sides only, NEVER the `border-color` shorthand: the shorthand resets all four
+   and would silently erase the semantic left spine set in command-center.css (it did —
+   every episode rendered slate instead of its cause colour until live DOM verification
+   caught it). Sky tints the frame; the spine belongs to the data. */
+html.sky .vs-dc-ep{
+  background:rgba(255,255,255,.6);
+  border-top-color:rgba(20,60,120,.1);
+  border-right-color:rgba(20,60,120,.1);
+  border-bottom-color:rgba(20,60,120,.1);
+  border-radius:14px;
+}
+html.sky .vs-dc-ep.live{
+  background:rgba(254,235,235,.72);
+  border-top-color:rgba(220,38,38,.24);
+  border-right-color:rgba(220,38,38,.24);
+  border-bottom-color:rgba(220,38,38,.24);
+}
+html.sky .vs-dc-chip{ background:rgba(255,255,255,.72); border-color:rgba(20,60,120,.14); }
+/* .code / .est / .tick chips keep their own semantic fills — see command-center.css */
+html.sky .vs-dc-chip.code{ background:rgba(220,38,38,.09); border-color:rgba(220,38,38,.28); }
+html.sky .vs-dc-chip.tick{ background:rgba(14,116,144,.09); border-color:rgba(14,116,144,.26); }
+html.sky .vs-dc-chip.tick.sev-critical{ background:rgba(220,38,38,.09); border-color:rgba(220,38,38,.26); }
+html.sky .vs-dc-ol-retry{ background:rgba(255,255,255,.8); border-color:rgba(20,60,120,.16); }
 /* Comparison-deck cards read as light glass tiles on the frosted modal. No backdrop-filter
    here (they sit ON the already-blurred sheet — one blur budget, per the Sky perf guardrail);
    just a near-solid white so the tilted stack stays crisp. */

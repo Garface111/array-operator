@@ -42,9 +42,9 @@
       prompt:
         "Help me get every array talking. Walk me through connecting my inverter portals so production stays live hands-off. Prefer one-click login over pasting keys.",
       hash: "#arrays",
-      detailHint: "Inverters",
-      open: { openSandbox: true, openAddArray: true },
-      openLabel: "Add array",
+      detailHint: "Fleet · Table",
+      open: { openSheet: true },
+      openLabel: "Open Fleet · Table",
       statusLine: function (L) {
         if (L && L.arrays)
           return (L.arrayCount || 0) + " array" + ((L.arrayCount || 0) === 1 ? "" : "s") + " connected";
@@ -232,14 +232,14 @@
     {
       id: "spreadsheet",
       story: "fleet",
-      label: "Spreadsheet",
-      sub: "Vendor table view",
-      why: "Same fleet as rows, every vendor, live now, today kWh, status.",
+      label: "Fleet · Table",
+      sub: "Sites & inverters as rows",
+      why: "Same fleet under Fleet → Table — every vendor, live now, today kWh, status.",
       prompt:
-        "Show me the Spreadsheet view under Inverters and when it's better than the Sandbox map.",
+        "Show me Fleet → Table and when it's better than Fleet → Sandbox.",
       hash: "#arrays",
       open: { openSheet: true },
-      openLabel: "Open sheet",
+      openLabel: "Open Fleet · Table",
     },
     {
       id: "addarray",
@@ -248,9 +248,9 @@
       sub: "Connect more sites",
       why: "Prefer one-click portal login; keys stay behind Enter manually.",
       prompt:
-        "I want to add another array or vendor. Walk me through + Add array with the easiest path for my vendor.",
+        "I want to add another array or vendor. Walk me through adding one the easy way — arrays should land in Fleet → Table.",
       hash: "#arrays",
-      open: { openAddArray: true },
+      open: { openSheet: true, openAddArray: true },
       openLabel: "Add array",
     },
     {
@@ -1048,7 +1048,7 @@
           : null;
       ops.innerHTML =
         '<div class="mh-cards">' +
-        '<div class="mh-card" data-run="fleet"><div class="mh-card-k">Inverters</div>' +
+        '<div class="mh-card" data-run="fleet"><div class="mh-card-k">Fleet</div>' +
         '<div class="mh-card-v">' +
         esc(String(fl.inverters || L.arrayCount || 0)) +
         " <small>units · " +

@@ -354,8 +354,11 @@
  if(typeof window.__sbOpenAlerts === "function") window.__sbOpenAlerts();
  };
 
- // On the DASHBOARD tab, surface the combined attention queue (every flagged
- // inverter across the fleet, worst-first); elsewhere keep it empty.
+ // Always keep the attention queue painted — even when Fleet Triage is not the
+ // active tab. Emptying #ccQueue while inactive made the tab-slide measure a
+ // short shell height, then __ccRender filled the table mid-slide and the panel
+ // "grew to full length" (Ford 2026-07-17: Inverters → Fleet Triage). The panel
+ // is display:none when off-tab so keeping the DOM costs nothing visible.
  renderProdKpis();
  // The weather-adjusted "Production vs expected" card moved to the Analysis tab
  // (analysis-forecast.js), Fleet Health now leads with the Needs-attention queue.
@@ -369,7 +372,7 @@
  attnH.classList.toggle("all-clear", loaded && !k.flagged);
  }
  if(!q) return;
- if(_dashActive()) renderQueueLEGACY(); else q.innerHTML = "";
+ renderQueueLEGACY();
  }
 
  // Active only when the owner is on the Dashboard tab.
@@ -901,6 +904,13 @@ Thank you,
  // card in the scene), so the rebuild would otherwise leave the #fleetCommander
  // placeholder empty. render() finds #fleetCommander by id wherever it lives.
  window.__ccRender = render;
+ // Tab-slide calls this after marking the destination .active and before
+ // measuring height, so Fleet Triage is full-length on the first animation frame.
+ window.__aoTabBeforeSlide = function(toEl){
+ try{
+ if(toEl && toEl.id === "panelDashboard") render();
+ }catch(e){}
+ };
  FleetStore.subscribe(onStore);
  // tick the "updated Ns ago" label once a second (cheap, text-only)
  setInterval(() => { const a = document.getElementById("ccAsof"); if(a) a.innerHTML = asofText(); }, 1000);

@@ -2778,8 +2778,13 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .vs-c-fresh{ font-size:11.5px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* "Producing X of Y" (Ford 2026-07-18): the live number keeps the ink weight; the
+   " / 7.6 kW" ceiling rides muted beside it so the eye lands on the live value
+   first and reads the ratio second. Never wraps — the pair is one glance. */
+.vs-pow-max{ color:var(--faint); font-weight:400; }
 /* Frozen feed: dim the stale live value, amber the "N min ago" so a paused feed never reads as current. */
 .vs-c-pow.vs-stale{ color:var(--muted); font-weight:400; }
+.vs-c-pow.vs-stale .vs-pow-max{ color:var(--faint); }
 /* "· N% of rated" rides next to the inverter's live kW (was misplaced under the Today=kWh column) — secondary weight so the kW reads as primary. */
 .vs-pct-rated{ color:var(--muted); font-weight:400; font-size:11.5px; }
 /* Today's kWh is an ESTIMATE (smeared from a utility bill), not a measured reading —
@@ -2973,6 +2978,78 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-dc-svg .vs-dc-ylab, .vs-dc-svg .vs-dc-xlab{ fill:var(--faint,#94a3b8); font-size:11px; }
 .vs-dc-svg .vs-dc-peer{ fill:none; stroke:var(--ink,#0f172a); stroke-width:1.5; stroke-dasharray:4 3; opacity:.5; vector-effect:non-scaling-stroke; }
 .vs-dc-nohist{ color:var(--faint); font-size:13px; padding:24px 0; text-align:center; }
+
+/* ── OUTAGE LOG (inverter detail overlay, after the 14-day chart) ───────────────
+   "When did it go offline, and why?" Each episode is a two-column row: WHEN on the
+   left (range + duration), the CAUSE sentence on the right, with a left spine whose
+   colour encodes WHO the cause points at — not how loud it is:
+     vendor_code  red     the hardware named its own fault (fact)
+     unit         amber   this inverter alone, while its neighbours produced
+     site_wide    cyan    the whole site went dark → NOT this unit (the calm "watch"
+                          tone from the alerting palette, deliberately not fault-amber)
+     no_data      slate   the feed went quiet; production unknown, not zero
+     unknown      slate   we genuinely cannot tell, and we say so
+   An ONGOING episode is a live problem, not history, so it overrides the spine to red,
+   tints its whole row, and carries a pulsing dot — it must never read as an archive
+   entry. Estimates always wear the dashed `est.` chip (never the solid fact chip). */
+.vs-dc-ol-load,
+.vs-dc-ol-clean,
+.vs-dc-ol-err{ font-size:13px; line-height:1.55; padding:16px 0; color:var(--muted); }
+.vs-dc-ol-load{ color:var(--faint); }
+.vs-dc-ol-clean{ color:var(--muted); }
+.vs-dc-ol-err{ color:var(--bad,#dc2626); }
+.vs-dc-ol-retry{ margin-left:8px; font:inherit; font-weight:650; cursor:pointer; padding:3px 10px;
+  border-radius:7px; border:1px solid var(--line); background:transparent; color:var(--ink,#0f172a); }
+.vs-dc-ol-retry:hover{ border-color:var(--ink,#0f172a); }
+
+.vs-dc-eps{ list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.vs-dc-ep{ display:grid; grid-template-columns:minmax(132px,168px) 1fr; gap:4px 18px;
+  padding:11px 14px 11px 13px; border:1px solid var(--line); border-left:3px solid var(--faint,#94a3b8);
+  border-radius:10px; background:transparent; }
+.vs-dc-ep[data-kind="vendor_code"]{ border-left-color:var(--bad,#dc2626); }
+.vs-dc-ep[data-kind="unit"]{ border-left-color:#d97706; }
+.vs-dc-ep[data-kind="site_wide"]{ border-left-color:#0e7490; }
+
+.vs-dc-ep-when{ display:flex; flex-direction:column; gap:3px; }
+.vs-dc-ep-range{ font-size:13.5px; font-weight:700; color:var(--ink,#0f172a); font-variant-numeric:tabular-nums; }
+.vs-dc-ep-dur{ font-size:11px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); }
+.vs-dc-ep-live{ font-size:11px; font-weight:750; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--bad,#dc2626); display:inline-flex; align-items:center; gap:5px; }
+.vs-dc-ep-live::first-letter{ font-size:14px; }   /* the ● reads as a status dot */
+
+.vs-dc-ep-kind{ font-size:10px; font-weight:750; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--faint); margin-bottom:3px; }
+.vs-dc-ep-cause{ margin:0; font-size:13px; line-height:1.55; color:var(--muted); }
+.vs-dc-ep-meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+
+/* Ongoing = a live problem. Loud enough to separate from history, quiet enough that a
+   log of five old outages doesn't turn the sheet into a wall of red. */
+/* border-left-color MUST come after the border-color shorthand — the shorthand resets
+   all four sides, so declaring the spine first silently loses it (it rendered a pale
+   rgba(220,38,38,.24) instead of solid red until live DOM verification caught it). */
+.vs-dc-ep.live{ background:rgba(220,38,38,.05); border-color:rgba(220,38,38,.22);
+  border-left-color:var(--bad,#dc2626); }
+.vs-dc-ep.live .vs-dc-ep-range{ color:var(--bad,#dc2626); }
+.vs-dc-ep.live .vs-dc-ep-cause{ color:var(--ink,#0f172a); }
+.vs-dc-ep.live .vs-dc-ep-live{ animation:vsDcPulse 2.4s ease-in-out infinite; }
+@keyframes vsDcPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+@media (prefers-reduced-motion: reduce){ .vs-dc-ep.live .vs-dc-ep-live{ animation:none; } }
+
+/* Chips. `code` is the vendor's own words (a fact — solid, monospaced, quoted-feeling);
+   `est` is ours (dashed border = "modelled, not measured"); `tick` links the alert. */
+.vs-dc-chip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:650;
+  padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted);
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vs-dc-chip.code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px; font-weight:600;
+  letter-spacing:.01em; color:#7f1d1d; background:rgba(220,38,38,.08); border-color:rgba(220,38,38,.28); }
+.vs-dc-chip.est{ border-style:dashed; color:var(--faint); }
+.vs-dc-chip.tick{ color:#0e7490; background:rgba(14,116,144,.07); border-color:rgba(14,116,144,.25); }
+.vs-dc-chip.tick.sev-critical{ color:#991b1b; background:rgba(220,38,38,.07); border-color:rgba(220,38,38,.25); }
+
+@media (max-width:640px){
+  .vs-dc-ep{ grid-template-columns:1fr; gap:6px; }
+  .vs-dc-ep-when{ flex-direction:row; align-items:baseline; gap:10px; flex-wrap:wrap; }
+}
 
 /* ── Array COMPARISON DECK (Ford 2026-07-13): every inverter as an off-axis, isometric
    stack of cohort-scaled mini-charts, fanned strongest→weakest so the spread reads at a

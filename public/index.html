@@ -69,7 +69,7 @@ document.documentElement.setAttribute("data-theme","day");
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
 <link rel="stylesheet" href="styles.css?v=20260716focus1">
-<link rel="stylesheet" href="command-center.css?v=20260717ftSub1">
+<link rel="stylesheet" href="command-center.css?v=20260719merge1">
 <link rel="stylesheet" href="ops.css?v=20260715eaMatch2">
 <link rel="stylesheet" href="theme-day.css?v=20260716overview1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260715ymRoomy1"><!-- multi-view Trends tab -->
@@ -95,7 +95,7 @@ document.documentElement.setAttribute("data-theme","day");
  ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
  ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:3dppx)"]
  ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
- ["theme-sky.css?v=20260716subnavMid1","theme-sky-triage.css?v=20260716table2","theme-sky-reports.css?v=20260716genwidth1","theme-sky-account.css?v=20260715arFullWidth1","theme-sky-analysis.css?v=20260716subnavCenter1","theme-sky-trends.css?v=20260716subnavCenter1","theme-sky-resources.css?v=20260715opsRes1","theme-sky-mobile.css?v=20260714demo2"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+ ["theme-sky.css?v=20260716subnavMid1","theme-sky-triage.css?v=20260718outage3","theme-sky-reports.css?v=20260716genwidth1","theme-sky-account.css?v=20260715arFullWidth1","theme-sky-analysis.css?v=20260716subnavCenter1","theme-sky-trends.css?v=20260716subnavCenter1","theme-sky-resources.css?v=20260715opsRes1","theme-sky-mobile.css?v=20260714demo2"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
 <!-- (The scroll-parallax "descent" was removed 2026-07-13, Ford: it magnified +
  softened the plate. The world is now a simple fixed cover background at
@@ -282,6 +282,66 @@ document.documentElement.setAttribute("data-theme","day");
  <a class="tab tab-signout" id="tabSignOut" href="/login"
  title="Sign out of this account" style="display:none">Sign out</a>
  </div>
+
+ <!-- ═══ EARLY TAB ROUTER (Ford 2026-07-19: "sometimes I can't click the top
+      tabs, nothing happens") ═══
+      The tabs are plain <a href="#…"> anchors and the ONLY thing that reacts is
+      sandbox.js's applyView, bound at its very bottom (hashchange +
+      DOMContentLoaded). sandbox.js is ~380KB and one of ~38 mostly
+      render-blocking scripts — measured ~520ms to domInteractive on a warm
+      cache, far worse cold. Until it executes, a tab click changes the hash and
+      NOTHING moves: the app looks frozen.
+
+      This inline router runs at PARSE time (no network, no dependency) and does
+      the one thing that matters — swap the visible panel — so the tabs respond
+      instantly. It mirrors applyView's exact DOM contract (TABS map +
+      tabFromHash, sandbox.js ~7693-7715): toggle .active on the panel and its
+      tab. When sandbox.js finally loads, applyView re-runs and takes over
+      authoritatively (module loading, plan gating, the slide pager); these
+      toggles are the same ones it would make, so there is no fight and no
+      double-animation (its _firstApply pass never slides).
+
+      Deliberately does NOT: load panel modules, enforce entitlements, or
+      animate. Those stay owned by applyView — this only kills the dead-click. -->
+ <script>
+ (function () {
+   var TABS = {
+     dashboard: ["panelDashboard", "tabDashboard"],
+     account:   ["panelAccount",   "tabAccount"],
+     arrays:    ["panelArrays",    "tabArrays"],
+     analysis:  ["panelAnalysis",  "tabAnalysis"],
+     reports:   ["panelReports",   "tabReports"],
+     ops:       ["panelOps",       "tabOps"]
+   };
+   // Mirrors sandbox.js tabFromHash() — keep in sync if that changes.
+   function fromHash() {
+     var h = location.hash;
+     if (h === "#account") return "account";
+     if (h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
+     if (h === "#arrays" || h === "#sandbox") return "arrays";
+     if (h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
+     if (h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
+     if (h === "#dashboard") return "dashboard";
+     if (h === "#sovereign") return "account";
+     return "arrays";
+   }
+   function apply() {
+     // Sovereign desk takes over the stage; leave that to applyView.
+     if (location.hash === "#sovereign") return;
+     var active = fromHash();
+     for (var name in TABS) {
+       var panel = document.getElementById(TABS[name][0]);
+       var tab = document.getElementById(TABS[name][1]);
+       if (panel) panel.classList.toggle("active", name === active);
+       if (tab) tab.classList.toggle("active", name === active);
+     }
+   }
+   try {
+     window.addEventListener("hashchange", apply);
+     apply();
+   } catch (e) { /* never block paint on this */ }
+ })();
+ </script>
 
  <!-- GMP-ONBOARDING GATE, shown to signed-in owners until they connect GMP.
  Onboarding is NOT complete without it: no GMP = no settlement data to
@@ -475,12 +535,12 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260718land1"></script>
-<script src="vendor-sheet.js?v=20260717ftSub1"></script>
-<script src="command-center.js?v=20260718fleet1"></script>
-<script src="reports.js?v=20260718deliv1"></script>
-<script src="marketplace.js?v=20260718desk1"></script>
-<script src="rec-desk.js?v=20260718desk1"></script>
+<script src="sandbox.js?v=20260719merge1"></script>
+<script src="vendor-sheet.js?v=20260719merge1"></script>
+<script src="command-center.js?v=20260719merge1"></script>
+<script src="reports.js?v=20260719merge1"></script>
+<script src="marketplace.js?v=20260719merge1"></script>
+<script src="rec-desk.js?v=20260719merge1"></script>
 <script src="ops.js?v=20260715eaMatch2"></script>
 <!-- Array Prospectus + the Array Market sub-tab (secondary-market v0). Registers
  into the shared Marketplace sub-tab registry (window.__aoMarketplace); exposes
@@ -563,8 +623,8 @@ document.documentElement.setAttribute("data-theme","day");
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
 <script src="mobile-os.js?v=20260718fleet1"></script>
 <!-- Tab pager: horizontal slide between top-tab panels (desktop) -->
-<link rel="stylesheet" href="tab-slide.css?v=20260717noUnfurl1">
-<script src="tab-slide.js?v=20260717triageInv1"></script>
+<link rel="stylesheet" href="tab-slide.css?v=20260719merge1">
+<script src="tab-slide.js?v=20260719merge1"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */

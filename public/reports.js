@@ -731,21 +731,108 @@
  if (b) b.style.removeProperty("display");
  }
  let _genrepMounted = false;
- function renderGenReports() {
+ let _genrepAccount = null; // cached GET /v1/account for the enable banner
+ async function fetchGenrepAccount(force) {
+ if (!force && _genrepAccount) return _genrepAccount;
+ const h = authHeaders();
+ if (!h) return null;
+ try {
+ const r = await fetch("/v1/account", { headers: h });
+ if (!r.ok) return null;
+ _genrepAccount = await r.json().catch(() => null);
+ return _genrepAccount;
+ } catch (e) { return null; }
+ }
+ function genrepEnableBannerHTML(opts) {
+ const soft = !!(opts && opts.apiMissing);
+ const body = soft
+ ? "Enablement API not live yet — ask support."
+ : "Unlocks NEPOOL/REC workbooks for your clients. Free to open the desk; auto-send bills $15/array/quarter only when you turn auto-send on per client.";
+ const btn = soft
+ ? ""
+ : `<button type="button" class="ao-btn ao-btn-primary" id="rbGenrepEnableBtn">Enable generation reports →</button>`;
+ return `<div id="rbGenrepEnable" class="rb-genrep-enable" role="region" aria-label="Generation reports enablement" style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 16px;margin:0 0 14px;padding:14px 16px;border-radius:12px;border:1px solid rgba(94,194,255,.28);background:rgba(94,194,255,.08);">
+ <div style="flex:1 1 220px;min-width:0">
+ <div style="font-weight:750;font-size:14px;color:var(--ink);margin:0 0 4px">Generation reports</div>
+ <div id="rbGenrepEnableCopy" style="font-size:12.5px;line-height:1.45;color:var(--muted)">${body}</div>
+ </div>
+ ${btn}
+ </div>`;
+ }
+ function wireGenrepEnableBanner(root) {
+ const btn = root && root.querySelector("#rbGenrepEnableBtn");
+ if (!btn) return;
+ btn.onclick = async () => {
+ const copy = root.querySelector("#rbGenrepEnableCopy");
+ const prev = btn.textContent;
+ btn.disabled = true;
+ btn.textContent = "Enabling…";
+ try {
+ const r = await fetch("/v1/account/generation-reports/enable", {
+ method: "POST",
+ headers: Object.assign({ "Content-Type": "application/json" }, authHeaders() || {}),
+ });
+ if (r.status === 404) {
+ if (copy) copy.textContent = "Enablement API not live yet — ask support.";
+ btn.remove();
+ return;
+ }
+ const data = await r.json().catch(() => ({}));
+ if (!r.ok || data.ok === false) {
+ if (copy) copy.textContent = apiErr(data, "Couldn't enable generation reports.");
+ btn.disabled = false;
+ btn.textContent = prev;
+ return;
+ }
+ _genrepAccount = Object.assign({}, _genrepAccount || {}, { generation_reports: true }, data.generation_reports != null ? { generation_reports: data.generation_reports } : {});
+ const ban = document.getElementById("rbGenrepEnable");
+ if (ban) ban.remove();
+ // Remount embed so it picks up the enabled world.
+ const shell = document.getElementById("rbGenReportsView");
+ const embedHost = document.getElementById("rbGenrepEmbedHost") || shell;
+ if (embedHost) {
+ try { if (window.NepoolGenReports && window.NepoolGenReports.unmount) window.NepoolGenReports.unmount(embedHost); } catch (e) {}
+ _genrepMounted = false;
+ mountGenrepEmbed(embedHost);
+ }
+ bulkToast("Generation reports enabled.");
+ } catch (e) {
+ if (copy) copy.textContent = "Network error enabling generation reports.";
+ btn.disabled = false;
+ btn.textContent = prev;
+ }
+ };
+ }
+ async function renderGenReports() {
  const host = document.getElementById("rbGenReportsView");
- if (!host || _genrepMounted) return;
+ if (!host || _genrepMounted || host.dataset.genrepBoot === "1") return;
  if (!session()) {
  // Anonymous demo stays honest: no fabricated NEPOOL data, just the door.
  host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — automated quarterly NEPOOL-GIS workbooks, emailed to each client. Sign in or start a trial to use them.</div>';
  return;
  }
- // Enabled for EVERY operator (Ford 2026-07-16). Mount the embed directly; a
- // fresh tenant is guided through setup by the embed's own progress spine. No
- // per-account "not set up" wall — generation reports is a standard AO feature.
- mountGenrepEmbed(host);
+ // Banner is additive honesty when the account flag is still off. Embed still
+ // mounts for exploration even without the flag (backend may soft-open).
+ host.dataset.genrepBoot = "1";
+ host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
+ let showBanner = false;
+ try {
+ const acct = await fetchGenrepAccount(false);
+ if (acct && acct.generation_reports === false) showBanner = true;
+ } catch (e) { /* soft-fail: mount without banner */ }
+ // If a parallel path already mounted, don't clobber.
+ if (_genrepMounted && host.querySelector("#rbGenrepEmbedHost")) {
+ delete host.dataset.genrepBoot;
+ return;
+ }
+ host.innerHTML = (showBanner ? genrepEnableBannerHTML() : "") +
+ '<div id="rbGenrepEmbedHost"></div>';
+ if (showBanner) wireGenrepEnableBanner(host);
+ mountGenrepEmbed(document.getElementById("rbGenrepEmbedHost") || host);
+ delete host.dataset.genrepBoot;
  }
  function mountGenrepEmbed(host) {
- if (_genrepMounted) return;
+ if (!host || _genrepMounted) return;
  _genrepMounted = true;
  host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
  const fail = (e) => {
@@ -6407,6 +6494,10 @@
  const prev = s.preview || {};
  const next = s.next_send_at ? new Date(s.next_send_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
  const last = s.last_sent_at ? new Date(s.last_sent_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never";
+ const fmtChipDate = (iso) => {
+ try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+ catch (e) { return ""; }
+ };
  const fmts = (s.formats || []).map(f => f.toUpperCase()).join(" + ");
  // ── one plain-English sentence, built from the offtaker's actual choices. ──
  const _arrName = ((arrs || []).find(a => String(a.id) === String(s.array_id)) || {}).name;
@@ -6443,13 +6534,33 @@
  } else if (pay && pay.status === "open" && pay.pay_url) {
  payPill = `<span class="rb-chip" title="Invoice includes a Stripe pay link">Pay link open</span>`;
  }
+ // Resend delivery truth (not "sent" ≡ "delivered"): bounce beats delivery,
+ // delivery beats bare accept, bare last_sent_at waits for webhook confirmation.
+ const sentMs = s.last_sent_at ? Date.parse(s.last_sent_at) : 0;
+ const bouncedMs = s.last_bounced_at ? Date.parse(s.last_bounced_at) : 0;
+ const deliveredMs = s.last_delivered_at ? Date.parse(s.last_delivered_at) : 0;
+ const bounceWins = !!(bouncedMs && (!sentMs || bouncedMs >= sentMs) && (!deliveredMs || bouncedMs >= deliveredMs));
+ let deliveryPill = "";
+ let deliveryMeta = "";
+ if (bounceWins) {
+ const reason = (s.last_bounce_reason || "").trim();
+ deliveryPill = `<span class="rb-chip rb-chip-off" title="${esc(reason || "Bounced")}">Bounced</span>`;
+ if (reason) deliveryMeta = `<div class="rb-acc-meta" style="color:var(--bad,#ef4444)">Bounce: ${esc(reason)}</div>`;
+ } else if (s.last_delivered_at) {
+ const d = fmtChipDate(s.last_delivered_at) || last;
+ deliveryPill = `<span class="rb-chip rb-chip-live" title="Resend confirmed delivery">Delivered · ${esc(d)}</span>`;
+ } else if (s.last_sent_at) {
+ deliveryPill = `<span class="rb-chip" title="Mailer accepted — waiting for Resend delivery confirmation">Sent · awaiting delivery confirmation · ${esc(last)}</span>`;
+ }
  // Status-first: one leading dot summarizes this offtaker's state so the list
  // scans top-to-bottom at a glance — needs-action (ready) first, then paused,
  // sent, or idle. Reuses the .rb-sec-dot halo language already in the card.
  let statusCls, statusLabel;
  if (!s.enabled) { statusCls = "paused"; statusLabel = "Paused"; }
  else if (draft) { statusCls = "ready"; statusLabel = draft.amount_usd != null ? money(draft.amount_usd) + " ready to review" : "Report ready to review"; }
- else if (s.last_sent_at) { statusCls = "sent"; statusLabel = "Sent · last " + last; }
+ else if (bounceWins) { statusCls = "paused"; statusLabel = "Bounced" + (s.last_bounce_reason ? " · " + s.last_bounce_reason : ""); }
+ else if (s.last_delivered_at) { statusCls = "sent"; statusLabel = "Delivered · " + (fmtChipDate(s.last_delivered_at) || last); }
+ else if (s.last_sent_at) { statusCls = "sent"; statusLabel = "Sent · awaiting delivery confirmation · " + last; }
  else { statusCls = "idle"; statusLabel = "No report sent yet"; }
  const statusDot = `<span class="rb-acc-dot rb-acc-dot-${statusCls}" title="${esc(statusLabel)}" aria-label="${esc(statusLabel)}"></span>`;
  return `
@@ -6459,11 +6570,12 @@
  <span class="rb-acc-caret" aria-hidden="true">▸</span>
  <div class="rb-acc-head-main">
  <div class="rb-acc-name">${statusDot}${esc(s.customer_name)}
- ${readyPill}${payPill}
+ ${readyPill}${deliveryPill}${payPill}
  <span class="rb-chip ${s.delivery_mode === "auto" ? "rb-chip-live" : ""}">${s.delivery_mode === "auto" ? "Auto-send" : "Draft for approval"}</span>
  ${s.enabled ? "" : `<span class="rb-chip rb-chip-off">Paused</span>`}
  </div>
  <div class="rb-acc-sentence">${sentence}</div>
+ ${deliveryMeta}
  ${s.template_fit_warning ? `<div class="rb-acc-warn" role="alert" title="${esc(s.template_fit_warning)}">\u26a0 ${esc(s.template_fit_warning)}</div>` : ""}
  <div class="rb-acc-meta">Next ${esc(next)} · last sent ${esc(last)}${prev.amount_owed != null && !draft ? " · ~" + money(prev.amount_owed) : ""}</div>
  </div>
@@ -8711,15 +8823,19 @@
  if (r.ok && data.ok) {
  const res = data.result || {};
  const to = (res.to || []).join(", ");
- let extra = "";
+ // Honest mailer language: accept ≠ delivered. Resend webhooks drive chips.
+ let msg = to
+ ? ("Sent to " + to + " — mailer accepted. Delivery confirmation appears when Resend confirms.")
+ : "Sent — mailer accepted. Delivery confirmation appears when Resend confirms.";
  if (res.pay_url) {
- extra = " · pay link attached";
+ msg += " Pay link attached.";
  // Refresh payment chips so this offtaker shows "Pay link open".
  try { await loadOfftakerPayments(); } catch (e) { /* ignore */ }
  } else if (res.pay_skip_reason) {
- extra = " · no pay link (" + String(res.pay_skip_reason).slice(0, 80) + ")";
+ msg += " No pay link (" + String(res.pay_skip_reason).slice(0, 80) + ").";
  }
- setSt("rb-status rb-ok", "Sent" + (to ? " to " + to : "") + extra + ".");
+ setSt("rb-status rb-ok", msg);
+ try { bulkToast(msg); } catch (e) { /* ignore */ }
  setTimeout(refreshInbox, 900);
  } else {
  setSt("rb-status rb-err", apiErr(data, "Send failed."));

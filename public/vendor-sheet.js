@@ -58,6 +58,20 @@
  // RIGHT NOW as a fraction of its nameplate. Glanceable, green needle swung right =
  // near capacity, amber straight up = middling, red swung left = barely producing.
  function _capW(iv) { return (iv && iv.nameplate_kw) ? iv.nameplate_kw * 1000 : 0; }
+ // An ARRAY's rated ceiling = the sum of its inverters' nameplates. Only honest
+ // when we know EVERY unit's rating — a partial sum would understate the ceiling
+ // and make a healthy array look like it's over-producing ("5 / 3 kW"), so a
+ // single unknown nameplate returns 0 and the row falls back to the bare live kW.
+ function arrCapKw(c) {
+ const invs = (c && c.inverters) || [];
+ if (!invs.length) return 0;
+ let sum = 0;
+ for (const iv of invs) {
+ if (!iv || !iv.nameplate_kw || !(iv.nameplate_kw > 0)) return 0;
+ sum += iv.nameplate_kw;
+ }
+ return sum;
+ }
  function _arrCapW(c) { return (c.inverters || []).reduce((t, iv) => t + _capW(iv), 0); }
  function _arrPowW(c) {
  return c.current_power_w != null ? c.current_power_w
@@ -131,6 +145,26 @@
  if (w == null) return "—";
  const k = w / 1000;
  return (k >= 10 ? k.toFixed(0) : k.toFixed(1)) + " kW";
+ }
+ // Bare number (no unit) — used as the LEFT half of "4.2 / 7.6 kW" so the unit
+ // is written once, at the end.
+ function kwNum(w) {
+ if (w == null) return "—";
+ const k = w / 1000;
+ return k >= 10 ? k.toFixed(0) : k.toFixed(1);
+ }
+ // "Producing X of Y" (Ford 2026-07-18): the live reading is meaningless without
+ // the ceiling next to it — an operator should read one cell and know whether
+ // 4 kW is great or terrible. Renders "4.2 / 7.6 kW" with the max muted; falls
+ // back to the plain live value when no nameplate is on file (never invents a
+ // ceiling), and to "—" when there's no live reading at all.
+ // `capKw` = rated nameplate in kW (NOT watts).
+ function powOfMax(w, capKw, opts) {
+ const o = opts || {};
+ const tilde = o.alloc ? "~" : "";
+ if (w == null) return "—";
+ if (!capKw || !(capKw > 0)) return tilde + kw(w);
+ return `${tilde}${kwNum(w)}<span class="vs-pow-max"> / ${kwNum(capKw * 1000)} kW</span>`;
  }
  // Empty cells stay blank (not "—") so missing today/kWh never clutters the row
  // next to the sparklines (Ford 2026-07-14: little dashes in the way of the graphs).
@@ -819,7 +853,163 @@
  : "Daily output · kWh · last 14 days"
  }${(cohort && cohort.peak > 0) ? ` <span class="vs-dc-legend">— dashed line: neighbor average (same units)</span>` : ""}</div>
  ${invChartHTML(iv, cohort)}
- </div>`;
+ </div>
+ <div class="vs-dc-chartwrap vs-dc-ol" id="vsDcOutages">${_olLoadingHTML()}</div>`;
+ }
+
+ /* ── OUTAGE LOG ────────────────────────────────────────────────────────────────
+  * "When did it go offline, and why?" — the episode history for this one inverter,
+  * lazily fetched when the detail overlay opens.
+  *
+  * The honesty contract is carried end-to-end from the API (see solar-operator
+  * api/inverter_outage_log.py): a vendor fault code is FACT and is shown verbatim as
+  * a chip; everything else is inference and says so in its sentence; a feed gap reads
+  * "production unknown", never "the inverter was down"; lost kWh is always marked
+  * `est.`; and `unknown` is rendered plainly rather than dressed up as a diagnosis.
+  * We never re-word the server's cause sentence — the API is the single place that
+  * wording is governed, so the app and the Energy Agent can never disagree. */
+ const OL_DAYS = 180;
+ const _olCache = new Map();        // inverter_id -> payload (re-open paints instantly)
+
+ function _olLoadingHTML(){
+   return `<div class="vs-dc-chart-h">Outage log</div>
+   <div class="vs-dc-ol-load">Reading the outage history…</div>`;
+ }
+
+ // "Mar 3" — with the year only when it isn't the current one (a 180-day window can
+ // straddle New Year, and a bare "Dec 28" would then be ambiguous).
+ function _olDate(iso){
+   if(!iso) return "";
+   const p = String(iso).split("-");
+   const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+   if(isNaN(d)) return esc(iso);
+   const opts = d.getFullYear() === new Date().getFullYear()
+     ? { month:"short", day:"numeric" } : { month:"short", day:"numeric", year:"numeric" };
+   return d.toLocaleDateString(undefined, opts);
+ }
+ function _olDays(n){ return n === 1 ? "1 day" : `${n} days`; }
+
+ // The "when" line: a closed episode reads as a range, a live one as "Since …".
+ function _olWhen(ep){
+   if(ep.ongoing){
+     return `<span class="vs-dc-ep-range">Since ${esc(_olDate(ep.started_on))}</span>` +
+            `<span class="vs-dc-ep-live">● Ongoing · ${esc(_olDays(ep.days))}</span>`;
+   }
+   const a = _olDate(ep.started_on), b = _olDate(ep.ended_on || ep.started_on);
+   const range = (a === b) ? a : `${a} – ${b}`;
+   return `<span class="vs-dc-ep-range">${esc(range)}</span>` +
+          `<span class="vs-dc-ep-dur">${esc(_olDays(ep.days))}</span>`;
+ }
+
+ const OL_KIND_LABEL = {
+   vendor_code: "Vendor fault code",
+   site_wide:   "Site-wide",
+   no_data:     "No data",
+   unit:        "This inverter",
+   unknown:     "Cause unknown",
+ };
+
+ function _olEpisodeHTML(ep){
+   const chips = [];
+   // Vendor codes/statuses are FACT — they get the strong chip. Everything else is ours.
+   (ep.vendor_codes || []).forEach(c =>
+     chips.push(`<span class="vs-dc-chip code" title="Reported by the vendor">${esc(c)}</span>`));
+   (ep.vendor_statuses || []).forEach(s =>
+     chips.push(`<span class="vs-dc-chip code" title="Vendor status during this outage">${esc(s)}</span>`));
+   if(ep.lost_kwh_est != null){
+     chips.push(`<span class="vs-dc-chip est" title="${esc(ep.lost_kwh_basis || "Estimated from neighbouring inverters")}">` +
+                `est. ${esc(Math.round(ep.lost_kwh_est).toLocaleString())} kWh lost</span>`);
+   }
+   if(ep.ticket){
+     const sev = String(ep.ticket.severity || "warning").replace(/[^a-z]/gi, "");
+     chips.push(`<span class="vs-dc-chip tick sev-${esc(sev)}" title="${esc(ep.ticket.note || "Linked alert")}">` +
+                `${esc(ep.ticket.title)} · ${esc(ep.ticket.status || "open")}</span>`);
+   }
+   const kind = String(ep.cause_kind || "unknown").replace(/[^a-z_]/gi, "");
+   return `<li class="vs-dc-ep${ep.ongoing ? " live" : ""}" data-kind="${esc(kind)}">
+     <div class="vs-dc-ep-when">${_olWhen(ep)}</div>
+     <div class="vs-dc-ep-body">
+       <div class="vs-dc-ep-kind">${esc(OL_KIND_LABEL[kind] || "Cause unknown")}</div>
+       <p class="vs-dc-ep-cause">${esc(ep.cause || "")}</p>
+       ${chips.length ? `<div class="vs-dc-ep-meta">${chips.join("")}</div>` : ""}
+     </div>
+   </li>`;
+ }
+
+ function outageLogHTML(data){
+   const s = (data && data.summary) || {};
+   const eps = (data && data.episodes) || [];
+   const win = (data && data.window) || {};
+   const head = `<div class="vs-dc-chart-h">Outage log` +
+     (win.days ? ` <span class="vs-dc-legend">— last ${esc(win.days)} days, complete days only</span>` : "") +
+     `</div>`;
+
+   if(!eps.length){
+     // Two very different empty states, and the difference matters: "clean" is good
+     // news; "no_history" means we haven't been watching and must not read as good.
+     const cls = s.state === "no_history" ? "vs-dc-nohist" : "vs-dc-ol-clean";
+     return `${head}<div class="${cls}">${esc(s.headline || "No outages recorded.")}</div>`;
+   }
+
+   const stat = (k, v) => v == null || v === "" ? "" :
+     `<div class="vs-dc-stat"><span class="vs-dc-k">${k}</span><span class="vs-dc-v">${v}</span></div>`;
+   const lost = s.lost_kwh_est != null
+     ? `~${esc(Math.round(s.lost_kwh_est).toLocaleString())} kWh` : null;
+   const stats = [
+     stat("Days offline", esc(String(s.outage_days))),
+     stat(s.episode_count === 1 ? "Outage" : "Outages", esc(String(s.episode_count))),
+     stat("Est. lost", lost),
+     stat("Longest", s.longest ? esc(_olDays(s.longest.days)) : null),
+   ].join("");
+
+   return `${head}
+   <div class="vs-dc-diag${s.ongoing ? " warn" : ""}">${esc(s.headline || "")}</div>
+   <div class="vs-dc-stats">${stats}</div>
+   <ul class="vs-dc-eps">${eps.map(_olEpisodeHTML).join("")}</ul>`;
+ }
+
+ // Fetch + paint the log into an already-open overlay. Never throws into the caller:
+ // a failure paints a real, named error state with a Retry (silence would be the bug).
+ function _mountOutageLog(root, iv){
+   const host = root.querySelector("#vsDcOutages");
+   if(!host) return;
+   const invId = iv && iv.inverter_id;
+   let session = null;
+   try { session = localStorage.getItem("so_session"); } catch(e){ session = null; }
+
+   if(invId == null || !session){
+     host.innerHTML = `<div class="vs-dc-chart-h">Outage log</div>` +
+       `<div class="vs-dc-nohist">The outage log reads from your own fleet — sign in to see it.</div>`;
+     return;
+   }
+   if(_olCache.has(invId)){ host.innerHTML = outageLogHTML(_olCache.get(invId)); return; }
+
+   host.innerHTML = _olLoadingHTML();
+   fetch(`/v1/array-owners/inverters/${encodeURIComponent(invId)}/outages?days=${OL_DAYS}`,
+         { headers: { Authorization: "Bearer " + session } })
+     .then(async r => {
+       if(!r.ok){
+         let detail = "";
+         try { const j = await r.json(); detail = (j && (j.detail || j.error)) || ""; } catch(_){}
+         const err = new Error(detail ? String(detail) : `HTTP ${r.status}`);
+         err.status = r.status;
+         throw err;
+       }
+       return r.json();
+     })
+     .then(data => {
+       _olCache.set(invId, data);
+       if(host.isConnected) host.innerHTML = outageLogHTML(data);
+     })
+     .catch(err => {
+       if(!host.isConnected) return;
+       const why = esc((err && err.message) || "the request failed");
+       host.innerHTML = `<div class="vs-dc-chart-h">Outage log</div>
+       <div class="vs-dc-ol-err">Couldn't load the outage log — ${why}.
+         <button type="button" class="vs-dc-ol-retry">Try again</button></div>`;
+       const btn = host.querySelector(".vs-dc-ol-retry");
+       if(btn) btn.addEventListener("click", () => _mountOutageLog(root, iv));
+     });
  }
  // Build + open the full-screen detail overlay for one inverter: its header + live
  // diagnosis + stats + the 14-day daily-output chart (with the neighbor-average line).
@@ -840,6 +1030,9 @@
  ov.querySelector(".vs-dc-x").addEventListener("click", close);
  document.addEventListener("keydown", onKey);
  document.body.appendChild(ov);
+ // The outage log is the one part of this sheet that needs its own round-trip, so it
+ // paints after the chart rather than holding the overlay closed while it loads.
+ _mountOutageLog(ov, iv);
  }
  let _sort = { key: "name", dir: "asc" }; // sort within each vendor group
  // "table" is the product name (was "spreadsheet"); keep reading the old key.
@@ -987,7 +1180,7 @@
  { key: "name", cls: "vs-c-name", label: "Name", tip: "Array or inverter name — click to rename" },
  { key: null, cls: "vs-c-gauge", label: "Output", tip: "Live output as % of nameplate" },
  { key: "inv", cls: "vs-c-inv", label: "Units", tip: "Inverter count (array) · peer index (inverter)" },
- { key: "pow", cls: "vs-c-pow", label: "Live kW", tip: "Instant power now (— at night or when feed is offline)" },
+ { key: "pow", cls: "vs-c-pow", label: "Live / max", tip: "Instant power now vs the rated nameplate ceiling — read it as \"producing X of Y\". (— at night or when the feed is offline; the max is hidden when no nameplate is on file.)" },
  { key: "today", cls: "vs-c-today", label: "Today", tip: "Energy produced today (kWh)" },
  { key: null, cls: "vs-c-spark", label: "14-day", tip: "Daily yield sparkline (last 14 days)" },
  { key: "status", cls: "vs-c-status", label: "Status", tip: "Health: 14-day peer + live anomalies" },
@@ -1459,7 +1652,7 @@
  <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
  <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
- <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${c.current_power_w == null ? "—" : ((allocArr ? "~" : "") + kw(c.current_power_w))}</span>
+ <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${powOfMax(c.current_power_w, arrCapKw(c), { alloc: allocArr })}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
  <span class="vs-c-spark">${_aggSpark(_arrDailies[_ci])}</span>
  <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
@@ -1526,7 +1719,7 @@
  ].filter(Boolean);
  const _sub = _subParts.map(esc).join(" · ");
  const _al = isAllocatedPower(iv);
- const _live = iv.current_power_w != null ? `${_al ? "~" : ""}${kw(iv.current_power_w)}` : "—";
+ const _live = powOfMax(iv.current_power_w, iv.nameplate_kw, { alloc: _al });
  const _today = iv.produced_today_kwh != null ? kwh0(iv.produced_today_kwh) : "—";
  // Peer index only when we have one; "—" keeps the Units column aligned.
  const _peer = iv.peer_index != null ? iv.peer_index.toFixed(2) + "×" : "—";

@@ -1806,7 +1806,7 @@ function doneScreen(){
  </div>` : "";
  if(existing){
  // Returning user: link is already on its way. Give them a direct way in too.
- cardCta = `<a class="btn btn-primary btn-lg" href="/?fresh=1&tour=hands-off" target="_blank" rel="noopener">Open dashboard →</a>
+ cardCta = `<a class="btn btn-primary btn-lg" href="/?fresh=1&tour=hands-off#arrays" target="_blank" rel="noopener">Open dashboard →</a>
  <div class="helper" style="text-align:center">Open the link we just emailed you, or sign in from the dashboard.</div>`;
  } else if(!created){
  cardCta = `<button class="btn btn-primary btn-lg" onclick="finish()">Try again →</button>`;
@@ -1830,7 +1830,7 @@ function doneScreen(){
  ${refreshCallout}
  <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
  ${cardCta}
- ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1&tour=hands-off" target="_blank" rel="noopener">Open dashboard</a>` : ""}
+ ${created && !signedIn ? `<a class="btn btn-ghost" href="/?fresh=1&tour=hands-off#arrays" target="_blank" rel="noopener">Open dashboard</a>` : ""}
  </div>
  </div></div>`;
 }
@@ -1840,15 +1840,10 @@ function doneScreen(){
 // read by app.js → live /v1/array-owners/overview. NOT /accounts (that proxies
 // to the NEPOOL verifier SPA, wrong product for an array owner).
 function goDashboard(){
- // If a vendor is mid-connect (Chint walks can take 30–60s), land on Inverters
- // so the pending "Connecting…" card is visible instead of an empty fleet.
- let hash = "";
- try {
- const pending = (window.__aoPendingFeeds && window.__aoPendingFeeds.list())
- || JSON.parse(localStorage.getItem("ao_pending_feeds") || "[]");
- if (pending && pending.length) hash = "#arrays";
- } catch (e) {}
- window.location.assign(`/?fresh=1&tour=hands-off&t=${Date.now()}${hash}`);
+ // Always land on Fleet → Table (#arrays) after onboarding (Ford 2026-07-18).
+ // Pending vendor captures show as Connecting… rows in the table/sheet too;
+ // do not bounce new owners to Invoices or an empty default hash.
+ window.location.assign(`/?fresh=1&tour=hands-off&t=${Date.now()}#arrays`);
 }
 
 function markPendingVendor(code, label, note){
