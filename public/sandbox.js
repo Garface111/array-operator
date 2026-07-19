@@ -7977,6 +7977,12 @@
  // TEMP DIAG (2026-07-19, tab-slide investigation) — expose the gate so the
  // failing condition is readable from outside applyView's closure. Remove once
  // the pager is confirmed firing.
+ try{ (window.__aoSlideRuns = window.__aoSlideRuns || []).push({
+   t: Math.round(performance.now()), prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
+   willSlide:_willSlide, firstApply:_firstApply, hash:location.hash,
+   active:[].slice.call(document.querySelectorAll(".panel.active")).map(function(p){return p.id;}),
+   via:(new Error()).stack.split("\n").slice(1,4).map(function(s){return s.trim().slice(0,60);})
+ }); }catch(_r){}
  try{ window.__aoSlideDebug = {firstApply:_firstApply, slideOK:_slideOK,
    prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
    anSubHop:_anSubHop, willSlide:_willSlide, hash:location.hash,
