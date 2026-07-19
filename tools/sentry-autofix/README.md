@@ -1,8 +1,9 @@
 # Sentry Auto-Fix
 
 An automated pipeline that turns a Sentry production error into a reviewed pull
-request. When Sentry fires an alert, a **Claude Code agent** identifies the root
-cause, writes the fix, adds a regression test, runs the suite, and opens a PR.
+request. When Sentry fires an alert, a **Grok Build CLI agent** identifies the
+root cause, writes the fix, adds a regression test, runs the suite, and opens a
+PR — drawing on **Grok Build prepaid credits** (not Anthropic).
 
 This was built in response to errors like the one that motivated it —
 `IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates
@@ -18,7 +19,7 @@ GitHub Actions cron (every 15 min)  →  poll_sentry.py
    reads the Sentry REST API for new unresolved errors
    →  repository_dispatch (event_type = "sentry-issue")
    →  .github/workflows/sentry-autofix.yml
-   →  anthropics/claude-code-action  (identify → fix → test → PR)
+   →  Grok Build CLI agent  (identify → fix → test → PR)
 ```
 
 **B) Webhook relay (lower latency — optional, needs a host)**
@@ -29,6 +30,11 @@ Sentry Issue Alert (webhook action)  →  relay.py (HMAC-verified)
 
 Both feed the same `sentry-autofix.yml`. Pick A for hands-off setup; add B later
 if you want near-instant fixes instead of up-to-15-minute latency.
+
+There is also a **local hourly cron** on the solar-operator box
+(`scripts/sentry_autofix_tick.sh` → `scripts/sentry_autofix.py`) that runs the
+same Grok agent outside GitHub Actions — useful when the GHA workflow is
+disabled or when you want the fix loop without CI minutes.
 
 ## Files
 
@@ -49,8 +55,8 @@ server to run; GitHub does the polling.
 
 | Secret | Purpose |
 | --- | --- |
-| `CLAUDE_CODE_OAUTH_TOKEN` | **Recommended.** Runs the agent on your Claude Pro/Max **subscription** instead of metered API billing. Generate locally with `claude setup-token` and paste the printed token. Expires periodically — regenerate and update when it does. |
-| `ANTHROPIC_API_KEY` | Alternative to the OAuth token (metered API key). Used only if the OAuth token is unset. Provide **one** of these two. |
+| `GROK_AUTH_JSON` | **Recommended.** Contents of `~/.grok/auth.json` after `grok login` on the **Grok Build** team (prepaid credits). Includes a refresh token so CI keeps minting fresh access tokens. A classic console `xai-…` API key on a different team authenticates then 401s against the CLI model — do **not** use that. |
+| `XAI_API_KEY` | Alternative only if the key is on a team entitled to the CLI model. Prefer `GROK_AUTH_JSON`. |
 | `SENTRY_AUTH_TOKEN` | Sentry token with **project:read + event:read**. Create at Sentry → Settings → Account → Auth Tokens (or an Org Internal Integration token). Lets the poller read your errors. |
 | `AUTOFIX_GH_TOKEN` | **Required for the poller.** A fine-grained or classic PAT with `repo` + `workflow` scope. GitHub deliberately blocks events fired with the default `GITHUB_TOKEN` from triggering other workflows, so the poller's `repository_dispatch` needs a PAT to start the autofix run. The same token lets the agent open PRs (and fix a different target repo). |
 
@@ -69,9 +75,10 @@ That's it. The poller (`.github/workflows/sentry-poll.yml`) runs every 15 minute
 finds new errors, and opens a fix PR for each — deduped so the same issue never
 gets two PRs. Tune the cadence by editing the `cron` line.
 
-> **Subscription usage.** With `CLAUDE_CODE_OAUTH_TOKEN`, automated runs draw on
-> your Claude Code limits. `SENTRY_MAX_ISSUES` (default 5/run), `SENTRY_QUERY`,
-> and the per-issue `concurrency` group keep an error storm from burning quota.
+> **Credit usage.** With `GROK_AUTH_JSON` from the Build team, automated runs
+> draw on Grok Build prepaid credits (not Anthropic). `SENTRY_MAX_ISSUES`
+> (default 5/run), `SENTRY_QUERY`, and the per-issue `concurrency` group keep an
+> error storm from burning quota.
 
 ## Setup — optional low-latency path (webhook relay)
 

@@ -1,6 +1,6 @@
 name: Sentry Auto-Fix
 
-# Runs a Claude Code agent that identifies, fixes, and tests a production error
+# Runs a Grok Build CLI agent that identifies, fixes, and tests a production error
 # reported by Sentry, then opens a PR. See tools/sentry-autofix/README.md.
 
 on:
@@ -62,13 +62,11 @@ jobs:
         run: |
           python .sentry-autofix-tools/tools/sentry-autofix/build_prompt.py \
             --payload "${PAYLOAD}" --out-dir "${RUNNER_TEMP}"
-          # claude-code-action's `prompt` takes literal text, so hand it the
-          # rendered prompt through a multiline env var.
-          {
-            echo "AGENT_PROMPT<<SENTRY_AUTOFIX_EOF"
-            cat "${RUNNER_TEMP}/sentry-autofix-prompt.md"
-            echo "SENTRY_AUTOFIX_EOF"
-          } >> "$GITHUB_ENV"
+          # The Grok CLI reads this file directly (--prompt-file), so the prompt
+          # never passes through the shell or an env var — no mangling of the
+          # markdown's backticks/newlines, and no env-size ceiling.
+          test -s "${RUNNER_TEMP}/sentry-autofix-prompt.md"
+          echo "Prompt rendered: $(wc -c < "${RUNNER_TEMP}/sentry-autofix-prompt.md") bytes"
         env:
           PAYLOAD: ${{ toJSON(github.event.client_payload.brief) != 'null' && toJSON(github.event.client_payload.brief) || github.event.inputs.payload }}
           # Autonomous mode is ON: the agent merges its own PR after verifying the
@@ -77,16 +75,103 @@ jobs:
           AUTOFIX_AUTOMERGE: "true"
           PYTHONPATH: .sentry-autofix-tools/tools/sentry-autofix
 
-      - name: Run Claude Code agent (identify → fix → test → PR)
-        uses: anthropics/claude-code-action@v1
-        with:
-          # Prefer the Claude Pro/Max subscription token (generate locally with
-          # `claude setup-token`, store as the CLAUDE_CODE_OAUTH_TOKEN secret).
-          # Falls back to a metered Anthropic API key if the OAuth token is unset.
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: ${{ env.AGENT_PROMPT }}
-          claude_args: >-
-            --max-turns 40
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
-          github_token: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
+      # ── Credential gate ───────────────────────────────────────────────────
+      # Runs on Grok Build CLI agents (Ford 2026-07-19). The CLI authenticates
+      # headlessly from XAI_API_KEY ("For CI/CD, automation, or environments
+      # without browser access, use an API key from console.x.ai" — grok README),
+      # or from a ~/.grok/auth.json blob captured after `grok login`.
+      #
+      # ⚠️ The key MUST belong to a team entitled to the `grok-build` model —
+      # that is the ONLY model the CLI exposes. A console key on a different
+      # team authenticates and then 401s with `unauthenticated:bad-credentials`,
+      # which is exactly what a plain console key does today.
+      #
+      # No credential → say so LOUDLY in the job summary and stop WITHOUT
+      # failing. Every Sentry alert fires this workflow, so a hard failure on a
+      # known-missing secret mails "All jobs have failed" per alert and trains
+      # the operator to ignore the alarm. The run is still visibly a no-op.
+      - name: Check for a Grok credential
+        id: cred
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          GROK_AUTH_JSON: ${{ secrets.GROK_AUTH_JSON }}
+        run: |
+          if [ -n "${XAI_API_KEY}" ] || [ -n "${GROK_AUTH_JSON}" ]; then
+            echo "have_cred=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_cred=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## ⚠️ Sentry Auto-Fix is DISABLED — no Grok credential"
+              echo
+              echo "This run did **nothing**. The agent needs a Grok Build credential:"
+              echo
+              echo "- **\`XAI_API_KEY\`** — an API key from https://console.x.ai on a team"
+              echo "  entitled to the \`grok-build\` model (the only model the CLI exposes)."
+              echo "  A key from a team without that entitlement authenticates and then"
+              echo "  401s \`unauthenticated:bad-credentials\`."
+              echo "- or **\`GROK_AUTH_JSON\`** — the contents of \`~/.grok/auth.json\` after"
+              echo "  running \`grok login\` locally."
+              echo
+              echo "Set one as a repository secret and re-run. The previous Grok Build"
+              echo "OIDC refresh token was **revoked** (\`invalid_grant\`), which is why"
+              echo "this stopped working."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Sentry Auto-Fix disabled::No Grok credential (XAI_API_KEY or GROK_AUTH_JSON). See the job summary."
+          fi
+
+      - name: Install Grok Build CLI
+        if: steps.cred.outputs.have_cred == 'true'
+        run: |
+          curl -fsSL https://x.ai/cli/install.sh | bash
+          echo "$HOME/.grok/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate Grok
+        if: steps.cred.outputs.have_cred == 'true'
+        env:
+          GROK_AUTH_JSON: ${{ secrets.GROK_AUTH_JSON }}
+        run: |
+          grok --version
+          # Browser-credential path: drop the captured auth.json into place. The
+          # API-key path needs no file — XAI_API_KEY is read from the env and
+          # takes precedence over browser credentials.
+          if [ -n "${GROK_AUTH_JSON}" ]; then
+            mkdir -p "$HOME/.grok"
+            printf '%s' "${GROK_AUTH_JSON}" > "$HOME/.grok/auth.json"
+            chmod 600 "$HOME/.grok/auth.json"
+            echo "Wrote ~/.grok/auth.json from the GROK_AUTH_JSON secret."
+          else
+            echo "Using XAI_API_KEY from the environment."
+          fi
+
+      - name: Run Grok agent (identify → fix → test → PR)
+        if: steps.cred.outputs.have_cred == 'true'
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          # The agent shells out to `gh` to open (and, in autonomous mode, merge)
+          # its PR — same token the checkout used, so it can push its branch.
+          GH_TOKEN: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AUTOFIX_GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          git config --global user.name  "sentry-autofix[bot]"
+          git config --global user.email "sentry-autofix@users.noreply.github.com"
+          # --prompt-file keeps the rendered markdown intact (no shell mangling of
+          # backticks/newlines). bypassPermissions is required for an unattended
+          # run: there is no human to approve each edit/command.
+          grok \
+            --prompt-file "${RUNNER_TEMP}/sentry-autofix-prompt.md" \
+            --permission-mode bypassPermissions \
+            --max-turns 40 \
+            --output-format plain \
+            2>&1 | tee "${RUNNER_TEMP}/grok-run.log"
+
+      - name: Summarize the run
+        if: steps.cred.outputs.have_cred == 'true' && always()
+        run: |
+          {
+            echo "## Sentry Auto-Fix — Grok Build agent"
+            echo
+            echo '```'
+            tail -c 8000 "${RUNNER_TEMP}/grok-run.log" 2>/dev/null || echo "(no agent output captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
