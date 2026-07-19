@@ -7974,6 +7974,13 @@
  );
  // Fleet Triage Dashboard|Table|Sandbox share one panel — same-panel hop never slides.
  const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel && !_anSubHop);
+ // TEMP DIAG (2026-07-19, tab-slide investigation) — expose the gate so the
+ // failing condition is readable from outside applyView's closure. Remove once
+ // the pager is confirmed firing.
+ try{ window.__aoSlideDebug = {firstApply:_firstApply, slideOK:_slideOK,
+   prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
+   anSubHop:_anSubHop, willSlide:_willSlide, hash:location.hash,
+   fn:typeof window.__aoTabSlide}; }catch(_d){}
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
