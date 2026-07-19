@@ -358,14 +358,10 @@
   .ar-panel .ar-row{background:rgba(15,23,42,.018)}
   .ar-panel .ar-util,
   .ar-card .ar-util{grid-column:auto}
-  /* Inverter portals: two explicit rows so API vendors (AlsoEnergy / SolarEdge)
-     sit side-by-side and vault portals (Fronius / SMA / Chint) fill a 3-up row —
-     no full-width SolarEdge band or skinny AlsoEnergy + empty gutter (Ford 2026-07-13). */
-  .ar-panel .ar-group.ar-group-inv,
-  .ar-card .ar-group.ar-group-inv,
-  .ar-stack .ar-group.ar-group-inv{
-    display:flex;flex-direction:column;gap:11px;
-  }
+  /* Inverter portals now render as one flat set of vendor cards (picker→tile),
+     so they inherit the SAME auto-fit card grid as Utility portals — same look,
+     several per row, no full-width bands or dead gutters (Ford 2026-07-19).
+     The old two-explicit-rows flex override is gone on purpose. */
   .ar-inv-row{display:grid;gap:11px;align-items:start;width:100%}
   .ar-inv-api{grid-template-columns:repeat(2,minmax(0,1fr))}
   .ar-inv-vault{grid-template-columns:repeat(3,minmax(0,1fr))}

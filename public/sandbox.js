@@ -6452,9 +6452,7 @@
  <div class="ar-card ar-card-group">
  <div class="ar-group ar-group-inv">
  <div class="ar-group-head"><span class="ar-group-title">Inverter portals</span><span class="ar-group-sub">${mode === "cloud" ? "Live production, pulled server-side and kept under 5 minutes old. Add a login for each portal account; link several under one vendor." : "Live production, refreshed automatically every few minutes."}</span></div>
- <div class="ar-inv-row ar-inv-slots">
  ${shownInvCodes.map(invTileFor).join("")}
- </div>
  <div class="ar-addutil ar-addinv">
  <button type="button" class="acct-btn ar-addinv-btn">+ Add an inverter login</button>
  <div class="ar-picker ar-picker-inv" hidden>
