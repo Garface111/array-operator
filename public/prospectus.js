@@ -258,7 +258,7 @@
     container.innerHTML = `<div class="aopx-wrap">
       <p class="aopx-eyebrow">Array Market</p>
       <h1 class="aopx-h">Array data room</h1>
-      <p class="aopx-sub">Prepare a verified prospectus for any array — production, weather-adjusted performance, equipment health, offtaker revenue and captured bills — and share it with a lender or buyer over a revocable link.</p>
+      <p class="aopx-sub">Build a verified data room for an array, share it over a revocable link.</p>
       <div class="aopx-sec">Prepare a prospectus</div>
       <div class="aopx-arrays"></div>
       <div class="aopx-sec">Generated prospectuses</div>
@@ -279,7 +279,7 @@
         return `<div class="aopx-card"><div class="aopx-row">
           <div><span class="aopx-name">${esc(a.name)}</span>
             <span class="aopx-meta"> · ${esc(kwTxt)} · ${(a.inverters || []).length} inverters</span></div>
-          <button class="aopx-btn oct" data-mk-array="${esc(a.id)}" data-mk-name="${esc(a.name)}">📄 Prepare prospectus</button>
+          <button class="aopx-btn" data-mk-array="${esc(a.id)}" data-mk-name="${esc(a.name)}">Prepare prospectus</button>
         </div></div>`;
       }).join("");
       arraysEl.querySelectorAll("[data-mk-array]").forEach(b => {
@@ -304,7 +304,7 @@
               <div class="aopx-meta">${esc(d.purpose || "sale")} · generated ${fmtDate(d.generated_at)}</div></div>
             <div class="aopx-actions" style="margin:0">
               <button class="aopx-btn" data-d-pdf="${d.document_id}" data-d-name="${esc(d.array_name || "")}">⬇ PDF</button>
-              <button class="aopx-btn oct" data-d-share="${d.document_id}">🔗 Share</button>
+              <button class="aopx-btn" data-d-share="${d.document_id}">Share</button>
             </div>
           </div>
           <div class="aopx-share" data-share-host="${d.document_id}"></div>

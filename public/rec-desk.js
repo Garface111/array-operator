@@ -194,10 +194,19 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
       container.innerHTML = '<div class="mk-wrap"><div class="mk-empty">Loading certificate desk…</div></div>';
     }
     fetch(API + "/rec-desk", { headers: hdrs })
-      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(r){
+        // DESIGN.md: loading must RESOLVE. r.ok?null left _desk null, which
+        // re-rendered "Loading certificate desk…" forever on any 4xx/5xx.
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
       .then(function(j){ _desk = j; render(container); })
       .catch(function(){
-        container.innerHTML = '<div class="mk-wrap"><div class="mk-empty">Couldn’t load the certificate desk.</div></div>';
+        container.innerHTML = '<div class="mk-wrap"><div class="mk-empty">'+
+          'Couldn’t load the certificate desk. '+
+          '<button class="mk-submit" id="mkRecRetry" type="button">Retry</button></div></div>';
+        var b = container.querySelector("#mkRecRetry");
+        if (b) b.onclick = function(){ _desk = null; load(container); };
       });
   }
 
