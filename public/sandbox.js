@@ -7974,22 +7974,6 @@
  );
  // Fleet Triage Dashboard|Table|Sandbox share one panel — same-panel hop never slides.
  const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel && !_anSubHop);
- // TEMP DIAG (2026-07-19, tab-slide investigation) — expose the gate so the
- // failing condition is readable from outside applyView's closure. Remove once
- // the pager is confirmed firing.
- try{ (window.__aoSlideRuns = window.__aoSlideRuns || []).push({
-   t: Math.round(performance.now()), prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
-   willSlide:_willSlide, firstApply:_firstApply, hash:location.hash,
-   active:[].slice.call(document.querySelectorAll(".panel.active")).map(function(p){return p.id;}),
-   via:(new Error()).stack.split("\n").slice(1,4).map(function(s){return s.trim().slice(0,60);})
- }); }catch(_r){}
- try{ window.__aoSlideDebug = {firstApply:_firstApply, slideOK:_slideOK,
-   prev:_prevPanel&&_prevPanel.id, to:_toPanel&&_toPanel.id,
-   anSubHop:_anSubHop, willSlide:_willSlide, hash:location.hash,
-   fn:typeof window.__aoTabSlide,
-   activeAtEntry:[].slice.call(document.querySelectorAll(".panel.active")).map(function(p){return p.id;}),
-   anyActive:[].slice.call(document.querySelectorAll(".active")).map(function(p){return p.id||p.className;}).slice(0,8)
- }; }catch(_d){}
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
@@ -8070,6 +8054,16 @@
  }
  applyTabGating();
  _firstApply = false;
+ // Hand routing ownership to applyView. index.html carries a tiny inline
+ // early-router that toggles .active on hashchange so a click before this file
+ // parses isn't a dead click. Once WE have run, that router must stand down: it
+ // fires FIRST on every hashchange and pre-applies the DESTINATION state, which
+ // destroys the one thing the pager needs — the OUTGOING panel still carrying
+ // .active. That made _prevPanel resolve to the destination (prev === to) or to
+ // null, so _willSlide was false and the tab animation died silently across the
+ // whole app (Ford 2026-07-19: "one of my agents accidentally deleted the
+ // animation"). Nothing was deleted; this flag is the handover it was missing.
+ try{ window.__aoRouterOwned = true; }catch(_ro){}
  try { rememberSubtab(); } catch(_){}
  // Next frame: sub-nav pills mid of tabbar bottom → content-card top
  try { requestAnimationFrame(function(){ centerAoSubnav(); }); } catch(_){ try{ centerAoSubnav(); }catch(__){} }

@@ -311,6 +311,7 @@ document.documentElement.setAttribute("data-theme","day");
      arrays:    ["panelArrays",    "tabArrays"],
      analysis:  ["panelAnalysis",  "tabAnalysis"],
      reports:   ["panelReports",   "tabReports"],
+     marketplace: ["panelMarketplace", "tabMarketplace"],
      ops:       ["panelOps",       "tabOps"]
    };
    // Mirrors sandbox.js tabFromHash() — keep in sync if that changes.
@@ -321,6 +322,7 @@ document.documentElement.setAttribute("data-theme","day");
      if (h === "#arrays" || h === "#sandbox") return "arrays";
      if (h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
      if (h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
+     if (h === "#marketplace") return "marketplace";
      if (h === "#dashboard") return "dashboard";
      if (h === "#sovereign") return "account";
      return "arrays";
@@ -328,7 +330,19 @@ document.documentElement.setAttribute("data-theme","day");
    function apply() {
      // Sovereign desk takes over the stage; leave that to applyView.
      if (location.hash === "#sovereign") return;
+     // STAND DOWN once sandbox.js's applyView has run (it sets this at the end
+     // of its first pass). We fire FIRST on every hashchange, so if we kept
+     // going we would pre-apply the DESTINATION state and destroy the outgoing
+     // panel's .active -- the exact thing the slide pager reads to know what to
+     // animate FROM. That silently killed the tab animation app-wide until
+     // 2026-07-19. Our job is only to cover the window before sandbox.js parses.
+     if (window.__aoRouterOwned) return;
      var active = fromHash();
+     // Unknown hash (fromHash falls back to "arrays", whose panelArrays does not
+     // exist) would blank EVERY panel. Only repaint when we can actually light
+     // one up; a stale-but-correct panel beats an empty stage.
+     var target = TABS[active] && document.getElementById(TABS[active][0]);
+     if (!target) return;
      for (var name in TABS) {
        var panel = document.getElementById(TABS[name][0]);
        var tab = document.getElementById(TABS[name][1]);
@@ -535,7 +549,7 @@ document.documentElement.setAttribute("data-theme","day");
  there's no session (gated inside those files). -->
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
-<script src="sandbox.js?v=20260719slidediag3"></script>
+<script src="sandbox.js?v=20260719slidefix"></script>
 <script src="vendor-sheet.js?v=20260719merge1"></script>
 <script src="command-center.js?v=20260719merge1"></script>
 <script src="reports.js?v=20260719condense2"></script>
