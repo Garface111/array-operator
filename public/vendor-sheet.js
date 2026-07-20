@@ -28,6 +28,10 @@
  // read as quiet structural cues, not decoration.
  const ICON_ARRAY = '<svg class="vs-rowicon vs-rowicon-array" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.6" y="1.6" width="5.3" height="5.3" rx="1.1"/><rect x="9.1" y="1.6" width="5.3" height="5.3" rx="1.1"/><rect x="1.6" y="9.1" width="5.3" height="5.3" rx="1.1"/><rect x="9.1" y="9.1" width="5.3" height="5.3" rx="1.1"/></g></svg>';
  const ICON_INVERTER = '<svg class="vs-rowicon vs-rowicon-inv" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="1.7" y="3.3" width="12.6" height="9.4" rx="2"/><path d="M4.3 9q1.35-2.6 2.85 0t2.85 0"/></g></svg>';
+ // Cap expanded inverter DOM rows — 191-inverter fleets used to paint every row
+ // on first expand and jank the main thread. Show a page, "Show all" opts in.
+ const INV_PAGE = 40;
+ const _invShowAll = Object.create(null); // arrayId -> true
  // Vendor subtree accent. Ford 2026-07-12: the per-vendor RAINBOW (a different hue per
  // vendor) "looks weird and unprofessional, doesn't match our thing." Removed. No inline
  // --vc is emitted anymore, so every vendor group falls back to ONE neutral slate spine +
@@ -1537,9 +1541,12 @@
  const monitoredTxt = onFile > all.length
  ? `${all.length} monitored of ${onFile} on file`
  : `${all.length} monitored array${all.length === 1 ? "" : "s"}`;
- cnt.textContent = _query
+ const liveRefreshing = !!(window.FleetStore && FleetStore.isRefreshingLive && FleetStore.isRefreshingLive());
+ const baseTxt = _query
  ? `${cols.length} of ${all.length} monitored arrays match "${_query}"`
  : `${monitoredTxt} · ${(data.summary || {}).inverters_total || invShown} inverters`;
+ cnt.textContent = liveRefreshing ? (baseTxt + " · updating live readings…") : baseTxt;
+ cnt.classList.toggle("vs-count-refreshing", liveRefreshing);
  }
  const pending = _pendingFeeds().filter(p => {
  // Still pending if no column for that vendor yet
@@ -1700,7 +1707,10 @@
  h += `<div class="vs-inv-empty">No inverters captured for this array yet.</div>`;
  } else {
  const cohortScale = cohortSpark(invs); // shared y-scale across this array's inverters (order-independent)
- sortInvs(invs, c.is_daylight).forEach(iv => {
+ const sortedInvs = sortInvs(invs, c.is_daylight);
+ const showAll = !!_invShowAll[c.array_id] || !!_query;
+ const page = showAll ? sortedInvs : sortedInvs.slice(0, INV_PAGE);
+ page.forEach(iv => {
  const ist = invStatus(iv, invs, c.is_daylight, c);
  const ikey = c.array_id + ":" + iv.inverter_id;
  _invByKey[ikey] = { iv, cohort: cohortScale, peers: invs, isDaylight: c.is_daylight };
@@ -1746,6 +1756,10 @@
  <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart + array comparison">Details →</button></span>
  </div>`;
  });
+ if (!showAll && sortedInvs.length > INV_PAGE) {
+ const more = sortedInvs.length - INV_PAGE;
+ h += `<button type="button" class="vs-inv-more" data-inv-more="${esc(String(c.array_id))}">Show all ${sortedInvs.length} inverters (+${more} more)</button>`;
+ }
  }
  h += `</div>`;
  }
@@ -1758,6 +1772,15 @@
  const id = b.getAttribute("data-arr");
  _expanded[id] = !_expanded[id];
  renderBody();
+ });
+ // Paginated inverter list — "Show all N inverters"
+ body.querySelectorAll("[data-inv-more]").forEach(b => {
+ b.onclick = (e) => {
+ if (e) e.stopPropagation();
+ const id = b.getAttribute("data-inv-more");
+ if (id != null) _invShowAll[id] = true;
+ renderBody();
+ };
  });
  // Collapse/expand every array under one vendor at once. The WHOLE header row is the
  // target now (Ford: "click anywhere in the row of the vendor... not just this tiny
@@ -2198,9 +2221,21 @@
  return;
  }
  _paintedPendingSig = "";
- host.innerHTML = `<div class="vs-empty">${loading ? "Loading your fleet…" : "No arrays connected yet, hit <b>+ Add vendor</b> above to connect one."}</div>`;
- return;
- }
+     // Real skeleton (not a blank "Loading your fleet…" dead-end) so post-onboarding
+     // feels like the fleet is being built, not stuck.
+     host.innerHTML = loading
+       ? `<div class="vs-empty vs-loading-skel" role="status" aria-live="polite">
+           <div class="vs-loading-title">Building your fleet…</div>
+           <div class="vs-loading-sub">Provider groups appear here as soon as we have them.</div>
+           <div class="vs-skel-stack">
+             <div class="vs-skel-row"><span class="vs-skel-bar w40"></span><span class="vs-skel-bar w20"></span><span class="vs-skel-bar w15"></span></div>
+             <div class="vs-skel-row"><span class="vs-skel-bar w55"></span><span class="vs-skel-bar w18"></span><span class="vs-skel-bar w12"></span></div>
+             <div class="vs-skel-row"><span class="vs-skel-bar w35"></span><span class="vs-skel-bar w22"></span><span class="vs-skel-bar w14"></span></div>
+           </div>
+         </div>`
+       : `<div class="vs-empty">No arrays connected yet, hit <b>+ Add vendor</b> above to connect one.</div>`;
+     return;
+   }
  if (!host.querySelector("#vsSearch")) buildShell(host); // build the persistent shell once
  renderBody();
  sizeScroll();

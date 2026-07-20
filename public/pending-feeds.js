@@ -342,7 +342,10 @@
     }
     try {
       if (window.FleetStore && typeof FleetStore.refetch === "function") {
-        FleetStore.refetch().then(function () {
+        // Poll the INSTANT stored tree during connect/onboarding so provider
+        // groups stream into the spreadsheet as harvest lands — never wait on
+        // the slow live SolarEdge equipment fan-out (that was the 90s hang).
+        FleetStore.refetch({ mode: "stored" }).then(function () {
           try {
             var snap = FleetStore.snapshot && FleetStore.snapshot();
             reconcile((snap && snap.arrays) || []);

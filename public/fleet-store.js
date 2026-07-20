@@ -159,6 +159,8 @@ window.FleetStore = (function(){
     focus: [],                 // arrayIds the sandbox shows (subset, keeps it from being 100 columns)
     triage: loadTriage(),      // shared workflow state, keyed by `${arrayId}|${invName}`
     energyRate: null,          // $/kWh the owner is actually billed at (backend default_net_rate_per_kwh); null until fetched
+    liveReady: false,          // true once the LIVE (not stored/lite) fleet-tree has landed
+    refreshingLive: false,     // true while background live enrichment is in flight after stored paint
   };
   // The dashboard "$ at risk / recoverable" figures must reflect what the owner
   // actually bills, not a marketing-blended guess. reports.js bills from the
@@ -960,6 +962,11 @@ window.FleetStore = (function(){
     state.arrays = arrays;
     state.simulated = !!(opts && opts.simulated);
     state.recovered = (opts && opts.recovered) || 0;
+    // liveReady = full live tree has landed at least once this session.
+    // refreshingLive = background live pull still in flight (stored painted first).
+    if(opts && opts.liveReady){ state.liveReady = true; state.refreshingLive = false; }
+    if(opts && opts.fromStored){ state.refreshingLive = !state.liveReady; }
+    if(opts && opts.refreshingLive != null) state.refreshingLive = !!opts.refreshingLive;
     state.arrays.forEach(recompute);
     // Reconcile the sandbox focus against the NEW array set. Drop any focused ids
     // that no longer exist (demo→live swap, or arrays the extension added after a
@@ -973,11 +980,14 @@ window.FleetStore = (function(){
     _lastUpdate = Date.now();
     // Snapshot real, signed-in fleet data for an instant paint on the next reload.
     // (Skip the simulated demo and the hydrate path itself, which pass fromCache.)
+    // Prefer live snapshots over stored so the next cold load has richer kW/daily.
     if(!state.simulated && !(opts && opts.fromCache) && getSession()){
-      saveFleetCache(arrays, state.recovered);
+      if(!(opts && opts.fromStored) || !state.liveReady){
+        saveFleetCache(arrays, state.recovered);
+      }
     }
     startHeartbeat();
-    notify("load");
+    notify(opts && opts.fromStored ? "stored" : "load");
   }
 
   /* ---- live heartbeat: keeps the dashboard genuinely live ----
@@ -1016,13 +1026,15 @@ window.FleetStore = (function(){
     if(Math.random() < 0.3) state.recovered += Math.round(10 + Math.random()*60);
   }
 
-  function refetch(){
+  function refetch(opts){
     const s = getSession(); if(!s) return Promise.resolve();
     // Never overwrite local state while a write is in flight, defer until the
     // last one settles (see _trackWrite). This is what stops a background pull
     // from clobbering an optimistic reassign and snapping inverters back.
     if(_pendingWrites > 0){ _refetchQueued = true; return Promise.resolve(); }
-    return fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+s } })
+    const mode = (opts && opts.mode) || "live";
+    const q = mode && mode !== "live" ? ("?mode=" + encodeURIComponent(mode)) : "";
+    return fetch("/v1/array-owners/fleet-tree" + q, { headers:{ Authorization:"Bearer "+s } })
       .then(r => {
         if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
         if(!r.ok) throw 0;
@@ -1030,7 +1042,16 @@ window.FleetStore = (function(){
       })
       // A signed-in owner's REAL tree, ingest it even when empty (no columns),
       // so a freshly-added-but-still-empty array is reflected, NOT masked by demo.
-      .then(t => { ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 }); })
+      // stored/lite must NEVER clobber a fresher live tree (would blank live kW).
+      .then(t => {
+        const isStored = (t && t.mode === "stored") || mode === "stored" || mode === "lite";
+        if(isStored && state.liveReady) return; // keep authoritative live snapshot
+        ingest(adaptTree(t), {
+          recovered:(t.summary&&t.summary.recovered_ytd)||0,
+          fromStored: !!isStored,
+          liveReady: !isStored,
+        });
+      })
       .catch((err)=>{ if(err && err.auth) onAuthExpired(); /* transient: keep current state */ });
   }
 
@@ -1091,34 +1112,65 @@ window.FleetStore = (function(){
       // tree when it arrives. No cache (first ever load) → fall through to fetch.
       const cached = readFleetCache();
       if(cached){
-        ingest(cached.arrays, { recovered: cached.recovered, fromCache: true });
+        ingest(cached.arrays, { recovered: cached.recovered, fromCache: true, refreshingLive: true });
       }
-      fetch("/v1/array-owners/fleet-tree", { headers:{ Authorization:"Bearer "+getSession() } })
+      // TWO-PHASE LOAD (kills the 60–90s blank "Loading your fleet…" cliff):
+      //   1) mode=stored — DB-only structure, provider groups paint in <1s so the
+      //      post-onboarding spreadsheet streams in as the fleet is already known.
+      //   2) mode=live   — full vendor enrichment in the background; upgrades the
+      //      same rows when ready (never blocks first paint).
+      const hdrs = { Authorization:"Bearer "+getSession() };
+      const pull = (mode) => fetch("/v1/array-owners/fleet-tree" + (mode === "live" ? "" : ("?mode=" + mode)), { headers: hdrs })
         .then(r => {
-          // 401/403 = expired/invalid session, NOT a data outage. Do not paint
-          // the simulated demo fleet over the owner's real arrays.
           if(r.status === 401 || r.status === 403){ const e = new Error("auth"); e.auth = true; throw e; }
           if(!r.ok) throw 0;
           return r.json();
+        });
+      // Phase 1: stored skeleton (always attempt; even with cache this re-syncs structure)
+      pull("stored")
+        .then(t => {
+          // Don't regress a liveReady snapshot with a thinner stored one mid-session
+          // (e.g. heartbeat race). First paint + onboarding growth still apply.
+          if(state.liveReady) return;
+          ingest(adaptTree(t), {
+            recovered:(t.summary&&t.summary.recovered_ytd)||0,
+            fromStored: true,
+            refreshingLive: true,
+          });
         })
+        .catch((err) => {
+          if(err && err.auth){ onAuthExpired(); return; }
+          // stored failed: keep cache if any; live phase may still save us
+        });
+      // Phase 2: live enrichment
+      pull("live")
         .then(t => {
           // Signed in → always show the owner's REAL tree, even if it's empty.
           // Empty means "you haven't connected/added anything yet" (honest empty
           // state), NEVER the fake 100-array demo, that's only for anon visitors.
-          ingest(adaptTree(t), { recovered:(t.summary&&t.summary.recovered_ytd)||0 });
+          ingest(adaptTree(t), {
+            recovered:(t.summary&&t.summary.recovered_ytd)||0,
+            liveReady: true,
+          });
           startAutoRefresh();   // keep the open tree fresh (clears recovered-source banners)
         })
         .catch((err) => {
           if(err && err.auth){ onAuthExpired(); return; }
-          // Transient (network/5xx) for a signed-in owner: keep the cached tree if
-          // we painted one; otherwise show an honest empty tree (never a fake fleet).
-          if(!cached) ingest([], {});
-        });
+          // Transient (network/5xx) for a signed-in owner: keep the cached/stored
+          // tree if we painted one; otherwise show an honest empty tree (never a fake fleet).
+          state.refreshingLive = false;
+          notify("load");
+          if(!state.loaded){
+            if(!cached) ingest([], {});
+          }
+        })
+        .finally(() => { _loading = false; });
     } else {
       // Anonymous visitor (marketing/preview), the simulated fleet tells the story.
       // Big-operator demo: ~20 sites / 200 inverters; recovered_ytd is a
       // narrative KPI for the command-center hero (not a real ledger figure).
-      ingest(simulateFleet(), { simulated:true, recovered:248600 });
+      ingest(simulateFleet(), { simulated:true, recovered:248600, liveReady:true });
+      _loading = false;
     }
   }
 
@@ -1288,6 +1340,8 @@ window.FleetStore = (function(){
     undo, redo, canUndo, canRedo, clearHistory,
     isLoaded: () => state.loaded,
     isSimulated: () => !!state.simulated,
+    isRefreshingLive: () => !!state.refreshingLive && !state.liveReady,
+    isLiveReady: () => !!state.liveReady,
     lastUpdate: () => _lastUpdate,
     energyRate,             // effective $/kWh for loss/value math (real billed rate when signed in, else fallback)
     REC_PER_MWH: 38,        // $/MWh REC value, shared so consumers don't drift

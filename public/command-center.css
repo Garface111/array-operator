@@ -3150,6 +3150,39 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-empty{ padding:60px 20px; text-align:center; color:var(--faint); font-size:14px; }
 .vs-empty-soft{ padding:24px 16px; font-size:13px; }
 
+/* First-paint fleet skeleton (post-onboarding / cold load) */
+.vs-loading-skel{ max-width:520px; margin:40px auto; text-align:left; }
+.vs-loading-title{ font-size:15px; font-weight:720; color:var(--ink,#0E1420); margin:0 0 4px; }
+.vs-loading-sub{ font-size:12.5px; color:var(--muted,#4C596B); margin:0 0 18px; line-height:1.4; }
+.vs-skel-stack{ display:flex; flex-direction:column; gap:10px; }
+.vs-skel-row{ display:flex; gap:10px; align-items:center; }
+.vs-skel-bar{
+  height:14px; border-radius:8px; flex:1 1 auto;
+  background:linear-gradient(90deg, rgba(15,23,42,.06), rgba(15,23,42,.12), rgba(15,23,42,.06));
+  background-size:200% 100%;
+  animation:vsShimmer 2.2s ease-in-out infinite;
+}
+.vs-skel-bar.w40{ flex:0 0 40%; max-width:40%; }
+.vs-skel-bar.w55{ flex:0 0 55%; max-width:55%; }
+.vs-skel-bar.w35{ flex:0 0 35%; max-width:35%; }
+.vs-skel-bar.w20{ flex:0 0 20%; max-width:20%; }
+.vs-skel-bar.w22{ flex:0 0 22%; max-width:22%; }
+.vs-skel-bar.w18{ flex:0 0 18%; max-width:18%; }
+.vs-skel-bar.w15{ flex:0 0 15%; max-width:15%; }
+.vs-skel-bar.w14{ flex:0 0 14%; max-width:14%; }
+.vs-skel-bar.w12{ flex:0 0 12%; max-width:12%; }
+.vs-count-refreshing{ color:var(--accent,#1976D2); }
+.vs-inv-more{
+  display:block; width:100%; margin:4px 0 10px; padding:10px 14px;
+  border:1px dashed rgba(15,23,42,.16); border-radius:10px;
+  background:rgba(15,23,42,.03); color:var(--ink,#0E1420);
+  font:inherit; font-size:12.5px; font-weight:650; cursor:pointer; text-align:center;
+}
+.vs-inv-more:hover{ background:rgba(15,23,42,.06); border-color:rgba(15,23,42,.28); }
+@media (prefers-reduced-motion: reduce){
+  .vs-skel-bar{ animation:none !important; }
+}
+
 /* Pending vendor — just-connected, waiting for fleet-tree to show arrays */
 .vs-pending{
   margin:0 0 14px; border-radius:16px; overflow:hidden;
