@@ -222,9 +222,16 @@ html.sky .rb-mm-sectionlab{color:var(--muted)}
 html.sky .rb-mm-main h3{color:var(--ink);font-weight:750}
 html.sky .rb-mm-main p{color:var(--muted)}
 html.sky .rb-mm-main p b{color:var(--ink)}
+html.sky .rb-fleet-fold{
+  background:rgba(255,255,255,.88);
+  border:1px solid var(--sky-glass-edge);
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .rb-fleet-fold-sum{ color:var(--ink); }
+html.sky .rb-fleet-fold-hint{ color:var(--muted); }
 html.sky .rb-mm-stage{
-  background:rgba(33,150,243,.06);
-  border:1px solid rgba(33,150,243,.14);
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(20,60,120,.10);
 }
 html.sky .rb-mm-preview{
   background:rgba(255,255,255,.98);
@@ -232,25 +239,29 @@ html.sky .rb-mm-preview{
   box-shadow:0 6px 18px -14px rgba(14,60,120,.28);
 }
 html.sky .rb-mm-preview:hover{
-  border-color:rgba(33,150,243,.4);
+  border-color:rgba(20,60,120,.22);
 }
 html.sky .rb-mm-env{border-color:rgba(20,60,120,.08)}
 html.sky .rb-mm-foot{border-color:rgba(20,60,120,.08);color:var(--muted)}
 html.sky .rb-mm-subj{color:var(--ink)}
+/* Quiet CTA — not solid brand blue/green (undo primary bar) */
 html.sky .rb-mm-cta,
 html.sky #rbMasterEmailOpen.rb-mm-cta{
-  background:linear-gradient(180deg, #34d399, #10b981);
-  color:#06140d;
-  border:1px solid rgba(6,20,13,.1);
-  font-weight:700;
+  background:rgba(255,255,255,.75);
+  color:var(--ink);
+  border:1px solid rgba(20,60,120,.16);
+  font-weight:650;
+  box-shadow:none;
 }
 html.sky .rb-mm-cta:hover,
 html.sky #rbMasterEmailOpen.rb-mm-cta:hover{
-  filter:brightness(1.04);
-  background:linear-gradient(180deg, #3ee0a4, #12c48a);
-  border-color:rgba(6,20,13,.12);
+  filter:none;
+  background:rgba(255,255,255,.95);
+  border-color:rgba(20,60,120,.28);
+  box-shadow:none;
 }
-html.sky .rb-mm-cta-sub{ color:rgba(6,20,13,.72); opacity:1; }
+html.sky .rb-mm-cta-ico{ background:rgba(20,60,120,.06); }
+html.sky .rb-mm-cta-sub{ color:var(--muted); opacity:1; }
 
 /* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────
    White glass bars; the per-provider hue spine is applied inline by reports.js

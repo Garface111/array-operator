@@ -2913,14 +2913,15 @@
  <div id="rbFinTrends" class="rb-fin" style="display:none" aria-label="Invoice trends"></div>
  <div id="rbGenReportsView" class="rb-genrep" style="display:none" aria-label="Generation reports"></div>
  <div id="rbGenList">
- <!-- Master solar credit rate, Tenant.default_net_rate_per_kwh (+ discount).
- SET → fleet override for every offtaker without a per-offtaker rate.
- BLANK → each offtaker uses the EXCESS credit rate from THEIR own bound
- utility sub-account bill (custom per offtaker).
+ <!-- Master solar credit rate — collapsed by default (fleet-wide optional override).
  Wired by wireGlobalRate() → GET/PUT /v1/array-operator/billing/global-rate. -->
- <div class="rb-globalrate rep-card" id="rbGlobalRate">
+ <details class="rb-fleet-fold rb-globalrate rep-card" id="rbGlobalRate">
+ <summary class="rb-fleet-fold-sum">
+ <span class="rb-fleet-fold-title">Master solar credit rate</span>
+ <span class="rb-fleet-fold-hint">Optional · blank = each offtaker’s own bill rate</span>
+ </summary>
+ <div class="rb-fleet-fold-body">
  <div class="rb-gr-main">
- <h3>Master solar credit rate</h3>
  <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
  the solar credit rate on <b>their own utility sub-account bill</b>
  (custom per offtaker). Fill this in to force one rate for everyone
@@ -2943,30 +2944,31 @@
  title="Percent off the credit rate offtakers pay (their solar savings). Blank = 10% default.">
  <span class="rb-gr-unit">% off</span></span>
  </label>
- <!-- Same column stack as the two rate fields so the button sits on the
- input row (vertical center of the boxes), not mid-way up the labels. -->
  <div class="rb-gr-field rb-gr-save">
  <span class="rb-gr-lbl rb-gr-lbl-spacer" aria-hidden="true">&nbsp;</span>
- <button class="ao-btn ao-btn-primary rb-btn" id="rbGrSave" type="button">Save rate</button>
+ <button class="ao-btn rb-btn" id="rbGrSave" type="button">Save rate</button>
  </div>
  <span class="rb-status" id="rbGrStatus"></span>
  </div>
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
- <!-- Master offtaker email — one template for EVERY offtaker invoice email.
-      Primary action is the full-width button (scope is in the label). Saves to
-      Tenant.offtaker_email_*. Preview is secondary; whole preview still opens studio. -->
- <div class="rb-mastermail rep-card" id="rbMasterEmail">
+ </details>
+ <!-- Master offtaker email — collapsed by default; open to edit shared letter. -->
+ <details class="rb-fleet-fold rb-mastermail rep-card" id="rbMasterEmail">
+ <summary class="rb-fleet-fold-sum">
+ <span class="rb-fleet-fold-title">Master email for all offtakers</span>
+ <span class="rb-fleet-fold-hint">Shared letter · merge tags personalize each send</span>
+ </summary>
+ <div class="rb-fleet-fold-body">
  <div class="rb-mm-sectionlab">Shared across all offtakers</div>
  <div class="rb-mm-head">
  <div class="rb-mm-main">
- <h3>Master email for all offtakers</h3>
  <p>One letter on every offtaker invoice. Edit once — <b>all offtakers</b> get it.
  Merge tags personalize each send. A note on one offtaker still overrides that send only.</p>
  </div>
  </div>
  <div class="rb-mm-stage">
- <button class="ao-btn ao-btn-primary rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
+ <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
  title="Open the email studio. Changes apply to every offtaker’s invoice email.">
  <span class="rb-mm-cta-ico" aria-hidden="true">✉</span>
  <span class="rb-mm-cta-label">
@@ -2986,6 +2988,7 @@
  </div>
  <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
  </div>
+ </details>
  <div class="rb-listwrap rb2-listwrap">
  <div class="rb2-controls">
  <span class="rb2-controls-label">Your offtakers</span>
