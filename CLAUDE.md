@@ -19,6 +19,13 @@ Hard mechanics (bite hardest, repeat here on purpose):
 - **Netlify is NOT git-linked.** Deploy = `scripts/deploy-and-verify.sh`
   (archives committed HEAD, gates on the Playwright onboarding loop). Verify by
   curling the LIVE asset for your change's content.
+- **⛔ PROD DEPLOY PATH (incident 2026-07-20 — read DEPLOY.md).**  
+  Production is **ONLY** `scripts/deploy-and-verify.sh` (REST upload of `public/`).  
+  **NEVER** `netlify deploy --prod --dir public` from this repo root against
+  arrayoperator.com — that attached the preprod **Private preview** IP gate to
+  live customers. Preprod gate config lives in `scripts/preprod/netlify.toml`
+  and is only staged by `scripts/deploy-preprod.sh` onto the **preview** site.
+  After prod deploy: HTML must be 200 and must **not** contain "Private preview".
 - Frontend map, deploy playbook, and deeper traps live in the CC fleet memory
   (`array-operator-frontend-map`, `deploy-playbook`,
-  `concurrent-writers-energyagent-repos`).
+  `concurrent-writers-energyagent-repos`) and **[DEPLOY.md](DEPLOY.md)**.

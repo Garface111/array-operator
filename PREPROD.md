@@ -39,20 +39,37 @@ cd ~/solar-operator && scripts/deploy-staging-backend.sh
 ```
 
 `deploy-preprod.sh` stages the committed `staging` tree, rewrites `public/_redirects`
-so `/v1/*` and `/accounts` proxy to the **staging** backend, and deploys from the repo
-root so Netlify bundles the access gate (`netlify.toml` + `netlify/edge_functions/gate.ts`).
+so `/v1/*` and `/accounts` proxy to the **staging** backend, copies
+**`scripts/preprod/netlify.toml`** (the only toml that enables the gate) into the
+staging dir, and deploys that temp tree to the **preview** site UUID only.
+
+## ⛔ Never put this gate on production (incident 2026-07-20)
+
+Someone ran `netlify deploy --prod --dir public` from the **repo root** against the
+**prod** site. The CLI still read root `netlify.toml` and shipped edge function
+`gate` to **arrayoperator.com** — real customers saw “Private preview” / Request
+access. Backend was healthy; the site was blocked.
+
+**Hard rules (also in [DEPLOY.md](DEPLOY.md)):**
+
+| Do | Don't |
+|----|--------|
+| Prod FE: `scripts/deploy-and-verify.sh` | `netlify deploy --prod` from repo root → prod site |
+| Preprod FE: `scripts/deploy-preprod.sh` | Point preprod script at prod site UUID |
+| Gate config only in `scripts/preprod/netlify.toml` | Put `[[edge_functions]] gate` in root `netlify.toml` |
+
+Root `netlify.toml` is now a **trap** (no edge functions; build command fails loud).
+The gate only exists when `deploy-preprod.sh` stages the preprod toml.
 
 ## The access gate (IP allowlist only)
 
-Every request to the preview site runs `netlify/edge-functions/gate.ts`:
+Every request to the **preview** site runs `netlify/edge-functions/gate.ts`:
 
 1. **Allowlisted IP** (`PREPROD_ALLOW_IPS`) — Ford's computer/network passes silently.
 2. Everyone else → a branded **403** "Private Preview" page with a *request access* link.
    No login prompt (the beta password was removed).
 
-The gate is **structurally preprod-only**: prod deploys only `git archive HEAD public`
-via the REST helper, so the root-level `netlify.toml`/edge function are never part of
-the prod artifact. The allowlist lives as a Netlify **site env var**:
+The allowlist lives as a Netlify **site env var on the preprod site only**:
 
 ```bash
 export NETLIFY_AUTH_TOKEN=$(cat ~/.hermes/secrets/netlify_token)

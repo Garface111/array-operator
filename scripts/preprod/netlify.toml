@@ -1,0 +1,21 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Array Operator — PREPROD-ONLY Netlify config
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# This file is staged into the deploy directory by scripts/deploy-preprod.sh.
+# It is NOT the repo-root netlify.toml (that file is a trap that forbids
+# attaching this gate to production).
+#
+# Target site: ao-owner-web-preview (PREPROD_SITE_ID in scripts/preprod/config.env)
+# NEVER use this config against array-operator-ea / arrayoperator.com.
+#
+# Gate: netlify/edge-functions/gate.ts (IP allowlist → "Private preview" 403)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[build]
+  publish = "public"
+
+# Gate every request through the preprod access control (IP allowlist).
+[[edge_functions]]
+  path = "/*"
+  function = "gate"

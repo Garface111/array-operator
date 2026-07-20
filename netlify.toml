@@ -1,18 +1,36 @@
-# Array Operator — PREPROD-ONLY Netlify config.
+# ═══════════════════════════════════════════════════════════════════════════
+# ⛔ STOP — THIS FILE MUST NEVER DEPLOY THE PREPROD GATE TO PRODUCTION ⛔
+# ═══════════════════════════════════════════════════════════════════════════
 #
-# This file only takes effect when scripts/deploy-preprod.sh runs
-# `netlify deploy` from the repo root against the preprod preview site.
+# INCIDENT (2026-07-20): someone ran from this repo root:
 #
-# Production (arrayoperator.com) is deployed by a DIFFERENT path — the REST
-# helper uploads only `git archive HEAD public` (the public/ dir), so it never
-# sees this root-level file or the edge-function gate. That is deliberate: the
-# access gate must never apply to the live product.
+#   netlify deploy --prod --dir public --site <array-operator-ea / prod UUID>
+#
+# Netlify CLI still reads THIS directory's netlify.toml. An older version of
+# this file wired edge function `gate` (IP allowlist → "Private preview") onto
+# arrayoperator.com and took the live product offline for real customers.
+# Backend was fine; the site returned 403 Private Preview to every non-allowlisted IP.
+#
+# ── PRODUCTION (arrayoperator.com) ─────────────────────────────────────────
+#   ONLY:  scripts/deploy-and-verify.sh
+#   or:    python3 /mnt/c/Users/fordg/CC/netlify_deploy_dir.py <clean-public-dir>
+#   That path uploads public/ via REST only — no edge functions, no this file.
+#
+# ── PREPROD (ao-owner-web-preview, gated) ──────────────────────────────────
+#   ONLY:  scripts/deploy-preprod.sh
+#   That script stages scripts/preprod/netlify.toml + edge functions into a
+#   temp dir and deploys that tree to the PREVIEW site id — never prod.
+#
+# ── FORBIDDEN ──────────────────────────────────────────────────────────────
+#   netlify deploy --prod ... from this repo root against the PROD site
+#   netlify deploy --prod --dir public --site 966cb1f5-944e-41fd-855b-10053edc5d18
+#   Any deploy that would attach edge function "gate" to arrayoperator.com
+#
+# This root netlify.toml intentionally has NO [[edge_functions]]. If you need
+# the preprod gate, use scripts/preprod/netlify.toml via deploy-preprod.sh.
+# ═══════════════════════════════════════════════════════════════════════════
 
 [build]
+  # If the CLI tries to "build" from repo root, fail loud instead of shipping a gate.
+  command = "echo '' && echo 'FATAL: do not netlify-build/deploy Array Operator from repo root.' && echo '  Prod:    scripts/deploy-and-verify.sh' && echo '  Preprod: scripts/deploy-preprod.sh' && echo 'See DEPLOY.md and netlify.toml header.' && exit 1"
   publish = "public"
-
-# Gate every request through the preprod access control (IP allowlist + beta
-# Basic-Auth). See netlify/edge_functions/gate.ts.
-[[edge_functions]]
-  path = "/*"
-  function = "gate"
