@@ -16,6 +16,14 @@
 /accounts             https://web-production-49c83.up.railway.app/app/   200
 /accounts/*           https://web-production-49c83.up.railway.app/app/:splat   200
 
+# ── Phone app (React owner-web, served at /m) ───────────────────────────
+# The dedicated phone client is a static Vite build in public/m/ (regenerate
+# with: cd apps/owner-web && vite build --base=/m/ → copy dist/* to public/m/).
+# Its client-side routes (/m/fleet, /m/invoices, …) have no backing file, so
+# fall back to the app shell. Real assets (/m/assets/*) exist on disk and are
+# served directly — Netlify only applies this rewrite when no file matches.
+/m/*                  /m/index.html      200
+
 # ── Pretty onboarding URL ───────────────────────────────────────────────
 # The landing-page Array door links to arrayoperator.com/onboarding (no .html).
 # Serve the static onboarding wizard from the clean URL. The wizard calls the
