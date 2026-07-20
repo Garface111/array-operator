@@ -2173,6 +2173,15 @@
  return !!a && a !== normSpokenLine(body);
  }
 
+ /** True when the mouth is actually live for this turn: the owner is in voice
+  * (mic open, or the turn itself came from voice) and the speaker isn't muted.
+  * The 🔊 "what I said" block is a VOICE artifact — in a typed conversation
+  * nothing was said aloud, so showing it just duplicates the written answer.
+  * Same predicate that decides chatCtx.voice_active on the turn path. */
+ function voiceOutputLive(isVoiceTurn) {
+ return !state.voiceMuted && !!(state.listening || state.micStream || isVoiceTurn);
+ }
+
  function addMsg(role, text, opts) {
  opts = opts || {};
  var host = document.getElementById("eaMsgs");
@@ -2252,7 +2261,13 @@
  // distinct from the written answer, lift it into a 🔊 block on top so the
  // owner immediately sees "what was said" above the supporting detail.
  var spokenLine = String(opts.spoken == null ? "" : opts.spoken).trim();
- if (role === "agent" && spokenIsDistinct(spokenLine, t)) {
+ // Only when it was really spoken aloud. Callers that know the turn's voice
+ // state pass spokenAloud; anything else falls back to the live mic/mute check
+ // (history repaint passes no `spoken` at all, so it never renders this).
+ var spokenAloud = opts.spokenAloud === undefined
+ ? voiceOutputLive()
+ : !!opts.spokenAloud;
+ if (role === "agent" && spokenAloud && spokenIsDistinct(spokenLine, t)) {
  var sb = document.createElement("div");
  sb.className = "ea-spoken-block";
  var sbIc = document.createElement("span");
@@ -3497,7 +3512,8 @@
  }
  // Voice OUTPUT live (spoken aloud) even for a typed turn → backend spends the
  // humanizer pass so the mouth gets a real one-liner, not a truncated wall.
- if (!state.voiceMuted && (state.listening || state.micStream || isVoiceTurn)) {
+ var voiceLive = voiceOutputLive(isVoiceTurn);
+ if (voiceLive) {
    chatCtx.voice_active = true;
  }
  var chatBody = {
@@ -3541,7 +3557,7 @@
  var mouthLine = ownerFacingSpeak(
  (d.speak && String(d.speak).trim()) || reply
  );
- addMsg("agent", reply, { spoken: mouthLine });
+ addMsg("agent", reply, { spoken: mouthLine, spokenAloud: voiceLive });
  clearTools();
 
  // Cut interim "one second…" filler, then deliver the real answer immediately
