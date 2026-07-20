@@ -15,3 +15,14 @@
   # microphone=(self) REQUIRED for Energy Agent voice (was microphone=() which
   # silently blocked getUserMedia with no browser prompt — Ford 2026-07-14).
   Permissions-Policy: geolocation=(), microphone=(self), camera=(), payment=()
+
+# The phone app (/m, React owner-web) loads its Plus Jakarta Sans webfont from
+# Google Fonts. Extend style-src/font-src to those hosts for this subtree ONLY
+# (more specific path wins); everything else stays as strict as the main site.
+/m/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob: mediastream:; connect-src 'self' https://api.open-meteo.com https://web-production-49c83.up.railway.app https://api.openai.com wss://*.openai.com https://*.openai.com; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(self), camera=(), payment=()

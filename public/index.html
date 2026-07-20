@@ -40,6 +40,28 @@
  });
 })();
 </script>
+<!-- Phone → app redirect (Ford 2026-07-20): a signed-in owner on a PHONE gets the
+ dedicated React app at /m instead of the desktop layout squeezed onto a small
+ screen. Tablets + desktop are untouched (≤600px width only, matching app.js's
+ isNarrow). Prospects with no session stay on the marketing/onboarding pages.
+ search + hash carry through so a magic-link /?token= handoff lands in the app.
+ Escape hatch: /?desktop=1 persists ao_force_desktop and keeps the desktop site.
+ Runs after session-tabscope.js so the so_session read reflects this tab. -->
+<script>
+(function () {
+ try {
+ var qs = location.search || "";
+ if (/[?&]desktop=1(?:&|$)/.test(qs)) { try { localStorage.setItem("ao_force_desktop", "1"); } catch (e) {} return; }
+ try { if (localStorage.getItem("ao_force_desktop")) return; } catch (e) {}
+ var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+ if (!isPhone) return;
+ var hasToken = /[?&]token=/.test(qs), hasSession = false;
+ try { hasSession = !!localStorage.getItem("so_session"); } catch (e) {}
+ if (!hasSession && !hasToken) return;
+ location.replace("/m/" + qs + (location.hash || ""));
+ } catch (e) {}
+})();
+</script>
 <!-- Whole-system browser error capture, loaded first so it sees errors from
  every later script. POSTs to the shared backend /v1/client-error. -->
 <script src="error-reporter.js?v=20260709"></script>
@@ -629,7 +651,7 @@ document.documentElement.setAttribute("data-theme","day");
 <link rel="stylesheet" href="energy-agent.css?v=20260717resWrap1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716deskfix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260719cleanchat1"></script>
+<script src="energy-agent.js?v=20260719voicebubble1"></script>
 <script src="sovereign-desk.js?v=20260716deskfix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
 <link rel="stylesheet" href="hands-off-tour.css?v=20260717resWrap1">

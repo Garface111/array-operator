@@ -1,12 +1,12 @@
 {
-  "updated": "2026-07-18",
+  "updated": "2026-07-20",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
       "name": "Vermont",
       "comp": "Blended residential ≈ $0.1839/kWh; Category I (≤15 kW) effective ≈ $0.1439/kWh after the Aug 1, 2026 siting charge rose 4¢ → 5¢.",
       "how": "Rates are set by the PUC's biennial update; an array's rate locks ~10 years from its permit, then rolls to the blended rate. Small systems add +$0.01/kWh, or +$0.03/kWh if RECs go to the utility.",
-      "note": "Group / offsite (community) net metering is being phased out under H.289 — existing arrays keep running.",
+      "note": "Group / offsite (community) net metering is being phased out under H.289 — existing arrays keep running. Separately, Green Mountain Power filed for a 7.5% rate increase effective Oct 1, 2026 (Case 26-0096-TF), the final step of its 2023–2026 Multi-Year Regulation Plan.",
       "utils": ["Green Mountain Power", "Vermont Electric Cooperative"],
       "reg": "PUC Case 26-0291-INV — 2026 biennial update, order May 29, 2026 (the 7th consecutive Category I cut).",
       "sources": [
@@ -33,7 +33,7 @@
       "name": "New Hampshire",
       "comp": "NEM 2.0 credits exports at ≈ 85% of retail (100% of supply + transmission + 25% of distribution). Eversource retail ≈ $0.25/kWh.",
       "how": "The NEM 2.0 credit formula is locked through Jan 1, 2041 (Docket DE 16-576) — unusually long-term stability for the region.",
-      "note": "Two 2026 laws extend the edges of net metering: SB 540 (effective July 27, 2026) legalizes plug-in 'balcony' solar, and HB 1718 (signed July 10, 2026) directs the Dept. of Energy and PUC to credit exports from renewable-charged batteries.",
+      "note": "Three 2026 laws extend the edges of net metering: SB 540 (effective July 27, 2026) legalizes plug-in 'balcony' solar; HB 1718 (signed July 10, 2026, Chapter 309) directs the Dept. of Energy and PUC to credit exports from renewable-charged batteries; and SB 538 (signed July 10, 2026) locks the current net-metering credit for 20 years for municipal solar projects up to 5 MW already in the interconnection queue.",
       "utils": ["Eversource", "Liberty Utilities", "New Hampshire Electric Cooperative", "Unitil"],
       "reg": "NH PUC affirmed the Eversource rate case (monthly customer charge ≈ $14 → $19.81, ROE 9.5%) but on reconsideration (Jan 6, 2026 order) threw out the automatic annual increases; the Dept. of Energy has appealed the alternative-regulation framework (Docket DE 24-070) to the NH Supreme Court.",
       "sources": [
@@ -60,7 +60,7 @@
       "name": "Maine",
       "comp": "Net Energy Billing (NEB) — 1:1 retail-rate credits for rooftop solar. CMP ≈ $0.27/kWh, Versant ≈ $0.32/kWh; credits roll monthly and true up annually.",
       "how": "Rooftop NEB is protected; LD 1777 halted new community-solar NEB and added monthly charges on existing community arrays, with a successor front-of-meter program (DSES) to be designed in 2026.",
-      "note": "LD 1777 bars new community-solar NEB and adds monthly charges on existing arrays ($2.80/kW-AC for 1–3 MW-AC, $6/kW-AC for 3–5 MW-AC) effective Jan 1, 2026; a successor (DSES) program draft is due Sept 30, 2026. CMP's one-year distribution rate plan (~$69M) is pending before the MPUC.",
+      "note": "LD 1777 bars new community-solar NEB and adds monthly charges on existing arrays ($2.80/kW-AC for 1–3 MW-AC, $6/kW-AC for 3–5 MW-AC) effective Jan 1, 2026; a successor (DSES) program draft is due Sept 30, 2026. CMP's refundable temporary distribution rates took effect July 1, 2026 (~$4/mo bill decrease, no distribution-charge increase through April 2027) while its one-year rate case is reviewed by the MPUC.",
       "utils": ["Central Maine Power (CMP)", "Versant Power"],
       "reg": "Maine PUC (MPUC). LD 1792 reversed a 2025 cost-allocation increase; tariff rates are set through 2046 (Dockets 2019-00197, 2022-00185). CMP residential Standard Offer (supply) is 12.721¢/kWh for 2026.",
       "sources": [
@@ -85,7 +85,7 @@
       "name": "Massachusetts",
       "comp": "1:1 retail-rate net metering for residential ≤ 25 kW (Class I) — credits ≈ $0.2836/kWh (Eversource), ≈ $0.32/kWh (National Grid).",
       "how": "On top of net metering, SMART 3.0 (PY2026) pays a flat $0.03/kWh incentive (residential ≤ 25 kW; $0.06/kWh low-income).",
-      "note": "DPU Docket 25-200 (delivery rate design) is examining whether to reduce the value of net-metering credits; no changes have been ordered and existing systems are expected to be grandfathered.",
+      "note": "DPU Docket 25-200 (delivery rate design) is examining whether to reduce the value of net-metering credits; no changes have been ordered and existing systems are expected to be grandfathered. DOER filed SMART 3.0 emergency regulations (225 CMR 28.00) on June 26, 2026 — comments run through an Aug 5, 2026 public hearing; Program Year 2026 carries 600 MW-AC of capacity.",
       "utils": ["Eversource", "National Grid", "Unitil"],
       "reg": "MA Dept. of Public Utilities (DPU); the SMART incentive is administered by DOER.",
       "sources": [
@@ -113,7 +113,7 @@
       "how": "Whichever option you choose at enrollment is locked for 20 years; Eversource and United Illuminating administer it identically.",
       "note": "",
       "utils": ["Eversource", "United Illuminating (UI)"],
-      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022. Eversource filed a ~$727M (≈18%) distribution rate case on July 14, 2026 (new rates would take effect July 2027); a May 1, 2026 Rate Adjustment Mechanism decision cut interim Eversource and UI rates.",
+      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022. Eversource filed a rate case on July 14, 2026 seeking ~$451M in distribution revenue (~11% residential), rising to a headline ~$727M (~18%) once ~$1B of 2018–2023 storm costs are included; new rates would take effect July 1, 2027. Standard-service supply rates fell July 1, 2026 (Eversource to ≈11.58¢/kWh, UI to ≈11.99¢/kWh), and a May 1, 2026 Rate Adjustment Mechanism decision cut interim delivery rates.",
       "sources": [
         { "l": "CT PURA", "u": "https://portal.ct.gov/pura" },
         { "l": "Office of Consumer Counsel", "u": "https://portal.ct.gov/occ" }
@@ -136,9 +136,9 @@
       "name": "Rhode Island",
       "comp": "Net metering ≈ 80% of retail (≈ $0.232/kWh) for new systems, 125% annual cap, protected through 2039. The separate REG program pays ≈ $0.2723/kWh for 15 years.",
       "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
-      "note": "The 2026 legislative session (ended June 11) killed a proposed solar 'grid access fee' on systems ≥ 1 MW but set up lower virtual-net-metering compensation for large projects. The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
+      "note": "The 2026 legislative session (ended June 11) killed a proposed solar 'grid access fee' on systems ≥ 1 MW but set up lower virtual-net-metering compensation for large projects and lowers the net-metering program cap from 275 MW toward 175 MW by 2031. The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027.",
       "utils": ["Rhode Island Energy"],
-      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) is pending, and Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
+      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) entered post-hearing briefing on July 16, 2026 with a decision expected before the ~September 2026 effective date, and Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
       "sources": [
         { "l": "RI PUC", "u": "https://ripuc.ri.gov/" },
         { "l": "Office of Energy Resources", "u": "https://energy.ri.gov/renewable-energy/net-metering" }
@@ -167,7 +167,7 @@
       "price_display": "≈ $30–40 / MWh",
       "price_usd_per_mwh_low": 30,
       "price_usd_per_mwh_high": 40,
-      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The MA Class I Alternative Compliance Payment (ACP) — $40/MWh (225 CMR 14.08), the industry-referenced ceiling since 2023 — caps the market. As of the May 2026 MassCEC/Evolution Markets auction, 2025-vintage MA Class I was trading near the top of this range, toward the $40 ACP, in a supply-constrained market ahead of the 2025 compliance deadline. Prices have historically swung from single digits to the cap.",
+      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The MA Class I Alternative Compliance Payment (ACP) — $40/MWh (225 CMR 14.08), the industry-referenced ceiling since 2023 — caps the market. As of the May 2026 MassCEC/Evolution Markets auction, 2025-vintage MA Class I was trading near the top of this range, toward the $40 ACP, in a supply-constrained market ahead of the 2025 compliance deadline. Connecticut's Class I RPS obligation drops to 25% for 2026 (and excludes new biomass/landfill-gas as of Oct 1, 2025), shifting some supply toward the higher-priced NH market. Prices have historically swung from single digits to the cap.",
       "registry": "NEPOOL-GIS",
       "mint_lag": "Issued quarterly, roughly one quarter after generation (e.g. Q1 generation mints mid-year).",
       "eligible_states": ["ma", "ct", "ri", "nh", "me", "vt"]
