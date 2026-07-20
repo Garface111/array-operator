@@ -1042,6 +1042,27 @@
  // not a grid of per-inverter minis. Tone tracks the array's live output vs its
  // combined rated capacity (green at/near max → amber → orange → idle when nothing
  // is reporting). Days where the whole array made nothing get a red dot.
+ // Vendor-offline production continuity: when the inverter feed is dead but the
+ // utility meter still has days, draw the utility series on the vendor stream
+ // with a provenance chip (backend production_fallback block). Never invents
+ // per-inverter history — array graph only.
+ function productionFallbackActive(col){
+ const pf = col && col.production_fallback;
+ return !!(pf && pf.active && pf.days_filled > 0);
+ }
+ function productionFallbackChip(col){
+ if(!productionFallbackActive(col)) return "";
+ const pf = col.production_fallback || {};
+ const src = String(pf.source || "utility").replace(/_/g, " ");
+ const n = pf.days_filled || 0;
+ const tip = pf.vendor_last_day
+  ? `Inverter monitoring offline since ${pf.vendor_last_day}. Showing utility meter for ${n} day${n===1?"":"s"}.`
+  : `Inverter monitoring offline. Showing utility meter for ${n} day${n===1?"":"s"}.`;
+ return `<div class="sb-pf-chip" title="${esc(tip)}" role="status">
+  <span class="sb-pf-chip-dot" aria-hidden="true"></span>
+  Production from utility meter · ${esc(src)}
+ </div>`;
+ }
  function arrayGraph(sortedInvs, arrayDaily, col, stream){
  stream = stream || "vendor";
  const split = (col && col.daily_split) || null;
@@ -1055,6 +1076,26 @@
  return _renderArraySeries(byDate, "Utility meter · last %d days",
  "var(--util, #5b8def)",
  "no utility-meter data yet, connect GMP to see settled generation");
+ }
+ // ── Vendor stream with dead inverter feed + live utility → draw utility
+ // series (honest provenance via productionFallbackChip above the graph). ──
+ if(stream === "vendor" && productionFallbackActive(col)){
+ const useries = (split && Array.isArray(split.utility)) ? split.utility : [];
+ // Prefer blended arrayDaily when utility already gap-filled into DailyGeneration
+ // (source=utility_meter rows) so the graph matches storage.
+ const byDate = new Map();
+ if(Array.isArray(arrayDaily) && arrayDaily.length){
+  arrayDaily.forEach(d => {
+   if(!d || d.date == null) return;
+   byDate.set(d.date, Math.max(0, +d.kwh || 0));
+  });
+ }
+ if(byDate.size < 2){
+  useries.forEach(d => { if(d && d.date != null) byDate.set(d.date, Math.max(0, +d.kwh || 0)); });
+ }
+ return _renderArraySeries(byDate, "Production (utility fallback) · last %d days",
+ "var(--util, #5b8def)",
+ "utility meter has no daily series yet");
  }
  if(!sortedInvs || !sortedInvs.length){
  // No inverters, but the array may still carry vendor-side history (csv/
@@ -2304,6 +2345,7 @@
  ${srcStatusBanner}
  ${freshnessHTML(col)}
  ${autoLoginHintHTML(col.vendor||"", col)}
+ ${productionFallbackChip(col)}
  ${arrayGraph(sortedInvs, col.daily, col, getStream())}
  ${aNowChip}
  ${arrayOutputBar(aOs, col)}
@@ -2406,9 +2448,11 @@
  const split = col.daily_split || null;
  // Stream-aware: in utility mode draw the meter series; in vendor mode sum the
  // per-inverter daily (falling back to the vendor split for inverter-less arrays).
+ // When production_fallback is active, prefer the utility series so the tile
+ // matches the array graph (vendor feed dead, meter still reporting).
  let series = [];
- if(stream === "utility"){
- series = (split && Array.isArray(split.utility)) ? split.utility : [];
+ if(stream === "utility" || productionFallbackActive(col)){
+ series = (split && Array.isArray(split.utility)) ? split.utility : (col.daily || []);
  } else {
  const invs = col.inverters || [];
  if(invs.length){

@@ -895,6 +895,11 @@
   .sb-ag-total{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
   .sb-ag-graph{display:block;width:100%;height:56px}
   .sb-ag-nodata{font-size:9.5px;color:var(--faint);font-style:italic;padding:10px 0}
+  /* Vendor-offline continuity: utility meter standing in for a dead inverter feed */
+  .sb-pf-chip{display:inline-flex;align-items:center;gap:6px;margin:8px 0 2px;padding:4px 9px;
+    border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;
+    background:rgba(91,141,239,.14);color:#8eb6ff;border:1px solid rgba(91,141,239,.28)}
+  .sb-pf-chip-dot{width:6px;height:6px;border-radius:50%;background:#5b8def;box-shadow:0 0 0 3px rgba(91,141,239,.18);flex:none}
 
   /* LEFT inner column: array identity + where its data comes from */
   .sb-array-details{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
