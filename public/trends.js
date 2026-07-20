@@ -259,7 +259,8 @@
  }
 
  // Year × array kWh matrix (Paul Bozuwa 2026-07-15): each array as a row,
- // calendar years as columns + lifetime. Current year column is YTD.
+ // calendar years as columns + trailing-12-mo (for YoY vs prior full year) +
+ // lifetime. Current year column is YTD — incomplete, so TTM is the fair compare.
  // Production only — offtaker $ true-ups stay on Invoices when that history exists.
  function yearMatrix(byArray, fleetYears) {
  const c = C();
@@ -272,9 +273,12 @@
  const years = Object.keys(yearSet).map(Number).filter(n => n > 1990).sort((a, b) => a - b);
  if (!years.length) return "";
  const curY = new Date().getFullYear();
+ const priorY = curY - 1;
  const rows = byArray.slice().sort((a, b) => (b.lifetime_kwh || 0) - (a.lifetime_kwh || 0));
  const colTot = {}; years.forEach(y => { colTot[y] = 0; });
  let lifeTot = 0;
+ let ttmTot = 0;
+ let priorTot = 0;
  const body = rows.map((a, i) => {
  const byY = a.kwh_by_year || {};
  const cells = years.map(y => {
@@ -284,25 +288,54 @@
  }).join("");
  const life = Number(a.lifetime_kwh || 0);
  lifeTot += life;
+ const ttm = Number(a.kwh_ttm != null ? a.kwh_ttm : 0);
+ ttmTot += ttm;
+ const prior = Number(a.kwh_prior_year != null ? a.kwh_prior_year
+  : (byY[String(priorY)] || 0));
+ if (prior > 0) priorTot += prior;
+ // YoY: trailing 12 mo vs prior full calendar year (apples-to-apples-ish)
+ let yoyCell = `<td class="tr-anum tr-ym-yoy">—</td>`;
+ const pct = a.ttm_vs_prior_year_pct;
+ if (pct != null && isFinite(pct) && prior > 0 && ttm > 0) {
+  const cls = pct < 0 ? "neg" : "pos";
+  const sign = pct > 0 ? "+" : "";
+  yoyCell = `<td class="tr-anum tr-ym-yoy ${cls}" title="Trailing 12 months vs full ${priorY}">${sign}${Number(pct).toFixed(1)}%</td>`;
+ } else if (prior > 0 && ttm > 0) {
+  const p = 100 * (ttm - prior) / prior;
+  const cls = p < 0 ? "neg" : "pos";
+  const sign = p > 0 ? "+" : "";
+  yoyCell = `<td class="tr-anum tr-ym-yoy ${cls}" title="Trailing 12 months vs full ${priorY}">${sign}${p.toFixed(1)}%</td>`;
+ }
  return `<tr style="--ri:${i}">
  <td class="tr-aname">${c.esc(a.name)}</td>
  ${cells}
+ <td class="tr-anum tr-ym-ttm" title="Sum of the last 12 calendar months">${ttm > 0 ? c.fmt0(ttm) : "—"}</td>
+ ${yoyCell}
  <td class="tr-anum tr-ym-life">${life > 0 ? c.fmt0(life) : "—"}</td>
  </tr>`;
  }).join("");
+ let footYoy = `<td class="tr-anum tr-ym-yoy">—</td>`;
+ if (priorTot > 0 && ttmTot > 0) {
+  const p = 100 * (ttmTot - priorTot) / priorTot;
+  const cls = p < 0 ? "neg" : "pos";
+  const sign = p > 0 ? "+" : "";
+  footYoy = `<td class="tr-anum tr-ym-yoy ${cls}"><b>${sign}${p.toFixed(1)}%</b></td>`;
+ }
  const foot = `<tr class="tr-ym-tot">
  <td class="tr-aname"><b>Fleet total</b></td>
  ${years.map(y => `<td class="tr-anum"><b>${colTot[y] > 0 ? c.fmt0(colTot[y]) : "—"}</b></td>`).join("")}
+ <td class="tr-anum tr-ym-ttm"><b>${ttmTot > 0 ? c.fmt0(ttmTot) : "—"}</b></td>
+ ${footYoy}
  <td class="tr-anum tr-ym-life"><b>${lifeTot > 0 ? c.fmt0(lifeTot) : "—"}</b></td>
  </tr>`;
  const yHeads = years.map(y =>
- `<th class="tr-anum">${y}${y === curY ? " <span class=\"tr-ym-partial\" title=\"Calendar year to date\">YTD</span>" : ""}</th>`
+ `<th class="tr-anum">${y}${y === curY ? " <span class=\"tr-ym-partial\" title=\"Calendar year to date — incomplete year\">YTD</span>" : ""}</th>`
  ).join("");
  return `<div class="tr-block tr-ymatrix" id="trYearMatrix">
  <div class="tr-block-h">PRODUCTION BY YEAR</div>
- <div class="tr-block-sub">kWh by array and calendar year. ${curY} is year-to-date. LATEST YOY above uses full months only.</div>
+ <div class="tr-block-sub">kWh by array and calendar year. ${curY} is year-to-date (incomplete). <b>Trailing 12 mo</b> is the rolling last year — compare it to full ${priorY} via the YoY column.</div>
  <div class="tr-tablewrap tr-tablewrap-scroll"><table class="tr-table tr-ym-table">
- <thead><tr><th>Array</th>${yHeads}<th class="tr-anum tr-ym-life">Lifetime</th></tr></thead>
+ <thead><tr><th>Array</th>${yHeads}<th class="tr-anum tr-ym-ttm" title="Last 12 calendar months of production">Trailing 12 mo</th><th class="tr-anum tr-ym-yoy" title="Trailing 12 months vs full prior calendar year">vs ${priorY}</th><th class="tr-anum tr-ym-life">Lifetime</th></tr></thead>
  <tbody>${body}${foot}</tbody>
  </table></div>
  </div>`;

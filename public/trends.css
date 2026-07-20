@@ -139,13 +139,21 @@
   /* full names — never ellipsize; horizontal scroll owns overflow */
   overflow:visible;text-overflow:clip;
 }
-.tr-ym-table th.tr-ym-life,.tr-ym-table td.tr-ym-life{
+.tr-ym-table th.tr-ym-life,.tr-ym-table td.tr-ym-life,
+.tr-ym-table th.tr-ym-ttm,.tr-ym-table td.tr-ym-ttm,
+.tr-ym-table th.tr-ym-yoy,.tr-ym-table td.tr-ym-yoy{
   min-width:6.5rem;padding-left:16px;padding-right:18px;
 }
+.tr-ym-table th.tr-ym-ttm,.tr-ym-table td.tr-ym-ttm{min-width:7.5rem}
 .tr-ym-partial{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--good2,#3fd68a);vertical-align:super}
 .tr-ym-tot td{border-top:1px solid var(--line);background:color-mix(in srgb,var(--ink) 3%,transparent)}
 .tr-ym-tot td:first-child{background:color-mix(in srgb,var(--ink) 3%,var(--card,var(--bg,#0b1220)))}
 .tr-ym-life{font-weight:650;color:var(--ink)!important}
+.tr-ym-ttm{font-weight:700;color:var(--good2,#3fd68a)!important;background:color-mix(in srgb,var(--good) 8%,transparent)}
+.tr-ym-table th.tr-ym-ttm{color:var(--good2,#3fd68a)!important}
+.tr-ym-yoy{font-weight:650;font-variant-numeric:tabular-nums}
+.tr-ym-yoy.pos{color:var(--good2,#3fd68a)!important}
+.tr-ym-yoy.neg{color:var(--bad,#ff6b6b)!important}
 .tr-tablewrap-scroll{
   display:block;width:100%;max-width:100%;min-width:0;
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
