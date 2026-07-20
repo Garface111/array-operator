@@ -154,6 +154,15 @@
 .tr-ym-yoy{font-weight:650;font-variant-numeric:tabular-nums}
 .tr-ym-yoy.pos{color:var(--good2,#3fd68a)!important}
 .tr-ym-yoy.neg{color:var(--bad,#ff6b6b)!important}
+.tr-export-pack{margin-left:8px}
+.tr-pack-btn{
+  font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;
+  background:rgba(63,214,138,.12);color:var(--good2,#3fd68a);
+  border:1px solid rgba(63,214,138,.28);white-space:nowrap;
+}
+.tr-pack-btn:hover{background:rgba(63,214,138,.2);border-color:rgba(63,214,138,.45)}
+.tr-pack-btn:disabled{opacity:.55;cursor:wait}
+.tr-apack{text-align:right;width:1%}
 .tr-tablewrap-scroll{
   display:block;width:100%;max-width:100%;min-width:0;
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;

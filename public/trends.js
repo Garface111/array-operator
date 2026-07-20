@@ -115,7 +115,8 @@
  if (total) parts.push(`<b>${reporting}</b>/${total} array${total === 1 ? "" : "s"} reporting`);
  if (!parts.length) return "";
  return `<div class="tr-fresh">${parts.join(" · ")}
- <button class="tr-export" id="trExport" type="button" title="Download monthly + daily production as CSV">↓ Export CSV</button></div>`;
+ <button class="tr-export" id="trExport" type="button" title="Download monthly + daily production as CSV">↓ Export CSV</button>
+ <button class="tr-export tr-export-pack" id="trMasterPack" type="button" title="Download a master spreadsheet pack for every array: all utility bills, daily + monthly history, YoY / trailing 12 mo">↓ Master data (all arrays)</button></div>`;
  }
 
  function statBand(d) {
@@ -183,6 +184,71 @@
  </div>`;
  }
 
+ // Master Array Data Pack: zip of per-array xlsx (utility bills + full history).
+ // Auth via session bearer; streams from Railway through same-origin proxy.
+ async function downloadMasterPackZip(btn) {
+  const tok = session();
+  if (!tok) {
+   try { window.AODialog && AODialog.alert("Sign in to download master data packs.", { title: "Sign in" }); } catch (e) {}
+   return;
+  }
+  const label = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Building…"; }
+  try {
+   const r = await fetch("/v1/array-owners/master-data.zip", {
+    headers: { Authorization: "Bearer " + tok },
+   });
+   if (!r.ok) {
+    let msg = "Download failed (" + r.status + ")";
+    try { const j = await r.json(); if (j && j.detail) msg = j.detail; } catch (e) {}
+    throw new Error(msg);
+   }
+   const blob = await r.blob();
+   const cd = r.headers.get("Content-Disposition") || "";
+   const mm = /filename="?([^"]+)"?/.exec(cd);
+   const url = URL.createObjectURL(blob);
+   const a = document.createElement("a");
+   a.href = url;
+   a.download = (mm && mm[1]) || "fleet-master-data.zip";
+   document.body.appendChild(a); a.click(); a.remove();
+   setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+   try {
+    window.AODialog && AODialog.alert(String(e.message || e), { title: "Master data pack" });
+   } catch (e2) { alert(String(e.message || e)); }
+  } finally {
+   if (btn) { btn.disabled = false; btn.textContent = label || "↓ Master data (all arrays)"; }
+  }
+ }
+
+ // Single-array master pack (from by-array table row buttons).
+ async function downloadArrayMasterPack(arrayId, arrayName, btn) {
+  const tok = session();
+  if (!tok || !arrayId) return;
+  const label = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+  try {
+   const r = await fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/master-data.xlsx", {
+    headers: { Authorization: "Bearer " + tok },
+   });
+   if (!r.ok) throw new Error("Download failed (" + r.status + ")");
+   const blob = await r.blob();
+   const cd = r.headers.get("Content-Disposition") || "";
+   const mm = /filename="?([^"]+)"?/.exec(cd);
+   const url = URL.createObjectURL(blob);
+   const a = document.createElement("a");
+   a.href = url;
+   a.download = (mm && mm[1]) || ((arrayName || "array") + "-master-data.xlsx");
+   document.body.appendChild(a); a.click(); a.remove();
+   setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+   try { window.AODialog && AODialog.alert(String(e.message || e), { title: "Master data" }); }
+   catch (e2) { alert(String(e.message || e)); }
+  } finally {
+   if (btn) { btn.disabled = false; btn.textContent = label || "↓ Pack"; }
+  }
+ }
+
  // Build a CSV of monthly + daily production and trigger a download.
  function exportCsv(d) {
  const rows = [["section", "period", "kwh"]];
@@ -246,13 +312,14 @@
  <td class="tr-aname">${c.esc(a.name)}</td>
  <td class="tr-anum">${dead ? "—" : c.fmt0(kwh) + " kWh"}</td>
  <td>${status}</td>
- <td class="tr-ayears">${yrs || "—"}</td></tr>`;
+ <td class="tr-ayears">${yrs || "—"}</td>
+ <td class="tr-apack"><button type="button" class="tr-pack-btn" data-pack-id="${c.esc(String(a.array_id))}" data-pack-name="${c.esc(a.name || "")}" title="Download master data pack: all utility bills, daily + monthly history, YoY / trailing 12 mo">↓ Pack</button></td></tr>`;
  }).join("");
  return `<div class="tr-block">
  <div class="tr-block-h">BY ARRAY</div>
- <div class="tr-block-sub">Lifetime production, share of fleet, and the years on record for each array, most productive first.</div>
+ <div class="tr-block-sub">Lifetime production, share of fleet, and the years on record for each array, most productive first. <b>↓ Pack</b> downloads the full multi-year master spreadsheet for that array (utility bills + daily history).</div>
  <div class="tr-tablewrap"><table class="tr-table">
- <thead><tr><th>Array</th><th class="tr-anum">Lifetime</th><th>Share</th><th>Years</th></tr></thead>
+ <thead><tr><th>Array</th><th class="tr-anum">Lifetime</th><th>Share</th><th>Years</th><th></th></tr></thead>
  <tbody>${body}</tbody>
  </table></div>
  </div>`;
@@ -508,6 +575,15 @@
  // wire the CSV export
  const ex = document.getElementById("trExport");
  if (ex) ex.addEventListener("click", () => exportCsv(d));
+ // Master data pack — zip of one mega-spreadsheet per array (bills + daily + YoY)
+ const mp = document.getElementById("trMasterPack");
+ if (mp) mp.addEventListener("click", () => downloadMasterPackZip(mp));
+ r.querySelectorAll("[data-pack-id]").forEach(btn => {
+  btn.addEventListener("click", () => {
+   downloadArrayMasterPack(btn.getAttribute("data-pack-id"),
+    btn.getAttribute("data-pack-name"), btn);
+  });
+ });
 
  // Professional REPORT, the headline of the tab: daily-output bar, YoY-growth
  // (graph #2), this-year-vs-last-year line, every one with LABELED AXES.
