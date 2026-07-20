@@ -239,16 +239,18 @@ html.sky .rb-mm-foot{border-color:rgba(20,60,120,.08);color:var(--muted)}
 html.sky .rb-mm-subj{color:var(--ink)}
 html.sky .rb-mm-cta,
 html.sky #rbMasterEmailOpen.rb-mm-cta{
-  background:rgba(16,185,129,.12);
-  color:#047857;
-  border:1px solid rgba(16,185,129,.28);
-  font-weight:650;
+  background:linear-gradient(180deg, #34d399, #10b981);
+  color:#06140d;
+  border:1px solid rgba(6,20,13,.1);
+  font-weight:700;
 }
 html.sky .rb-mm-cta:hover,
 html.sky #rbMasterEmailOpen.rb-mm-cta:hover{
-  background:rgba(16,185,129,.2);
-  border-color:rgba(16,185,129,.45);
+  filter:brightness(1.04);
+  background:linear-gradient(180deg, #3ee0a4, #12c48a);
+  border-color:rgba(6,20,13,.12);
 }
+html.sky .rb-mm-cta-sub{ color:rgba(6,20,13,.72); opacity:1; }
 
 /* ── 6 · PROVIDER HEADS (top of the 3-level accordion) ─────────────────────
    White glass bars; the per-provider hue spine is applied inline by reports.js

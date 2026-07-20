@@ -2440,7 +2440,7 @@
  ov.innerHTML = `
  <div class="rb-es-head">
  <div>
- <b>Customize email template</b>
+ <b>Edit master email for all offtakers</b>
  <span class="rb-es-sub">Master letter for <b>every offtaker invoice email</b>. Save once and all offtakers get the new wording — merge tags ({{greeting}}, {{amount}}, {{period}}…) personalize each send intelligently. A per-offtaker edited note still overrides one send only.</span>
  </div>
  <span class="rb-es-status" id="esStatus">Saved</span>
@@ -2953,22 +2953,28 @@
  </div>
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
- <!-- Master offtaker email — 1-1 with Generation reports Delivery settings
-      "Email template" region (AutoReportsSettingsCard): section label, sample
-      preview card, full-width Customize CTA → full studio. Saves to
-      Tenant.offtaker_email_* so every offtaker invoice email updates. -->
+ <!-- Master offtaker email — one template for EVERY offtaker invoice email.
+      Primary action is the full-width button (scope is in the label). Saves to
+      Tenant.offtaker_email_*. Preview is secondary; whole preview still opens studio. -->
  <div class="rb-mastermail rep-card" id="rbMasterEmail">
- <div class="rb-mm-sectionlab">Email template</div>
+ <div class="rb-mm-sectionlab">Shared across all offtakers</div>
  <div class="rb-mm-head">
  <div class="rb-mm-main">
- <h3>Master offtaker email</h3>
- <p>Edit once — <b>every offtaker</b> receives this letter on their invoice email.
- Merge tags personalize each send ({{greeting}}, {{amount}}, {{period}}…).
- A per-offtaker edited note still overrides this for that one send only.</p>
+ <h3>Master email for all offtakers</h3>
+ <p>One letter on every offtaker invoice. Edit once — <b>all offtakers</b> get it.
+ Merge tags personalize each send. A note on one offtaker still overrides that send only.</p>
  </div>
  </div>
  <div class="rb-mm-stage">
- <div class="rb-mm-eyebrow">✦ Sample preview · what your offtakers actually receive</div>
+ <button class="ao-btn ao-btn-primary rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
+ title="Open the email studio. Changes apply to every offtaker’s invoice email.">
+ <span class="rb-mm-cta-ico" aria-hidden="true">✉</span>
+ <span class="rb-mm-cta-label">
+ <span class="rb-mm-cta-title">Edit master email for all offtakers</span>
+ <span class="rb-mm-cta-sub">Subject, body, sign-off · applies to every offtaker</span>
+ </span>
+ </button>
+ <div class="rb-mm-eyebrow">Sample · what each offtaker receives (personalized)</div>
  <div class="rb-mm-preview" id="rbMasterEmailPreview">
  <div class="rb-mm-env">
  <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
@@ -2977,8 +2983,6 @@
  <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
  <div class="rb-mm-foot" id="rbMmFoot"></div>
  </div>
- <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
- title="Open the full email studio — subject, body, sign-off, live preview, test send, AI assist. Changes apply to every offtaker invoice email.">Customize email template</button>
  </div>
  <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
  </div>
@@ -3036,7 +3040,7 @@
  </div>
  </div>
  </div>
- <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Customize the email every offtaker invoice goes out with: greeting, wording, sign-off. Personalized per offtaker with merge tags ({{greeting}} renders “Hi Abigail,” automatically); a per-offtaker edited note still overrides it.">✉ Customize email</button>
+ <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only.">✉ Master email · all offtakers</button>
  <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
  <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating.">⬆ Bulk import</button>
  <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
