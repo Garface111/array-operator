@@ -186,6 +186,10 @@ document.documentElement.setAttribute("data-theme","day");
  .trial-nudge.success{border-left:2px solid var(--good,#3fd68a)}
  .trial-nudge.success .trial-nudge-copy{color:var(--ink)}
  .trial-nudge.neutral{border-left:2px solid var(--line)}
+ /* product-notices: stack of the same quiet bars (rate changes, etc.) */
+ #productNotices{display:flex;flex-direction:column;gap:6px;margin:8px 0 0}
+ #productNotices[hidden]{display:none}
+ #productNotices .product-notice{margin:0}
  /* hero: value prop (left) + pricing card (right) */
  .hero{display:flex;gap:28px;align-items:stretch;padding:26px 26px 22px;flex-wrap:wrap}
  .hero-main{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
@@ -394,6 +398,10 @@ document.documentElement.setAttribute("data-theme","day");
  </div>
  </div>
 
+ <!-- Product announcements (rate changes, etc.) — product-notices.js.
+      Add entries to AO_PRODUCT_NOTICES; same quiet trial-nudge chrome. -->
+ <div id="productNotices" hidden></div>
+
  <!-- Trial card-capture nudge, quiet, dismissible. app.js updateTrialNudge shows
  it for a trialing owner with no card on file as trial end nears. -->
  <div class="trial-nudge" id="trialNudge" role="region" aria-label="Trial ending" hidden>
@@ -572,6 +580,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="demo-data.js?v=20260714big"></script>
 <script src="app.js?v=20260715eaModal2"></script>
 <script src="session-ping.js?v=20260720tos1"></script>
+<script src="product-notices.js?v=20260720rate1"></script>
 <script src="sandbox.js?v=20260719slidefix"></script>
 <script src="vendor-sheet.js?v=20260719stream2"></script>
 <script src="command-center.js?v=20260719fleetguard1"></script>
