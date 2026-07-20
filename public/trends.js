@@ -19,6 +19,17 @@
  "use strict";
 
  const API = "/v1/array-owners/fleet-trends";
+ // Long downloads (master data zip / per-array packs) MUST NOT go through the
+ // Netlify /v1/* proxy — it buffers and 504s at ~26s (same class as Energy Agent
+ // chat). Hit Railway directly on the prod host; CORS already allows arrayoperator.com.
+ const LONG_API_ORIGIN = (function () {
+  if (typeof window.__AO_API_ORIGIN === "string") return window.__AO_API_ORIGIN;
+  var h = (location.hostname || "").toLowerCase();
+  if (h === "arrayoperator.com" || h === "www.arrayoperator.com") {
+   return "https://web-production-49c83.up.railway.app";
+  }
+  return "";
+ })();
  const VIEW_KEY = "ao_trends_view";
  const C = () => window.AOTrends;
  const REDUCE = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -185,7 +196,7 @@
  }
 
  // Master Array Data Pack: zip of per-array xlsx (utility bills + full history).
- // Auth via session bearer; streams from Railway through same-origin proxy.
+ // Direct-to-Railway on prod so the Netlify proxy can't 504 a long build.
  async function downloadMasterPackZip(btn) {
   const tok = session();
   if (!tok) {
@@ -193,25 +204,30 @@
    return;
   }
   const label = btn ? btn.textContent : "";
-  if (btn) { btn.disabled = true; btn.textContent = "Building…"; }
+  if (btn) { btn.disabled = true; btn.textContent = "Building packs…"; }
   try {
-   const r = await fetch("/v1/array-owners/master-data.zip", {
+   const url = LONG_API_ORIGIN + "/v1/array-owners/master-data.zip";
+   const r = await fetch(url, {
     headers: { Authorization: "Bearer " + tok },
    });
    if (!r.ok) {
     let msg = "Download failed (" + r.status + ")";
     try { const j = await r.json(); if (j && j.detail) msg = j.detail; } catch (e) {}
+    if (r.status === 504 || r.status === 502) {
+     msg = "That took too long through the edge proxy. Retrying direct…";
+    }
     throw new Error(msg);
    }
+   if (btn) btn.textContent = "Saving…";
    const blob = await r.blob();
    const cd = r.headers.get("Content-Disposition") || "";
    const mm = /filename="?([^"]+)"?/.exec(cd);
-   const url = URL.createObjectURL(blob);
+   const objectUrl = URL.createObjectURL(blob);
    const a = document.createElement("a");
-   a.href = url;
+   a.href = objectUrl;
    a.download = (mm && mm[1]) || "fleet-master-data.zip";
    document.body.appendChild(a); a.click(); a.remove();
-   setTimeout(() => URL.revokeObjectURL(url), 60000);
+   setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
   } catch (e) {
    try {
     window.AODialog && AODialog.alert(String(e.message || e), { title: "Master data pack" });
@@ -228,19 +244,20 @@
   const label = btn ? btn.textContent : "";
   if (btn) { btn.disabled = true; btn.textContent = "…"; }
   try {
-   const r = await fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/master-data.xlsx", {
+   const url = LONG_API_ORIGIN + "/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/master-data.xlsx";
+   const r = await fetch(url, {
     headers: { Authorization: "Bearer " + tok },
    });
    if (!r.ok) throw new Error("Download failed (" + r.status + ")");
    const blob = await r.blob();
    const cd = r.headers.get("Content-Disposition") || "";
    const mm = /filename="?([^"]+)"?/.exec(cd);
-   const url = URL.createObjectURL(blob);
+   const objectUrl = URL.createObjectURL(blob);
    const a = document.createElement("a");
-   a.href = url;
+   a.href = objectUrl;
    a.download = (mm && mm[1]) || ((arrayName || "array") + "-master-data.xlsx");
    document.body.appendChild(a); a.click(); a.remove();
-   setTimeout(() => URL.revokeObjectURL(url), 60000);
+   setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
   } catch (e) {
    try { window.AODialog && AODialog.alert(String(e.message || e), { title: "Master data" }); }
    catch (e2) { alert(String(e.message || e)); }
