@@ -2221,65 +2221,76 @@
  }
  if (passEl) passEl.value = "";
  setMsg(
- "✓ " + label + " saved, starting cloud harvest. Watch Fleet → Table for Connecting…",
- true
- );
- btn.textContent = "✓ " + label + " saved";
- // Connecting… skeletons for every inverter portal (SE/Fronius/SMA/Chint/…)
- try {
- if (window.__aoPendingFeeds) {
- if (typeof window.__aoPendingFeeds.markInverter === "function") {
- window.__aoPendingFeeds.markInverter(provider, {
- label: label,
- note: "saved from hands-off setup",
- rearm: true,
- });
- } else if (INVERTER_PENDING[provider]) {
- window.__aoPendingFeeds.mark(provider, {
- label: label,
- note: "saved from hands-off setup",
- rearm: true,
- });
- }
- }
- } catch (e) {}
- // Kick harvester to pick this login up on the next tick (≤90s), don't wait for cron
- try {
- fetch("/v1/cloud-capture/refresh", {
- method: "POST",
- headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
- body: "{}",
- }).catch(function () {});
- } catch (e) {}
- try {
- window.dispatchEvent(new Event("ao:vault-changed"));
- } catch (e) {}
- // Refresh live chips without full remount thrash
- setTimeout(function () {
- probeLive().then(function () {
- softUpdate();
- var root = document.getElementById("hoTour");
- var box2 = root && root.querySelector("[data-ho-login]");
- var newBtn = box2 && box2.querySelector(".ho-login-save");
- var sel2 = box2 && box2.querySelector(".ho-login-provider");
- var lab2 =
- (sel2 && sel2.options[sel2.selectedIndex] && sel2.options[sel2.selectedIndex].text) ||
- "next";
- if (newBtn) {
- newBtn.disabled = false;
- newBtn.textContent = "Add another portal →";
- }
- // Nudge operator to pick a different portal for multi-vendor
- var nowEl = box2 && box2.querySelector("[data-ho-now]");
- if (nowEl) {
- nowEl.innerHTML =
- "<b>✓ " +
- esc(label) +
- " saved.</b>";
- nowEl.classList.add("ho-login-now-ok");
- }
- });
- }, 600);
+           "✓ " + label + " saved — collecting arrays in Fleet → Table…",
+           true
+         );
+         btn.textContent = "✓ " + label + " saved";
+         // Connecting… skeletons for every inverter portal (SE/Fronius/SMA/Chint/…)
+         try {
+           if (window.__aoPendingFeeds) {
+             if (typeof window.__aoPendingFeeds.markInverter === "function") {
+               window.__aoPendingFeeds.markInverter(provider, {
+                 label: label,
+                 note: "saved from hands-off setup",
+                 rearm: true,
+               });
+             } else if (INVERTER_PENDING[provider]) {
+               window.__aoPendingFeeds.mark(provider, {
+                 label: label,
+                 note: "saved from hands-off setup",
+                 rearm: true,
+               });
+             }
+           }
+         } catch (e) {}
+         // Kick harvester to pick this login up on the next tick (≤90s), don't wait for cron
+         try {
+           fetch("/v1/cloud-capture/refresh", {
+             method: "POST",
+             headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+             body: "{}",
+           }).catch(function () {});
+         } catch (e) {}
+         try {
+           window.dispatchEvent(new Event("ao:vault-changed"));
+         } catch (e) {}
+         // Show Fleet → Table so arrays cascade in under Connecting… while the
+         // tour stays open (operator watches the stream, not a blank account tab).
+         try {
+           if (location.hash !== "#arrays") location.hash = "#arrays";
+           else if (window.__aoLoadVendorSheet) window.__aoLoadVendorSheet();
+           // Nudge table view on if sandbox/dashboard is showing
+           try {
+             var seg = document.getElementById("vsSegSheet");
+             if (seg) seg.click();
+           } catch (e2) {}
+         } catch (e) {}
+         // Refresh live chips without full remount thrash
+         setTimeout(function () {
+           probeLive().then(function () {
+             softUpdate();
+             var root = document.getElementById("hoTour");
+             var box2 = root && root.querySelector("[data-ho-login]");
+             var newBtn = box2 && box2.querySelector(".ho-login-save");
+             var sel2 = box2 && box2.querySelector(".ho-login-provider");
+             var lab2 =
+               (sel2 && sel2.options[sel2.selectedIndex] && sel2.options[sel2.selectedIndex].text) ||
+               "next";
+             if (newBtn) {
+               newBtn.disabled = false;
+               newBtn.textContent = "Add another portal →";
+             }
+             // Nudge operator to pick a different portal for multi-vendor
+             var nowEl = box2 && box2.querySelector("[data-ho-now]");
+             if (nowEl) {
+               nowEl.innerHTML =
+                 "<b>✓ " +
+                 esc(label) +
+                 " saved.</b> Watching Fleet → Table collect arrays…";
+               nowEl.classList.add("ho-login-now-ok");
+             }
+           });
+         }, 600);
  } catch (e) {
  setMsg("Network error. Try again.", false);
  btn.disabled = false;

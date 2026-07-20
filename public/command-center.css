@@ -3183,6 +3183,32 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   .vs-skel-bar{ animation:none !important; }
 }
 
+.vs-pending.is-collecting{
+  border-color:rgba(22,163,74,.28);
+  background:linear-gradient(135deg, rgba(22,163,74,.08), rgba(255,255,255,.7) 55%, rgba(211,242,206,.12));
+}
+.vs-pending.is-collecting .vs-pending-badge,
+.vs-pending.is-collecting .vs-pending-stat{ color:#15803d; }
+.vs-pending.is-collecting .vs-pending-pulse{
+  background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,.4);
+}
+.vs-collect-ghosts{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.vs-collect-ghost{
+  display:flex; gap:10px; align-items:center; opacity:.85;
+  padding:8px 10px; border-radius:10px;
+  background:rgba(15,23,42,.03); border:1px dashed rgba(15,23,42,.10);
+}
+.vs-row.vs-arr.is-enter{
+  animation:vsArrIn .45s ease both;
+}
+@keyframes vsArrIn{
+  from{ opacity:0; transform:translateY(8px); }
+  to{ opacity:1; transform:none; }
+}
+@media (prefers-reduced-motion: reduce){
+  .vs-row.vs-arr.is-enter{ animation:none !important; }
+}
+
 /* Pending vendor — just-connected, waiting for fleet-tree to show arrays */
 .vs-pending{
   margin:0 0 14px; border-radius:16px; overflow:hidden;

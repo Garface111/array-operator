@@ -32,6 +32,8 @@
  // on first expand and jank the main thread. Show a page, "Show all" opts in.
  const INV_PAGE = 40;
  const _invShowAll = Object.create(null); // arrayId -> true
+ // Array ids already cascaded into the sheet — new ones get .is-enter (collect stream).
+ let _seenArrIds = Object.create(null);
  // Vendor subtree accent. Ford 2026-07-12: the per-vendor RAINBOW (a different hue per
  // vendor) "looks weird and unprofessional, doesn't match our thing." Removed. No inline
  // --vc is emitted anymore, so every vendor group falls back to ONE neutral slate spine +
@@ -1542,16 +1544,29 @@
  ? `${all.length} monitored of ${onFile} on file`
  : `${all.length} monitored array${all.length === 1 ? "" : "s"}`;
  const liveRefreshing = !!(window.FleetStore && FleetStore.isRefreshingLive && FleetStore.isRefreshingLive());
+ const allPending = _pendingFeeds();
+ // Keep pending cards visible while harvest is still collecting (sites growing),
+ // not only when zero arrays exist. That is the progressive stream UX.
+ const pending = allPending.slice();
+ const building = pending.some(p => (p.status || "connecting") !== "failed");
  const baseTxt = _query
  ? `${cols.length} of ${all.length} monitored arrays match "${_query}"`
  : `${monitoredTxt} · ${(data.summary || {}).inverters_total || invShown} inverters`;
- cnt.textContent = liveRefreshing ? (baseTxt + " · updating live readings…") : baseTxt;
- cnt.classList.toggle("vs-count-refreshing", liveRefreshing);
- }
- const pending = _pendingFeeds().filter(p => {
- // Still pending if no column for that vendor yet
- return !cols.some(c => (c.vendor || "").toLowerCase() === p.vendor);
+ let cntTxt = baseTxt;
+ if (building && pending.length) {
+ const bits = pending.map(p => {
+ const lab = p.label || p.vendor;
+ const n = p.sites != null ? Number(p.sites) : 0;
+ return n > 0 ? `${lab} ${n}` : lab;
  });
+ cntTxt = `Collecting ${bits.join(", ")}…` + (cols.length ? ` · ${baseTxt}` : "");
+ } else if (liveRefreshing) {
+ cntTxt = baseTxt + " · updating live readings…";
+ }
+ cnt.textContent = cntTxt;
+ cnt.classList.toggle("vs-count-refreshing", !!(building || liveRefreshing));
+ }
+ const pending = _pendingFeeds().slice();
  if (!cols.length && !pending.length) {
  _paintedPendingSig = "";
  body.innerHTML = `<div class="vs-empty">${_query ? `No arrays match "${esc(_query)}".` : "No arrays connected yet, hit <b>+ Add vendor</b> above to connect one."}</div>`;
@@ -1565,17 +1580,29 @@
  const byVendor = {};
  cols.forEach(c => { const v = (c.vendor || "other").toLowerCase(); (byVendor[v] = byVendor[v] || []).push(c); });
  const vendors = Object.keys(byVendor).sort((a, b) => vlabel(a).localeCompare(vlabel(b)));
+ // Pending vendors with ZERO arrays yet go first; collecting vendors (have arrays)
+ // render their banner right above their live group below.
+ const pendingEmpty = pending.filter(p => !(p.sites > 0) || !byVendor[p.vendor]);
+ const pendingByV = {};
+ pending.forEach(p => { pendingByV[p.vendor] = p; });
  let h = "";
  // Pending vendors first (just-connected, user is watching for them).
  // Animate only newly appeared pending vendors.
  const prevSig = _paintedPendingSig;
- pending.forEach(p => {
+ pendingEmpty.forEach(p => {
  const isNew = !prevSig || !prevSig.split("|").includes(p.vendor);
  h += pendingVendorHtml(p, { animate: isNew });
  });
  _paintedPendingSig = _pendingSig(pending);
+ // Track which array ids we've painted so new ones cascade in
  vendors.forEach(v => {
  const list = sortCols(byVendor[v]);
+ // Progressive collecting banner for this vendor while harvest still growing
+ const pCollect = pendingByV[v];
+ if (pCollect && (pCollect.sites > 0 || (pCollect.status || "connecting") === "connecting")) {
+ const isNew = !prevSig || !String(prevSig).includes(v);
+ h += pendingVendorHtml(pCollect, { animate: isNew });
+ }
  // Aggregate 14-day sparklines for the rollup rows: per-array (sum of its
  // inverters) + per-vendor (sum of its arrays). Computed once; the array daily
  // is reused for each array row below.
@@ -1617,7 +1644,11 @@
  // First-seen vendor inits to collapsed; the toggle owns it after. An ACTIVE SEARCH
  // overrides collapse so matching arrays are actually visible (cols is already
  // filtered to matches above, so only vendors that HAVE a match render here).
+ // While THIS vendor is mid-harvest, force expanded so streaming rows are visible.
  if (_vendorCollapsed[v] === undefined) _vendorCollapsed[v] = true;
+ if (pCollect && (pCollect.sites > 0 || (pCollect.status || "connecting") === "connecting")) {
+ _vendorCollapsed[v] = false;
+ }
  const vCollapsed = !_query && !!_vendorCollapsed[v];
  const vSync = vendorSyncSummary(list);
  // The WHOLE header row toggles collapse (Ford: "click anywhere in the row of the
@@ -1654,7 +1685,13 @@
  ? ` title="${esc([allocArr ? ARR_ALLOC_TIP(c.vendor) : "", staleMsg].filter(Boolean).join(" "))}"`
  : "";
  const open = !!_expanded[c.array_id] || (!!_query && invMatch(c, _query) && !(c.array_name || "").toLowerCase().includes(_query));
- h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
+ const arrKey = String(c.array_id);
+ // Cascade-enter only while a harvest is streaming (pending active) — not on
+ // ordinary cold loads of a settled fleet.
+ const streaming = pending.length > 0;
+ const isNewArr = streaming && !_seenArrIds[arrKey];
+ _seenArrIds[arrKey] = 1;
+ h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}${isNewArr ? " is-enter" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
  <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
  <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
  <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
@@ -1768,6 +1805,12 @@
  });
  body.innerHTML = h;
  armGaugeSweep(body);
+ // Drop cascade-enter class after first paint so later rebuilds stay calm
+ requestAnimationFrame(() => {
+ body.querySelectorAll(".vs-arr.is-enter, .vs-pending.is-enter").forEach(el => {
+ el.classList.remove("is-enter");
+ });
+ });
  body.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
  const id = b.getAttribute("data-arr");
  _expanded[id] = !_expanded[id];
@@ -2090,6 +2133,12 @@
  return p.stuckMsg ||
  `Still working on <b>${label}</b>, your login is saved and we keep retrying. Large fleets can take a few minutes.`;
  }
+ const n = p.sites != null ? Number(p.sites) : 0;
+ const inv = p.invCount != null ? Number(p.invCount) : 0;
+ if (n > 0) {
+ const invBit = inv > 0 ? ` · <b>${inv}</b> inverter${inv === 1 ? "" : "s"}` : "";
+ return `Collecting <b>${label}</b> — <b>${n}</b> array${n === 1 ? "" : "s"} so far${invBit}. New sites land here as we find them.`;
+ }
  const wait = _waitPhrase(p);
  return `We got your <b>${label}</b> sign-in, arrays are landing on your account now (<span data-pending-wait>${esc(wait)}</span>). This page updates automatically.`;
  }
@@ -2098,35 +2147,51 @@
  const st = p.status || "connecting";
  if (st === "failed") return "Login issue";
  if (st === "stuck") return "Still working…";
+ const n = p.sites != null ? Number(p.sites) : 0;
+ if (n > 0) return n + " array" + (n === 1 ? "" : "s") + " so far…";
  return "Connecting…";
  }
 
  /** Skeleton vendor block while a just-connected portal is still landing.
- * Used for every inverter vendor (SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy). */
+ * Used for every inverter vendor (SolarEdge, Fronius, SMA, Chint, Locus, AlsoEnergy).
+ * When arrays have started landing (p.sites > 0), show a compact collecting banner
+ * instead of empty skeleton bars — real rows stream in the group below. */
  function pendingVendorHtml(p, opts) {
  opts = opts || {};
  const label = esc(p.label || (window.__aoPendingFeeds && window.__aoPendingFeeds.labelFor
  ? window.__aoPendingFeeds.labelFor(p.vendor) : null) || p.vendor || "Vendor");
  const st = p.status || "connecting";
+ const n = p.sites != null ? Number(p.sites) : 0;
+ const collecting = n > 0 && st !== "failed";
  const enterCls = opts.animate === false ? "" : " is-enter";
- const stCls = st === "failed" ? " is-failed" : st === "stuck" ? " is-stuck" : "";
- const skel = st === "failed"
- ? ""
- : `<div class="vs-pending-skel"></div><div class="vs-pending-skel vs-pending-skel-short"></div>`;
- return `<div class="vs-pending${enterCls}${stCls}" data-pending-vendor="${esc(p.vendor)}" data-pending-status="${esc(st)}">
+ const stCls = st === "failed" ? " is-failed" : st === "stuck" ? " is-stuck" : collecting ? " is-collecting" : "";
+ let bodyInner;
+ if (st === "failed") {
+ bodyInner = `<p class="vs-pending-copy" data-pending-copy>${_pendingCopy(p, label)}</p>`;
+ } else if (collecting) {
+ // Ghost rows that read as "still pulling" under the live stream
+ bodyInner = `<p class="vs-pending-copy" data-pending-copy>${_pendingCopy(p, label)}</p>
+ <div class="vs-collect-ghosts" aria-hidden="true">
+ <div class="vs-collect-ghost"><span class="vs-skel-bar w55"></span><span class="vs-skel-bar w18"></span><span class="vs-skel-bar w12"></span></div>
+ <div class="vs-collect-ghost"><span class="vs-skel-bar w40"></span><span class="vs-skel-bar w20"></span><span class="vs-skel-bar w15"></span></div>
+ </div>`;
+ } else {
+ bodyInner = `<div class="vs-pending-skel"></div><div class="vs-pending-skel vs-pending-skel-short"></div>
+ <p class="vs-pending-copy" data-pending-copy>${_pendingCopy(p, label)}</p>`;
+ }
+ return `<div class="vs-pending${enterCls}${stCls}" data-pending-vendor="${esc(p.vendor)}" data-pending-status="${esc(st)}" data-pending-sites="${n}">
  <div class="vs-pending-head">
  <span class="vs-pending-badge">${label}</span>
  <span class="vs-pending-pulse" aria-hidden="true"></span>
  <span class="vs-pending-stat" data-pending-stat>${esc(_pendingStat(p))}</span>
  </div>
  <div class="vs-pending-body">
- ${skel}
- <p class="vs-pending-copy" data-pending-copy>${_pendingCopy(p, label)}</p>
+ ${bodyInner}
  </div>
  </div>`;
  }
 
- /** In-place update of wait copy / status, never remount (avoids enter anim + shimmer restart). */
+ /** In-place update of wait copy / status / collecting counts, never remount. */
  function softUpdatePendingCards(root, pending) {
  if (!root || !pending || !pending.length) return false;
  const nodes = root.querySelectorAll("[data-pending-vendor]");
@@ -2134,38 +2199,37 @@
  for (let i = 0; i < pending.length; i++) {
  if (nodes[i].getAttribute("data-pending-vendor") !== pending[i].vendor) return false;
  }
+ let needsRebuild = false;
  pending.forEach((p, i) => {
  const el = nodes[i];
  const st = p.status || "connecting";
  const prev = el.getAttribute("data-pending-status") || "connecting";
- // Status class change needs a light rebuild of that card only
- if (prev !== st) {
- const label = esc(p.label || p.vendor || "Vendor");
+ const n = p.sites != null ? Number(p.sites) : 0;
+ const prevN = Number(el.getAttribute("data-pending-sites") || "0");
+ // Crossing into collecting (0 → N) needs structure change (ghost rows)
+ if ((prevN === 0) !== (n === 0) || (prev !== st && (st === "failed" || prev === "failed"))) {
+ needsRebuild = true;
+ return;
+ }
  el.setAttribute("data-pending-status", st);
+ el.setAttribute("data-pending-sites", String(n));
  el.classList.toggle("is-failed", st === "failed");
  el.classList.toggle("is-stuck", st === "stuck");
- const stat = el.querySelector("[data-pending-stat]");
- if (stat) stat.textContent = _pendingStat(p);
- const copy = el.querySelector("[data-pending-copy]");
- if (copy) copy.innerHTML = _pendingCopy(p, label);
- const body = el.querySelector(".vs-pending-body");
- if (body && st === "failed") {
- body.querySelectorAll(".vs-pending-skel").forEach(s => s.remove());
- }
- } else if (st === "connecting") {
- const waitEl = el.querySelector("[data-pending-wait]");
- const phrase = _waitPhrase(p);
- if (waitEl && waitEl.textContent !== phrase) waitEl.textContent = phrase;
- } else {
- const copy = el.querySelector("[data-pending-copy]");
+ el.classList.toggle("is-collecting", n > 0 && st !== "failed");
  const label = esc(p.label || p.vendor || "Vendor");
- if (copy && p.stuckMsg) {
+ const stat = el.querySelector("[data-pending-stat]");
+ if (stat) {
+ const t = _pendingStat(p);
+ if (stat.textContent !== t) stat.textContent = t;
+ }
+ const copy = el.querySelector("[data-pending-copy]");
+ if (copy) {
  const next = _pendingCopy(p, label);
  if (copy.innerHTML !== next) copy.innerHTML = next;
  }
- }
  el.classList.remove("is-enter");
  });
+ if (needsRebuild) return false;
  return true;
  }
 

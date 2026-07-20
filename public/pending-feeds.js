@@ -15,9 +15,14 @@
 
   var KEY = "ao_pending_feeds";
   var MAX_AGE_MS = 12 * 60 * 1000; // keep card up to 12 min
-  var POLL_MS = 5000;
-  var MAX_POLLS = 72; // ~6 min of aggressive poll, then stuck (not gone)
+  var POLL_MS = 2500; // snappy while collecting (was 5s)
+  var POLL_MS_IDLE = 8000; // after first arrays land, ease off
+  var MAX_POLLS = 120; // ~5 min aggressive + idle
   var STUCK_AFTER_MS = 90 * 1000; // soft "taking longer" after 90s
+  // Don't vanish the Connecting card the instant the first array lands —
+  // keep collecting UI until the count stabilizes (harvest still adding sites).
+  var STABLE_POLLS = 3; // same sites count this many ticks → done
+  var MIN_COLLECT_MS = 4000; // always show stream for at least this long after first array
 
   var _pollTimer = null;
   var _pollCount = 0;
@@ -53,11 +58,19 @@
     return INVERTER_VENDORS[v] || v || "Vendor";
   }
 
-  /** Signature includes status so stuck/failed re-paints without remount thrash. */
+  /** Signature includes status + site count so progressive stream re-paints. */
   function signature(list) {
     return (list || [])
       .map(function (p) {
-        return p.vendor + ":" + (p.status || "connecting");
+        return (
+          p.vendor +
+          ":" +
+          (p.status || "connecting") +
+          ":" +
+          (p.sites != null ? p.sites : "") +
+          ":" +
+          (p.invCount != null ? p.invCount : "")
+        );
       })
       .sort()
       .join("|");
@@ -200,25 +213,106 @@
     });
   }
 
-  /** Drop pending rows once that vendor has arrays (or inverters) in the live fleet. */
+  /**
+   * Progressive collect: update per-vendor site/inverter counts as the fleet
+   * grows. Only clear a pending card once harvest has stabilized (same count
+   * for STABLE_POLLS ticks after the first array), so the spreadsheet can show
+   * arrays streaming in under Connecting… instead of a flash-and-dump.
+   */
   function reconcile(arrays) {
     arrays = arrays || [];
-    var present = {};
+    var present = {}; // vendor -> { sites:Set, inv:n }
     arrays.forEach(function (a) {
       var v = norm(a.vendor);
-      if (v) present[v] = (present[v] || 0) + 1;
+      if (v) {
+        if (!present[v]) present[v] = { sites: {}, inv: 0 };
+        present[v].sites[String(a.id != null ? a.id : a.name || "")] = 1;
+        present[v].inv += (a.inverters && a.inverters.length) || 0;
+      }
       (a.inverters || []).forEach(function (inv) {
         var iv = norm(inv.vendor);
-        if (iv) present[iv] = (present[iv] || 0) + 1;
+        if (!iv) return;
+        if (!present[iv]) present[iv] = { sites: {}, inv: 0 };
+        present[iv].inv += 1;
+        if (a && a.id != null) present[iv].sites[String(a.id)] = 1;
       });
     });
-    var before = read();
-    var next = before.filter(function (p) {
-      return !present[p.vendor];
+    Object.keys(present).forEach(function (k) {
+      present[k].nSites = Object.keys(present[k].sites).length;
     });
-    if (next.length !== before.length) {
+
+    var before = read();
+    if (!before.length) return;
+    var now = _now();
+    var next = [];
+    var changed = false;
+
+    before.forEach(function (p) {
+      var hit = present[p.vendor];
+      var nSites = hit ? hit.nSites : 0;
+      var nInv = hit ? hit.inv : 0;
+      var prevSites = p.sites != null ? p.sites : null;
+      var prevInv = p.invCount != null ? p.invCount : null;
+
+      if (nSites !== prevSites || nInv !== prevInv) {
+        p.sites = nSites;
+        p.invCount = nInv;
+        p.lastGrowAt = now;
+        p.stableTicks = 0;
+        if (nSites > 0 && p.status === "connecting") {
+          // Keep status=connecting so UI stays in "collecting" mode
+          p.collecting = true;
+        }
+        changed = true;
+      } else if (nSites > 0) {
+        p.stableTicks = (p.stableTicks || 0) + 1;
+        changed = true;
+      }
+
+      // Failed / stuck always keep the card until operator clears or max age
+      if (p.status === "failed") {
+        next.push(p);
+        return;
+      }
+
+      // Done collecting when count has been stable long enough AND we've shown
+      // the stream at least MIN_COLLECT_MS after first array.
+      var firstSeen = p.firstArrayAt || (nSites > 0 ? now : null);
+      if (nSites > 0 && !p.firstArrayAt) {
+        p.firstArrayAt = now;
+        firstSeen = now;
+        changed = true;
+      }
+      var stableEnough =
+        nSites > 0 &&
+        (p.stableTicks || 0) >= STABLE_POLLS &&
+        firstSeen &&
+        now - firstSeen >= MIN_COLLECT_MS;
+
+      if (stableEnough) {
+        // Drop — fleet rows are the truth now
+        changed = true;
+        return;
+      }
+      next.push(p);
+    });
+
+    if (changed || next.length !== before.length) {
       write(next, true);
       if (!next.length) stopPoll();
+      else reschedulePoll(next);
+    }
+  }
+
+  function reschedulePoll(list) {
+    // Faster while waiting for first array; calmer once streaming.
+    var anyEmpty = (list || []).some(function (p) {
+      return !(p.sites > 0) && (p.status || "connecting") === "connecting";
+    });
+    var ms = anyEmpty ? POLL_MS : POLL_MS_IDLE;
+    if (_pollTimer) {
+      clearInterval(_pollTimer);
+      _pollTimer = setInterval(_tick, ms);
     }
   }
 
