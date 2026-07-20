@@ -331,8 +331,12 @@
  };
  });
  loadFeed(k, host.querySelector("#resFeed"), host.querySelector("#resNewsMeta"));
+ // Title carries the state; the old grandiose eyebrow is gone (see resources.html).
+ // Kept tolerant of both: an older cached shell may still have #resEyebrow.
+ var title = host.querySelector("#resTitle");
+ if (title) title.textContent = "What’s happening in " + ((NE(k) && NE(k).name) || "New England");
  var eb = host.querySelector("#resEyebrow");
- if (eb) eb.textContent = "The " + ((NE(k) && NE(k).name) || "New England") + " solar operator’s briefing";
+ if (eb) eb.remove();
  }
 
  // Styles for the NEW bits (picker + per-state reference + REC market cards). Injected once

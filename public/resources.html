@@ -63,13 +63,16 @@
  <span class="r"><a href="/#reports">Offtaker invoicing</a><a href="/onboarding">Start free</a></span>
  </div>
 
+ <!-- Plain statement of what this page is. The previous copy ("The Vermont solar
+      operator's briefing" / "Know the rules that move your credits." + a
+      four-line sentence inventorying every feature and its benefit) was the
+      brochure voice DESIGN.md bans — Ford 2026-07-20: "too much, overwhelming
+      and weird, sounds too AI generated. Just: here's up to date news about
+      what's happening in your state." The eyebrow is gone because the title
+      already names the state, and redundancy is a bug. -->
  <div class="hero">
- <span class="eyebrow" id="resEyebrow">The New England solar operator's briefing</span>
- <h1>Know the rules that move your credits.</h1>
- <p class="lede">Net-metering rates, Renewable Energy Credit (REC) market prices, active rate cases,
- and the regulatory changes that decide what your arrays earn across New England, tracked in one
- place and refreshed daily, so you never bill on a stale rate or miss a decision that affects your
- offtakers.</p>
+ <h1 id="resTitle">What's happening in New England</h1>
+ <p class="lede">Rate cases, net-metering decisions, and REC prices — updated daily.</p>
  </div>
 
  <div id="resApp"><p class="muted">Loading your state briefing…</p></div>
@@ -81,7 +84,7 @@
  <a href="mailto:admin@solaroperator.org">admin@solaroperator.org</a>.
  </div>
 </div>
-<script src="resources.js?v=20260713rec"></script>
+<script src="resources.js?v=20260720plain"></script>
 <script>
  document.addEventListener("DOMContentLoaded", function () {
  if (window.AOResources) window.AOResources.mount(document.querySelector(".wrap"));
