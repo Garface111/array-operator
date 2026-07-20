@@ -6976,28 +6976,152 @@
  // The cover email AUTO-SAVES as you type (debounced 700ms), no Save button.
  let saveT = null;
  const tag = () => wrap.querySelector(".rb-email-saved");
+ const badge = () => wrap.querySelector(".rb-email-src");
+ const revertBtn = () => wrap.querySelector("[data-email-revert]");
+ const paintEmailMeta = (d) => {
+  const custom = !!(d && (d.email_is_custom || (d.note && String(d.note).trim())
+   || (ta.value && d._defaultNote != null && ta.value !== d.email_letter_master
+       && ta.value !== (d._masterNote || d.email_letter_master))));
+  // Prefer live textarea vs master for the badge while typing.
+  const usingCustom = !!(d && (
+   (d.note && String(d.note).trim())
+   || d.email_is_custom
+   || (d._defaultNote && ta.value === d._defaultNote && d.email_source === "custom")
+   || (ta.value && d.email_letter_master && ta.value !== d.email_letter_master
+       && ta.value !== (d._masterNote || ""))
+  ));
+  const b = badge();
+  if (b) {
+   if (usingCustom) {
+    b.className = "rb-email-src rb-email-src-custom";
+    b.textContent = "Custom for this offtaker only";
+    b.title = "This letter is exclusive to this offtaker. Other offtakers still use the master email.";
+   } else {
+    b.className = "rb-email-src rb-email-src-master";
+    b.textContent = "Using master email · all offtakers";
+    b.title = "Falling back to the shared master offtaker email. Edit to make a custom letter for this offtaker only.";
+   }
+  }
+  const rb = revertBtn();
+  if (rb) rb.hidden = !usingCustom;
+ };
  const doSave = async () => {
  try {
  const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
- // An UNTOUCHED default letter never persists as a per-draft note —
- // saving it would freeze today's mass template onto this draft and
- // detach it from future template edits. Empty note → the send keeps
- // using the live template.
+ // Untouched default (whether master or offtaker-custom default) → empty
+ // draft note so we don't freeze the letter on this draft. When the text
+ // was edited, persist BOTH the draft note AND the offtaker's exclusive
+ // custom letter (master remains the fallback for everyone else).
  const untouched = d && d._defaultNote != null && ta.value === d._defaultNote;
+ const masterTxt = (d && (d.email_letter_master || d._masterNote)) || "";
+ const isMasterText = masterTxt && ta.value === masterTxt;
  const noteVal = untouched ? "" : ta.value;
+ const body = { note: noteVal };
+ if (!untouched && ta.value.trim() && !isMasterText) {
+  // Edited away from master → exclusive custom for this offtaker.
+  body.email_letter = ta.value;
+ } else if (!untouched && isMasterText) {
+  // Typed exactly the master letter → treat as master, clear custom.
+  body.email_letter = null;
+ }
  const r = await fetch(API + "/drafts/" + did, {
  method: "PATCH",
  headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
- body: JSON.stringify({ note: noteVal }),
+ body: JSON.stringify(body),
  });
  const t = tag(); if (t) t.textContent = r.ok ? "✓ saved" : "couldn’t save";
- if (d) d.note = noteVal;
+ if (d) {
+  d.note = noteVal;
+  if (body.email_letter !== undefined) {
+   d.email_is_custom = !!(body.email_letter && String(body.email_letter).trim());
+   d.email_source = d.email_is_custom ? "custom" : "master";
+   if (d.email_is_custom) {
+    d.email_letter_default = body.email_letter;
+    d._defaultNote = body.email_letter;
+   } else {
+    d.email_letter_default = masterTxt || d.email_letter_default;
+    d._defaultNote = d.email_letter_default;
+   }
+  }
+  // Merge server flags if returned
+  try {
+   const j = await r.json();
+   if (j && j.draft) {
+    ["email_is_custom", "email_source", "email_letter_default",
+     "email_letter_master", "email_subject_default", "note"].forEach(k => {
+     if (k in j.draft) d[k] = j.draft[k];
+    });
+    if (j.draft.email_letter_default) d._defaultNote = j.draft.email_letter_default;
+    if (j.draft.email_letter_master) d._masterNote = j.draft.email_letter_master;
+   }
+  } catch (_) { /* ok */ }
+ }
+ paintEmailMeta(d);
  } catch (_) { const t = tag(); if (t) t.textContent = "couldn’t save"; }
  };
- const queueSave = () => { const t = tag(); if (t) t.textContent = "saving…"; clearTimeout(saveT); saveT = setTimeout(doSave, 700); };
+ const queueSave = () => {
+  const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+  paintEmailMeta(d);
+  const t = tag(); if (t) t.textContent = "saving…";
+  clearTimeout(saveT); saveT = setTimeout(doSave, 700);
+ };
  ta.addEventListener("input", () => { autoGrowMsg(ta); focusDraft(); queueSave(); });
  ta.addEventListener("focus", focusDraft);
  ta.addEventListener("blur", () => { clearTimeout(saveT); doSave(); });
+ const d0 = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+ if (d0) paintEmailMeta(d0);
+ });
+ // Revert this offtaker to the master email (clears exclusive custom).
+ wrap.querySelectorAll("[data-email-revert]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+   const did = btn.getAttribute("data-email-revert");
+   const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+   const ta = wrap.querySelector(`textarea[data-draftmsg="${did}"]`);
+   if (!d || !ta) return;
+   btn.disabled = true;
+   try {
+    const r = await fetch(API + "/drafts/" + did, {
+     method: "PATCH",
+     headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+     body: JSON.stringify({ note: "", email_letter: null }),
+    });
+    if (!r.ok) throw new Error("revert failed");
+    let master = d.email_letter_master || d._masterNote || "";
+    try {
+     const j = await r.json();
+     if (j && j.draft) {
+      ["email_is_custom", "email_source", "email_letter_default",
+       "email_letter_master", "note"].forEach(k => {
+       if (k in j.draft) d[k] = j.draft[k];
+      });
+      master = j.draft.email_letter_master || j.draft.email_letter_default || master;
+     }
+    } catch (_) { /* ok */ }
+    d.note = "";
+    d.email_is_custom = false;
+    d.email_source = "master";
+    d.email_letter_default = master;
+    d.email_letter_master = master;
+    d._defaultNote = master;
+    d._masterNote = master;
+    ta.value = master;
+    autoGrowMsg(ta);
+    const tag = wrap.querySelector(".rb-email-saved");
+    if (tag) tag.textContent = "✓ reverted to master";
+    const badge = wrap.querySelector(".rb-email-src");
+    if (badge) {
+     badge.className = "rb-email-src rb-email-src-master";
+     badge.textContent = "Using master email · all offtakers";
+    }
+    btn.hidden = true;
+    renderDraftDoc();
+   } catch (_) {
+    const tag = wrap.querySelector(".rb-email-saved");
+    if (tag) tag.textContent = "couldn’t revert";
+   } finally {
+    btn.disabled = false;
+   }
+  });
  });
  requestAnimationFrame(() => wrap.querySelectorAll("textarea[data-draftmsg]").forEach(autoGrowMsg));
  wrap.querySelectorAll('input[data-dact="autogmp"], input[data-dact="summary"]').forEach(cb =>
@@ -7633,6 +7757,9 @@
  // Remember the auto-written note so a live recompute can re-sync it, but only
  // while the operator hasn't customized it (we compare against this snapshot).
  d._defaultNote = d.email_letter_default || defaultDraftNote(d);
+ d._masterNote = d.email_letter_master || d._defaultNote;
+ // email_is_custom / email_source come from the backend (per-offtaker exclusive
+ // letter vs master fallback).
  const auto = d.auto_attach_gmp !== false; // ON by default
  const sumOn = d.include_summary === true; // OFF by default, AO summary is opt-in (Ford)
  // Provider-aware auto-attach: the toggle attaches the offtaker's BOUND utility
@@ -7695,12 +7822,29 @@
  <div class="rb-sec-body">${body}</div>
  </details>`;
  };
+ const _emailCustom = !!(d.email_is_custom || (d.note && String(d.note).trim()));
  const emailBody = `
  <div class="rb-draft-email">
- <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
+ <div class="rb-email-head">
+  <span class="rl">Email to your offtaker <span class="rb-email-saved" aria-live="polite"></span></span>
+  <span class="rb-email-src ${_emailCustom ? "rb-email-src-custom" : "rb-email-src-master"}"
+   title="${_emailCustom
+    ? "This letter is exclusive to this offtaker. Other offtakers still use the master email."
+    : "Falling back to the shared master offtaker email. Edit to customize for this offtaker only."}">${
+     _emailCustom ? "Custom for this offtaker only" : "Using master email · all offtakers"
+   }</span>
+ </div>
  <textarea class="rb-draft-msg" data-draftmsg="${d.id}" rows="6"
- placeholder="Write the note your offtaker sees…">${esc(d.note || d.email_letter_default || defaultDraftNote(d))}</textarea>
- <span class="rb-draft-msg-hint">Saves automatically as you type. The invoice${d.has_gmp_pdf ? " + GMP bill are" : " is"} attached for you.</span>
+ placeholder="Write the letter this offtaker sees…">${esc(d.note || d.email_letter_default || defaultDraftNote(d))}</textarea>
+ <div class="rb-email-actions">
+  <button type="button" class="ao-btn rb-btn rb-email-revert" data-email-revert="${d.id}"
+   ${_emailCustom ? "" : "hidden"}
+   title="Clear this offtaker’s custom letter and fall back to the master email used by all offtakers.">↩ Revert to default</button>
+  <span class="rb-draft-msg-hint">${_emailCustom
+   ? "Custom letter for this offtaker only · master is the fallback for everyone else."
+   : "Master email (all offtakers). Edit to make a custom letter exclusive to this offtaker."
+  } Invoice${d.has_gmp_pdf ? " + utility bill are" : " is"} attached. Saves as you type.</span>
+ </div>
  </div>`;
  // The per-offtaker template box (#rbTpl) is folded into .rb-tpl-slot by foldTplIntoInbox.
  const tplSlot = `<div class="rb-tpl-slot"></div>`;
@@ -7730,7 +7874,7 @@
  ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
  ${sec("How this was calculated", calcDashboard(d), "kWh × rate × share = the amount", true, "amber")}
  ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "emerald")}
- ${sec("Edit email", emailBody, "the note your offtaker sees", false, "amber")}
+ ${sec("Edit email", emailBody, _emailCustom ? "custom · this offtaker only" : "master · all offtakers", false, "amber")}
  ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "sky")}
  ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "emerald")}
  ${bacSec}

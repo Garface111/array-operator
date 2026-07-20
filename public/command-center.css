@@ -937,6 +937,27 @@ body.sb-fs-lock{ overflow:hidden; }
 /* ---- editable draft email (approval inbox) ---- */
 .rb-draft-email{ margin:14px 0 4px; display:flex; flex-direction:column; gap:6px; }
 .rb-draft-email .rl{ font-size:11.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.05em; }
+.rb-email-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.rb-email-src{
+  font-size:11px; font-weight:700; letter-spacing:.02em;
+  padding:3px 9px; border-radius:999px; white-space:nowrap;
+}
+.rb-email-src-master{
+  background:rgba(37,99,235,.10); color:#1d4ed8;
+  border:1px solid rgba(37,99,235,.22);
+}
+.rb-email-src-custom{
+  background:rgba(245,158,11,.14); color:#b45309;
+  border:1px solid rgba(245,158,11,.32);
+}
+.rb-email-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:2px; }
+.rb-email-revert{
+  flex:none; font-size:12px; font-weight:650; padding:6px 12px;
+  background:rgba(255,255,255,.04); border:1px solid var(--line);
+  color:var(--ink); border-radius:10px; cursor:pointer;
+}
+.rb-email-revert:hover{ border-color:rgba(37,99,235,.4); color:#1d4ed8; }
+.rb-email-revert:disabled{ opacity:.55; cursor:wait; }
 .rb-draft-msg{ width:100%; box-sizing:border-box; background:#eef5ff;
   border:1px solid rgba(37,99,235,.22); border-radius:10px; color:var(--ink); padding:12px 14px;
   font:inherit; font-size:13px; line-height:1.55; resize:vertical; min-height:140px;
@@ -2034,6 +2055,9 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-review-acts{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .rb-btn-lg{ font-size:14px; font-weight:760; padding:11px 22px; }
 .rb-email-saved{ font-size:11px; font-weight:600; color:var(--good,#0a7d4f); text-transform:none; letter-spacing:0; }
+html.sky .rb-email-src-master{ background:rgba(33,150,243,.12); color:#1565c0; border-color:rgba(33,150,243,.28); }
+html.sky .rb-email-src-custom{ background:rgba(245,158,11,.12); color:#c2410c; border-color:rgba(245,158,11,.3); }
+html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
 .rb-calc{ background:#fff; border:1px solid #e6edf3; border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,32,43,.04); }
 /* The calc dashboard now sits in the form column between the offtaker name and the
    cover email — give it breathing room above (the email block supplies the gap below). */
