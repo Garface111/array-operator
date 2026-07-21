@@ -3436,7 +3436,7 @@
  addMsg("agent", tabsCheatSheet());
  try {
  enqueueSpeak(
- "Those are the tabs in the top bar: Fleet, Analysis, Invoices, Marketplace, Repairs, and Account.",
+ "Those are the tabs in the top bar: Fleet, Analysis, Invoices, Repairs, Marketplace, and Account.",
  { source: "chat", force: true }
  );
  } catch (e) {}

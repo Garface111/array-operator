@@ -7866,7 +7866,7 @@
 
  /* ===========================================================================
  * TOP TABS: Fleet Triage (#dashboard | #arrays table | #sandbox) · Analysis ·
- * Invoices · Marketplace · Repairs · Account.
+ * Invoices · Repairs · Marketplace · Account.
  * Fleet Triage sub-views: Dashboard · Table · Sandbox (former Inverters tab).
  * ==========================================================================*/
  const TABS = {
@@ -8030,7 +8030,9 @@
  if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
  });
  if(_willSlide){
- const _ord = {panelDashboard:0,panelAnalysis:1,panelTrends:1,panelResources:1,panelReports:2,panelMarketplace:3,panelOps:4,panelAccount:5};
+ // Slide direction must match visible tab order:
+ // Fleet · Analysis · Invoices · Repairs · Marketplace · Account
+ const _ord = {panelDashboard:0,panelAnalysis:1,panelTrends:1,panelResources:1,panelReports:2,panelOps:3,panelMarketplace:4,panelAccount:5};
  const _fi = (_ord[_prevPanel.id] != null ? _ord[_prevPanel.id] : 0);
  const _ti = (_ord[_toPanel.id] != null ? _ord[_toPanel.id] : 0);
  // Pre-paint Fleet Triage before the slide measures height so the incoming

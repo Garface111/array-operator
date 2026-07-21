@@ -279,13 +279,14 @@ document.documentElement.setAttribute("data-theme","day");
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
  <a class="tab" id="tabReports" href="#reports" role="tab" title="Invoice offtakers for their share of solar credits">Invoices</a>
- <!-- Marketplace: the Offtaker Exchange — surface unallocated group-net-metering
- excess (vacancy) + collect demand. Owns #panelMarketplace; sub-tabs render from
- the shared window.__aoMarketplace registry (marketplace.js). -->
- <a class="tab" id="tabMarketplace" href="#marketplace" role="tab" title="Offtaker Exchange — unallocated credits, expiry alerts, demand waitlist">Marketplace</a>
  <!-- Repairs: command center for parallel repair pipelines + Resources sub-view. -->
  <a class="tab" id="tabOps" href="#ops" role="tab"
  title="Repair command center — detect, draft outreach, coordinate, verify">Repairs<span class="tab-dot" id="opsDot" aria-hidden="true"></span></a>
+ <!-- Marketplace: the Offtaker Exchange — surface unallocated group-net-metering
+ excess (vacancy) + collect demand. Owns #panelMarketplace; sub-tabs render from
+ the shared window.__aoMarketplace registry (marketplace.js). Sits to the right
+ of Repairs (tab order: Fleet · Analysis · Invoices · Repairs · Marketplace · Account). -->
+ <a class="tab" id="tabMarketplace" href="#marketplace" role="tab" title="Offtaker Exchange — unallocated credits, expiry alerts, demand waitlist">Marketplace</a>
  <!-- Account tab (was "Master Account"; shortened 2026-07-13). -->
  <a class="tab" id="tabAccount" href="#account" role="tab">Account<span class="tab-dot" id="acctDot" aria-hidden="true"></span></a>
  <!-- Shown only to signed-out visitors (toggled by renderFromSession in app.js). -->
