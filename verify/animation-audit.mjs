@@ -317,8 +317,10 @@ function catalogIssues(scenario, burst, expect) {
 
   // Stall before motion — only when motion never really arrives (true jank).
   // Large maxΔ means the slide did fire; a few pre-motion frames are normal.
+  // Ambient continuous: ignore EARLY_STALL (idle observe has no "start").
   if (
     exp.expectMotion &&
+    !exp.continuous &&
     (m.earlyStallMax || 0) >= Math.ceil(FPS * 0.5) &&
     m.maxPct < 8 &&
     m.motionFrames < 4
@@ -376,13 +378,14 @@ function catalogIssues(scenario, burst, expect) {
     });
   }
 
-  // Hard snap: huge change across almost no motion frames (needs dense capture
-  // to be meaningful — ignore when we only got a handful of samples).
+  // Hard snap: huge change across almost no motion frames.
+  // Short transitions (~250–350ms) legitimately span only ~3 frames at 12fps —
+  // require many samples AND ≤2 motion frames so we don't false-flag dcpop/dcin.
   if (
     exp.expectMotion &&
-    burst.frameCount >= 10 &&
-    m.maxPct > 30 &&
-    m.motionFrames <= 3
+    burst.frameCount >= 22 &&
+    m.maxPct > 40 &&
+    m.motionFrames <= 2
   ) {
     issues.push({
       severity: "high",
