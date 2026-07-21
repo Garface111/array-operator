@@ -143,6 +143,18 @@
  } catch(_){}
  toast("Energy Agent isn't available on this page.");
  }
+ // Open the Energy Agent scoped to the whole fleet — a read-only fleet analyst
+ // (backend command_center mode). Falls back to a plain agent turn on an older
+ // build that lacks the fleet entrypoint, then to a bare open.
+ function askFleet(){
+ const prompt = "What needs a human on my fleet today — worst first?";
+ try {
+ if(typeof window.__eaOpenFleet === "function"){ window.__eaOpenFleet(prompt, { source:"fleet-ai" }); return; }
+ if(typeof window.__eaSendText === "function"){ window.__eaSendText(prompt, { source:"fleet-ai" }); return; }
+ if(typeof window.__eaOpen === "function"){ window.__eaOpen(); return; }
+ } catch(_){}
+ toast("Energy Agent isn't available on this page.");
+ }
  // Deep-link into Fleet Triage → Table, focused on this inverter row.
  function openInInverters(r){
  if(!r) return;
@@ -370,6 +382,24 @@
  attnH.textContent = !loaded ? "Needs attention"
  : (k.flagged ? "Needs attention" : "No items need attention 🌞");
  attnH.classList.toggle("all-clear", loaded && !k.flagged);
+ // Fleet-level Energy Agent affordance beside the header — one octarine action
+ // (the AI is acting) that opens the read-only fleet analyst. Real fleets only:
+ // on the demo/simulated preview there's no owner fleet to reason about.
+ const attnWrap = attnH.parentElement;
+ if(attnWrap){
+ let ask = document.getElementById("ccFleetAsk");
+ if(MODEL.simulated){
+ if(ask) ask.remove();
+ } else if(!ask){
+ ask = document.createElement("button");
+ ask.type = "button";
+ ask.id = "ccFleetAsk";
+ ask.className = "cc-fleet-ask";
+ ask.innerHTML = `🤖 Ask about your fleet`;
+ ask.addEventListener("click", askFleet);
+ attnWrap.appendChild(ask);
+ }
+ }
  }
  if(!q) return;
  renderQueueLEGACY();
