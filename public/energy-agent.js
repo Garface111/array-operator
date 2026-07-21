@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721opsAlign1";
+ var EA_BUILD = "20260721opsAlign2";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -7364,50 +7364,56 @@
  }
 
  /**
- * Line up #eaPanel's left edge with the Energy Agent tab in #tabbar, and park
- * the card just under the tabbar. Also pad #panelOps so the repairs card sits
- * clear of the fixed chat (dual-pane ≥1100px).
+ * Line up #eaPanel's left edge with the Energy Agent top-tab, park the card
+ * just under the tabbar, and pad #panelOps clear of the fixed chat.
+ * CSS already approximates wrap+tabbar inset; this refines with live geometry
+ * (trial banners, exact tab metrics). Desktop dual-pane ≥961px.
  */
  function syncEaOpsAlign() {
  try {
  if (!document.body.classList.contains("ea-on-ops")) return;
  if (!document.body.classList.contains("ea-shell-open")) return;
- if (window.matchMedia && !window.matchMedia("(min-width: 1100px)").matches) return;
+ if (window.matchMedia && !window.matchMedia("(min-width: 961px)").matches) return;
 
- var tab = document.querySelector("#tabbar .tab.ea-tab")
- || document.querySelector("#tabbar .ea-tab");
- var tabbar = document.getElementById("tabbar");
  var root = document.documentElement;
- if (!tab || !root) return;
+ var tab = document.querySelector("#tabbar .tab.ea-tab")
+ || document.querySelector("#tabbar .ea-tab")
+ || document.getElementById("eaOrb");
+ var tabbar = document.getElementById("tabbar");
+ var wrap = document.querySelector("body > .wrap");
+ if (!root) return;
 
+ // Prefer the live Energy Agent tab left edge (Ford: "line up with leftmost tab")
+ if (tab) {
  var tabRect = tab.getBoundingClientRect();
- var left = Math.max(8, Math.round(tabRect.left));
- root.style.setProperty("--ea-ops-left", left + "px");
+ // Ignore a bogus measure while layout is still mid-slide (tab off-screen / zero)
+ if (tabRect.width > 8 && tabRect.left >= 0 && tabRect.left < window.innerWidth) {
+ root.style.setProperty("--ea-ops-left", Math.round(tabRect.left) + "px");
+ }
+ }
 
  if (tabbar) {
- var gap = 10;
- var top = Math.round(tabbar.getBoundingClientRect().bottom + gap);
+ var top = Math.round(tabbar.getBoundingClientRect().bottom + 10);
  root.style.setProperty("--ea-ops-top", Math.max(64, top) + "px");
  }
 
- // Content pad: distance from wrap's left edge to the right of the chat card
- var wrap = document.querySelector("body > .wrap");
- var rail = 640;
- try {
- var cs = getComputedStyle(root);
- var raw = cs.getPropertyValue("--ea-rail").trim();
- // --ea-rail may be min(640px, 46vw) — measure the actual panel width if open
+ // Content pad inside .wrap so repairs clears the fixed chat card
+ var leftPx = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-left")) || 0;
  var panel = document.getElementById("eaPanel");
- if (panel && panel.classList.contains("open") && panel.offsetWidth > 40) {
- rail = panel.offsetWidth;
- } else if (raw) {
- // best-effort: use 46vw cap
- rail = Math.min(640, Math.round(window.innerWidth * 0.46));
- }
- } catch (eR) {}
+ var rail = (panel && panel.classList.contains("open") && panel.offsetWidth > 40)
+ ? panel.offsetWidth
+ : Math.min(640, Math.round(window.innerWidth * 0.42));
  var wrapLeft = wrap ? wrap.getBoundingClientRect().left : 0;
- var panelRight = left + rail;
- var pad = Math.max(0, Math.round(panelRight - wrapLeft + 12));
+ // #panelOps margin is relative to wrap's content box (inside padding).
+ // Distance from wrap content-left to panel-right + gap:
+ var wrapPadLeft = 28;
+ try {
+ if (wrap) {
+ var st = getComputedStyle(wrap);
+ wrapPadLeft = parseFloat(st.paddingLeft) || 28;
+ }
+ } catch (eP) {}
+ var pad = Math.max(0, Math.round((leftPx + rail + 12) - (wrapLeft + wrapPadLeft)));
  root.style.setProperty("--ea-ops-content-pad", pad + "px");
  } catch (e) {}
  }

@@ -428,42 +428,48 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
 }
 
 /* ══ Repairs dual-pane (body.ea-on-ops + ea-shell-open) ═════════════════════
-   On Repairs the default 360px floating rail wastes half the viewport: skinny
-   chat, narrow centered card, huge sky gutters. When Energy Agent is open on
-   this tab we switch to a dual-pane workspace:
+   When Energy Agent is open on Repairs:
 
-   · Full-width top tabbar (no .wrap slide)
-   · Chat ~2× wide, tucked under the tabbar as a floating card
-   · Repairs fills the right column (wider shell, left-aligned)
+   · Full-width top tabbar (no .wrap side-shift)
+   · Chat card tucked under the tabbar
+   · Chat LEFT edge lines up with the Energy Agent top-tab (leftmost control)
+   · Repairs fills the column to the right
 
-   Scoped ≥1100px so mid-desktop still gets a bump; mobile sheet untouched.
-   Hands-off setup side-by-side keeps its own rules (excluded below). */
-@media (min-width: 1100px){
+   Desktop ≥961px; mobile sheet untouched. Hands-off side-by-side excluded. */
+@media (min-width: 961px){
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
-    --ea-rail: min(640px, 46vw);
-    /* Fallbacks until JS measures the Energy Agent top-tab (left edge + tabbar bottom) */
+    --ea-rail: min(560px, 42vw);
+    /* Must match the dual-pane .wrap max-width below */
+    --ea-ops-wrap-max: min(1680px, calc(100vw - 24px));
+    /* CSS-first align: centered wrap left + .wrap pad (28) + sky tabbar pad (6).
+       JS may refine with the live EA tab getBoundingClientRect. */
+    --ea-ops-left: calc((100vw - var(--ea-ops-wrap-max)) / 2 + 28px + 6px);
     --ea-ops-top: 88px;
-    --ea-ops-left: var(--ea-gap);
-    --ea-ops-content-pad: calc(var(--ea-rail) + var(--ea-gap) + 8px);
+    /* With tab-aligned left, content pad ≈ rail + small gap (inside wrap) */
+    --ea-ops-content-pad: calc(var(--ea-rail) + 18px);
+  }
+  @media (min-width: 1280px){
+    body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
+      --ea-rail: min(640px, 46vw);
+    }
   }
 
   /* Full-bleed chrome — tabbar spans the whole window above both panes */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) > .wrap{
     transform: none !important;
-    max-width: min(1680px, calc(100vw - 24px)) !important;
+    max-width: var(--ea-ops-wrap-max) !important;
     width: 100%;
     margin-left: auto !important;
     margin-right: auto !important;
   }
 
-  /* Wide chat card: under the tabbar; left edge aligned to the Energy Agent tab */
+  /* Wide chat card: under the tabbar; left edge = Energy Agent top-tab */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #eaPanel{
     top: var(--ea-ops-top);
-    left: var(--ea-ops-left);
+    left: var(--ea-ops-left) !important;
     bottom: var(--ea-gap);
     width: var(--ea-rail);
     max-width: min(var(--ea-rail), calc(100vw - var(--ea-ops-left) - var(--ea-gap)));
-    /* Width/left animate when entering Repairs with agent open */
     transition:
       transform .34s cubic-bezier(.2,.8,.2,1),
       visibility 0s linear 0s,
@@ -499,16 +505,6 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .sb-detail-host.sb-dc-open{
     left: calc(var(--ea-ops-left) + var(--ea-rail) + 12px) !important;
     top: var(--ea-ops-top) !important;
-  }
-}
-
-/* Mid desktop: still wider than default 360, keep classic side-shift */
-@media (min-width: 961px) and (max-width: 1099px){
-  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
-    --ea-rail: min(480px, 42vw);
-  }
-  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #panelOps .rp-shell{
-    max-width: min(820px, 94vw);
   }
 }
 
