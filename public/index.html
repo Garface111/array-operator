@@ -274,7 +274,8 @@ document.documentElement.setAttribute("data-theme","day");
  (Inverters no longer a separate top tab — Marketplace took that slot).
  #arrays → Table, #sandbox → Sandbox, #dashboard → Triage. -->
  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
- <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet</a>
+ <!-- href=#arrays = Fleet → Table default; sub-tab memory restores Triage/Sandbox when last used -->
+ <a class="tab" id="tabDashboard" href="#arrays" role="tab">Fleet</a>
  <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13), see #panelAnalysis's
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
@@ -338,17 +339,17 @@ document.documentElement.setAttribute("data-theme","day");
      ops:       ["panelOps",       "tabOps"]
    };
    // Mirrors sandbox.js tabFromHash() — keep in sync if that changes.
+   // Fleet family (#dashboard Triage | #arrays Table | #sandbox) all light panelDashboard.
    function fromHash() {
      var h = location.hash;
      if (h === "#account") return "account";
      if (h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
-     if (h === "#arrays" || h === "#sandbox") return "arrays";
+     if (h === "#arrays" || h === "#table" || h === "#sandbox" || h === "#dashboard") return "dashboard";
      if (h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
      if (h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
      if (h === "#marketplace") return "marketplace";
-     if (h === "#dashboard") return "dashboard";
      if (h === "#sovereign") return "account";
-     return "arrays";
+     return "dashboard";
    }
    function apply() {
      // Sovereign desk takes over the stage; leave that to applyView.
@@ -574,7 +575,7 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="app.js?v=20260715eaModal2"></script>
 <script src="session-ping.js?v=20260720tos1"></script>
 <script src="solar-credit-notice.js?v=20260720sc1"></script>
-<script src="sandbox.js?v=20260720prodfallback"></script>
+<script src="sandbox.js?v=20260721fleetSubMem"></script>
 <script src="vendor-sheet.js?v=20260719stream2"></script>
 <script src="command-center.js?v=20260719fleetguard1"></script>
 <script src="reports.js?v=20260720fold1"></script>

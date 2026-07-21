@@ -8140,18 +8140,21 @@
  // (no hashchange → applyView doesn't run), so let it record too.
  try { window.__aoRememberSub = rememberSubtab; } catch(_){}
  // Restore on a top-tab click, before the anchor's default navigation runs.
+ // ALWAYS re-open the last sub-view for that top tab (incl. the default).
+ // Previous guard skipped restore when mem === SUBTAB_DEFAULT, so Fleet → Table
+ // (#arrays, the default) was lost: the <a href="#dashboard"> hard-landed on
+ // Triage every time you left Table for Analysis and came back (Ford 2026-07-21).
  document.addEventListener("click", function(e){
  try{
  const a = e.target && e.target.closest ? e.target.closest("#tabAnalysis, #tabReports, #tabDashboard") : null;
  if(!a) return;
  const targetTab = a.id === "tabAnalysis" ? "analysis"
   : a.id === "tabReports" ? "reports" : "dashboard";
- const mem = _subtabMem[targetTab];
- if(mem && _subtabTabForHash(mem) === targetTab && mem.toLowerCase() !== SUBTAB_DEFAULT[targetTab]){
+ const mem = _subtabMem[targetTab] || SUBTAB_DEFAULT[targetTab];
+ if(!mem || _subtabTabForHash(mem) !== targetTab) return;
  e.preventDefault();
- if((location.hash || "").toLowerCase() === mem.toLowerCase()) applyView();
+ if((location.hash || "").toLowerCase() === String(mem).toLowerCase()) applyView();
  else location.hash = mem;
- }
  }catch(_){}
  }, true);
 
