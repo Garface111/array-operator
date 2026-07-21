@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721eaFps2";
+ var EA_BUILD = "20260721eaCloseLeave1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -702,22 +702,10 @@
  ' </span>' +
  ' </div>' +
  ' <div class="ea-compose" id="eaCompose">' +
- // Railway-style suggested prompts ABOVE the input — demo real EA muscle and
- // goad owners into a hard question (not "hi" / "what can you do").
- ' <div class="ea-suggestions" id="eaSuggestions" role="group" aria-label="Try asking Energy Agent">' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Which inverter needs attention right now, and why? Walk me through the evidence.">' +
- ' <span class="ea-sug-ic" aria-hidden="true">⚡</span>Which inverter needs attention — and why?</button>' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Rank my fleet by lost production dollars this week. What should I fix first if I only get one truck roll tomorrow?">' +
- ' <span class="ea-sug-ic" aria-hidden="true">$</span>Rank lost production by $ — one truck roll</button>' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Is anything marked gone quiet a real dropout, or is it just night / overnight silence? Be strict.">' +
- ' <span class="ea-sug-ic" aria-hidden="true">☾</span>Gone quiet — or just night?</button>' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Draft a repair outreach email for the worst underperforming or down inverter. Include the diagnosis and what the tech should check.">' +
- ' <span class="ea-sug-ic" aria-hidden="true">✉</span>Draft repair outreach for the worst unit</button>' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Who still needs an offtaker invoice, and what would you send? Pull real numbers from my accounts.">' +
- ' <span class="ea-sug-ic" aria-hidden="true">🧾</span>Who still needs an offtaker invoice?</button>' +
- ' <button type="button" class="ea-sug" data-ea-prompt="Stress-test my fleet like a skeptical owner: peer underperformance, silent gateways, and anything the 14-day health badge is missing. Hardest problem first.">' +
- ' <span class="ea-sug-ic" aria-hidden="true">🔬</span>Stress-test my fleet — hardest first</button>' +
- ' </div>' +
+ // Railway-style marquee suggestions ABOVE the input — two rows scroll in
+ // opposite directions so they gear past each other. DOM filled by
+ // mountSuggestionMarquee() (chips duplicated for seamless loop).
+ ' <div class="ea-suggestions" id="eaSuggestions" role="group" aria-label="Try asking Energy Agent"></div>' +
  ' <div class="ea-attach-row" id="eaAttachRow" hidden></div>' +
  ' <div class="ea-compose-shell">' +
  ' <textarea id="eaInput" rows="1" placeholder="Ask anything about your fleet, repairs, invoices…"></textarea>' +
@@ -814,29 +802,8 @@
  }, true);
  }
  document.getElementById("eaSend").onclick = sendText;
- // Suggested-prompt chips (Railway-style): one click = send a hard demo ask.
- (function wireSuggestions() {
- var root = document.getElementById("eaSuggestions");
- if (!root || root._wired) return;
- root._wired = true;
- root.addEventListener("click", function (e) {
- var btn = e.target && e.target.closest ? e.target.closest(".ea-sug") : null;
- if (!btn || !root.contains(btn)) return;
- e.preventDefault();
- var prompt = (btn.getAttribute("data-ea-prompt") || btn.textContent || "").trim();
- if (!prompt) return;
- // Visual press; send immediately so the owner sees a real agent turn.
- btn.classList.add("ea-sug-fired");
- setTimeout(function () { try { btn.classList.remove("ea-sug-fired"); } catch (e2) {} }, 600);
- if (typeof window.__eaSendText === "function") {
- window.__eaSendText(prompt, { source: "suggestion_chip" });
- } else {
- var input = document.getElementById("eaInput");
- if (input) { input.value = prompt; }
- sendText();
- }
- });
- })();
+ // Railway-style marquee: opposite-scrolling rows of hard demo prompts.
+ mountSuggestionMarquee();
  document.getElementById("eaMic").onclick = function (e) {
  e.preventDefault();
  toggleMic();
@@ -3220,6 +3187,99 @@
  // Always cancel Realtime so the mouth stops; model will see user_interrupted next turn
  try { cancelRealtimeIfActive(); } catch (e) {}
  stopSpeak({ reason: reason || "barge_in" });
+ }
+
+ // ── Railway-style suggested prompt marquee ───────────────────────────────
+ // Two rows, opposite scroll directions, seamless loop (chips duplicated).
+ // Click sends a hard capability-demo question immediately.
+ var EA_SUGGESTION_ROWS = [
+ [
+ { ic: "⚡", label: "Which inverter needs attention — and why?",
+ prompt: "Which inverter needs attention right now, and why? Walk me through the evidence." },
+ { ic: "$", label: "Rank lost production by $ — one truck roll",
+ prompt: "Rank my fleet by lost production dollars this week. What should I fix first if I only get one truck roll tomorrow?" },
+ { ic: "☾", label: "Gone quiet — or just night?",
+ prompt: "Is anything marked gone quiet a real dropout, or is it just night / overnight silence? Be strict." },
+ { ic: "🔬", label: "Stress-test my fleet — hardest first",
+ prompt: "Stress-test my fleet like a skeptical owner: peer underperformance, silent gateways, and anything the 14-day health badge is missing. Hardest problem first." },
+ { ic: "📊", label: "Peer underperformance on my biggest array",
+ prompt: "On my biggest array, which units are underperforming vs peers under the same sky? Show peer_index and what to check." },
+ ],
+ [
+ { ic: "✉", label: "Draft repair outreach for the worst unit",
+ prompt: "Draft a repair outreach email for the worst underperforming or down inverter. Include the diagnosis and what the tech should check." },
+ { ic: "🧾", label: "Who still needs an offtaker invoice?",
+ prompt: "Who still needs an offtaker invoice, and what would you send? Pull real numbers from my accounts." },
+ { ic: "🔧", label: "Open a repair case for the loudest fault",
+ prompt: "If anything is faulted or dead, open or draft a repair case with the serial, diagnosis, and next step." },
+ { ic: "🌤", label: "What's dragging today's production?",
+ prompt: "What's dragging today's production across the fleet — weather, feed lag, or real hardware? Be honest when you don't know." },
+ { ic: "🧭", label: "Tour what Energy Agent can actually do",
+ prompt: "Give me a hard, concrete tour of what you can do for THIS fleet right now — not generic features. Use real sites and statuses." },
+ ],
+ ];
+
+ function _eaSugBtnHtml(item) {
+ var label = String(item.label || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+ var prompt = String(item.prompt || item.label || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+ var ic = String(item.ic || "•").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+ return (
+ '<button type="button" class="ea-sug" data-ea-prompt="' + prompt + '">' +
+ '<span class="ea-sug-ic" aria-hidden="true">' + ic + "</span>" + label +
+ "</button>"
+ );
+ }
+
+ function mountSuggestionMarquee() {
+ var root = document.getElementById("eaSuggestions");
+ if (!root || root._mounted) return;
+ root._mounted = true;
+
+ var html = "";
+ for (var r = 0; r < EA_SUGGESTION_ROWS.length; r++) {
+ var row = EA_SUGGESTION_ROWS[r];
+ var dir = r % 2 === 0 ? "rtl" : "ltr"; // row0 → left, row1 → right (gear past each other)
+ var set = row.map(_eaSugBtnHtml).join("");
+ // Duplicate set for seamless infinite scroll (track is 2× one set; animate -50%).
+ html +=
+ '<div class="ea-sug-row ea-sug-row-' + dir + '">' +
+ '<div class="ea-sug-track">' +
+ '<div class="ea-sug-set">' + set + "</div>" +
+ '<div class="ea-sug-set" aria-hidden="true">' + set + "</div>" +
+ "</div></div>";
+ }
+ root.innerHTML = html;
+
+ root.addEventListener("click", function (e) {
+ var btn = e.target && e.target.closest ? e.target.closest(".ea-sug") : null;
+ if (!btn || !root.contains(btn)) return;
+ e.preventDefault();
+ var prompt = (btn.getAttribute("data-ea-prompt") || "").trim();
+ if (!prompt) return;
+ btn.classList.add("ea-sug-fired");
+ setTimeout(function () { try { btn.classList.remove("ea-sug-fired"); } catch (e2) {} }, 600);
+ // Pause that row briefly so click feels intentional (animation resumes via CSS)
+ var rowEl = btn.closest(".ea-sug-row");
+ if (rowEl) {
+ rowEl.classList.add("ea-sug-row-paused");
+ setTimeout(function () { try { rowEl.classList.remove("ea-sug-row-paused"); } catch (e3) {} }, 1800);
+ }
+ if (typeof window.__eaSendText === "function") {
+ window.__eaSendText(prompt, { source: "suggestion_chip" });
+ } else {
+ var input = document.getElementById("eaInput");
+ if (input) input.value = prompt;
+ sendText();
+ }
+ });
+
+ // Hover pauses the whole marquee (easier to click a moving chip)
+ root.addEventListener("mouseenter", function () { root.classList.add("ea-sug-paused"); });
+ root.addEventListener("mouseleave", function () { root.classList.remove("ea-sug-paused"); });
+ root.addEventListener("focusin", function () { root.classList.add("ea-sug-paused"); });
+ root.addEventListener("focusout", function (e) {
+ if (!root.contains(e.relatedTarget)) root.classList.remove("ea-sug-paused");
+ });
  }
 
  // ── chat ─────────────────────────────────────────────────────────────────
@@ -7476,11 +7536,17 @@
  applyMode();
  }
 
- // Leaving Repairs: drop live-measured vars after the morph finishes so we
- // don't snap mid-flight, then CSS defaults take over for the next visit.
+ // Leaving Repairs: minimize Energy Agent. Dual-pane geometry only exists on
+ // this tab — closing avoids morphing a wide rail onto Invoices/Fleet. Owner
+ // can reopen on any other tab with the normal tab control.
  if (leaving) {
  clearEaAlignTimers();
  _eaAlignTimers.push(setTimeout(clearEaOpsInlineVars, EA_MORPH_MS + 40));
+ if (state.open) {
+ try {
+ setOpen(false).catch(function () {});
+ } catch (eClose) {}
+ }
  }
 
  // Entering Repairs → auto-open Energy Agent (desktop dual-pane + mobile sheet).
