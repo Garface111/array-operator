@@ -2221,8 +2221,9 @@
  // NEVER apply when painting server history (prefix-match was collapsing threads).
  if (!opts.history && !opts.skipDedup) {
  var last = host.lastElementChild;
- // Skip action-chip rows when finding last real bubble
- while (last && last.classList && last.classList.contains("ea-mind-actions")) {
+ // Skip action-chip / next-step rows when finding last real bubble
+ while (last && last.classList &&
+ (last.classList.contains("ea-mind-actions") || last.classList.contains("ea-next-steps"))) {
  last = last.previousElementSibling;
  }
  if (last && last.getAttribute("data-role") === role) {
@@ -2327,6 +2328,144 @@
  if (!host) return;
  host.innerHTML = "";
  host.hidden = true;
+ }
+
+ /** Remove previous turn's next-step chips (only the latest set stays). */
+ function clearNextStepChips() {
+ var host = document.getElementById("eaMsgs");
+ if (!host) return;
+ host.querySelectorAll(".ea-next-steps").forEach(function (el) {
+ try { el.remove(); } catch (e) {}
+ });
+ }
+
+ /**
+  * After each agent reply, offer 2–4 clickable next steps so the owner can
+  * continue without typing. Backend may pass d.next_steps; otherwise we derive
+  * smart follow-ups from the reply + last user ask.
+  */
+ function deriveNextSteps(reply, userText, d) {
+ var steps = [];
+ var seen = {};
+ function push(label, prompt) {
+ label = String(label || "").trim();
+ prompt = String(prompt || label).trim();
+ if (!label || !prompt) return;
+ var key = prompt.toLowerCase();
+ if (seen[key] || steps.length >= 4) return;
+ // Keep chip labels short; full prompt goes to the agent
+ if (label.length > 48) label = label.slice(0, 45).replace(/\s+\S*$/, "") + "…";
+ seen[key] = true;
+ steps.push({ label: label, prompt: prompt });
+ }
+
+ // 1) Server-authored (preferred when present)
+ var raw = (d && (d.next_steps || d.followups || d.suggested_actions)) || [];
+ if (Array.isArray(raw)) {
+ raw.forEach(function (s) {
+ if (typeof s === "string") push(s, s);
+ else if (s && (s.label || s.prompt || s.text)) {
+ push(s.label || s.text || s.prompt, s.prompt || s.text || s.label);
+ }
+ });
+ }
+
+ var r = String(reply || "");
+ var rl = r.toLowerCase();
+ var u = String(userText || "").toLowerCase();
+
+ // 2) If the agent asked a clear question, offer "Yes — …" as first chip
+ var qs = r.match(/[^.!?\n]{12,110}\?/g) || [];
+ if (qs.length) {
+ var q = qs[qs.length - 1].replace(/\s+/g, " ").trim();
+ // Skip meta "any questions?" style closers
+ if (!/\b(anything else|any (other )?questions?|let me know|how can i help)\b/i.test(q)) {
+ var body = q.replace(/\?+\s*$/, "").trim();
+ push("Yes — do that", "Yes. " + body + ".");
+ push("No, something else", "No — let's look at something else. What's the next highest-value thing I should check?");
+ }
+ }
+
+ // 3) Domain follow-ups from what was just discussed
+ if (/\b(invoice|offtaker|billing|send.?pipeline|draft)\b/i.test(r + " " + u)) {
+ push("Draft that invoice", "Draft the offtaker invoice we were just talking about with real numbers, ready to review.");
+ push("Who else needs invoices?", "Who still needs an offtaker invoice this cycle? List them with amounts if you can.");
+ }
+ if (/\b(repair|underperform|fault|dead|gone quiet|comm.?gap|truck.?roll|outreach|tech)\b/i.test(r + " " + u)) {
+ push("Draft repair outreach", "Draft a repair outreach email for the worst unit we discussed — diagnosis + what the tech should check.");
+ push("Open a repair case", "Open or update a repair case for the problem unit with serial, diagnosis, and next step.");
+ }
+ if (/\b(fleet|inverter|array|peer|production|downtime|health)\b/i.test(r + " " + u)
+ && !steps.some(function (s) { return /repair|invoice/i.test(s.label); })) {
+ push("Hardest problem first", "Stress-test my fleet — what's the single highest-priority problem right now and why?");
+ }
+ if (/\b(tour|tab|walk|show me|open)\b/i.test(r + " " + u)) {
+ push("Walk me through that tab", "Open the relevant tab and walk me through what I'm looking at, step by step.");
+ }
+ if (/\b(night|quiet|stale|feed behind|sync)\b/i.test(r)) {
+ push("Is it just night?", "Be strict: is this a real dropout or just overnight silence / capture lag?");
+ }
+
+ // 4) Always offer a productive default if we still have room
+ if (steps.length < 2) {
+ push("What should I do next?", "Based on my fleet right now, what is the single best next action and why?");
+ }
+ if (steps.length < 3) {
+ push("Dig deeper", "Go deeper on what you just said — give me evidence and a concrete next move.");
+ }
+ if (steps.length < 4) {
+ push("Something else…", "I want to change direction. What are the top three things you can help me with on this fleet today?");
+ }
+
+ return steps.slice(0, 4);
+ }
+
+ function showNextStepChips(reply, userText, d) {
+ clearNextStepChips();
+ var host = document.getElementById("eaMsgs");
+ if (!host) return;
+ var steps = deriveNextSteps(reply, userText, d);
+ if (!steps.length) return;
+
+ var row = document.createElement("div");
+ row.className = "ea-next-steps";
+ row.setAttribute("role", "group");
+ row.setAttribute("aria-label", "Suggested next steps");
+
+ var label = document.createElement("div");
+ label.className = "ea-next-steps-lbl";
+ label.textContent = "Next steps";
+ row.appendChild(label);
+
+ var wrap = document.createElement("div");
+ wrap.className = "ea-next-steps-row";
+ steps.forEach(function (s) {
+ var btn = document.createElement("button");
+ btn.type = "button";
+ btn.className = "ea-next-chip";
+ btn.textContent = s.label;
+ btn.setAttribute("data-ea-next", s.prompt);
+ btn.title = s.prompt;
+ btn.onclick = function () {
+ // Mark chosen, clear the set, send as a normal user turn
+ try {
+ wrap.querySelectorAll(".ea-next-chip").forEach(function (b) {
+ b.disabled = true;
+ b.classList.toggle("ea-next-picked", b === btn);
+ });
+ } catch (e) {}
+ clearNextStepChips();
+ if (typeof window.__eaSendText === "function") {
+ window.__eaSendText(s.prompt, { source: "next_step_chip" });
+ } else {
+ turn(s.prompt, "text").catch(function () {});
+ }
+ };
+ wrap.appendChild(btn);
+ });
+ row.appendChild(wrap);
+ host.appendChild(row);
+ host.scrollTop = host.scrollHeight;
  }
 
  /** Tool dump UI removed (Ford 2026-07-14), answers only; tools still run server-side. */
@@ -3489,6 +3628,8 @@
  }
  // First real user turn this browser session → marquee on-ramp goes away.
  dismissSuggestionMarquee();
+ // New user message → previous next-step chips are stale
+ clearNextStepChips();
  // Hard stop first, works even if a previous turn is still thinking/speaking
  if (isStopCommand(text)) {
  if (!opts.userAlreadyShown) addMsg("user", text);
@@ -3713,6 +3854,8 @@
  );
  addMsg("agent", reply, { spoken: mouthLine, spokenAloud: voiceLive });
  clearTools();
+ // Clickable next steps under this reply (owner can still type freely)
+ try { showNextStepChips(reply, text, d); } catch (eNs) {}
 
  // Cut interim "one second…" filler, then deliver the real answer immediately
  var speakP = finishThinkingAndSpeak(mouthLine, turnGen);

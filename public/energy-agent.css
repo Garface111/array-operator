@@ -697,6 +697,87 @@ html:not(.sky) .ea-msg.agent.repair-email .ea-email-label,
 html:not(.sky) .ea-msg.agent.mind-update[data-origin="repair"] .ea-email-label{
   color: #7dd3fc;
 }
+/* ── Next-step chips after each agent reply ────────────────────────────────
+   Owner clicks one → sent as their next message; typing still works. */
+.ea-next-steps{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: flex-start;
+  margin: -2px 0 12px 2px;
+  max-width: 96%;
+  animation: ea-next-in .22s ease-out;
+}
+@keyframes ea-next-in{
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.ea-next-steps-lbl{
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--faint, #94a3b8);
+  padding-left: 2px;
+}
+.ea-next-steps-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ea-next-chip{
+  appearance: none;
+  margin: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,233,.28);
+  background: rgba(255,255,255,.88);
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 0 rgba(255,255,255,.75) inset;
+  transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
+}
+.ea-next-chip:hover{
+  border-color: rgba(14,165,233,.5);
+  background: rgba(224,242,254,.95);
+  box-shadow: 0 4px 14px -8px rgba(14,60,120,.35);
+}
+.ea-next-chip:active,
+.ea-next-chip.ea-next-picked{
+  transform: translateY(1px);
+  background: rgba(186,230,253,.98);
+  border-color: rgba(14,165,233,.55);
+}
+.ea-next-chip:disabled{
+  opacity: .7;
+  cursor: default;
+}
+html:not(.sky) .ea-next-steps-lbl{ color: #64748b; }
+html:not(.sky) .ea-next-chip{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(56,189,248,.28);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+html:not(.sky) .ea-next-chip:hover{
+  background: rgba(56,189,248,.14);
+  border-color: rgba(56,189,248,.45);
+  color: #f8fafc;
+}
+html:not(.sky) .ea-next-chip:active,
+html:not(.sky) .ea-next-chip.ea-next-picked{
+  background: rgba(56,189,248,.22);
+}
+@media (prefers-reduced-motion: reduce){
+  .ea-next-steps{ animation: none; }
+}
+
 /* Sovereign action chips stay visible under the product-mind bubble */
 .ea-mind-actions{
   display: flex;
