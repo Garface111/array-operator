@@ -63,7 +63,9 @@ window.FleetStore = (function(){
     const s = getSession(); if(!s) return;                 // only cache real, signed-in data
     try {
       localStorage.setItem(cacheKeyFor(s), JSON.stringify({
-        v: 1, at: Date.now(), recovered: recovered||0, arrays: arrays
+        // v:2 — cache includes inverter/array `daily` for 14-day sparklines
+        // (v:1 sanitize stripped them → flat Waterford graphs on cold load).
+        v: 2, at: Date.now(), recovered: recovered||0, arrays: arrays
       }));
     } catch(e){ /* quota/serialise, non-fatal, just lose the fast path */ }
   }
@@ -74,6 +76,25 @@ window.FleetStore = (function(){
   // the DOM. Unknown extra keys are dropped (not spread) so nothing rides along.
   const _str = (x, max) => (typeof x === "string" ? x.slice(0, max || 120) : (x == null ? "" : String(x).slice(0, max || 120)));
   const _num = (x) => (typeof x === "number" && isFinite(x) ? x : null);
+  function sanitizeDaily(pts){
+    // Keep 14-day sparkline history through the instant-reload cache.
+    // Without this, sanitizeInverter dropped `daily` on every cold paint so
+    // Waterford (and any extension-captured site) showed flat "no history"
+    // sparklines until/unless the live fleet-tree returned — and a failed or
+    // slow live pull left the table stuck empty even when DB had good kWh.
+    if(!Array.isArray(pts)) return [];
+    const out = [];
+    for(let i = 0; i < pts.length && out.length < 32; i++){
+      const d = pts[i];
+      if(!d || typeof d !== "object") continue;
+      const kwh = _num(d.kwh);
+      if(kwh == null || kwh < 0) continue;
+      const date = d.date != null ? _str(d.date, 32) : null;
+      if(!date) continue;
+      out.push({ date, kwh });
+    }
+    return out;
+  }
   function sanitizeInverter(iv){
     if(!iv || typeof iv !== "object" || Array.isArray(iv)) return null;
     const out = {
@@ -87,6 +108,8 @@ window.FleetStore = (function(){
       window_kwh: _num(iv.window_kwh),
       produced_today_kwh: _num(iv.produced_today_kwh),
       peer_index: _num(iv.peer_index),
+      min_kwh: _num(iv.min_kwh),
+      peak_kwh: _num(iv.peak_kwh),
       last_seen: iv.last_seen != null ? _str(iv.last_seen, 40) : null,
       // Live-reading provenance — MUST survive the cache/allow-list or liveVerdict
       // goes blind to estimated splits + stale readings and re-flags them (the bug).
@@ -99,6 +122,8 @@ window.FleetStore = (function(){
       expected_low_reason: iv.expected_low_reason != null ? _str(iv.expected_low_reason, 240) : null,
       expected_low_baseline: _num(iv.expected_low_baseline),
       expected_low_breach: iv.expected_low_breach === true,
+      // 14-day history for Table/Sandbox sparklines (was dropped — Waterford bug).
+      daily: sanitizeDaily(iv.daily),
     };
     return out;
   }
@@ -126,6 +151,9 @@ window.FleetStore = (function(){
       vendor: _str(a.vendor, 40),
       portfolio_name: a.portfolio_name != null ? _str(a.portfolio_name, 80) : null,
       reminder: a.reminder != null ? _str(a.reminder, 2000) : null,
+      daily: sanitizeDaily(a.daily),
+      produced_today_kwh: _num(a.produced_today_kwh),
+      current_power_w: _num(a.current_power_w),
       inverters: invs,
     };
   }
@@ -135,7 +163,8 @@ window.FleetStore = (function(){
       const raw = localStorage.getItem(cacheKeyFor(s));
       if(!raw) return null;
       const c = JSON.parse(raw);
-      if(!c || typeof c !== "object" || c.v !== 1 || !Array.isArray(c.arrays)) return null;
+      // Accept v1 (no daily) and v2 (with daily); both go through sanitize.
+      if(!c || typeof c !== "object" || (c.v !== 1 && c.v !== 2) || !Array.isArray(c.arrays)) return null;
       // Validate + coerce each cached array to the known shape; drop malformed ones
       // rather than trusting the blob wholesale. A poisoned cache degrades to a network
       // load, never to executing/rendering attacker-shaped data.
