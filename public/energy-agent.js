@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260719cleanchat1";
+ var EA_BUILD = "20260721opsWide1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3039,6 +3039,8 @@
  tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
  } catch (e) {}
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
+ // Repairs dual-pane: widen rail + tuck under tabbar when on #ops
+ try { syncOpsWideClass(); } catch (eOps) {}
  // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
  try {
  requestAnimationFrame(function () {
@@ -7316,6 +7318,22 @@
  }
  }
 
+ /** Body class for Repairs dual-pane CSS (wide chat under full tabbar). */
+ function syncOpsWideClass() {
+ var onOps = false;
+ try {
+ var h = String(location.hash || "").toLowerCase();
+ if (h === "#ops" || h === "#claims" || h === "#repairs") onOps = true;
+ if (!onOps) {
+ var p = document.getElementById("panelOps");
+ if (p && p.classList.contains("active")) onOps = true;
+ }
+ } catch (e) {}
+ try {
+ document.body.classList.toggle("ea-on-ops", !!onOps);
+ } catch (e2) {}
+ }
+
  // ── boot ─────────────────────────────────────────────────────────────────
  function boot() {
  ensureUi();
@@ -7332,6 +7350,13 @@
  var wrap = document.getElementById("fsWrap");
  if (wrap && signedIn()) wrap.style.display = "none";
  } catch (e) {}
+ // Keep ea-on-ops in sync so opening EA on Repairs gets the wide dual-pane.
+ try {
+ syncOpsWideClass();
+ window.addEventListener("hashchange", syncOpsWideClass);
+ // Sandbox may flip .panel.active without a hash tick in some paths
+ document.addEventListener("ao-view-change", syncOpsWideClass);
+ } catch (eSync) {}
  if (signedIn()) {
  // Don't call getUserMedia here, Chrome ignores it without a user gesture.
  // Show the clickable gate so the user can grant mic with one click.
