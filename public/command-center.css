@@ -2034,6 +2034,30 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-arch-yes{ color:#0a7d4f; background:rgba(10,125,79,.1); }
 .rb-arch-no{ color:var(--faint,#94a3b8); background:rgba(148,163,184,.12); }
 @media(max-width:640px){ .rb-arch-zip{ margin-left:0; } .rb-arch-off{ flex-direction:column; align-items:flex-start; gap:3px; } }
+
+/* ── Utility bill archive (PDFs on file, each downloadable) ──────────────── */
+.rb-bill-arch{ margin-top:10px; }
+.rb-bill-list{ display:flex; flex-direction:column; gap:6px; padding-top:4px; }
+.rb-bill-row{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:10px 12px; border:1px solid #eef2f6; border-radius:10px;
+  background:rgba(2,6,23,.008);
+}
+.rb-bill-main{ min-width:0; flex:1 1 200px; display:flex; flex-direction:column; gap:2px; }
+.rb-bill-name{ font-size:13px; font-weight:680; color:var(--ink,#16202b); }
+.rb-bill-period{ font-size:12px; color:#41505f; font-variant-numeric:tabular-nums; }
+.rb-bill-meta{ font-size:11.5px; color:var(--faint,#94a3b8); }
+.rb-bill-dl{ white-space:nowrap; flex:0 0 auto; }
+.rb-bill-dl-stat{ font-size:11.5px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); min-width:1.2em; }
+.rb-bill-dl-stat:empty{ display:none; }
+.rb-bill-dl-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
+.rb-bill-dl-stat.rb-err{ color:var(--bad,#e5484d); font-weight:600; max-width:28ch; }
+.rb-bill-dl-stat.rb-busy{ color:var(--muted,#475569); }
+@media(max-width:640px){
+  .rb-bill-row{ flex-direction:column; align-items:flex-start; }
+  .rb-bill-dl{ width:100%; }
+}
+
 /* GMP-bills connection status under the offtakers header */
 .rb-gmpbills-status{ margin:10px 0 4px; }
 .rb-gmpbills-status:empty{ display:none; }

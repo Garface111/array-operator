@@ -1409,11 +1409,14 @@
  // re-drafts as new bills land, no manual button (Ford 2026-07-07).
  if (!prefetch && authHeaders()) { autoDraftAll({ force: true }); startAutoDraftPoll(); }
  }
- // Invoice archive (monthly directory): fetch the manifest once (cached) on a real
- // view and render the collapsible directory. Skipped during the idle prefetch;
- // fails soft (fetch error → renderArchive keeps the host hidden).
+ // Invoice archive + utility bill archive: fetch manifests (cached) on a real
+ // view and render the collapsible directories. Skipped during idle prefetch;
+ // fails soft (fetch error → section absent, never blocks the generator).
  if (!prefetch && authHeaders()) {
- loadArchive().then(() => renderArchive()).catch(() => {});
+ Promise.all([
+ loadArchive().catch(() => null),
+ loadBillArchive().catch(() => null),
+ ]).then(() => renderArchive()).catch(() => {});
  }
  }
  window.__aoLoadReports = load;
@@ -1831,8 +1834,11 @@
  * soft: a fetch error just leaves the section absent, never blocks the generator.
  * ==========================================================================*/
  let ARCHIVE = null; // /invoice-archive manifest (cached)
+ let BILL_ARCHIVE = null; // /utility-bill-archive manifest (cached)
  let _archivePromise = null;
+ let _billArchivePromise = null;
  let _archiveOpen = false; // remember the panel's open/closed state across refreshes
+ let _billArchiveOpen = false;
  function loadArchive() {
  if (ARCHIVE) return Promise.resolve(ARCHIVE);
  if (_archivePromise) return _archivePromise;
@@ -1854,6 +1860,26 @@
  })().then(v => { _archivePromise = null; return v; });
  return _archivePromise;
  }
+ function loadBillArchive() {
+ if (BILL_ARCHIVE) return Promise.resolve(BILL_ARCHIVE);
+ if (_billArchivePromise) return _billArchivePromise;
+ if (!authHeaders()) return Promise.resolve(null);
+ _billArchivePromise = fetch(API + "/utility-bill-archive", { headers: authHeaders() })
+ .then(r => (r.ok ? r.json() : null))
+ .then(d => {
+ if (d && d.ok) BILL_ARCHIVE = d;
+ return BILL_ARCHIVE;
+ })
+ .catch(() => null)
+ .then(v => { _billArchivePromise = null; return v; });
+ return _billArchivePromise;
+ }
+ function fmtBytes(n) {
+ n = Number(n) || 0;
+ if (n < 1024) return n + " B";
+ if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + " KB";
+ return (n / (1024 * 1024)).toFixed(1) + " MB";
+ }
 
  // A single availability badge, emerald ✓ when present, muted "—" when not.
  // Honest: never renders a ✓ for something the backend says isn't available.
@@ -1868,27 +1894,32 @@
  return isNaN(d) ? String(m) : d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
  }
 
- // Render the archive panel into #rbArchiveHost from the cached manifest. Signed-in
- // only; hides the host entirely when there's no manifest (fetch failed / demo).
+ // Render invoice archive + utility bill archive into #rbArchiveHost.
+ // Signed-in only; hides the host when neither surface has anything to show.
  function renderArchive() {
  const host = $("#rbArchiveHost");
  if (!host) return;
- if (!authHeaders() || !ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
+ if (!authHeaders()) { host.hidden = true; host.innerHTML = ""; return; }
+ const months = (ARCHIVE && ARCHIVE.months) || [];
+ const total = (ARCHIVE && ARCHIVE.month_count) || 0;
+ const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
+ const billCount = (BILL_ARCHIVE && BILL_ARCHIVE.count) || bills.length || 0;
+ if (!ARCHIVE && !BILL_ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
  host.hidden = false;
- const months = ARCHIVE.months || [];
- const total = ARCHIVE.month_count || 0;
- // Empty state, honest, quiet.
- if (!total || !months.length) {
- host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+
+ // ── Invoice archive ────────────────────────────────────────────────────
+ let invHtml = "";
+ if (!ARCHIVE) {
+ invHtml = ""; // still loading / failed soft
+ } else if (!total || !months.length) {
+ invHtml = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
  <span class="rb-arch-t">Invoice archive</span>
  <span class="rb-arch-sub">monthly directory</span></summary>
  <div class="rb-arch-body">
- <p class="rb-arch-empty">No invoices archived yet. They'll appear once a GMP bill has billable excess.</p>
+ <p class="rb-arch-empty">No invoices archived yet. They'll appear once a utility bill has billable excess.</p>
  </div></details>`;
- wireArchiveToggle();
- return;
- }
+ } else {
  const monthsHtml = months.map(m => {
  const arrays = m.arrays || [];
  const arraysHtml = arrays.map(a => {
@@ -1920,20 +1951,93 @@
  <div class="rb-arch-arrays">${arraysHtml || `<div class="rb-arch-off-none">No arrays billed this month.</div>`}</div>
  </div>`;
  }).join("");
- host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+ invHtml = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
  <span class="rb-arch-t">Invoice archive</span>
  <span class="rb-arch-sub">${total} month${total === 1 ? "" : "s"} · newest first</span></summary>
  <div class="rb-arch-body">${monthsHtml}</div></details>`;
+ }
+
+ // ── Utility bill archive ───────────────────────────────────────────────
+ let billHtml = "";
+ if (!BILL_ARCHIVE) {
+ billHtml = "";
+ } else if (!billCount) {
+ billHtml = `<details class="rb-arch rb-bill-arch"${_billArchiveOpen ? " open" : ""} id="rbBillArch">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Utility bill archive</span>
+ <span class="rb-arch-sub">PDFs on file</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-arch-empty">No utility bill PDFs on file yet. They land here when cloud capture or the extension pulls a bill (GMP, VEC, and other co-ops).</p>
+ </div></details>`;
+ } else {
+ const rows = bills.map(b => {
+ const period = b.period_start && b.period_end
+ ? (esc(b.period_start) + " → " + esc(b.period_end))
+ : (b.month ? esc(monthLabel(b.month)) : (b.bill_date ? esc(b.bill_date) : "Period unknown"));
+ const kwh = b.kwh_generated != null ? (Number(b.kwh_generated).toLocaleString() + " kWh") : "";
+ const size = b.size ? fmtBytes(b.size) : "";
+ const meta = [b.provider_label || "Utility", kwh, size].filter(Boolean).join(" · ");
+ return `<div class="rb-bill-row">
+ <div class="rb-bill-main">
+ <span class="rb-bill-name">${esc(b.account_label || "Utility account")}</span>
+ <span class="rb-bill-period">${period}</span>
+ <span class="rb-bill-meta">${esc(meta)}</span>
+ </div>
+ <button class="ao-btn rb-btn rb-bill-dl" type="button"
+ data-bill-dl="${esc(b.download || "")}"
+ data-bill-name="${esc(b.filename || ("utility_bill_" + (b.id || "") + ".pdf"))}"
+ title="Download this utility bill PDF">⬇ Download PDF</button>
+ <span class="rb-bill-dl-stat" data-bill-stat="${esc(String(b.id))}" aria-live="polite"></span>
+ </div>`;
+ }).join("");
+ billHtml = `<details class="rb-arch rb-bill-arch"${_billArchiveOpen ? " open" : ""} id="rbBillArch">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Utility bill archive</span>
+ <span class="rb-arch-sub">${billCount} bill${billCount === 1 ? "" : "s"} on file · newest first</span></summary>
+ <div class="rb-arch-body"><div class="rb-bill-list">${rows}</div></div></details>`;
+ }
+
+ host.innerHTML = invHtml + billHtml;
  wireArchiveToggle();
  // Per-month .zip download (authenticated blob download, same helper as the CSV export).
  host.querySelectorAll("[data-arch-zip]").forEach(btn => {
  btn.onclick = () => downloadArchiveMonth(btn.getAttribute("data-arch-zip"), btn, host);
  });
+ host.querySelectorAll("[data-bill-dl]").forEach(btn => {
+ btn.onclick = () => downloadUtilityBill(
+ btn.getAttribute("data-bill-dl"),
+ btn.getAttribute("data-bill-name") || "utility_bill.pdf",
+ btn
+ );
+ });
  }
  function wireArchiveToggle() {
  const det = $("#rbArch");
  if (det) det.addEventListener("toggle", () => { _archiveOpen = det.open; });
+ const billDet = $("#rbBillArch");
+ if (billDet) billDet.addEventListener("toggle", () => { _billArchiveOpen = billDet.open; });
+ }
+ async function downloadUtilityBill(url, filename, btn) {
+ if (!url || btn.disabled) return;
+ const row = btn.closest(".rb-bill-row");
+ const stat = row ? row.querySelector("[data-bill-stat]") : null;
+ const setStat = (cls, msg) => {
+ if (!stat) return;
+ stat.className = "rb-bill-dl-stat" + (cls ? " " + cls : "");
+ stat.textContent = msg || "";
+ };
+ btn.disabled = true;
+ setStat("rb-busy", "…");
+ try {
+ await authBlobDownload(url, filename);
+ setStat("rb-ok", "✓");
+ setTimeout(() => setStat("", ""), 2500);
+ } catch (e) {
+ setStat("rb-err", (e && e.message) || "Failed");
+ } finally {
+ btn.disabled = false;
+ }
  }
  async function downloadArchiveMonth(month, btn, host) {
  const stat = host.querySelector(`[data-arch-stat="${CSS.escape(month)}"]`);
