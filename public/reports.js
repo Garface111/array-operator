@@ -2063,7 +2063,6 @@
  const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
  const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
  const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
- const mmBtn = $("#rbMasterEmailOpen"); if (mmBtn) mmBtn.onclick = () => demoNudge(mmBtn);
  const exBtn = $("#rb2ExportBtn"); if (exBtn) exBtn.onclick = () => demoNudge(exBtn);
  }
 
@@ -2192,15 +2191,12 @@
  const ov = document.getElementById("esOverlay");
  if (ov) ov.hidden = true;
  document.body.style.overflow = "";
- // Refresh the in-page master email card so the sample preview matches the studio.
- try { loadMasterEmailPreview(); } catch (_) { /* non-fatal */ }
+ // Master email is toolbar-only now (no inline preview card).
  }
 
- // ─── Master email card (inline on Offtakers tab) ───────────────────────────
- // 1-1 with Generation reports Delivery settings → Email template region:
- // sample preview + full-width "Customize email template" → studio.
+ // ─── Master email (toolbar button only) ───────────────────────────────────
  // Studio writes Tenant.offtaker_email_* so EVERY offtaker invoice email uses
- // the new letter (merge tags personalize; per-offtaker notes still win one send).
+ // the new letter. Entry point: #rbEmailStudio next to Link utility bills.
  //
  // Demo gate: ONLY !authHeaders(). window.AO_DEMO is always defined by
  // demo-data.js even when signed in — never use `|| window.AO_DEMO` here
@@ -2212,82 +2208,13 @@
  if (!signedIn) { demoNudge(e && e.currentTarget); return; }
  openEmailStudio();
  };
- const cardBtn = $("#rbMasterEmailOpen");
- if (cardBtn) cardBtn.onclick = open;
  const esBtn = $("#rbEmailStudio");
  if (esBtn) esBtn.onclick = open;
- // Whole preview pane is also a hit target (gen-reports UX: click to customize).
- const prev = $("#rbMasterEmailPreview");
- if (prev) {
- prev.setAttribute("role", "button");
- prev.setAttribute("tabindex", "0");
- prev.setAttribute("title", "Open the email template studio");
- prev.onclick = open;
- prev.onkeydown = (e) => {
- if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
- };
- }
- if (!signedIn) {
- const subjEl = $("#rbMmSubj");
- const bodyEl = $("#rbMmBody");
- const fromEl = $("#rbMmFrom");
- if (fromEl) fromEl.textContent = "you · via Array Operator";
- if (subjEl) subjEl.textContent = "Your solar credit invoice — sample period";
- if (bodyEl) {
- bodyEl.innerHTML = "<p>Hi there,</p><p>Please find your solar credit invoice attached, "
- + "along with the utility bill behind the figures.</p>"
- + "<p class='rb-mm-mute'>Sign in to customize this letter for every offtaker.</p>";
- }
- return;
- }
- loadMasterEmailPreview();
  }
 
  async function loadMasterEmailPreview() {
- const fromEl = $("#rbMmFrom");
- const subjEl = $("#rbMmSubj");
- const bodyEl = $("#rbMmBody");
- const footEl = $("#rbMmFoot");
- const statEl = $("#rbMmStatus");
- if (!subjEl || !bodyEl) return;
- if (!authHeaders()) {
- subjEl.textContent = "Sign in to preview your offtaker email.";
- bodyEl.innerHTML = "";
- return;
- }
- if (statEl) statEl.textContent = "";
- try {
- const d = await esApi("");
- if (fromEl) {
- const fe = d.from_email || "admin@solaroperator.org";
- fromEl.textContent = fe + " · via Array Operator";
- }
- // Preview with current (saved) templates — null body means server uses tenant defaults.
- const r = await esApi("/preview", {
- method: "POST",
- body: JSON.stringify({
- subject_template: d.subject_template || null,
- body_template: d.body_template || null,
- signoff: d.signoff || null,
- }),
- });
- subjEl.textContent = r.subject_rendered || "(subject)";
- bodyEl.innerHTML = r.body_rendered
- || "<p class='rb-mm-mute'>Preview will appear here once a template is set.</p>";
- if (footEl) {
- const who = r.sample_client || null;
- footEl.textContent = who
- ? "Previewing with " + who + "'s figures — every offtaker gets their own."
- : "Add an offtaker with an email to see a personalized sample.";
- }
- } catch (e) {
- subjEl.textContent = "Couldn't load preview";
- bodyEl.innerHTML = "<p class='rb-mm-mute'>" + esc(e.message || "Preview failed") +
- " · <button type='button' class='rb-mm-retry' id='rbMmRetry'>Try again</button></p>";
- const retry = $("#rbMmRetry");
- if (retry) retry.onclick = () => loadMasterEmailPreview();
- if (statEl) statEl.textContent = "";
- }
+ // Legacy no-op: inline master-email fold removed (Ford 2026-07-21).
+ // Kept so residual callers after studio close do not throw.
  }
 
  async function esPreview() {
@@ -2953,42 +2880,9 @@
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
  </details>
- <!-- Master offtaker email — collapsed by default; open to edit shared letter. -->
- <details class="rb-fleet-fold rb-mastermail rep-card" id="rbMasterEmail">
- <summary class="rb-fleet-fold-sum">
- <span class="rb-fleet-fold-title">Master email for all offtakers</span>
- <span class="rb-fleet-fold-hint">Shared letter · merge tags personalize each send</span>
- </summary>
- <div class="rb-fleet-fold-body">
- <div class="rb-mm-sectionlab">Shared across all offtakers</div>
- <div class="rb-mm-head">
- <div class="rb-mm-main">
- <p>One letter on every offtaker invoice. Edit once — <b>all offtakers</b> get it.
- Merge tags personalize each send. A note on one offtaker still overrides that send only.</p>
- </div>
- </div>
- <div class="rb-mm-stage">
- <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
- title="Open the email studio. Changes apply to every offtaker’s invoice email.">
- <span class="rb-mm-cta-ico" aria-hidden="true">✉</span>
- <span class="rb-mm-cta-label">
- <span class="rb-mm-cta-title">Edit master email for all offtakers</span>
- <span class="rb-mm-cta-sub">Subject, body, sign-off · applies to every offtaker</span>
- </span>
- </button>
- <div class="rb-mm-eyebrow">Sample · what each offtaker receives (personalized)</div>
- <div class="rb-mm-preview" id="rbMasterEmailPreview">
- <div class="rb-mm-env">
- <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
- <div><span class="rb-mm-envlab">SUBJECT</span> <span id="rbMmSubj" class="rb-mm-subj">Loading…</span></div>
- </div>
- <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
- <div class="rb-mm-foot" id="rbMmFoot"></div>
- </div>
- </div>
- <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
- </div>
- </details>
+ <!-- Master offtaker email is edited only via the toolbar "✉ Master email · all
+ offtakers" button next to Link utility bills (Ford 2026-07-21: drop the
+ fleet-fold dropdown; one entry point). -->
  <div class="rb-listwrap rb2-listwrap">
  <div class="rb2-controls">
  <span class="rb2-controls-label">Your offtakers</span>
