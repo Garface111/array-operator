@@ -611,21 +611,35 @@ async function main() {
 
     // ── D. Table / vendor sheet ──────────────────────────────────────────
     { id: "table-row-expand", label: "Table expand array row (vsExpandIn)", keys: ["vsExpandIn", "vsArrIn", "vsGgFill", "vsGgNeedle"],
-      setup: async (p) => { await hash(p, "#arrays"); await sleep(1500); },
-      act: async (p) => {
-        // Prefer a collapsed array row (.vs-arr:not(.open))
-        const ok =
-          (await click(p, "#vendorSheet .vs-arr:not(.open)")) ||
-          (await click(p, "#vendorSheet button.vs-arr")) ||
-          (await click(p, "#vendorSheet [data-arr]"));
-        if (!ok) {
-          await p.evaluate(() => {
-            const b = document.querySelector("#vendorSheet .vs-arr:not(.open), #vendorSheet .vs-arr");
-            if (b) b.click();
-          });
-        }
+      setup: async (p) => {
+        await hash(p, "#arrays");
+        await sleep(400);
+        await p.evaluate(() => {
+          try {
+            if (typeof window.__aoApplyFleetTriageSub === "function") window.__aoApplyFleetTriageSub();
+          } catch (_) {}
+        });
+        // Wait until array rows actually have layout (not 0×0)
+        await p.waitForFunction(() => {
+          const el = document.querySelector("#vendorSheet .vs-arr");
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 80 && r.height > 12 && location.hash.includes("array");
+        }, { timeout: 20000 }).catch(() => {});
+        await sleep(500);
       },
-      expect: { expectMotion: true, expectSettle: true }, durationMs: 1400 },
+      act: async (p) => {
+        await p.evaluate(() => {
+          const b =
+            document.querySelector("#vendorSheet .vs-arr:not(.open)") ||
+            document.querySelector("#vendorSheet .vs-arr");
+          if (b) {
+            b.scrollIntoView({ block: "center" });
+            b.click();
+          }
+        });
+      },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1600 },
     { id: "table-ambient", label: "Table gauges/pulse continuous", keys: ["vsPulse", "vsDcPulse", "dpShimmer"],
       setup: async (p) => { await hash(p, "#arrays"); await sleep(800); },
       act: async () => {},
@@ -876,23 +890,46 @@ async function main() {
     await sleep(250);
   }
 
-  // Mobile pass (resize + re-run mobile scenarios)
-  console.log(`\n══ Mobile animation registry ══`);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await sleep(600);
-  await page.evaluate(() => {
-    try { window.dispatchEvent(new Event("resize")); } catch (_) {}
-  });
-  await sleep(500);
-  for (const sc of ALL.filter((s) => s.mobile)) {
-    await runScenario(page, scenarios, sc);
-    await sleep(250);
-  }
-
-  // Restore desktop for any post steps
-  await page.setViewportSize(VIEWPORT);
-
   await browser.close();
+
+  // Mobile pass — fresh context at phone size so mobile-nav.js injects More sheet
+  console.log(`\n══ Mobile animation registry (fresh phone context) ══`);
+  {
+    const mBrowser = await chromium.launch({
+      headless: !HEADED,
+      args: ["--disable-dev-shm-usage"],
+    });
+    const mCtx = await mBrowser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      reducedMotion: "no-preference",
+    });
+    const mPage = await mCtx.newPage();
+    const tok2 = await demoToken();
+    await mPage.goto(`${BASE}/login`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await mPage.evaluate((tok) => {
+      try {
+        localStorage.setItem("so_session", tok);
+        localStorage.setItem("so_token", tok);
+      } catch (_) {}
+    }, tok2);
+    await mPage.goto(`${BASE}/?auditm=${Date.now()}#analysis`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    await mPage.waitForSelector("#tabbar, .tabbar", { timeout: 30000 });
+    await sleep(2000);
+    // Wait for More control (injected by mobile-nav.js)
+    await mPage.waitForSelector("button.tab-more, .tab.tab-more", { timeout: 10000 }).catch(() => {});
+
+    for (const sc of ALL.filter((s) => s.mobile)) {
+      await runScenario(mPage, scenarios, sc);
+      await sleep(250);
+    }
+    await mBrowser.close();
+  }
 
   // Attach animation key catalog to report
   const keyHits = {};
