@@ -525,17 +525,59 @@
     } catch (e) {}
   }
 
+  /** Toggle Energy Agent side rail — open if closed, close if open (Repairs pill). */
+  function toggleAgentEmpty() {
+    try {
+      var open = !!(document.body && document.body.classList.contains("ea-shell-open"));
+      if (open && typeof window.__eaClose === "function") {
+        window.__eaClose();
+        return;
+      }
+      openAgentEmpty();
+    } catch (e) {
+      openAgentEmpty();
+    }
+  }
+
+  function syncAgentPillLabels() {
+    try {
+      var open = !!(document.body && document.body.classList.contains("ea-shell-open"));
+      document.querySelectorAll("#panelOps .rp-talk.ea-match, #panelOps [data-ops-open-empty]").forEach(function (b) {
+        var lab = b.querySelector(".ea-tab-label");
+        if (lab) lab.textContent = open ? "Close" : "Energy Agent";
+        b.setAttribute("aria-label", open ? "Close Energy Agent" : "Talk to Energy Agent");
+        b.setAttribute("aria-pressed", open ? "true" : "false");
+        b.title = open ? "Close Energy Agent" : "Talk to Energy Agent";
+        b.classList.toggle("is-open", open);
+      });
+    } catch (e) {}
+  }
+
+  // Keep pill label in sync when the rail opens/closes from elsewhere (tab orb, ×, Esc)
+  if (!window.__opsEaPillWired) {
+    window.__opsEaPillWired = true;
+    document.addEventListener("ea-open-change", syncAgentPillLabels);
+    // Fallback if event missed (class toggled without event)
+    try {
+      var mo = new MutationObserver(function () { syncAgentPillLabels(); });
+      mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    } catch (e) {}
+  }
+
   function wire() {
     var el = root();
     if (!el) return;
     var d = STATE.data;
 
-    // Open agent with empty composer (no auto prompt)
+    // Open/close agent (toggle) — same control must dismiss the side window
     el.querySelectorAll("[data-ops-open-empty]").forEach(function (b) {
-      b.onclick = function () {
-        openAgentEmpty();
+      b.onclick = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        toggleAgentEmpty();
+        setTimeout(syncAgentPillLabels, 50);
       };
     });
+    syncAgentPillLabels();
 
     // Explicit "Ask agent…" — only these fill the composer
     el.querySelectorAll("[data-ops-ask-general]").forEach(function (b) {

@@ -774,7 +774,29 @@
  e.stopPropagation();
  requestMicFromClick();
  };
- document.getElementById("eaClose").onclick = function () { setOpen(false); };
+ // Close X — must always dismiss the side rail (stopPropagation so nothing
+ // re-opens; larger hit target in CSS). Ford 2026-07-21: button looked dead.
+ var eaCloseBtn = document.getElementById("eaClose");
+ if (eaCloseBtn) {
+ eaCloseBtn.onclick = function (e) {
+ if (e) { e.preventDefault(); e.stopPropagation(); }
+ setOpen(false);
+ };
+ }
+ // Escape always closes the dock (desktop + mobile sheet)
+ if (!window.__eaEscWired) {
+ window.__eaEscWired = true;
+ document.addEventListener("keydown", function (e) {
+ if (e.key !== "Escape") return;
+ if (!state.open) return;
+ // Don't steal Escape from nested modals/detail sheets with higher priority
+ try {
+ if (document.querySelector(".vs-dc-open, .sb-ov.show, .rb-modal.open, [aria-modal='true']")) return;
+ } catch (e2) {}
+ e.preventDefault();
+ setOpen(false);
+ }, true);
+ }
  document.getElementById("eaSend").onclick = sendText;
  document.getElementById("eaMic").onclick = function (e) {
  e.preventDefault();
@@ -2996,6 +3018,7 @@
  orb.classList.toggle("active", state.open);
  orb.setAttribute("aria-pressed", state.open ? "true" : "false");
  orb.setAttribute("aria-label", state.open ? "Close Energy Agent" : "Open Energy Agent");
+ orb.title = state.open ? "Close Energy Agent" : "Energy Agent, click to talk";
  }
  if (fab) {
  fab.classList.toggle("open", state.open);
@@ -3003,6 +3026,10 @@
  fab.setAttribute("aria-label", state.open ? "Minimize Energy Agent" : "Open Energy Agent");
  fab.title = state.open ? "Minimize chat" : "Energy Agent, chat";
  }
+ // Notify host surfaces (Repairs pill, etc.) so their buttons become Close when open
+ try {
+ document.dispatchEvent(new CustomEvent("ea-open-change", { detail: { open: state.open } }));
+ } catch (e3) {}
  // Desktop: shift site content right. Mobile CSS zeroes the margin.
  document.body.classList.toggle("ea-shell-open", state.open);
  // Hands-off setup open? Dock EA to the RIGHT of the setup rail (don't cover it).
