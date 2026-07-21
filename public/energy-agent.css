@@ -17,11 +17,10 @@
   /* Legacy name used by overlays / hands-off / older rules — same as content inset
      (no longer “card + left gap + right gap” re-center footprint). */
   --ea-footprint: var(--ea-content-inset);
-  /* Shared motion for open/close AND regular↔Repairs morph (one curve everywhere).
-     Shell shift is transform-only (compositor / 60fps). Geometry morph drops
-     backdrop-filter while body.ea-morphing so we don’t paint-blur every frame. */
+  /* Shared motion — transform-only paths (compositor). Keep short so it reads
+     as many small frames, not a slow slideshow of layout steps. */
   --ea-ease: cubic-bezier(.2,.8,.2,1);
-  --ea-dur: .42s;
+  --ea-dur: .28s;
   /* Defaults for ops dual-pane geometry (overridden on body.ea-on-ops). Always
      defined so leaving ops can interpolate back instead of snapping from unset. */
   --ea-ops-left: var(--ea-gap);
@@ -277,9 +276,9 @@ body.ea-morphing > .wrap{
   pointer-events: none; /* skip hit-testing cost during the slide */
 }
 
-/* ── Energy Agent dock — open/close + size morph (desktop) ─────────────────
-   Open/close: translate3d (compositor). Regular↔Repairs: left/top/width share
-   the same ease; blur is off while body.ea-morphing so frames stay full-rate.
+/* ── Energy Agent dock — open/close (desktop) ──────────────────────────────
+   ONLY transform + visibility animate (compositor, ~60fps). Geometry
+   (left/top/width) is set INSTANTLY; mode morphs use JS FLIP on transform.
    Scoped ≥961px — mobile bottom-sheet is separate. */
 @media (min-width: 961px){
   #eaPanel{
@@ -293,13 +292,10 @@ body.ea-morphing > .wrap{
     isolation: isolate;
     backface-visibility: hidden;
     will-change: transform;
+    /* Geometry is snap-set — NEVER transition left/top/width (layout thrash /
+       slideshow FPS). Open/close and FLIP morphs are transform-only. */
     transition:
       transform var(--ea-dur) var(--ea-ease),
-      width var(--ea-dur) var(--ea-ease),
-      max-width var(--ea-dur) var(--ea-ease),
-      top var(--ea-dur) var(--ea-ease),
-      left var(--ea-dur) var(--ea-ease),
-      bottom var(--ea-dur) var(--ea-ease),
       visibility 0s linear var(--ea-dur);
   }
   #eaPanel.open{
@@ -307,14 +303,9 @@ body.ea-morphing > .wrap{
     transform: translate3d(0, 0, 0);
     visibility: visible;
     pointer-events: auto;
-    will-change: transform, width, left, top;
+    will-change: transform;
     transition:
       transform var(--ea-dur) var(--ea-ease),
-      width var(--ea-dur) var(--ea-ease),
-      max-width var(--ea-dur) var(--ea-ease),
-      top var(--ea-dur) var(--ea-ease),
-      left var(--ea-dur) var(--ea-ease),
-      bottom var(--ea-dur) var(--ea-ease),
       visibility 0s;
   }
   /* Pack column tight to the card via GPU translate — left-aligned box, then
@@ -326,10 +317,6 @@ body.ea-morphing > .wrap{
     width: auto;
     transform: translate3d(var(--ea-content-inset), 0, 0);
     will-change: transform;
-  }
-  /* During morph, promote the panel layer for width/left too */
-  body.ea-morphing #eaPanel.open{
-    will-change: transform, width, left, top;
   }
 }
 @media (prefers-reduced-motion: reduce){

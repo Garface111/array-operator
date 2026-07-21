@@ -8044,6 +8044,9 @@
  if(window.__ccRender) window.__ccRender();
  } catch(_pre){}
  }
+ // Apply EA dual-pane / pack geometry BEFORE measuring the slide free-band,
+ // so incoming panels never start centered under the Energy Agent rail.
+ try { if (typeof window.__eaPrepareForView === "function") window.__eaPrepareForView(); } catch (_ea) {}
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
  catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
  }

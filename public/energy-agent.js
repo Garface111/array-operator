@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721eaFps1";
+ var EA_BUILD = "20260721eaFps2";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -7362,7 +7362,7 @@
  var _eaWasOnOps = false;
  var _eaAlignTimers = [];
  var _eaMorphTimer = null;
- var EA_MORPH_MS = 420; // keep in sync with --ea-dur in energy-agent.css
+ var EA_MORPH_MS = 280; // keep in sync with --ea-dur (.28s) in energy-agent.css
  function isOpsHash(h) {
  h = String(h || "").toLowerCase();
  return h === "#ops" || h === "#claims" || h === "#repairs";
@@ -7387,8 +7387,65 @@
  _eaMorphTimer = setTimeout(function () {
  try { document.body.classList.remove("ea-morphing"); } catch (e) {}
  _eaMorphTimer = null;
- }, EA_MORPH_MS + 60);
+ }, EA_MORPH_MS + 50);
  } catch (e) {}
+ }
+ /**
+ * FLIP morph on #eaPanel (and #panelOps if active) using ONLY transform.
+ * Geometry (left/top/width) snaps in applyFn; the visual continuity is a
+ * compositor-only translate+scale so we get many small frames, not layout slideshow.
+ */
+ function flipEaMorph(applyFn) {
+ var panel = document.getElementById("eaPanel");
+ var ops = document.getElementById("panelOps");
+ var els = [];
+ if (panel && panel.classList.contains("open")) els.push(panel);
+ if (ops && ops.classList.contains("active")) els.push(ops);
+ if (!els.length) {
+ try { applyFn(); } catch (e0) {}
+ return;
+ }
+ markEaMorphing();
+ var firsts = els.map(function (el) { return el.getBoundingClientRect(); });
+ try { applyFn(); } catch (e1) { return; }
+ // Force layout so "last" is post-change
+ void document.body.offsetHeight;
+ els.forEach(function (el, i) {
+ var first = firsts[i];
+ var last = el.getBoundingClientRect();
+ if (!first || !last || last.width < 2 || last.height < 2) return;
+ var dx = first.left - last.left;
+ var dy = first.top - last.top;
+ var sx = first.width / last.width;
+ var sy = first.height / last.height;
+ if (!isFinite(sx) || sx < 0.25 || sx > 4) sx = 1;
+ if (!isFinite(sy) || sy < 0.25 || sy > 4) sy = 1;
+ // Skip no-ops
+ if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
+ return;
+ }
+ el.style.transition = "none";
+ el.style.transformOrigin = "0 0";
+ el.style.transform =
+ "translate3d(" + dx + "px," + dy + "px,0) scale(" + sx + "," + sy + ")";
+ });
+ requestAnimationFrame(function () {
+ requestAnimationFrame(function () {
+ els.forEach(function (el) {
+ el.style.transition = "transform " + EA_MORPH_MS + "ms cubic-bezier(.2,.8,.2,1)";
+ el.style.transform = "translate3d(0,0,0) scale(1,1)";
+ });
+ setTimeout(function () {
+ els.forEach(function (el) {
+ try {
+ el.style.transition = "";
+ el.style.transform = "";
+ el.style.transformOrigin = "";
+ } catch (e2) {}
+ });
+ }, EA_MORPH_MS + 40);
+ });
+ });
  }
  function syncOpsWideClass() {
  var onOps = false;
@@ -7404,11 +7461,20 @@
  var leaving = !onOps && _eaWasOnOps;
  _eaWasOnOps = onOps;
 
- if (entering || leaving) markEaMorphing();
-
+ var applyMode = function () {
  try {
  document.body.classList.toggle("ea-on-ops", !!onOps);
  } catch (e2) {}
+ };
+
+ // When EA is already open, FLIP morph regular↔ops so both panel + repairs
+ // content move together (transform-only). When closed, just flip the class.
+ if ((entering || leaving) && state.open) {
+ flipEaMorph(applyMode);
+ } else {
+ if (entering || leaving) markEaMorphing();
+ applyMode();
+ }
 
  // Leaving Repairs: drop live-measured vars after the morph finishes so we
  // don't snap mid-flight, then CSS defaults take over for the next visit.
@@ -7426,16 +7492,12 @@
  } catch (eOpen) {}
  }
 
- // Live tab-edge refine: once after layout, once after morph settles.
- // Avoid mid-morph setProperty storms (they caused stepped/jumpy frames).
+ // Live tab-edge refine AFTER morph (don’t fight the FLIP).
  if (onOps) {
  clearEaAlignTimers();
- requestAnimationFrame(function () {
- syncEaOpsAlign({ soft: true });
- });
  _eaAlignTimers.push(setTimeout(function () {
  syncEaOpsAlign({ soft: false });
- }, EA_MORPH_MS + 30));
+ }, EA_MORPH_MS + 50));
  }
  }
 
@@ -7571,6 +7633,10 @@
 
  window.__eaOpen = function () { setOpen(true); };
  window.__eaClose = function () { setOpen(false); };
+ /** Call before tab-slide so ea-on-ops geometry is applied and free-band is correct. */
+ window.__eaPrepareForView = function () {
+ try { syncOpsWideClass(); } catch (e) {}
+ };
  /**
  * Open the agent and put text in the composer WITHOUT sending.
  * Used by Repairs tab: staged "tell me about my repair system" prompt.

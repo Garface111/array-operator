@@ -39,8 +39,10 @@ html.ao-tab-sliding{ overflow-x: clip; }   /* guard vs a 100vw scrollbar */
   position: absolute;
   top: 0; left: 50%;                         /* width + negative margin (inline) center it */
   display: block;                            /* keep both panels rendered through the slide */
-  transition: transform .5s cubic-bezier(.4, 0, .2, 1);
+  /* transform-only, compositor; matches EA morph curve for paired motion */
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1);
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce){
