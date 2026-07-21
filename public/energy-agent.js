@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721opsWide1";
+ var EA_BUILD = "20260721opsAlign1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3041,6 +3041,12 @@
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
  // Repairs dual-pane: widen rail + tuck under tabbar when on #ops
  try { syncOpsWideClass(); } catch (eOps) {}
+ try {
+ if (document.body.classList.contains("ea-on-ops")) {
+ requestAnimationFrame(syncEaOpsAlign);
+ setTimeout(syncEaOpsAlign, 80);
+ }
+ } catch (eAlign) {}
  // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
  try {
  requestAnimationFrame(function () {
@@ -7319,11 +7325,15 @@
  }
 
  /** Body class for Repairs dual-pane CSS (wide chat under full tabbar). */
+ var _eaWasOnOps = false;
+ function isOpsHash(h) {
+ h = String(h || "").toLowerCase();
+ return h === "#ops" || h === "#claims" || h === "#repairs";
+ }
  function syncOpsWideClass() {
  var onOps = false;
  try {
- var h = String(location.hash || "").toLowerCase();
- if (h === "#ops" || h === "#claims" || h === "#repairs") onOps = true;
+ if (isOpsHash(location.hash)) onOps = true;
  if (!onOps) {
  var p = document.getElementById("panelOps");
  if (p && p.classList.contains("active")) onOps = true;
@@ -7332,6 +7342,74 @@
  try {
  document.body.classList.toggle("ea-on-ops", !!onOps);
  } catch (e2) {}
+
+ // Entering Repairs → auto-open Energy Agent (desktop dual-pane + mobile sheet).
+ // Only on enter so closing the agent while staying on Repairs is respected.
+ var entering = onOps && !_eaWasOnOps;
+ _eaWasOnOps = onOps;
+ if (entering && signedIn() && !state.open) {
+ try {
+ setOpen(true).catch(function () {});
+ } catch (eOpen) {}
+ }
+
+ // Align chat card under the Energy Agent top tab after layout settles
+ if (onOps) {
+ requestAnimationFrame(function () {
+ syncEaOpsAlign();
+ setTimeout(syncEaOpsAlign, 80);
+ setTimeout(syncEaOpsAlign, 360); // after open slide settles
+ });
+ }
+ }
+
+ /**
+ * Line up #eaPanel's left edge with the Energy Agent tab in #tabbar, and park
+ * the card just under the tabbar. Also pad #panelOps so the repairs card sits
+ * clear of the fixed chat (dual-pane ≥1100px).
+ */
+ function syncEaOpsAlign() {
+ try {
+ if (!document.body.classList.contains("ea-on-ops")) return;
+ if (!document.body.classList.contains("ea-shell-open")) return;
+ if (window.matchMedia && !window.matchMedia("(min-width: 1100px)").matches) return;
+
+ var tab = document.querySelector("#tabbar .tab.ea-tab")
+ || document.querySelector("#tabbar .ea-tab");
+ var tabbar = document.getElementById("tabbar");
+ var root = document.documentElement;
+ if (!tab || !root) return;
+
+ var tabRect = tab.getBoundingClientRect();
+ var left = Math.max(8, Math.round(tabRect.left));
+ root.style.setProperty("--ea-ops-left", left + "px");
+
+ if (tabbar) {
+ var gap = 10;
+ var top = Math.round(tabbar.getBoundingClientRect().bottom + gap);
+ root.style.setProperty("--ea-ops-top", Math.max(64, top) + "px");
+ }
+
+ // Content pad: distance from wrap's left edge to the right of the chat card
+ var wrap = document.querySelector("body > .wrap");
+ var rail = 640;
+ try {
+ var cs = getComputedStyle(root);
+ var raw = cs.getPropertyValue("--ea-rail").trim();
+ // --ea-rail may be min(640px, 46vw) — measure the actual panel width if open
+ var panel = document.getElementById("eaPanel");
+ if (panel && panel.classList.contains("open") && panel.offsetWidth > 40) {
+ rail = panel.offsetWidth;
+ } else if (raw) {
+ // best-effort: use 46vw cap
+ rail = Math.min(640, Math.round(window.innerWidth * 0.46));
+ }
+ } catch (eR) {}
+ var wrapLeft = wrap ? wrap.getBoundingClientRect().left : 0;
+ var panelRight = left + rail;
+ var pad = Math.max(0, Math.round(panelRight - wrapLeft + 12));
+ root.style.setProperty("--ea-ops-content-pad", pad + "px");
+ } catch (e) {}
  }
 
  // ── boot ─────────────────────────────────────────────────────────────────
@@ -7356,11 +7434,30 @@
  window.addEventListener("hashchange", syncOpsWideClass);
  // Sandbox may flip .panel.active without a hash tick in some paths
  document.addEventListener("ao-view-change", syncOpsWideClass);
+ window.addEventListener("resize", function () {
+ if (document.body.classList.contains("ea-on-ops")) syncEaOpsAlign();
+ });
+ document.addEventListener("ea-open-change", function () {
+ if (document.body.classList.contains("ea-on-ops")) {
+ requestAnimationFrame(syncEaOpsAlign);
+ setTimeout(syncEaOpsAlign, 80);
+ setTimeout(syncEaOpsAlign, 360);
+ }
+ });
  } catch (eSync) {}
  if (signedIn()) {
  // Don't call getUserMedia here, Chrome ignores it without a user gesture.
  // Show the clickable gate so the user can grant mic with one click.
  setTimeout(refreshMicGate, 400);
+ // Deep-link / refresh already on #ops → open agent once UI is ready
+ if (isOpsHash(location.hash)) {
+ setTimeout(function () {
+ try {
+ if (!state.open) setOpen(true).catch(function () {});
+ } catch (e0) {}
+ setTimeout(syncEaOpsAlign, 100);
+ }, 200);
+ }
  }
  }
 

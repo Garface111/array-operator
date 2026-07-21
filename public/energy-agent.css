@@ -441,8 +441,10 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
 @media (min-width: 1100px){
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
     --ea-rail: min(640px, 46vw);
-    /* Tabbar ~ margin 20 + pill ~52 + mb 10 ≈ 82; leave a small sky gap */
+    /* Fallbacks until JS measures the Energy Agent top-tab (left edge + tabbar bottom) */
     --ea-ops-top: 88px;
+    --ea-ops-left: var(--ea-gap);
+    --ea-ops-content-pad: calc(var(--ea-rail) + var(--ea-gap) + 8px);
   }
 
   /* Full-bleed chrome — tabbar spans the whole window above both panes */
@@ -454,24 +456,25 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
     margin-right: auto !important;
   }
 
-  /* Wide chat card: under the tabbar, full remaining height */
+  /* Wide chat card: under the tabbar; left edge aligned to the Energy Agent tab */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #eaPanel{
     top: var(--ea-ops-top);
-    left: var(--ea-gap);
+    left: var(--ea-ops-left);
     bottom: var(--ea-gap);
     width: var(--ea-rail);
-    max-width: min(var(--ea-rail), calc(100vw - var(--ea-gap) * 2));
-    /* Width animates when entering/leaving Repairs with agent open */
+    max-width: min(var(--ea-rail), calc(100vw - var(--ea-ops-left) - var(--ea-gap)));
+    /* Width/left animate when entering Repairs with agent open */
     transition:
       transform .34s cubic-bezier(.2,.8,.2,1),
       visibility 0s linear 0s,
       width .34s cubic-bezier(.2,.8,.2,1),
-      top .34s cubic-bezier(.2,.8,.2,1);
+      top .34s cubic-bezier(.2,.8,.2,1),
+      left .34s cubic-bezier(.2,.8,.2,1);
   }
 
   /* Repairs column sits in the right pane (clear of the chat card) */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #panelOps.active{
-    margin-left: calc(var(--ea-rail) + var(--ea-gap) + 8px);
+    margin-left: var(--ea-ops-content-pad);
     max-width: none;
     min-width: 0;
     box-sizing: border-box;
@@ -485,7 +488,7 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
 
   /* Mic gate parks above the wide rail */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .ea-mic-gate{
-    left: calc(var(--ea-gap) + var(--ea-rail) + 16px);
+    left: calc(var(--ea-ops-left) + var(--ea-rail) + 16px);
     top: calc(var(--ea-ops-top) + 8px);
   }
 
@@ -494,7 +497,7 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .sb-ov,
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .cl-modal-back,
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .sb-detail-host.sb-dc-open{
-    left: calc(var(--ea-rail) + var(--ea-gap) * 2) !important;
+    left: calc(var(--ea-ops-left) + var(--ea-rail) + 12px) !important;
     top: var(--ea-ops-top) !important;
   }
 }
