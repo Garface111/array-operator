@@ -7527,26 +7527,23 @@
  } catch (e2) {}
  };
 
- // When EA is already open, FLIP morph regular↔ops so both panel + repairs
- // content move together (transform-only). When closed, just flip the class.
- if ((entering || leaving) && state.open) {
- flipEaMorph(applyMode);
- } else {
- if (entering || leaving) markEaMorphing();
- applyMode();
- }
-
- // Leaving Repairs: minimize Energy Agent. Dual-pane geometry only exists on
- // this tab — closing avoids morphing a wide rail onto Invoices/Fleet. Owner
- // can reopen on any other tab with the normal tab control.
+ // Leaving Repairs: minimize EA first (no wide→narrow morph onto Invoices).
+ // Owner reopens on any other tab via the top control if they want it.
  if (leaving) {
  clearEaAlignTimers();
- _eaAlignTimers.push(setTimeout(clearEaOpsInlineVars, EA_MORPH_MS + 40));
+ clearEaOpsInlineVars();
  if (state.open) {
  try {
  setOpen(false).catch(function () {});
  } catch (eClose) {}
  }
+ applyMode(); // drop ea-on-ops after close starts
+ } else if (entering && state.open) {
+ // Already open on another tab → FLIP into dual-pane with repairs
+ flipEaMorph(applyMode);
+ } else {
+ if (entering) markEaMorphing();
+ applyMode();
  }
 
  // Entering Repairs → auto-open Energy Agent (desktop dual-pane + mobile sheet).

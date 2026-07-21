@@ -1231,30 +1231,81 @@ html:not(.sky) .ea-footer{
   border: 0;
 }
 
-/* ── Suggested prompts (Railway-style chips ABOVE the input) ───────────────
-   Demo EA capabilities + goad a hard question. Wrap like a tag cloud; click
-   sends immediately. Compact so the rail still fits a real conversation. */
+/* ── Suggested prompts — Railway-style dual marquee ────────────────────────
+   Two rows, opposite directions (RTL + LTR) so chips gear past each other.
+   Each track holds two identical sets; animate -50% for a seamless loop. */
 .ea-suggestions{
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  margin: 0 0 8px;
-  max-height: 92px;
+  margin: 0 0 10px;
   overflow: hidden;
-  /* soft fade on the bottom edge if chips clip */
-  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+  /* side fades so chips dissolve at the rail edges */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
 }
+.ea-sug-row{
+  overflow: hidden;
+  width: 100%;
+  min-height: 28px;
+}
+.ea-sug-track{
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+/* slow continuous drift — opposite dirs gear past each other; durations
+   offset so rows don't phase-lock */
+.ea-sug-row-rtl .ea-sug-track{
+  animation: ea-sug-marquee-rtl 48s linear infinite;
+}
+.ea-sug-row-ltr .ea-sug-track{
+  animation: ea-sug-marquee-ltr 56s linear infinite;
+}
+.ea-sug-set{
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding-right: 6px; /* gap between the two sets in the track */
+  flex: 0 0 auto;
+}
+@keyframes ea-sug-marquee-rtl{
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); } /* one set width left */
+}
+@keyframes ea-sug-marquee-ltr{
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }    /* one set width right */
+}
+/* Pause on hover/focus so chips are clickable; also per-row after click */
+.ea-suggestions.ea-sug-paused .ea-sug-track,
+.ea-sug-row.ea-sug-row-paused .ea-sug-track{
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce){
+  .ea-sug-track{
+    animation: none !important;
+    transform: none !important;
+  }
+  .ea-suggestions{
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .ea-sug-row{ overflow-x: auto; }
+  .ea-sug-track{ width: auto; }
+  .ea-sug-set:last-child{ display: none; } /* no duplicate when static */
+}
+
 .ea-sug{
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  max-width: 100%;
+  flex: 0 0 auto;
   margin: 0;
   padding: 5px 10px 5px 8px;
   border-radius: 999px;
   border: 1px solid rgba(14,165,233,.18);
-  background: rgba(255,255,255,.72);
+  background: rgba(255,255,255,.78);
   color: var(--ink, #0f172a);
   font: inherit;
   font-size: 11.5px;
@@ -1264,21 +1315,19 @@ html:not(.sky) .ea-footer{
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   box-shadow: 0 1px 0 rgba(255,255,255,.7) inset;
   transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
 }
 .ea-sug:hover{
-  border-color: rgba(14,165,233,.4);
-  background: rgba(224,242,254,.85);
-  box-shadow: 0 4px 14px -8px rgba(14,60,120,.35);
+  border-color: rgba(14,165,233,.45);
+  background: rgba(224,242,254,.95);
+  box-shadow: 0 4px 14px -8px rgba(14,60,120,.4);
 }
 .ea-sug:active,
 .ea-sug.ea-sug-fired{
   transform: translateY(1px) scale(.98);
-  background: rgba(186,230,253,.95);
-  border-color: rgba(14,165,233,.5);
+  background: rgba(186,230,253,.98);
+  border-color: rgba(14,165,233,.55);
 }
 .ea-sug-ic{
   flex: 0 0 auto;
@@ -1292,19 +1341,19 @@ html:not(.sky) .ea-footer{
   opacity: .85;
 }
 html:not(.sky) .ea-sug{
-  background: rgba(255,255,255,.05);
-  border-color: rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.14);
   color: #e2e8f0;
   box-shadow: none;
 }
 html:not(.sky) .ea-sug:hover{
-  background: rgba(56,189,248,.12);
-  border-color: rgba(56,189,248,.35);
+  background: rgba(56,189,248,.14);
+  border-color: rgba(56,189,248,.4);
   color: #f8fafc;
 }
 html:not(.sky) .ea-sug:active,
 html:not(.sky) .ea-sug.ea-sug-fired{
-  background: rgba(56,189,248,.2);
+  background: rgba(56,189,248,.22);
 }
 
 .ea-compose-shell{
@@ -2067,8 +2116,10 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-msgs{ padding: 10px 12px 12px; }
   .ea-msg{ font-size: 12.5px; padding: 9px 24px 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
-  .ea-suggestions{ max-height: 72px; gap: 5px; margin-bottom: 6px; }
+  .ea-suggestions{ gap: 5px; margin-bottom: 8px; }
   .ea-sug{ font-size: 11px; padding: 4px 8px 4px 7px; }
+  .ea-sug-row-rtl .ea-sug-track{ animation-duration: 40s; }
+  .ea-sug-row-ltr .ea-sug-track{ animation-duration: 48s; }
   .ea-compose-bar{ gap: 5px; padding: 6px 8px; }
   .ea-compose-bar > .ea-chip.ea-chip-icon,
   .ea-compose-bar > .ea-chip{
