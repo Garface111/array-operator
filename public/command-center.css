@@ -2559,14 +2559,30 @@ html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
 }
 /* Fleet Triage | Table | Sandbox: soft enter (was hard cut; animation-audit HARD_SNAP) */
 #panelDashboard .ft-sub.ft-sub-enter{
-  animation: ftSubEnter .32s cubic-bezier(.22,1,.36,1) both;
+  animation: ftSubEnter .42s cubic-bezier(.22,1,.36,1) both;
 }
 @keyframes ftSubEnter{
-  from{ opacity:0; transform: translateY(8px); }
+  from{ opacity:0; transform: translateY(10px); }
   to{ opacity:1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce){
   #panelDashboard .ft-sub.ft-sub-enter{ animation: none; }
+}
+
+/* Analysis | Trends | Resources sub-hop: soft enter (was hard .active cut) */
+#panelAnalysis.an-sub-enter,
+#panelTrends.an-sub-enter,
+#panelResources.an-sub-enter{
+  animation: anSubEnter .48s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes anSubEnter{
+  from{ opacity:0; transform: translateY(12px); }
+  to{ opacity:1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce){
+  #panelAnalysis.an-sub-enter,
+  #panelTrends.an-sub-enter,
+  #panelResources.an-sub-enter{ animation: none; }
 }
 
 /* Sub-nav strip (Ford 2026-07-16): flex-centers the pill in the band between

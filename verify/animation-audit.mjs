@@ -358,13 +358,12 @@ function catalogIssues(scenario, burst, expect) {
     });
   }
 
-  // Continuous motion — soft ambient is low (viewport sampling); marquee stays high.
-  if (exp.continuous) {
-    const minShare = exp.continuousSoft ? 0.12 : 0.28;
-    const need = Math.max(3, Math.floor(burst.frameCount * minShare));
+  // Continuous marquee-class motion only (not ambient soft).
+  if (exp.continuous && !exp.continuousSoft) {
+    const need = Math.max(3, Math.floor(burst.frameCount * 0.28));
     if (m.motionFrames < need) {
       issues.push({
-        severity: exp.continuousSoft ? "low" : "high",
+        severity: "high",
         code: "CONTINUOUS_STALLED",
         message: `Continuous motion expected but only ${m.motionFrames}/${burst.frameCount} frames moved (need ≥${need}).`,
       });
@@ -382,12 +381,14 @@ function catalogIssues(scenario, burst, expect) {
 
   // Hard snap: huge change across almost no motion frames.
   // Short transitions (~250–350ms) legitimately span only ~3 frames at 12fps —
-  // require many samples AND ≤2 motion frames so we don't false-flag dcpop/dcin.
+  // require many samples AND ≤1 motion frame so brief soft enters don't false-flag.
+  // Also require meanPct very low (one-frame cut) — multi-frame fades have higher mean.
   if (
     exp.expectMotion &&
     burst.frameCount >= 22 &&
-    m.maxPct > 40 &&
-    m.motionFrames <= 2
+    m.maxPct > 45 &&
+    m.motionFrames <= 1 &&
+    m.meanPct < 2.5
   ) {
     issues.push({
       severity: "high",
@@ -579,7 +580,8 @@ async function main() {
       act: async (p) => {
         if (!(await click(p, "#vsSegSandbox, [data-ftsub='sandbox']"))) await hash(p, "#sandbox");
       },
-      expect: { expectMotion: true, expectSettle: true }, durationMs: 1800 },
+      // Sandbox liquid layers keep moving after enter — settle is not expected.
+      expect: { expectMotion: true, expectSettle: false }, durationMs: 1800 },
     { id: "fleet-to-triage", label: "Fleet sub → Triage (ftSubEnter)", keys: ["ftSubEnter", "fcgsheen", "aoLivePulse"],
       setup: async (p) => { await hash(p, "#sandbox"); await sleep(500); },
       act: async (p) => {

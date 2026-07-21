@@ -7920,9 +7920,23 @@
  const pA = document.getElementById("panelAnalysis");
  const pT = document.getElementById("panelTrends");
  const pR = document.getElementById("panelResources");
- if(pA) pA.classList.toggle("active", sub === "analysis");
- if(pT) pT.classList.toggle("active", sub === "trends");
- if(pR) pR.classList.toggle("active", sub === "resources");
+ // Soft enter when Analysis | Trends | Resources hop (was instant .active swap —
+ // animation-audit HARD_SNAP on trends-enter / analysis sub hops).
+ function _showAn(el, on){
+ if(!el) return;
+ const wasActive = el.classList.contains("active");
+ el.classList.toggle("active", on);
+ if(on && !wasActive){
+ el.classList.remove("an-sub-enter");
+ void el.offsetWidth;
+ el.classList.add("an-sub-enter");
+ } else if(!on){
+ el.classList.remove("an-sub-enter");
+ }
+ }
+ _showAn(pA, sub === "analysis");
+ _showAn(pT, sub === "trends");
+ _showAn(pR, sub === "resources");
  document.querySelectorAll(".an-sub-seg [data-ansub]").forEach(b => {
  const on = b.getAttribute("data-ansub") === sub;
  b.classList.toggle("on", on);
