@@ -898,7 +898,10 @@ Thank you,
  if(document.readyState!=="loading") applyTriageState();
  else document.addEventListener("DOMContentLoaded", applyTriageState);
 
- window.__ccLoad = () => FleetStore.load();
+ // Guard every bare FleetStore access at init: if fleet-store.js never ran
+ // (crawler partial exec, blocked script, parse error) bare `FleetStore` is a
+ // ReferenceError. sandbox.js already guards the same way. (Sentry PYTHON-FASTAPI-12)
+ window.__ccLoad = () => { const s = FS(); if (s && s.load) s.load(); };
  // Expose the commander render so sandbox.js can (re)fill the in-canvas fleet
  // card after every canvas rebuild, the card now lives INSIDE .sb-canvas (a
  // card in the scene), so the rebuild would otherwise leave the #fleetCommander
@@ -911,9 +914,11 @@ Thank you,
  if(toEl && toEl.id === "panelDashboard") render();
  }catch(e){}
  };
- FleetStore.subscribe(onStore);
  // tick the "updated Ns ago" label once a second (cheap, text-only)
  setInterval(() => { const a = document.getElementById("ccAsof"); if(a) a.innerHTML = asofText(); }, 1000);
- if(document.readyState!=="loading") FleetStore.load();
+ if (window.FleetStore) {
+ FleetStore.subscribe(onStore);
+ if (document.readyState !== "loading") FleetStore.load();
  else document.addEventListener("DOMContentLoaded", FleetStore.load);
+ }
 })();

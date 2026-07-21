@@ -6,6 +6,10 @@
 (function () {
  "use strict";
  const C = window.AOTrends;
+ // Guard: if trends-core.js never ran (crawler partial exec, blocked script,
+ // parse error) AOTrends is undefined and bare C.registerView is a TypeError.
+ // monthly/bars already guard the same way. (Sentry PYTHON-FASTAPI-1G)
+ if (!C || !C.registerView) return;
 
  C.registerView("liquid", {
  label: "Liquid Energy", badge: "A", order: 1,

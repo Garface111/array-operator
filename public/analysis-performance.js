@@ -84,6 +84,12 @@
  ".anperf-muted-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
  ".anperf-foot{font-size:11.5px;color:var(--faint);margin-top:12px;line-height:1.5;max-width:74ch;}",
 
+ /* boundary badge (Performance Verification) — additive only */
+ ".anperf-bnd{display:inline-flex;align-items:center;font-size:10px;font-weight:720;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--bg2);margin-left:6px;vertical-align:middle;letter-spacing:.02em;}",
+ ".anperf-bnd.meter{color:var(--good);border-color:rgba(37,99,235,.28);background:rgba(37,99,235,.07);}",
+ ".anperf-bnd.inverter{color:var(--warn);border-color:rgba(217,119,6,.28);background:rgba(217,119,6,.08);}",
+ ".anperf-bnd.mixed,.anperf-bnd.unavailable{color:var(--faint);}",
+
  "@media (max-width:680px){",
  ".anperf-row{grid-template-columns:minmax(0,1fr) 84px 48px;gap:9px;}",
  ".anperf-num{font-size:38px;}",
@@ -95,6 +101,42 @@
 
  // ---- helpers ----------------------------------------------------------------
  function num(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
+
+ // Boundary badge from Performance Verification (ctx.verification or window stash).
+ // Returns "" when unavailable so empty PI states stay unchanged.
+ function boundaryBadgeHtml(boundary) {
+ if (!boundary || boundary === "unavailable") return "";
+ var label = boundary === "meter" ? "Meter"
+ : boundary === "inverter" ? "Inverter"
+ : boundary === "mixed" ? "Mixed" : "";
+ if (!label) return "";
+ return '<span class="anperf-bnd ' + boundary + '" title="Measured energy boundary">' + label + '</span>';
+ }
+ function verificationCtx(ctx) {
+ if (ctx && ctx.verification) return ctx.verification;
+ try { return window.__aoVerification || null; } catch (e) { return null; }
+ }
+ function portfolioBoundaryFromVer(v) {
+ if (!v) return null;
+ if (v.boundary) return v.boundary;
+ var set = {}, arrays = v.arrays || [];
+ for (var i = 0; i < arrays.length; i++) {
+ if (arrays[i] && arrays[i].boundary) set[arrays[i].boundary] = true;
+ }
+ var keys = Object.keys(set).filter(function (k) { return k !== "unavailable"; });
+ if (!keys.length) return null;
+ if (keys.length === 1) return keys[0];
+ return "mixed";
+ }
+ function arrayBoundaryFromVer(v, arrayId) {
+ if (!v) return null;
+ if (v.byArray && v.byArray[String(arrayId)]) return v.byArray[String(arrayId)].boundary || null;
+ var arrays = v.arrays || [];
+ for (var i = 0; i < arrays.length; i++) {
+ if (arrays[i] && String(arrays[i].array_id) === String(arrayId)) return arrays[i].boundary || null;
+ }
+ return null;
+ }
 
  // total nameplate kW across the fleet (sum of every inverter)
  function fleetNameplateKw(arrays) {
@@ -180,18 +222,26 @@
  var pctTxt = pct != null ? (pct + "% of expected") : (Math.round(pr * 100) + "% of expected");
 
  var modeled = num(fc.arrays_modeled), skipped = num(fc.arrays_skipped);
+ var ver = verificationCtx(ctx);
+ var bnd = portfolioBoundaryFromVer(ver);
+ var bndChip = "";
+ if (bnd === "meter" || bnd === "inverter" || bnd === "mixed") {
+ var bl = bnd === "meter" ? "Meter" : (bnd === "inverter" ? "Inverter" : "Mixed");
+ bndChip = '<span class="anperf-chip"><b>' + bl + '</b> boundary</span>';
+ }
 
  return '<div class="anperf-headline">' +
  '<div class="anperf-dial">' + dialSvg(pr, prColor) +
  '<div class="anperf-dial-mid">' + (Math.round(pr * 100)) + '%</div></div>' +
  '<div class="anperf-big">' +
- '<div class="anperf-num">' + pr.toFixed(2) + '<span class="anperf-unit">PI</span></div>' +
+ '<div class="anperf-num">' + pr.toFixed(2) + '<span class="anperf-unit">PI</span>' + boundaryBadgeHtml(bnd) + '</div>' +
  '<div class="anperf-alt">' + esc(pctTxt) + '</div>' +
  '<div class="anperf-cap">Measured production ÷ weather-expected production, last ' + win + ' days. A PI near 1.00 means the fleet is producing about what the weather should yield.</div>' +
  '<div class="anperf-chips">' +
  '<span class="anperf-chip conf-' + esc(conf) + '"><span class="anperf-cdot"></span>' + esc(conf) + ' confidence</span>' +
  (modeled != null ? '<span class="anperf-chip"><b>' + modeled + '</b> modeled</span>' : '') +
  (skipped ? '<span class="anperf-chip">' + skipped + ' not modeled</span>' : '') +
+ bndChip +
  '</div></div></div>';
  }
 
@@ -257,11 +307,13 @@
  var html = '<div class="anperf-list">' +
  '<div class="anperf-list-h"><span class="lab">Per array · worst first</span><span class="hint">% of weather-expected</span></div>';
 
+ var ver = verificationCtx(ctx);
  rows.forEach(function (r) {
  var cls = piBarClass(r.pr);
  var w = Math.max(2, Math.min(100, r.pct)); // bar caps at 100% width even if over-performing
+ var ab = arrayBoundaryFromVer(ver, r.id);
  html += '<div class="anperf-row">' +
- '<div class="anperf-name">' + esc(r.name) +
+ '<div class="anperf-name">' + esc(r.name) + boundaryBadgeHtml(ab) +
  (r.tilt ? '<i>tilt assumed</i>' : (r.days != null ? '<i>' + r.days + 'd</i>' : '')) +
  '</div>' +
  '<div class="anperf-bar ' + cls + '"><b style="width:' + w.toFixed(0) + '%"></b></div>' +
