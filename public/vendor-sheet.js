@@ -283,7 +283,9 @@
  // brief — the same soft tone the overview's "Watching N" tile uses.
  if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict) {
  const _srcOk = !(_pStat && _pStat.vendorOut);
- const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight, _srcOk);
+ const _elev = parentCol && parentCol.solar_elevation_deg != null
+  ? parentCol.solar_elevation_deg : null;
+ const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight, _srcOk, _elev);
  if (_lv === "dark") {
  return { label: "Dark now", cls: "watch",
  tip: "Producing nothing right now while its neighbors are, the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
@@ -1121,11 +1123,14 @@
  function _fleetPeersProducing(c){
  try {
  const cols = (window.FleetStore && FleetStore.toColumns && (FleetStore.toColumns().columns || [])) || [];
- return cols.some(o =>
- o && o.array_id !== c.array_id
- && o.is_daylight !== false
- && o.current_power_w != null
- && o.current_power_w > 100);
+ return cols.some(o => {
+ if (!o || o.array_id === c.array_id) return false;
+ if (o.is_daylight === false) return false;
+ // Peers in the dusk shoulder don't count as "still producing" proof
+ if (o.live_compare_ok === false) return false;
+ if (o.solar_elevation_deg != null && +o.solar_elevation_deg < 12) return false;
+ return o.current_power_w != null && o.current_power_w > 100;
+ });
  } catch (_) { return false; }
  }
  // Whole array has no usable live output AND no measured today total.
@@ -1166,10 +1171,12 @@
  }
  return { tip: "The last cloud harvest from " + (vl || "this vendor") + " failed. We're still retrying automatically." };
  }
- // Daylight + no live output + no today kWh + fleet peers ARE producing →
- // this is not "all clear". Name it as a vendor/feed problem so the operator
- // checks the portal rather than trusting a green badge on a dark site.
- if (c.is_daylight !== false && _arrayNoLiveOutput(c) && _fleetPeersProducing(c)) {
+ // Solid daytime + no live output + no today kWh + fleet peers ARE producing →
+ // this is not "all clear". Suppress at dusk/dawn: low sun makes one site go
+ // dark while a sunnier neighbor still produces (not a vendor feed fault).
+ var _cmpOk = c.live_compare_ok !== false
+  && (c.solar_elevation_deg == null || +c.solar_elevation_deg >= 12);
+ if (_cmpOk && c.is_daylight !== false && _arrayNoLiveOutput(c) && _fleetPeersProducing(c)) {
  return {
  tip: (vl || "This vendor") + " is reporting no live output for this array while other arrays in your fleet are producing. Check the vendor portal, this is almost certainly a vendor-side feed issue, not a healthy clear site.",
  };
