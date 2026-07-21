@@ -44,9 +44,11 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
   const seeded = useRef(false);
   const dragY = useRef(0);
   const dragging = useRef(false);
+  const dragOffsetRef = useRef(0);
   const [dragOffset, setDragOffset] = useState(0);
 
   const vv = useVisualViewport(open);
@@ -268,26 +270,77 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }
 
-  // ── Swipe-down dismiss (handle only) ───────────────────────────────────
-  function onPointerDown(e: React.PointerEvent) {
-    dragging.current = true;
-    dragY.current = e.clientY;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-  function onPointerMove(e: React.PointerEvent) {
-    if (!dragging.current) return;
-    setDragOffset(Math.max(0, e.clientY - dragY.current));
-  }
-  function onPointerUp() {
-    if (!dragging.current) return;
-    dragging.current = false;
-    if (dragOffset > 100) {
-      setDragOffset(0);
-      onClose();
-    } else {
-      setDragOffset(0);
-    }
-  }
+  // ── Swipe-down dismiss — large top hit zone, page scroll locked ────────
+  useEffect(() => {
+    if (!open) return;
+    const el = handleRef.current;
+    if (!el) return;
+
+    const setOff = (y: number) => {
+      dragOffsetRef.current = y;
+      setDragOffset(y);
+    };
+
+    const onStart = (e: TouchEvent | PointerEvent) => {
+      // Don't start drag from the close button
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("[data-chat-close]")) return;
+
+      const clientY =
+        "touches" in e ? e.touches[0]?.clientY : (e as PointerEvent).clientY;
+      if (clientY == null) return;
+      dragging.current = true;
+      dragY.current = clientY;
+      setOff(0);
+    };
+
+    const onMove = (e: TouchEvent | PointerEvent) => {
+      if (!dragging.current) return;
+      const clientY =
+        "touches" in e
+          ? e.touches[0]?.clientY
+          : (e as PointerEvent).clientY;
+      if (clientY == null) return;
+      const dy = Math.max(0, clientY - dragY.current);
+      // Prevent page/sheet under-scroll while dragging the handle
+      e.preventDefault();
+      setOff(dy);
+    };
+
+    const onEnd = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      const y = dragOffsetRef.current;
+      if (y > 80) {
+        setOff(0);
+        onClose();
+      } else {
+        setOff(0);
+      }
+    };
+
+    // Touch (non-passive for preventDefault)
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    // Pointer for desktop / stylus
+    el.addEventListener("pointerdown", onStart as EventListener);
+    el.addEventListener("pointermove", onMove as EventListener);
+    el.addEventListener("pointerup", onEnd);
+    el.addEventListener("pointercancel", onEnd);
+
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+      el.removeEventListener("pointerdown", onStart as EventListener);
+      el.removeEventListener("pointermove", onMove as EventListener);
+      el.removeEventListener("pointerup", onEnd);
+      el.removeEventListener("pointercancel", onEnd);
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -332,22 +385,22 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
             : "max(0px, env(safe-area-inset-bottom))",
         }}
       >
-        {/* ── Header (fixed height, never scrolls away) ── */}
-        <header className="ao-chat-header shrink-0 border-b border-sky-200/60 bg-white/95 backdrop-blur-md">
-          <div
-            className="flex cursor-grab flex-col items-center touch-none select-none active:cursor-grabbing"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            <div className="flex w-full justify-center py-2">
-              <span className="block h-1 w-10 rounded-full bg-sky-300" />
-            </div>
+        {/* ── Header + large swipe-down zone (entire top chrome is the grip) ── */}
+        <header
+          ref={handleRef}
+          className="ao-chat-header ao-chat-handle shrink-0 border-b border-sky-200/60 bg-white/95 backdrop-blur-md select-none"
+          style={{ touchAction: "none" }}
+        >
+          {/* Tall grab strip — easy swipe-down target */}
+          <div className="flex w-full flex-col items-center justify-center pt-3 pb-1">
+            <span className="block h-1.5 w-12 rounded-full bg-sky-300" />
+            <span className="mt-1.5 text-[10px] font-extrabold uppercase tracking-wider text-sky-600/90">
+              swipe down to close
+            </span>
           </div>
-          <div className="flex items-center gap-2.5 px-3.5 pb-2.5">
+          <div className="flex min-h-[56px] items-center gap-2.5 px-3.5 pb-3 pt-1">
             <div
-              className="h-9 w-9 shrink-0 rounded-full shadow-md ring-2 ring-white"
+              className="h-10 w-10 shrink-0 rounded-full shadow-md ring-2 ring-white"
               style={{
                 background:
                   "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
@@ -363,13 +416,17 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
                   ? "Thinking…"
                   : vv.keyboardOpen
                     ? "Type your question"
-                    : "Swipe down to close"}
+                    : "Pull down on this header to close"}
               </p>
             </div>
             <button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-full bg-sky-50 text-lg font-bold leading-none text-sky-800 ring-1 ring-sky-100"
-              onClick={onClose}
+              data-chat-close
+              className="grid h-11 w-11 place-items-center rounded-full bg-sky-50 text-xl font-bold leading-none text-sky-800 ring-1 ring-sky-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               aria-label="Close chat"
             >
               ×

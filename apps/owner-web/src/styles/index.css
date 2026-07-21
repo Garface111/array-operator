@@ -7,7 +7,9 @@
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --nav-h: 58px;
-  --agent-dock-h: 62px;
+  --agent-dock-h: 72px;
+  /* Tall hit zone for swipe-up (includes padding above the visible bar) */
+  --agent-dock-hit-h: 120px;
   --header-h: 56px;
 
   --sky-top: #1e90e8;
@@ -97,6 +99,19 @@ textarea {
 .ao-chat-composer {
   /* Keep above iOS home indicator when keyboard closed */
   box-shadow: 0 -8px 24px -16px rgba(20, 60, 120, 0.18);
+}
+.ao-chat-handle {
+  /* Entire header is a drag surface — don't let the browser steal the gesture */
+  touch-action: none;
+  cursor: grab;
+}
+.ao-chat-handle:active {
+  cursor: grabbing;
+}
+.ao-agent-dock-hit {
+  /* Page must not scroll while finger is on the agent bar */
+  touch-action: none;
+  overscroll-behavior: none;
 }
 /* Bounce dots for “thinking” */
 @keyframes ao-bounce {
