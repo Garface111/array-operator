@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Card, H1, SkyScreen, StatCard, Sub } from "@/components/ui";
+import { Btn, Card, H1, SkyScreen, StatCard, Sub } from "@/components/ui";
+import { useAgent } from "@/lib/AgentContext";
 import { fetchSubscriptions } from "@/lib/api";
 import { sky } from "@/lib/theme";
 
 export default function MarketplaceScreen() {
+  const { openAgent } = useAgent();
   const [arrayCount, setArrayCount] = useState(0);
   const [subCount, setSubCount] = useState(0);
 
@@ -27,12 +29,28 @@ export default function MarketplaceScreen() {
         <StatCard label="Offtakers" value={String(subCount)} meta="On file" />
       </View>
 
-      <Card style={{ marginTop: 12 }}>
+      <Card style={{ marginTop: 12, gap: 10 }}>
         <Text style={styles.body}>
-          Surface unallocated group-net-metering excess and collect demand — same
-          exchange concept as desktop Marketplace. Full listing/create flows
-          continue on the web; this native shell shows your live counts.
+          Ask Energy Agent to measure vacancy with tools and capture demand leads
+          on your waitlist — same capabilities as desktop Marketplace.
         </Text>
+        <Btn
+          title="Ask Agent about vacancy"
+          primary
+          onPress={() =>
+            openAgent(
+              "Marketplace brief: any unallocated credits / vacancy on my fleet, and how to list demand? Use tools."
+            )
+          }
+        />
+        <Btn
+          title="Capture demand with Agent"
+          onPress={() =>
+            openAgent(
+              "Help me capture offtaker demand for excess credits. Use tools if available."
+            )
+          }
+        />
       </Card>
     </SkyScreen>
   );

@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Pressable, Text } from "react-native";
+import { useAgent } from "@/lib/AgentContext";
 import { sky } from "@/lib/theme";
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
@@ -19,6 +20,8 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 
 /** Desktop parity: Fleet · Analysis · Invoices · Repairs · Marketplace · Account */
 export default function TabLayout() {
+  const { openAgent } = useAgent();
+
   return (
     <Tabs
       screenOptions={{
@@ -31,6 +34,22 @@ export default function TabLayout() {
           fontSize: 15,
         },
         headerShadowVisible: false,
+        headerRight: () => (
+          <Pressable
+            onPress={() => openAgent()}
+            style={{
+              marginRight: 12,
+              backgroundColor: sky.primary,
+              borderRadius: 16,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
+              Agent
+            </Text>
+          </Pressable>
+        ),
         tabBarStyle: {
           backgroundColor: sky.glassChrome,
           borderTopColor: sky.line,
@@ -46,7 +65,9 @@ export default function TabLayout() {
         name="fleet"
         options={{
           title: "Array Operator",
-          tabBarLabel: ({ focused }) => <TabLabel label="Fleet" focused={focused} />,
+          tabBarLabel: ({ focused }) => (
+            <TabLabel label="Fleet" focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -94,9 +115,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* hide template leftovers if any */}
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
 }

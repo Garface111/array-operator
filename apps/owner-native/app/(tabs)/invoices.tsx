@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import {
+  Btn,
   Card,
   Chip,
   H1,
@@ -9,12 +10,14 @@ import {
   StatCard,
   Sub,
 } from "@/components/ui";
+import { useAgent } from "@/lib/AgentContext";
 import { fetchSendPipeline, fetchSubscriptions } from "@/lib/api";
 import { fmtMoney } from "@/lib/format";
 import type { OfftakerSub, SendPipeline } from "@/lib/types";
 import { sky } from "@/lib/theme";
 
 export default function InvoicesScreen() {
+  const { openAgent } = useAgent();
   const [pipe, setPipe] = useState<SendPipeline | null>(null);
   const [subs, setSubs] = useState<OfftakerSub[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +103,26 @@ export default function InvoicesScreen() {
             last?.dollars != null
               ? `${fmtMoney(last.dollars)} last $`
               : "Drafts / waiting"
+          }
+        />
+      </View>
+
+      <View style={{ gap: 8, marginTop: 12 }}>
+        <Btn
+          title="Pipeline brief with Agent"
+          primary
+          onPress={() =>
+            openAgent(
+              "Summarize my offtaker invoice pipeline: shares, send mode, online pay, anything broken. Use tools."
+            )
+          }
+        />
+        <Btn
+          title="Add offtakers with Agent"
+          onPress={() =>
+            openAgent(
+              "Help me add offtakers. You can create them with tools — keep steps short."
+            )
           }
         />
       </View>

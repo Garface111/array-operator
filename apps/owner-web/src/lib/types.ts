@@ -182,11 +182,24 @@ export type EnergyAgentSession = {
   [key: string]: unknown;
 };
 
+export type EnergyAgentPending = {
+  id?: string;
+  type?: string;
+  tool?: string;
+  reason?: string;
+  message?: string;
+  preview?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 export type EnergyAgentChatResponse = {
   reply?: string;
   message?: string;
   content?: string;
+  speak?: string;
   session_id?: string;
-  pending?: unknown[];
+  pending?: EnergyAgentPending | null;
+  tool_trace?: Array<{ name?: string; tool?: string; [key: string]: unknown }>;
+  ui_commands?: Array<{ type?: string; url?: string; hash?: string; label?: string }>;
   [key: string]: unknown;
 };

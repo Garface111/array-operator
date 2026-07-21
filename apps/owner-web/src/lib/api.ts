@@ -313,3 +313,18 @@ export function agentChat(
     }),
   });
 }
+
+export function agentConfirm(
+  sessionId: string,
+  confirm: boolean,
+  pendingId?: string | null
+): Promise<EnergyAgentChatResponse & { result?: unknown; cancelled?: boolean }> {
+  return apiFetch("/v1/energy-agent/confirm", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      confirm,
+      pending_id: pendingId || undefined,
+    }),
+  });
+}

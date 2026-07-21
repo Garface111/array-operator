@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { AgentProvider } from "@/lib/AgentContext";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { sky } from "@/lib/theme";
 
@@ -43,13 +44,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
-      <AuthGate>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: sky.mid } }}>
-          <Stack.Screen name="login" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </AuthGate>
+      <AgentProvider>
+        <StatusBar style="dark" />
+        <AuthGate>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: sky.mid },
+            }}
+          >
+            <Stack.Screen name="login" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AuthGate>
+      </AgentProvider>
     </AuthProvider>
   );
 }
