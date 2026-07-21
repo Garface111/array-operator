@@ -1243,6 +1243,83 @@ html:not(.sky) .ea-footer{
   padding: 0;
   border: 0;
 }
+
+/* ── Suggested prompts (Railway-style chips ABOVE the input) ───────────────
+   Demo EA capabilities + goad a hard question. Wrap like a tag cloud; click
+   sends immediately. Compact so the rail still fits a real conversation. */
+.ea-suggestions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  max-height: 92px;
+  overflow: hidden;
+  /* soft fade on the bottom edge if chips clip */
+  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+}
+.ea-sug{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  margin: 0;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,233,.18);
+  background: rgba(255,255,255,.72);
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 620;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset;
+  transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
+}
+.ea-sug:hover{
+  border-color: rgba(14,165,233,.4);
+  background: rgba(224,242,254,.85);
+  box-shadow: 0 4px 14px -8px rgba(14,60,120,.35);
+}
+.ea-sug:active,
+.ea-sug.ea-sug-fired{
+  transform: translateY(1px) scale(.98);
+  background: rgba(186,230,253,.95);
+  border-color: rgba(14,165,233,.5);
+}
+.ea-sug-ic{
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  opacity: .85;
+}
+html:not(.sky) .ea-sug{
+  background: rgba(255,255,255,.05);
+  border-color: rgba(255,255,255,.12);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+html:not(.sky) .ea-sug:hover{
+  background: rgba(56,189,248,.12);
+  border-color: rgba(56,189,248,.35);
+  color: #f8fafc;
+}
+html:not(.sky) .ea-sug:active,
+html:not(.sky) .ea-sug.ea-sug-fired{
+  background: rgba(56,189,248,.2);
+}
+
 .ea-compose-shell{
   display: flex;
   flex-direction: column;
@@ -2003,6 +2080,8 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-msgs{ padding: 10px 12px 12px; }
   .ea-msg{ font-size: 12.5px; padding: 9px 24px 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
+  .ea-suggestions{ max-height: 72px; gap: 5px; margin-bottom: 6px; }
+  .ea-sug{ font-size: 11px; padding: 4px 8px 4px 7px; }
   .ea-compose-bar{ gap: 5px; padding: 6px 8px; }
   .ea-compose-bar > .ea-chip.ea-chip-icon,
   .ea-compose-bar > .ea-chip{

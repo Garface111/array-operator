@@ -702,9 +702,25 @@
  ' </span>' +
  ' </div>' +
  ' <div class="ea-compose" id="eaCompose">' +
+ // Railway-style suggested prompts ABOVE the input — demo real EA muscle and
+ // goad owners into a hard question (not "hi" / "what can you do").
+ ' <div class="ea-suggestions" id="eaSuggestions" role="group" aria-label="Try asking Energy Agent">' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Which inverter needs attention right now, and why? Walk me through the evidence.">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">⚡</span>Which inverter needs attention — and why?</button>' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Rank my fleet by lost production dollars this week. What should I fix first if I only get one truck roll tomorrow?">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">$</span>Rank lost production by $ — one truck roll</button>' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Is anything marked gone quiet a real dropout, or is it just night / overnight silence? Be strict.">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">☾</span>Gone quiet — or just night?</button>' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Draft a repair outreach email for the worst underperforming or down inverter. Include the diagnosis and what the tech should check.">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">✉</span>Draft repair outreach for the worst unit</button>' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Who still needs an offtaker invoice, and what would you send? Pull real numbers from my accounts.">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">🧾</span>Who still needs an offtaker invoice?</button>' +
+ ' <button type="button" class="ea-sug" data-ea-prompt="Stress-test my fleet like a skeptical owner: peer underperformance, silent gateways, and anything the 14-day health badge is missing. Hardest problem first.">' +
+ ' <span class="ea-sug-ic" aria-hidden="true">🔬</span>Stress-test my fleet — hardest first</button>' +
+ ' </div>' +
  ' <div class="ea-attach-row" id="eaAttachRow" hidden></div>' +
  ' <div class="ea-compose-shell">' +
- ' <textarea id="eaInput" rows="1" placeholder="Message Energy Agent"></textarea>' +
+ ' <textarea id="eaInput" rows="1" placeholder="Ask anything about your fleet, repairs, invoices…"></textarea>' +
  ' <input type="file" id="eaFile" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log" hidden />' +
  ' <div class="ea-compose-bar">' +
  // Icon-only chips (labels cut off in the rail). Hover/title + aria-label carry
@@ -798,6 +814,29 @@
  }, true);
  }
  document.getElementById("eaSend").onclick = sendText;
+ // Suggested-prompt chips (Railway-style): one click = send a hard demo ask.
+ (function wireSuggestions() {
+ var root = document.getElementById("eaSuggestions");
+ if (!root || root._wired) return;
+ root._wired = true;
+ root.addEventListener("click", function (e) {
+ var btn = e.target && e.target.closest ? e.target.closest(".ea-sug") : null;
+ if (!btn || !root.contains(btn)) return;
+ e.preventDefault();
+ var prompt = (btn.getAttribute("data-ea-prompt") || btn.textContent || "").trim();
+ if (!prompt) return;
+ // Visual press; send immediately so the owner sees a real agent turn.
+ btn.classList.add("ea-sug-fired");
+ setTimeout(function () { try { btn.classList.remove("ea-sug-fired"); } catch (e2) {} }, 600);
+ if (typeof window.__eaSendText === "function") {
+ window.__eaSendText(prompt, { source: "suggestion_chip" });
+ } else {
+ var input = document.getElementById("eaInput");
+ if (input) { input.value = prompt; }
+ sendText();
+ }
+ });
+ })();
  document.getElementById("eaMic").onclick = function (e) {
  e.preventDefault();
  toggleMic();
