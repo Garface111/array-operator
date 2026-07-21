@@ -2136,11 +2136,7 @@
  } catch (_) {
  const list = $("#rbList");
  if (list) {
- const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
- const headLine = pending
- ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Select an offtaker to review and send.`;
- list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
+ list.innerHTML =
  OFFTAKERS.slice(0, 40).map(s => subCard(s, demoArrays, demoUtil)).join("") +
  (OFFTAKERS.length > 40
  ? `<div class="empty" style="padding:12px;color:var(--faint)">+ ${OFFTAKERS.length - 40} more offtakers, sign up to manage the full book.</div>`
@@ -6098,11 +6094,6 @@
  list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet. Click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
  return;
  }
- // Header copy: "N reports ready to review & send. Review before you send."
- const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
- const headLine = pending
- ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Select an offtaker to review and send.`;
  // Keep the currently-open card open across refreshes, but do NOT auto-open one on a
  // fresh load, every offtaker starts collapsed until the operator clicks one (Ford).
  const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
@@ -6307,12 +6298,12 @@
  }
  // Search on its own full-width row first, then filter chips underneath —
  // the search is the primary lookup tool and shouldn't share a cramped row.
+ // (No rb-acc-lead flag strip — "ready to review" / "doesn't match GMP" already
+ // live in the top KPI band + Bill audit tab; Ford 2026-07-21 screenshot.)
  const toolsHTML = (filterStripHTML || searchHTML)
  ? `<div class="rb-listtools${searchHTML ? " rb-listtools-searchfirst" : ""}">${searchHTML}${filterStripHTML}</div>`
  : "";
- list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
- `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + toolsHTML + body;
- wireBacChip($("#rbBacSummary"));
+ list.innerHTML = toolsHTML + body;
  renderKpis(); // the KPI band tracks the freshly-rendered list's counts
  // Wire the GMP-vs-non-GMP filter chips, flip the scope + re-render in place.
  list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
