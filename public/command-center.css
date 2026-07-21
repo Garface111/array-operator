@@ -3350,8 +3350,22 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   from{ opacity:0; transform:translateY(8px); }
   to{ opacity:1; transform:none; }
 }
+/* Expand array → inverter block enters (was hard cut) */
+.vs-inv-wrap.is-enter{
+  animation:vsExpandIn .38s cubic-bezier(.22,1,.36,1) both;
+}
+.vs-inv-wrap.is-enter .vs-inv{
+  animation:vsArrIn .4s ease both;
+  animation-delay:calc(0.03s * var(--vi, 0));
+}
+@keyframes vsExpandIn{
+  from{ opacity:0; transform:translateY(6px); }
+  to{ opacity:1; transform:none; }
+}
 @media (prefers-reduced-motion: reduce){
   .vs-row.vs-arr.is-enter{ animation:none !important; }
+  .vs-inv-wrap.is-enter,
+  .vs-inv-wrap.is-enter .vs-inv{ animation:none !important; }
 }
 
 /* Pending vendor — just-connected, waiting for fleet-tree to show arrays */
