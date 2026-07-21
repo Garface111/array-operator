@@ -64,11 +64,15 @@ export type SendPipeline = {
 export type OfftakerSub = {
   id?: number | string;
   name?: string;
+  customer_name?: string | null;
   email?: string;
+  client_email?: string | null;
   enabled?: boolean;
   share_pct?: number | null;
+  array_share_pct?: number | null;
   allocation_pct?: number | null;
   array_name?: string | null;
+  array_id?: number | string | null;
   delivery_mode?: string | null;
   status?: string | null;
 };

@@ -38,7 +38,15 @@ export function InvoicesScreen() {
     const s = q.trim().toLowerCase();
     if (!s) return subs;
     return subs.filter((o) =>
-      [o.name, o.email, o.array_name, o.status]
+      [
+        o.name,
+        o.customer_name,
+        o.email,
+        o.client_email,
+        o.array_name,
+        o.status,
+        o.delivery_mode,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(s)
@@ -147,22 +155,31 @@ export function InvoicesScreen() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {filtered.map((o) => {
+            {filtered.map((o, idx) => {
               const st =
                 o.enabled === false
                   ? "paused"
                   : String(o.status || o.delivery_mode || "active");
               const share =
-                o.share_pct ?? o.allocation_pct ?? null;
+                o.share_pct ?? o.array_share_pct ?? o.allocation_pct ?? null;
+              const displayName = String(
+                o.name || o.customer_name || ""
+              ).trim();
+              const displayEmail = String(
+                o.email || o.client_email || ""
+              ).trim();
               return (
-                <li key={String(o.id ?? o.email ?? o.name)} className="ao-card p-3.5">
+                <li
+                  key={String(o.id ?? displayEmail ?? displayName ?? idx)}
+                  className="ao-card p-3.5"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-extrabold">
-                        {o.name || "Offtaker"}
+                        {displayName || `Offtaker ${idx + 1}`}
                       </div>
                       <div className="truncate text-[11px] font-semibold text-muted">
-                        {o.email || "—"}
+                        {displayEmail || "—"}
                         {o.array_name ? ` · ${o.array_name}` : ""}
                       </div>
                     </div>
@@ -172,7 +189,7 @@ export function InvoicesScreen() {
                     {share != null ? (
                       <span className="ao-chip ao-chip-sky">
                         {Number(share) <= 1
-                          ? `${Math.round(Number(share) * 100)}% share`
+                          ? `${Math.round(Number(share) * 1000) / 10}% share`
                           : `${Number(share)}% share`}
                       </span>
                     ) : null}

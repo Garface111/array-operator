@@ -54,10 +54,16 @@ export type AccountInfo = {
 
 export type OfftakerSub = {
   id?: number | string;
+  /** Display name (normalized from API customer_name). */
   name?: string;
+  /** API field — real offtaker name on list-bundle. */
+  customer_name?: string | null;
   email?: string;
+  /** API field — offtaker email on list-bundle. */
+  client_email?: string | null;
   enabled?: boolean;
   share_pct?: number | null;
+  array_share_pct?: number | null;
   allocation_pct?: number | null;
   array_name?: string | null;
   array_id?: number | string | null;

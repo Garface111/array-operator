@@ -7,6 +7,7 @@ import type {
   FleetInverter,
   FleetTree,
   FleetTreeRaw,
+  OfftakerSub,
   Overview,
   PasswordLoginResult,
   SendPipeline,
@@ -280,10 +281,49 @@ export function fetchSendPipeline(): Promise<SendPipeline> {
   });
 }
 
-export function fetchSubscriptions(): Promise<SubscriptionsPayload> {
-  return apiFetch<SubscriptionsPayload>("/v1/array-operator/billing/list-bundle", {
-    logoutOn401: false,
+/**
+ * Normalize list-bundle offtakers for the UI.
+ * API uses customer_name / client_email / array_share_pct — not name / email.
+ */
+export function adaptSubscriptions(raw: SubscriptionsPayload): SubscriptionsPayload {
+  const arrays = raw.arrays || [];
+  const byId = new Map<string, string>();
+  for (const a of arrays) {
+    if (a?.id != null && a.name) byId.set(String(a.id), a.name);
+  }
+  const subscriptions = (raw.subscriptions || []).map((s, i) => {
+    const name = String(
+      s.customer_name || s.name || ""
+    ).trim();
+    const email = String(
+      s.client_email || s.email || ""
+    ).trim();
+    const share =
+      s.array_share_pct ?? s.share_pct ?? s.allocation_pct ?? null;
+    const arrayId = s.array_id != null ? String(s.array_id) : null;
+    const arrayName =
+      (s.array_name && String(s.array_name)) ||
+      (arrayId ? byId.get(arrayId) : undefined) ||
+      null;
+    return {
+      ...s,
+      name: name || `Offtaker ${i + 1}`,
+      customer_name: (s.customer_name ?? name) || null,
+      email: email || undefined,
+      client_email: (s.client_email ?? email) || null,
+      share_pct: share,
+      array_name: arrayName,
+    } as OfftakerSub;
   });
+  return { ...raw, subscriptions, arrays };
+}
+
+export async function fetchSubscriptions(): Promise<SubscriptionsPayload> {
+  const raw = await apiFetch<SubscriptionsPayload>(
+    "/v1/array-operator/billing/list-bundle",
+    { logoutOn401: false }
+  );
+  return adaptSubscriptions(raw || {});
 }
 
 export function fetchAccount(): Promise<AccountInfo> {

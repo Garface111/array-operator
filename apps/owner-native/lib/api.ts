@@ -154,6 +154,38 @@ export function fetchSendPipeline(): Promise<SendPipeline> {
   });
 }
 
+/** Normalize list-bundle: API sends customer_name / client_email, UI uses name / email. */
+export function adaptSubscriptions(raw: {
+  subscriptions?: OfftakerSub[];
+  arrays?: Array<{ id?: number; name?: string }>;
+}): { subscriptions: OfftakerSub[]; arrays: Array<{ id?: number; name?: string }> } {
+  const arrays = raw.arrays || [];
+  const byId = new Map<string, string>();
+  for (const a of arrays) {
+    if (a?.id != null && a.name) byId.set(String(a.id), a.name);
+  }
+  const subscriptions = (raw.subscriptions || []).map((s, i) => {
+    const name = String(s.customer_name || s.name || "").trim();
+    const email = String(s.client_email || s.email || "").trim();
+    const share = s.array_share_pct ?? s.share_pct ?? s.allocation_pct ?? null;
+    const arrayId = s.array_id != null ? String(s.array_id) : null;
+    const arrayName =
+      (s.array_name && String(s.array_name)) ||
+      (arrayId ? byId.get(arrayId) : undefined) ||
+      null;
+    return {
+      ...s,
+      name: name || `Offtaker ${i + 1}`,
+      customer_name: (s.customer_name ?? name) || null,
+      email: email || undefined,
+      client_email: (s.client_email ?? email) || null,
+      share_pct: share,
+      array_name: arrayName,
+    };
+  });
+  return { subscriptions, arrays };
+}
+
 export async function fetchSubscriptions(): Promise<{
   subscriptions: OfftakerSub[];
   arrays: Array<{ id?: number; name?: string }>;
@@ -162,10 +194,7 @@ export async function fetchSubscriptions(): Promise<{
     subscriptions?: OfftakerSub[];
     arrays?: Array<{ id?: number; name?: string }>;
   }>("/v1/array-operator/billing/list-bundle", { logoutOn401: false });
-  return {
-    subscriptions: b.subscriptions || [],
-    arrays: b.arrays || [],
-  };
+  return adaptSubscriptions(b || {});
 }
 
 export function fetchAccount(): Promise<AccountInfo> {

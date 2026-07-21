@@ -45,7 +45,15 @@ export default function InvoicesScreen() {
     const s = q.trim().toLowerCase();
     if (!s) return subs;
     return subs.filter((o) =>
-      [o.name, o.email, o.array_name, o.status]
+      [
+        o.name,
+        o.customer_name,
+        o.email,
+        o.client_email,
+        o.array_name,
+        o.status,
+        o.delivery_mode,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(s)
@@ -146,19 +154,24 @@ export default function InvoicesScreen() {
             </Text>
           </Card>
         ) : (
-          filtered.map((o) => {
+          filtered.map((o, idx) => {
             const st =
               o.enabled === false
                 ? "paused"
                 : String(o.status || o.delivery_mode || "active");
-            const share = o.share_pct ?? o.allocation_pct ?? null;
+            const share =
+              o.share_pct ?? o.array_share_pct ?? o.allocation_pct ?? null;
+            const displayName = String(o.name || o.customer_name || "").trim();
+            const displayEmail = String(o.email || o.client_email || "").trim();
             return (
-              <Card key={String(o.id ?? o.email ?? o.name)}>
+              <Card key={String(o.id ?? displayEmail ?? displayName ?? idx)}>
                 <View style={styles.head}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.name}>{o.name || "Offtaker"}</Text>
+                    <Text style={styles.name}>
+                      {displayName || `Offtaker ${idx + 1}`}
+                    </Text>
                     <Text style={styles.meta} numberOfLines={1}>
-                      {o.email || "—"}
+                      {displayEmail || "—"}
                       {o.array_name ? ` · ${o.array_name}` : ""}
                     </Text>
                   </View>
@@ -167,7 +180,7 @@ export default function InvoicesScreen() {
                 {share != null ? (
                   <Text style={[styles.meta, { marginTop: 8 }]}>
                     {Number(share) <= 1
-                      ? `${Math.round(Number(share) * 100)}% share`
+                      ? `${Math.round(Number(share) * 1000) / 10}% share`
                       : `${Number(share)}% share`}
                     {o.delivery_mode ? ` · ${o.delivery_mode}` : ""}
                   </Text>
