@@ -1,12 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthGate } from "@/auth/AuthGate";
 import { AppShell } from "@/components/AppShell";
-import { ConnectScreen } from "@/screens/ConnectScreen";
+import { AccountScreen } from "@/screens/AccountScreen";
+import { AnalysisScreen } from "@/screens/AnalysisScreen";
 import { FleetScreen } from "@/screens/FleetScreen";
-import { HomeScreen } from "@/screens/HomeScreen";
 import { InvoicesScreen } from "@/screens/InvoicesScreen";
 import { LoginScreen } from "@/screens/LoginScreen";
-import { MoreScreen } from "@/screens/MoreScreen";
+import { MarketplaceScreen } from "@/screens/MarketplaceScreen";
+import { RepairsScreen } from "@/screens/RepairsScreen";
 
 export default function App() {
   return (
@@ -14,14 +15,20 @@ export default function App() {
       <Route path="/login" element={<LoginScreen />} />
       <Route element={<AuthGate />}>
         <Route element={<AppShell />}>
-          <Route index element={<HomeScreen />} />
+          <Route index element={<Navigate to="/fleet" replace />} />
           <Route path="fleet" element={<FleetScreen />} />
+          <Route path="analysis" element={<AnalysisScreen />} />
           <Route path="invoices" element={<InvoicesScreen />} />
-          <Route path="connect" element={<ConnectScreen />} />
-          <Route path="more" element={<MoreScreen />} />
+          <Route path="repairs" element={<RepairsScreen />} />
+          <Route path="marketplace" element={<MarketplaceScreen />} />
+          <Route path="account" element={<AccountScreen />} />
+          {/* legacy deep links */}
+          <Route path="home" element={<Navigate to="/fleet" replace />} />
+          <Route path="connect" element={<Navigate to="/account" replace />} />
+          <Route path="more" element={<Navigate to="/account" replace />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/fleet" replace />} />
     </Routes>
   );
 }

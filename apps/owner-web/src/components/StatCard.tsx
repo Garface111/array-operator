@@ -7,10 +7,10 @@ type Props = {
 };
 
 const TONE: Record<NonNullable<Props["tone"]>, string> = {
-  default: "border-line",
-  good: "border-emerald-200 bg-emerald-50/50",
-  warn: "border-amber-200 bg-amber-50/50",
-  bad: "border-red-200 bg-red-50/50",
+  default: "",
+  good: "ring-1 ring-emerald-300/50",
+  warn: "ring-1 ring-amber-300/60",
+  bad: "ring-1 ring-red-300/60",
 };
 
 export function StatCard({ label, value, meta, tone = "default", onClick }: Props) {
@@ -19,7 +19,7 @@ export function StatCard({ label, value, meta, tone = "default", onClick }: Prop
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`ao-card w-full p-3.5 text-left ${TONE[tone]} ${
+      className={`ao-card w-full p-3 text-left ${TONE[tone]} ${
         onClick ? "active:scale-[0.99]" : ""
       }`}
     >
@@ -29,7 +29,7 @@ export function StatCard({ label, value, meta, tone = "default", onClick }: Prop
       <div className="mt-1 text-[15px] font-extrabold tracking-tight text-ink">
         {value}
       </div>
-      {meta ? <div className="mt-1 text-xs font-medium text-muted">{meta}</div> : null}
+      {meta ? <div className="mt-1 text-[11px] font-semibold text-muted">{meta}</div> : null}
     </Comp>
   );
 }

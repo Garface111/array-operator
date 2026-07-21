@@ -110,7 +110,7 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
       <section
         role="dialog"
         aria-label="Energy Agent"
-        className="relative z-10 mx-auto flex max-h-[min(72vh,560px)] w-full max-w-lg flex-col rounded-t-sheet border border-line bg-white shadow-sheet"
+        className="ao-chrome relative z-10 mx-auto flex max-h-[min(72vh,560px)] w-full max-w-lg flex-col rounded-t-[28px] border shadow-sheet"
         style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}
       >
         <div className="flex items-center gap-2 border-b border-line px-4 pb-3 pt-4">

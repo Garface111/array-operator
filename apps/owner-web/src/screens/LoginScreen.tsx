@@ -12,9 +12,8 @@ export function LoginScreen() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // Already signed in (e.g. phone handoff from desktop so_session) → go home.
   useEffect(() => {
-    if (getSession()) nav("/", { replace: true });
+    if (getSession()) nav("/fleet", { replace: true });
   }, [nav]);
 
   async function onSubmit(e: FormEvent) {
@@ -31,7 +30,7 @@ export function LoginScreen() {
         if (!res.session_token) throw new Error("No session returned");
         setSession(res.session_token);
         rearmUnauthorized();
-        nav("/", { replace: true });
+        nav("/fleet", { replace: true });
       }
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : "Sign-in failed");
@@ -44,40 +43,42 @@ export function LoginScreen() {
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-8 text-center">
         <div
-          className="mx-auto mb-4 h-14 w-14 rounded-full shadow-lg"
+          className="mx-auto mb-4 h-16 w-16 rounded-full shadow-lg ring-4 ring-white/50"
           style={{
             background:
               "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
           }}
         />
-        <h1 className="text-xl font-extrabold tracking-tight">Array Operator</h1>
-        <p className="mt-1 text-sm text-muted">
-          Phone-first fleet & offtaker ops · Energy Agent
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">
+          Array Operator
+        </h1>
+        <p className="mt-1 text-sm font-semibold text-muted">
+          Sky fleet · offtakers · Energy Agent
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="ao-card space-y-3 p-4">
+      <form onSubmit={onSubmit} className="ao-sheet space-y-3 p-5">
         <label className="block">
-          <span className="text-xs font-bold text-muted">Email</span>
+          <span className="text-xs font-extrabold text-muted">Email</span>
           <input
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
+            className="mt-1 w-full rounded-xl border border-line bg-white/90 px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
           />
         </label>
         {mode === "password" ? (
           <label className="block">
-            <span className="text-xs font-bold text-muted">Password</span>
+            <span className="text-xs font-extrabold text-muted">Password</span>
             <input
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
+              className="mt-1 w-full rounded-xl border border-line bg-white/90 px-3 py-2.5 outline-none ring-sky-500 focus:ring-2"
             />
           </label>
         ) : null}
@@ -105,8 +106,8 @@ export function LoginScreen() {
         ) : null}
       </form>
 
-      <p className="mt-6 text-center text-[11px] text-muted">
-        Same account as arrayoperator.com · does not replace the desktop site
+      <p className="mt-6 text-center text-[11px] font-semibold text-muted">
+        Same account as arrayoperator.com desktop
       </p>
     </div>
   );

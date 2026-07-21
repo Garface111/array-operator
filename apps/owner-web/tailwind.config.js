@@ -4,19 +4,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#0f172a",
-        muted: "#64748b",
-        line: "rgba(33, 150, 243, 0.14)",
+        ink: "#0E1420",
+        muted: "#4C596B",
+        faint: "#6B7789",
+        line: "rgba(20, 60, 120, 0.16)",
         sky: {
-          50: "#f0f9ff",
-          100: "#e0f2fe",
-          500: "#2196f3",
-          600: "#1e88e5",
-          700: "#1976d2",
+          50: "#EAF4FD",
+          100: "#D9E7FB",
+          200: "#BEE3FA",
+          400: "#56B4F0",
+          500: "#2196F3",
+          600: "#1E88E5",
+          700: "#1976D2",
+          800: "#1565C0",
         },
-        good: "#10b981",
-        warn: "#f59e0b",
-        bad: "#ef4444",
+        live: "#22C55E",
+        good: "#2196F3",
+        warn: "#F59E0B",
+        bad: "#EF4444",
       },
       fontFamily: {
         sans: [
@@ -28,11 +33,11 @@ export default {
         ],
       },
       boxShadow: {
-        card: "0 8px 24px -14px rgba(15, 50, 110, 0.28)",
-        sheet: "0 20px 50px -20px rgba(15, 40, 80, 0.45)",
+        card: "0 8px 30px rgba(20, 60, 120, 0.1)",
+        sheet: "0 18px 50px -12px rgba(20, 60, 120, 0.18)",
       },
       borderRadius: {
-        sheet: "1.25rem",
+        sheet: "1.75rem",
       },
     },
   },

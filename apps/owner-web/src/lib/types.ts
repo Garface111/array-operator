@@ -8,6 +8,8 @@ export type PasswordLoginResult = {
   detail?: string;
 };
 
+export type DailyPt = { date?: string; kwh?: number | null };
+
 /** Canonical array row used by Home / Fleet after adapting overview + fleet-tree. */
 export type FleetArray = {
   id: number | string;
@@ -19,6 +21,8 @@ export type FleetArray = {
   current_power_w?: number | null;
   nameplate_kw?: number | null;
   diagnosis?: string | null;
+  daily?: DailyPt[];
+  is_daylight?: boolean;
   inverters?: FleetInverter[];
   [key: string]: unknown;
 };
@@ -31,6 +35,41 @@ export type FleetInverter = {
   current_power_w?: number | null;
   nameplate_kw?: number | null;
   diagnosis?: string | null;
+  daily?: DailyPt[];
+  [key: string]: unknown;
+};
+
+export type AccountInfo = {
+  tenant_id?: string;
+  email?: string;
+  name?: string;
+  company_name?: string;
+  product?: string;
+  is_demo?: boolean;
+  active?: boolean;
+  subscription_status?: string | null;
+  billing_plan?: string | null;
+  [key: string]: unknown;
+};
+
+export type OfftakerSub = {
+  id?: number | string;
+  name?: string;
+  email?: string;
+  enabled?: boolean;
+  share_pct?: number | null;
+  allocation_pct?: number | null;
+  array_name?: string | null;
+  array_id?: number | string | null;
+  delivery_mode?: string | null;
+  status?: string | null;
+  [key: string]: unknown;
+};
+
+export type SubscriptionsPayload = {
+  ok?: boolean;
+  subscriptions?: OfftakerSub[];
+  arrays?: Array<{ id?: number; name?: string; client_name?: string }>;
   [key: string]: unknown;
 };
 
@@ -86,6 +125,8 @@ export type FleetTreeRaw = {
     vendor?: string | null;
     current_power_w?: number | null;
     produced_today_kwh?: number | null;
+    is_daylight?: boolean;
+    daily?: DailyPt[];
     alert?: { status?: string; level?: string; headline?: string; [key: string]: unknown };
     inverters?: Array<{
       inverter_id?: number | string;
@@ -95,6 +136,7 @@ export type FleetTreeRaw = {
       current_power_w?: number | null;
       nameplate_kw?: number | null;
       diagnosis?: string | null;
+      daily?: DailyPt[];
       [key: string]: unknown;
     }>;
     [key: string]: unknown;

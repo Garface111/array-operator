@@ -1,5 +1,6 @@
 import { clearSession, getSession, SESSION_KEY, UNAUTHORIZED_EVENT } from "./session";
 import type {
+  AccountInfo,
   EnergyAgentChatResponse,
   EnergyAgentSession,
   FleetArray,
@@ -9,6 +10,7 @@ import type {
   Overview,
   PasswordLoginResult,
   SendPipeline,
+  SubscriptionsPayload,
 } from "./types";
 
 export class UnauthorizedError extends Error {
@@ -200,6 +202,7 @@ export function adaptFleetTree(raw: FleetTreeRaw | null | undefined): FleetTree 
       current_power_w: inv.current_power_w ?? null,
       nameplate_kw: inv.nameplate_kw ?? null,
       diagnosis: inv.diagnosis ?? null,
+      daily: Array.isArray(inv.daily) ? inv.daily : [],
     }));
     const alertStatus =
       (c.alert && (c.alert.status || c.alert.level || c.alert.headline)) || "";
@@ -211,6 +214,10 @@ export function adaptFleetTree(raw: FleetTreeRaw | null | undefined): FleetTree 
       if (bad) status = bad.status;
       else if (warn) status = warn.status;
     }
+    const nameplate = invs.reduce(
+      (s, inv) => s + (inv.nameplate_kw && inv.nameplate_kw > 0 ? inv.nameplate_kw : 0),
+      0
+    );
     return {
       id: c.array_id ?? c.array_name ?? "unknown",
       name: String(c.array_name || "Array"),
@@ -218,6 +225,9 @@ export function adaptFleetTree(raw: FleetTreeRaw | null | undefined): FleetTree 
       vendor: c.vendor ?? null,
       current_power_w: c.current_power_w ?? null,
       today_kwh: c.produced_today_kwh ?? null,
+      nameplate_kw: nameplate > 0 ? nameplate : null,
+      daily: Array.isArray(c.daily) ? c.daily : [],
+      is_daylight: c.is_daylight !== false,
       inverters: invs,
     };
   });
@@ -268,6 +278,16 @@ export function fetchSendPipeline(): Promise<SendPipeline> {
   return apiFetch<SendPipeline>("/v1/array-operator/billing/send-pipeline", {
     logoutOn401: false,
   });
+}
+
+export function fetchSubscriptions(): Promise<SubscriptionsPayload> {
+  return apiFetch<SubscriptionsPayload>("/v1/array-operator/billing/list-bundle", {
+    logoutOn401: false,
+  });
+}
+
+export function fetchAccount(): Promise<AccountInfo> {
+  return apiFetch<AccountInfo>("/v1/account");
 }
 
 // ── Energy Agent ─────────────────────────────────────────────────────────

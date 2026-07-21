@@ -2,10 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Sky design tokens (mirrors public/theme-sky.css) ───────────────────── */
 :root {
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --nav-h: 64px;
+  --nav-h: 58px;
+  --header-h: 56px;
+
+  --sky-top: #1e90e8;
+  --sky-mid: #56b4f0;
+  --sky-horizon: #bee3fa;
+  --sky-primary: #2196f3;
+  --sky-primary-deep: #1976d2;
+  --sky-pastel-blue: #d9e7fb;
+  --sky-pastel-green: #d3f2ce;
+  --sky-green: #4caf50;
+
+  --sky-glass-chrome: rgba(255, 255, 255, 0.62);
+  --sky-glass-content: rgba(255, 255, 255, 0.58);
+  --sky-glass-solid: rgba(255, 255, 255, 0.78);
+  --sky-sheet-blur: blur(18px) saturate(1.7);
+  --sky-glass-edge: rgba(255, 255, 255, 0.55);
+  --sky-shadow-card: 0 8px 30px rgba(20, 60, 120, 0.1);
+  --sky-shadow-sheet: 0 18px 50px -12px rgba(20, 60, 120, 0.18);
+
+  --bg: #eaf4fd;
+  --ink: #0e1420;
+  --muted: #4c596b;
+  --faint: #6b7789;
+  --line: rgba(20, 60, 120, 0.16);
+  --good: #2196f3;
+  --live: #22c55e;
+  --warn: #f59e0b;
+  --bad: #ef4444;
 }
 
 html,
@@ -15,17 +44,40 @@ body,
   height: 100%;
 }
 
+html {
+  background: var(--sky-mid);
+}
+
 body {
   margin: 0;
-  background:
-    radial-gradient(900px 420px at 80% -10%, #dbeafe 0%, transparent 55%),
-    #f0f9ff;
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: clip;
+  /* Sky world plate — same plate family as desktop (site-root assets) */
+  background:
+    linear-gradient(180deg, rgba(30, 144, 232, 0.28) 0%, rgba(190, 227, 250, 0.15) 42%, rgba(234, 244, 253, 0.88) 100%),
+    image-set(
+      url("/img/sky/world-m-1284.webp") type("image/webp"),
+      url("/img/sky/world-m-1284.jpg") type("image/jpeg")
+    ),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
+  background-size: cover, cover, auto;
+  background-position: center, center 42%, center;
+  background-attachment: fixed, fixed, fixed;
+  background-repeat: no-repeat;
 }
 
-/* iOS: avoid focus zoom on form fields */
+/* Fallback when plate is slow */
+@supports not (background-image: image-set(url("x") type("image/webp"))) {
+  body {
+    background:
+      linear-gradient(180deg, rgba(30, 144, 232, 0.35) 0%, rgba(234, 244, 253, 0.92) 70%),
+      linear-gradient(180deg, var(--sky-top), var(--sky-horizon));
+  }
+}
+
 input,
 select,
 textarea {
@@ -33,19 +85,131 @@ textarea {
 }
 
 @layer components {
-  .ao-card {
-    @apply rounded-2xl border border-line bg-white/90 shadow-card backdrop-blur-sm;
+  .ao-glass {
+    background: var(--sky-glass-content);
+    border: 1px solid var(--sky-glass-edge);
+    box-shadow: var(--sky-shadow-card);
+    backdrop-filter: var(--sky-sheet-blur);
+    -webkit-backdrop-filter: var(--sky-sheet-blur);
   }
+
+  .ao-card {
+    @apply rounded-[22px] border;
+    background: var(--sky-glass-solid);
+    border-color: var(--line);
+    box-shadow: var(--sky-shadow-card);
+  }
+
+  .ao-sheet {
+    @apply rounded-[28px] border;
+    background: var(--sky-glass-content);
+    border-color: var(--sky-glass-edge);
+    box-shadow: var(--sky-shadow-sheet);
+    backdrop-filter: var(--sky-sheet-blur);
+    -webkit-backdrop-filter: var(--sky-sheet-blur);
+  }
+
+  .ao-chrome {
+    background: var(--sky-glass-chrome);
+    border-color: var(--sky-glass-edge);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  }
+
   .ao-btn {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition active:scale-[0.98];
   }
+
   .ao-btn-primary {
-    @apply ao-btn bg-sky-500 text-white shadow-md shadow-sky-500/30;
+    @apply ao-btn text-white;
+    background: linear-gradient(180deg, #42a5f5, var(--sky-primary));
+    box-shadow: 0 8px 20px -8px rgba(33, 150, 243, 0.65);
   }
+
   .ao-btn-ghost {
-    @apply ao-btn border border-line bg-white text-ink;
+    @apply ao-btn border text-ink;
+    background: rgba(255, 255, 255, 0.72);
+    border-color: var(--line);
   }
+
   .ao-chip {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold;
+  }
+
+  .ao-chip-good {
+    background: rgba(34, 197, 94, 0.14);
+    color: #15803d;
+  }
+  .ao-chip-warn {
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
+  }
+  .ao-chip-bad {
+    background: rgba(239, 68, 68, 0.14);
+    color: #b91c1c;
+  }
+  .ao-chip-muted {
+    background: rgba(20, 60, 120, 0.08);
+    color: var(--muted);
+  }
+  .ao-chip-sky {
+    background: rgba(33, 150, 243, 0.14);
+    color: var(--sky-primary-deep);
+  }
+
+  .ao-seg {
+    @apply flex gap-1 rounded-2xl p-1;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--line);
+  }
+  .ao-seg button {
+    @apply flex-1 rounded-xl px-3 py-2 text-xs font-extrabold transition;
+    color: var(--muted);
+  }
+  .ao-seg button[data-on="1"] {
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--sky-primary-deep);
+    box-shadow: 0 4px 14px -6px rgba(20, 60, 120, 0.35);
+  }
+
+  .ao-table-wrap {
+    @apply overflow-x-auto rounded-[22px] border;
+    background: var(--sky-glass-solid);
+    border-color: var(--line);
+    box-shadow: var(--sky-shadow-card);
+  }
+
+  .ao-table {
+    @apply w-full min-w-[520px] border-collapse text-left text-xs;
+  }
+  .ao-table th:first-child,
+  .ao-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 4px 0 10px -6px rgba(20, 60, 120, 0.25);
+  }
+  .ao-table th:first-child {
+    z-index: 12;
+  }
+  .ao-table th {
+    @apply sticky top-0 z-10 px-3 py-2.5 text-[10px] font-extrabold uppercase tracking-wider;
+    color: var(--sky-primary-deep);
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid var(--line);
+  }
+  .ao-table td {
+    @apply px-3 py-2.5 align-middle;
+    border-bottom: 1px solid rgba(20, 60, 120, 0.08);
+  }
+  .ao-table tr:last-child td {
+    border-bottom: 0;
+  }
+  .ao-table tr.ao-array-row {
+    background: rgba(33, 150, 243, 0.04);
+  }
+  .ao-table tr.ao-inv-row {
+    background: rgba(255, 255, 255, 0.35);
   }
 }
