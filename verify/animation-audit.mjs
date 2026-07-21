@@ -333,9 +333,14 @@ function catalogIssues(scenario, burst, expect) {
     });
   }
 
-  // Flash: multi-flash only, or lone flash with no sustained motion (true pop).
-  // Single-frame flash during large panel swaps is normal; only multi-flash is med.
-  if (m.flashCount >= 3 || (m.flashCount === 2 && m.motionFrames <= 5)) {
+  // Flash: true pop = spikes with almost no sustained multi-frame motion.
+  // Progressive content paint (fallback → live data → feed) during a soft enter
+  // legitimately produces a few single-frame spikes while motionFrames stay high.
+  if (
+    (m.flashCount >= 3 && m.motionFrames <= 6) ||
+    (m.flashCount === 2 && m.motionFrames <= 5) ||
+    m.flashCount >= 6
+  ) {
     issues.push({
       severity: "med",
       code: "FLASH",
@@ -1050,9 +1055,10 @@ async function main() {
   console.log(`Report: ${path.join(OUT, "report.md")}`);
   console.log("════════════════════════════════════════\n");
 
-  // Exit non-zero on high severity so CI can gate
-  if ((bySev.high || 0) > 0) process.exitCode = 2;
-  else if ((bySev.med || 0) > 0) process.exitCode = 0; // med = review, not hard fail yet
+  // Exit non-zero on high OR med so continuous until-clean can stop only when both are 0.
+  // low (capture-fps / ambient noise) is informational.
+  if ((bySev.high || 0) > 0 || (bySev.med || 0) > 0) process.exitCode = 2;
+  else process.exitCode = 0;
 }
 
 main().catch((e) => {
