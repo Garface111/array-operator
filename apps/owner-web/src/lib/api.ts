@@ -302,14 +302,20 @@ export function startAgentSession(context?: Record<string, unknown>): Promise<En
 export function agentChat(
   sessionId: string,
   message: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
+  attachmentIds?: string[]
 ): Promise<EnergyAgentChatResponse> {
   return apiFetch<EnergyAgentChatResponse>("/v1/energy-agent/chat", {
     method: "POST",
     body: JSON.stringify({
       session_id: sessionId,
       message,
-      context: context || { client: "owner-web", surface: "mobile_home" },
+      context: context || {
+        client: "owner-web",
+        surface: "agent_sheet_mobile",
+        mobile: true,
+      },
+      attachment_ids: attachmentIds?.length ? attachmentIds : undefined,
     }),
   });
 }
@@ -327,4 +333,43 @@ export function agentConfirm(
       pending_id: pendingId || undefined,
     }),
   });
+}
+
+/** Uploaded chat asset returned by POST /v1/energy-agent/upload */
+export type AgentUploadAsset = {
+  id: string;
+  filename?: string;
+  mime?: string;
+  size?: number;
+  kind?: string;
+  preview?: string | null;
+};
+
+/**
+ * Attach a file/image for the next Energy Agent chat turn.
+ * Uses multipart FormData — do not set Content-Type (browser sets boundary).
+ */
+export async function uploadAgentFile(file: File): Promise<AgentUploadAsset> {
+  const fd = new FormData();
+  fd.append("file", file, file.name || "upload.bin");
+  const headers = new Headers();
+  const token = getSession();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(apiUrl("/v1/energy-agent/upload"), {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  if (res.status === 401) {
+    notifyUnauthorizedOnce();
+    throw new UnauthorizedError();
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, await parseError(res));
+  }
+  const data = (await res.json()) as { ok?: boolean; asset?: AgentUploadAsset };
+  if (!data?.asset?.id) {
+    throw new ApiError(500, "Upload succeeded but no asset id returned");
+  }
+  return data.asset;
 }

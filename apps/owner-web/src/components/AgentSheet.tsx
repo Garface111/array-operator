@@ -10,18 +10,52 @@ import {
   agentChat,
   agentConfirm,
   startAgentSession,
+  uploadAgentFile,
+  type AgentUploadAsset,
 } from "@/lib/api";
 import type { EnergyAgentPending } from "@/lib/types";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AgentMarkdown } from "./AgentMarkdown";
 
-type Msg = { role: "user" | "agent"; text: string; tools?: string[] };
+type Msg = {
+  role: "user" | "agent";
+  text: string;
+  tools?: string[];
+  attachments?: string[];
+};
+
+type PendingAttach = AgentUploadAsset & { localName: string };
 
 type Props = {
   open: boolean;
   onClose: () => void;
   seedPrompt?: string | null;
 };
+
+const MOBILE_CTX = {
+  client: "owner-web",
+  surface: "agent_sheet_mobile",
+  mobile: true,
+} as const;
+
+const QUICK_ACTIONS: Array<{ label: string; prompt: string }> = [
+  {
+    label: "Fleet brief",
+    prompt: "Give me a quick fleet health brief for mobile — what needs attention?",
+  },
+  {
+    label: "Vacancy",
+    prompt: "Any unallocated credits / marketplace vacancy on my fleet?",
+  },
+  {
+    label: "Repairs",
+    prompt: "Repair system status and O&M roster — what's open and who do we contact?",
+  },
+  {
+    label: "Invoices",
+    prompt: "Offtaker invoice pipeline status — drafted, waiting on bills, next send?",
+  },
+];
 
 /**
  * Mobile chat sheet — designed to standard chat UX:
@@ -31,6 +65,7 @@ type Props = {
  * - Scroll pins to latest message; body scroll locked while open
  * - Swipe-down on handle to dismiss
  * - At top of thread: one more scroll-up (overscroll) closes the whole chat
+ * - Mobile attach: camera / library / file → upload → attachment chips
  */
 export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -40,12 +75,18 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState<EnergyAgentPending | null>(null);
   const [ready, setReady] = useState(false);
+  const [attachments, setAttachments] = useState<PendingAttach[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const seeded = useRef(false);
   const dragY = useRef(0);
   const dragging = useRef(false);
@@ -87,6 +128,9 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
       setReady(false);
       setInput("");
       setErr(null);
+      setAttachments([]);
+      setShowAttachMenu(false);
+      setUploading(false);
       return;
     }
     let cancelled = false;
@@ -94,15 +138,12 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     (async () => {
       try {
         setErr(null);
-        const s = await startAgentSession({
-          client: "owner-web",
-          surface: "agent_sheet_mobile",
-        });
+        const s = await startAgentSession({ ...MOBILE_CTX });
         if (cancelled) return;
         setSessionId(s.session_id || null);
         const intro =
           s.intro ||
-          "Hi — I'm **Energy Agent**. I can check fleet health, offtakers, repairs, marketplace vacancy, and run setup.\n\nAsk me anything on this account.";
+          "Hi — **Energy Agent on mobile**. Fleet, offtakers, repairs, marketplace — ask me. Tap **+** to attach a photo or file.";
         setMsgs([{ role: "agent", text: intro }]);
         setReady(true);
       } catch (e) {
@@ -170,15 +211,62 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     }
   }
 
+  async function handleFiles(fileList: FileList | null) {
+    if (!fileList?.length || busy || uploading) return;
+    setShowAttachMenu(false);
+    setUploading(true);
+    setErr(null);
+    try {
+      const next: PendingAttach[] = [];
+      for (const file of Array.from(fileList).slice(0, 8)) {
+        if (attachments.length + next.length >= 8) break;
+        const asset = await uploadAgentFile(file);
+        next.push({
+          ...asset,
+          localName: file.name || asset.filename || "file",
+        });
+      }
+      if (next.length) setAttachments((a) => [...a, ...next].slice(0, 8));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      // reset inputs so the same file can be re-picked
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (libraryInputRef.current) libraryInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttach(id: string) {
+    setAttachments((a) => a.filter((x) => x.id !== id));
+  }
+
   async function send(text: string) {
     const t = text.trim();
-    if (!t || busy) return;
+    const pendingAttach = attachments.slice();
+    const attachIds = pendingAttach.map((a) => a.id).filter(Boolean);
+    if ((!t && !attachIds.length) || busy || uploading) return;
+    const display =
+      t ||
+      (attachIds.length
+        ? `Please analyze the attached file${attachIds.length > 1 ? "s" : ""}.`
+        : "");
     setInput("");
+    setAttachments([]);
+    setShowAttachMenu(false);
     // Reset textarea height
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-    setMsgs((m) => [...m, { role: "user", text: t }]);
+    setMsgs((m) => [
+      ...m,
+      {
+        role: "user",
+        text: display,
+        attachments: pendingAttach.map((a) => a.localName || a.filename || a.id),
+      },
+    ]);
     setBusy(true);
     setErr(null);
     setPending(null);
@@ -186,19 +274,12 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     try {
       let sid = sessionId;
       if (!sid) {
-        const s = await startAgentSession({
-          client: "owner-web",
-          surface: "agent_sheet_mobile",
-        });
+        const s = await startAgentSession({ ...MOBILE_CTX });
         sid = s.session_id || null;
         setSessionId(sid);
       }
       if (!sid) throw new Error("No agent session");
-      const res = await agentChat(sid, t, {
-        client: "owner-web",
-        surface: "agent_sheet_mobile",
-        mobile: true,
-      });
+      const res = await agentChat(sid, display, { ...MOBILE_CTX }, attachIds);
       const reply =
         res.reply ||
         res.speak ||
@@ -591,6 +672,28 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
                     text={m.text}
                     variant={m.role === "user" ? "user" : "agent"}
                   />
+                  {m.attachments?.length ? (
+                    <div
+                      className={[
+                        "mt-2 flex flex-wrap gap-1",
+                        m.role === "user" ? "text-white/90" : "text-muted",
+                      ].join(" ")}
+                    >
+                      {m.attachments.map((name) => (
+                        <span
+                          key={name}
+                          className={[
+                            "inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-bold",
+                            m.role === "user"
+                              ? "bg-white/20"
+                              : "bg-sky-50 text-sky-800",
+                          ].join(" ")}
+                        >
+                          📎 {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 {m.tools?.length ? (
                   <div className="mt-1 flex max-w-[92%] flex-wrap gap-1 px-0.5">
@@ -672,13 +775,137 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
               : "max(10px, env(safe-area-inset-bottom))",
           }}
         >
-          <div className="mx-auto flex max-w-lg items-end gap-2 rounded-[22px] border border-sky-200/80 bg-sky-50/50 p-1.5 shadow-sm">
+          {/* Quick action chips — mobile-centric shortcuts */}
+          {!busy && ready && msgs.length <= 2 && !attachments.length ? (
+            <div className="mx-auto mb-2 flex max-w-lg gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {QUICK_ACTIONS.map((q) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void send(q.prompt)}
+                  className="shrink-0 rounded-full bg-sky-100/90 px-3 py-2 text-[11px] font-extrabold text-sky-800 ring-1 ring-sky-200/80 active:bg-sky-200"
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Pending attachment chips */}
+          {attachments.length || uploading ? (
+            <div className="mx-auto mb-2 flex max-w-lg flex-wrap gap-1.5">
+              {attachments.map((a) => (
+                <span
+                  key={a.id}
+                  className="inline-flex max-w-[70%] items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-bold text-sky-900 ring-1 ring-sky-200"
+                >
+                  <span className="truncate">
+                    {a.localName || a.filename || a.id}
+                  </span>
+                  <button
+                    type="button"
+                    className="grid h-5 w-5 place-items-center rounded-full text-sky-700 hover:bg-sky-200"
+                    aria-label="Remove attachment"
+                    onClick={() => removeAttach(a.id)}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {uploading ? (
+                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 ring-1 ring-amber-200">
+                  Uploading…
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Attach action sheet */}
+          {showAttachMenu ? (
+            <div className="mx-auto mb-2 grid max-w-lg grid-cols-3 gap-2">
+              <button
+                type="button"
+                className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-sky-50 text-[11px] font-extrabold text-sky-900 ring-1 ring-sky-200 active:bg-sky-100"
+                onClick={() => cameraInputRef.current?.click()}
+              >
+                <span className="text-lg" aria-hidden>
+                  📷
+                </span>
+                Camera
+              </button>
+              <button
+                type="button"
+                className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-sky-50 text-[11px] font-extrabold text-sky-900 ring-1 ring-sky-200 active:bg-sky-100"
+                onClick={() => libraryInputRef.current?.click()}
+              >
+                <span className="text-lg" aria-hidden>
+                  🖼
+                </span>
+                Photos
+              </button>
+              <button
+                type="button"
+                className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-sky-50 text-[11px] font-extrabold text-sky-900 ring-1 ring-sky-200 active:bg-sky-100"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <span className="text-lg" aria-hidden>
+                  📄
+                </span>
+                File
+              </button>
+            </div>
+          ) : null}
+
+          {/* Hidden pickers — camera uses capture for mobile-centric UX */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => void handleFiles(e.target.files)}
+          />
+          <input
+            ref={libraryInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => void handleFiles(e.target.files)}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log"
+            multiple
+            className="hidden"
+            onChange={(e) => void handleFiles(e.target.files)}
+          />
+
+          <div className="mx-auto flex max-w-lg items-end gap-1.5 rounded-[22px] border border-sky-200/80 bg-sky-50/50 p-1.5 shadow-sm">
+            <button
+              type="button"
+              disabled={busy || uploading}
+              onClick={() => setShowAttachMenu((v) => !v)}
+              className={[
+                "mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl font-bold leading-none ring-1 transition",
+                showAttachMenu
+                  ? "bg-sky-500 text-white ring-sky-500"
+                  : "bg-white text-sky-700 ring-sky-200 active:bg-sky-100",
+              ].join(" ")}
+              aria-label={showAttachMenu ? "Close attach menu" : "Attach photo or file"}
+              aria-expanded={showAttachMenu}
+            >
+              {showAttachMenu ? "×" : "+"}
+            </button>
             <textarea
               ref={inputRef}
               value={input}
               rows={1}
               onChange={(e) => onInputChange(e.target.value)}
               onFocus={() => {
+                setShowAttachMenu(false);
                 // After keyboard animates, pin to latest messages
                 setTimeout(() => scrollToBottom(false), 80);
                 setTimeout(() => scrollToBottom(false), 320);
@@ -690,15 +917,23 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
                   void send(input);
                 }
               }}
-              placeholder="Message Energy Agent…"
+              placeholder={
+                attachments.length
+                  ? "Add a note about the file…"
+                  : "Message Energy Agent…"
+              }
               enterKeyHint="send"
-              className="max-h-[120px] min-h-[44px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-[16px] font-medium leading-snug text-ink outline-none placeholder:text-muted/70"
+              className="max-h-[120px] min-h-[44px] min-w-0 flex-1 resize-none bg-transparent px-2.5 py-2.5 text-[16px] font-medium leading-snug text-ink outline-none placeholder:text-muted/70"
               // 16px prevents iOS zoom on focus
               style={{ fontSize: 16 }}
             />
             <button
               type="submit"
-              disabled={busy || !input.trim()}
+              disabled={
+                busy ||
+                uploading ||
+                (!input.trim() && attachments.length === 0)
+              }
               className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sky-500 text-white shadow-md shadow-sky-500/30 disabled:opacity-40"
               aria-label="Send"
             >
@@ -716,6 +951,9 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
               </svg>
             </button>
           </div>
+          <p className="mx-auto mt-1.5 max-w-lg px-1 text-center text-[10px] font-semibold text-muted">
+            + attaches camera, photos, or files for the Agent
+          </p>
         </form>
       </section>
     </div>

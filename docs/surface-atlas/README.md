@@ -8,7 +8,8 @@ Ground-truth capture of every major owner-facing state on arrayoperator.com.
 | `shots/*.png` | Viewport/full-page screenshots (demo session, 1440×900) |
 | `manifest.json` | Per-state DOM inventory + navigation edges |
 | `capture.mjs` | Re-runnable Playwright walker |
-| `../../solar-operator/api/energy_agent_surface_model.md` | **Mind memory** — micro/meso/macro model the Energy Agent loads via `product_map(topic=surface…)` |
+| `../../solar-operator/api/energy_agent_surface_model.md` | **Desktop mind memory** — micro/meso/macro model via `product_map(topic=surface…)` |
+| `../../solar-operator/api/energy_agent_mobile_surface_model.md` | **Mobile mind memory** — owner-web `/m` + React Native via `product_map(topic=surface_mobile…)` |
 
 ## Re-capture
 ```bash
