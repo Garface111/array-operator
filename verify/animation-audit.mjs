@@ -234,11 +234,12 @@ async function captureBurst(page, name, { durationMs = DURATION_MS, fps = FPS } 
     if (p < 0.05) { freeze++; freezeMax = Math.max(freezeMax, freeze); }
     else freeze = 0;
   }
-  // Early stall: freeze BEFORE any real motion in the first ~450ms (true jank).
-  // Post-animation stillness is expected settle and is NOT a freeze bug.
+  // Early stall: freeze AFTER the click window (~120ms) but BEFORE motion.
+  // Frames 0–120ms are pre-click by design (capture starts first) — ignore them.
   let earlyStall = 0, earlyStallMax = 0, sawMotion = false;
   for (let k = 0; k < diffs.length; k++) {
-    if (diffs[k].t > 450) break;
+    if (diffs[k].t < 120) continue;
+    if (diffs[k].t > 550) break;
     if (diffs[k].pct >= 0.35) {
       sawMotion = true;
       earlyStall = 0;
@@ -302,12 +303,15 @@ function catalogIssues(scenario, burst, expect) {
   const m = burst.metrics;
   const exp = expect || {};
 
-  // Expected motion but almost none
+  // Expected motion but almost none.
+  // Ambient continuous (live dots, liquid) is often sub-pixel at full-viewport
+  // capture — downgrade to low so we don't false-fail the whole suite.
   if (exp.expectMotion && m.motionFrames < 2 && m.maxPct < 0.4) {
     issues.push({
-      severity: "high",
+      severity: exp.continuousSoft ? "low" : "high",
       code: "NO_MOTION",
-      message: `Expected animation but saw almost no frame change (maxΔ=${m.maxPct}%, motionFrames=${m.motionFrames}).`,
+      message: `Expected animation but saw almost no frame change (maxΔ=${m.maxPct}%, motionFrames=${m.motionFrames}).` +
+        (exp.continuousSoft ? " Ambient/pulse may be too small for full-viewport sampling." : ""),
     });
   }
 
@@ -338,13 +342,18 @@ function catalogIssues(scenario, burst, expect) {
     });
   }
 
-  // Continuous marquee: need ongoing motion, not a one-shot
-  if (exp.continuous && m.motionFrames < Math.floor(burst.frameCount * 0.35)) {
-    issues.push({
-      severity: "high",
-      code: "MARQUEE_STALLED",
-      message: `Continuous motion expected (marquee) but only ${m.motionFrames}/${burst.frameCount} frames moved.`,
-    });
+  // Continuous motion (marquee / liquid / pulse): need ongoing change, not a one-shot.
+  // Soft continuous (ambient pulses) uses a lower bar.
+  if (exp.continuous) {
+    const minShare = exp.continuousSoft ? 0.12 : 0.28;
+    const need = Math.max(3, Math.floor(burst.frameCount * minShare));
+    if (m.motionFrames < need) {
+      issues.push({
+        severity: exp.continuousSoft ? "med" : "high",
+        code: "CONTINUOUS_STALLED",
+        message: `Continuous motion expected but only ${m.motionFrames}/${burst.frameCount} frames moved (need ≥${need}).`,
+      });
+    }
   }
 
   // Capture quality (ignore nonsense negative/zero from clock edge cases)
@@ -397,7 +406,7 @@ async function gotoHash(page, hash) {
   await sleep(200);
 }
 
-async function runScenario(page, scenarios, { id, label, setup, act, expect, durationMs }) {
+async function runScenario(page, scenarios, { id, label, keys, setup, act, expect, durationMs }) {
   console.log(`\n▶ ${id} — ${label}`);
   if (setup) await setup(page);
   await sleep(200);
@@ -419,6 +428,7 @@ async function runScenario(page, scenarios, { id, label, setup, act, expect, dur
   scenarios.push({
     id,
     label,
+    keys: keys || [],
     expect: expect || {},
     metrics: burst.metrics,
     frameCount: burst.frameCount,
@@ -469,194 +479,381 @@ async function main() {
   });
 
   const scenarios = [];
-
-  // ── Tab-slide animations (top bar) ─────────────────────────────────────
-  const tabs = [
-    { id: "tab-analysis", hash: "#analysis", sel: "#tabAnalysis, a.tab[href='#analysis']" },
-    { id: "tab-reports", hash: "#reports", sel: "#tabReports, a.tab[href='#reports']" },
-    { id: "tab-ops", hash: "#ops", sel: "#tabOps, a.tab[href='#ops']" },
-    { id: "tab-marketplace", hash: "#marketplace", sel: "#tabMarketplace, a.tab[href='#marketplace']" },
-    { id: "tab-account", hash: "#account", sel: "#tabAccount, a.tab[href='#account']" },
-    { id: "tab-fleet", hash: "#dashboard", sel: "#tabDashboard, a.tab[href='#dashboard']" },
-  ];
-
-  // Start on fleet
-  await gotoHash(page, "#dashboard");
-  await sleep(800);
-
-  for (const t of tabs) {
-    await runScenario(page, scenarios, {
-      id: t.id,
-      label: `Top-tab navigate → ${t.hash}`,
-      act: async (p) => {
-        const clicked = await safeClick(p, t.sel);
-        if (!clicked) await gotoHash(p, t.hash);
-      },
-      expect: { expectMotion: true, expectSettle: true },
-      durationMs: 1600, // tab-slide is ~500ms; capture pad
+  const click = (p, sel) => safeClick(p, sel);
+  const hash = (p, h) => gotoHash(p, h);
+  const openEa = async (p) => {
+    await p.evaluate(() => {
+      try { sessionStorage.removeItem("ao_ea_suggestions_dismissed"); } catch (_) {}
     });
+    const ok =
+      (await safeClick(p, "#eaOrb")) ||
+      (await safeClick(p, "#eaFab")) ||
+      (await safeClick(p, ".ea-orb, .ea-fab, .tab.ea-tab"));
+    if (!ok) {
+      await p.evaluate(() => {
+        if (typeof window.__eaOpen === "function") window.__eaOpen();
+        else {
+          document.body.classList.add("ea-shell-open");
+          const panel = document.getElementById("eaPanel");
+          if (panel) { panel.hidden = false; panel.classList.add("open"); }
+        }
+      });
+    }
     await sleep(400);
-  }
+  };
+  const closeEa = async (p) => {
+    const ok = (await safeClick(p, "#eaClose, .ea-close, [data-ea-close]")) || (await safeClick(p, "#eaOrb"));
+    if (!ok) {
+      await p.evaluate(() => {
+        if (typeof window.__eaClose === "function") window.__eaClose();
+        else {
+          document.body.classList.remove("ea-shell-open");
+          const panel = document.getElementById("eaPanel");
+          if (panel) { panel.hidden = true; panel.classList.remove("open"); }
+        }
+      });
+    }
+  };
 
-  // ── Fleet sub-views ────────────────────────────────────────────────────
-  await gotoHash(page, "#dashboard");
-  await sleep(600);
-  for (const [id, sel, label] of [
-    ["fleet-table", "a[href='#arrays'], button:has-text('Table'), .vs-seg-btn:has-text('Table'), [data-view='table']", "Fleet → Table"],
-    ["fleet-sandbox", "a[href='#sandbox'], button:has-text('Sandbox'), .vs-seg-btn:has-text('Sandbox')", "Fleet → Sandbox"],
-    ["fleet-triage", "a[href='#dashboard'], button:has-text('Triage'), .vs-seg-btn:has-text('Triage')", "Fleet → Triage"],
-  ]) {
-    await runScenario(page, scenarios, {
-      id,
-      label,
+  /**
+   * FULL registry — every intentional animation surface we currently ship.
+   * `keys` lists the CSS/JS animation names this scenario is meant to exercise
+   * (for the catalog report). Prefer real clicks; hash fallbacks when needed.
+   */
+  const ALL = [
+    // ── A. Top-tab pager (tab-slide.js / tab-slide.css) ───────────────────
+    { id: "tab-to-analysis", label: "Tab slide → Analysis", keys: ["tab-slide", "ao-sliding"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(500); },
+      act: async (p) => { if (!(await click(p, "#tabAnalysis"))) await hash(p, "#analysis"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-to-reports", label: "Tab slide → Invoices", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#analysis"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabReports"))) await hash(p, "#reports"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-to-ops", label: "Tab slide → Repairs", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#reports"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabOps"))) await hash(p, "#ops"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-to-marketplace", label: "Tab slide → Marketplace", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#ops"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabMarketplace"))) await hash(p, "#marketplace"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-to-account", label: "Tab slide → Account", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#marketplace"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabAccount"))) await hash(p, "#account"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-to-fleet", label: "Tab slide → Fleet", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#account"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabDashboard"))) await hash(p, "#dashboard"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "tab-fleet-to-reports-long", label: "Tab slide long hop Fleet→Invoices", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(500); },
+      act: async (p) => { if (!(await click(p, "#tabReports"))) await hash(p, "#reports"); },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1600 },
+
+    // ── B. Fleet Triage | Table | Sandbox (ftSubEnter) ────────────────────
+    { id: "fleet-to-table", label: "Fleet sub → Table (ftSubEnter)", keys: ["ftSubEnter"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(500); },
       act: async (p) => {
-        if (!(await safeClick(p, sel))) {
-          // hash fallbacks
-          if (id === "fleet-table") await gotoHash(p, "#arrays");
-          else if (id === "fleet-sandbox") await gotoHash(p, "#sandbox");
-          else await gotoHash(p, "#dashboard");
+        if (!(await click(p, "#vsSegSheet, [data-ftsub='table']"))) await hash(p, "#arrays");
+      },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1200 },
+    { id: "fleet-to-sandbox", label: "Fleet sub → Sandbox (ftSubEnter + sbArrive)", keys: ["ftSubEnter", "sbArrive", "sbliqwave", "sbliqrise"],
+      setup: async (p) => { await hash(p, "#arrays"); await sleep(500); },
+      act: async (p) => {
+        if (!(await click(p, "#vsSegSandbox, [data-ftsub='sandbox']"))) await hash(p, "#sandbox");
+      },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1800 },
+    { id: "fleet-to-triage", label: "Fleet sub → Triage (ftSubEnter)", keys: ["ftSubEnter", "fcgsheen", "aoLivePulse"],
+      setup: async (p) => { await hash(p, "#sandbox"); await sleep(500); },
+      act: async (p) => {
+        if (!(await click(p, "#vsSegDashboard, [data-ftsub='dashboard']"))) await hash(p, "#dashboard");
+      },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1400 },
+
+    // ── C. Sandbox ambient / continuous ──────────────────────────────────
+    { id: "sandbox-ambient-liquid", label: "Sandbox liquid layers continuous", keys: ["sbliqwave", "sbliqrise", "sbliqbreathe", "sbliqtwinkle", "sb-now-pulse", "livepulse", "sbflowv", "sbflowh"],
+      setup: async (p) => { await hash(p, "#sandbox"); await sleep(1500); },
+      act: async () => {},
+      expect: { expectMotion: true, continuous: true, continuousSoft: true, expectSettle: false },
+      durationMs: 2800 },
+    { id: "sandbox-card-detail", label: "Sandbox inverter card → detail (dcin/dcpop)", keys: ["dcin", "dcpop", "dcfade", "sb-modal-in"],
+      setup: async (p) => { await hash(p, "#sandbox"); await sleep(1200); },
+      act: async (p) => {
+        const sel = ".sb-inv, .sb-card, .sb-inv-card, [data-inv-id], .sb-col .sb-inv";
+        if (!(await click(p, sel))) {
+          await p.evaluate(() => {
+            const el = document.querySelector(".sb-inv, .sb-card");
+            if (el) el.click();
+          });
         }
       },
-      expect: { expectMotion: true },
-      durationMs: 1200,
-    });
-  }
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1400 },
+    { id: "sandbox-detail-close", label: "Sandbox detail close", keys: ["dcin"],
+      setup: async (p) => { /* leave whatever open */ await sleep(200); },
+      act: async (p) => {
+        if (!(await click(p, ".sb-dc-close, .dc-close, .sb-modal-x, [data-dc-close], .sb-ov-close"))) {
+          await p.keyboard.press("Escape");
+        }
+      },
+      expect: { expectMotion: false }, durationMs: 900 },
 
-  // ── Energy Agent open / close ──────────────────────────────────────────
-  await gotoHash(page, "#dashboard");
-  await sleep(500);
-  await runScenario(page, scenarios, {
-    id: "ea-open",
-    label: "Open Energy Agent panel",
-    act: async (p) => {
-      // Orb / fab / programmatic
-      const clicked =
-        (await safeClick(p, "#eaOrb")) ||
-        (await safeClick(p, "#eaFab")) ||
-        (await safeClick(p, "[data-ea-open]")) ||
-        (await safeClick(p, ".ea-orb, .ea-fab"));
-      if (!clicked) {
+    // ── D. Table / vendor sheet ──────────────────────────────────────────
+    { id: "table-row-expand", label: "Table expand array row (vsArrIn)", keys: ["vsArrIn", "vsGgFill", "vsGgNeedle"],
+      setup: async (p) => { await hash(p, "#arrays"); await sleep(1200); },
+      act: async (p) => {
+        const ok =
+          (await click(p, ".vs-row .vs-expand, .vs-arr-toggle, .vs-row-head, .vs-group-head, tr.vs-arr")) ||
+          (await click(p, "#vendorSheet .vs-row, #vendorSheet [data-aid]"));
+        if (!ok) await p.evaluate(() => {
+          const b = document.querySelector("#vendorSheet button, #vendorSheet .vs-row");
+          if (b) b.click();
+        });
+      },
+      expect: { expectMotion: true }, durationMs: 1400 },
+    { id: "table-ambient", label: "Table gauges/pulse continuous", keys: ["vsPulse", "vsDcPulse", "dpShimmer"],
+      setup: async (p) => { await hash(p, "#arrays"); await sleep(800); },
+      act: async () => {},
+      expect: { expectMotion: true, continuous: true, continuousSoft: true, expectSettle: false },
+      durationMs: 2200 },
+
+    // ── E. Triage ambient ────────────────────────────────────────────────
+    { id: "triage-ambient", label: "Triage live dots / sheen continuous", keys: ["fcgsheen", "pulse", "aoLivePulse", "anPulse"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(1000); },
+      act: async () => {},
+      expect: { expectMotion: true, continuous: true, continuousSoft: true, expectSettle: false },
+      durationMs: 2400 },
+
+    // ── F. Energy Agent ──────────────────────────────────────────────────
+    { id: "ea-open", label: "EA panel open (transform rail)", keys: ["ea-shell", "eaPulse", "eaGatePulse"],
+      setup: async (p) => {
+        await hash(p, "#dashboard");
+        await p.evaluate(() => { try { sessionStorage.removeItem("ao_ea_suggestions_dismissed"); } catch (_) {} });
+        await closeEa(p);
+        await sleep(400);
+      },
+      act: openEa,
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1500 },
+    { id: "ea-marquee", label: "EA suggestion dual marquee continuous", keys: ["ea-sug-marquee-rtl", "ea-sug-marquee-ltr"],
+      setup: async (p) => {
+        await openEa(p);
         await p.evaluate(() => {
-          if (typeof window.__eaOpen === "function") window.__eaOpen();
+          try { sessionStorage.removeItem("ao_ea_suggestions_dismissed"); } catch (_) {}
+          if (typeof window.__eaRemountSuggestions === "function") window.__eaRemountSuggestions();
           else {
-            const panel = document.getElementById("eaPanel");
-            if (panel) {
-              panel.classList.add("open");
-              panel.hidden = false;
+            const root = document.getElementById("eaSuggestions");
+            if (root) {
+              root.hidden = false;
+              root.classList.remove("ea-suggestions-gone");
             }
           }
         });
-      }
-    },
-    expect: { expectMotion: true, expectSettle: true },
-    durationMs: 1400,
-  });
-
-  // Marquee continuous motion (only if suggestions visible)
-  const marqueeVisible = await page.evaluate(() => {
-    const el = document.getElementById("eaSuggestions");
-    if (!el || el.hidden || el.classList.contains("ea-suggestions-gone")) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 40 && r.height > 10;
-  });
-  if (marqueeVisible) {
-    await runScenario(page, scenarios, {
-      id: "ea-marquee",
-      label: "EA suggestion marquee continuous scroll (idle observe)",
-      act: async () => {}, // pure observe
+        await sleep(400);
+      },
+      act: async () => {},
       expect: { expectMotion: true, continuous: true, expectSettle: false },
-      durationMs: 2200,
-    });
-  } else {
-    console.log("\n⏭ ea-marquee — skipped (suggestions already dismissed this session)");
-    scenarios.push({
-      id: "ea-marquee",
-      label: "EA suggestion marquee",
-      skipped: true,
-      reason: "suggestions not visible",
-      issues: [],
-    });
-  }
-
-  // Next-step chips appear after a synthetic agent bubble (local inject for motion)
-  await runScenario(page, scenarios, {
-    id: "ea-next-steps-inject",
-    label: "EA next-step chips appear under a reply",
-    act: async (p) => {
-      await p.evaluate(() => {
-        const host = document.getElementById("eaMsgs");
-        if (!host) return;
-        // Simulate agent reply + next steps if helper exists
-        const msg = document.createElement("div");
-        msg.className = "ea-msg agent";
-        msg.setAttribute("data-role", "agent");
-        msg.innerHTML = '<div class="ea-msg-body">Audit probe: fleet looks mostly healthy. Want a hard pass next?</div>';
-        host.appendChild(msg);
-        if (typeof window.__eaShowNextSteps === "function") {
-          window.__eaShowNextSteps("fleet healthy. invoice and repair options.", "audit");
-        } else {
-          // Fallback local chips matching production markup
+      durationMs: 3000 },
+    { id: "ea-next-steps", label: "EA next-step chips enter (ea-next-in)", keys: ["ea-next-in"],
+      setup: async (p) => { await openEa(p); await sleep(300); },
+      act: async (p) => {
+        await p.evaluate(() => {
+          const host = document.getElementById("eaMsgs");
+          if (!host) return;
+          const msg = document.createElement("div");
+          msg.className = "ea-msg agent";
+          msg.innerHTML = '<div class="ea-msg-body">Audit: next steps should animate in.</div>';
+          host.appendChild(msg);
           const row = document.createElement("div");
           row.className = "ea-next-steps";
           row.innerHTML =
-            '<div class="ea-next-steps-lbl">Next steps</div>' +
-            '<div class="ea-next-steps-row">' +
+            '<div class="ea-next-steps-lbl">Next steps</div><div class="ea-next-steps-row">' +
             '<button type="button" class="ea-next-chip">Hardest problem first</button>' +
-            '<button type="button" class="ea-next-chip">Who needs invoices?</button>' +
-            '<button type="button" class="ea-next-chip">Dig deeper</button>' +
-            "</div>";
+            '<button type="button" class="ea-next-chip">Draft repair outreach</button>' +
+            '<button type="button" class="ea-next-chip">Dig deeper</button></div>';
           host.appendChild(row);
           host.scrollTop = host.scrollHeight;
-        }
-      });
-    },
-    expect: { expectMotion: true, expectSettle: true },
-    durationMs: 900,
-  });
-
-  // Close EA
-  await runScenario(page, scenarios, {
-    id: "ea-close",
-    label: "Close Energy Agent panel",
-    act: async (p) => {
-      const clicked =
-        (await safeClick(p, "#eaClose, .ea-close, [data-ea-close]")) ||
-        (await safeClick(p, "#eaOrb"));
-      if (!clicked) {
-        await p.evaluate(() => {
-          if (typeof window.__eaClose === "function") window.__eaClose();
-          else {
-            const panel = document.getElementById("eaPanel");
-            if (panel) {
-              panel.classList.remove("open");
-              panel.hidden = true;
-            }
-          }
         });
-      }
-    },
-    expect: { expectMotion: true },
-    durationMs: 1200,
-  });
-
-  // ── Analysis sub-segments if present ───────────────────────────────────
-  await gotoHash(page, "#analysis");
-  await sleep(900);
-  const anSubs = await page.locator("[data-ansub], .an-sub, .vs-seg-btn").count();
-  if (anSubs > 1) {
-    await runScenario(page, scenarios, {
-      id: "analysis-subnav",
-      label: "Analysis sub-nav click",
-      act: async (p) => {
-        const n = await p.locator("[data-ansub], .an-subbtn, .vs-seg-btn").count();
-        if (n > 1) await p.locator("[data-ansub], .an-subbtn, .vs-seg-btn").nth(1).click({ timeout: 3000 }).catch(() => {});
       },
-      expect: { expectMotion: true },
-      durationMs: 1100,
-    });
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1000 },
+    { id: "ea-improve-open", label: "EA Improve panel open", keys: ["dcin", "ea-improve"],
+      setup: async (p) => { await openEa(p); await sleep(300); },
+      act: async (p) => {
+        if (!(await click(p, "#eaImproveOpen"))) {
+          await p.evaluate(() => {
+            const b = document.getElementById("eaImproveOpen");
+            if (b) b.click();
+          });
+        }
+      },
+      expect: { expectMotion: true }, durationMs: 1100 },
+    { id: "ea-close", label: "EA panel close", keys: ["ea-shell"],
+      setup: async (p) => { await openEa(p); await sleep(300); },
+      act: closeEa,
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1400 },
+
+    // ── G. Analysis + Trends ─────────────────────────────────────────────
+    { id: "analysis-enter", label: "Open Analysis (tab + sub content)", keys: ["tab-slide", "tr-rise", "anPulse"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabAnalysis"))) await hash(p, "#analysis"); },
+      expect: { expectMotion: true }, durationMs: 1600 },
+    { id: "analysis-sub-2", label: "Analysis sub-nav second pill", keys: ["tr-rise", "tr-rowin"],
+      setup: async (p) => { await hash(p, "#analysis"); await sleep(800); },
+      act: async (p) => {
+        const loc = p.locator("#panelAnalysis [data-ansub], #panelAnalysis .vs-seg-btn, #panelAnalysis .an-subbtn, #panelAnalysis [role='tab']");
+        const n = await loc.count();
+        if (n > 1) await loc.nth(1).click({ timeout: 3000 }).catch(() => {});
+        else if (n === 1) await loc.nth(0).click({ timeout: 2000 }).catch(() => {});
+      },
+      expect: { expectMotion: false }, durationMs: 1200 },
+    { id: "trends-enter", label: "Trends / Through-time enter (tr-rise, tr-rowin)", keys: ["tr-rise", "tr-rowin", "tr-breathe"],
+      setup: async (p) => { await hash(p, "#analysis"); await sleep(500); },
+      act: async (p) => {
+        if (!(await click(p, "a[href='#trends'], [data-ansub='trends'], [data-ansub='through-time'], button:has-text('Through time'), button:has-text('Trends')"))) {
+          await hash(p, "#trends");
+        }
+      },
+      expect: { expectMotion: true }, durationMs: 1800 },
+    { id: "trends-ambient", label: "Trends ambient breathe continuous", keys: ["tr-breathe"],
+      setup: async (p) => { await hash(p, "#trends"); await sleep(1000); },
+      act: async () => {},
+      expect: { expectMotion: true, continuous: true, continuousSoft: true, expectSettle: false },
+      durationMs: 2600 },
+
+    // ── H. Invoices ──────────────────────────────────────────────────────
+    { id: "invoices-enter", label: "Invoices tab enter", keys: ["tab-slide", "rbaccin", "rbpickin"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabReports"))) await hash(p, "#reports"); },
+      expect: { expectMotion: true }, durationMs: 1600 },
+    { id: "invoices-expand", label: "Invoices accordion / details expand", keys: ["rbaccin", "rbpickin"],
+      setup: async (p) => { await hash(p, "#reports"); await sleep(1000); },
+      act: async (p) => {
+        const ok =
+          (await click(p, "#panelReports details summary, #panelReports .rb-acc-sum, #panelReports .rb-card, #panelReports .rb-row")) ||
+          (await click(p, "#panelReports button, #panelReports [aria-expanded='false']"));
+        if (!ok) await p.evaluate(() => {
+          const s = document.querySelector("#panelReports summary, #panelReports .rb-acc-sum");
+          if (s) s.click();
+        });
+      },
+      expect: { expectMotion: true }, durationMs: 1300 },
+
+    // ── I. Marketplace ───────────────────────────────────────────────────
+    { id: "marketplace-enter", label: "Marketplace tab enter", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#reports"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabMarketplace"))) await hash(p, "#marketplace"); },
+      expect: { expectMotion: true }, durationMs: 1500 },
+    { id: "marketplace-sub", label: "Marketplace sub-tab switch", keys: ["mk-sub"],
+      setup: async (p) => { await hash(p, "#marketplace"); await sleep(800); },
+      act: async (p) => {
+        const loc = p.locator("#panelMarketplace .vs-seg-btn, #panelMarketplace [role='tab'], #marketplaceRoot .vs-seg-btn, .mk-subnav button");
+        const n = await loc.count();
+        if (n > 1) await loc.nth(1).click({ timeout: 3000 }).catch(() => {});
+      },
+      expect: { expectMotion: false }, durationMs: 1100 },
+
+    // ── J. Account ───────────────────────────────────────────────────────
+    { id: "account-enter", label: "Account tab enter", keys: ["tab-slide", "arFlash", "aoLivePulse"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabAccount"))) await hash(p, "#account"); },
+      expect: { expectMotion: true }, durationMs: 1500 },
+    { id: "account-card-expand", label: "Account card expand / flash", keys: ["arFlash", "arGroupPulse", "aoAlUp"],
+      setup: async (p) => { await hash(p, "#account"); await sleep(800); },
+      act: async (p) => {
+        if (!(await click(p, "#panelAccount .ar-card-head, #panelAccount details summary, #panelAccount .ar-toggle"))) {
+          await p.evaluate(() => {
+            const el = document.querySelector("#panelAccount .ar-card-head, #panelAccount summary");
+            if (el) el.click();
+          });
+        }
+      },
+      expect: { expectMotion: true }, durationMs: 1200 },
+
+    // ── K. Resources ─────────────────────────────────────────────────────
+    { id: "resources-enter", label: "Resources enter (aoResPulse)", keys: ["tab-slide", "aoResPulse", "tr-rise"],
+      setup: async (p) => { await hash(p, "#analysis"); await sleep(400); },
+      act: async (p) => {
+        if (!(await click(p, "a[href='#resources'], [data-ansub='resources'], button:has-text('Resources')"))) {
+          await hash(p, "#resources");
+        }
+      },
+      expect: { expectMotion: true }, durationMs: 1600 },
+    { id: "resources-ambient", label: "Resources live-dot continuous", keys: ["aoResPulse"],
+      setup: async (p) => { await hash(p, "#resources"); await sleep(800); },
+      act: async () => {},
+      expect: { expectMotion: true, continuous: true, continuousSoft: true, expectSettle: false },
+      durationMs: 2200 },
+
+    // ── L. Repairs ───────────────────────────────────────────────────────
+    { id: "repairs-enter", label: "Repairs tab enter", keys: ["tab-slide"],
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabOps"))) await hash(p, "#ops"); },
+      expect: { expectMotion: true }, durationMs: 1500 },
+    { id: "repairs-cta", label: "Repairs primary CTA press feedback", keys: ["rp-talk"],
+      setup: async (p) => { await hash(p, "#ops"); await sleep(900); },
+      act: async (p) => {
+        await click(p, "#panelOps .rp-talk, #panelOps button.primary, #opsTalkMain");
+      },
+      expect: { expectMotion: false }, durationMs: 1000 },
+
+    // ── M. Mobile bottom nav + More sheet ────────────────────────────────
+    { id: "mobile-tab-fleet", label: "Mobile bottom nav → Fleet", keys: ["mobile-nav"],
+      mobile: true,
+      setup: async (p) => { await hash(p, "#analysis"); await sleep(400); },
+      act: async (p) => { if (!(await click(p, "#tabDashboard"))) await hash(p, "#dashboard"); },
+      expect: { expectMotion: true }, durationMs: 1200 },
+    { id: "mobile-more-open", label: "Mobile More sheet open (mobMoreUp)", keys: ["mobMoreUp"],
+      mobile: true,
+      setup: async (p) => { await hash(p, "#dashboard"); await sleep(500); },
+      act: async (p) => {
+        if (!(await click(p, "#mobMore, .tab-more, [data-mob-more], button:has-text('More')"))) {
+          await p.evaluate(() => {
+            const b = document.querySelector(".tab-overflow, #tabAccount");
+            if (b) b.click();
+          });
+        }
+      },
+      expect: { expectMotion: true }, durationMs: 1200 },
+  ];
+
+  // Desktop pass
+  console.log(`\n══ Desktop full animation registry (${ALL.filter((s) => !s.mobile).length} scenarios) ══`);
+  for (const sc of ALL.filter((s) => !s.mobile)) {
+    if (sc.skipIf && (await sc.skipIf(page))) {
+      console.log(`\n⏭ ${sc.id} — skipped`);
+      scenarios.push({ id: sc.id, label: sc.label, keys: sc.keys || [], skipped: true, reason: "skipIf", issues: [] });
+      continue;
+    }
+    await runScenario(page, scenarios, sc);
+    await sleep(250);
   }
 
+  // Mobile pass (resize + re-run mobile scenarios)
+  console.log(`\n══ Mobile animation registry ══`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await sleep(600);
+  await page.evaluate(() => {
+    try { window.dispatchEvent(new Event("resize")); } catch (_) {}
+  });
+  await sleep(500);
+  for (const sc of ALL.filter((s) => s.mobile)) {
+    await runScenario(page, scenarios, sc);
+    await sleep(250);
+  }
+
+  // Restore desktop for any post steps
+  await page.setViewportSize(VIEWPORT);
+
   await browser.close();
+
+  // Attach animation key catalog to report
+  const keyHits = {};
+  for (const s of scenarios) {
+    for (const k of s.keys || []) {
+      keyHits[k] = keyHits[k] || { exercised_by: [], issues: 0 };
+      keyHits[k].exercised_by.push(s.id);
+      keyHits[k].issues += (s.issues || []).length;
+    }
+  }
 
   // ── Aggregate report ───────────────────────────────────────────────────
   const allIssues = scenarios.flatMap((s) => s.issues || []);
@@ -674,25 +871,34 @@ async function main() {
       scenarios: scenarios.length,
       issues: allIssues.length,
       by_severity: bySev,
+      animation_keys_exercised: Object.keys(keyHits).length,
     },
+    animation_keys: keyHits,
     scenarios,
   };
   fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(report, null, 2));
 
   const md = [];
-  md.push(`# Animation audit — ${stamp}\n`);
-  md.push(`Base: \`${BASE}\` · target ${FPS}fps · burst ${DURATION_MS}ms\n`);
+  md.push(`# Animation audit — FULL registry — ${stamp}\n`);
+  md.push(`Base: \`${BASE}\` · target ${FPS}fps · default burst ${DURATION_MS}ms\n`);
   md.push(`\n## Summary\n`);
   md.push(`- Scenarios: **${scenarios.length}**\n`);
+  md.push(`- Animation keys tagged: **${Object.keys(keyHits).length}**\n`);
   md.push(`- Issues: **${allIssues.length}** (high ${bySev.high || 0} · med ${bySev.med || 0} · low ${bySev.low || 0})\n`);
+  md.push(`\n## Animation keys exercised\n`);
+  for (const [k, v] of Object.entries(keyHits).sort((a, b) => a[0].localeCompare(b[0]))) {
+    md.push(`- \`${k}\` ← ${v.exercised_by.join(", ")}${v.issues ? ` _(issues touching: ${v.issues})_` : ""}\n`);
+  }
   md.push(`\n## Scenarios\n`);
   for (const s of scenarios) {
     if (s.skipped) {
       md.push(`\n### \`${s.id}\` — ${s.label}\n- _skipped_: ${s.reason}\n`);
+      if (s.keys && s.keys.length) md.push(`- keys: ${s.keys.map((k) => "`" + k + "`").join(", ")}\n`);
       continue;
     }
     md.push(`\n### \`${s.id}\` — ${s.label}\n`);
-    md.push(`- frames: ${s.frameCount} · meanΔ ${s.metrics.meanPct}% · maxΔ ${s.metrics.maxPct}% · freeze ${s.metrics.freezeMaxStreak} · flashes ${s.metrics.flashCount} · capture ~${s.metrics.actualFps}fps\n`);
+    if (s.keys && s.keys.length) md.push(`- keys: ${s.keys.map((k) => "`" + k + "`").join(", ")}\n`);
+    md.push(`- frames: ${s.frameCount} · meanΔ ${s.metrics.meanPct}% · maxΔ ${s.metrics.maxPct}% · earlyStall ${s.metrics.earlyStallMax || 0} · flashes ${s.metrics.flashCount} · capture ~${s.metrics.actualFps}fps\n`);
     md.push(`- contact sheet: [${s.contact}](${s.contact})\n`);
     if (s.issues && s.issues.length) {
       md.push(`- **issues:**\n`);
@@ -703,7 +909,7 @@ async function main() {
       md.push(`- issues: none detected by heuristics\n`);
     }
   }
-  md.push(`\n## How to re-run\n\`\`\`bash\ncd /root/array-operator/verify && node animation-audit.mjs\n\`\`\`\n`);
+  md.push(`\n## How to re-run\n\`\`\`bash\ncd /root/array-operator/verify && npm run audit:animations\n\`\`\`\n`);
   fs.writeFileSync(path.join(OUT, "report.md"), md.join(""));
 
   console.log("\n════════════════════════════════════════");

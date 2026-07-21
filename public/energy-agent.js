@@ -3390,15 +3390,21 @@
  );
  }
 
- function mountSuggestionMarquee() {
+ function mountSuggestionMarquee(force) {
  var root = document.getElementById("eaSuggestions");
- if (!root || root._mounted) return;
+ if (!root) return;
+ if (root._mounted && !force) return;
  root._mounted = true;
 
- // Already used EA this tab session → never show the on-ramp again.
- if (suggestionsDismissedThisSession()) {
+ // Already used EA this tab session → never show the on-ramp again (unless force for audit).
+ if (!force && suggestionsDismissedThisSession()) {
  dismissSuggestionMarquee();
  return;
+ }
+ if (force) {
+ try { sessionStorage.removeItem(EA_SUG_SESSION_KEY); } catch (e0) {}
+ root.hidden = false;
+ root.classList.remove("ea-suggestions-gone");
  }
 
  var html = "";
@@ -3443,6 +3449,7 @@
  if (!root.contains(e.relatedTarget)) root.classList.remove("ea-sug-paused");
  });
  }
+ try { window.__eaRemountSuggestions = function () { mountSuggestionMarquee(true); }; } catch (eR) {}
 
  // ── chat ─────────────────────────────────────────────────────────────────
  async function sendText() {
