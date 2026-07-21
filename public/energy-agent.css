@@ -1243,6 +1243,16 @@ html:not(.sky) .ea-footer{
   /* side fades so chips dissolve at the rail edges */
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  transition: opacity .2s ease, max-height .25s ease, margin .2s ease;
+  max-height: 80px;
+}
+.ea-suggestions[hidden],
+.ea-suggestions.ea-suggestions-gone{
+  display: none !important;
+  max-height: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 .ea-sug-row{
   overflow: hidden;

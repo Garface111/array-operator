@@ -2827,6 +2827,8 @@
  });
  state._historyPainted = n > 0;
  scrollMsgsToEnd();
+ // Existing thread = not a first-use on-ramp moment; hide suggestion marquee.
+ if (n > 0) dismissSuggestionMarquee();
  // Subtle cue when there's scrollback
  if (n > 4) {
  setStatus("Restored " + n + " messages, scroll up for earlier", "on");
@@ -3219,6 +3221,25 @@
  ],
  ];
 
+ // Session-only: marquee is a first-use on-ramp. After the first user message
+ // this browser tab session, stay gone (sessionStorage survives soft reloads).
+ var EA_SUG_SESSION_KEY = "ao_ea_suggestions_dismissed";
+
+ function suggestionsDismissedThisSession() {
+ try { return sessionStorage.getItem(EA_SUG_SESSION_KEY) === "1"; } catch (e) { return false; }
+ }
+
+ function dismissSuggestionMarquee() {
+ try { sessionStorage.setItem(EA_SUG_SESSION_KEY, "1"); } catch (e) {}
+ var root = document.getElementById("eaSuggestions");
+ if (!root) return;
+ root.hidden = true;
+ root.setAttribute("aria-hidden", "true");
+ root.classList.add("ea-suggestions-gone");
+ // Stop animations / free a bit of paint once dismissed
+ try { root.innerHTML = ""; } catch (e2) {}
+ }
+
  function _eaSugBtnHtml(item) {
  var label = String(item.label || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
  var prompt = String(item.prompt || item.label || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -3235,6 +3256,12 @@
  if (!root || root._mounted) return;
  root._mounted = true;
 
+ // Already used EA this tab session → never show the on-ramp again.
+ if (suggestionsDismissedThisSession()) {
+ dismissSuggestionMarquee();
+ return;
+ }
+
  var html = "";
  for (var r = 0; r < EA_SUGGESTION_ROWS.length; r++) {
  var row = EA_SUGGESTION_ROWS[r];
@@ -3249,6 +3276,8 @@
  "</div></div>";
  }
  root.innerHTML = html;
+ root.hidden = false;
+ root.removeAttribute("aria-hidden");
 
  root.addEventListener("click", function (e) {
  var btn = e.target && e.target.closest ? e.target.closest(".ea-sug") : null;
@@ -3256,14 +3285,8 @@
  e.preventDefault();
  var prompt = (btn.getAttribute("data-ea-prompt") || "").trim();
  if (!prompt) return;
- btn.classList.add("ea-sug-fired");
- setTimeout(function () { try { btn.classList.remove("ea-sug-fired"); } catch (e2) {} }, 600);
- // Pause that row briefly so click feels intentional (animation resumes via CSS)
- var rowEl = btn.closest(".ea-sug-row");
- if (rowEl) {
- rowEl.classList.add("ea-sug-row-paused");
- setTimeout(function () { try { rowEl.classList.remove("ea-sug-row-paused"); } catch (e3) {} }, 1800);
- }
+ // Dismiss immediately — this counts as their first message this session.
+ dismissSuggestionMarquee();
  if (typeof window.__eaSendText === "function") {
  window.__eaSendText(prompt, { source: "suggestion_chip" });
  } else {
@@ -3464,6 +3487,8 @@
  if (!text && pendingAttach.length) {
  text = "Please analyze the attached file(s).";
  }
+ // First real user turn this browser session → marquee on-ramp goes away.
+ dismissSuggestionMarquee();
  // Hard stop first, works even if a previous turn is still thinking/speaking
  if (isStopCommand(text)) {
  if (!opts.userAlreadyShown) addMsg("user", text);
