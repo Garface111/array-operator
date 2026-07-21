@@ -17,6 +17,16 @@
   /* Legacy name used by overlays / hands-off / older rules — same as content inset
      (no longer “card + left gap + right gap” re-center footprint). */
   --ea-footprint: var(--ea-content-inset);
+  /* Shared motion for open/close AND regular↔Repairs morph (one curve everywhere).
+     Slightly longer than the old 340ms so width/left morphs don’t feel snappy. */
+  --ea-ease: cubic-bezier(.2,.8,.2,1);
+  --ea-dur: .42s;
+  /* Defaults for ops dual-pane geometry (overridden on body.ea-on-ops). Always
+     defined so leaving ops can interpolate back instead of snapping from unset. */
+  --ea-ops-left: var(--ea-gap);
+  --ea-ops-top: var(--ea-gap);
+  --ea-ops-content-pad: 0px;
+  --ea-ops-wrap-max: min(1680px, calc(100vw - 24px));
   --ea-sky: #38bdf8;
   --ea-sky2: #0ea5e9;
   --ea-sun: #fbbf24;
@@ -163,6 +173,9 @@ html.sky #tabbar .tab.ea-tab.active .ea-tab-ic{
   color: #0c4a6e; font: inherit; font-size: 12.5px; font-weight: 740;
   cursor: pointer; box-shadow: 0 10px 28px -12px rgba(14,165,233,.55);
   animation: eaGatePulse 1.8s ease-in-out infinite;
+  /* left/top morph with the EA rail (regular ↔ Repairs); short transform for hover */
+  transition: left var(--ea-dur) var(--ea-ease), top var(--ea-dur) var(--ea-ease),
+              transform .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .ea-mic-gate[hidden]{ display: none !important; }
 .ea-mic-gate:hover{ transform: translateY(-1px); border-color: rgba(14,165,233,.55); }
@@ -175,7 +188,7 @@ html:not(.sky) .ea-mic-gate{
   background: linear-gradient(180deg, var(--card,#111827), var(--card2,#0b1220));
   color: var(--ink,#e5e7eb); border-color: rgba(56,189,248,.35);
 }
-/* When dock is open, park the gate above the rail */
+/* When dock is open, park the gate above the rail (positions transition on desktop) */
 body.ea-shell-open .ea-mic-gate{ left: calc(var(--ea-gap) + var(--ea-rail) + 16px); top: 16px; }
 
 /* ── Left dock — a FLOATING rounded card (inset from every edge, not a slab) ── */
@@ -244,23 +257,23 @@ body.ea-shell-open .panel.active{
 }
 /* Shell-only transition — not nested content .wrap (Resources) */
 body > .wrap{
-  transition: transform .34s cubic-bezier(.2,.8,.2,1),
-              margin-left .34s cubic-bezier(.2,.8,.2,1),
-              max-width .34s cubic-bezier(.2,.8,.2,1);
+  transition: transform var(--ea-dur) var(--ea-ease),
+              margin-left var(--ea-dur) var(--ea-ease),
+              margin-right var(--ea-dur) var(--ea-ease),
+              max-width var(--ea-dur) var(--ea-ease);
   min-width: 0;
 }
 
-/* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
-   The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
-   on TRANSFORM, so it glides both IN on open and back OUT on close (the X /
-   minimize) — in lockstep with the .wrap content shift, on the same smooth
-   ease-out curve the mobile sheet uses (cubic-bezier(.2,.8,.2,1), ~340ms; the
-   researched ~250–320ms band, nudged up a touch for a smoother settle). Using a
-   transition (not a one-shot keyframe) also makes it INTERRUPTIBLE: closing
-   mid-open reverses smoothly from wherever it is instead of snapping.
-   `visibility` (delayed one duration on close) keeps the parked rail out of the
-   a11y tree + hit-testing without a display:none that would kill the exit slide.
-   Scoped ≥961px so the mobile bottom-sheet (translateY, further down) is untouched. */
+/* Repairs content pad morphs when dual-pane engages */
+#panelOps{
+  transition: margin-left var(--ea-dur) var(--ea-ease);
+}
+
+/* ── Energy Agent dock — open/close + size morph (desktop) ─────────────────
+   Parked off-screen via translateX; open/close and regular↔Repairs geometry
+   (width / left / top) all share --ea-dur / --ea-ease so nothing snaps 0→1.
+   Interruptible: reverse mid-morph continues from current computed style.
+   Scoped ≥961px — mobile bottom-sheet is separate. */
 @media (min-width: 961px){
   #eaPanel{
     display: flex;
@@ -269,36 +282,51 @@ body > .wrap{
     transform: translateX(calc(-100% - var(--ea-gap) - 28px));
     visibility: hidden;
     pointer-events: none;
-    will-change: transform;
-    transition: transform .34s cubic-bezier(.2,.8,.2,1),
-                visibility 0s linear .34s;
+    will-change: transform, width, left, top;
+    /* Geometry ALWAYS transitions — regular rail ↔ Repairs wide is a morph,
+       not a second open. visibility only delayed on the close path. */
+    transition:
+      transform var(--ea-dur) var(--ea-ease),
+      width var(--ea-dur) var(--ea-ease),
+      max-width var(--ea-dur) var(--ea-ease),
+      top var(--ea-dur) var(--ea-ease),
+      left var(--ea-dur) var(--ea-ease),
+      bottom var(--ea-dur) var(--ea-ease),
+      border-radius var(--ea-dur) var(--ea-ease),
+      visibility 0s linear var(--ea-dur);
   }
   #eaPanel.open{
     transform: translateX(0);
     visibility: visible;
     pointer-events: auto;
-    transition: transform .34s cubic-bezier(.2,.8,.2,1),
-                visibility 0s;
+    transition:
+      transform var(--ea-dur) var(--ea-ease),
+      width var(--ea-dur) var(--ea-ease),
+      max-width var(--ea-dur) var(--ea-ease),
+      top var(--ea-dur) var(--ea-ease),
+      left var(--ea-dur) var(--ea-ease),
+      bottom var(--ea-dur) var(--ea-ease),
+      border-radius var(--ea-dur) var(--ea-ease),
+      visibility 0s;
   }
   /* Pack the main column tight against the floating EA card (no re-center
-     sky gutter). margin-left parks it just past the card; transform stays none
-     so we don’t double-shift with ops dual-pane / hands-off rules. */
+     sky gutter). Length-valued margin-left so ops dual-pane can morph to a
+     different inset instead of jumping margin-left:auto (not interpolable). */
   body.ea-shell-open > .wrap{
     max-width: min(1440px, calc(100vw - var(--ea-content-inset) - 16px));
     transform: none;
     margin-left: var(--ea-content-inset) !important;
     margin-right: auto !important;
     width: auto;
-    transition: margin-left .34s cubic-bezier(.2,.8,.2,1),
-                max-width .34s cubic-bezier(.2,.8,.2,1);
   }
-  /* Ops dual-pane / hands-off own their own .wrap rules (transform/margin). */
 }
 @media (prefers-reduced-motion: reduce){
   body.ea-shell-open > .wrap,
   body > .wrap{ transition: none; }
   #eaPanel,
   #eaPanel.open{ transition: none; }
+  .ea-mic-gate,
+  #panelOps{ transition: none; }
 }
 
 /* App modals (openModal / AODialog / claim) center on the FULL viewport by
@@ -446,47 +474,47 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
    · Chat LEFT edge lines up with the Energy Agent top-tab (leftmost control)
    · Repairs fills the column to the right
 
-   Desktop ≥961px; mobile sheet untouched. Hands-off side-by-side excluded. */
+   Geometry uses the SAME transition list as the regular rail so toggling
+   ea-on-ops morphs width/left/top/wrap-margin — never snaps. Desktop ≥961px. */
 @media (min-width: 961px){
-  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
+  /* Set geometry vars whenever we're on Repairs (even if EA closed) so opening
+     the agent already targets dual-pane dimensions — one smooth entrance. */
+  body.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
     --ea-rail: min(560px, 42vw);
-    /* Must match the dual-pane .wrap max-width below */
     --ea-ops-wrap-max: min(1680px, calc(100vw - 24px));
     /* CSS-first align: centered wrap left + .wrap pad (28) + sky tabbar pad (6).
-       JS may refine with the live EA tab getBoundingClientRect. */
+       JS may refine with the live EA tab getBoundingClientRect after settle. */
     --ea-ops-left: calc((100vw - var(--ea-ops-wrap-max)) / 2 + 28px + 6px);
     --ea-ops-top: 88px;
-    /* With tab-aligned left, content pad ≈ rail + small gap (inside wrap) */
     --ea-ops-content-pad: calc(var(--ea-rail) + 18px);
+    /* Content inset for overlays / mic follows the wide rail while on ops */
+    --ea-content-inset: calc(var(--ea-ops-left) + var(--ea-rail) + var(--ea-content-gap));
   }
   @media (min-width: 1280px){
-    body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
+    body.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
       --ea-rail: min(640px, 46vw);
     }
   }
 
-  /* Full-bleed chrome — tabbar spans the whole window above both panes */
+  /* Full-bleed chrome — tabbar spans the whole window above both panes.
+     margin-left is a LENGTH (centered inset), not auto — so it interpolates
+     from the regular packed inset when entering/leaving Repairs. */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) > .wrap{
     transform: none !important;
     max-width: var(--ea-ops-wrap-max) !important;
     width: 100%;
-    margin-left: auto !important;
+    margin-left: calc((100vw - var(--ea-ops-wrap-max)) / 2) !important;
     margin-right: auto !important;
   }
 
-  /* Wide chat card: under the tabbar; left edge = Energy Agent top-tab */
+  /* Wide chat card: under the tabbar; left edge = Energy Agent top-tab.
+     Transitions inherit from the base #eaPanel rule (width/left/top). */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #eaPanel{
     top: var(--ea-ops-top);
-    left: var(--ea-ops-left) !important;
+    left: var(--ea-ops-left);
     bottom: var(--ea-gap);
     width: var(--ea-rail);
     max-width: min(var(--ea-rail), calc(100vw - var(--ea-ops-left) - var(--ea-gap)));
-    transition:
-      transform .34s cubic-bezier(.2,.8,.2,1),
-      visibility 0s linear 0s,
-      width .34s cubic-bezier(.2,.8,.2,1),
-      top .34s cubic-bezier(.2,.8,.2,1),
-      left .34s cubic-bezier(.2,.8,.2,1);
   }
 
   /* Repairs column sits in the right pane (clear of the chat card) */
@@ -503,7 +531,7 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
     margin-top: 12px;
   }
 
-  /* Mic gate parks above the wide rail */
+  /* Mic gate parks above the wide rail (inherits left/top transition) */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .ea-mic-gate{
     left: calc(var(--ea-ops-left) + var(--ea-rail) + 16px);
     top: calc(var(--ea-ops-top) + 8px);

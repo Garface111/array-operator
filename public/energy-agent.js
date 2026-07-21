@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721opsAlign2";
+ var EA_BUILD = "20260721eaMorph1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3039,14 +3039,8 @@
  tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
  } catch (e) {}
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
- // Repairs dual-pane: widen rail + tuck under tabbar when on #ops
+ // Repairs dual-pane: morph rail + tuck under tabbar when on #ops
  try { syncOpsWideClass(); } catch (eOps) {}
- try {
- if (document.body.classList.contains("ea-on-ops")) {
- requestAnimationFrame(syncEaOpsAlign);
- setTimeout(syncEaOpsAlign, 80);
- }
- } catch (eAlign) {}
  // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
  try {
  requestAnimationFrame(function () {
@@ -7326,9 +7320,23 @@
 
  /** Body class for Repairs dual-pane CSS (wide chat under full tabbar). */
  var _eaWasOnOps = false;
+ var _eaAlignTimers = [];
+ var EA_MORPH_MS = 420; // keep in sync with --ea-dur in energy-agent.css
  function isOpsHash(h) {
  h = String(h || "").toLowerCase();
  return h === "#ops" || h === "#claims" || h === "#repairs";
+ }
+ function clearEaAlignTimers() {
+ _eaAlignTimers.forEach(function (t) { try { clearTimeout(t); } catch (e) {} });
+ _eaAlignTimers = [];
+ }
+ function clearEaOpsInlineVars() {
+ try {
+ var root = document.documentElement;
+ root.style.removeProperty("--ea-ops-left");
+ root.style.removeProperty("--ea-ops-top");
+ root.style.removeProperty("--ea-ops-content-pad");
+ } catch (e) {}
  }
  function syncOpsWideClass() {
  var onOps = false;
@@ -7339,40 +7347,54 @@
  if (p && p.classList.contains("active")) onOps = true;
  }
  } catch (e) {}
+
+ var entering = onOps && !_eaWasOnOps;
+ var leaving = !onOps && _eaWasOnOps;
+ _eaWasOnOps = onOps;
+
  try {
  document.body.classList.toggle("ea-on-ops", !!onOps);
  } catch (e2) {}
 
+ // Leaving Repairs: drop live-measured vars after the morph finishes so we
+ // don't snap mid-flight, then CSS defaults take over for the next visit.
+ if (leaving) {
+ clearEaAlignTimers();
+ _eaAlignTimers.push(setTimeout(clearEaOpsInlineVars, EA_MORPH_MS + 40));
+ }
+
  // Entering Repairs → auto-open Energy Agent (desktop dual-pane + mobile sheet).
  // Only on enter so closing the agent while staying on Repairs is respected.
- var entering = onOps && !_eaWasOnOps;
- _eaWasOnOps = onOps;
+ // ea-on-ops is already on, so the open slide lands at dual-pane size (one motion).
  if (entering && signedIn() && !state.open) {
  try {
  setOpen(true).catch(function () {});
  } catch (eOpen) {}
  }
 
- // Align chat card under the Energy Agent top tab after layout settles
+ // Live tab-edge refine: once after layout, once after morph settles.
+ // Avoid mid-morph setProperty storms (they caused stepped/jumpy frames).
  if (onOps) {
+ clearEaAlignTimers();
  requestAnimationFrame(function () {
- syncEaOpsAlign();
- setTimeout(syncEaOpsAlign, 80);
- setTimeout(syncEaOpsAlign, 360); // after open slide settles
+ syncEaOpsAlign({ soft: true });
  });
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, EA_MORPH_MS + 30));
  }
  }
 
  /**
  * Line up #eaPanel's left edge with the Energy Agent top-tab, park the card
  * just under the tabbar, and pad #panelOps clear of the fixed chat.
- * CSS already approximates wrap+tabbar inset; this refines with live geometry
- * (trial banners, exact tab metrics). Desktop dual-pane ≥961px.
+ * CSS already approximates wrap+tabbar inset; this refines with live geometry.
+ * soft:true — only apply if delta is meaningful (avoids 1px thrash during morph).
  */
- function syncEaOpsAlign() {
+ function syncEaOpsAlign(opts) {
+ opts = opts || {};
  try {
  if (!document.body.classList.contains("ea-on-ops")) return;
- if (!document.body.classList.contains("ea-shell-open")) return;
  if (window.matchMedia && !window.matchMedia("(min-width: 961px)").matches) return;
 
  var root = document.documentElement;
@@ -7383,29 +7405,38 @@
  var wrap = document.querySelector("body > .wrap");
  if (!root) return;
 
- // Prefer the live Energy Agent tab left edge (Ford: "line up with leftmost tab")
+ var nextLeft = null;
+ var nextTop = null;
+
  if (tab) {
  var tabRect = tab.getBoundingClientRect();
- // Ignore a bogus measure while layout is still mid-slide (tab off-screen / zero)
  if (tabRect.width > 8 && tabRect.left >= 0 && tabRect.left < window.innerWidth) {
- root.style.setProperty("--ea-ops-left", Math.round(tabRect.left) + "px");
+ nextLeft = Math.round(tabRect.left);
  }
+ }
+ if (tabbar) {
+ nextTop = Math.max(64, Math.round(tabbar.getBoundingClientRect().bottom + 10));
  }
 
- if (tabbar) {
- var top = Math.round(tabbar.getBoundingClientRect().bottom + 10);
- root.style.setProperty("--ea-ops-top", Math.max(64, top) + "px");
+ // soft pass: skip tiny corrections while the morph is still running
+ if (opts.soft) {
+ var curLeft = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-left")) || 0;
+ var curTop = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-top")) || 0;
+ if (nextLeft != null && Math.abs(nextLeft - curLeft) < 6) nextLeft = null;
+ if (nextTop != null && Math.abs(nextTop - curTop) < 6) nextTop = null;
  }
+
+ if (nextLeft != null) root.style.setProperty("--ea-ops-left", nextLeft + "px");
+ if (nextTop != null) root.style.setProperty("--ea-ops-top", nextTop + "px");
 
  // Content pad inside .wrap so repairs clears the fixed chat card
+ if (!document.body.classList.contains("ea-shell-open")) return;
  var leftPx = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-left")) || 0;
  var panel = document.getElementById("eaPanel");
  var rail = (panel && panel.classList.contains("open") && panel.offsetWidth > 40)
  ? panel.offsetWidth
  : Math.min(640, Math.round(window.innerWidth * 0.42));
  var wrapLeft = wrap ? wrap.getBoundingClientRect().left : 0;
- // #panelOps margin is relative to wrap's content box (inside padding).
- // Distance from wrap content-left to panel-right + gap:
  var wrapPadLeft = 28;
  try {
  if (wrap) {
@@ -7414,6 +7445,10 @@
  }
  } catch (eP) {}
  var pad = Math.max(0, Math.round((leftPx + rail + 12) - (wrapLeft + wrapPadLeft)));
+ if (opts.soft) {
+ var curPad = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-content-pad")) || 0;
+ if (Math.abs(pad - curPad) < 8) return;
+ }
  root.style.setProperty("--ea-ops-content-pad", pad + "px");
  } catch (e) {}
  }
@@ -7441,14 +7476,21 @@
  // Sandbox may flip .panel.active without a hash tick in some paths
  document.addEventListener("ao-view-change", syncOpsWideClass);
  window.addEventListener("resize", function () {
- if (document.body.classList.contains("ea-on-ops")) syncEaOpsAlign();
+ if (document.body.classList.contains("ea-on-ops")) {
+ clearEaAlignTimers();
+ // Debounce: one refine after resize settles (don’t fight continuous resize)
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, 80));
+ }
  });
  document.addEventListener("ea-open-change", function () {
- if (document.body.classList.contains("ea-on-ops")) {
- requestAnimationFrame(syncEaOpsAlign);
- setTimeout(syncEaOpsAlign, 80);
- setTimeout(syncEaOpsAlign, 360);
- }
+ if (!document.body.classList.contains("ea-on-ops")) return;
+ clearEaAlignTimers();
+ requestAnimationFrame(function () { syncEaOpsAlign({ soft: true }); });
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, EA_MORPH_MS + 30));
  });
  } catch (eSync) {}
  if (signedIn()) {
