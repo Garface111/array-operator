@@ -1,10 +1,18 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   agentChat,
   agentConfirm,
   startAgentSession,
 } from "@/lib/api";
 import type { EnergyAgentPending } from "@/lib/types";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AgentMarkdown } from "./AgentMarkdown";
 
 type Msg = { role: "user" | "agent"; text: string; tools?: string[] };
@@ -16,10 +24,12 @@ type Props = {
 };
 
 /**
- * Bottom sheet chat for Energy Agent.
- * - Markdown replies (bold / italic / lists / links)
- * - Drag handle: swipe down to dismiss, swipe-friendly open from dock
- * - Pending confirm for write tools
+ * Mobile chat sheet — designed to standard chat UX:
+ * - Full visual-viewport height (keyboard-safe via visualViewport API)
+ * - Fixed header + scrollable messages + sticky composer
+ * - No autofocus on open (avoids iOS jump / “messages disappear”)
+ * - Scroll pins to latest message; body scroll locked while open
+ * - Swipe-down on handle to dismiss
  */
 export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -28,21 +38,56 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState<EnergyAgentPending | null>(null);
+  const [ready, setReady] = useState(false);
+
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
   const seeded = useRef(false);
   const dragY = useRef(0);
   const dragging = useRef(false);
-  const [sheetOffset, setSheetOffset] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
 
+  const vv = useVisualViewport(open);
+
+  // ── Body scroll lock while chat is open ────────────────────────────────
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    const prevPos = document.body.style.position;
+    const prevTop = document.body.style.top;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.overflow = prev;
+      document.body.style.position = prevPos;
+      document.body.style.top = prevTop;
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
+  // ── Session bootstrap (no autofocus — user taps to type) ───────────────
   useEffect(() => {
     if (!open) {
       seeded.current = false;
       setPending(null);
-      setSheetOffset(0);
+      setDragOffset(0);
+      setReady(false);
+      setInput("");
+      setErr(null);
       return;
     }
     let cancelled = false;
+    setReady(false);
     (async () => {
       try {
         setErr(null);
@@ -51,17 +96,16 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
           surface: "agent_sheet_mobile",
         });
         if (cancelled) return;
-        const id = s.session_id || null;
-        setSessionId(id);
+        setSessionId(s.session_id || null);
         const intro =
           s.intro ||
-          "Hi — I'm **Energy Agent**. I can check fleet health, offtakers, repairs, marketplace vacancy, and run setup. Ask me anything on this account.";
+          "Hi — I'm **Energy Agent**. I can check fleet health, offtakers, repairs, marketplace vacancy, and run setup.\n\nAsk me anything on this account.";
         setMsgs([{ role: "agent", text: intro }]);
-        // Focus composer after open (mobile keyboard optional)
-        setTimeout(() => inputRef.current?.focus(), 350);
+        setReady(true);
       } catch (e) {
         if (!cancelled)
           setErr(e instanceof Error ? e.message : "Could not start Agent");
+        setReady(true);
       }
     })();
     return () => {
@@ -69,18 +113,36 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     };
   }, [open]);
 
+  // Seeded prompt from dock CTAs
   useEffect(() => {
-    if (!open || !seedPrompt || !sessionId || seeded.current || busy) return;
+    if (!open || !seedPrompt || !sessionId || seeded.current || busy || !ready)
+      return;
     seeded.current = true;
     void send(seedPrompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, seedPrompt, sessionId]);
+  }, [open, seedPrompt, sessionId, ready]);
 
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [msgs, busy, pending]);
+  // ── Pin scroll to bottom (messages, keyboard, pending) ─────────────────
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = listRef.current;
+    if (!el) return;
+    const run = () => {
+      el.scrollTop = el.scrollHeight;
+      bottomRef.current?.scrollIntoView({
+        block: "end",
+        behavior: smooth ? "smooth" : "auto",
+      });
+    };
+    // Double rAF: after layout / keyboard animation
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  }, []);
 
-  // Escape to close
+  useLayoutEffect(() => {
+    if (!open) return;
+    scrollToBottom(false);
+  }, [msgs, busy, pending, open, vv.height, vv.keyboardOpen, scrollToBottom]);
+
+  // Escape
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -109,10 +171,15 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     const t = text.trim();
     if (!t || busy) return;
     setInput("");
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
     setMsgs((m) => [...m, { role: "user", text: t }]);
     setBusy(true);
     setErr(null);
     setPending(null);
+    scrollToBottom(true);
     try {
       let sid = sessionId;
       if (!sid) {
@@ -193,63 +260,94 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     void send(input);
   }
 
-  // ── Swipe-down dismiss on handle ───────────────────────────────────────
+  function onInputChange(v: string) {
+    setInput(v);
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }
+
+  // ── Swipe-down dismiss (handle only) ───────────────────────────────────
   function onPointerDown(e: React.PointerEvent) {
     dragging.current = true;
     dragY.current = e.clientY;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragging.current) return;
-    const dy = Math.max(0, e.clientY - dragY.current);
-    setSheetOffset(dy);
+    setDragOffset(Math.max(0, e.clientY - dragY.current));
   }
   function onPointerUp() {
     if (!dragging.current) return;
     dragging.current = false;
-    if (sheetOffset > 110) {
-      setSheetOffset(0);
+    if (dragOffset > 100) {
+      setDragOffset(0);
       onClose();
     } else {
-      setSheetOffset(0);
+      setDragOffset(0);
     }
   }
 
   if (!open) return null;
 
+  // Sheet fills the *visual* viewport so keyboard never covers the composer.
+  // offsetTop handles iOS visual viewport shift while focused.
+  const sheetHeight = Math.max(280, vv.height || window.innerHeight);
+  const sheetTop = vv.offsetTop || 0;
+
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+    <div
+      className="ao-chat-root fixed inset-x-0 z-[60] flex justify-center"
+      style={{
+        top: sheetTop,
+        height: sheetHeight,
+        // Above everything; isolate layout from body
+      }}
+    >
+      {/* Dim backdrop within visual viewport */}
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/35 backdrop-blur-[2px] transition-opacity"
-        style={{ opacity: 1 - Math.min(sheetOffset / 280, 0.6) }}
+        className="absolute inset-0 bg-slate-900/40"
         aria-label="Close Energy Agent"
         onClick={onClose}
-      />
-      <section
-        role="dialog"
-        aria-label="Energy Agent"
-        className="ao-chrome relative z-10 mx-auto flex h-[min(88vh,720px)] w-full max-w-lg flex-col rounded-t-[28px] border shadow-sheet"
         style={{
-          paddingBottom: "max(10px, env(safe-area-inset-bottom))",
-          transform: `translateY(${sheetOffset}px)`,
-          transition: dragging.current ? "none" : "transform 0.22s ease-out",
+          opacity: 1 - Math.min(dragOffset / 240, 0.5),
+        }}
+      />
+
+      <section
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Energy Agent chat"
+        className="ao-chat-sheet relative z-10 flex h-full w-full max-w-lg flex-col bg-[#F0F7FD] shadow-sheet"
+        style={{
+          transform: `translateY(${dragOffset}px)`,
+          transition: dragging.current ? "none" : "transform 0.2s ease-out",
+          // Safe areas: top notch when full-screen; bottom only if no keyboard
+          paddingTop: "max(0px, env(safe-area-inset-top))",
+          paddingBottom: vv.keyboardOpen
+            ? 0
+            : "max(0px, env(safe-area-inset-bottom))",
         }}
       >
-        {/* Drag handle */}
-        <div
-          className="flex cursor-grab flex-col items-center touch-none select-none active:cursor-grabbing"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          <div className="py-2.5">
-            <span className="block h-1.5 w-11 rounded-full bg-sky-300/90" />
+        {/* ── Header (fixed height, never scrolls away) ── */}
+        <header className="ao-chat-header shrink-0 border-b border-sky-200/60 bg-white/95 backdrop-blur-md">
+          <div
+            className="flex cursor-grab flex-col items-center touch-none select-none active:cursor-grabbing"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            <div className="flex w-full justify-center py-2">
+              <span className="block h-1 w-10 rounded-full bg-sky-300" />
+            </div>
           </div>
-          <div className="flex w-full items-center gap-2 border-b border-line px-4 pb-3">
+          <div className="flex items-center gap-2.5 px-3.5 pb-2.5">
             <div
-              className="h-10 w-10 shrink-0 rounded-full shadow-md ring-2 ring-white/70"
+              className="h-9 w-9 shrink-0 rounded-full shadow-md ring-2 ring-white"
               style={{
                 background:
                   "radial-gradient(circle at 35% 30%, #fff7cc 0%, #fbbf24 28%, transparent 46%), radial-gradient(circle at 50% 55%, #38bdf8 0%, #2196f3 58%, #0369a1 100%)",
@@ -257,121 +355,188 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
               aria-hidden
             />
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-extrabold tracking-tight">
+              <h2 className="text-[15px] font-extrabold tracking-tight text-ink">
                 Energy Agent
               </h2>
               <p className="truncate text-[11px] font-semibold text-muted">
-                Swipe down to close · fleet · offtakers · repairs
+                {busy
+                  ? "Thinking…"
+                  : vv.keyboardOpen
+                    ? "Type your question"
+                    : "Swipe down to close"}
               </p>
             </div>
             <button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl bg-white/70 text-lg font-bold text-muted"
+              className="grid h-9 w-9 place-items-center rounded-full bg-sky-50 text-lg font-bold leading-none text-sky-800 ring-1 ring-sky-100"
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Close chat"
             >
               ×
             </button>
           </div>
-        </div>
+        </header>
 
+        {/* ── Message list (only scroll region) ── */}
         <div
           ref={listRef}
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3.5 py-3"
+          className="ao-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+          style={{
+            WebkitOverflowScrolling: "touch",
+            // Prevent iOS rubber-band from scrolling the page under us
+            overscrollBehavior: "contain",
+          }}
         >
-          {msgs.map((m, i) => (
-            <div key={i}>
+          <div className="mx-auto flex max-w-lg flex-col gap-3">
+            {!ready && !err ? (
+              <div className="py-8 text-center text-sm font-semibold text-muted">
+                Connecting…
+              </div>
+            ) : null}
+
+            {msgs.map((m, i) => (
               <div
+                key={i}
                 className={[
-                  "max-w-[94%] rounded-[20px] px-3.5 py-3",
-                  m.role === "user"
-                    ? "ml-auto bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-md shadow-sky-500/25"
-                    : "bg-white/92 text-ink shadow-sm ring-1 ring-sky-100/80",
+                  "flex flex-col",
+                  m.role === "user" ? "items-end" : "items-start",
                 ].join(" ")}
               >
-                <AgentMarkdown
-                  text={m.text}
-                  variant={m.role === "user" ? "user" : "agent"}
-                />
-              </div>
-              {m.tools?.length ? (
-                <div className="mt-1.5 flex flex-wrap gap-1 px-1">
-                  {m.tools.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full bg-sky-100/90 px-2 py-0.5 text-[10px] font-bold text-sky-800"
-                    >
-                      {t}
-                    </span>
-                  ))}
+                <div
+                  className={[
+                    "max-w-[92%] rounded-[18px] px-3.5 py-2.5",
+                    m.role === "user"
+                      ? "rounded-br-md bg-sky-500 text-white shadow-md shadow-sky-500/20"
+                      : "rounded-bl-md bg-white text-ink shadow-sm ring-1 ring-sky-100/90",
+                  ].join(" ")}
+                >
+                  <AgentMarkdown
+                    text={m.text}
+                    variant={m.role === "user" ? "user" : "agent"}
+                  />
                 </div>
-              ) : null}
-            </div>
-          ))}
-          {pending ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 shadow-sm">
-              <div className="text-xs font-extrabold text-amber-900">
-                Confirm action
+                {m.tools?.length ? (
+                  <div className="mt-1 flex max-w-[92%] flex-wrap gap-1 px-0.5">
+                    {m.tools.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              <p className="mt-1 text-[12.5px] font-semibold leading-snug text-amber-950/90">
-                {pending.reason ||
-                  pending.message ||
-                  (pending.tool
-                    ? `Run ${pending.tool}?`
-                    : "Apply this change?")}
-              </p>
-              <div className="mt-2.5 flex gap-2">
-                <button
-                  type="button"
-                  className="ao-btn-primary !min-h-10 !flex-1 !text-xs"
-                  disabled={busy}
-                  onClick={() => void onConfirm(true)}
-                >
-                  Yes, do it
-                </button>
-                <button
-                  type="button"
-                  className="ao-btn-ghost !min-h-10 !flex-1 !text-xs"
-                  disabled={busy}
-                  onClick={() => void onConfirm(false)}
-                >
-                  Cancel
-                </button>
+            ))}
+
+            {pending ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+                <div className="text-xs font-extrabold text-amber-900">
+                  Confirm action
+                </div>
+                <p className="mt-1 text-[13px] font-semibold leading-snug text-amber-950/90">
+                  {pending.reason ||
+                    pending.message ||
+                    (pending.tool
+                      ? `Run ${pending.tool}?`
+                      : "Apply this change?")}
+                </p>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    className="ao-btn-primary !min-h-10 !flex-1 !text-xs"
+                    disabled={busy}
+                    onClick={() => void onConfirm(true)}
+                  >
+                    Yes, do it
+                  </button>
+                  <button
+                    type="button"
+                    className="ao-btn-ghost !min-h-10 !flex-1 !text-xs"
+                    disabled={busy}
+                    onClick={() => void onConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {busy ? (
-            <div className="flex items-center gap-2 px-1 text-xs font-semibold text-muted">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
-              Thinking…
-            </div>
-          ) : null}
-          {err ? (
-            <div className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-              {err}
-            </div>
-          ) : null}
+            ) : null}
+
+            {busy ? (
+              <div className="flex items-center gap-2 self-start rounded-2xl bg-white px-3.5 py-2.5 text-xs font-semibold text-muted shadow-sm ring-1 ring-sky-100">
+                <span className="flex gap-1">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-500 [animation-delay:0ms]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-500 [animation-delay:120ms]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-500 [animation-delay:240ms]" />
+                </span>
+                Thinking
+              </div>
+            ) : null}
+
+            {err ? (
+              <div className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-100">
+                {err}
+              </div>
+            ) : null}
+
+            {/* Scroll anchor */}
+            <div ref={bottomRef} className="h-px w-full shrink-0" aria-hidden />
+          </div>
         </div>
 
+        {/* ── Composer (always at bottom of visual viewport) ── */}
         <form
           onSubmit={onSubmit}
-          className="border-t border-line bg-white/50 px-3 pt-2.5"
+          className="ao-chat-composer shrink-0 border-t border-sky-200/70 bg-white px-3 pt-2"
+          style={{
+            paddingBottom: vv.keyboardOpen
+              ? 8
+              : "max(10px, env(safe-area-inset-bottom))",
+          }}
         >
-          <div className="flex gap-2 rounded-2xl border border-line bg-white/90 p-1.5 shadow-sm">
-            <input
+          <div className="mx-auto flex max-w-lg items-end gap-2 rounded-[22px] border border-sky-200/80 bg-sky-50/50 p-1.5 shadow-sm">
+            <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Energy Agent…"
-              className="min-w-0 flex-1 bg-transparent px-2.5 py-2.5 text-base font-medium outline-none placeholder:text-muted/80"
-              autoComplete="off"
+              rows={1}
+              onChange={(e) => onInputChange(e.target.value)}
+              onFocus={() => {
+                // After keyboard animates, pin to latest messages
+                setTimeout(() => scrollToBottom(false), 80);
+                setTimeout(() => scrollToBottom(false), 320);
+              }}
+              onKeyDown={(e) => {
+                // Enter sends; Shift+Enter newline
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              placeholder="Message Energy Agent…"
+              enterKeyHint="send"
+              className="max-h-[120px] min-h-[44px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-[16px] font-medium leading-snug text-ink outline-none placeholder:text-muted/70"
+              // 16px prevents iOS zoom on focus
+              style={{ fontSize: 16 }}
             />
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="ao-btn-primary shrink-0 !min-h-11 !rounded-xl !px-4 disabled:opacity-50"
+              className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sky-500 text-white shadow-md shadow-sky-500/30 disabled:opacity-40"
+              aria-label="Send"
             >
-              Send
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
+                <path
+                  d="M3.4 20.4L21 12 3.4 3.6 3 10l12 2-12 2 .4 6.4z"
+                  fill="currentColor"
+                />
+              </svg>
             </button>
           </div>
         </form>

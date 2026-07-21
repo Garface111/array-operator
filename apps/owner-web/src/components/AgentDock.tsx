@@ -1,12 +1,17 @@
+import { useRef } from "react";
+
 type Props = {
   onOpen: () => void;
 };
 
 /**
- * Always-visible bottom access for Energy Agent — sits above the tab bar.
- * Tap or swipe-up hint opens the full chat sheet (handled by parent).
+ * Thumb-zone access for Energy Agent — sits above the tab bar.
+ * Tap anywhere, or swipe up on the dock, to open chat.
  */
 export function AgentDock({ onOpen }: Props) {
+  const startY = useRef(0);
+  const startX = useRef(0);
+
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-[45] flex justify-center px-3"
@@ -17,10 +22,24 @@ export function AgentDock({ onOpen }: Props) {
       <button
         type="button"
         onClick={onOpen}
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          startY.current = t.clientY;
+          startX.current = t.clientX;
+        }}
+        onTouchEnd={(e) => {
+          const t = e.changedTouches[0];
+          const dy = startY.current - t.clientY;
+          const dx = Math.abs(t.clientX - startX.current);
+          // Swipe up on the dock opens chat (in addition to tap)
+          if (dy > 36 && dy > dx) {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
         className="pointer-events-auto ao-chrome group flex w-full max-w-lg items-center gap-3 rounded-[22px] border px-3.5 py-2.5 shadow-sheet active:scale-[0.99]"
-        aria-label="Open Energy Agent — swipe up or tap"
+        aria-label="Open Energy Agent chat"
       >
-        {/* Grip / swipe affordance */}
         <div className="flex w-7 flex-col items-center gap-1" aria-hidden>
           <span className="h-1 w-8 rounded-full bg-sky-300/90" />
           <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-600/80">
@@ -42,7 +61,7 @@ export function AgentDock({ onOpen }: Props) {
             Energy Agent
           </div>
           <div className="truncate text-[11px] font-semibold text-muted">
-            Ask about fleet, invoices, repairs…
+            Tap or swipe up to chat
           </div>
         </div>
 

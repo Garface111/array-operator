@@ -85,6 +85,36 @@ textarea {
   font-size: 16px;
 }
 
+/* ── Chat sheet (keyboard-safe mobile UI) ───────────────────────────────── */
+.ao-chat-sheet {
+  /* Solid fill — glass over sky looked broken when keyboard resized the plate */
+  background: linear-gradient(180deg, #f5faff 0%, #eef6fd 40%, #e8f2fb 100%);
+}
+.ao-chat-messages {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.ao-chat-composer {
+  /* Keep above iOS home indicator when keyboard closed */
+  box-shadow: 0 -8px 24px -16px rgba(20, 60, 120, 0.18);
+}
+/* Bounce dots for “thinking” */
+@keyframes ao-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+.ao-chat-messages .animate-bounce {
+  animation: ao-bounce 1s infinite ease-in-out;
+}
+
 @layer components {
   .ao-glass {
     background: var(--sky-glass-content);

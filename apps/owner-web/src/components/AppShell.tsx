@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AgentDock } from "./AgentDock";
 import { AgentSheet } from "./AgentSheet";
@@ -19,46 +19,7 @@ export function AppShell() {
     setTimeout(() => setSeed(null), 200);
   }, []);
 
-  // Global swipe-up from bottom edge (thumb zone) opens agent when closed
-  useEffect(() => {
-    if (agentOpen) return;
-    let startY = 0;
-    let startX = 0;
-    let tracking = false;
-
-    const onStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      const t = e.touches[0];
-      const h = window.innerHeight;
-      // Only from bottom ~100px (above nav + dock)
-      if (t.clientY < h - 120) return;
-      startY = t.clientY;
-      startX = t.clientX;
-      tracking = true;
-    };
-    const onMove = (e: TouchEvent) => {
-      if (!tracking || e.touches.length !== 1) return;
-      const t = e.touches[0];
-      const dy = startY - t.clientY; // up is positive
-      const dx = Math.abs(t.clientX - startX);
-      if (dy > 55 && dy > dx * 1.2) {
-        tracking = false;
-        openAgent();
-      }
-    };
-    const onEnd = () => {
-      tracking = false;
-    };
-
-    window.addEventListener("touchstart", onStart, { passive: true });
-    window.addEventListener("touchmove", onMove, { passive: true });
-    window.addEventListener("touchend", onEnd, { passive: true });
-    return () => {
-      window.removeEventListener("touchstart", onStart);
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("touchend", onEnd);
-    };
-  }, [agentOpen, openAgent]);
+  // Swipe-up only on the dock itself (global edge swipe fought scrolling / felt glitchy)
 
   return (
     <div className="mx-auto flex min-h-full max-w-lg flex-col">
