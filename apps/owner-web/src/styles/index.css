@@ -7,6 +7,7 @@
   color-scheme: light;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --nav-h: 58px;
+  --agent-dock-h: 62px;
   --header-h: 56px;
 
   --sky-top: #1e90e8;

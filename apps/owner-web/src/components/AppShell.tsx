@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { AgentDock } from "./AgentDock";
 import { AgentSheet } from "./AgentSheet";
 import { BottomNav } from "./BottomNav";
 
@@ -7,10 +8,57 @@ export function AppShell() {
   const [agentOpen, setAgentOpen] = useState(false);
   const [seed, setSeed] = useState<string | null>(null);
 
-  function openAgent(prompt?: string) {
+  const openAgent = useCallback((prompt?: string) => {
     setSeed(prompt || null);
     setAgentOpen(true);
-  }
+  }, []);
+
+  const closeAgent = useCallback(() => {
+    setAgentOpen(false);
+    // Clear seed so next open without prompt is a fresh chat intro
+    setTimeout(() => setSeed(null), 200);
+  }, []);
+
+  // Global swipe-up from bottom edge (thumb zone) opens agent when closed
+  useEffect(() => {
+    if (agentOpen) return;
+    let startY = 0;
+    let startX = 0;
+    let tracking = false;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const h = window.innerHeight;
+      // Only from bottom ~100px (above nav + dock)
+      if (t.clientY < h - 120) return;
+      startY = t.clientY;
+      startX = t.clientX;
+      tracking = true;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dy = startY - t.clientY; // up is positive
+      const dx = Math.abs(t.clientX - startX);
+      if (dy > 55 && dy > dx * 1.2) {
+        tracking = false;
+        openAgent();
+      }
+    };
+    const onEnd = () => {
+      tracking = false;
+    };
+
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
+  }, [agentOpen, openAgent]);
 
   return (
     <div className="mx-auto flex min-h-full max-w-lg flex-col">
@@ -32,32 +80,29 @@ export function AppShell() {
               Array Operator
             </div>
             <div className="text-[11px] font-semibold text-muted">
-              Sky fleet · offtakers · Agent
+              Sky fleet · offtakers · Energy Agent
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => openAgent()}
-            className="ao-btn-primary !min-h-9 !rounded-full !px-3.5 !text-xs"
-          >
-            Agent
-          </button>
         </div>
       </header>
 
       <main
         className="flex-1 px-3.5 pt-3"
         style={{
-          paddingBottom: "calc(var(--nav-h) + 20px + env(safe-area-inset-bottom))",
+          // Room for tab bar + floating Agent dock
+          paddingBottom:
+            "calc(var(--nav-h) + var(--agent-dock-h) + 28px + env(safe-area-inset-bottom))",
         }}
       >
         <Outlet context={{ openAgent }} />
       </main>
 
+      {/* Bottom: Agent dock above tab nav — primary AI access */}
+      {!agentOpen ? <AgentDock onOpen={() => openAgent()} /> : null}
       <BottomNav />
       <AgentSheet
         open={agentOpen}
-        onClose={() => setAgentOpen(false)}
+        onClose={closeAgent}
         seedPrompt={seed}
       />
     </div>

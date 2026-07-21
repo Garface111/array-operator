@@ -15,6 +15,7 @@ import {
   agentConfirm,
   startAgentSession,
 } from "@/lib/agentApi";
+import { FormattedText } from "@/components/FormattedText";
 import { sky } from "@/lib/theme";
 
 type Msg = { role: "user" | "agent"; text: string; tools?: string[] };
@@ -164,14 +165,7 @@ export function AgentModal({ open, onClose, seedPrompt }: Props) {
                 m.role === "user" ? styles.user : styles.agent,
               ]}
             >
-              <Text
-                style={[
-                  styles.bubbleText,
-                  m.role === "user" && { color: "#fff" },
-                ]}
-              >
-                {m.text}
-              </Text>
+              <FormattedText text={m.text} user={m.role === "user"} />
               {m.tools?.length ? (
                 <Text style={styles.tools}>{m.tools.join(" · ")}</Text>
               ) : null}

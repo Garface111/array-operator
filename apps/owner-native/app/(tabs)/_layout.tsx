@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
-import { Pressable, Text } from "react-native";
-import { useAgent } from "@/lib/AgentContext";
+import { Text } from "react-native";
 import { sky } from "@/lib/theme";
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
@@ -20,8 +19,6 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 
 /** Desktop parity: Fleet · Analysis · Invoices · Repairs · Marketplace · Account */
 export default function TabLayout() {
-  const { openAgent } = useAgent();
-
   return (
     <Tabs
       screenOptions={{
@@ -34,22 +31,7 @@ export default function TabLayout() {
           fontSize: 15,
         },
         headerShadowVisible: false,
-        headerRight: () => (
-          <Pressable
-            onPress={() => openAgent()}
-            style={{
-              marginRight: 12,
-              backgroundColor: sky.primary,
-              borderRadius: 16,
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
-              Agent
-            </Text>
-          </Pressable>
-        ),
+        // Agent access is the bottom dock (AgentProvider) — thumb-friendly
         tabBarStyle: {
           backgroundColor: sky.glassChrome,
           borderTopColor: sky.line,
