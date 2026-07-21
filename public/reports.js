@@ -4495,14 +4495,25 @@
  reading order survives the fold. -->
  <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
  <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
+ <!-- Budget bill + true-up sit on the main form (Ford 2026-07-21): was buried
+ under Advanced and invisible when adding/editing offtakers. -->
+ <label class="rep-fld"><span class="rl">Budget bill, fixed total ($/period)
+ <span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Line items still show the real credit value. Pair with Annual true-up to settle the difference at year-end.">ⓘ</span></span>
+ <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = bill the calculated amount">
+ <span class="rb-fld-hint">e.g. 2150 — they pay this fixed amount monthly; the invoice still shows real solar value.</span></label>
+ <label class="rep-fld rb-check-fld" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+ <input type="checkbox" id="rbmTrueup" style="margin-top:4px;width:auto;">
+ <span><span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
+ <span class="rb-fld-hint" style="display:block;margin-top:2px;">At year-end, settle budget vs actual: charge the shortfall or credit the overpayment on their next bill.</span></span>
+ </label>
  </div>
  <!-- Everything below is OPTIONAL and saves blank, so it folds away by
  default (mirrors the offtaker-edit card's .rb-fadv drawer). Native
  <details> keeps every field IN THE DOM, so saveManual() still reads
  #rbmCreditRate / #rbmRate / #rbmXThresh / #rbmCommDate / #rbmInvStart
- / #rbmBudget exactly as before. -->
+ exactly as before. Budget/true-up live above (always visible). -->
  <details class="rb-fadv" id="rbmAdv"${MANUAL_ADV_OPEN ? " open" : ""}>
- <summary>Advanced billing, solar credit rate, discount, flag threshold, commissioning, invoice numbering, budget</summary>
+ <summary>Advanced billing, solar credit rate, discount, flag threshold, commissioning, invoice numbering</summary>
  <div class="rb-mform-grid" style="padding:0 15px 15px">
  <!-- Solar credit rate (Ford 2026-07-07): an EDITABLE $/kWh override for
  every offtaker, defaulting to the bill's own rate. This slot is
@@ -4525,9 +4536,6 @@
  <label class="rep-fld"><span class="rl">Starting invoice #</span>
  <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
  <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
- <label class="rep-fld"><span class="rl">Budget bill, fixed total ($)</span>
- <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = use the calculated amount">
- <span class="rb-fld-hint">Set a flat amount this offtaker pays, overrides the calculated total (line items still show).</span></label>
  </div>
  </details>
  <div class="rb-controls">
@@ -4768,6 +4776,7 @@
  if (xThreshNum !== null) fd.append("crosscheck_threshold_pct", String(xThreshNum)); // variance flag threshold, pct points
  if (invStartNum !== null) fd.append("invoice_number_start", String(invStartNum));
  if (budgetNum !== null) fd.append("budget_amount_usd", String(budgetNum));
+ fd.append("annual_trueup", ($("#rbmTrueup") && $("#rbmTrueup").checked) ? "true" : "false");
  fd.append("cadence", segValue("rbmCadence") || "monthly");
  fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
  fd.append("send_mode", mode);
@@ -5637,6 +5646,12 @@
  <label><input type="checkbox" id="rbTrueup"> Annual true-up (Sept)</label>
  </div>
  </div>
+ <div class="rb-ctl" style="flex:1 1 100%;">
+ <label class="rep-fld" style="margin:0;"><span class="rl">Budget bill, fixed total ($/period)
+ <span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period. Pair with Annual true-up to settle budget vs actual in September.">ⓘ</span></span>
+ <input type="number" id="rbBudget" min="0" step="0.01" placeholder="blank = bill the calculated amount" style="max-width:220px;">
+ <span class="rb-fld-hint">Fixed monthly/period amount. Leave blank for calculated solar credit.</span></label>
+ </div>
  </div>
  <div class="rb-emails">
  <label class="rep-fld"><span class="rl">Client email</span>
@@ -5808,6 +5823,17 @@
  fd.append("formats", JSON.stringify(fmts));
  fd.append("include_summary", $("#rbSummary").checked ? "true" : "false");
  fd.append("annual_trueup", $("#rbTrueup").checked ? "true" : "false");
+ const budgetEl = $("#rbBudget");
+ const budgetRaw = budgetEl ? budgetEl.value.trim() : "";
+ if (budgetRaw !== "") {
+ const budgetNum = Number(budgetRaw);
+ if (isNaN(budgetNum) || budgetNum < 0) {
+ st.className = "rb-status rb-err";
+ st.textContent = "Budget must be a dollar amount ≥ 0, or blank.";
+ return;
+ }
+ fd.append("budget_amount_usd", String(budgetNum));
+ }
  try {
  const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
  const data = await r.json().catch(() => ({}));
@@ -8236,16 +8262,22 @@
  <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
  <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
  </select></label>
+ <label class="rep-fld"><span class="rl">Budget bill, fixed total ($/period)<span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Invoice still shows the real credit value. Pair with Annual true-up to settle the difference in September.">ⓘ</span></span>
+ <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = bill the calculated amount">
+ <span class="rb-fld-hint">Fixed amount they pay each period. Leave blank to bill actual solar credit.</span></label>
+ <label class="rep-fld rb-check-fld" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+ <input type="checkbox" data-of="annual_trueup" ${d.annual_trueup ? "checked" : ""} style="margin-top:4px;width:auto;">
+ <span><span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
+ <span class="rb-fld-hint" style="display:block;margin-top:2px;">Settle budget vs actual at year-end: charge shortfall or credit overpayment on the next bill.${(d.pending_credit_usd && d.pending_credit_usd > 0) ? ` <b>Banked credit: $${Number(d.pending_credit_usd).toFixed(2)}</b>` : ""}</span></span>
+ </label>
  </div>
  </div>
 
  <details class="rb-fadv" data-seckey="Advanced overrides"${SEC_OPEN["Advanced overrides"] ? " open" : ""}>
- <summary>Advanced, flag threshold, budget cap, invoice numbering, commissioning</summary>
+ <summary>Advanced, flag threshold, invoice numbering, commissioning</summary>
  <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
  <label class="rep-fld"><span class="rl">Bill-accuracy threshold (%)<span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Share above, no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
  <input type="number" data-of="crosscheck_threshold_pct" min="0.001" max="100" step="0.001" value="${xThresh}" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)"></label>
- <label class="rep-fld"><span class="rl">Budget bill, fixed total ($)<span class="rb-info" tabindex="0" title="Set a flat amount this offtaker pays, overrides the calculated total (line items still show).">ⓘ</span></span>
- <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = use the calculated amount"></label>
  <label class="rep-fld"><span class="rl">Starting invoice #<span class="rb-info" tabindex="0" title="Seeds sequential invoice numbering; each send adds 1.">ⓘ</span></span>
  <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based"></label>
  ${editArrayId !== "" ? `
@@ -8665,7 +8697,10 @@
  function onOfftakerEdit(card, box, did, sid, field, inp) {
  const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
  if (!d) return;
- const raw = inp.value;
+ // Checkboxes use .checked; text/number inputs use .value.
+ const raw = (inp && inp.type === "checkbox")
+ ? (inp.checked ? "true" : "false")
+ : inp.value;
  ACTIVE_DRAFT_ID = did; // preview tracks the edited draft
  // Optimistic repaint for what the preview/grid can show right now.
  if (field === "customer_name") {
@@ -8679,6 +8714,10 @@
  else if (field === "client_email") d.client_email = raw;
  else if (field === "send_mode") d.send_mode = raw;
  else if (field === "cc_emails") d.cc_emails = raw;
+ else if (field === "annual_trueup") d.annual_trueup = raw === "true";
+ else if (field === "budget_amount_usd") {
+ d.budget_amount_usd = raw === "" ? null : Number(raw);
+ }
  else if (field === "allocation_pct" && raw !== "") {
  const frac = Number(raw) / 100;
  // The share posts as allocation_pct, but on an own-meter (sub-metered)
@@ -8728,6 +8767,7 @@
  case "discount_pct": return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
  case "net_rate_per_kwh": return { net_rate_per_kwh: v === "" ? null : Number(v) };
  case "budget_amount_usd": return { budget_amount_usd: v === "" ? null : Number(v) };
+ case "annual_trueup": return { annual_trueup: v === "true" || v === true };
  // Bill-accuracy flag threshold (Bruce 2026-07-07): percentage points, sent as-is;
  // blank clears it (the check falls back to the fleet default). NOT a money field —
  // it never changes the amount, only how tight the accuracy flag is.
