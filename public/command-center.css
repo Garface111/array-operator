@@ -2035,26 +2035,80 @@ html[data-theme="day"] .rep-fld.req > select{
 .rb-arch-no{ color:var(--faint,#94a3b8); background:rgba(148,163,184,.12); }
 @media(max-width:640px){ .rb-arch-zip{ margin-left:0; } .rb-arch-off{ flex-direction:column; align-items:flex-start; gap:3px; } }
 
-/* ── Utility bill archive (PDFs on file, each downloadable) ──────────────── */
+/* ── Utility bill archive (PDFs on file, grouped by year) ────────────────── */
 .rb-bill-arch{ margin-top:10px; }
-.rb-bill-list{ display:flex; flex-direction:column; gap:6px; padding-top:4px; }
-.rb-bill-row{
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  padding:10px 12px; border:1px solid #eef2f6; border-radius:10px;
-  background:rgba(2,6,23,.008);
+.rb-bill-timescale-hint{
+  font-size:12px; color:var(--faint,#94a3b8); line-height:1.45;
+  margin:4px 2px 12px; padding:0;
 }
-.rb-bill-main{ min-width:0; flex:1 1 200px; display:flex; flex-direction:column; gap:2px; }
+/* Year buckets */
+.rb-bill-year{
+  border:1px solid #e8eef5; border-radius:12px; margin-bottom:10px;
+  background:linear-gradient(180deg, rgba(37,99,235,.03), rgba(2,6,23,.01));
+  overflow:hidden;
+}
+.rb-bill-year-sum{
+  list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px;
+  padding:11px 14px; user-select:none;
+}
+.rb-bill-year-sum::-webkit-details-marker{ display:none; }
+.rb-bill-year-sum:hover{ background:rgba(37,99,235,.05); }
+.rb-bill-year[open] > .rb-bill-year-sum .rb-sec-caret{ transform:rotate(90deg); color:var(--good,#2563eb); }
+.rb-bill-year-label{
+  font-size:15px; font-weight:780; letter-spacing:-.02em; color:var(--ink,#16202b);
+  font-variant-numeric:tabular-nums;
+}
+.rb-bill-year-count{
+  margin-left:auto; font-size:11.5px; font-weight:650; color:var(--faint,#94a3b8);
+  font-variant-numeric:tabular-nums;
+}
+.rb-bill-year-body{ padding:0 12px 12px; }
+.rb-bill-list{ display:flex; flex-direction:column; gap:6px; padding-top:2px; }
+/* Timeline rail down the left of each year bucket */
+.rb-bill-list-timeline{ gap:0; position:relative; }
+.rb-bill-row{
+  display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap;
+  padding:10px 12px 10px 4px; border:0; border-radius:0;
+  background:transparent; position:relative;
+}
+.rb-bill-list-timeline .rb-bill-row + .rb-bill-row{ border-top:1px solid rgba(20,60,120,.06); }
+.rb-bill-time{
+  flex:0 0 14px; width:14px; position:relative; align-self:stretch;
+  display:flex; flex-direction:column; align-items:center; padding-top:5px;
+}
+.rb-bill-time-dot{
+  width:9px; height:9px; border-radius:50%; flex:0 0 auto;
+  background:var(--sky-primary,#2196f3);
+  box-shadow:0 0 0 3px rgba(33,150,243,.18);
+  z-index:1;
+}
+.rb-bill-time-rail{
+  flex:1 1 auto; width:2px; margin-top:4px; min-height:12px;
+  background:linear-gradient(180deg, rgba(33,150,243,.35), rgba(33,150,243,.08));
+  border-radius:1px;
+}
+.rb-bill-list-timeline .rb-bill-row:last-child .rb-bill-time-rail{ display:none; }
+.rb-bill-main{ min-width:0; flex:1 1 180px; display:flex; flex-direction:column; gap:3px; padding-top:1px; }
 .rb-bill-name{ font-size:13px; font-weight:680; color:var(--ink,#16202b); }
-.rb-bill-period{ font-size:12px; color:#41505f; font-variant-numeric:tabular-nums; }
+.rb-bill-period{ display:flex; flex-direction:column; gap:1px; }
+.rb-bill-period-label{
+  font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--faint,#94a3b8);
+}
+.rb-bill-period-range{
+  font-size:13px; font-weight:650; color:#334155;
+  font-variant-numeric:tabular-nums; letter-spacing:-.01em;
+}
 .rb-bill-meta{ font-size:11.5px; color:var(--faint,#94a3b8); }
-.rb-bill-dl{ white-space:nowrap; flex:0 0 auto; }
-.rb-bill-dl-stat{ font-size:11.5px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); min-width:1.2em; }
+.rb-bill-dl{ white-space:nowrap; flex:0 0 auto; margin-top:2px; }
+.rb-bill-dl-stat{ font-size:11.5px; font-variant-numeric:tabular-nums; color:var(--muted,#475569); min-width:1.2em; align-self:center; }
 .rb-bill-dl-stat:empty{ display:none; }
 .rb-bill-dl-stat.rb-ok{ color:#0a7d4f; font-weight:650; }
 .rb-bill-dl-stat.rb-err{ color:var(--bad,#e5484d); font-weight:600; max-width:28ch; }
 .rb-bill-dl-stat.rb-busy{ color:var(--muted,#475569); }
 @media(max-width:640px){
-  .rb-bill-row{ flex-direction:column; align-items:flex-start; }
+  .rb-bill-row{ flex-direction:column; align-items:flex-start; padding-left:0; }
+  .rb-bill-time{ display:none; }
   .rb-bill-dl{ width:100%; }
 }
 

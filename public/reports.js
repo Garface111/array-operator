@@ -1971,17 +1971,73 @@
  <p class="rb-arch-empty">No utility bill PDFs on file yet. They land here when cloud capture or the extension pulls a bill (GMP, VEC, and other co-ops).</p>
  </div></details>`;
  } else {
- const rows = bills.map(b => {
- const period = b.period_start && b.period_end
- ? (esc(b.period_start) + " → " + esc(b.period_end))
- : (b.month ? esc(monthLabel(b.month)) : (b.bill_date ? esc(b.bill_date) : "Period unknown"));
- const kwh = b.kwh_generated != null ? (Number(b.kwh_generated).toLocaleString() + " kWh") : "";
+ // Group by calendar year (period end → bill date → month), newest years first.
+ // Clear timescale: year rail + human billing-period line on each row.
+ const billYearOf = (b) => {
+ const raw = (b.period_end || b.bill_date || b.month || b.period_start || "").toString();
+ const y = raw.slice(0, 4);
+ return /^\d{4}$/.test(y) ? y : "Unknown year";
+ };
+ const parseIso = (s) => {
+ if (!s) return null;
+ const d = new Date(String(s).slice(0, 10) + "T12:00:00");
+ return isNaN(d) ? null : d;
+ };
+ const fmtMd = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+ const fmtMdy = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+ const fmtMy = (d) => d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+ // e.g. "Jun 1 – Jun 30, 2026" · "Billed Jul 15, 2026" · "June 2026"
+ const formatBillTimescale = (b) => {
+ const ps = parseIso(b.period_start);
+ const pe = parseIso(b.period_end);
+ const bd = parseIso(b.bill_date);
+ if (ps && pe) {
+ const sameYear = ps.getFullYear() === pe.getFullYear();
+ const range = sameYear
+ ? (fmtMd(ps) + " – " + fmtMdy(pe))
+ : (fmtMdy(ps) + " – " + fmtMdy(pe));
+ const billed = bd ? (" · bill dated " + fmtMd(bd)) : "";
+ return { primary: range, secondary: "Billing period" + billed };
+ }
+ if (b.month) {
+ const ml = monthLabel(b.month);
+ const billed = bd ? (" · bill dated " + fmtMdy(bd)) : "";
+ return { primary: ml, secondary: "Billing month" + billed };
+ }
+ if (bd) return { primary: fmtMdy(bd), secondary: "Bill date (period not on file)" };
+ return { primary: "Period unknown", secondary: "No dates captured for this bill" };
+ };
+ const byYear = new Map(); // year → bills[]
+ bills.forEach(b => {
+ const y = billYearOf(b);
+ if (!byYear.has(y)) byYear.set(y, []);
+ byYear.get(y).push(b);
+ });
+ const years = Array.from(byYear.keys()).sort((a, b) => {
+ if (a === "Unknown year") return 1;
+ if (b === "Unknown year") return -1;
+ return Number(b) - Number(a);
+ });
+ const yearsHtml = years.map((y, yi) => {
+ const list = byYear.get(y) || [];
+ // Newest year open by default; remember if user toggled (data-year on details)
+ const openAttr = yi === 0 ? " open" : "";
+ const rows = list.map(b => {
+ const ts = formatBillTimescale(b);
+ const kwh = b.kwh_generated != null ? (Number(b.kwh_generated).toLocaleString() + " kWh gen") : "";
  const size = b.size ? fmtBytes(b.size) : "";
  const meta = [b.provider_label || "Utility", kwh, size].filter(Boolean).join(" · ");
  return `<div class="rb-bill-row">
+ <div class="rb-bill-time" aria-hidden="true">
+ <span class="rb-bill-time-dot"></span>
+ <span class="rb-bill-time-rail"></span>
+ </div>
  <div class="rb-bill-main">
  <span class="rb-bill-name">${esc(b.account_label || "Utility account")}</span>
- <span class="rb-bill-period">${period}</span>
+ <span class="rb-bill-period">
+ <span class="rb-bill-period-label">${esc(ts.secondary)}</span>
+ <span class="rb-bill-period-range">${esc(ts.primary)}</span>
+ </span>
  <span class="rb-bill-meta">${esc(meta)}</span>
  </div>
  <button class="ao-btn rb-btn rb-bill-dl" type="button"
@@ -1991,11 +2047,29 @@
  <span class="rb-bill-dl-stat" data-bill-stat="${esc(String(b.id))}" aria-live="polite"></span>
  </div>`;
  }).join("");
+ return `<details class="rb-bill-year"${openAttr} data-bill-year="${esc(y)}">
+ <summary class="rb-bill-year-sum">
+ <span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-bill-year-label">${esc(y)}</span>
+ <span class="rb-bill-year-count">${list.length} bill${list.length === 1 ? "" : "s"}</span>
+ </summary>
+ <div class="rb-bill-year-body">
+ <div class="rb-bill-list rb-bill-list-timeline">${rows}</div>
+ </div>
+ </details>`;
+ }).join("");
+ const yearSpan = years.filter(y => y !== "Unknown year");
+ const spanHint = yearSpan.length > 1
+ ? (yearSpan[yearSpan.length - 1] + "–" + yearSpan[0])
+ : (yearSpan[0] || "");
  billHtml = `<details class="rb-arch rb-bill-arch"${_billArchiveOpen ? " open" : ""} id="rbBillArch">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
  <span class="rb-arch-t">Utility bill archive</span>
- <span class="rb-arch-sub">${billCount} bill${billCount === 1 ? "" : "s"} on file · newest first</span></summary>
- <div class="rb-arch-body"><div class="rb-bill-list">${rows}</div></div></details>`;
+ <span class="rb-arch-sub">${billCount} bill${billCount === 1 ? "" : "s"} on file${spanHint ? " · " + esc(spanHint) : ""} · by year</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-bill-timescale-hint">Organized by billing year (period end). Each row shows the utility bill’s billing period.</p>
+ ${yearsHtml}
+ </div></details>`;
  }
 
  host.innerHTML = invHtml + billHtml;
