@@ -8,9 +8,15 @@
      the inset from every viewport edge, --ea-radius its corner rounding. */
   --ea-gap: 14px;
   --ea-radius: 22px;
-  /* Total horizontal footprint the open card claims on the left (card + both
-     insets). The site content shifts by half of this to re-center beside it. */
-  --ea-footprint: calc(var(--ea-rail) + var(--ea-gap) * 2);
+  /* Air between the floating card’s right edge and the main column (regular EA
+     view). Keep tight — re-centering used to leave a wide sky gutter (Ford
+     2026-07-21 screenshot). */
+  --ea-content-gap: 12px;
+  /* Where the main app column starts when EA is open (left inset + rail + gap). */
+  --ea-content-inset: calc(var(--ea-gap) + var(--ea-rail) + var(--ea-content-gap));
+  /* Legacy name used by overlays / hands-off / older rules — same as content inset
+     (no longer “card + left gap + right gap” re-center footprint). */
+  --ea-footprint: var(--ea-content-inset);
   --ea-sky: #38bdf8;
   --ea-sky2: #0ea5e9;
   --ea-sun: #fbbf24;
@@ -237,7 +243,12 @@ body.ea-shell-open .panel.active{
   box-sizing: border-box;
 }
 /* Shell-only transition — not nested content .wrap (Resources) */
-body > .wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
+body > .wrap{
+  transition: transform .34s cubic-bezier(.2,.8,.2,1),
+              margin-left .34s cubic-bezier(.2,.8,.2,1),
+              max-width .34s cubic-bezier(.2,.8,.2,1);
+  min-width: 0;
+}
 
 /* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
    The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
@@ -269,19 +280,19 @@ body > .wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0;
     transition: transform .34s cubic-bezier(.2,.8,.2,1),
                 visibility 0s;
   }
-  /* The SITE slides right on transform — same curve, same duration, same trigger
-     as the panel above, so they move in perfect lockstep and both stay on the
-     GPU (no reflow). .wrap stays centered (margin:0 auto); the transform re-
-     centers it into the space beside the card, and max-width caps the column so
-     the tabbar/account email never clip. On wide screens the cap already equals
-     the resting 1440px width, so opening is a pure composited slide with ZERO
-     reflow; narrower desktops take a single width reflow, then glide. */
+  /* Pack the main column tight against the floating EA card (no re-center
+     sky gutter). margin-left parks it just past the card; transform stays none
+     so we don’t double-shift with ops dual-pane / hands-off rules. */
   body.ea-shell-open > .wrap{
-    max-width: min(1440px, calc(100vw - var(--ea-footprint) - 24px));
-    transform: translateX(calc(var(--ea-footprint) / 2));
-    transition: transform .34s cubic-bezier(.2,.8,.2,1);
-    will-change: transform;
+    max-width: min(1440px, calc(100vw - var(--ea-content-inset) - 16px));
+    transform: none;
+    margin-left: var(--ea-content-inset) !important;
+    margin-right: auto !important;
+    width: auto;
+    transition: margin-left .34s cubic-bezier(.2,.8,.2,1),
+                max-width .34s cubic-bezier(.2,.8,.2,1);
   }
+  /* Ops dual-pane / hands-off own their own .wrap rules (transform/margin). */
 }
 @media (prefers-reduced-motion: reduce){
   body.ea-shell-open > .wrap,
@@ -301,7 +312,7 @@ body.ea-shell-open .ao-overlay,
 body.ea-shell-open .sb-ov,
 body.ea-shell-open .cl-modal-back,
 body.ea-shell-open .sb-detail-host.sb-dc-open{
-  left: calc(var(--ea-rail) + var(--ea-gap) * 2) !important;
+  left: var(--ea-content-inset) !important;
   right: 0 !important;
   width: auto !important;
 }

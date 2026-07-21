@@ -83,7 +83,8 @@
   box-shadow:0 0 0 3px rgba(33,150,243,.14);
 }
 /* sit clear of Energy Agent rail */
-body.ea-shell-open #hoPill{ left:calc(var(--ea-rail,360px) + 18px); }
+/* Sit just past the EA floating card (same inset as the main column). */
+body.ea-shell-open #hoPill{ left:var(--ea-content-inset, calc(var(--ea-gap,14px) + var(--ea-rail,360px) + 12px)); }
 /* mobile: above Alerts FAB (also left) + bottom nav */
 @media(max-width:720px){
   #hoPill{
