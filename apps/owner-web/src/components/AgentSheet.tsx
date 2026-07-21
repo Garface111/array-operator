@@ -30,6 +30,7 @@ type Props = {
  * - No autofocus on open (avoids iOS jump / “messages disappear”)
  * - Scroll pins to latest message; body scroll locked while open
  * - Swipe-down on handle to dismiss
+ * - At top of thread: one more scroll-up (overscroll) closes the whole chat
  */
 export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -270,19 +271,18 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }
 
+  const setOff = useCallback((y: number) => {
+    dragOffsetRef.current = y;
+    setDragOffset(y);
+  }, []);
+
   // ── Swipe-down dismiss — large top hit zone, page scroll locked ────────
   useEffect(() => {
     if (!open) return;
     const el = handleRef.current;
     if (!el) return;
 
-    const setOff = (y: number) => {
-      dragOffsetRef.current = y;
-      setDragOffset(y);
-    };
-
     const onStart = (e: TouchEvent | PointerEvent) => {
-      // Don't start drag from the close button
       const target = e.target as HTMLElement | null;
       if (target?.closest?.("[data-chat-close]")) return;
 
@@ -302,7 +302,6 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
           : (e as PointerEvent).clientY;
       if (clientY == null) return;
       const dy = Math.max(0, clientY - dragY.current);
-      // Prevent page/sheet under-scroll while dragging the handle
       e.preventDefault();
       setOff(dy);
     };
@@ -319,12 +318,10 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
       }
     };
 
-    // Touch (non-passive for preventDefault)
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: true });
     el.addEventListener("touchcancel", onEnd, { passive: true });
-    // Pointer for desktop / stylus
     el.addEventListener("pointerdown", onStart as EventListener);
     el.addEventListener("pointermove", onMove as EventListener);
     el.addEventListener("pointerup", onEnd);
@@ -340,7 +337,130 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
       el.removeEventListener("pointerup", onEnd);
       el.removeEventListener("pointercancel", onEnd);
     };
-  }, [open, onClose]);
+  }, [open, onClose, setOff]);
+
+  /**
+   * At max scroll-up (top of thread): one more "scroll up" closes the chat.
+   * Finger continues past the top (pull down overscroll) → whole sheet dismisses.
+   * When the thread is short (nothing to scroll), same pull works on the list.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current;
+    if (!el) return;
+
+    let startY = 0;
+    let armed = false; // finger down while at top
+    let pulling = false; // actively past-top overscroll
+    let pull = 0;
+    const CLOSE_PX = 90;
+
+    const atTop = () => el.scrollTop <= 2;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      armed = atTop();
+      pulling = false;
+      pull = 0;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const y = e.touches[0].clientY;
+      const dy = y - startY; // finger down → positive → past top when atTop
+
+      // Hit top mid-gesture while scrolling toward older messages
+      if (!armed && atTop() && dy > 0) {
+        armed = true;
+        startY = y;
+        pull = 0;
+      }
+
+      if (!armed) return;
+
+      // Left the top — cancel overscroll-close, let normal scroll work
+      if (!atTop() && !pulling) {
+        armed = false;
+        pulling = false;
+        pull = 0;
+        setOff(0);
+        return;
+      }
+
+      // At top: further "scroll up" = finger moves down (dy > 0)
+      if (atTop() && dy > 0) {
+        pulling = true;
+        pull = dy;
+        // Stop rubber-band / page fight; sheet follows the pull
+        e.preventDefault();
+        setOff(Math.min(dy * 0.85, 220));
+      } else if (pulling && dy <= 0) {
+        // Reversed back into content
+        pulling = false;
+        pull = 0;
+        setOff(0);
+        armed = atTop();
+        startY = y;
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (pulling && pull >= CLOSE_PX) {
+        setOff(0);
+        onClose();
+      } else {
+        setOff(0);
+      }
+      armed = false;
+      pulling = false;
+      pull = 0;
+    };
+
+    // Desktop / trackpad: scroll up (deltaY < 0) while at top closes
+    let wheelAcc = 0;
+    let wheelTimer: ReturnType<typeof setTimeout> | null = null;
+    const onWheel = (e: WheelEvent) => {
+      if (!atTop()) {
+        wheelAcc = 0;
+        return;
+      }
+      // Negative deltaY = scroll up (toward past top)
+      if (e.deltaY < 0) {
+        e.preventDefault();
+        wheelAcc += -e.deltaY;
+        setOff(Math.min(wheelAcc * 0.4, 180));
+        if (wheelTimer) clearTimeout(wheelTimer);
+        wheelTimer = setTimeout(() => {
+          if (wheelAcc > 140) {
+            setOff(0);
+            onClose();
+          } else {
+            setOff(0);
+          }
+          wheelAcc = 0;
+        }, 120);
+      } else {
+        wheelAcc = 0;
+        setOff(0);
+      }
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+      el.removeEventListener("wheel", onWheel);
+      if (wheelTimer) clearTimeout(wheelTimer);
+    };
+  }, [open, onClose, setOff, ready, msgs.length]);
 
   if (!open) return null;
 
@@ -416,7 +536,7 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
                   ? "Thinking…"
                   : vv.keyboardOpen
                     ? "Type your question"
-                    : "Pull down on this header to close"}
+                    : "At top of chat, scroll up again to close"}
               </p>
             </div>
             <button
@@ -437,11 +557,11 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
         {/* ── Message list (only scroll region) ── */}
         <div
           ref={listRef}
-          className="ao-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+          className="ao-chat-messages min-h-0 flex-1 overflow-y-auto px-3 py-3"
           style={{
             WebkitOverflowScrolling: "touch",
-            // Prevent iOS rubber-band from scrolling the page under us
-            overscrollBehavior: "contain",
+            // We handle top overscroll ourselves (close chat); block browser rubber-band
+            overscrollBehaviorY: "none",
           }}
         >
           <div className="mx-auto flex max-w-lg flex-col gap-3">
