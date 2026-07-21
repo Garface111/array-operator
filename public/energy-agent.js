@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721eaMorph1";
+ var EA_BUILD = "20260721eaFps1";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -3031,6 +3031,7 @@
  document.dispatchEvent(new CustomEvent("ea-open-change", { detail: { open: state.open } }));
  } catch (e3) {}
  // Desktop: shift site content right. Mobile CSS zeroes the margin.
+ markEaMorphing();
  document.body.classList.toggle("ea-shell-open", state.open);
  // Hands-off setup open? Dock EA to the RIGHT of the setup rail (don't cover it).
  var tourOpen = false;
@@ -7321,6 +7322,7 @@
  /** Body class for Repairs dual-pane CSS (wide chat under full tabbar). */
  var _eaWasOnOps = false;
  var _eaAlignTimers = [];
+ var _eaMorphTimer = null;
  var EA_MORPH_MS = 420; // keep in sync with --ea-dur in energy-agent.css
  function isOpsHash(h) {
  h = String(h || "").toLowerCase();
@@ -7338,6 +7340,17 @@
  root.style.removeProperty("--ea-ops-content-pad");
  } catch (e) {}
  }
+ /** High-FPS morph window: CSS drops backdrop-filter; wrap is transform-only. */
+ function markEaMorphing() {
+ try {
+ document.body.classList.add("ea-morphing");
+ if (_eaMorphTimer) clearTimeout(_eaMorphTimer);
+ _eaMorphTimer = setTimeout(function () {
+ try { document.body.classList.remove("ea-morphing"); } catch (e) {}
+ _eaMorphTimer = null;
+ }, EA_MORPH_MS + 60);
+ } catch (e) {}
+ }
  function syncOpsWideClass() {
  var onOps = false;
  try {
@@ -7351,6 +7364,8 @@
  var entering = onOps && !_eaWasOnOps;
  var leaving = !onOps && _eaWasOnOps;
  _eaWasOnOps = onOps;
+
+ if (entering || leaving) markEaMorphing();
 
  try {
  document.body.classList.toggle("ea-on-ops", !!onOps);

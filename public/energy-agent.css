@@ -18,7 +18,8 @@
      (no longer “card + left gap + right gap” re-center footprint). */
   --ea-footprint: var(--ea-content-inset);
   /* Shared motion for open/close AND regular↔Repairs morph (one curve everywhere).
-     Slightly longer than the old 340ms so width/left morphs don’t feel snappy. */
+     Shell shift is transform-only (compositor / 60fps). Geometry morph drops
+     backdrop-filter while body.ea-morphing so we don’t paint-blur every frame. */
   --ea-ease: cubic-bezier(.2,.8,.2,1);
   --ea-dur: .42s;
   /* Defaults for ops dual-pane geometry (overridden on body.ea-on-ops). Always
@@ -255,36 +256,43 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-/* Shell-only transition — not nested content .wrap (Resources) */
+/* Shell shift is TRANSFORM-ONLY (GPU compositor). Never transition margin-left /
+   max-width on .wrap — those reflow the whole dashboard every frame and kill FPS
+   (the “10–15×” gap vs a pure transform slide). */
 body > .wrap{
-  transition: transform var(--ea-dur) var(--ea-ease),
-              margin-left var(--ea-dur) var(--ea-ease),
-              margin-right var(--ea-dur) var(--ea-ease),
-              max-width var(--ea-dur) var(--ea-ease);
+  transition: transform var(--ea-dur) var(--ea-ease);
   min-width: 0;
+  backface-visibility: hidden;
 }
 
-/* Repairs content pad morphs when dual-pane engages */
-#panelOps{
-  transition: margin-left var(--ea-dur) var(--ea-ease);
+/* High-FPS morph window: drop the glass blur (paint-heavy) while size/position
+   are changing; solid fill still reads as the same card. */
+body.ea-morphing #eaPanel,
+body.ea-morphing #eaPanel.open{
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body.ea-morphing > .wrap{
+  will-change: transform;
+  pointer-events: none; /* skip hit-testing cost during the slide */
 }
 
 /* ── Energy Agent dock — open/close + size morph (desktop) ─────────────────
-   Parked off-screen via translateX; open/close and regular↔Repairs geometry
-   (width / left / top) all share --ea-dur / --ea-ease so nothing snaps 0→1.
-   Interruptible: reverse mid-morph continues from current computed style.
+   Open/close: translate3d (compositor). Regular↔Repairs: left/top/width share
+   the same ease; blur is off while body.ea-morphing so frames stay full-rate.
    Scoped ≥961px — mobile bottom-sheet is separate. */
 @media (min-width: 961px){
   #eaPanel{
     display: flex;
-    /* Park fully off-screen: clear the card width + its left inset + shadow blur
-       so no sliver/shadow peeks at the edge when closed. */
-    transform: translateX(calc(-100% - var(--ea-gap) - 28px));
+    /* Park fully off-screen on the compositor thread */
+    transform: translate3d(calc(-100% - var(--ea-gap) - 28px), 0, 0);
     visibility: hidden;
     pointer-events: none;
-    will-change: transform, width, left, top;
-    /* Geometry ALWAYS transitions — regular rail ↔ Repairs wide is a morph,
-       not a second open. visibility only delayed on the close path. */
+    /* Own layer; isolate paints so chat internals don’t dirty the page */
+    contain: layout paint;
+    isolation: isolate;
+    backface-visibility: hidden;
+    will-change: transform;
     transition:
       transform var(--ea-dur) var(--ea-ease),
       width var(--ea-dur) var(--ea-ease),
@@ -292,13 +300,14 @@ body > .wrap{
       top var(--ea-dur) var(--ea-ease),
       left var(--ea-dur) var(--ea-ease),
       bottom var(--ea-dur) var(--ea-ease),
-      border-radius var(--ea-dur) var(--ea-ease),
       visibility 0s linear var(--ea-dur);
   }
   #eaPanel.open{
-    transform: translateX(0);
+    /* translate3d(0,0,0) keeps the layer promoted while open */
+    transform: translate3d(0, 0, 0);
     visibility: visible;
     pointer-events: auto;
+    will-change: transform, width, left, top;
     transition:
       transform var(--ea-dur) var(--ea-ease),
       width var(--ea-dur) var(--ea-ease),
@@ -306,18 +315,21 @@ body > .wrap{
       top var(--ea-dur) var(--ea-ease),
       left var(--ea-dur) var(--ea-ease),
       bottom var(--ea-dur) var(--ea-ease),
-      border-radius var(--ea-dur) var(--ea-ease),
       visibility 0s;
   }
-  /* Pack the main column tight against the floating EA card (no re-center
-     sky gutter). Length-valued margin-left so ops dual-pane can morph to a
-     different inset instead of jumping margin-left:auto (not interpolable). */
+  /* Pack column tight to the card via GPU translate — left-aligned box, then
+     slide by content-inset. max-width is set instantly (no transition). */
   body.ea-shell-open > .wrap{
     max-width: min(1440px, calc(100vw - var(--ea-content-inset) - 16px));
-    transform: none;
-    margin-left: var(--ea-content-inset) !important;
+    margin-left: 0 !important;
     margin-right: auto !important;
     width: auto;
+    transform: translate3d(var(--ea-content-inset), 0, 0);
+    will-change: transform;
+  }
+  /* During morph, promote the panel layer for width/left too */
+  body.ea-morphing #eaPanel.open{
+    will-change: transform, width, left, top;
   }
 }
 @media (prefers-reduced-motion: reduce){
@@ -325,8 +337,8 @@ body > .wrap{
   body > .wrap{ transition: none; }
   #eaPanel,
   #eaPanel.open{ transition: none; }
-  .ea-mic-gate,
-  #panelOps{ transition: none; }
+  .ea-mic-gate{ transition: none; }
+  body.ea-morphing > .wrap{ pointer-events: auto; }
 }
 
 /* App modals (openModal / AODialog / claim) center on the FULL viewport by
@@ -496,19 +508,18 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
     }
   }
 
-  /* Full-bleed chrome — tabbar spans the whole window above both panes.
-     margin-left is a LENGTH (centered inset), not auto — so it interpolates
-     from the regular packed inset when entering/leaving Repairs. */
+  /* Full-bleed chrome: center via GPU translate (same property as packed mode
+     so the shell morphs at compositor rate, not layout rate). */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) > .wrap{
-    transform: none !important;
     max-width: var(--ea-ops-wrap-max) !important;
     width: 100%;
-    margin-left: calc((100vw - var(--ea-ops-wrap-max)) / 2) !important;
+    margin-left: 0 !important;
     margin-right: auto !important;
+    transform: translate3d(calc((100vw - var(--ea-ops-wrap-max)) / 2), 0, 0) !important;
   }
 
   /* Wide chat card: under the tabbar; left edge = Energy Agent top-tab.
-     Transitions inherit from the base #eaPanel rule (width/left/top). */
+     left/top/width transition on the panel layer (blur off while morphing). */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #eaPanel{
     top: var(--ea-ops-top);
     left: var(--ea-ops-left);
@@ -517,7 +528,7 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
     max-width: min(var(--ea-rail), calc(100vw - var(--ea-ops-left) - var(--ea-gap)));
   }
 
-  /* Repairs column sits in the right pane (clear of the chat card) */
+  /* Repairs column — pad set instantly (no margin transition → no page reflow) */
   body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #panelOps.active{
     margin-left: var(--ea-ops-content-pad);
     max-width: none;
