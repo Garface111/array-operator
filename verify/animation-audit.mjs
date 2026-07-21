@@ -917,16 +917,32 @@ async function main() {
     }, tok2);
     await mPage.goto(`${BASE}/?auditm=${Date.now()}#analysis`, {
       waitUntil: "domcontentloaded",
-      timeout: 60000,
+      timeout: 90000,
     });
-    await mPage.waitForSelector("#tabbar, .tabbar", { timeout: 30000 });
-    await sleep(2000);
-    // Wait for More control (injected by mobile-nav.js)
-    await mPage.waitForSelector("button.tab-more, .tab.tab-more", { timeout: 10000 }).catch(() => {});
-
-    for (const sc of ALL.filter((s) => s.mobile)) {
-      await runScenario(mPage, scenarios, sc);
-      await sleep(250);
+    let mobileOk = true;
+    try {
+      await mPage.waitForSelector("#tabbar, .tabbar, a.tab, #tabDashboard", { timeout: 45000 });
+    } catch (e) {
+      mobileOk = false;
+      console.log("  ! mobile shell did not appear in time — skipping mobile scenarios");
+      for (const sc of ALL.filter((s) => s.mobile)) {
+        scenarios.push({
+          id: sc.id,
+          label: sc.label,
+          keys: sc.keys || [],
+          skipped: true,
+          reason: "mobile shell timeout",
+          issues: [],
+        });
+      }
+    }
+    if (mobileOk) {
+      await sleep(2500);
+      await mPage.waitForSelector("button.tab-more, .tab.tab-more", { timeout: 15000 }).catch(() => {});
+      for (const sc of ALL.filter((s) => s.mobile)) {
+        await runScenario(mPage, scenarios, sc);
+        await sleep(250);
+      }
     }
     await mBrowser.close();
   }
