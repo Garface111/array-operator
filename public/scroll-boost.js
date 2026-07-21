@@ -1,17 +1,21 @@
 /**
- * Site-wide scroll boost — wheel/trackpad moves farther per gesture than the
- * OS default, so long pages (fleet, invoices, analysis) feel snappy.
+ * Site-wide scroll boost — makes wheel/trackpad travel farther without
+ * killing OS momentum (which is what made a preventDefault multiplier feel
+ * *slower* on trackpads).
  *
- * Multiplier: 2.25× (override with ?scroll=1.5 … 4, or window.__AO_SCROLL_MULT).
- * Skips: browser zoom (ctrl/meta+wheel), form fields, sandbox canvas zoom,
- *        [data-no-scroll-boost], prefers-reduced-motion.
+ * Strategy: leave the browser’s native scroll alone, then add EXTRA distance
+ * so total ≈ MULT × the default step. No preventDefault → inertia stays.
+ *
+ * Default MULT = 3 (2× extra on top of native). Override: ?scroll=4 or
+ * window.__AO_SCROLL_MULT = 4 before this script loads.
  */
 (function () {
   "use strict";
   if (window.__AO_SCROLL_BOOST) return;
   window.__AO_SCROLL_BOOST = true;
 
-  var MULT = 2.25;
+  // Total intended multiple of native step. Extra applied = (MULT - 1).
+  var MULT = 3;
   try {
     if (typeof window.__AO_SCROLL_MULT === "number" && window.__AO_SCROLL_MULT > 0) {
       MULT = window.__AO_SCROLL_MULT;
@@ -20,15 +24,16 @@
       if (q != null && q !== "") MULT = parseFloat(q) || MULT;
     }
   } catch (e) {}
-  MULT = Math.max(1, Math.min(4, MULT));
+  MULT = Math.max(1, Math.min(6, MULT));
 
   try {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      MULT = 1; // no artificial boost when the OS asks for less motion
+      MULT = 1;
     }
   } catch (e2) {}
 
-  if (MULT <= 1.001) return;
+  var EXTRA = MULT - 1; // e.g. MULT=3 → add 2× native on top of native = 3× total
+  if (EXTRA < 0.05) return;
 
   function isScrollable(el, dx, dy) {
     if (!el || el.nodeType !== 1) return false;
@@ -43,20 +48,26 @@
       el.scrollWidth > el.clientWidth + 1;
     if (Math.abs(dy) >= Math.abs(dx)) {
       if (!canY) return false;
-      if (dy < 0 && el.scrollTop <= 0) return false;
-      if (dy > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 1) return false;
+      // Allow boosting even near edges — browser may still move parent.
       return true;
     }
-    if (!canX) return false;
-    if (dx < 0 && el.scrollLeft <= 0) return false;
-    if (dx > 0 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 1) return false;
-    return true;
+    return !!canX;
   }
 
   function findTarget(start, dx, dy) {
     var el = start && start.nodeType === 1 ? start : start && start.parentElement;
     while (el && el !== document.body && el !== document.documentElement) {
-      if (isScrollable(el, dx, dy)) return el;
+      if (isScrollable(el, dx, dy)) {
+        // Prefer the element that can still move in the gesture direction.
+        if (Math.abs(dy) >= Math.abs(dx)) {
+          if (dy < 0 && el.scrollTop > 0) return el;
+          if (dy > 0 && el.scrollTop + el.clientHeight < el.scrollHeight - 1) return el;
+          // At edge: keep walking so we boost the parent that will actually move.
+        } else {
+          if (dx < 0 && el.scrollLeft > 0) return el;
+          if (dx > 0 && el.scrollLeft + el.clientWidth < el.scrollWidth - 1) return el;
+        }
+      }
       el = el.parentElement;
     }
     return document.scrollingElement || document.documentElement;
@@ -75,7 +86,6 @@
         return true;
       }
     }
-    // Sandbox fleet canvas uses wheel to zoom — leave native/handler alone.
     if (t.closest(".sb-viewport, [data-wheel-zoom], [data-no-scroll-boost]")) return true;
     return false;
   }
@@ -85,7 +95,6 @@
 
     var dx = e.deltaX;
     var dy = e.deltaY;
-    // Normalize line/page modes to roughly pixel scale before multiplying.
     if (e.deltaMode === 1) {
       dx *= 16;
       dy *= 16;
@@ -95,20 +104,26 @@
     }
     if (!dx && !dy) return;
 
+    // Extra only — native scroll still runs (no preventDefault).
+    var addX = dx * EXTRA;
+    var addY = dy * EXTRA;
     var target = findTarget(e.target, dx, dy);
-    e.preventDefault();
-
-    var left = dx * MULT;
-    var top = dy * MULT;
     var root = document.scrollingElement || document.documentElement;
+
     if (target === root || target === document.documentElement || target === document.body) {
-      window.scrollBy(left, top);
+      // Instant extra jump (behavior:auto — never inherit html{scroll-behavior:smooth},
+      // which made each wheel tick animate and felt *slower* than native).
+      try {
+        window.scrollBy({ left: addX, top: addY, behavior: "auto" });
+      } catch (err) {
+        window.scrollBy(addX, addY);
+      }
     } else {
-      target.scrollLeft += left;
-      target.scrollTop += top;
+      target.scrollLeft += addX;
+      target.scrollTop += addY;
     }
   }
 
-  // Bubble phase: let element-level handlers (sandbox zoom, maps) run first.
-  window.addEventListener("wheel", onWheel, { passive: false, capture: false });
+  // passive:true — we never call preventDefault (critical for trackpad feel).
+  window.addEventListener("wheel", onWheel, { passive: true, capture: false });
 })();
