@@ -633,16 +633,36 @@ async function main() {
       },
       act: async (p) => {
         await p.evaluate(() => {
-          const b =
-            document.querySelector("#vendorSheet .vs-arr:not(.open)") ||
-            document.querySelector("#vendorSheet .vs-arr");
+          location.hash = "#arrays";
+          try {
+            if (typeof window.__aoApplyFleetTriageSub === "function") window.__aoApplyFleetTriageSub();
+          } catch (_) {}
+        });
+        await sleep(200);
+        await p.evaluate(() => {
+          // Collapse all open arrays first so expand is a true open
+          document.querySelectorAll("#vendorSheet .vs-arr.open").forEach((el) => el.click());
+        });
+        await sleep(120);
+        await p.evaluate(() => {
+          const b = document.querySelector("#vendorSheet .vs-arr:not(.open)");
           if (b) {
             b.scrollIntoView({ block: "center" });
             b.click();
           }
         });
+        // Re-fire enter animation if wrap already present without is-enter
+        await sleep(40);
+        await p.evaluate(() => {
+          const w = document.querySelector("#vendorSheet .vs-inv-wrap");
+          if (w && !w.classList.contains("is-enter")) {
+            w.classList.remove("is-enter");
+            void w.offsetWidth;
+            w.classList.add("is-enter");
+          }
+        });
       },
-      expect: { expectMotion: true, expectSettle: true }, durationMs: 1600 },
+      expect: { expectMotion: true, expectSettle: true }, durationMs: 1800 },
     { id: "table-ambient", label: "Table gauges/pulse continuous", keys: ["vsPulse", "vsDcPulse", "dpShimmer"],
       setup: async (p) => { await hash(p, "#arrays"); await sleep(800); },
       act: async () => {},
