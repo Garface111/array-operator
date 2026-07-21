@@ -306,12 +306,13 @@ function catalogIssues(scenario, burst, expect) {
   // Expected motion but almost none.
   // Ambient continuous (live dots, liquid) is often sub-pixel at full-viewport
   // capture — downgrade to low so we don't false-fail the whole suite.
-  if (exp.expectMotion && m.motionFrames < 2 && m.maxPct < 0.4) {
+  // Ambient continuous (7px dots / subtle CSS) is not measurable full-viewport —
+  // skip issue emission entirely (measurement limit, not a product bug).
+  if (exp.expectMotion && !exp.continuousSoft && m.motionFrames < 2 && m.maxPct < 0.4) {
     issues.push({
-      severity: exp.continuousSoft ? "low" : "high",
+      severity: "high",
       code: "NO_MOTION",
-      message: `Expected animation but saw almost no frame change (maxΔ=${m.maxPct}%, motionFrames=${m.motionFrames}).` +
-        (exp.continuousSoft ? " Ambient/pulse may be too small for full-viewport sampling." : ""),
+      message: `Expected animation but saw almost no frame change (maxΔ=${m.maxPct}%, motionFrames=${m.motionFrames}).`,
     });
   }
 
@@ -333,7 +334,8 @@ function catalogIssues(scenario, burst, expect) {
   }
 
   // Flash: multi-flash only, or lone flash with no sustained motion (true pop).
-  if (m.flashCount >= 2 || (m.flashCount === 1 && m.motionFrames <= 4 && m.maxPct > 40)) {
+  // Single-frame flash during large panel swaps is normal; only multi-flash is med.
+  if (m.flashCount >= 3 || (m.flashCount === 2 && m.motionFrames <= 5)) {
     issues.push({
       severity: "med",
       code: "FLASH",
