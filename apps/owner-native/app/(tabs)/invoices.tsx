@@ -126,6 +126,15 @@ export default function InvoicesScreen() {
           }
         />
         <Btn
+          title="Edit offtakers with Agent"
+          primary
+          onPress={() =>
+            openAgent(
+              "Edit offtakers with me on mobile. First list_offtakers (real customer names, shares, emails, arrays). Then help change share %, rate, email, delivery mode, or array/bill — get_offtaker + patch_offtaker (confirm). Keep steps short; ask which offtaker first if unclear."
+            )
+          }
+        />
+        <Btn
           title="Add offtakers with Agent"
           onPress={() =>
             openAgent(
@@ -177,14 +186,34 @@ export default function InvoicesScreen() {
                   </View>
                   <Chip status={st} />
                 </View>
-                {share != null ? (
-                  <Text style={[styles.meta, { marginTop: 8 }]}>
-                    {Number(share) <= 1
-                      ? `${Math.round(Number(share) * 1000) / 10}% share`
-                      : `${Number(share)}% share`}
-                    {o.delivery_mode ? ` · ${o.delivery_mode}` : ""}
-                  </Text>
-                ) : null}
+                <View style={styles.cardActions}>
+                  {share != null ? (
+                    <Text style={styles.meta}>
+                      {Number(share) <= 1
+                        ? `${Math.round(Number(share) * 1000) / 10}% share`
+                        : `${Number(share)}% share`}
+                      {o.delivery_mode ? ` · ${o.delivery_mode}` : ""}
+                    </Text>
+                  ) : (
+                    <Text style={styles.meta}>
+                      {o.delivery_mode ? String(o.delivery_mode) : " "}
+                    </Text>
+                  )}
+                  <Btn
+                    title="Edit with Agent"
+                    onPress={() => {
+                      const who =
+                        displayName ||
+                        displayEmail ||
+                        (o.id != null ? `id ${o.id}` : "this offtaker");
+                      openAgent(
+                        `Edit offtaker "${who}"${
+                          o.id != null ? ` (subscription_id=${o.id})` : ""
+                        }. Call get_offtaker / list_offtakers, show current share, rate, email, array, delivery mode. Ask what to change, then patch_offtaker with confirm.`
+                      );
+                    }}
+                  />
+                </View>
               </Card>
             );
           })
@@ -218,5 +247,6 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   name: { fontSize: 14, fontWeight: "800", color: sky.ink },
   meta: { fontSize: 11, fontWeight: "600", color: sky.muted, marginTop: 2 },
+  cardActions: { marginTop: 10, gap: 8 },
   err: { color: sky.bad, fontWeight: "700", marginBottom: 8, fontSize: 12 },
 });

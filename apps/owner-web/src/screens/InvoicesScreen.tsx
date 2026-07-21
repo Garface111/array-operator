@@ -123,6 +123,17 @@ export function InvoicesScreen() {
         </button>
         <button
           type="button"
+          className="ao-btn-primary !min-h-10 !text-xs"
+          onClick={() =>
+            openAgent(
+              "Edit offtakers with me on mobile. First list_offtakers (show real customer names, shares, emails, arrays). Then help me change share %, rate, email, delivery mode, or which array/bill they're on — use get_offtaker and patch_offtaker (confirm writes). Keep steps short; ask which offtaker first if unclear."
+            )
+          }
+        >
+          Edit offtakers with Agent
+        </button>
+        <button
+          type="button"
           className="ao-btn-ghost !min-h-10 !text-xs"
           onClick={() =>
             openAgent(
@@ -135,11 +146,26 @@ export function InvoicesScreen() {
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-extrabold">Offtaker list</h2>
-          <span className="text-[11px] font-bold text-muted">
-            {filtered.length} shown
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-muted">
+              {filtered.length} shown
+            </span>
+            {subs.length > 0 ? (
+              <button
+                type="button"
+                className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-extrabold text-sky-800 ring-1 ring-sky-200"
+                onClick={() =>
+                  openAgent(
+                    "Edit offtakers: list_offtakers first with real names, then walk me through changes (share, rate, email, mode) via patch_offtaker."
+                  )
+                }
+              >
+                Edit with Agent
+              </button>
+            ) : null}
+          </div>
         </div>
         <input
           value={q}
@@ -185,7 +211,7 @@ export function InvoicesScreen() {
                     </div>
                     <span className={chipClass(statusTone(st))}>{st}</span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-muted">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted">
                     {share != null ? (
                       <span className="ao-chip ao-chip-sky">
                         {Number(share) <= 1
@@ -198,6 +224,23 @@ export function InvoicesScreen() {
                         {String(o.delivery_mode)}
                       </span>
                     ) : null}
+                    <button
+                      type="button"
+                      className="ml-auto rounded-full bg-sky-500 px-3 py-1.5 text-[10px] font-extrabold text-white shadow-sm shadow-sky-500/25"
+                      onClick={() => {
+                        const who =
+                          displayName ||
+                          displayEmail ||
+                          (o.id != null ? `id ${o.id}` : "this offtaker");
+                        openAgent(
+                          `Edit offtaker "${who}"${
+                            o.id != null ? ` (subscription_id=${o.id})` : ""
+                          }. Call get_offtaker / list_offtakers, show current share, rate, email, array, delivery mode. Ask what to change, then patch_offtaker with confirm.`
+                        );
+                      }}
+                    >
+                      Edit with Agent
+                    </button>
                   </div>
                 </li>
               );
