@@ -51,6 +51,31 @@ It is **credential-free**: it replays the extension's `SO_EXTENSION_PRESENT` / `
   builder never grades its own work. This is the check that would have caught the `#/pv/sites`
   regression in 30 seconds instead of a screenshot from Ford.
 
+## Animation audit (frame-dense “video” of the UI)
+
+`animation-audit.mjs` walks major Array Operator surfaces, fires an action, then captures
+**dense CDP screencast frames** (~15–25fps) so motion can be analyzed like a short video.
+
+```bash
+cd verify
+npm install
+npm run audit:animations              # headless, live arrayoperator.com
+HEADED=1 npm run audit:animations     # watch the browser
+FPS=20 DURATION_MS=1600 npm run audit:animations
+```
+
+Each run writes `artifacts/animation-audit/<timestamp>/`:
+
+| Path | Contents |
+|------|----------|
+| `frames/<scenario>_NNNN.jpg` | Frame-by-frame stills after each click |
+| `contact/<scenario>.html` | Contact sheet strip for quick scan |
+| `report.json` / `report.md` | Catalog of issues + metrics |
+
+**Issue codes:** `NO_MOTION`, `HARD_SNAP`, `EARLY_STALL`, `FLASH`, `NO_SETTLE`, `MARQUEE_STALLED`, `LOW_CAPTURE_FPS`.
+
+Exit `2` if any **high** severity issue is found (CI-gatable).
+
 ## Layer 2 — synthetic subject (vision judge)
 
 Feed `artifacts/onboarding-happy.png` (and headed step screenshots) to a vision model with:

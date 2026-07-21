@@ -7954,9 +7954,24 @@
  const dash = document.getElementById("ftDash");
  const sheet = document.getElementById("sheetWrap");
  const sb = document.getElementById("sbWrap");
- if(dash){ dash.hidden = (sub !== "dashboard"); }
- if(sheet){ sheet.hidden = (sub !== "table"); }
- if(sb){ sb.hidden = (sub !== "sandbox"); }
+ // Soft enter animation when a fleet sub-view becomes visible (was a hard cut —
+ // animation-audit HARD_SNAP on table/sandbox/triage switches).
+ function _showFt(el, on){
+ if(!el) return;
+ const wasHidden = !!el.hidden;
+ el.hidden = !on;
+ if(on && wasHidden){
+ el.classList.remove("ft-sub-enter");
+ // reflow so re-adding the class restarts the keyframes
+ void el.offsetWidth;
+ el.classList.add("ft-sub-enter");
+ } else if(!on){
+ el.classList.remove("ft-sub-enter");
+ }
+ }
+ _showFt(dash, sub === "dashboard");
+ _showFt(sheet, sub === "table");
+ _showFt(sb, sub === "sandbox");
  document.querySelectorAll(".ft-sub-seg [data-ftsub]").forEach(b => {
  const on = b.getAttribute("data-ftsub") === sub;
  b.classList.toggle("on", on);

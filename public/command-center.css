@@ -2479,6 +2479,17 @@ html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
 #panelDashboard .ft-sub-seg{
   max-width: min(100%, 420px);
 }
+/* Fleet Triage | Table | Sandbox: soft enter (was hard cut; animation-audit HARD_SNAP) */
+#panelDashboard .ft-sub.ft-sub-enter{
+  animation: ftSubEnter .32s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes ftSubEnter{
+  from{ opacity:0; transform: translateY(8px); }
+  to{ opacity:1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce){
+  #panelDashboard .ft-sub.ft-sub-enter{ animation: none; }
+}
 
 /* Sub-nav strip (Ford 2026-07-16): flex-centers the pill in the band between
    the tabbar bottom and the main content card top.
