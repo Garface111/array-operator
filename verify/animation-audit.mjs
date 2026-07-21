@@ -639,11 +639,16 @@ async function main() {
           } catch (_) {}
         });
         await sleep(200);
+        // Vendor groups start COLLAPSED — expand a vendor first so .vs-arr has layout
         await p.evaluate(() => {
-          // Collapse all open arrays first so expand is a true open
+          const vh = document.querySelector("#vendorSheet .vs-vgroup.collapsed .vs-vhead, #vendorSheet .vs-vhead[aria-expanded='false']");
+          if (vh) vh.click();
+        });
+        await sleep(200);
+        await p.evaluate(() => {
           document.querySelectorAll("#vendorSheet .vs-arr.open").forEach((el) => el.click());
         });
-        await sleep(120);
+        await sleep(100);
         await p.evaluate(() => {
           const b = document.querySelector("#vendorSheet .vs-arr:not(.open)");
           if (b) {
@@ -651,11 +656,10 @@ async function main() {
             b.click();
           }
         });
-        // Re-fire enter animation if wrap already present without is-enter
         await sleep(40);
         await p.evaluate(() => {
           const w = document.querySelector("#vendorSheet .vs-inv-wrap");
-          if (w && !w.classList.contains("is-enter")) {
+          if (w) {
             w.classList.remove("is-enter");
             void w.offsetWidth;
             w.classList.add("is-enter");
