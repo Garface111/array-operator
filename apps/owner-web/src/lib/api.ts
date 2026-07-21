@@ -2,7 +2,10 @@ import { clearSession, getSession, SESSION_KEY, UNAUTHORIZED_EVENT } from "./ses
 import type {
   EnergyAgentChatResponse,
   EnergyAgentSession,
+  FleetArray,
+  FleetInverter,
   FleetTree,
+  FleetTreeRaw,
   Overview,
   PasswordLoginResult,
   SendPipeline,
@@ -37,6 +40,41 @@ export function rearmUnauthorized(): void {
   unauthorizedNotified = false;
 }
 
+/**
+ * Absolute API origin for Capacitor/native shells (local WebView origin has no
+ * /v1 proxy). Same-origin browser deploys (arrayoperator.com/m) and local web
+ * preview use "" so /v1 stays on the page origin (Netlify or dev proxy).
+ */
+export function apiOrigin(): string {
+  try {
+    const { protocol, hostname } = window.location;
+    if (protocol === "capacitor:" || protocol === "ionic:") {
+      return "https://arrayoperator.com";
+    }
+    // Capacitor Android/iOS often load as https://localhost — but only when the
+    // Capacitor bridge is present. Plain localhost web preview must stay relative
+    // (otherwise CORS blocks arrayoperator.com and the fleet looks empty).
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor;
+    if (cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) {
+      return "https://arrayoperator.com";
+    }
+    if (cap && (hostname === "localhost" || hostname === "127.0.0.1")) {
+      return "https://arrayoperator.com";
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+function apiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = apiOrigin();
+  if (!base) return path;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const body = await res.json();
@@ -50,20 +88,31 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+export type ApiFetchOptions = RequestInit & {
+  /**
+   * When true (default for most calls), a 401 clears so_session and routes to login.
+   * Set false for optional/secondary endpoints so a billing 401 cannot wipe a good session.
+   */
+  logoutOn401?: boolean;
+};
+
 export async function apiFetch<T = unknown>(
   path: string,
-  init: RequestInit = {}
+  init: ApiFetchOptions = {}
 ): Promise<T> {
-  const headers = new Headers(init.headers || {});
-  if (!headers.has("Content-Type") && init.body) {
+  const { logoutOn401 = true, ...req } = init;
+  const headers = new Headers(req.headers || {});
+  if (!headers.has("Content-Type") && req.body) {
     headers.set("Content-Type", "application/json");
   }
   const token = getSession();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(apiUrl(path), { ...req, headers });
   if (res.status === 401) {
-    notifyUnauthorizedOnce();
+    if (logoutOn401 && token) {
+      notifyUnauthorizedOnce();
+    }
     throw new UnauthorizedError();
   }
   if (!res.ok) {
@@ -80,9 +129,11 @@ export async function passwordLogin(
   password: string,
   product = "array_operator"
 ): Promise<PasswordLoginResult> {
+  // Login itself must not clear a stale token mid-request.
   const data = await apiFetch<PasswordLoginResult>("/v1/auth/password-login", {
     method: "POST",
     body: JSON.stringify({ email, password, product }),
+    logoutOn401: false,
   });
   if (data.session_token) {
     localStorage.setItem(SESSION_KEY, data.session_token);
@@ -95,7 +146,109 @@ export async function requestMagicLink(email: string): Promise<{ ok?: boolean }>
   return apiFetch("/v1/auth/request", {
     method: "POST",
     body: JSON.stringify({ email, product: "array_operator" }),
+    logoutOn401: false,
   });
+}
+
+// ── Adapters (API shape → UI shape) ──────────────────────────────────────
+
+/** Map overview arrays (array_id / health / peer) → FleetArray[]. */
+export function adaptOverviewArrays(overview: Overview | null | undefined): FleetArray[] {
+  if (!overview?.arrays?.length) return [];
+  return overview.arrays.map((a) => {
+    const id = a.array_id ?? a.id ?? a.name ?? "unknown";
+    const status =
+      (a.health && typeof a.health.status === "string" && a.health.status) ||
+      (a.peer && typeof a.peer.status === "string" && a.peer.status) ||
+      (typeof a.status === "string" ? a.status : "") ||
+      "unknown";
+    const today =
+      a.today && typeof a.today === "object" && a.today.kwh != null
+        ? Number(a.today.kwh)
+        : null;
+    const liveW =
+      a.live && typeof a.live === "object" && a.live.current_power_w != null
+        ? Number(a.live.current_power_w)
+        : null;
+    return {
+      id,
+      name: String(a.name || "Array"),
+      status: String(status),
+      peer_index: a.peer?.peer_index ?? null,
+      diagnosis: a.peer?.diagnosis ?? a.health?.message ?? null,
+      today_kwh: today,
+      current_power_w: liveW,
+      inverters: [],
+    };
+  });
+}
+
+/**
+ * Live fleet-tree returns { columns: [...] } (sandbox shape). Desktop
+ * fleet-store.js adaptTree() is the source of truth — mirror it here.
+ */
+export function adaptFleetTree(raw: FleetTreeRaw | null | undefined): FleetTree {
+  if (!raw) return { arrays: [] };
+
+  // Prefer columns (real API). Fall back to arrays only if already canonical.
+  const fromColumns = (raw.columns || []).map((c): FleetArray => {
+    const invs: FleetInverter[] = (c.inverters || []).map((inv, idx) => ({
+      id: inv.inverter_id != null ? inv.inverter_id : `inv-${idx}`,
+      name: String(inv.name || "Inverter"),
+      status: String(inv.status || "unknown"),
+      peer_index: inv.peer_index ?? null,
+      current_power_w: inv.current_power_w ?? null,
+      nameplate_kw: inv.nameplate_kw ?? null,
+      diagnosis: inv.diagnosis ?? null,
+    }));
+    const alertStatus =
+      (c.alert && (c.alert.status || c.alert.level || c.alert.headline)) || "";
+    // Roll up worst inverter status when array alert is quiet.
+    let status = String(alertStatus || "ok");
+    if (!alertStatus || alertStatus === "ok") {
+      const bad = invs.find((i) => /dead|fault|offline|error/i.test(i.status));
+      const warn = invs.find((i) => /under|attn|warn|stale|gap/i.test(i.status));
+      if (bad) status = bad.status;
+      else if (warn) status = warn.status;
+    }
+    return {
+      id: c.array_id ?? c.array_name ?? "unknown",
+      name: String(c.array_name || "Array"),
+      status,
+      vendor: c.vendor ?? null,
+      current_power_w: c.current_power_w ?? null,
+      today_kwh: c.produced_today_kwh ?? null,
+      inverters: invs,
+    };
+  });
+
+  if (fromColumns.length) {
+    return { arrays: fromColumns, summary: raw.summary, raw };
+  }
+
+  // Legacy shape already using arrays[]
+  if (Array.isArray(raw.arrays) && raw.arrays.length) {
+    return {
+      arrays: raw.arrays.map((a) => ({
+        id: a.id ?? a.name ?? "unknown",
+        name: String(a.name || "Array"),
+        status: String(a.status || "unknown"),
+        inverters: (a.inverters || []).map((inv, idx) => ({
+          id: inv.id ?? `inv-${idx}`,
+          name: String(inv.name || "Inverter"),
+          status: String(inv.status || "unknown"),
+          peer_index: inv.peer_index ?? null,
+          current_power_w: inv.current_power_w ?? null,
+          nameplate_kw: inv.nameplate_kw ?? null,
+          diagnosis: inv.diagnosis ?? null,
+        })),
+      })),
+      summary: raw.summary,
+      raw,
+    };
+  }
+
+  return { arrays: [], summary: raw.summary, raw };
 }
 
 // ── Fleet / offtakers ────────────────────────────────────────────────────
@@ -104,13 +257,17 @@ export function fetchOverview(): Promise<Overview> {
   return apiFetch<Overview>("/v1/array-owners/overview");
 }
 
-export function fetchFleetTree(force = false): Promise<FleetTree> {
+export async function fetchFleetTree(force = false): Promise<FleetTree> {
   const q = force ? "?force=1" : "";
-  return apiFetch<FleetTree>(`/v1/array-owners/fleet-tree${q}`);
+  const raw = await apiFetch<FleetTreeRaw>(`/v1/array-owners/fleet-tree${q}`);
+  return adaptFleetTree(raw);
 }
 
 export function fetchSendPipeline(): Promise<SendPipeline> {
-  return apiFetch<SendPipeline>("/v1/array-operator/billing/send-pipeline");
+  // Optional pulse — never log the owner out if billing auth disagrees.
+  return apiFetch<SendPipeline>("/v1/array-operator/billing/send-pipeline", {
+    logoutOn401: false,
+  });
 }
 
 // ── Energy Agent ─────────────────────────────────────────────────────────

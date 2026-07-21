@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { StatCard } from "@/components/StatCard";
 import { useOutletAgent } from "@/hooks/useOutletAgent";
-import { fetchFleetTree, fetchOverview, fetchSendPipeline } from "@/lib/api";
+import {
+  adaptOverviewArrays,
+  fetchFleetTree,
+  fetchOverview,
+  fetchSendPipeline,
+} from "@/lib/api";
 import { fmtKwh, fmtMoney, statusTone } from "@/lib/format";
 import type { FleetTree, Overview, SendPipeline } from "@/lib/types";
 
@@ -21,7 +26,11 @@ export function HomeScreen() {
       setErr(null);
       try {
         const [o, t, p] = await Promise.all([
-          fetchOverview().catch(() => null),
+          fetchOverview().catch((e) => {
+            if (!cancelled)
+              setErr(e instanceof Error ? e.message : "Could not load overview");
+            return null;
+          }),
           fetchFleetTree().catch(() => null),
           fetchSendPipeline().catch(() => null),
         ]);
@@ -29,6 +38,9 @@ export function HomeScreen() {
         setOverview(o);
         setTree(t);
         setPipe(p);
+        if (!o && !t) {
+          setErr((prev) => prev || "Could not load your fleet");
+        }
       } catch (e) {
         if (!cancelled)
           setErr(e instanceof Error ? e.message : "Could not load home");
@@ -41,62 +53,90 @@ export function HomeScreen() {
     };
   }, []);
 
+  const fleetArrays = useMemo(() => {
+    if (tree?.arrays?.length) return tree.arrays;
+    return adaptOverviewArrays(overview);
+  }, [tree, overview]);
+
   const stats = useMemo(() => {
-    const arrays = overview?.arrays || tree?.arrays || [];
-    const nArrays = overview?.totals?.array_count ?? arrays.length;
+    const nArrays =
+      overview?.totals?.array_count ??
+      overview?.peer_summary?.arrays_total ??
+      tree?.summary?.arrays_total ??
+      fleetArrays.length;
+
     let inv = 0;
     let attn = 0;
     let dead = 0;
-    (tree?.arrays || []).forEach((a) => {
-      (a.inverters || []).forEach((invRow) => {
-        inv += 1;
-        const tone = statusTone(String(invRow.status || a.status || ""));
+    fleetArrays.forEach((a) => {
+      const invs = a.inverters || [];
+      if (invs.length) {
+        invs.forEach((invRow) => {
+          inv += 1;
+          const tone = statusTone(String(invRow.status || a.status || ""));
+          if (tone === "bad") dead += 1;
+          else if (tone === "warn") attn += 1;
+        });
+      } else {
+        const tone = statusTone(String(a.status || ""));
         if (tone === "bad") dead += 1;
         else if (tone === "warn") attn += 1;
-      });
+      }
     });
+
+    // Prefer peer_summary when present (overview), else tree.summary.attention
     const peer = overview?.peer_summary;
     if (peer) {
-      attn = peer.underperforming ?? attn;
-      dead = peer.dead ?? dead;
+      if (peer.underperforming != null || peer.dead != null) {
+        attn = peer.underperforming ?? attn;
+        dead = peer.dead ?? dead;
+      } else if (peer.arrays_attention != null) {
+        attn = peer.arrays_attention;
+        dead = 0;
+      }
+    } else if (tree?.summary?.attention != null) {
+      attn = tree.summary.attention;
     }
+
     const last = pipe?.last;
     const delivered = last?.delivered ?? last?.sent;
     const enabled = pipe?.total_enabled;
+    const todayKwh = overview?.totals?.today_kwh;
+    const valueToday =
+      overview?.totals?.value_today ?? overview?.totals?.today_usd ?? null;
+
     return {
       nArrays,
       inv,
       attn,
       dead,
-      todayKwh: overview?.totals?.today_kwh,
-      valueToday: overview?.totals?.value_today,
+      todayKwh,
+      valueToday,
       delivered,
       enabled,
       mode: pipe?.default_delivery_mode || "—",
       period: last?.period_label || last?.period_month || null,
     };
-  }, [overview, tree, pipe]);
+  }, [overview, tree, pipe, fleetArrays]);
 
   const attention = useMemo(() => {
     const rows: { name: string; status: string }[] = [];
-    (tree?.arrays || overview?.arrays || []).forEach((a) => {
+    fleetArrays.forEach((a) => {
       const name = String(a.name || "Array");
       const st = String(a.status || "");
       const tone = statusTone(st);
       if (tone === "warn" || tone === "bad") rows.push({ name, status: st || "attention" });
-      (a as { inverters?: Array<{ name?: string; status?: string }> }).inverters?.forEach(
-        (inv) => {
-          const t = statusTone(inv.status);
-          if (t === "warn" || t === "bad")
-            rows.push({
-              name: `${name} · ${inv.name || "inverter"}`,
-              status: String(inv.status || "attention"),
-            });
-        }
-      );
+      (a.inverters || []).forEach((inv) => {
+        const t = statusTone(inv.status);
+        if (t === "warn" || t === "bad")
+          rows.push({
+            name: `${name} · ${inv.name || "inverter"}`,
+            status: String(inv.status || "attention"),
+          });
+      });
     });
     return rows.slice(0, 5);
-  }, [tree, overview]);
+  }, [fleetArrays]);
 
   if (loading) {
     return (
@@ -198,6 +238,64 @@ export function HomeScreen() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Compact fleet list so owners see real arrays on Home, not only a count */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-extrabold">Your arrays</h2>
+          <Link to="/fleet" className="text-xs font-bold text-sky-700">
+            All →
+          </Link>
+        </div>
+        {fleetArrays.length === 0 ? (
+          <div className="ao-card px-3.5 py-4 text-sm text-muted">
+            No arrays on this account yet.{" "}
+            <Link to="/connect" className="font-bold text-sky-700">
+              Connect feeds →
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {fleetArrays.slice(0, 6).map((a) => {
+              const tone = statusTone(a.status);
+              const invN = a.inverters?.length || 0;
+              return (
+                <li key={String(a.id)}>
+                  <Link
+                    to="/fleet"
+                    className="ao-card flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold">{a.name}</div>
+                      <div className="text-[11px] text-muted">
+                        {invN
+                          ? `${invN} inverter${invN === 1 ? "" : "s"}`
+                          : a.today_kwh != null
+                            ? fmtKwh(a.today_kwh)
+                            : "Array"}
+                      </div>
+                    </div>
+                    <span
+                      className={[
+                        "ao-chip shrink-0",
+                        tone === "good"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : tone === "warn"
+                            ? "bg-amber-100 text-amber-900"
+                            : tone === "bad"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-slate-100 text-slate-600",
+                      ].join(" ")}
+                    >
+                      {a.status || "—"}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="space-y-2">

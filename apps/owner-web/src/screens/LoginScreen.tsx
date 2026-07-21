@@ -1,7 +1,7 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { passwordLogin, requestMagicLink, rearmUnauthorized } from "@/lib/api";
-import { setSession } from "@/lib/session";
+import { getSession, setSession } from "@/lib/session";
 
 export function LoginScreen() {
   const nav = useNavigate();
@@ -11,6 +11,11 @@ export function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // Already signed in (e.g. phone handoff from desktop so_session) → go home.
+  useEffect(() => {
+    if (getSession()) nav("/", { replace: true });
+  }, [nav]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
