@@ -2184,6 +2184,41 @@ html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
 .rb-calc-row.total .rb-calc-k{ color:#16202b; font-weight:800; font-size:14px; }
 .rb-calc-row.total .rb-calc-v{ color:#0a7d4f; font-size:18px; font-weight:850; }
 
+/* Group-host bill anatomy strip (Generated · Host consumed · Group excess · …) */
+.rb-anat{ margin:10px 0 12px; padding:10px 12px; border-radius:12px; border:1px solid #e6edf3;
+  background:linear-gradient(180deg,#f7fafc,#fff); }
+.rb-anat-has-warn{ border-color:rgba(214,158,46,.45); background:linear-gradient(180deg,rgba(255,247,232,.9),#fff); }
+.rb-anat-h{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; font-weight:700; color:#5a6b7b; margin-bottom:8px; }
+.rb-anat-h small{ text-transform:none; letter-spacing:0; font-weight:500; color:#90a0b0; margin-left:6px; }
+.rb-anat-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.rb-anat-chip{ display:flex; flex-direction:column; gap:2px; min-width:5.5em; padding:6px 9px;
+  border-radius:10px; background:rgba(16,32,43,.03); border:1px solid #eef2f6; }
+.rb-anat-k{ font-size:10px; letter-spacing:.04em; text-transform:uppercase; font-weight:700; color:#90a0b0; }
+.rb-anat-v{ font-size:13px; font-weight:750; color:#16202b; font-variant-numeric:tabular-nums; }
+.rb-anat-warns{ margin-top:8px; display:flex; flex-direction:column; gap:4px; }
+.rb-anat-warn{ font-size:12px; line-height:1.4; color:#8a6414; font-weight:600; }
+.rb-anat-compact{ margin:8px 0 0; padding:8px 10px; }
+.rb-anat-compact .rb-anat-chip{ padding:5px 8px; min-width:4.8em; }
+.rb-anat-compact .rb-anat-v{ font-size:12.5px; }
+
+/* How to read a GMP group host bill */
+.rb-gmp-help{ margin:0 0 12px; border:1px solid #e6edf3; border-radius:12px; background:#fff;
+  box-shadow:0 1px 2px rgba(16,32,43,.03); }
+.rb-gmp-help > summary{ cursor:pointer; list-style:none; padding:10px 14px; font-size:12.5px;
+  font-weight:700; color:#0a7d4f; display:flex; align-items:center; gap:8px; }
+.rb-gmp-help > summary::-webkit-details-marker{ display:none; }
+.rb-gmp-help > summary::before{ content:"▸"; font-size:11px; color:#90a0b0; transition:transform .12s; }
+.rb-gmp-help[open] > summary::before{ transform:rotate(90deg); }
+.rb-gmp-help-body{ padding:0 14px 12px; font-size:13px; line-height:1.5; color:#3a4a58; }
+.rb-gmp-help-body p{ margin:0 0 8px; }
+.rb-gmp-help-body ul{ margin:0 0 10px; padding-left:1.15em; }
+.rb-gmp-help-body li{ margin:3px 0; }
+.rb-gmp-help-ex{ margin-top:8px; padding:10px 12px; border-radius:10px; background:#f4f8f6;
+  border:1px solid #dce8e2; }
+.rb-gmp-help-ex-h{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; font-weight:750;
+  color:#0a7d4f; margin-bottom:4px; }
+.rb-gmp-help-ex-p{ margin:0; font-size:12.5px; color:#3a4a58; }
+
 /* ── Bill accuracy check ─────────────────────────────────────────────────────
    The per-offtaker GMP-allocation cross-check + production-vs-bill panel, woven
    into the invoice-review flow. Day palette (white cards, slate ink, emerald for

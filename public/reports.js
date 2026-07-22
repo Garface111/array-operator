@@ -550,6 +550,7 @@
  const body = flaggedRows
  ? `<div class="rb-au-offs">${flaggedRows}</div>` + okDrawer
  : (okDrawer || `<div class="rb-au-offs"><div class="rb-au-off rb-au-quiet"><div class="rb-au-note rb-au-mute">No offtakers on this array yet.</div></div></div>`);
+ const anat = billAnatomyHTML(a.bill_anatomy, { compact: true });
  return `<div class="rb-au-card${flagged ? " rb-au-card-flag" : ""}">
  <div class="rb-au-master">
  <div class="rb-au-master-name">${esc(a.array_name || ("Array " + (a.array_id != null ? a.array_id : "")))}
@@ -558,6 +559,7 @@
  <span class="rb-au-excess">Group excess <b>${a.group_excess_kwh != null ? fmt0(a.group_excess_kwh) + " kWh" : "—"}</b></span>
  ${rate ? `<span class="rb-au-rate">${esc(rate)}</span>` : ""}
  </div>
+ ${anat}
  </div>
  ${body}
  </div>`;
@@ -624,7 +626,8 @@
  host.innerHTML = `
  <div class="rb-au-head">
  <div class="rb-au-title">Bill audit <span class="rb-au-eyebrow">GMP allocation cross-check</span></div>
- <p class="rb-au-lead">The array's master utility bill on top; each offtaker's own bill underneath. We flag it when GMP's credited kWh doesn't match <b>their share × the array's group excess</b>.</p>
+ <p class="rb-au-lead">The array's master utility bill on top; each offtaker's own bill underneath. We flag it when GMP's credited kWh doesn't match <b>their share × the array's group excess</b>. Offtaker credits use <b>Group Excess Shared</b>, never the page‑1 snapshot.</p>
+ ${gmpGroupHostHelpHTML()}
  </div>
  ${summary}
  <div class="rb-au-tabs" role="tablist">${subtabs}</div>
@@ -6639,12 +6642,74 @@
  // billed EXACTLY. Fallback (topology B / no group data / list payloads without
  // the meta): the stored figures + the entered share, exactly as before.
  function draftDisplayTriple(d) {
+ // Prefer Group Excess Shared from bill anatomy when present (hard rule).
+ const anatPool = d && d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null
+  ? Number(d.bill_anatomy.group_excess_shared_kwh) : null;
  if (d && d.billing_basis === "gmp_credited" && d.derived_share_pct != null
- && d.array_group_excess_kwh != null) {
- return { total: d.array_group_excess_kwh, share: d.derived_share_pct, fromBill: true };
+ && (anatPool != null || d.array_group_excess_kwh != null)) {
+ return {
+  total: anatPool != null ? anatPool : d.array_group_excess_kwh,
+  share: d.derived_share_pct,
+  fromBill: true,
+ };
  }
- return { total: d ? d.array_total_kwh : null,
- share: offtakerShareFrac(d), fromBill: false };
+ const total = anatPool != null ? anatPool
+  : (d && d.array_group_excess_kwh != null ? d.array_group_excess_kwh
+   : (d ? d.array_total_kwh : null));
+ return { total, share: offtakerShareFrac(d), fromBill: false };
+ }
+
+ // ── GMP group-host bill anatomy strip (Generated · Host consumed · Group
+ // excess · Net billed · Fixed charges) + integrity / fallback warnings.
+ // Used on offtaker draft calc + Bill audit master cards.
+ function billAnatomyHTML(anat, opts) {
+  opts = opts || {};
+  if (!anat || typeof anat !== "object") return "";
+  const chip = (lab, val, unit) =>
+   `<span class="rb-anat-chip"><span class="rb-anat-k">${esc(lab)}</span>`
+   + `<span class="rb-anat-v">${val != null ? esc(String(val)) + (unit || "") : "—"}</span></span>`;
+  const gen = anat.generated_kwh != null ? fmt0(anat.generated_kwh) : null;
+  const host = anat.host_consumed_kwh != null ? fmt0(anat.host_consumed_kwh) : null;
+  const shared = anat.group_excess_shared_kwh != null ? fmt0(anat.group_excess_shared_kwh) : null;
+  const net = anat.net_billed_kwh != null ? fmt0(anat.net_billed_kwh) : null;
+  const fixed = anat.fixed_charges_usd != null ? money(anat.fixed_charges_usd) : null;
+  const warns = (anat.warnings || []).filter(Boolean);
+  const warnHtml = warns.length
+   ? `<div class="rb-anat-warns">${warns.map(w =>
+      `<div class="rb-anat-warn" role="status">⚠ ${esc(w)}</div>`).join("")}</div>`
+   : "";
+  const title = opts.compact
+   ? ""
+   : `<div class="rb-anat-h">Host bill anatomy <small>offtaker credits use Group Excess Shared</small></div>`;
+  return `<div class="rb-anat${opts.compact ? " rb-anat-compact" : ""}${warns.length ? " rb-anat-has-warn" : ""}">`
+   + title
+   + `<div class="rb-anat-chips" role="group" aria-label="Host bill anatomy">`
+   + chip("Generated", gen, " kWh")
+   + chip("Host consumed", host, " kWh")
+   + chip("Group excess shared", shared, " kWh")
+   + chip("Net billed", net, " kWh")
+   + chip("Fixed charges", fixed, "")
+   + `</div>${warnHtml}</div>`;
+ }
+
+ // Collapsible operator help: how to read a GMP group host bill (May example).
+ function gmpGroupHostHelpHTML() {
+  return `<details class="rb-gmp-help">
+ <summary>How to read a GMP group host bill</summary>
+ <div class="rb-gmp-help-body">
+  <p>On a <b>group net-metering host</b> bill (Group Rate), GMP first nets the host site’s own use against generation, then labels the leftover as <b>Group Excess Shared</b> — that is the kWh pool assigned to group members for credits. It is <b>not</b> a second unexplained loss of energy.</p>
+  <ul>
+   <li><b>Page 2 Bill Details win</b> over page 1 “My Energy Use Snap Shot”.</li>
+   <li><b>Offtaker credits use Group Excess Shared</b>, never the snapshot totals.</li>
+   <li>Never use gross generation as the offtaker pool when Group Excess Shared is smaller (host load was netted first).</li>
+   <li>When host consumption is 0, generated and group excess are the same number.</li>
+  </ul>
+  <div class="rb-gmp-help-ex">
+   <div class="rb-gmp-help-ex-h">Example (host load nonzero)</div>
+   <p class="rb-gmp-help-ex-p">Period 04/17–05/19 · Snapshot 27,180 gen / 180 used · Detail <b>27,000 generated − 175 host consumed = 26,825 group excess shared</b>. Use <b>26,825</b> for offtaker credit math — not 27,180 or 27,000 alone.</p>
+  </div>
+ </div>
+</details>`;
  }
 
  function subCard(s, arrs, utilAccts) {
@@ -7661,12 +7726,26 @@
  ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${creditDue}</span></div>
  <div class="rb-calc-row total"><span class="rb-calc-k">Amount due<small>budget bill this period</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
  : `<div class="rb-calc-row total"><span class="rb-calc-k">Solar credit value due<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`;
+ const anat = billAnatomyHTML(d.bill_anatomy);
+ const poolLabel = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
+  ? "Group excess shared"
+  : (d.array_group_excess_kwh != null ? "Group excess shared" : "Array generation");
+ const poolHint = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
+  ? "offtaker credit pool on the host bill"
+  : "metered on the bill";
+ const warnNote = (d.bill_anatomy_warnings && d.bill_anatomy_warnings.length)
+  ? d.bill_anatomy_warnings.map(w =>
+     `<div class="rb-anat-warn" role="status">⚠ ${esc(w)}</div>`).join("")
+  : "";
  return `
  <div class="rb-calc">
  <div class="rb-calc-h">How we calculated this invoice</div>
+ ${gmpGroupHostHelpHTML()}
  <div class="rb-calc-row"><span class="rb-calc-k">Latest ${offtakerProviderLabel(d) || "utility"} bill</span>
  <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(gmpBillFilename(d))}">view ↓</button>` : ""}</span></div>
- <div class="rb-calc-row"><span class="rb-calc-k">Array generation<small>metered on the bill</small></span><span class="rb-calc-v">${fmt0(trip.total)} kWh</span></div>
+ ${anat || ""}
+ ${warnNote && !anat ? `<div class="rb-anat-warns">${warnNote}</div>` : ""}
+ <div class="rb-calc-row"><span class="rb-calc-k">${esc(poolLabel)}<small>${esc(poolHint)}</small></span><span class="rb-calc-v">${fmt0(trip.total)} kWh</span></div>
  <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share${trip.fromBill ? "<small>from their own utility bill</small>" : ""}</span>
  <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
  ${rateRow}
