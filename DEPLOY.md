@@ -70,3 +70,16 @@ config lives only in `scripts/preprod/netlify.toml` and is copied in by
 If you are an agent: **do not invent Netlify deploy commands.** Call
 `scripts/deploy-and-verify.sh` (prod) or `scripts/deploy-preprod.sh` (preprod).
 If either script fails, stop and report — do not fall back to raw `netlify deploy --prod`.
+
+## Sovereign chamber (false-real product — never production)
+
+Always-on sandbox URL for the rocket-engine mind (L2):
+
+| | |
+|--|--|
+| **URL** | https://chamber--array-operator-ea.netlify.app |
+| **How** | Netlify **branch deploy** (`branch=chamber`, `draft=true`) on the **same** site UUID as prod — does **not** publish arrayoperator.com |
+| **Command** | `python3 scripts/chamber_deploy_dir.py [public-dir]` |
+| **Auto** | Sovereign sandbox AO ships call this via `energy_agent_sovereign_chamber.py` |
+
+New Netlify sites are blocked by plan quota (429). Do **not** create `ao-sovereign-chamber`. Do **not** use preprod (IP gate). Chamber ships `public/` only (includes `_redirects` so `/v1/*` still proxies to Railway).
