@@ -1408,13 +1408,6 @@ function cloudDoneScreen(){
  <div class="s" id="cvDoneStat" style="margin-top:.6rem"></div>
  <div class="s" style="margin-top:.6rem">Add, remove, or switch to on-device anytime in <b>Master Account → Auto-refresh</b>.</div>
  </div>
- <div class="callout" style="margin-top:1rem;text-align:left">
- <div class="t">📋 Have an offtaker roster spreadsheet?</div>
- <div class="s">Utility export or your own Excel, we detect columns and you review before offtakers are created. Optional; you can also bulk-import later from Invoices.</div>
- <div class="row" style="margin-top:.75rem;justify-content:flex-start">
- <a class="btn btn-primary" href="/?setup=offtakers&tour=hands-off#reports">Upload offtaker spreadsheet →</a>
- </div>
- </div>
  <div style="display:flex;flex-direction:column;gap:.6rem;align-items:center;margin-top:.5rem">
  <button class="btn btn-primary btn-lg" onclick="goDashboard()">Open my dashboard →</button>
  <button class="btn btn-ghost" id="addCardBtn" onclick="addCard()">Add a card to stay on after the trial</button>
@@ -1843,19 +1836,6 @@ function doneScreen(){
  ? `Your <b>14-day free trial</b> is live, no card needed. You're already signed in; open your dashboard below.`
  : `Your <b>14-day free trial</b> is live, no card needed. We just emailed <b>${state.email}</b> a secure sign-in link to open your dashboard.`));
  let cardCta;
- // Optional offtaker roster path, same bulk-import engine as Invoices → Bulk import.
- const offtakerCta = (created || existing) ? `
- <div class="callout" style="margin-top:1.25rem;text-align:left">
- <div class="t">📋 Have an offtaker roster spreadsheet?</div>
- <div class="s">Drop the file you already use, utility membership export, Excel, or Google Sheets.
- We detect the columns, match each offtaker to an array, and you review before anything is created.
- You can also do this anytime from <b>Invoices → Bulk import</b>.</div>
- <div class="row" style="margin-top:.85rem;justify-content:flex-start;gap:.5rem;flex-wrap:wrap">
- <a class="btn btn-primary" href="/?setup=offtakers&tour=hands-off#reports"
- ${signedIn ? "" : 'target="_blank" rel="noopener"'}>Upload offtaker spreadsheet →</a>
- <span class="helper" style="margin:0">Optional, skip if you bill one customer at a time.</span>
- </div>
- </div>` : "";
  if(existing){
  // Returning user: link is already on its way. Give them a direct way in too.
  cardCta = `<a class="btn btn-primary btn-lg" href="/?fresh=1&tour=hands-off#arrays" target="_blank" rel="noopener">Open dashboard →</a>
@@ -1875,7 +1855,6 @@ function doneScreen(){
  <div class="seal">🌿</div>
  <div class="done-h">${existing ? "Welcome back." : (created ? "You're set. We've got it from here." : "Almost there.")}</div>
  <div class="done-s">${trialLine}</div>
- ${offtakerCta}
  ${existing ? "" : `<div class="done-s">${state.arraysConnected
  ? `All ${n} ${n===1?"array is":"arrays are"} <b>connected and being watched right now</b>, every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`
  : `All ${n} ${n===1?"array is":"arrays are"} queued for watching, every inverter ranked against its peers, your offtaker invoices generated for you, and a plain-English digest in your inbox each morning.`}</div>`}
