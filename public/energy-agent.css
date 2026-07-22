@@ -17,10 +17,10 @@
   /* Legacy name used by overlays / hands-off / older rules — same as content inset
      (no longer “card + left gap + right gap” re-center footprint). */
   --ea-footprint: var(--ea-content-inset);
-  /* Shared motion — transform-only paths (compositor). Keep short so it reads
-     as many small frames, not a slow slideshow of layout steps. */
-  --ea-ease: cubic-bezier(.2,.8,.2,1);
-  --ea-dur: .28s;
+  /* Shared motion — disabled (Ford 2026-07-22): Energy Agent opens/closes
+     instantly; no slide of the rail or main column. */
+  --ea-ease: linear;
+  --ea-dur: 0s;
   /* Defaults for ops dual-pane geometry (overridden on body.ea-on-ops). Always
      defined so leaving ops can interpolate back instead of snapping from unset. */
   --ea-ops-left: var(--ea-gap);
@@ -173,9 +173,8 @@ html.sky #tabbar .tab.ea-tab.active .ea-tab-ic{
   color: #0c4a6e; font: inherit; font-size: 12.5px; font-weight: 740;
   cursor: pointer; box-shadow: 0 10px 28px -12px rgba(14,165,233,.55);
   animation: eaGatePulse 1.8s ease-in-out infinite;
-  /* left/top morph with the EA rail (regular ↔ Repairs); short transform for hover */
-  transition: left var(--ea-dur) var(--ea-ease), top var(--ea-dur) var(--ea-ease),
-              transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  /* Geometry snaps with the rail; only light hover feedback remains */
+  transition: border-color .12s ease, box-shadow .12s ease;
 }
 .ea-mic-gate[hidden]{ display: none !important; }
 .ea-mic-gate:hover{ transform: translateY(-1px); border-color: rgba(14,165,233,.55); }
@@ -259,7 +258,7 @@ body.ea-shell-open .panel.active{
    max-width on .wrap — those reflow the whole dashboard every frame and kill FPS
    (the “10–15×” gap vs a pure transform slide). */
 body > .wrap{
-  transition: transform var(--ea-dur) var(--ea-ease);
+  transition: none;
   min-width: 0;
   backface-visibility: hidden;
 }
@@ -291,22 +290,17 @@ body.ea-morphing > .wrap{
     contain: layout paint;
     isolation: isolate;
     backface-visibility: hidden;
-    will-change: transform;
-    /* Geometry is snap-set — NEVER transition left/top/width (layout thrash /
-       slideshow FPS). Open/close and FLIP morphs are transform-only. */
-    transition:
-      transform var(--ea-dur) var(--ea-ease),
-      visibility 0s linear var(--ea-dur);
+    will-change: auto;
+    /* Instant open/close — no rail slide (Ford 2026-07-22). */
+    transition: none;
   }
   #eaPanel.open{
     /* translate3d(0,0,0) keeps the layer promoted while open */
     transform: translate3d(0, 0, 0);
     visibility: visible;
     pointer-events: auto;
-    will-change: transform;
-    transition:
-      transform var(--ea-dur) var(--ea-ease),
-      visibility 0s;
+    will-change: auto;
+    transition: none;
   }
   /* Pack column tight to the card via GPU translate — left-aligned box, then
      slide by content-inset. max-width is set instantly (no transition). */

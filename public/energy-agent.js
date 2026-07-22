@@ -4856,7 +4856,7 @@
  // Wait for the panel to mount, then always start at the TOP
  var psel = panelSelectorForHash(h) || "body";
  await waitForSelector(psel + ".active, " + psel, 3500);
- await sleep(700); // let tab transition + paint finish
+ await sleep(80); // paint settle (tab transitions removed)
  await scrollPanelTop(h);
  if (s.say) {
  setTourCaption(s.say, nIdx, narrated.length);
@@ -7611,7 +7611,7 @@
  var _eaWasOnOps = false;
  var _eaAlignTimers = [];
  var _eaMorphTimer = null;
- var EA_MORPH_MS = 280; // keep in sync with --ea-dur (.28s) in energy-agent.css
+ var EA_MORPH_MS = 0; // instant (Ford 2026-07-22: no EA open/morph animation)
  function isOpsHash(h) {
  h = String(h || "").toLowerCase();
  return h === "#ops" || h === "#claims" || h === "#repairs";

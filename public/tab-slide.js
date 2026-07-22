@@ -52,12 +52,9 @@
   }
 
   function disabled(){
-    try{
-      if(localStorage.getItem("ao_tabslide") === "0") return true;
-      if(location.search.indexOf("tabslide=0") >= 0) return true;
-    }catch(e){}
-    // Desktop only — mobile keeps its existing instant switching + bottom nav.
-    return (window.innerWidth || 0) < 961;
+    // Ford 2026-07-22: tab slides are more trouble than they're worth —
+    // always swap panels instantly (no horizontal page animation).
+    return true;
   }
   function reduced(){
     try{ return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; }

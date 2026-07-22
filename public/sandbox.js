@@ -8040,28 +8040,10 @@
  function applyView(){
  const active = tabFromHash();
  const isSov = location.hash === "#sovereign";
- // Tab pager (Ford 2026-07-16): when the top content panel changes, slide the
- // outgoing panel out and the incoming in (via tab-slide.js) instead of an
- // instant swap. Falls back to instant on first paint, Sovereign, Analysis
- // sub-view hops (#trends/#resources/#analysis among themselves), mobile,
- // reduced motion, or any error.
- //
- // Analysis sub-views (Fleet analysis | Trends | Resources) share one top tab
- // and must NEVER slide. Hash guards alone only skip slides *to* #trends /
- // #resources — going back to #analysis (Fleet) still looked like a panel
- // change (panelTrends → panelAnalysis) and animated. Block that family.
- const _anSubPanel = {panelAnalysis:1, panelTrends:1, panelResources:1};
- const _slideOK = !_firstApply && !isSov && typeof window.__aoTabSlide === "function"
- && location.hash !== "#trends" && location.hash !== "#resources";
- const _prevPanel = _slideOK ? document.querySelector(
- "#panelDashboard.active,#panelAnalysis.active,#panelTrends.active,#panelResources.active,#panelReports.active,#panelMarketplace.active,#panelOps.active,#panelAccount.active") : null;
- const _toPanel = (!isSov && TABS[active]) ? document.getElementById(TABS[active].panel) : null;
- const _anSubHop = !!(
-  _prevPanel && _toPanel &&
-  _anSubPanel[_prevPanel.id] && _anSubPanel[_toPanel.id]
- );
- // Fleet Triage Dashboard|Table|Sandbox share one panel — same-panel hop never slides.
- const _willSlide = !!(_slideOK && _prevPanel && _toPanel && _prevPanel !== _toPanel && !_anSubHop);
+ // Tab pager disabled (Ford 2026-07-22): instant panel swap only — horizontal
+ // slides were more trouble than they were worth. Keep the flags false so the
+ // rest of applyView still toggles .active the simple way.
+ const _willSlide = false;
  Object.keys(TABS).forEach(name => {
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
