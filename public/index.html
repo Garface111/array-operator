@@ -21,6 +21,28 @@
  } catch (e) {}
 })();
 </script>
+<!-- NEPOOL fold deep-link (2026-07-22): nepooloperator.com 301s to
+ ?from=nepool because Netlify redirects cannot carry a #hash. Rewrite early
+ so tabFromHash / landDefaultTab / invoicesSubFromHash all see Generation
+ reports (#reports/generation) before the SPA paints. Also honors
+ ?open=genreports. Scrubs the query so a refresh doesn't re-stick. -->
+<script>
+(function () {
+ try {
+  var q = location.search || "";
+  var wantsGen =
+    /[?&]from=nepool(?:&|$)/i.test(q) ||
+    /[?&]open=genreports(?:&|$)/i.test(q);
+  if (!wantsGen) return;
+  var sp = new URLSearchParams(q);
+  sp.delete("from");
+  sp.delete("open");
+  var qs = sp.toString();
+  var path = location.pathname + (qs ? "?" + qs : "") + "#reports/generation";
+  history.replaceState(null, "", path);
+ } catch (e) {}
+})();
+</script>
 <!-- Per-tab auth session shim, MUST be the very first script so it patches the
  so_session localStorage routing before anything reads/writes it. Lets Ford stay
  signed into different accounts in different tabs. See session-tabscope.js. -->
