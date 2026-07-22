@@ -105,6 +105,11 @@
 
  var state = {
  open: false,
+ // Command Center (fleet) mode: set when launched via __eaOpenFleet, cleared
+ // on close. While true AND on the Fleet dashboard, packContext tags the turn
+ // context.mode = "command_center" so the backend fences the agent to
+ // read-only fleet tools. Re-sent every turn, so leaving clears it server-side.
+ ccMode: false,
  sessionId: null,
  listening: false,
  thinking: false,
@@ -371,8 +376,14 @@
  if (hKey.charAt(0) !== "#") hKey = "#" + hKey;
  var surface = SURFACE_MESO[hKey] || SURFACE_MESO["#dashboard"] || SURFACE_MESO["#arrays"];
 
+ // Command Center (fleet) mode is only live while the fleet dock is open AND
+ // the owner is on the Fleet dashboard; navigating away drops it automatically.
+ // Always emit the key (null when off) so the backend, which merges+persists
+ // turn context, never gets stuck in a stale mode.
+ var ccActive = state.ccMode && hKey.indexOf("#dashboard") === 0;
  var ctx = {
  hash: hash,
+ mode: ccActive ? "command_center" : null,
  tab_label: tabLabel(hash),
  // Always remind the model of live nav labels (hashes are internal only)
  nav_tabs: [
@@ -3156,6 +3167,9 @@
  o = true;
  }
  state.open = !!o;
+ // Closing the dock ends Command Center (fleet) mode — a later open from the
+ // general orb is the full assistant again, never stuck read-only.
+ if (!state.open) state.ccMode = false;
  var panel = document.getElementById("eaPanel");
  var orb = document.getElementById("eaOrb");
  var fab = document.getElementById("eaFab");
@@ -7914,6 +7928,21 @@
  if (!text) return Promise.resolve();
  return setOpen(true).then(function () {
  return turn(text, opts.source || "programmatic", opts);
+ });
+ };
+ /**
+ * Open the agent in Command Center (fleet) mode and send a fleet turn. The
+ * backend fences this session to read-only fleet tools (context.mode ===
+ * "command_center"). Mode holds for follow-up turns until the dock closes or
+ * the owner leaves the Fleet dashboard. Called from command-center.js.
+ */
+ window.__eaOpenFleet = function (text, opts) {
+ opts = opts || {};
+ state.ccMode = true;
+ text = String(text || "").trim();
+ return setOpen(true).then(function () {
+ if (!text) return;
+ return turn(text, opts.source || "fleet-ai", opts);
  });
  };
 })();
