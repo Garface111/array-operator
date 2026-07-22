@@ -270,6 +270,8 @@
   /* One-shot "you're here — add your logins" cue when arriving from onboarding skip. */
   #rowAutoRefresh.ar-flash .ar-panel,
   #rowAutoRefresh.ar-flash .ar-card-head{animation:arFlash 2.6s ease-out 1}
+  #rowAutoRefresh.ar-flash{animation:arFlash 2.6s ease-out 1}
+  .ar-card.ar-enter{animation:aoAlUp .28s cubic-bezier(.2,.8,.2,1) both}
   @keyframes arFlash{0%,55%{box-shadow:0 0 0 2px var(--good,#34d896),0 0 22px -2px var(--good,#34d896)}100%{box-shadow:0 0 0 0 transparent}}
   .ar-panel-head{display:flex;gap:14px;align-items:flex-start;width:100%;box-sizing:border-box}
   .ar-panel-ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;

@@ -304,6 +304,9 @@
  esc(it.source || "Read more") + " ↗</a></div>" : "") +
  "</div></div>";
  }).join("");
+ feedEl.classList.remove("rs-feed-in");
+ void feedEl.offsetWidth;
+ feedEl.classList.add("rs-feed-in");
  }).catch(function () {
  if (metaEl) metaEl.textContent = "Couldn’t load the latest updates right now, see the sources below.";
  });
@@ -322,6 +325,10 @@
  var app = host.querySelector("#resApp");
  if (!app) return;
  app.innerHTML = pickerHTML(k) + '<div id="resBody">' + bodyHTML(k) + "</div>";
+ // Soft paint so multi-stage load (fallback → live → feed) isn't a hard flash.
+ app.classList.remove("rs-enter");
+ void app.offsetWidth;
+ app.classList.add("rs-enter");
  app.querySelectorAll("[data-state]").forEach(function (b) {
  b.onclick = function () {
  var ns = b.getAttribute("data-state");
@@ -378,7 +385,12 @@
  '.res-rec-prod{border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:11px 13px;background:rgba(15,23,42,.02)}' +
  '.res-rec-prod-name{font-size:12.5px;font-weight:700;color:var(--ink,#0f172a)}' +
  '.res-rec-prod-price{font-size:13.5px;font-weight:700;color:var(--live,#059669);margin:4px 0 6px}' +
- '.res-rec-prod-note{font-size:12px;color:var(--muted,#475569);line-height:1.45}';
+ '.res-rec-prod-note{font-size:12px;color:var(--muted,#475569);line-height:1.45}' +
+ /* soft paint on multi-stage load (fallback → live → feed) — kills hard flashes */
+ '#resApp.rs-enter{animation:rsEnter .42s cubic-bezier(.22,1,.36,1) both}' +
+ '#resFeed.rs-feed-in{animation:rsEnter .36s cubic-bezier(.22,1,.36,1) both}' +
+ '@keyframes rsEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+ '@media (prefers-reduced-motion:reduce){#resApp.rs-enter,#resFeed.rs-feed-in{animation:none}}';
 
  function injectStyles() {
  if (document.getElementById("ao-res-styles")) return;

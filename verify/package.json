@@ -8,9 +8,14 @@
     "verify": "node onboarding-sync.mjs && node card-return.mjs",
     "verify:onboarding": "node onboarding-sync.mjs",
     "verify:card-return": "node card-return.mjs",
-    "verify:headed": "HEADED=1 node onboarding-sync.mjs"
+    "verify:headed": "HEADED=1 node onboarding-sync.mjs",
+    "audit:animations": "node animation-audit.mjs",
+    "audit:animations:headed": "HEADED=1 node animation-audit.mjs"
   },
   "dependencies": {
-    "playwright": "^1.49.0"
+    "playwright": "^1.49.0",
+    "pngjs": "^7.0.0",
+    "pixelmatch": "^6.0.0",
+    "jpeg-js": "^0.4.4"
   }
 }

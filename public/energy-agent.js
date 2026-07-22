@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260719cleanchat1";
+ var EA_BUILD = "20260721eaCloseLeave2";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -713,9 +713,13 @@
  ' </span>' +
  ' </div>' +
  ' <div class="ea-compose" id="eaCompose">' +
+ // Railway-style marquee suggestions ABOVE the input — two rows scroll in
+ // opposite directions so they gear past each other. DOM filled by
+ // mountSuggestionMarquee() (chips duplicated for seamless loop).
+ ' <div class="ea-suggestions" id="eaSuggestions" role="group" aria-label="Try asking Energy Agent"></div>' +
  ' <div class="ea-attach-row" id="eaAttachRow" hidden></div>' +
  ' <div class="ea-compose-shell">' +
- ' <textarea id="eaInput" rows="1" placeholder="Message Energy Agent"></textarea>' +
+ ' <textarea id="eaInput" rows="1" placeholder="Ask anything about your fleet, repairs, invoices…"></textarea>' +
  ' <input type="file" id="eaFile" multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.xlsx,.xls,.log" hidden />' +
  ' <div class="ea-compose-bar">' +
  // Icon-only chips (labels cut off in the rail). Hover/title + aria-label carry
@@ -785,8 +789,32 @@
  e.stopPropagation();
  requestMicFromClick();
  };
- document.getElementById("eaClose").onclick = function () { setOpen(false); };
+ // Close X — must always dismiss the side rail (stopPropagation so nothing
+ // re-opens; larger hit target in CSS). Ford 2026-07-21: button looked dead.
+ var eaCloseBtn = document.getElementById("eaClose");
+ if (eaCloseBtn) {
+ eaCloseBtn.onclick = function (e) {
+ if (e) { e.preventDefault(); e.stopPropagation(); }
+ setOpen(false);
+ };
+ }
+ // Escape always closes the dock (desktop + mobile sheet)
+ if (!window.__eaEscWired) {
+ window.__eaEscWired = true;
+ document.addEventListener("keydown", function (e) {
+ if (e.key !== "Escape") return;
+ if (!state.open) return;
+ // Don't steal Escape from nested modals/detail sheets with higher priority
+ try {
+ if (document.querySelector(".vs-dc-open, .sb-ov.show, .rb-modal.open, [aria-modal='true']")) return;
+ } catch (e2) {}
+ e.preventDefault();
+ setOpen(false);
+ }, true);
+ }
  document.getElementById("eaSend").onclick = sendText;
+ // Railway-style marquee: opposite-scrolling rows of hard demo prompts.
+ mountSuggestionMarquee();
  document.getElementById("eaMic").onclick = function (e) {
  e.preventDefault();
  toggleMic();
@@ -2204,8 +2232,9 @@
  // NEVER apply when painting server history (prefix-match was collapsing threads).
  if (!opts.history && !opts.skipDedup) {
  var last = host.lastElementChild;
- // Skip action-chip rows when finding last real bubble
- while (last && last.classList && last.classList.contains("ea-mind-actions")) {
+ // Skip action-chip / next-step rows when finding last real bubble
+ while (last && last.classList &&
+ (last.classList.contains("ea-mind-actions") || last.classList.contains("ea-next-steps"))) {
  last = last.previousElementSibling;
  }
  if (last && last.getAttribute("data-role") === role) {
@@ -2310,6 +2339,144 @@
  if (!host) return;
  host.innerHTML = "";
  host.hidden = true;
+ }
+
+ /** Remove previous turn's next-step chips (only the latest set stays). */
+ function clearNextStepChips() {
+ var host = document.getElementById("eaMsgs");
+ if (!host) return;
+ host.querySelectorAll(".ea-next-steps").forEach(function (el) {
+ try { el.remove(); } catch (e) {}
+ });
+ }
+
+ /**
+  * After each agent reply, offer 2–4 clickable next steps so the owner can
+  * continue without typing. Backend may pass d.next_steps; otherwise we derive
+  * smart follow-ups from the reply + last user ask.
+  */
+ function deriveNextSteps(reply, userText, d) {
+ var steps = [];
+ var seen = {};
+ function push(label, prompt) {
+ label = String(label || "").trim();
+ prompt = String(prompt || label).trim();
+ if (!label || !prompt) return;
+ var key = prompt.toLowerCase();
+ if (seen[key] || steps.length >= 4) return;
+ // Keep chip labels short; full prompt goes to the agent
+ if (label.length > 48) label = label.slice(0, 45).replace(/\s+\S*$/, "") + "…";
+ seen[key] = true;
+ steps.push({ label: label, prompt: prompt });
+ }
+
+ // 1) Server-authored (preferred when present)
+ var raw = (d && (d.next_steps || d.followups || d.suggested_actions)) || [];
+ if (Array.isArray(raw)) {
+ raw.forEach(function (s) {
+ if (typeof s === "string") push(s, s);
+ else if (s && (s.label || s.prompt || s.text)) {
+ push(s.label || s.text || s.prompt, s.prompt || s.text || s.label);
+ }
+ });
+ }
+
+ var r = String(reply || "");
+ var rl = r.toLowerCase();
+ var u = String(userText || "").toLowerCase();
+
+ // 2) If the agent asked a clear question, offer "Yes — …" as first chip
+ var qs = r.match(/[^.!?\n]{12,110}\?/g) || [];
+ if (qs.length) {
+ var q = qs[qs.length - 1].replace(/\s+/g, " ").trim();
+ // Skip meta "any questions?" style closers
+ if (!/\b(anything else|any (other )?questions?|let me know|how can i help)\b/i.test(q)) {
+ var body = q.replace(/\?+\s*$/, "").trim();
+ push("Yes — do that", "Yes. " + body + ".");
+ push("No, something else", "No — let's look at something else. What's the next highest-value thing I should check?");
+ }
+ }
+
+ // 3) Domain follow-ups from what was just discussed
+ if (/\b(invoice|offtaker|billing|send.?pipeline|draft)\b/i.test(r + " " + u)) {
+ push("Draft that invoice", "Draft the offtaker invoice we were just talking about with real numbers, ready to review.");
+ push("Who else needs invoices?", "Who still needs an offtaker invoice this cycle? List them with amounts if you can.");
+ }
+ if (/\b(repair|underperform|fault|dead|gone quiet|comm.?gap|truck.?roll|outreach|tech)\b/i.test(r + " " + u)) {
+ push("Draft repair outreach", "Draft a repair outreach email for the worst unit we discussed — diagnosis + what the tech should check.");
+ push("Open a repair case", "Open or update a repair case for the problem unit with serial, diagnosis, and next step.");
+ }
+ if (/\b(fleet|inverter|array|peer|production|downtime|health)\b/i.test(r + " " + u)
+ && !steps.some(function (s) { return /repair|invoice/i.test(s.label); })) {
+ push("Hardest problem first", "Stress-test my fleet — what's the single highest-priority problem right now and why?");
+ }
+ if (/\b(tour|tab|walk|show me|open)\b/i.test(r + " " + u)) {
+ push("Walk me through that tab", "Open the relevant tab and walk me through what I'm looking at, step by step.");
+ }
+ if (/\b(night|quiet|stale|feed behind|sync)\b/i.test(r)) {
+ push("Is it just night?", "Be strict: is this a real dropout or just overnight silence / capture lag?");
+ }
+
+ // 4) Always offer a productive default if we still have room
+ if (steps.length < 2) {
+ push("What should I do next?", "Based on my fleet right now, what is the single best next action and why?");
+ }
+ if (steps.length < 3) {
+ push("Dig deeper", "Go deeper on what you just said — give me evidence and a concrete next move.");
+ }
+ if (steps.length < 4) {
+ push("Something else…", "I want to change direction. What are the top three things you can help me with on this fleet today?");
+ }
+
+ return steps.slice(0, 4);
+ }
+
+ function showNextStepChips(reply, userText, d) {
+ clearNextStepChips();
+ var host = document.getElementById("eaMsgs");
+ if (!host) return;
+ var steps = deriveNextSteps(reply, userText, d);
+ if (!steps.length) return;
+
+ var row = document.createElement("div");
+ row.className = "ea-next-steps";
+ row.setAttribute("role", "group");
+ row.setAttribute("aria-label", "Suggested next steps");
+
+ var label = document.createElement("div");
+ label.className = "ea-next-steps-lbl";
+ label.textContent = "Next steps";
+ row.appendChild(label);
+
+ var wrap = document.createElement("div");
+ wrap.className = "ea-next-steps-row";
+ steps.forEach(function (s) {
+ var btn = document.createElement("button");
+ btn.type = "button";
+ btn.className = "ea-next-chip";
+ btn.textContent = s.label;
+ btn.setAttribute("data-ea-next", s.prompt);
+ btn.title = s.prompt;
+ btn.onclick = function () {
+ // Mark chosen, clear the set, send as a normal user turn
+ try {
+ wrap.querySelectorAll(".ea-next-chip").forEach(function (b) {
+ b.disabled = true;
+ b.classList.toggle("ea-next-picked", b === btn);
+ });
+ } catch (e) {}
+ clearNextStepChips();
+ if (typeof window.__eaSendText === "function") {
+ window.__eaSendText(s.prompt, { source: "next_step_chip" });
+ } else {
+ turn(s.prompt, "text").catch(function () {});
+ }
+ };
+ wrap.appendChild(btn);
+ });
+ row.appendChild(wrap);
+ host.appendChild(row);
+ host.scrollTop = host.scrollHeight;
  }
 
  /** Tool dump UI removed (Ford 2026-07-14), answers only; tools still run server-side. */
@@ -2810,6 +2977,8 @@
  });
  state._historyPainted = n > 0;
  scrollMsgsToEnd();
+ // Existing thread = not a first-use on-ramp moment; hide suggestion marquee.
+ if (n > 0) dismissSuggestionMarquee();
  // Subtle cue when there's scrollback
  if (n > 4) {
  setStatus("Restored " + n + " messages, scroll up for earlier", "on");
@@ -3010,6 +3179,7 @@
  orb.classList.toggle("active", state.open);
  orb.setAttribute("aria-pressed", state.open ? "true" : "false");
  orb.setAttribute("aria-label", state.open ? "Close Energy Agent" : "Open Energy Agent");
+ orb.title = state.open ? "Close Energy Agent" : "Energy Agent, click to talk";
  }
  if (fab) {
  fab.classList.toggle("open", state.open);
@@ -3017,7 +3187,12 @@
  fab.setAttribute("aria-label", state.open ? "Minimize Energy Agent" : "Open Energy Agent");
  fab.title = state.open ? "Minimize chat" : "Energy Agent, chat";
  }
+ // Notify host surfaces (Repairs pill, etc.) so their buttons become Close when open
+ try {
+ document.dispatchEvent(new CustomEvent("ea-open-change", { detail: { open: state.open } }));
+ } catch (e3) {}
  // Desktop: shift site content right. Mobile CSS zeroes the margin.
+ markEaMorphing();
  document.body.classList.toggle("ea-shell-open", state.open);
  // Hands-off setup open? Dock EA to the RIGHT of the setup rail (don't cover it).
  var tourOpen = false;
@@ -3026,6 +3201,8 @@
  tourOpen = !!(ho && ho.classList.contains("ho-open") && !ho.hidden);
  } catch (e) {}
  document.body.classList.toggle("ho-ea-sidebyside", !!(state.open && tourOpen));
+ // Repairs dual-pane: morph rail + tuck under tabbar when on #ops
+ try { syncOpsWideClass(); } catch (eOps) {}
  // Table view densifies on ea-shell-open — remeasure scroll + let layout settle
  try {
  requestAnimationFrame(function () {
@@ -3166,6 +3343,127 @@
  try { cancelRealtimeIfActive(); } catch (e) {}
  stopSpeak({ reason: reason || "barge_in" });
  }
+
+ // ── Railway-style suggested prompt marquee ───────────────────────────────
+ // Two rows, opposite scroll directions, seamless loop (chips duplicated).
+ // Click sends a hard capability-demo question immediately.
+ var EA_SUGGESTION_ROWS = [
+ [
+ { ic: "⚡", label: "Which inverter needs attention — and why?",
+ prompt: "Which inverter needs attention right now, and why? Walk me through the evidence." },
+ { ic: "$", label: "Rank lost production by $ — one truck roll",
+ prompt: "Rank my fleet by lost production dollars this week. What should I fix first if I only get one truck roll tomorrow?" },
+ { ic: "☾", label: "Gone quiet — or just night?",
+ prompt: "Is anything marked gone quiet a real dropout, or is it just night / overnight silence? Be strict." },
+ { ic: "🔬", label: "Stress-test my fleet — hardest first",
+ prompt: "Stress-test my fleet like a skeptical owner: peer underperformance, silent gateways, and anything the 14-day health badge is missing. Hardest problem first." },
+ { ic: "📊", label: "Peer underperformance on my biggest array",
+ prompt: "On my biggest array, which units are underperforming vs peers under the same sky? Show peer_index and what to check." },
+ ],
+ [
+ { ic: "✉", label: "Draft repair outreach for the worst unit",
+ prompt: "Draft a repair outreach email for the worst underperforming or down inverter. Include the diagnosis and what the tech should check." },
+ { ic: "🧾", label: "Who still needs an offtaker invoice?",
+ prompt: "Who still needs an offtaker invoice, and what would you send? Pull real numbers from my accounts." },
+ { ic: "🔧", label: "Open a repair case for the loudest fault",
+ prompt: "If anything is faulted or dead, open or draft a repair case with the serial, diagnosis, and next step." },
+ { ic: "🌤", label: "What's dragging today's production?",
+ prompt: "What's dragging today's production across the fleet — weather, feed lag, or real hardware? Be honest when you don't know." },
+ { ic: "🧭", label: "Tour what Energy Agent can actually do",
+ prompt: "Give me a hard, concrete tour of what you can do for THIS fleet right now — not generic features. Use real sites and statuses." },
+ ],
+ ];
+
+ // Session-only: marquee is a first-use on-ramp. After the first user message
+ // this browser tab session, stay gone (sessionStorage survives soft reloads).
+ var EA_SUG_SESSION_KEY = "ao_ea_suggestions_dismissed";
+
+ function suggestionsDismissedThisSession() {
+ try { return sessionStorage.getItem(EA_SUG_SESSION_KEY) === "1"; } catch (e) { return false; }
+ }
+
+ function dismissSuggestionMarquee() {
+ try { sessionStorage.setItem(EA_SUG_SESSION_KEY, "1"); } catch (e) {}
+ var root = document.getElementById("eaSuggestions");
+ if (!root) return;
+ root.hidden = true;
+ root.setAttribute("aria-hidden", "true");
+ root.classList.add("ea-suggestions-gone");
+ // Stop animations / free a bit of paint once dismissed
+ try { root.innerHTML = ""; } catch (e2) {}
+ }
+
+ function _eaSugBtnHtml(item) {
+ var label = String(item.label || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+ var prompt = String(item.prompt || item.label || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+ var ic = String(item.ic || "•").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+ return (
+ '<button type="button" class="ea-sug" data-ea-prompt="' + prompt + '">' +
+ '<span class="ea-sug-ic" aria-hidden="true">' + ic + "</span>" + label +
+ "</button>"
+ );
+ }
+
+ function mountSuggestionMarquee(force) {
+ var root = document.getElementById("eaSuggestions");
+ if (!root) return;
+ if (root._mounted && !force) return;
+ root._mounted = true;
+
+ // Already used EA this tab session → never show the on-ramp again (unless force for audit).
+ if (!force && suggestionsDismissedThisSession()) {
+ dismissSuggestionMarquee();
+ return;
+ }
+ if (force) {
+ try { sessionStorage.removeItem(EA_SUG_SESSION_KEY); } catch (e0) {}
+ root.hidden = false;
+ root.classList.remove("ea-suggestions-gone");
+ }
+
+ var html = "";
+ for (var r = 0; r < EA_SUGGESTION_ROWS.length; r++) {
+ var row = EA_SUGGESTION_ROWS[r];
+ var dir = r % 2 === 0 ? "rtl" : "ltr"; // row0 → left, row1 → right (gear past each other)
+ var set = row.map(_eaSugBtnHtml).join("");
+ // Duplicate set for seamless infinite scroll (track is 2× one set; animate -50%).
+ html +=
+ '<div class="ea-sug-row ea-sug-row-' + dir + '">' +
+ '<div class="ea-sug-track">' +
+ '<div class="ea-sug-set">' + set + "</div>" +
+ '<div class="ea-sug-set" aria-hidden="true">' + set + "</div>" +
+ "</div></div>";
+ }
+ root.innerHTML = html;
+ root.hidden = false;
+ root.removeAttribute("aria-hidden");
+
+ root.addEventListener("click", function (e) {
+ var btn = e.target && e.target.closest ? e.target.closest(".ea-sug") : null;
+ if (!btn || !root.contains(btn)) return;
+ e.preventDefault();
+ var prompt = (btn.getAttribute("data-ea-prompt") || "").trim();
+ if (!prompt) return;
+ // Dismiss immediately — this counts as their first message this session.
+ dismissSuggestionMarquee();
+ if (typeof window.__eaSendText === "function") {
+ window.__eaSendText(prompt, { source: "suggestion_chip" });
+ } else {
+ var input = document.getElementById("eaInput");
+ if (input) input.value = prompt;
+ sendText();
+ }
+ });
+
+ // Hover pauses the whole marquee (easier to click a moving chip)
+ root.addEventListener("mouseenter", function () { root.classList.add("ea-sug-paused"); });
+ root.addEventListener("mouseleave", function () { root.classList.remove("ea-sug-paused"); });
+ root.addEventListener("focusin", function () { root.classList.add("ea-sug-paused"); });
+ root.addEventListener("focusout", function (e) {
+ if (!root.contains(e.relatedTarget)) root.classList.remove("ea-sug-paused");
+ });
+ }
+ try { window.__eaRemountSuggestions = function () { mountSuggestionMarquee(true); }; } catch (eR) {}
 
  // ── chat ─────────────────────────────────────────────────────────────────
  async function sendText() {
@@ -3349,6 +3647,10 @@
  if (!text && pendingAttach.length) {
  text = "Please analyze the attached file(s).";
  }
+ // First real user turn this browser session → marquee on-ramp goes away.
+ dismissSuggestionMarquee();
+ // New user message → previous next-step chips are stale
+ clearNextStepChips();
  // Hard stop first, works even if a previous turn is still thinking/speaking
  if (isStopCommand(text)) {
  if (!opts.userAlreadyShown) addMsg("user", text);
@@ -3573,6 +3875,8 @@
  );
  addMsg("agent", reply, { spoken: mouthLine, spokenAloud: voiceLive });
  clearTools();
+ // Clickable next steps under this reply (owner can still type freely)
+ try { showNextStepChips(reply, text, d); } catch (eNs) {}
 
  // Cut interim "one second…" filler, then deliver the real answer immediately
  var speakP = finishThinkingAndSpeak(mouthLine, turnGen);
@@ -7303,6 +7607,220 @@
  }
  }
 
+ /** Body class for Repairs dual-pane CSS (wide chat under full tabbar). */
+ var _eaWasOnOps = false;
+ var _eaAlignTimers = [];
+ var _eaMorphTimer = null;
+ var EA_MORPH_MS = 280; // keep in sync with --ea-dur (.28s) in energy-agent.css
+ function isOpsHash(h) {
+ h = String(h || "").toLowerCase();
+ return h === "#ops" || h === "#claims" || h === "#repairs";
+ }
+ function clearEaAlignTimers() {
+ _eaAlignTimers.forEach(function (t) { try { clearTimeout(t); } catch (e) {} });
+ _eaAlignTimers = [];
+ }
+ function clearEaOpsInlineVars() {
+ try {
+ var root = document.documentElement;
+ root.style.removeProperty("--ea-ops-left");
+ root.style.removeProperty("--ea-ops-top");
+ root.style.removeProperty("--ea-ops-content-pad");
+ } catch (e) {}
+ }
+ /** High-FPS morph window: CSS drops backdrop-filter; wrap is transform-only. */
+ function markEaMorphing() {
+ try {
+ document.body.classList.add("ea-morphing");
+ if (_eaMorphTimer) clearTimeout(_eaMorphTimer);
+ _eaMorphTimer = setTimeout(function () {
+ try { document.body.classList.remove("ea-morphing"); } catch (e) {}
+ _eaMorphTimer = null;
+ }, EA_MORPH_MS + 50);
+ } catch (e) {}
+ }
+ /**
+ * FLIP morph on #eaPanel (and #panelOps if active) using ONLY transform.
+ * Geometry (left/top/width) snaps in applyFn; the visual continuity is a
+ * compositor-only translate+scale so we get many small frames, not layout slideshow.
+ */
+ function flipEaMorph(applyFn) {
+ var panel = document.getElementById("eaPanel");
+ var ops = document.getElementById("panelOps");
+ var els = [];
+ if (panel && panel.classList.contains("open")) els.push(panel);
+ if (ops && ops.classList.contains("active")) els.push(ops);
+ if (!els.length) {
+ try { applyFn(); } catch (e0) {}
+ return;
+ }
+ markEaMorphing();
+ var firsts = els.map(function (el) { return el.getBoundingClientRect(); });
+ try { applyFn(); } catch (e1) { return; }
+ // Force layout so "last" is post-change
+ void document.body.offsetHeight;
+ els.forEach(function (el, i) {
+ var first = firsts[i];
+ var last = el.getBoundingClientRect();
+ if (!first || !last || last.width < 2 || last.height < 2) return;
+ var dx = first.left - last.left;
+ var dy = first.top - last.top;
+ var sx = first.width / last.width;
+ var sy = first.height / last.height;
+ if (!isFinite(sx) || sx < 0.25 || sx > 4) sx = 1;
+ if (!isFinite(sy) || sy < 0.25 || sy > 4) sy = 1;
+ // Skip no-ops
+ if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
+ return;
+ }
+ el.style.transition = "none";
+ el.style.transformOrigin = "0 0";
+ el.style.transform =
+ "translate3d(" + dx + "px," + dy + "px,0) scale(" + sx + "," + sy + ")";
+ });
+ requestAnimationFrame(function () {
+ requestAnimationFrame(function () {
+ els.forEach(function (el) {
+ el.style.transition = "transform " + EA_MORPH_MS + "ms cubic-bezier(.2,.8,.2,1)";
+ el.style.transform = "translate3d(0,0,0) scale(1,1)";
+ });
+ setTimeout(function () {
+ els.forEach(function (el) {
+ try {
+ el.style.transition = "";
+ el.style.transform = "";
+ el.style.transformOrigin = "";
+ } catch (e2) {}
+ });
+ }, EA_MORPH_MS + 40);
+ });
+ });
+ }
+ function syncOpsWideClass() {
+ var onOps = false;
+ try {
+ if (isOpsHash(location.hash)) onOps = true;
+ if (!onOps) {
+ var p = document.getElementById("panelOps");
+ if (p && p.classList.contains("active")) onOps = true;
+ }
+ } catch (e) {}
+
+ var entering = onOps && !_eaWasOnOps;
+ var leaving = !onOps && _eaWasOnOps;
+ _eaWasOnOps = onOps;
+
+ var applyMode = function () {
+ try {
+ document.body.classList.toggle("ea-on-ops", !!onOps);
+ } catch (e2) {}
+ };
+
+ // Leaving Repairs: minimize EA first (no wide→narrow morph onto Invoices).
+ // Owner reopens on any other tab via the top control if they want it.
+ if (leaving) {
+ clearEaAlignTimers();
+ clearEaOpsInlineVars();
+ if (state.open) {
+ try {
+ setOpen(false).catch(function () {});
+ } catch (eClose) {}
+ }
+ applyMode(); // drop ea-on-ops after close starts
+ } else if (entering && state.open) {
+ // Already open on another tab → FLIP into dual-pane with repairs
+ flipEaMorph(applyMode);
+ } else {
+ if (entering) markEaMorphing();
+ applyMode();
+ }
+
+ // Entering Repairs → auto-open Energy Agent (desktop dual-pane + mobile sheet).
+ // Only on enter so closing the agent while staying on Repairs is respected.
+ // ea-on-ops is already on, so the open slide lands at dual-pane size (one motion).
+ if (entering && signedIn() && !state.open) {
+ try {
+ setOpen(true).catch(function () {});
+ } catch (eOpen) {}
+ }
+
+ // Live tab-edge refine AFTER morph (don’t fight the FLIP).
+ if (onOps) {
+ clearEaAlignTimers();
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, EA_MORPH_MS + 50));
+ }
+ }
+
+ /**
+ * Line up #eaPanel's left edge with the Energy Agent top-tab, park the card
+ * just under the tabbar, and pad #panelOps clear of the fixed chat.
+ * CSS already approximates wrap+tabbar inset; this refines with live geometry.
+ * soft:true — only apply if delta is meaningful (avoids 1px thrash during morph).
+ */
+ function syncEaOpsAlign(opts) {
+ opts = opts || {};
+ try {
+ if (!document.body.classList.contains("ea-on-ops")) return;
+ if (window.matchMedia && !window.matchMedia("(min-width: 961px)").matches) return;
+
+ var root = document.documentElement;
+ var tab = document.querySelector("#tabbar .tab.ea-tab")
+ || document.querySelector("#tabbar .ea-tab")
+ || document.getElementById("eaOrb");
+ var tabbar = document.getElementById("tabbar");
+ var wrap = document.querySelector("body > .wrap");
+ if (!root) return;
+
+ var nextLeft = null;
+ var nextTop = null;
+
+ if (tab) {
+ var tabRect = tab.getBoundingClientRect();
+ if (tabRect.width > 8 && tabRect.left >= 0 && tabRect.left < window.innerWidth) {
+ nextLeft = Math.round(tabRect.left);
+ }
+ }
+ if (tabbar) {
+ nextTop = Math.max(64, Math.round(tabbar.getBoundingClientRect().bottom + 10));
+ }
+
+ // soft pass: skip tiny corrections while the morph is still running
+ if (opts.soft) {
+ var curLeft = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-left")) || 0;
+ var curTop = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-top")) || 0;
+ if (nextLeft != null && Math.abs(nextLeft - curLeft) < 6) nextLeft = null;
+ if (nextTop != null && Math.abs(nextTop - curTop) < 6) nextTop = null;
+ }
+
+ if (nextLeft != null) root.style.setProperty("--ea-ops-left", nextLeft + "px");
+ if (nextTop != null) root.style.setProperty("--ea-ops-top", nextTop + "px");
+
+ // Content pad inside .wrap so repairs clears the fixed chat card
+ if (!document.body.classList.contains("ea-shell-open")) return;
+ var leftPx = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-left")) || 0;
+ var panel = document.getElementById("eaPanel");
+ var rail = (panel && panel.classList.contains("open") && panel.offsetWidth > 40)
+ ? panel.offsetWidth
+ : Math.min(640, Math.round(window.innerWidth * 0.42));
+ var wrapLeft = wrap ? wrap.getBoundingClientRect().left : 0;
+ var wrapPadLeft = 28;
+ try {
+ if (wrap) {
+ var st = getComputedStyle(wrap);
+ wrapPadLeft = parseFloat(st.paddingLeft) || 28;
+ }
+ } catch (eP) {}
+ var pad = Math.max(0, Math.round((leftPx + rail + 12) - (wrapLeft + wrapPadLeft)));
+ if (opts.soft) {
+ var curPad = parseFloat(getComputedStyle(root).getPropertyValue("--ea-ops-content-pad")) || 0;
+ if (Math.abs(pad - curPad) < 8) return;
+ }
+ root.style.setProperty("--ea-ops-content-pad", pad + "px");
+ } catch (e) {}
+ }
+
  // ── boot ─────────────────────────────────────────────────────────────────
  function boot() {
  ensureUi();
@@ -7319,10 +7837,43 @@
  var wrap = document.getElementById("fsWrap");
  if (wrap && signedIn()) wrap.style.display = "none";
  } catch (e) {}
+ // Keep ea-on-ops in sync so opening EA on Repairs gets the wide dual-pane.
+ try {
+ syncOpsWideClass();
+ window.addEventListener("hashchange", syncOpsWideClass);
+ // Sandbox may flip .panel.active without a hash tick in some paths
+ document.addEventListener("ao-view-change", syncOpsWideClass);
+ window.addEventListener("resize", function () {
+ if (document.body.classList.contains("ea-on-ops")) {
+ clearEaAlignTimers();
+ // Debounce: one refine after resize settles (don’t fight continuous resize)
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, 80));
+ }
+ });
+ document.addEventListener("ea-open-change", function () {
+ if (!document.body.classList.contains("ea-on-ops")) return;
+ clearEaAlignTimers();
+ requestAnimationFrame(function () { syncEaOpsAlign({ soft: true }); });
+ _eaAlignTimers.push(setTimeout(function () {
+ syncEaOpsAlign({ soft: false });
+ }, EA_MORPH_MS + 30));
+ });
+ } catch (eSync) {}
  if (signedIn()) {
  // Don't call getUserMedia here, Chrome ignores it without a user gesture.
  // Show the clickable gate so the user can grant mic with one click.
  setTimeout(refreshMicGate, 400);
+ // Deep-link / refresh already on #ops → open agent once UI is ready
+ if (isOpsHash(location.hash)) {
+ setTimeout(function () {
+ try {
+ if (!state.open) setOpen(true).catch(function () {});
+ } catch (e0) {}
+ setTimeout(syncEaOpsAlign, 100);
+ }, 200);
+ }
  }
  }
 
@@ -7334,6 +7885,10 @@
 
  window.__eaOpen = function () { setOpen(true); };
  window.__eaClose = function () { setOpen(false); };
+ /** Call before tab-slide so ea-on-ops geometry is applied and free-band is correct. */
+ window.__eaPrepareForView = function () {
+ try { syncOpsWideClass(); } catch (e) {}
+ };
  /**
  * Open the agent and put text in the composer WITHOUT sending.
  * Used by Repairs tab: staged "tell me about my repair system" prompt.

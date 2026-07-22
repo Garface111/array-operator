@@ -314,14 +314,38 @@
  if (btn) { btn.click(); return true; }
  return false;
  }
- // The little flagged-count badge on the "Bill audit" tab label itself —
- // visible before the tab is ever opened (populated when RECON lands).
+ // Count offtakers the audit has genuinely flagged (allocation mismatch and/or
+ // production-vs-bill mismatch). Same definition as the "to review" chip — not
+ // "awaiting data". Used for the Bill-audit tab notification bubble.
+ function reconFlaggedCount() {
+ if (!RECON || !Array.isArray(RECON.subscriptions)) {
+  return Math.max(0, Number((RECON && RECON.allocation_flagged) || 0));
+ }
+ const flagged = new Set();
+ RECON.subscriptions.forEach(r => {
+  const hard = (r.allocation && r.allocation.status === "mismatch")
+   || (r.arrays || []).some(a => a.status === "mismatch");
+  if (hard && r.sub_id != null) flagged.add(r.sub_id);
+ });
+ // Prefer unique offtaker count; fall back to allocation_flagged if the list is empty.
+ return flagged.size || Math.max(0, Number(RECON.allocation_flagged || 0));
+ }
+ // Little notification bubble on the top-right of the "Bill audit" sub-nav button
+ // (populated when RECON lands). Hidden when zero.
  function updateAuditTabBadge() {
  const b = document.getElementById("rbAuditTabBadge");
  if (!b) return;
- const n = (RECON && RECON.allocation_flagged) || 0;
+ const n = reconFlaggedCount();
  b.hidden = !n;
- if (n) b.textContent = "⚑ " + n;
+ if (n) {
+  b.textContent = n > 99 ? "99+" : String(n);
+  b.setAttribute("aria-label",
+   n + " offtaker" + (n === 1 ? "" : "s") + " flagged by the bill audit");
+  b.title = n + " flagged · open Bill audit to review";
+ } else {
+  b.removeAttribute("aria-label");
+  b.removeAttribute("title");
+ }
  }
  // Re-render the summary chip in place (after the reconcile data lands post-paint).
  function refreshBacSummary() {
@@ -1409,11 +1433,14 @@
  // re-drafts as new bills land, no manual button (Ford 2026-07-07).
  if (!prefetch && authHeaders()) { autoDraftAll({ force: true }); startAutoDraftPoll(); }
  }
- // Invoice archive (monthly directory): fetch the manifest once (cached) on a real
- // view and render the collapsible directory. Skipped during the idle prefetch;
- // fails soft (fetch error → renderArchive keeps the host hidden).
+ // Invoice archive + utility bill archive: fetch manifests (cached) on a real
+ // view and render the collapsible directories. Skipped during idle prefetch;
+ // fails soft (fetch error → section absent, never blocks the generator).
  if (!prefetch && authHeaders()) {
- loadArchive().then(() => renderArchive()).catch(() => {});
+ Promise.all([
+ loadArchive().catch(() => null),
+ loadBillArchive().catch(() => null),
+ ]).then(() => renderArchive()).catch(() => {});
  }
  }
  window.__aoLoadReports = load;
@@ -1831,8 +1858,11 @@
  * soft: a fetch error just leaves the section absent, never blocks the generator.
  * ==========================================================================*/
  let ARCHIVE = null; // /invoice-archive manifest (cached)
+ let BILL_ARCHIVE = null; // /utility-bill-archive manifest (cached)
  let _archivePromise = null;
+ let _billArchivePromise = null;
  let _archiveOpen = false; // remember the panel's open/closed state across refreshes
+ let _billArchiveOpen = false;
  function loadArchive() {
  if (ARCHIVE) return Promise.resolve(ARCHIVE);
  if (_archivePromise) return _archivePromise;
@@ -1854,6 +1884,26 @@
  })().then(v => { _archivePromise = null; return v; });
  return _archivePromise;
  }
+ function loadBillArchive() {
+ if (BILL_ARCHIVE) return Promise.resolve(BILL_ARCHIVE);
+ if (_billArchivePromise) return _billArchivePromise;
+ if (!authHeaders()) return Promise.resolve(null);
+ _billArchivePromise = fetch(API + "/utility-bill-archive", { headers: authHeaders() })
+ .then(r => (r.ok ? r.json() : null))
+ .then(d => {
+ if (d && d.ok) BILL_ARCHIVE = d;
+ return BILL_ARCHIVE;
+ })
+ .catch(() => null)
+ .then(v => { _billArchivePromise = null; return v; });
+ return _billArchivePromise;
+ }
+ function fmtBytes(n) {
+ n = Number(n) || 0;
+ if (n < 1024) return n + " B";
+ if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + " KB";
+ return (n / (1024 * 1024)).toFixed(1) + " MB";
+ }
 
  // A single availability badge, emerald ✓ when present, muted "—" when not.
  // Honest: never renders a ✓ for something the backend says isn't available.
@@ -1868,27 +1918,32 @@
  return isNaN(d) ? String(m) : d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
  }
 
- // Render the archive panel into #rbArchiveHost from the cached manifest. Signed-in
- // only; hides the host entirely when there's no manifest (fetch failed / demo).
+ // Render invoice archive + utility bill archive into #rbArchiveHost.
+ // Signed-in only; hides the host when neither surface has anything to show.
  function renderArchive() {
  const host = $("#rbArchiveHost");
  if (!host) return;
- if (!authHeaders() || !ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
+ if (!authHeaders()) { host.hidden = true; host.innerHTML = ""; return; }
+ const months = (ARCHIVE && ARCHIVE.months) || [];
+ const total = (ARCHIVE && ARCHIVE.month_count) || 0;
+ const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
+ const billCount = (BILL_ARCHIVE && BILL_ARCHIVE.count) || bills.length || 0;
+ if (!ARCHIVE && !BILL_ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
  host.hidden = false;
- const months = ARCHIVE.months || [];
- const total = ARCHIVE.month_count || 0;
- // Empty state, honest, quiet.
- if (!total || !months.length) {
- host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+
+ // ── Invoice archive ────────────────────────────────────────────────────
+ let invHtml = "";
+ if (!ARCHIVE) {
+ invHtml = ""; // still loading / failed soft
+ } else if (!total || !months.length) {
+ invHtml = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
  <span class="rb-arch-t">Invoice archive</span>
  <span class="rb-arch-sub">monthly directory</span></summary>
  <div class="rb-arch-body">
- <p class="rb-arch-empty">No invoices archived yet. They'll appear once a GMP bill has billable excess.</p>
+ <p class="rb-arch-empty">No invoices archived yet. They'll appear once a utility bill has billable excess.</p>
  </div></details>`;
- wireArchiveToggle();
- return;
- }
+ } else {
  const monthsHtml = months.map(m => {
  const arrays = m.arrays || [];
  const arraysHtml = arrays.map(a => {
@@ -1920,20 +1975,167 @@
  <div class="rb-arch-arrays">${arraysHtml || `<div class="rb-arch-off-none">No arrays billed this month.</div>`}</div>
  </div>`;
  }).join("");
- host.innerHTML = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
+ invHtml = `<details class="rb-arch"${_archiveOpen ? " open" : ""} id="rbArch">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
  <span class="rb-arch-t">Invoice archive</span>
  <span class="rb-arch-sub">${total} month${total === 1 ? "" : "s"} · newest first</span></summary>
  <div class="rb-arch-body">${monthsHtml}</div></details>`;
+ }
+
+ // ── Utility bill archive ───────────────────────────────────────────────
+ let billHtml = "";
+ if (!BILL_ARCHIVE) {
+ billHtml = "";
+ } else if (!billCount) {
+ billHtml = `<details class="rb-arch rb-bill-arch"${_billArchiveOpen ? " open" : ""} id="rbBillArch">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Utility bill archive</span>
+ <span class="rb-arch-sub">PDFs on file</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-arch-empty">No utility bill PDFs on file yet. They land here when cloud capture or the extension pulls a bill (GMP, VEC, and other co-ops).</p>
+ </div></details>`;
+ } else {
+ // Group by calendar year (period end → bill date → month), newest years first.
+ // Clear timescale: year rail + human billing-period line on each row.
+ const billYearOf = (b) => {
+ const raw = (b.period_end || b.bill_date || b.month || b.period_start || "").toString();
+ const y = raw.slice(0, 4);
+ return /^\d{4}$/.test(y) ? y : "Unknown year";
+ };
+ const parseIso = (s) => {
+ if (!s) return null;
+ const d = new Date(String(s).slice(0, 10) + "T12:00:00");
+ return isNaN(d) ? null : d;
+ };
+ const fmtMd = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+ const fmtMdy = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+ const fmtMy = (d) => d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+ // e.g. "Jun 1 – Jun 30, 2026" · "Billed Jul 15, 2026" · "June 2026"
+ const formatBillTimescale = (b) => {
+ const ps = parseIso(b.period_start);
+ const pe = parseIso(b.period_end);
+ const bd = parseIso(b.bill_date);
+ if (ps && pe) {
+ const sameYear = ps.getFullYear() === pe.getFullYear();
+ const range = sameYear
+ ? (fmtMd(ps) + " – " + fmtMdy(pe))
+ : (fmtMdy(ps) + " – " + fmtMdy(pe));
+ const billed = bd ? (" · bill dated " + fmtMd(bd)) : "";
+ return { primary: range, secondary: "Billing period" + billed };
+ }
+ if (b.month) {
+ const ml = monthLabel(b.month);
+ const billed = bd ? (" · bill dated " + fmtMdy(bd)) : "";
+ return { primary: ml, secondary: "Billing month" + billed };
+ }
+ if (bd) return { primary: fmtMdy(bd), secondary: "Bill date (period not on file)" };
+ return { primary: "Period unknown", secondary: "No dates captured for this bill" };
+ };
+ const byYear = new Map(); // year → bills[]
+ bills.forEach(b => {
+ const y = billYearOf(b);
+ if (!byYear.has(y)) byYear.set(y, []);
+ byYear.get(y).push(b);
+ });
+ const years = Array.from(byYear.keys()).sort((a, b) => {
+ if (a === "Unknown year") return 1;
+ if (b === "Unknown year") return -1;
+ return Number(b) - Number(a);
+ });
+ const yearsHtml = years.map((y, yi) => {
+ const list = byYear.get(y) || [];
+ // Newest year open by default; remember if user toggled (data-year on details)
+ const openAttr = yi === 0 ? " open" : "";
+ const rows = list.map(b => {
+ const ts = formatBillTimescale(b);
+ const kwh = b.kwh_generated != null ? (Number(b.kwh_generated).toLocaleString() + " kWh gen") : "";
+ const size = b.size ? fmtBytes(b.size) : "";
+ const meta = [b.provider_label || "Utility", kwh, size].filter(Boolean).join(" · ");
+ return `<div class="rb-bill-row">
+ <div class="rb-bill-time" aria-hidden="true">
+ <span class="rb-bill-time-dot"></span>
+ <span class="rb-bill-time-rail"></span>
+ </div>
+ <div class="rb-bill-main">
+ <span class="rb-bill-name">${esc(b.account_label || "Utility account")}</span>
+ <span class="rb-bill-period">
+ <span class="rb-bill-period-label">${esc(ts.secondary)}</span>
+ <span class="rb-bill-period-range">${esc(ts.primary)}</span>
+ </span>
+ <span class="rb-bill-meta">${esc(meta)}</span>
+ </div>
+ <button class="ao-btn rb-btn rb-bill-dl" type="button"
+ data-bill-dl="${esc(b.download || "")}"
+ data-bill-name="${esc(b.filename || ("utility_bill_" + (b.id || "") + ".pdf"))}"
+ title="Download this utility bill PDF">⬇ Download PDF</button>
+ <span class="rb-bill-dl-stat" data-bill-stat="${esc(String(b.id))}" aria-live="polite"></span>
+ </div>`;
+ }).join("");
+ return `<details class="rb-bill-year"${openAttr} data-bill-year="${esc(y)}">
+ <summary class="rb-bill-year-sum">
+ <span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-bill-year-label">${esc(y)}</span>
+ <span class="rb-bill-year-count">${list.length} bill${list.length === 1 ? "" : "s"}</span>
+ </summary>
+ <div class="rb-bill-year-body">
+ <div class="rb-bill-list rb-bill-list-timeline">${rows}</div>
+ </div>
+ </details>`;
+ }).join("");
+ const yearSpan = years.filter(y => y !== "Unknown year");
+ const spanHint = yearSpan.length > 1
+ ? (yearSpan[yearSpan.length - 1] + "–" + yearSpan[0])
+ : (yearSpan[0] || "");
+ billHtml = `<details class="rb-arch rb-bill-arch"${_billArchiveOpen ? " open" : ""} id="rbBillArch">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Utility bill archive</span>
+ <span class="rb-arch-sub">${billCount} bill${billCount === 1 ? "" : "s"} on file${spanHint ? " · " + esc(spanHint) : ""} · by year</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-bill-timescale-hint">Organized by billing year (period end). Each row shows the utility bill’s billing period.</p>
+ ${yearsHtml}
+ </div></details>`;
+ }
+
+ host.innerHTML = invHtml + billHtml;
  wireArchiveToggle();
  // Per-month .zip download (authenticated blob download, same helper as the CSV export).
  host.querySelectorAll("[data-arch-zip]").forEach(btn => {
  btn.onclick = () => downloadArchiveMonth(btn.getAttribute("data-arch-zip"), btn, host);
  });
+ host.querySelectorAll("[data-bill-dl]").forEach(btn => {
+ btn.onclick = () => downloadUtilityBill(
+ btn.getAttribute("data-bill-dl"),
+ btn.getAttribute("data-bill-name") || "utility_bill.pdf",
+ btn
+ );
+ });
  }
  function wireArchiveToggle() {
  const det = $("#rbArch");
  if (det) det.addEventListener("toggle", () => { _archiveOpen = det.open; });
+ const billDet = $("#rbBillArch");
+ if (billDet) billDet.addEventListener("toggle", () => { _billArchiveOpen = billDet.open; });
+ }
+ async function downloadUtilityBill(url, filename, btn) {
+ if (!url || btn.disabled) return;
+ const row = btn.closest(".rb-bill-row");
+ const stat = row ? row.querySelector("[data-bill-stat]") : null;
+ const setStat = (cls, msg) => {
+ if (!stat) return;
+ stat.className = "rb-bill-dl-stat" + (cls ? " " + cls : "");
+ stat.textContent = msg || "";
+ };
+ btn.disabled = true;
+ setStat("rb-busy", "…");
+ try {
+ await authBlobDownload(url, filename);
+ setStat("rb-ok", "✓");
+ setTimeout(() => setStat("", ""), 2500);
+ } catch (e) {
+ setStat("rb-err", (e && e.message) || "Failed");
+ } finally {
+ btn.disabled = false;
+ }
  }
  async function downloadArchiveMonth(month, btn, host) {
  const stat = host.querySelector(`[data-arch-stat="${CSS.escape(month)}"]`);
@@ -2032,11 +2234,7 @@
  } catch (_) {
  const list = $("#rbList");
  if (list) {
- const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
- const headLine = pending
- ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Select an offtaker to review and send.`;
- list.innerHTML = `<div class="rb-acc-lead">${headLine}</div>` +
+ list.innerHTML =
  OFFTAKERS.slice(0, 40).map(s => subCard(s, demoArrays, demoUtil)).join("") +
  (OFFTAKERS.length > 40
  ? `<div class="empty" style="padding:12px;color:var(--faint)">+ ${OFFTAKERS.length - 40} more offtakers, sign up to manage the full book.</div>`
@@ -2063,7 +2261,6 @@
  const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
  const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
  const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
- const mmBtn = $("#rbMasterEmailOpen"); if (mmBtn) mmBtn.onclick = () => demoNudge(mmBtn);
  const exBtn = $("#rb2ExportBtn"); if (exBtn) exBtn.onclick = () => demoNudge(exBtn);
  }
 
@@ -2192,15 +2389,12 @@
  const ov = document.getElementById("esOverlay");
  if (ov) ov.hidden = true;
  document.body.style.overflow = "";
- // Refresh the in-page master email card so the sample preview matches the studio.
- try { loadMasterEmailPreview(); } catch (_) { /* non-fatal */ }
+ // Master email is toolbar-only now (no inline preview card).
  }
 
- // ─── Master email card (inline on Offtakers tab) ───────────────────────────
- // 1-1 with Generation reports Delivery settings → Email template region:
- // sample preview + full-width "Customize email template" → studio.
+ // ─── Master email (toolbar button only) ───────────────────────────────────
  // Studio writes Tenant.offtaker_email_* so EVERY offtaker invoice email uses
- // the new letter (merge tags personalize; per-offtaker notes still win one send).
+ // the new letter. Entry point: #rbEmailStudio next to Link utility bills.
  //
  // Demo gate: ONLY !authHeaders(). window.AO_DEMO is always defined by
  // demo-data.js even when signed in — never use `|| window.AO_DEMO` here
@@ -2212,82 +2406,13 @@
  if (!signedIn) { demoNudge(e && e.currentTarget); return; }
  openEmailStudio();
  };
- const cardBtn = $("#rbMasterEmailOpen");
- if (cardBtn) cardBtn.onclick = open;
  const esBtn = $("#rbEmailStudio");
  if (esBtn) esBtn.onclick = open;
- // Whole preview pane is also a hit target (gen-reports UX: click to customize).
- const prev = $("#rbMasterEmailPreview");
- if (prev) {
- prev.setAttribute("role", "button");
- prev.setAttribute("tabindex", "0");
- prev.setAttribute("title", "Open the email template studio");
- prev.onclick = open;
- prev.onkeydown = (e) => {
- if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
- };
- }
- if (!signedIn) {
- const subjEl = $("#rbMmSubj");
- const bodyEl = $("#rbMmBody");
- const fromEl = $("#rbMmFrom");
- if (fromEl) fromEl.textContent = "you · via Array Operator";
- if (subjEl) subjEl.textContent = "Your solar credit invoice — sample period";
- if (bodyEl) {
- bodyEl.innerHTML = "<p>Hi there,</p><p>Please find your solar credit invoice attached, "
- + "along with the utility bill behind the figures.</p>"
- + "<p class='rb-mm-mute'>Sign in to customize this letter for every offtaker.</p>";
- }
- return;
- }
- loadMasterEmailPreview();
  }
 
  async function loadMasterEmailPreview() {
- const fromEl = $("#rbMmFrom");
- const subjEl = $("#rbMmSubj");
- const bodyEl = $("#rbMmBody");
- const footEl = $("#rbMmFoot");
- const statEl = $("#rbMmStatus");
- if (!subjEl || !bodyEl) return;
- if (!authHeaders()) {
- subjEl.textContent = "Sign in to preview your offtaker email.";
- bodyEl.innerHTML = "";
- return;
- }
- if (statEl) statEl.textContent = "";
- try {
- const d = await esApi("");
- if (fromEl) {
- const fe = d.from_email || "admin@solaroperator.org";
- fromEl.textContent = fe + " · via Array Operator";
- }
- // Preview with current (saved) templates — null body means server uses tenant defaults.
- const r = await esApi("/preview", {
- method: "POST",
- body: JSON.stringify({
- subject_template: d.subject_template || null,
- body_template: d.body_template || null,
- signoff: d.signoff || null,
- }),
- });
- subjEl.textContent = r.subject_rendered || "(subject)";
- bodyEl.innerHTML = r.body_rendered
- || "<p class='rb-mm-mute'>Preview will appear here once a template is set.</p>";
- if (footEl) {
- const who = r.sample_client || null;
- footEl.textContent = who
- ? "Previewing with " + who + "'s figures — every offtaker gets their own."
- : "Add an offtaker with an email to see a personalized sample.";
- }
- } catch (e) {
- subjEl.textContent = "Couldn't load preview";
- bodyEl.innerHTML = "<p class='rb-mm-mute'>" + esc(e.message || "Preview failed") +
- " · <button type='button' class='rb-mm-retry' id='rbMmRetry'>Try again</button></p>";
- const retry = $("#rbMmRetry");
- if (retry) retry.onclick = () => loadMasterEmailPreview();
- if (statEl) statEl.textContent = "";
- }
+ // Legacy no-op: inline master-email fold removed (Ford 2026-07-21).
+ // Kept so residual callers after studio close do not throw.
  }
 
  async function esPreview() {
@@ -2953,42 +3078,9 @@
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
  </details>
- <!-- Master offtaker email — collapsed by default; open to edit shared letter. -->
- <details class="rb-fleet-fold rb-mastermail rep-card" id="rbMasterEmail">
- <summary class="rb-fleet-fold-sum">
- <span class="rb-fleet-fold-title">Master email for all offtakers</span>
- <span class="rb-fleet-fold-hint">Shared letter · merge tags personalize each send</span>
- </summary>
- <div class="rb-fleet-fold-body">
- <div class="rb-mm-sectionlab">Shared across all offtakers</div>
- <div class="rb-mm-head">
- <div class="rb-mm-main">
- <p>One letter on every offtaker invoice. Edit once — <b>all offtakers</b> get it.
- Merge tags personalize each send. A note on one offtaker still overrides that send only.</p>
- </div>
- </div>
- <div class="rb-mm-stage">
- <button class="ao-btn rb-btn rb-mm-cta" id="rbMasterEmailOpen" type="button"
- title="Open the email studio. Changes apply to every offtaker’s invoice email.">
- <span class="rb-mm-cta-ico" aria-hidden="true">✉</span>
- <span class="rb-mm-cta-label">
- <span class="rb-mm-cta-title">Edit master email for all offtakers</span>
- <span class="rb-mm-cta-sub">Subject, body, sign-off · applies to every offtaker</span>
- </span>
- </button>
- <div class="rb-mm-eyebrow">Sample · what each offtaker receives (personalized)</div>
- <div class="rb-mm-preview" id="rbMasterEmailPreview">
- <div class="rb-mm-env">
- <div><span class="rb-mm-envlab">FROM</span> <span id="rbMmFrom">—</span></div>
- <div><span class="rb-mm-envlab">SUBJECT</span> <span id="rbMmSubj" class="rb-mm-subj">Loading…</span></div>
- </div>
- <div class="rb-mm-body" id="rbMmBody"><span class="rb-mm-mute">Rendering sample…</span></div>
- <div class="rb-mm-foot" id="rbMmFoot"></div>
- </div>
- </div>
- <div class="rb-mm-status" id="rbMmStatus" aria-live="polite"></div>
- </div>
- </details>
+ <!-- Master offtaker email is edited only via the toolbar "✉ Master email · all
+ offtakers" button next to Link utility bills (Ford 2026-07-21: drop the
+ fleet-fold dropdown; one entry point). -->
  <div class="rb-listwrap rb2-listwrap">
  <div class="rb2-controls">
  <span class="rb2-controls-label">Your offtakers</span>
@@ -4427,14 +4519,25 @@
  reading order survives the fold. -->
  <label class="rep-fld req"><span class="rl">Expected share of array's net meter group (%)</span>
  <input type="number" id="rbmPct" min="0.01" max="100" step="0.001" placeholder="e.g. 24.783"></label>
+ <!-- Budget bill + true-up sit on the main form (Ford 2026-07-21): was buried
+ under Advanced and invisible when adding/editing offtakers. -->
+ <label class="rep-fld"><span class="rl">Budget bill, fixed total ($/period)
+ <span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Line items still show the real credit value. Pair with Annual true-up to settle the difference at year-end.">ⓘ</span></span>
+ <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = bill the calculated amount">
+ <span class="rb-fld-hint">e.g. 2150 — they pay this fixed amount monthly; the invoice still shows real solar value.</span></label>
+ <label class="rep-fld rb-check-fld" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+ <input type="checkbox" id="rbmTrueup" style="margin-top:4px;width:auto;">
+ <span><span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
+ <span class="rb-fld-hint" style="display:block;margin-top:2px;">At year-end, settle budget vs actual: charge the shortfall or credit the overpayment on their next bill.</span></span>
+ </label>
  </div>
  <!-- Everything below is OPTIONAL and saves blank, so it folds away by
  default (mirrors the offtaker-edit card's .rb-fadv drawer). Native
  <details> keeps every field IN THE DOM, so saveManual() still reads
  #rbmCreditRate / #rbmRate / #rbmXThresh / #rbmCommDate / #rbmInvStart
- / #rbmBudget exactly as before. -->
+ exactly as before. Budget/true-up live above (always visible). -->
  <details class="rb-fadv" id="rbmAdv"${MANUAL_ADV_OPEN ? " open" : ""}>
- <summary>Advanced billing, solar credit rate, discount, flag threshold, commissioning, invoice numbering, budget</summary>
+ <summary>Advanced billing, solar credit rate, discount, flag threshold, commissioning, invoice numbering</summary>
  <div class="rb-mform-grid" style="padding:0 15px 15px">
  <!-- Solar credit rate (Ford 2026-07-07): an EDITABLE $/kWh override for
  every offtaker, defaulting to the bill's own rate. This slot is
@@ -4457,9 +4560,6 @@
  <label class="rep-fld"><span class="rl">Starting invoice #</span>
  <input type="number" id="rbmInvStart" min="0" max="9999999" step="1" placeholder="blank = date-based">
  <span class="rb-fld-hint">Optional. Seeds sequential invoice numbering; each send adds 1.</span></label>
- <label class="rep-fld"><span class="rl">Budget bill, fixed total ($)</span>
- <input type="number" id="rbmBudget" min="0" step="0.01" placeholder="blank = use the calculated amount">
- <span class="rb-fld-hint">Set a flat amount this offtaker pays, overrides the calculated total (line items still show).</span></label>
  </div>
  </details>
  <div class="rb-controls">
@@ -4700,6 +4800,7 @@
  if (xThreshNum !== null) fd.append("crosscheck_threshold_pct", String(xThreshNum)); // variance flag threshold, pct points
  if (invStartNum !== null) fd.append("invoice_number_start", String(invStartNum));
  if (budgetNum !== null) fd.append("budget_amount_usd", String(budgetNum));
+ fd.append("annual_trueup", ($("#rbmTrueup") && $("#rbmTrueup").checked) ? "true" : "false");
  fd.append("cadence", segValue("rbmCadence") || "monthly");
  fd.append("delivery_mode", segValue("rbmDelivery") || "approval");
  fd.append("send_mode", mode);
@@ -5569,6 +5670,12 @@
  <label><input type="checkbox" id="rbTrueup"> Annual true-up (Sept)</label>
  </div>
  </div>
+ <div class="rb-ctl" style="flex:1 1 100%;">
+ <label class="rep-fld" style="margin:0;"><span class="rl">Budget bill, fixed total ($/period)
+ <span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period. Pair with Annual true-up to settle budget vs actual in September.">ⓘ</span></span>
+ <input type="number" id="rbBudget" min="0" step="0.01" placeholder="blank = bill the calculated amount" style="max-width:220px;">
+ <span class="rb-fld-hint">Fixed monthly/period amount. Leave blank for calculated solar credit.</span></label>
+ </div>
  </div>
  <div class="rb-emails">
  <label class="rep-fld"><span class="rl">Client email</span>
@@ -5740,6 +5847,17 @@
  fd.append("formats", JSON.stringify(fmts));
  fd.append("include_summary", $("#rbSummary").checked ? "true" : "false");
  fd.append("annual_trueup", $("#rbTrueup").checked ? "true" : "false");
+ const budgetEl = $("#rbBudget");
+ const budgetRaw = budgetEl ? budgetEl.value.trim() : "";
+ if (budgetRaw !== "") {
+ const budgetNum = Number(budgetRaw);
+ if (isNaN(budgetNum) || budgetNum < 0) {
+ st.className = "rb-status rb-err";
+ st.textContent = "Budget must be a dollar amount ≥ 0, or blank.";
+ return;
+ }
+ fd.append("budget_amount_usd", String(budgetNum));
+ }
  try {
  const r = await fetch(API + "/subscriptions", { method: "POST", headers: authHeaders(), body: fd });
  const data = await r.json().catch(() => ({}));
@@ -6100,11 +6218,6 @@
  list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet. Click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;
  return;
  }
- // Header copy: "N reports ready to review & send. Review before you send."
- const pending = OFFTAKERS.filter(s => DRAFT_BY_SUB[String(s.id)]).length;
- const headLine = pending
- ? `<b>${pending}</b> report${pending === 1 ? "" : "s"} ready to review &amp; send. Review before you send.`
- : `Select an offtaker to review and send.`;
  // Keep the currently-open card open across refreshes, but do NOT auto-open one on a
  // fresh load, every offtaker starts collapsed until the operator clicks one (Ford).
  const stillOpen = ACTIVE_SUB_ID && OFFTAKERS.some(s => String(s.id) === String(ACTIVE_SUB_ID));
@@ -6309,12 +6422,12 @@
  }
  // Search on its own full-width row first, then filter chips underneath —
  // the search is the primary lookup tool and shouldn't share a cramped row.
+ // (No rb-acc-lead flag strip — "ready to review" / "doesn't match GMP" already
+ // live in the top KPI band + Bill audit tab; Ford 2026-07-21 screenshot.)
  const toolsHTML = (filterStripHTML || searchHTML)
  ? `<div class="rb-listtools${searchHTML ? " rb-listtools-searchfirst" : ""}">${searchHTML}${filterStripHTML}</div>`
  : "";
- list.innerHTML = `<div class="rb-acc-lead">${headLine}` +
- `<span class="rb-bac-summary" id="rbBacSummary">${bacSummaryHTML()}</span></div>` + toolsHTML + body;
- wireBacChip($("#rbBacSummary"));
+ list.innerHTML = toolsHTML + body;
  renderKpis(); // the KPI band tracks the freshly-rendered list's counts
  // Wire the GMP-vs-non-GMP filter chips, flip the scope + re-render in place.
  list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
@@ -6924,10 +7037,30 @@
  } else {
  const why = GEN_FAIL[sid]
  || "No billable period yet for this offtaker, its report appears here once a GMP bill lands.";
- bodyCol = `<div class="rb-draft rb-draft-empty">
+ // Still surface offtaker editor (incl. budget in Billing) before a bill/draft
+ // exists so operators can set a fixed budget anytime (Ford 2026-07-21).
+ const emptySubAsDraft = {
+  id: null,
+  subscription_id: sid,
+  customer_name: activeOf.customer_name,
+  budget_amount_usd: activeOf.budget_amount_usd,
+  annual_trueup: activeOf.annual_trueup,
+  pending_credit_usd: activeOf.pending_credit_usd,
+  allocation_pct: activeOf.allocation_pct,
+  array_share_pct: activeOf.array_share_pct,
+  client_email: activeOf.client_email,
+  utility_account_id: activeOf.utility_account_id,
+  discount_pct: activeOf.discount_pct,
+  net_rate_per_kwh: activeOf.net_rate_per_kwh,
+  cadence: activeOf.cadence,
+  send_mode: activeOf.send_mode,
+  cc_emails: activeOf.cc_emails,
+ };
+ bodyCol = `<div class="rb-draft rb-draft-empty" data-subid="${esc(String(sid))}">
  <div class="rb-draft-top"><div class="rb-draft-name">${esc(activeOf.customer_name || "Offtaker")}</div></div>
  <p class="rb-empty-why">${esc(why)}</p>
- <p class="rb-empty-auto">⚡ Drafts automatically the moment its bill lands, nothing to click.</p>
+ <p class="rb-empty-auto">⚡ Drafts automatically the moment its bill lands, nothing to click. You can still edit offtaker details (incl. budget) below.</p>
+ ${offtakerEditor(emptySubAsDraft, INBOX_UTIL_ACCTS)}
  </div>`;
  }
 
@@ -7526,7 +7659,7 @@
  const creditDue = creditVal != null ? money(creditVal) : "computing…";
  const totalRows = budgetSet
  ? `<div class="rb-calc-row sub"><span class="rb-calc-k">Solar credit value<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${creditDue}</span></div>
- <div class="rb-calc-row total"><span class="rb-calc-k">Budget bill, fixed total<small>overrides the calculated value</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
+ <div class="rb-calc-row total"><span class="rb-calc-k">Amount due<small>budget bill this period</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
  : `<div class="rb-calc-row total"><span class="rb-calc-k">Solar credit value due<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`;
  return `
  <div class="rb-calc">
@@ -7876,7 +8009,7 @@
  </div>
  ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
  ${sec("How this was calculated", calcDashboard(d), "kWh × rate × share = the amount", true, "amber")}
- ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "emerald")}
+ ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, budget, delivery", true, "emerald")}
  ${sec("Edit email", emailBody, _emailCustom ? "custom · this offtaker only" : "master · all offtakers", false, "amber")}
  ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "sky")}
  ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "emerald")}
@@ -8153,9 +8286,12 @@
  <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783">
  ${subRec.array_share_pct != null ? `<span class="rb-fld-hint">Their invoice bills <b>their own utility bill</b>, GMP's actual allocation. This share is your expected value for the <b>bill-accuracy audit</b> (and only bills directly while their sub-account has no settled bill).</span>` : ""}</label>
  ${rateFieldHTML(d, utilAccts)}
- <label class="rep-fld"><span class="rl">Discount (%)</span>
+ <label class="rep-fld"><span class="rl">Discount (%)<span class="rb-info" tabindex="0" title="Percent off the solar credit rate. Blank uses your default discount.">ⓘ</span></span>
  <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
  ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default, auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
+ <label class="rep-fld"><span class="rl">Budget ($/period)<span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Leave blank to bill the calculated amount. Pair with Annual true-up (Invoicing) to settle the difference in September.">ⓘ</span></span>
+ <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = calculated">
+ ${(d.pending_credit_usd && d.pending_credit_usd > 0) ? `<span class="rb-fld-hint">Banked true-up credit: <b>$${Number(d.pending_credit_usd).toFixed(2)}</b></span>` : ""}</label>
  </div>
  </div>
 
@@ -8173,16 +8309,19 @@
  <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
  <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
  </select></label>
+ <label class="rep-fld rb-check-fld" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+ <input type="checkbox" data-of="annual_trueup" ${d.annual_trueup ? "checked" : ""} style="margin-top:4px;width:auto;">
+ <span><span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
+ <span class="rb-fld-hint" style="display:block;margin-top:2px;">Settle budget vs actual at year-end.</span></span>
+ </label>
  </div>
  </div>
 
  <details class="rb-fadv" data-seckey="Advanced overrides"${SEC_OPEN["Advanced overrides"] ? " open" : ""}>
- <summary>Advanced, flag threshold, budget cap, invoice numbering, commissioning</summary>
+ <summary>Advanced, flag threshold, invoice numbering, commissioning</summary>
  <div class="rb-cust-grid rb-offedit-grid rb-fgrid">
  <label class="rep-fld"><span class="rl">Bill-accuracy threshold (%)<span class="rb-info" tabindex="0" title="The Bill accuracy check derives GMP's actual share automatically (credited ÷ the array's group excess) and compares it to the Share above, no data entry. This sets how far the two may differ before it's flagged. Blank = your default (${fmtPct(XCHECK_DEFAULT_PCT)}%).">ⓘ</span></span>
  <input type="number" data-of="crosscheck_threshold_pct" min="0.001" max="100" step="0.001" value="${xThresh}" placeholder="blank = default (${fmtPct(XCHECK_DEFAULT_PCT)}%)"></label>
- <label class="rep-fld"><span class="rl">Budget bill, fixed total ($)<span class="rb-info" tabindex="0" title="Set a flat amount this offtaker pays, overrides the calculated total (line items still show).">ⓘ</span></span>
- <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = use the calculated amount"></label>
  <label class="rep-fld"><span class="rl">Starting invoice #<span class="rb-info" tabindex="0" title="Seeds sequential invoice numbering; each send adds 1.">ⓘ</span></span>
  <input type="number" data-of="invoice_number_start" min="0" max="9999999" step="1" value="${invStart}" placeholder="blank = date-based"></label>
  ${editArrayId !== "" ? `
@@ -8599,11 +8738,27 @@
  } catch (e) { /* leave blank */ }
  }
 
+ function resolveOfftakerEditTarget(did, sid) {
+ // Prefer the active draft (figures + preview). Fall back to DRAFT_BY_SUB,
+ // then the offtaker list row — so budget/true-up can be set before any draft
+ // exists (empty state after expand).
+ let d = did != null ? INBOX_DRAFTS.find(x => String(x.id) === String(did)) : null;
+ if (!d && sid != null) d = DRAFT_BY_SUB[String(sid)] || null;
+ if (!d && sid != null) {
+  const of = OFFTAKERS.find(s => String(s.id) === String(sid));
+  if (of) d = of; // list row shape is enough for budget/true-up optimistic edits
+ }
+ return d || null;
+ }
+
  function onOfftakerEdit(card, box, did, sid, field, inp) {
- const d = INBOX_DRAFTS.find(x => String(x.id) === String(did));
+ const d = resolveOfftakerEditTarget(did, sid);
  if (!d) return;
- const raw = inp.value;
- ACTIVE_DRAFT_ID = did; // preview tracks the edited draft
+ // Checkboxes use .checked; text/number inputs use .value.
+ const raw = (inp && inp.type === "checkbox")
+ ? (inp.checked ? "true" : "false")
+ : inp.value;
+ if (did != null) ACTIVE_DRAFT_ID = did; // preview tracks the edited draft
  // Optimistic repaint for what the preview/grid can show right now.
  if (field === "customer_name") {
  d.customer_name = raw;
@@ -8612,10 +8767,23 @@
  if (nameEl) nameEl.textContent = raw;
  const pickName = document.querySelector(".rb-pick-btn-name");
  if (pickName) pickName.textContent = raw;
+ // Keep list-row offtaker in sync when editing without a draft.
+ const of = OFFTAKERS.find(s => String(s.id) === String(sid));
+ if (of) of.customer_name = raw;
  }
  else if (field === "client_email") d.client_email = raw;
  else if (field === "send_mode") d.send_mode = raw;
  else if (field === "cc_emails") d.cc_emails = raw;
+ else if (field === "annual_trueup") {
+  d.annual_trueup = raw === "true";
+  const of = OFFTAKERS.find(s => String(s.id) === String(sid));
+  if (of) of.annual_trueup = d.annual_trueup;
+ }
+ else if (field === "budget_amount_usd") {
+ d.budget_amount_usd = raw === "" ? null : Number(raw);
+ const of = OFFTAKERS.find(s => String(s.id) === String(sid));
+ if (of) of.budget_amount_usd = d.budget_amount_usd;
+ }
  else if (field === "allocation_pct" && raw !== "") {
  const frac = Number(raw) / 100;
  // The share posts as allocation_pct, but on an own-meter (sub-metered)
@@ -8626,7 +8794,7 @@
  const v = card && card.querySelectorAll(".rb-draft-grid .rb-v")[1];
  if (v) v.textContent = (Math.round((offtakerShareFrac(d) || 0) * 1000) / 10) + "%";
  }
- renderDraftDoc();
+ if (did != null) renderDraftDoc();
  const body = ofPatchBody(field, raw);
  if (body === null) return; // nothing to persist (blank required)
  scheduleOfftakerPatch(card, box, did, sid, body,
@@ -8665,6 +8833,7 @@
  case "discount_pct": return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
  case "net_rate_per_kwh": return { net_rate_per_kwh: v === "" ? null : Number(v) };
  case "budget_amount_usd": return { budget_amount_usd: v === "" ? null : Number(v) };
+ case "annual_trueup": return { annual_trueup: v === "true" || v === true };
  // Bill-accuracy flag threshold (Bruce 2026-07-07): percentage points, sent as-is;
  // blank clears it (the check falls back to the fleet default). NOT a money field —
  // it never changes the amount, only how tight the accuracy flag is.

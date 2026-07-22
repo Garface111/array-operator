@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="scroll-boost.js?v=20260721omnidian1"></script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Array Operator</title>
@@ -90,8 +92,8 @@ document.documentElement.setAttribute("data-theme","day");
 })();
 </script>
 <link id="favicon" rel="icon" type="image/svg+xml" href="favicon-day.svg"><!-- day(blue) is default; swapped to favicon.svg(green/night) by the theme toggle -->
-<link rel="stylesheet" href="styles.css?v=20260720prodfallback">
-<link rel="stylesheet" href="command-center.css?v=20260721fleetai1">
+<link rel="stylesheet" href="styles.css?v=20260721animLoop1">
+<link rel="stylesheet" href="command-center.css?v=20260721fleetai2">
 <link rel="stylesheet" href="ops.css?v=20260715eaMatch2">
 <link rel="stylesheet" href="theme-day.css?v=20260716overview1"><!-- NEPOOL-palette day mode; last so it wins under [data-theme=day] -->
 <link rel="stylesheet" href="trends.css?v=20260720masterpack1"><!-- multi-view Trends tab -->
@@ -117,7 +119,7 @@ document.documentElement.setAttribute("data-theme","day");
  ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:2.5dppx) and (max-resolution:2.99dppx)"],
  ["img/sky/world-zo6-2560.webp","(max-width:600px) and (min-resolution:3dppx)"]
  ].forEach(function(p){ document.write('<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="'+p[0]+'" media="'+p[1]+'">'); });
- ["theme-sky.css?v=20260716subnavMid1","theme-sky-triage.css?v=20260718outage3","theme-sky-reports.css?v=20260720fold1","theme-sky-account.css?v=20260719addbtn","theme-sky-analysis.css?v=20260716subnavCenter1","theme-sky-trends.css?v=20260716subnavCenter1","theme-sky-resources.css?v=20260715opsRes1","theme-sky-mobile.css?v=20260714demo2"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
+ ["theme-sky.css?v=20260716subnavMid1","theme-sky-triage.css?v=20260718outage3","theme-sky-reports.css?v=20260721auditBadge1","theme-sky-account.css?v=20260719addbtn","theme-sky-analysis.css?v=20260716subnavCenter1","theme-sky-trends.css?v=20260716subnavCenter1","theme-sky-resources.css?v=20260715opsRes1","theme-sky-mobile.css?v=20260714demo2"].forEach(function(h){ document.write('<link rel="stylesheet" href="'+h+'">'); });
 }</script>
 <!-- (The scroll-parallax "descent" was removed 2026-07-13, Ford: it magnified +
  softened the plate. The world is now a simple fixed cover background at
@@ -274,7 +276,8 @@ document.documentElement.setAttribute("data-theme","day");
  (Inverters no longer a separate top tab — Marketplace took that slot).
  #arrays → Table, #sandbox → Sandbox, #dashboard → Triage. -->
  <div class="tabbar" id="tabbar" role="tablist" aria-label="Choose a view">
- <a class="tab" id="tabDashboard" href="#dashboard" role="tab">Fleet</a>
+ <!-- href=#arrays = Fleet → Table default; sub-tab memory restores Triage/Sandbox when last used -->
+ <a class="tab" id="tabDashboard" href="#arrays" role="tab">Fleet</a>
  <!-- Trends is now a SUB-VIEW of Analysis (Ford 2026-07-13), see #panelAnalysis's
  segmented control. No top-level Trends tab; #trends deep-links route here. -->
  <a class="tab" id="tabAnalysis" href="#analysis" role="tab">Analysis</a>
@@ -338,17 +341,17 @@ document.documentElement.setAttribute("data-theme","day");
      ops:       ["panelOps",       "tabOps"]
    };
    // Mirrors sandbox.js tabFromHash() — keep in sync if that changes.
+   // Fleet family (#dashboard Triage | #arrays Table | #sandbox) all light panelDashboard.
    function fromHash() {
      var h = location.hash;
      if (h === "#account") return "account";
      if (h === "#ops" || h === "#claims" || h === "#repairs") return "ops";
-     if (h === "#arrays" || h === "#sandbox") return "arrays";
+     if (h === "#arrays" || h === "#table" || h === "#sandbox" || h === "#dashboard") return "dashboard";
      if (h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
      if (h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
      if (h === "#marketplace") return "marketplace";
-     if (h === "#dashboard") return "dashboard";
      if (h === "#sovereign") return "account";
-     return "arrays";
+     return "dashboard";
    }
    function apply() {
      // Sovereign desk takes over the stage; leave that to applyView.
@@ -564,7 +567,7 @@ document.documentElement.setAttribute("data-theme","day");
 
 </div>
 
-<script src="fleet-store.js?v=20260719stream1"></script>
+<script src="fleet-store.js?v=20260721duskGate1"></script>
 <script src="pending-feeds.js?v=6"></script>
 <!-- Anonymous-demo data, a coherent fake operator (Catamount Community Solar, the
  "both" plan) so signed-out visitors see a populated Master Account + Offtaker
@@ -574,13 +577,13 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="app.js?v=20260715eaModal2"></script>
 <script src="session-ping.js?v=20260720tos1"></script>
 <script src="solar-credit-notice.js?v=20260720sc1"></script>
-<script src="sandbox.js?v=20260720prodfallback"></script>
-<script src="vendor-sheet.js?v=20260719stream2"></script>
-<script src="command-center.js?v=20260721fleetai1"></script>
-<script src="reports.js?v=20260720fold1"></script>
+<script src="sandbox.js?v=20260721ftAnim1"></script>
+<script src="vendor-sheet.js?v=20260721animLoop1"></script>
+<script src="command-center.js?v=20260721fleetai2"></script>
+<script src="reports.js?v=20260721auditBadge1"></script>
 <script src="marketplace.js?v=20260719panes1"></script>
 <script src="rec-desk.js?v=20260719design1"></script>
-<script src="ops.js?v=20260715eaMatch2"></script>
+<script src="ops.js?v=20260721closeToggle1"></script>
 <!-- Array Prospectus + the Array Market sub-tab (secondary-market v0). Registers
  into the shared Marketplace sub-tab registry (window.__aoMarketplace); exposes
  window.AOProspectus.open() for the Fleet drawer. Self-contained (own
@@ -652,19 +655,19 @@ document.documentElement.setAttribute("data-theme","day");
 <script src="trends-view-heatfield.js?v=20260712sky1"></script>
 <script src="trends.js?v=20260720masterpack2"></script>
 <!-- Energy Agent: voice-first orb + tools + browser driver -->
-<link rel="stylesheet" href="energy-agent.css?v=20260717resWrap1">
+<link rel="stylesheet" href="energy-agent.css?v=20260721eaNext1">
 <link rel="stylesheet" href="sovereign-desk.css?v=20260716deskfix1">
 <link rel="stylesheet" href="mobile-os.css?v=20260715aiCompact1">
-<script src="energy-agent.js?v=20260721fleetai1"></script>
+<script src="energy-agent.js?v=20260721fleetai2"></script>
 <script src="sovereign-desk.js?v=20260716deskfix1"></script>
 <!-- Post-onboarding hands-off walkthrough (fires on ?fresh=1 / ?tour=hands-off) -->
-<link rel="stylesheet" href="hands-off-tour.css?v=20260717resWrap1">
+<link rel="stylesheet" href="hands-off-tour.css?v=20260721eaPack1">
 <script src="hands-off-tour.js?v=20260719stream2"></script>
 <!-- Mobile OS: Energy Agent is the operating layer (checklist → overview → Detail) -->
 <script src="mobile-os.js?v=20260718fleet1"></script>
 <!-- Tab pager: horizontal slide between top-tab panels (desktop) -->
-<link rel="stylesheet" href="tab-slide.css?v=20260719merge1">
-<script src="tab-slide.js?v=20260719mkslide1"></script>
+<link rel="stylesheet" href="tab-slide.css?v=20260721eaFps2">
+<script src="tab-slide.js?v=20260721eaFps2"></script>
 <script>
  /* Day/night toggle wiring, persists choice in localStorage (ao_theme) and
  keeps the icon + the browser chrome color (meta theme-color) in sync. */

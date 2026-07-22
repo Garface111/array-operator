@@ -24,8 +24,32 @@
     "panelAnalysis","panelTrends","panelResources","panelReports",
     "panelMarketplace","panelOps"
   ];
-  var DUR_MS = 500;
+  var DUR_MS = 280; // match Energy Agent --ea-dur for paired motion
   var stage = null, sliding = false, activeCleanup = null;
+
+  /**
+   * When Energy Agent is open (fixed left rail), tab panels must NOT center on
+   * the full viewport — that parks them under the EA card, then they jump right
+   * when the slide ends (Ford 2026-07-21). Center + pin width in the free band
+   * to the right of the rail so incoming/outgoing slide together clear of EA.
+   */
+  function eaSlideLayout(){
+    var out = { offsetPx: 0, pinW: 0 };
+    try{
+      if(!document.body.classList.contains("ea-shell-open")) return out;
+      var p = document.getElementById("eaPanel");
+      if(!p || !p.classList.contains("open")) return out;
+      var r = p.getBoundingClientRect();
+      if(r.width < 40) return out;
+      var freeLeft = r.right + 10;
+      var freeW = Math.max(280, window.innerWidth - freeLeft - 16);
+      var freeCenter = freeLeft + freeW / 2;
+      var viewCenter = window.innerWidth / 2;
+      out.offsetPx = Math.round(freeCenter - viewCenter);
+      out.pinW = Math.round(freeW);
+    }catch(e){}
+    return out;
+  }
 
   function disabled(){
     try{
@@ -117,7 +141,17 @@
       // absolutely-positioned panels stay their normal width (not stretched to
       // 100vw). Measured off the outgoing panel WHILE it is still in normal flow
       // (before .ao-sliding makes both absolute — absolute w/o width is shrink-to-fit).
-      var pinW = fromEl.offsetWidth || toEl.offsetWidth || 0;
+      // When EA is open, pin to the free band width (not under the rail).
+      var eaLay = eaSlideLayout();
+      var pinW = eaLay.pinW || fromEl.offsetWidth || toEl.offsetWidth || 0;
+      var eaOff = eaLay.offsetPx || 0; // shift center into free band
+      var restX = eaOff ? (eaOff + "px") : "0px";
+      var enterX = eaOff
+        ? "calc(" + enter + " + " + eaOff + "px)"
+        : enter;
+      var exitX = eaOff
+        ? "calc(" + exit + " + " + eaOff + "px)"
+        : exit;
 
       // Commit the LOGICAL active state BEFORE measuring height. Only `to` is
       // .active. Active-gated content (Fleet Triage attention queue used to paint
@@ -140,6 +174,7 @@
       toEl.classList.add("ao-slide-to");
       try{ document.documentElement.classList.add("ao-tab-sliding"); }catch(e){}
       // Pin width + center each panel (left:50% from CSS, negative half-width here).
+      // eaOff shifts the center into the free band beside Energy Agent.
       if(pinW > 0){
         [fromEl, toEl].forEach(function(el){
           el.style.width = pinW + "px";
@@ -157,15 +192,16 @@
       fromEl.style.transition = "none";
       toEl.style.transition = "none";
       s.style.transition = "none";
-      fromEl.style.transform = "translateX(0)";
-      toEl.style.transform = "translateX(" + enter + ")";
+      fromEl.style.transform = "translate3d(" + restX + ",0,0)";
+      toEl.style.transform = "translate3d(" + enterX + ",0,0)";
       if(stageH > 0) s.style.height = stageH + "px";
       void s.offsetWidth;                       // commit the start frame
       fromEl.style.transition = "";             // hand easing back to tab-slide.css
       toEl.style.transition = "";
       // Stage height stays put (no transition) — only the panels move.
-      fromEl.style.transform = "translateX(" + exit + ")";
-      toEl.style.transform = "translateX(0)";
+      // Both end/start in the EA-clear band so nothing sits under the rail.
+      fromEl.style.transform = "translate3d(" + exitX + ",0,0)";
+      toEl.style.transform = "translate3d(" + restX + ",0,0)";
 
       var done = false, timer = 0;
       function cleanup(){

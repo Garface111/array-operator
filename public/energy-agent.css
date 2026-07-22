@@ -8,9 +8,25 @@
      the inset from every viewport edge, --ea-radius its corner rounding. */
   --ea-gap: 14px;
   --ea-radius: 22px;
-  /* Total horizontal footprint the open card claims on the left (card + both
-     insets). The site content shifts by half of this to re-center beside it. */
-  --ea-footprint: calc(var(--ea-rail) + var(--ea-gap) * 2);
+  /* Air between the floating card’s right edge and the main column (regular EA
+     view). Keep tight — re-centering used to leave a wide sky gutter (Ford
+     2026-07-21 screenshot). */
+  --ea-content-gap: 12px;
+  /* Where the main app column starts when EA is open (left inset + rail + gap). */
+  --ea-content-inset: calc(var(--ea-gap) + var(--ea-rail) + var(--ea-content-gap));
+  /* Legacy name used by overlays / hands-off / older rules — same as content inset
+     (no longer “card + left gap + right gap” re-center footprint). */
+  --ea-footprint: var(--ea-content-inset);
+  /* Shared motion — transform-only paths (compositor). Keep short so it reads
+     as many small frames, not a slow slideshow of layout steps. */
+  --ea-ease: cubic-bezier(.2,.8,.2,1);
+  --ea-dur: .28s;
+  /* Defaults for ops dual-pane geometry (overridden on body.ea-on-ops). Always
+     defined so leaving ops can interpolate back instead of snapping from unset. */
+  --ea-ops-left: var(--ea-gap);
+  --ea-ops-top: var(--ea-gap);
+  --ea-ops-content-pad: 0px;
+  --ea-ops-wrap-max: min(1680px, calc(100vw - 24px));
   --ea-sky: #38bdf8;
   --ea-sky2: #0ea5e9;
   --ea-sun: #fbbf24;
@@ -157,6 +173,9 @@ html.sky #tabbar .tab.ea-tab.active .ea-tab-ic{
   color: #0c4a6e; font: inherit; font-size: 12.5px; font-weight: 740;
   cursor: pointer; box-shadow: 0 10px 28px -12px rgba(14,165,233,.55);
   animation: eaGatePulse 1.8s ease-in-out infinite;
+  /* left/top morph with the EA rail (regular ↔ Repairs); short transform for hover */
+  transition: left var(--ea-dur) var(--ea-ease), top var(--ea-dur) var(--ea-ease),
+              transform .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .ea-mic-gate[hidden]{ display: none !important; }
 .ea-mic-gate:hover{ transform: translateY(-1px); border-color: rgba(14,165,233,.55); }
@@ -169,7 +188,7 @@ html:not(.sky) .ea-mic-gate{
   background: linear-gradient(180deg, var(--card,#111827), var(--card2,#0b1220));
   color: var(--ink,#e5e7eb); border-color: rgba(56,189,248,.35);
 }
-/* When dock is open, park the gate above the rail */
+/* When dock is open, park the gate above the rail (positions transition on desktop) */
 body.ea-shell-open .ea-mic-gate{ left: calc(var(--ea-gap) + var(--ea-rail) + 16px); top: 16px; }
 
 /* ── Left dock — a FLOATING rounded card (inset from every edge, not a slab) ── */
@@ -236,50 +255,67 @@ body.ea-shell-open .panel.active{
   min-width: 0;
   box-sizing: border-box;
 }
-/* Shell-only transition — not nested content .wrap (Resources) */
-body > .wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0; }
+/* Shell shift is TRANSFORM-ONLY (GPU compositor). Never transition margin-left /
+   max-width on .wrap — those reflow the whole dashboard every frame and kill FPS
+   (the “10–15×” gap vs a pure transform slide). */
+body > .wrap{
+  transition: transform var(--ea-dur) var(--ea-ease);
+  min-width: 0;
+  backface-visibility: hidden;
+}
 
-/* ── Energy Agent dock — open/close motion (desktop rail) ───────────────────
-   The rail is kept rendered but parked off-screen (translateX(-100%)) and slides
-   on TRANSFORM, so it glides both IN on open and back OUT on close (the X /
-   minimize) — in lockstep with the .wrap content shift, on the same smooth
-   ease-out curve the mobile sheet uses (cubic-bezier(.2,.8,.2,1), ~340ms; the
-   researched ~250–320ms band, nudged up a touch for a smoother settle). Using a
-   transition (not a one-shot keyframe) also makes it INTERRUPTIBLE: closing
-   mid-open reverses smoothly from wherever it is instead of snapping.
-   `visibility` (delayed one duration on close) keeps the parked rail out of the
-   a11y tree + hit-testing without a display:none that would kill the exit slide.
-   Scoped ≥961px so the mobile bottom-sheet (translateY, further down) is untouched. */
+/* High-FPS morph window: drop the glass blur (paint-heavy) while size/position
+   are changing; solid fill still reads as the same card. */
+body.ea-morphing #eaPanel,
+body.ea-morphing #eaPanel.open{
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body.ea-morphing > .wrap{
+  will-change: transform;
+  pointer-events: none; /* skip hit-testing cost during the slide */
+}
+
+/* ── Energy Agent dock — open/close (desktop) ──────────────────────────────
+   ONLY transform + visibility animate (compositor, ~60fps). Geometry
+   (left/top/width) is set INSTANTLY; mode morphs use JS FLIP on transform.
+   Scoped ≥961px — mobile bottom-sheet is separate. */
 @media (min-width: 961px){
   #eaPanel{
     display: flex;
-    /* Park fully off-screen: clear the card width + its left inset + shadow blur
-       so no sliver/shadow peeks at the edge when closed. */
-    transform: translateX(calc(-100% - var(--ea-gap) - 28px));
+    /* Park fully off-screen on the compositor thread */
+    transform: translate3d(calc(-100% - var(--ea-gap) - 28px), 0, 0);
     visibility: hidden;
     pointer-events: none;
+    /* Own layer; isolate paints so chat internals don’t dirty the page */
+    contain: layout paint;
+    isolation: isolate;
+    backface-visibility: hidden;
     will-change: transform;
-    transition: transform .34s cubic-bezier(.2,.8,.2,1),
-                visibility 0s linear .34s;
+    /* Geometry is snap-set — NEVER transition left/top/width (layout thrash /
+       slideshow FPS). Open/close and FLIP morphs are transform-only. */
+    transition:
+      transform var(--ea-dur) var(--ea-ease),
+      visibility 0s linear var(--ea-dur);
   }
   #eaPanel.open{
-    transform: translateX(0);
+    /* translate3d(0,0,0) keeps the layer promoted while open */
+    transform: translate3d(0, 0, 0);
     visibility: visible;
     pointer-events: auto;
-    transition: transform .34s cubic-bezier(.2,.8,.2,1),
-                visibility 0s;
+    will-change: transform;
+    transition:
+      transform var(--ea-dur) var(--ea-ease),
+      visibility 0s;
   }
-  /* The SITE slides right on transform — same curve, same duration, same trigger
-     as the panel above, so they move in perfect lockstep and both stay on the
-     GPU (no reflow). .wrap stays centered (margin:0 auto); the transform re-
-     centers it into the space beside the card, and max-width caps the column so
-     the tabbar/account email never clip. On wide screens the cap already equals
-     the resting 1440px width, so opening is a pure composited slide with ZERO
-     reflow; narrower desktops take a single width reflow, then glide. */
+  /* Pack column tight to the card via GPU translate — left-aligned box, then
+     slide by content-inset. max-width is set instantly (no transition). */
   body.ea-shell-open > .wrap{
-    max-width: min(1440px, calc(100vw - var(--ea-footprint) - 24px));
-    transform: translateX(calc(var(--ea-footprint) / 2));
-    transition: transform .34s cubic-bezier(.2,.8,.2,1);
+    max-width: min(1440px, calc(100vw - var(--ea-content-inset) - 16px));
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    width: auto;
+    transform: translate3d(var(--ea-content-inset), 0, 0);
     will-change: transform;
   }
 }
@@ -288,6 +324,8 @@ body > .wrap{ transition: transform .34s cubic-bezier(.2,.8,.2,1); min-width: 0;
   body > .wrap{ transition: none; }
   #eaPanel,
   #eaPanel.open{ transition: none; }
+  .ea-mic-gate{ transition: none; }
+  body.ea-morphing > .wrap{ pointer-events: auto; }
 }
 
 /* App modals (openModal / AODialog / claim) center on the FULL viewport by
@@ -301,7 +339,7 @@ body.ea-shell-open .ao-overlay,
 body.ea-shell-open .sb-ov,
 body.ea-shell-open .cl-modal-back,
 body.ea-shell-open .sb-detail-host.sb-dc-open{
-  left: calc(var(--ea-rail) + var(--ea-gap) * 2) !important;
+  left: var(--ea-content-inset) !important;
   right: 0 !important;
   width: auto !important;
 }
@@ -427,6 +465,86 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   }
 }
 
+/* ══ Repairs dual-pane (body.ea-on-ops + ea-shell-open) ═════════════════════
+   When Energy Agent is open on Repairs:
+
+   · Full-width top tabbar (no .wrap side-shift)
+   · Chat card tucked under the tabbar
+   · Chat LEFT edge lines up with the Energy Agent top-tab (leftmost control)
+   · Repairs fills the column to the right
+
+   Geometry uses the SAME transition list as the regular rail so toggling
+   ea-on-ops morphs width/left/top/wrap-margin — never snaps. Desktop ≥961px. */
+@media (min-width: 961px){
+  /* Set geometry vars whenever we're on Repairs (even if EA closed) so opening
+     the agent already targets dual-pane dimensions — one smooth entrance. */
+  body.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
+    --ea-rail: min(560px, 42vw);
+    --ea-ops-wrap-max: min(1680px, calc(100vw - 24px));
+    /* CSS-first align: centered wrap left + .wrap pad (28) + sky tabbar pad (6).
+       JS may refine with the live EA tab getBoundingClientRect after settle. */
+    --ea-ops-left: calc((100vw - var(--ea-ops-wrap-max)) / 2 + 28px + 6px);
+    --ea-ops-top: 88px;
+    --ea-ops-content-pad: calc(var(--ea-rail) + 18px);
+    /* Content inset for overlays / mic follows the wide rail while on ops */
+    --ea-content-inset: calc(var(--ea-ops-left) + var(--ea-rail) + var(--ea-content-gap));
+  }
+  @media (min-width: 1280px){
+    body.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside){
+      --ea-rail: min(640px, 46vw);
+    }
+  }
+
+  /* Full-bleed chrome: center via GPU translate (same property as packed mode
+     so the shell morphs at compositor rate, not layout rate). */
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) > .wrap{
+    max-width: var(--ea-ops-wrap-max) !important;
+    width: 100%;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    transform: translate3d(calc((100vw - var(--ea-ops-wrap-max)) / 2), 0, 0) !important;
+  }
+
+  /* Wide chat card: under the tabbar; left edge = Energy Agent top-tab.
+     left/top/width transition on the panel layer (blur off while morphing). */
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #eaPanel{
+    top: var(--ea-ops-top);
+    left: var(--ea-ops-left);
+    bottom: var(--ea-gap);
+    width: var(--ea-rail);
+    max-width: min(var(--ea-rail), calc(100vw - var(--ea-ops-left) - var(--ea-gap)));
+  }
+
+  /* Repairs column — pad set instantly (no margin transition → no page reflow) */
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #panelOps.active{
+    margin-left: var(--ea-ops-content-pad);
+    max-width: none;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) #panelOps .rp-shell{
+    max-width: min(1000px, 100%);
+    margin-left: 4px;
+    margin-right: auto;
+    margin-top: 12px;
+  }
+
+  /* Mic gate parks above the wide rail (inherits left/top transition) */
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .ea-mic-gate{
+    left: calc(var(--ea-ops-left) + var(--ea-rail) + 16px);
+    top: calc(var(--ea-ops-top) + 8px);
+  }
+
+  /* Dialogs center in the repairs column only */
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .ao-overlay,
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .sb-ov,
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .cl-modal-back,
+  body.ea-shell-open.ea-on-ops:not(.ho-shell-open):not(.ho-ea-sidebyside) .sb-detail-host.sb-dc-open{
+    left: calc(var(--ea-ops-left) + var(--ea-rail) + 12px) !important;
+    top: var(--ea-ops-top) !important;
+  }
+}
+
 /* ── Panel internals ─────────────────────────────────────────────────────── */
 #eaRoot{ font-family: inherit; color: var(--ink, #0f172a); }
 #eaRoot *{ box-sizing: border-box; }
@@ -435,14 +553,25 @@ body.ho-shell-open.ea-shell-open .ea-mic-gate{
   display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
   padding: 16px 16px 12px; border-bottom: 1px solid rgba(14,165,233,.14);
   flex: 0 0 auto;
+  position: relative;
+  z-index: 4; /* keep × above msgs/overlays */
 }
 .ea-head h3{ margin: 0; font-size: 15px; font-weight: 760; letter-spacing: -.01em; }
 .ea-head p{ margin: 3px 0 0; font-size: 11.5px; color: var(--muted,#64748b); line-height: 1.35; max-width: 28ch; }
 .ea-x{
-  border: 0; background: transparent; color: var(--muted,#64748b); font-size: 18px;
-  cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 8px;
+  border: 0; background: transparent; color: var(--muted,#64748b); font-size: 20px;
+  cursor: pointer; line-height: 1; padding: 0;
+  /* Comfortable 36×36 hit target so the × is easy to press (Ford 2026-07-21) */
+  min-width: 36px; min-height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  position: relative;
+  z-index: 5; /* above head chrome / tour cap */
+  flex: 0 0 auto;
+  -webkit-tap-highlight-color: transparent;
 }
 .ea-x:hover{ background: rgba(14,165,233,.08); color: var(--ink); }
+.ea-x:active{ background: rgba(14,165,233,.14); }
 
 .ea-status{
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -568,6 +697,87 @@ html:not(.sky) .ea-msg.agent.repair-email .ea-email-label,
 html:not(.sky) .ea-msg.agent.mind-update[data-origin="repair"] .ea-email-label{
   color: #7dd3fc;
 }
+/* ── Next-step chips after each agent reply ────────────────────────────────
+   Owner clicks one → sent as their next message; typing still works. */
+.ea-next-steps{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: flex-start;
+  margin: -2px 0 12px 2px;
+  max-width: 96%;
+  animation: ea-next-in .22s ease-out;
+}
+@keyframes ea-next-in{
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.ea-next-steps-lbl{
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--faint, #94a3b8);
+  padding-left: 2px;
+}
+.ea-next-steps-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ea-next-chip{
+  appearance: none;
+  margin: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,233,.28);
+  background: rgba(255,255,255,.88);
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 0 rgba(255,255,255,.75) inset;
+  transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
+}
+.ea-next-chip:hover{
+  border-color: rgba(14,165,233,.5);
+  background: rgba(224,242,254,.95);
+  box-shadow: 0 4px 14px -8px rgba(14,60,120,.35);
+}
+.ea-next-chip:active,
+.ea-next-chip.ea-next-picked{
+  transform: translateY(1px);
+  background: rgba(186,230,253,.98);
+  border-color: rgba(14,165,233,.55);
+}
+.ea-next-chip:disabled{
+  opacity: .7;
+  cursor: default;
+}
+html:not(.sky) .ea-next-steps-lbl{ color: #64748b; }
+html:not(.sky) .ea-next-chip{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(56,189,248,.28);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+html:not(.sky) .ea-next-chip:hover{
+  background: rgba(56,189,248,.14);
+  border-color: rgba(56,189,248,.45);
+  color: #f8fafc;
+}
+html:not(.sky) .ea-next-chip:active,
+html:not(.sky) .ea-next-chip.ea-next-picked{
+  background: rgba(56,189,248,.22);
+}
+@media (prefers-reduced-motion: reduce){
+  .ea-next-steps{ animation: none; }
+}
+
 /* Sovereign action chips stay visible under the product-mind bubble */
 .ea-mind-actions{
   display: flex;
@@ -1101,6 +1311,142 @@ html:not(.sky) .ea-footer{
   padding: 0;
   border: 0;
 }
+
+/* ── Suggested prompts — Railway-style dual marquee ────────────────────────
+   Two rows, opposite directions (RTL + LTR) so chips gear past each other.
+   Each track holds two identical sets; animate -50% for a seamless loop. */
+.ea-suggestions{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  overflow: hidden;
+  /* side fades so chips dissolve at the rail edges */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  transition: opacity .2s ease, max-height .25s ease, margin .2s ease;
+  max-height: 80px;
+}
+.ea-suggestions[hidden],
+.ea-suggestions.ea-suggestions-gone{
+  display: none !important;
+  max-height: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.ea-sug-row{
+  overflow: hidden;
+  width: 100%;
+  min-height: 28px;
+}
+.ea-sug-track{
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+/* slow continuous drift — opposite dirs gear past each other; durations
+   offset so rows don't phase-lock */
+.ea-sug-row-rtl .ea-sug-track{
+  animation: ea-sug-marquee-rtl 48s linear infinite;
+}
+.ea-sug-row-ltr .ea-sug-track{
+  animation: ea-sug-marquee-ltr 56s linear infinite;
+}
+.ea-sug-set{
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding-right: 6px; /* gap between the two sets in the track */
+  flex: 0 0 auto;
+}
+@keyframes ea-sug-marquee-rtl{
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); } /* one set width left */
+}
+@keyframes ea-sug-marquee-ltr{
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }    /* one set width right */
+}
+/* Pause on hover/focus so chips are clickable; also per-row after click */
+.ea-suggestions.ea-sug-paused .ea-sug-track,
+.ea-sug-row.ea-sug-row-paused .ea-sug-track{
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce){
+  .ea-sug-track{
+    animation: none !important;
+    transform: none !important;
+  }
+  .ea-suggestions{
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .ea-sug-row{ overflow-x: auto; }
+  .ea-sug-track{ width: auto; }
+  .ea-sug-set:last-child{ display: none; } /* no duplicate when static */
+}
+
+.ea-sug{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,233,.18);
+  background: rgba(255,255,255,.78);
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 620;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset;
+  transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
+}
+.ea-sug:hover{
+  border-color: rgba(14,165,233,.45);
+  background: rgba(224,242,254,.95);
+  box-shadow: 0 4px 14px -8px rgba(14,60,120,.4);
+}
+.ea-sug:active,
+.ea-sug.ea-sug-fired{
+  transform: translateY(1px) scale(.98);
+  background: rgba(186,230,253,.98);
+  border-color: rgba(14,165,233,.55);
+}
+.ea-sug-ic{
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  opacity: .85;
+}
+html:not(.sky) .ea-sug{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.14);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+html:not(.sky) .ea-sug:hover{
+  background: rgba(56,189,248,.14);
+  border-color: rgba(56,189,248,.4);
+  color: #f8fafc;
+}
+html:not(.sky) .ea-sug:active,
+html:not(.sky) .ea-sug.ea-sug-fired{
+  background: rgba(56,189,248,.22);
+}
+
 .ea-compose-shell{
   display: flex;
   flex-direction: column;
@@ -1861,6 +2207,10 @@ html.ea-merged #fsWrap{ display: none !important; }
   .ea-msgs{ padding: 10px 12px 12px; }
   .ea-msg{ font-size: 12.5px; padding: 9px 24px 9px 11px; }
   .ea-footer{ padding: 0 8px 10px; padding-top: 8px; }
+  .ea-suggestions{ gap: 5px; margin-bottom: 8px; }
+  .ea-sug{ font-size: 11px; padding: 4px 8px 4px 7px; }
+  .ea-sug-row-rtl .ea-sug-track{ animation-duration: 40s; }
+  .ea-sug-row-ltr .ea-sug-track{ animation-duration: 48s; }
   .ea-compose-bar{ gap: 5px; padding: 6px 8px; }
   .ea-compose-bar > .ea-chip.ea-chip-icon,
   .ea-compose-bar > .ea-chip{

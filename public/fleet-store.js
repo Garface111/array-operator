@@ -63,7 +63,9 @@ window.FleetStore = (function(){
     const s = getSession(); if(!s) return;                 // only cache real, signed-in data
     try {
       localStorage.setItem(cacheKeyFor(s), JSON.stringify({
-        v: 1, at: Date.now(), recovered: recovered||0, arrays: arrays
+        // v:2 — cache includes inverter/array `daily` for 14-day sparklines
+        // (v:1 sanitize stripped them → flat Waterford graphs on cold load).
+        v: 2, at: Date.now(), recovered: recovered||0, arrays: arrays
       }));
     } catch(e){ /* quota/serialise, non-fatal, just lose the fast path */ }
   }
@@ -74,6 +76,25 @@ window.FleetStore = (function(){
   // the DOM. Unknown extra keys are dropped (not spread) so nothing rides along.
   const _str = (x, max) => (typeof x === "string" ? x.slice(0, max || 120) : (x == null ? "" : String(x).slice(0, max || 120)));
   const _num = (x) => (typeof x === "number" && isFinite(x) ? x : null);
+  function sanitizeDaily(pts){
+    // Keep 14-day sparkline history through the instant-reload cache.
+    // Without this, sanitizeInverter dropped `daily` on every cold paint so
+    // Waterford (and any extension-captured site) showed flat "no history"
+    // sparklines until/unless the live fleet-tree returned — and a failed or
+    // slow live pull left the table stuck empty even when DB had good kWh.
+    if(!Array.isArray(pts)) return [];
+    const out = [];
+    for(let i = 0; i < pts.length && out.length < 32; i++){
+      const d = pts[i];
+      if(!d || typeof d !== "object") continue;
+      const kwh = _num(d.kwh);
+      if(kwh == null || kwh < 0) continue;
+      const date = d.date != null ? _str(d.date, 32) : null;
+      if(!date) continue;
+      out.push({ date, kwh });
+    }
+    return out;
+  }
   function sanitizeInverter(iv){
     if(!iv || typeof iv !== "object" || Array.isArray(iv)) return null;
     const out = {
@@ -87,6 +108,8 @@ window.FleetStore = (function(){
       window_kwh: _num(iv.window_kwh),
       produced_today_kwh: _num(iv.produced_today_kwh),
       peer_index: _num(iv.peer_index),
+      min_kwh: _num(iv.min_kwh),
+      peak_kwh: _num(iv.peak_kwh),
       last_seen: iv.last_seen != null ? _str(iv.last_seen, 40) : null,
       // Live-reading provenance — MUST survive the cache/allow-list or liveVerdict
       // goes blind to estimated splits + stale readings and re-flags them (the bug).
@@ -99,6 +122,8 @@ window.FleetStore = (function(){
       expected_low_reason: iv.expected_low_reason != null ? _str(iv.expected_low_reason, 240) : null,
       expected_low_baseline: _num(iv.expected_low_baseline),
       expected_low_breach: iv.expected_low_breach === true,
+      // 14-day history for Table/Sandbox sparklines (was dropped — Waterford bug).
+      daily: sanitizeDaily(iv.daily),
     };
     return out;
   }
@@ -126,6 +151,9 @@ window.FleetStore = (function(){
       vendor: _str(a.vendor, 40),
       portfolio_name: a.portfolio_name != null ? _str(a.portfolio_name, 80) : null,
       reminder: a.reminder != null ? _str(a.reminder, 2000) : null,
+      daily: sanitizeDaily(a.daily),
+      produced_today_kwh: _num(a.produced_today_kwh),
+      current_power_w: _num(a.current_power_w),
       inverters: invs,
     };
   }
@@ -135,7 +163,8 @@ window.FleetStore = (function(){
       const raw = localStorage.getItem(cacheKeyFor(s));
       if(!raw) return null;
       const c = JSON.parse(raw);
-      if(!c || typeof c !== "object" || c.v !== 1 || !Array.isArray(c.arrays)) return null;
+      // Accept v1 (no daily) and v2 (with daily); both go through sanitize.
+      if(!c || typeof c !== "object" || (c.v !== 1 && c.v !== 2) || !Array.isArray(c.arrays)) return null;
       // Validate + coerce each cached array to the known shape; drop malformed ones
       // rather than trusting the blob wholesale. A poisoned cache degrades to a network
       // load, never to executing/rendering attacker-shaped data.
@@ -331,6 +360,9 @@ window.FleetStore = (function(){
   const LIVE_FLOOR_W = 25;   // below this (or 1% of rated) = idle, not "producing"
   const LOW_PEER_GAP = 0.15; // >15% below the peer median pct-of-max = "low" (Ford's threshold)
   const LIVE_MAX_AGE_H = 2;  // a captured power reading older than this is not "now"
+  // Mirror backend LIVE_COMPARE_MIN_ELEVATION_DEG: below this, dusk/dawn shading
+  // makes peer gaps untrustworthy — never flag live dark/low (Ford 2026-07-21).
+  const LIVE_COMPARE_MIN_ELEV = 12;
   // A per-inverter live reading we can TRUST for a dark/low verdict — and trust as
   // peer evidence. Mirrors the backend alert sweep's _has_fresh_real_reading
   // ([[inverter-alerting]] 98941d3): NEVER an estimated site-total split
@@ -382,7 +414,7 @@ window.FleetStore = (function(){
   // caller knows the source is stale/unpolled (source_status), it passes false so a
   // stale reading can never masquerade as a live fault — the honest signal there is
   // "vendor feed is behind", surfaced separately, not "this inverter went dark".
-  function liveVerdict(inv, peers, isDaylight, srcOk){
+  function liveVerdict(inv, peers, isDaylight, srcOk, solarElev){
     // NO ENERGY REGISTER (backend no_energy_register, e.g. Tannery #7): the unit
     // streams live power but has a dead cumulative-energy register, so it has no
     // gradeable history AND its per-inverter power is a bogus energy-share split
@@ -391,6 +423,9 @@ window.FleetStore = (function(){
     // FAULT. Surfaces render its own honest "no energy data" state instead.
     if(inv && inv.no_energy_register) return "ok";
     if(isDaylight === false) return "ok";          // night: zero is expected (Sleeping)
+    // Dusk/dawn shoulder: sun still "up" for Sleeping UI, but too low for peer
+    // compare — orientation/shade zeros one unit while neighbors still produce.
+    if(solarElev != null && isFinite(+solarElev) && +solarElev < LIVE_COMPARE_MIN_ELEV) return "ok";
     if(srcOk === false) return "ok";               // vendor feed stale → don't trust live readings
     // Peers only count as live evidence when THEIR reading is fresh + real — an
     // estimated site-split can never be fake peer-proof (was Bruce's phantom "dark").
@@ -431,8 +466,8 @@ window.FleetStore = (function(){
   }
   // True when an inverter that 14-day health calls "ok" is actually a live
   // anomaly RIGHT NOW (dark, or low vs its peers, while peers produce). Cross-surface flag.
-  function isLiveAnomaly(inv, peers, isDaylight, srcOk){
-    return inv.status === "ok" && ["dark","low"].includes(liveVerdict(inv, peers, isDaylight, srcOk));
+  function isLiveAnomaly(inv, peers, isDaylight, srcOk, solarElev){
+    return inv.status === "ok" && ["dark","low"].includes(liveVerdict(inv, peers, isDaylight, srcOk, solarElev));
   }
 
   /* ===========================================================================
@@ -456,17 +491,27 @@ window.FleetStore = (function(){
   // agree on "feed behind": (1) source clock stale in daylight, incl. the SolarEdge/
   // Locus ≥6h age belt (their state flag lags), and (2) a whole array dark in daylight
   // while OTHER fleet arrays produce (feed lying/broken, never a green "all clear").
+  function _liveCompareOk(col){
+    if(!col || col.is_daylight === false) return false;
+    if(col.live_compare_ok === false) return false;
+    if(col.live_compare_ok === true) return true;
+    const elev = col.solar_elevation_deg;
+    if(elev != null && isFinite(+elev)) return +elev >= LIVE_COMPARE_MIN_ELEV;
+    return true; // unknown elev → leave to other gates
+  }
   function _feedBehind(col){
     if(col.is_daylight === false) return false;      // night = asleep, handled separately
     const ss = col.source_status;
     if(ss && ss.state === "stale") return true;
     const v = (col.vendor || "").toLowerCase();
     if((v === "solaredge" || v === "locus") && ss && ss.age_hours != null && ss.age_hours >= 6) return true;
+    // Whole-array dark while fleet peers produce: only in solid daytime. At dusk
+    // a shaded site going dark while another still produces is not a feed fault.
     const liveDead = col.current_power_w == null || col.current_power_w <= 25;
     const todayDead = col.produced_today_kwh == null || col.produced_today_kwh <= 0.05;
-    if(liveDead && todayDead){
+    if(liveDead && todayDead && _liveCompareOk(col)){
       const peers = (state.arrays || []).some(a =>
-        a && a.id !== col.array_id && a.is_daylight !== false
+        a && a.id !== col.array_id && _liveCompareOk(a)
         && a.current_power_w != null && a.current_power_w > 100);
       if(peers) return true;
     }
@@ -477,11 +522,12 @@ window.FleetStore = (function(){
     const daylight = col.is_daylight !== false;
     const vendorOut = _feedBehind(col);
     const srcOk = !vendorOut;
+    const elev = col.solar_elevation_deg;
     let hard = 0, crit = 0, under = 0, quiet = 0, watch = 0;
     for(const inv of invs){
       const s = inv.status;
       if(s === "ok"){
-        const lv = liveVerdict(inv, invs, col.is_daylight, srcOk);
+        const lv = liveVerdict(inv, invs, col.is_daylight, srcOk, elev);
         if(lv === "dark" || lv === "low") watch++;
         continue;
       }
@@ -532,6 +578,10 @@ window.FleetStore = (function(){
       alert: alertFor(a),
       daily: a.daily || [],   // array-level production history (Chint weekETrend backfill etc.)
       is_daylight: a.is_daylight !== false,   // sun-up flag for the card "Sleeping" state
+      solar_elevation_deg: a.solar_elevation_deg != null ? +a.solar_elevation_deg : null,
+      live_compare_ok: a.live_compare_ok !== false && (a.live_compare_ok === true
+        || a.solar_elevation_deg == null
+        || +a.solar_elevation_deg >= LIVE_COMPARE_MIN_ELEV),
       source_status: a.source_status || null,  // vendor-side data freshness → outage banner
       sync_status: a.sync_status || null,       // OUR capture recency → "synced Xm ago" column
       // Server-computed array live power + today's kWh (forwarded so the card
@@ -1197,6 +1247,9 @@ window.FleetStore = (function(){
       // Server-computed sun-up flag (real solar elevation), gates the card's
       // calm "Sleeping" night state on (night AND zero output), never zero alone.
       is_daylight: c.is_daylight !== false,
+      // Degrees above horizon + solid-day gate for live peer-compare (dusk shoulder).
+      solar_elevation_deg: c.solar_elevation_deg != null ? +c.solar_elevation_deg : null,
+      live_compare_ok: c.live_compare_ok !== false,
       // Source-data freshness {state:ok|stale|none,last_report,age_hours}. Carried
       // through so the card can flag a VENDOR-side reporting outage (not ours).
       source_status: c.source_status || null,

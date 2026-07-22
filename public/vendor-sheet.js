@@ -283,7 +283,9 @@
  // brief — the same soft tone the overview's "Watching N" tile uses.
  if (s === "ok" && cohort && window.FleetStore && FleetStore.liveVerdict) {
  const _srcOk = !(_pStat && _pStat.vendorOut);
- const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight, _srcOk);
+ const _elev = parentCol && parentCol.solar_elevation_deg != null
+  ? parentCol.solar_elevation_deg : null;
+ const _lv = FleetStore.liveVerdict(iv, cohort, isDaylight, _srcOk, _elev);
  if (_lv === "dark") {
  return { label: "Dark now", cls: "watch",
  tip: "Producing nothing right now while its neighbors are, the live anomaly we flagged. Its 14-day output is still healthy, so this is likely a brief outage; if it stays dark into tomorrow the health verdict escalates automatically." };
@@ -578,6 +580,9 @@
  function extPresent() { try { return _extPresent || !!window.__AO_EXT_PRESENT; } catch (_) { return _extPresent; } }
 
  const _expanded = {}; // array_id -> bool (survives re-renders)
+ // One-shot enter animation for inverter rows when an array is expanded
+ // (animation-audit: table-row-expand was a hard cut / NO_MOTION).
+ const _justExpanded = {};
  let _focusFlashKey = null; // "array_id:inverter_id" to flash-highlight (deep-link from Fleet Triage); survives re-renders
  const _vendorCollapsed = {}; // vendor code -> bool, collapses ALL its arrays at once
  // (Ford: "I have 56 arrays in Chint, I should be able to
@@ -1121,11 +1126,14 @@
  function _fleetPeersProducing(c){
  try {
  const cols = (window.FleetStore && FleetStore.toColumns && (FleetStore.toColumns().columns || [])) || [];
- return cols.some(o =>
- o && o.array_id !== c.array_id
- && o.is_daylight !== false
- && o.current_power_w != null
- && o.current_power_w > 100);
+ return cols.some(o => {
+ if (!o || o.array_id === c.array_id) return false;
+ if (o.is_daylight === false) return false;
+ // Peers in the dusk shoulder don't count as "still producing" proof
+ if (o.live_compare_ok === false) return false;
+ if (o.solar_elevation_deg != null && +o.solar_elevation_deg < 12) return false;
+ return o.current_power_w != null && o.current_power_w > 100;
+ });
  } catch (_) { return false; }
  }
  // Whole array has no usable live output AND no measured today total.
@@ -1166,10 +1174,12 @@
  }
  return { tip: "The last cloud harvest from " + (vl || "this vendor") + " failed. We're still retrying automatically." };
  }
- // Daylight + no live output + no today kWh + fleet peers ARE producing →
- // this is not "all clear". Name it as a vendor/feed problem so the operator
- // checks the portal rather than trusting a green badge on a dark site.
- if (c.is_daylight !== false && _arrayNoLiveOutput(c) && _fleetPeersProducing(c)) {
+ // Solid daytime + no live output + no today kWh + fleet peers ARE producing →
+ // this is not "all clear". Suppress at dusk/dawn: low sun makes one site go
+ // dark while a sunnier neighbor still produces (not a vendor feed fault).
+ var _cmpOk = c.live_compare_ok !== false
+  && (c.solar_elevation_deg == null || +c.solar_elevation_deg >= 12);
+ if (_cmpOk && c.is_daylight !== false && _arrayNoLiveOutput(c) && _fleetPeersProducing(c)) {
  return {
  tip: (vl || "This vendor") + " is reporting no live output for this array while other arrays in your fleet are producing. Check the vendor portal, this is almost certainly a vendor-side feed issue, not a healthy clear site.",
  };
@@ -1703,7 +1713,8 @@
  <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
  </button>`;
  if (open) {
- h += `<div class="vs-inv-wrap">`;
+ const justOpen = !!_justExpanded[c.array_id];
+ h += `<div class="vs-inv-wrap${justOpen ? " is-enter" : ""}" data-inv-wrap="${esc(String(c.array_id))}">`;
  // Stale feed recovery: when this array's source is paused, give a direct
  // path back to fresh data right where the owner notices it, open the
  // vendor portal (extension re-captures on open). Reuses the existing
@@ -1747,7 +1758,7 @@
  const sortedInvs = sortInvs(invs, c.is_daylight);
  const showAll = !!_invShowAll[c.array_id] || !!_query;
  const page = showAll ? sortedInvs : sortedInvs.slice(0, INV_PAGE);
- page.forEach(iv => {
+ page.forEach((iv, _vii) => {
  const ist = invStatus(iv, invs, c.is_daylight, c);
  const ikey = c.array_id + ":" + iv.inverter_id;
  _invByKey[ikey] = { iv, cohort: cohortScale, peers: invs, isDaylight: c.is_daylight };
@@ -1781,7 +1792,7 @@
  cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
- h += `<div class="vs-row vs-inv${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
+ h += `<div class="vs-row vs-inv${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" style="--vi:${_vii}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
  <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
  <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
  <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
@@ -1807,13 +1818,17 @@
  armGaugeSweep(body);
  // Drop cascade-enter class after first paint so later rebuilds stay calm
  requestAnimationFrame(() => {
- body.querySelectorAll(".vs-arr.is-enter, .vs-pending.is-enter").forEach(el => {
+ body.querySelectorAll(".vs-arr.is-enter, .vs-pending.is-enter, .vs-inv-wrap.is-enter").forEach(el => {
  el.classList.remove("is-enter");
  });
+ // One-shot expand markers consumed after paint
+ Object.keys(_justExpanded).forEach(k => { delete _justExpanded[k]; });
  });
  body.querySelectorAll("[data-arr]").forEach(b => b.onclick = () => {
  const id = b.getAttribute("data-arr");
+ const opening = !_expanded[id];
  _expanded[id] = !_expanded[id];
+ if (opening) _justExpanded[id] = 1;
  renderBody();
  });
  // Paginated inverter list — "Show all N inverters"

@@ -7920,9 +7920,23 @@
  const pA = document.getElementById("panelAnalysis");
  const pT = document.getElementById("panelTrends");
  const pR = document.getElementById("panelResources");
- if(pA) pA.classList.toggle("active", sub === "analysis");
- if(pT) pT.classList.toggle("active", sub === "trends");
- if(pR) pR.classList.toggle("active", sub === "resources");
+ // Soft enter when Analysis | Trends | Resources hop (was instant .active swap —
+ // animation-audit HARD_SNAP on trends-enter / analysis sub hops).
+ function _showAn(el, on){
+ if(!el) return;
+ const wasActive = el.classList.contains("active");
+ el.classList.toggle("active", on);
+ if(on && !wasActive){
+ el.classList.remove("an-sub-enter");
+ void el.offsetWidth;
+ el.classList.add("an-sub-enter");
+ } else if(!on){
+ el.classList.remove("an-sub-enter");
+ }
+ }
+ _showAn(pA, sub === "analysis");
+ _showAn(pT, sub === "trends");
+ _showAn(pR, sub === "resources");
  document.querySelectorAll(".an-sub-seg [data-ansub]").forEach(b => {
  const on = b.getAttribute("data-ansub") === sub;
  b.classList.toggle("on", on);
@@ -7954,9 +7968,24 @@
  const dash = document.getElementById("ftDash");
  const sheet = document.getElementById("sheetWrap");
  const sb = document.getElementById("sbWrap");
- if(dash){ dash.hidden = (sub !== "dashboard"); }
- if(sheet){ sheet.hidden = (sub !== "table"); }
- if(sb){ sb.hidden = (sub !== "sandbox"); }
+ // Soft enter animation when a fleet sub-view becomes visible (was a hard cut —
+ // animation-audit HARD_SNAP on table/sandbox/triage switches).
+ function _showFt(el, on){
+ if(!el) return;
+ const wasHidden = !!el.hidden;
+ el.hidden = !on;
+ if(on && wasHidden){
+ el.classList.remove("ft-sub-enter");
+ // reflow so re-adding the class restarts the keyframes
+ void el.offsetWidth;
+ el.classList.add("ft-sub-enter");
+ } else if(!on){
+ el.classList.remove("ft-sub-enter");
+ }
+ }
+ _showFt(dash, sub === "dashboard");
+ _showFt(sheet, sub === "table");
+ _showFt(sb, sub === "sandbox");
  document.querySelectorAll(".ft-sub-seg [data-ftsub]").forEach(b => {
  const on = b.getAttribute("data-ftsub") === sub;
  b.classList.toggle("on", on);
@@ -8044,6 +8073,9 @@
  if(window.__ccRender) window.__ccRender();
  } catch(_pre){}
  }
+ // Apply EA dual-pane / pack geometry BEFORE measuring the slide free-band,
+ // so incoming panels never start centered under the Energy Agent rail.
+ try { if (typeof window.__eaPrepareForView === "function") window.__eaPrepareForView(); } catch (_ea) {}
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
  catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
  }
@@ -8140,18 +8172,21 @@
  // (no hashchange → applyView doesn't run), so let it record too.
  try { window.__aoRememberSub = rememberSubtab; } catch(_){}
  // Restore on a top-tab click, before the anchor's default navigation runs.
+ // ALWAYS re-open the last sub-view for that top tab (incl. the default).
+ // Previous guard skipped restore when mem === SUBTAB_DEFAULT, so Fleet → Table
+ // (#arrays, the default) was lost: the <a href="#dashboard"> hard-landed on
+ // Triage every time you left Table for Analysis and came back (Ford 2026-07-21).
  document.addEventListener("click", function(e){
  try{
  const a = e.target && e.target.closest ? e.target.closest("#tabAnalysis, #tabReports, #tabDashboard") : null;
  if(!a) return;
  const targetTab = a.id === "tabAnalysis" ? "analysis"
   : a.id === "tabReports" ? "reports" : "dashboard";
- const mem = _subtabMem[targetTab];
- if(mem && _subtabTabForHash(mem) === targetTab && mem.toLowerCase() !== SUBTAB_DEFAULT[targetTab]){
+ const mem = _subtabMem[targetTab] || SUBTAB_DEFAULT[targetTab];
+ if(!mem || _subtabTabForHash(mem) !== targetTab) return;
  e.preventDefault();
- if((location.hash || "").toLowerCase() === mem.toLowerCase()) applyView();
+ if((location.hash || "").toLowerCase() === String(mem).toLowerCase()) applyView();
  else location.hash = mem;
- }
  }catch(_){}
  }, true);
 
