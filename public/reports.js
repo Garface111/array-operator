@@ -7013,8 +7013,8 @@
  } else {
  const why = GEN_FAIL[sid]
  || "No billable period yet for this offtaker, its report appears here once a GMP bill lands.";
- // Still surface budget controls (and the full offtaker editor) so operators
- // can set a fixed budget even before a bill/draft exists (Ford 2026-07-21).
+ // Still surface offtaker editor (incl. budget in Billing) before a bill/draft
+ // exists so operators can set a fixed budget anytime (Ford 2026-07-21).
  const emptySubAsDraft = {
   id: null,
   subscription_id: sid,
@@ -7035,8 +7035,7 @@
  bodyCol = `<div class="rb-draft rb-draft-empty" data-subid="${esc(String(sid))}">
  <div class="rb-draft-top"><div class="rb-draft-name">${esc(activeOf.customer_name || "Offtaker")}</div></div>
  <p class="rb-empty-why">${esc(why)}</p>
- <p class="rb-empty-auto">⚡ Drafts automatically the moment its bill lands, nothing to click. You can still set budget billing below.</p>
- ${budgetBillingPanel(emptySubAsDraft)}
+ <p class="rb-empty-auto">⚡ Drafts automatically the moment its bill lands, nothing to click. You can still edit offtaker details (incl. budget) below.</p>
  ${offtakerEditor(emptySubAsDraft, INBOX_UTIL_ACCTS)}
  </div>`;
  }
@@ -7651,43 +7650,6 @@
  </div>`;
  }
 
- // Always-visible budget controls (Ford 2026-07-21). Lived only inside collapsed
- // "Offtaker details", so if you didn't set budget at add-time there was no
- // obvious place to enter it. Sits under "How we calculated" (open by default).
- function budgetBillingPanel(d) {
- const sid = d.subscription_id;
- const budgetVal = d.budget_amount_usd != null ? d.budget_amount_usd : "";
- const trueupOn = !!d.annual_trueup;
- const credit = (d.pending_credit_usd != null && Number(d.pending_credit_usd) > 0)
-  ? Number(d.pending_credit_usd) : 0;
- return `
- <div class="rb-budget-panel" data-budget-panel="${esc(String(sid))}">
-  <div class="rb-budget-panel-h">
-   <span class="rb-budget-panel-title">Budget billing</span>
-   <span class="rb-budget-panel-sub">optional · fixed amount each period</span>
-  </div>
-  <div class="rb-budget-panel-grid">
-   <label class="rep-fld rb-budget-amt">
-    <span class="rl">Budgeted amount ($/period)
-     <span class="rb-info" tabindex="0" title="Fixed amount this offtaker pays each period instead of the calculated solar credit. Leave blank to bill the calculated amount. Pair with Annual true-up to settle the difference in September.">ⓘ</span>
-    </span>
-    <input type="number" data-of="budget_amount_usd" min="0" step="0.01"
-     value="${budgetVal === "" ? "" : esc(String(budgetVal))}"
-     placeholder="blank = bill calculated solar credit"
-     inputmode="decimal">
-    <span class="rb-fld-hint">e.g. 2150 — they pay this fixed total; the calc above still shows real solar value.</span>
-   </label>
-   <label class="rep-fld rb-check-fld rb-budget-trueup">
-    <input type="checkbox" data-of="annual_trueup" ${trueupOn ? "checked" : ""}>
-    <span>
-     <span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
-     <span class="rb-fld-hint" style="display:block;margin-top:2px;">At year-end, settle budget vs actual: charge the shortfall or credit the overpayment on their next bill.${credit > 0 ? ` <b>Banked credit: $${credit.toFixed(2)}</b>` : ""}</span>
-    </span>
-   </label>
-  </div>
- </div>`;
- }
-
  // The send actions, lifted ABOVE the live preview (Paul's review flow). Disabled when
  // reviewing an OLDER version (look-only), switch to latest to send.
  function reviewActions(d, readonly) {
@@ -8022,8 +7984,8 @@
  <div class="rb-draft-period">${esc(d.period_label || "latest period")}</div>
  </div>
  ${sid != null ? `<div class="rb-xcheck-host" data-xcheck="${esc(String(sid))}">${xcheckHTML(sid)}</div>` : ""}
- ${sec("How this was calculated", calcDashboard(d) + budgetBillingPanel(d), "kWh × rate × share = the amount · set a budget below", true, "amber")}
- ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, schedule, delivery", false, "emerald")}
+ ${sec("How this was calculated", calcDashboard(d), "kWh × rate × share = the amount", true, "amber")}
+ ${sec("Offtaker details", offtakerEditor(d, utilAccts) + attachBox, "share, rate, budget, delivery", true, "emerald")}
  ${sec("Edit email", emailBody, _emailCustom ? "custom · this offtaker only" : "master · all offtakers", false, "amber")}
  ${sec("Invoice template", tplSlot, "PDF / Excel format", false, "sky")}
  ${sec("Generation spreadsheet", trackerBox, "their tracking sheet", false, "emerald")}
@@ -8300,9 +8262,12 @@
  <input type="number" data-of="allocation_pct" min="0.01" max="100" step="0.001" value="${pct}" placeholder="e.g. 24.783">
  ${subRec.array_share_pct != null ? `<span class="rb-fld-hint">Their invoice bills <b>their own utility bill</b>, GMP's actual allocation. This share is your expected value for the <b>bill-accuracy audit</b> (and only bills directly while their sub-account has no settled bill).</span>` : ""}</label>
  ${rateFieldHTML(d, utilAccts)}
- <label class="rep-fld"><span class="rl">Discount (%)</span>
+ <label class="rep-fld"><span class="rl">Discount (%)<span class="rb-info" tabindex="0" title="Percent off the solar credit rate. Blank uses your default discount.">ⓘ</span></span>
  <input type="number" data-of="discount_pct" min="0" max="100" step="0.1" value="${disc}" placeholder="e.g. 10">
  ${autoDisc ? `<span class="rb-fld-hint">Applying <b>${autoDiscPct}% (default, auto-applied)</b> because you haven't set one${d.resolved_net_note ? ` · ${esc(d.resolved_net_note)}` : ""}. Enter a value to override.</span>` : ""}</label>
+ <label class="rep-fld"><span class="rl">Budget ($/period)<span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Leave blank to bill the calculated amount. Pair with Annual true-up (Invoicing) to settle the difference in September.">ⓘ</span></span>
+ <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = calculated">
+ ${(d.pending_credit_usd && d.pending_credit_usd > 0) ? `<span class="rb-fld-hint">Banked true-up credit: <b>$${Number(d.pending_credit_usd).toFixed(2)}</b></span>` : ""}</label>
  </div>
  </div>
 
@@ -8320,13 +8285,10 @@
  <option value="to_client" ${sm === "to_client" ? "selected" : ""}>The offtaker</option>
  <option value="to_both" ${sm === "to_both" ? "selected" : ""}>Both</option>
  </select></label>
- <label class="rep-fld"><span class="rl">Budget bill, fixed total ($/period)<span class="rb-info" tabindex="0" title="Optional fixed amount this offtaker pays each period instead of the calculated solar credit. Invoice still shows the real credit value. Pair with Annual true-up to settle the difference in September.">ⓘ</span></span>
- <input type="number" data-of="budget_amount_usd" min="0" step="0.01" value="${d.budget_amount_usd != null ? d.budget_amount_usd : ""}" placeholder="blank = bill the calculated amount">
- <span class="rb-fld-hint">Fixed amount they pay each period. Leave blank to bill actual solar credit.</span></label>
  <label class="rep-fld rb-check-fld" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
  <input type="checkbox" data-of="annual_trueup" ${d.annual_trueup ? "checked" : ""} style="margin-top:4px;width:auto;">
  <span><span class="rl" style="display:block;margin:0;">Annual true-up (Sept)</span>
- <span class="rb-fld-hint" style="display:block;margin-top:2px;">Settle budget vs actual at year-end: charge shortfall or credit overpayment on the next bill.${(d.pending_credit_usd && d.pending_credit_usd > 0) ? ` <b>Banked credit: $${Number(d.pending_credit_usd).toFixed(2)}</b>` : ""}</span></span>
+ <span class="rb-fld-hint" style="display:block;margin-top:2px;">Settle budget vs actual at year-end.</span></span>
  </label>
  </div>
  </div>
@@ -8663,27 +8625,7 @@
  const OF_RECHECK_FIELDS = new Set(["crosscheck_threshold_pct"]);
  const OF_PENDING = {}; // sid -> { body, money, timer, card, box, did }
 
- function wireBudgetPanels(wrap) {
- // Budget panel sits in the open "How we calculated" section (or empty state),
- // outside .rb-offedit. Same data-of → onOfftakerEdit path as the editor.
- wrap.querySelectorAll(".rb-budget-panel").forEach(panel => {
-  if (panel.dataset.wiredBudget) return;
-  panel.dataset.wiredBudget = "1";
-  const psid = panel.getAttribute("data-budget-panel");
-  const cardEl = panel.closest(".rb-draft") || wrap.querySelector(".rb-draft");
-  const did = cardEl && cardEl.getAttribute("data-did");
-  const box = wrap.querySelector(".rb-offedit");
-  panel.querySelectorAll("[data-of]").forEach(inp => {
-   const field = inp.getAttribute("data-of");
-   const h = () => onOfftakerEdit(cardEl, box, did, psid, field, inp);
-   inp.addEventListener("input", h);
-   inp.addEventListener("change", h);
-  });
- });
- }
-
  function wireOfftakerEditors(wrap) {
- wireBudgetPanels(wrap);
  wrap.querySelectorAll(".rb-offedit").forEach(box => {
  const sid = box.getAttribute("data-offedit");
  const card = box.closest(".rb-draft");

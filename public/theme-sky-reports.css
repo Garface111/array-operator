@@ -355,25 +355,6 @@ html.sky .rb-calc{background:rgba(255,255,255,.88);
   border:1px solid rgba(255,255,255,.9);border-radius:16px;
   box-shadow:var(--sky-shadow-card)}
 
-/* Budget billing panel — always visible under "How we calculated" so operators
-   can set a fixed amount without opening Advanced / Offtaker details. */
-html.sky .rb-budget-panel{
-  margin-top:12px;padding:14px 16px 16px;
-  background:linear-gradient(180deg,rgba(33,150,243,.10),rgba(255,255,255,.92));
-  border:1px solid rgba(33,150,243,.28);border-radius:14px;
-  box-shadow:0 1px 0 rgba(255,255,255,.8) inset}
-html.sky .rb-budget-panel-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
-  margin:0 0 10px}
-html.sky .rb-budget-panel-title{font-weight:700;font-size:13px;letter-spacing:.02em;
-  color:var(--sky-ink,#0E1420)}
-html.sky .rb-budget-panel-sub{font-size:12px;color:rgba(14,20,32,.55)}
-html.sky .rb-budget-panel-grid{display:grid;gap:12px}
-html.sky .rb-budget-panel .rb-budget-amt input[type="number"]{
-  max-width:240px;font-size:16px;font-weight:600}
-html.sky .rb-budget-trueup{display:flex;align-items:flex-start;gap:10px;cursor:pointer;
-  margin:0}
-html.sky .rb-budget-trueup input[type="checkbox"]{margin-top:3px;width:auto;flex:0 0 auto}
-
 /* the editable cover-email note keeps its informational blue, tuned to sky */
 html.sky .rb-draft-msg{background:rgba(33,150,243,.07);
   border-color:rgba(33,150,243,.25);border-radius:12px}
