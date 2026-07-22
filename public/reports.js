@@ -314,14 +314,38 @@
  if (btn) { btn.click(); return true; }
  return false;
  }
- // The little flagged-count badge on the "Bill audit" tab label itself —
- // visible before the tab is ever opened (populated when RECON lands).
+ // Count offtakers the audit has genuinely flagged (allocation mismatch and/or
+ // production-vs-bill mismatch). Same definition as the "to review" chip — not
+ // "awaiting data". Used for the Bill-audit tab notification bubble.
+ function reconFlaggedCount() {
+ if (!RECON || !Array.isArray(RECON.subscriptions)) {
+  return Math.max(0, Number((RECON && RECON.allocation_flagged) || 0));
+ }
+ const flagged = new Set();
+ RECON.subscriptions.forEach(r => {
+  const hard = (r.allocation && r.allocation.status === "mismatch")
+   || (r.arrays || []).some(a => a.status === "mismatch");
+  if (hard && r.sub_id != null) flagged.add(r.sub_id);
+ });
+ // Prefer unique offtaker count; fall back to allocation_flagged if the list is empty.
+ return flagged.size || Math.max(0, Number(RECON.allocation_flagged || 0));
+ }
+ // Little notification bubble on the top-right of the "Bill audit" sub-nav button
+ // (populated when RECON lands). Hidden when zero.
  function updateAuditTabBadge() {
  const b = document.getElementById("rbAuditTabBadge");
  if (!b) return;
- const n = (RECON && RECON.allocation_flagged) || 0;
+ const n = reconFlaggedCount();
  b.hidden = !n;
- if (n) b.textContent = "⚑ " + n;
+ if (n) {
+  b.textContent = n > 99 ? "99+" : String(n);
+  b.setAttribute("aria-label",
+   n + " offtaker" + (n === 1 ? "" : "s") + " flagged by the bill audit");
+  b.title = n + " flagged · open Bill audit to review";
+ } else {
+  b.removeAttribute("aria-label");
+  b.removeAttribute("title");
+ }
  }
  // Re-render the summary chip in place (after the reconcile data lands post-paint).
  function refreshBacSummary() {

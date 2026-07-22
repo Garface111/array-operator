@@ -1453,17 +1453,20 @@ body.sb-fs-lock{ overflow:hidden; }
   .rb2-listwrap{padding:12px 14px 22px}
 }
 
-/* Flagged-count badge on the "Bill audit" tab label — visible before the tab
-   is ever opened, so the catches (worth $25 each from GMP) aren't buried. */
-.rb-au-genbadge{ display:inline-flex; align-items:center; margin-left:7px;
-  font:700 10.5px/1 inherit; color:#92600a; background:rgba(245,158,11,.16);
-  border:1px solid rgba(245,158,11,.35); border-radius:20px; padding:2px 8px;
-  vertical-align:1px; white-space:nowrap; }
-/* Same trap documented above for .nmg-combo-list / .rb-track-global: `display:
-   inline-flex` is an AUTHOR rule that always beats the UA `[hidden]{display:none}`,
-   so `updateAuditTabBadge()` setting `b.hidden = true` (n===0) never actually hid
-   it — an empty amber pill sat next to "Bill audit" with nothing flagged (Ford,
-   2026-07-11). Restore the hide. */
+/* Notification bubble on the Bill audit sub-nav button (top-right corner).
+   Shows how many offtakers the audit has flagged. Hidden at zero. */
+.rb-au-genbadge{
+  position:absolute; top:-6px; right:-6px; z-index:2;
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:18px; height:18px; padding:0 5px; margin:0;
+  font:800 10px/1 system-ui, -apple-system, sans-serif;
+  color:#fff; background:#e11d48; /* rose — attention bubble */
+  border:2px solid #fff; border-radius:999px;
+  box-shadow:0 2px 6px -1px rgba(190,18,60,.45);
+  white-space:nowrap; pointer-events:none;
+  letter-spacing:-.02em;
+}
+/* Same trap as .nmg-combo-list: author display:flex beats [hidden]. */
 .rb-au-genbadge[hidden]{ display:none !important; }
 .rb-au-sum-why{ font-size:10.5px; font-weight:500; color:var(--faint,#94a3b8); margin-left:6px; }
 
@@ -2636,6 +2639,7 @@ html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
   align-items: center;
 }
 #panelReports .inv-sub-seg .vs-seg-btn{
+  position: relative; /* anchor for the top-right flag bubble */
   font-size: 12.5px;
   font-weight: 700;
   padding: 7px 18px;
@@ -2643,14 +2647,16 @@ html.sky .rb-email-revert{ background:rgba(255,255,255,.9); }
   white-space: nowrap;
 }
 #panelReports .inv-sub-seg .rb-au-genbadge{
+  position:absolute; top:-5px; right:-5px; z-index:2;
   display:inline-flex; align-items:center; justify-content:center;
-  min-width:16px; height:16px; padding:0 5px; margin-left:5px;
-  border-radius:999px; font-size:10px; font-weight:780;
-  background:rgba(217,119,6,.16); color:#b45309; border:1px solid rgba(217,119,6,.28);
-  vertical-align:middle; line-height:1;
+  min-width:17px; height:17px; padding:0 5px; margin:0;
+  border-radius:999px; font-size:10px; font-weight:800;
+  background:#e11d48; color:#fff; border:2px solid #fff;
+  box-shadow:0 2px 6px -1px rgba(190,18,60,.4);
+  line-height:1; pointer-events:none;
 }
 #panelReports .inv-sub-seg .vs-seg-btn.on .rb-au-genbadge{
-  background:rgba(255,255,255,.95); color:#b45309; border-color:transparent;
+  background:#e11d48; color:#fff; border-color:#fff;
 }
 #panelReports .rb2-tabrow--kpis-only{
   display:flex; justify-content:flex-end; margin:0 0 4px; border:0;

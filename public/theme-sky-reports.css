@@ -104,18 +104,26 @@ html.sky #panelReports .inv-sub-seg{
   box-shadow:0 4px 18px -4px rgba(20,60,120,.18) !important;
 }
 html.sky #panelReports .inv-sub-seg .vs-seg-btn{
+  position:relative !important; /* anchor for flag notification bubble */
   padding:7px 18px !important;
   font-size:12.5px !important;
 }
+/* Top-right notification bubble on Bill audit (count of audit flags). */
 html.sky #panelReports .inv-sub-seg .rb-au-genbadge{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-width:16px;height:16px;padding:0 5px;margin-left:5px;
-  border-radius:999px;font-size:10px;font-weight:780;
-  background:rgba(180,83,9,.14);color:#b45309;border:1px solid rgba(180,83,9,.28);
-  vertical-align:middle;line-height:1;
+  position:absolute !important; top:-5px !important; right:-5px !important;
+  display:inline-flex !important;align-items:center;justify-content:center;
+  min-width:17px;height:17px;padding:0 5px;margin:0 !important;
+  border-radius:999px;font-size:10px;font-weight:800;
+  background:#e11d48 !important;color:#fff !important;
+  border:2px solid #fff !important;
+  box-shadow:0 2px 8px -1px rgba(190,18,60,.45);
+  line-height:1;pointer-events:none;z-index:3;
+}
+html.sky #panelReports .inv-sub-seg .rb-au-genbadge[hidden]{
+  display:none !important;
 }
 html.sky #panelReports .inv-sub-seg .vs-seg-btn.on .rb-au-genbadge{
-  background:#fff;color:#b45309;border-color:#fff;
+  background:#e11d48 !important;color:#fff !important;border-color:#fff !important;
 }
 html.sky #panelReports .rb2-tabrow--kpis-only{
   margin-top:2px;justify-content:flex-end;
