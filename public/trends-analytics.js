@@ -124,6 +124,7 @@
  capacity: d.capacity_kw, capacityArrays: d.capacity_known_arrays || 0,
  specYield: d.specific_yield_ttm_kwh_per_kwp,
  env: d.environmental, rate: d.blended_rate_usd_per_kwh,
+ rateSource: d.rate_source || null, rateNote: d.rate_note || null,
  ttm: d.ttm_kwh, lifetime: d.lifetime_kwh };
  }
 
@@ -470,7 +471,15 @@
  } else {
  cards.push(kpiPrompt("Specific yield", "Add panel nameplate (kW) on the Arrays tab to unlock kWh/kWp"));
  }
- if (S.rate != null) cards.push(kpi("Blended rate", "$"+S.rate.toFixed(3), "/kWh", "measured from your billing data"));
+ if (S.rate != null) {
+  const src = (S.rateSource || "");
+  const rateTitle = src === "bill_or_schedule"
+   ? "Average of bill / schedule rates for arrays in scope"
+   : src === "tenant_default"
+   ? "Your account default net rate"
+   : "VT utility default estimate (by provider), not a kWh-weighted blend of your bills";
+  cards.push(kpi("Est. rate", "$"+S.rate.toFixed(3), "/kWh", rateTitle));
+ }
  k.innerHTML = cards.join("");
  }
  function kpi(label, val, unit, title) {

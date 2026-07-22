@@ -165,12 +165,22 @@
  if (bestKwh == null || (p.kwh || 0) > bestKwh) { bestKwh = p.kwh || 0; bestLabel = `${MON[p.month - 1]} ${y}`; }
  }
  }
- // Implied blended rate behind the savings number, for the tooltip.
+ // Implied rate behind the savings number, for the tooltip. Source is honest:
+ // bill/schedule when available, otherwise a VT utility default estimate —
+ // never presented as a measured PUC statewide figure.
  const rate = (d.ttm_savings_usd && d.ttm_kwh) ? (d.ttm_savings_usd / d.ttm_kwh) : null;
+ const rateSrc = d.rate_source || "";
+ const rateNote = d.rate_note || (
+  rateSrc === "bill_or_schedule" ? "from your bill / rate schedule"
+  : rateSrc === "tenant_default" ? "from your account default rate"
+  : "VT utility default estimate — not a bill-weighted blend"
+ );
  const yoyTitle = yoyMonths > 0
  ? `${latestYr} vs ${prevYr}, same ${yoyMonths} full month${yoyMonths === 1 ? "" : "s"} (in-progress month excluded)`
  : "Year-over-year appears once you have two years of history";
- const savTitle = rate ? `≈ $${rate.toFixed(3)}/kWh blended rate × trailing-12-mo kWh` : "Estimated value of the energy produced";
+ const savTitle = rate
+  ? `≈ $${rate.toFixed(3)}/kWh (${rateNote}) × trailing-12-mo kWh`
+  : "Estimated value of the energy produced";
 
  const stat = (k, valHtml, extra) =>
  `<div class="tr-stat"${extra || ""}><span class="tr-glow"></span><div class="tr-k">${k}</div>${valHtml}</div>`;

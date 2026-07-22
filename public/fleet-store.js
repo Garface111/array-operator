@@ -897,6 +897,49 @@ window.FleetStore = (function(){
     return id;
   }
 
+  // Hide a personal/non-business array from the fleet without soft-deleting it
+  // (POST /exclude). Same optimistic remove as deleteArray, but history stays
+  // on the server and re-include is available via excluded:false.
+  function excludeArray(id){
+    const idx = state.arrays.findIndex(a => String(a.id) === String(id));
+    if(idx === -1) return;
+    const removed = state.arrays[idx];
+    const wasFocused = state.focus.some(f => String(f) === String(id));
+    state.arrays = state.arrays.filter(a => String(a.id) !== String(id));
+    state.focus = state.focus.filter(f => String(f) !== String(id));
+    notify();
+    if(isLive()){
+      apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/exclude",
+              { excluded: true })
+        .then(()=>refetch()).catch(()=>refetch());
+    }
+    pushHistory({
+      undo: () => {
+        if(!state.arrays.some(a => String(a.id) === String(id))){
+          const at = Math.min(idx, state.arrays.length);
+          state.arrays.splice(at, 0, removed);
+          if(wasFocused && !state.focus.some(f => String(f) === String(id))) state.focus.push(id);
+        }
+        notify();
+        if(isLive()){
+          apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/exclude",
+                  { excluded: false })
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+      redo: () => {
+        state.arrays = state.arrays.filter(a => String(a.id) !== String(id));
+        state.focus = state.focus.filter(f => String(f) !== String(id));
+        notify();
+        if(isLive()){
+          apiPost("/v1/array-owners/arrays/" + encodeURIComponent(id) + "/exclude",
+                  { excluded: true })
+            .then(()=>refetch()).catch(()=>refetch());
+        }
+      },
+    });
+  }
+
   function deleteArray(id){
     const idx = state.arrays.findIndex(a => String(a.id) === String(id));
     if(idx === -1) return;                                 // nothing matched
@@ -1384,7 +1427,7 @@ window.FleetStore = (function(){
     subscribe, load, refetch, startAutoRefresh,
     snapshot, toColumns, focusColumns, focusIds, setFocus, defaultFocusIds,
     focusIsNarrowed, clearFocus,
-    reassignInverter, reorderInverters, createArray, deleteArray, deleteInverter, resetLayout,
+    reassignInverter, reorderInverters, createArray, deleteArray, excludeArray, deleteInverter, resetLayout,
     renameArray, renameInverter, setArrayPortfolio, setArrayReminder,
     findArray, findInv,
     setTriage, setTriageBatch, triageState, isLive,

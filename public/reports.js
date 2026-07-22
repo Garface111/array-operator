@@ -8677,7 +8677,7 @@
  if (commEl) {
  const arrId = commEl.getAttribute("data-commdate-arr");
  const hintEl = box.querySelector(".rb-of-ratehint");
- const defHint = "The array's in-service date, sets which GMP rate applies (Rate #1 for the first 11 years, then Blended Statewide).";
+ const defHint = "In-service date pins the 11-year net-metering adder window (Rate #1 → Blended). Set it once so expected rates and ops reminders stay accurate.";
  // Pre-fill the current commissioning date from the array setup (best-effort).
  prefillCommissioningDate(arrId, commEl, hintEl, defHint);
  // Persist on change (debounced) to PATCH /arrays/{id} via first_connect_date.

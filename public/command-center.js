@@ -557,11 +557,35 @@
  <tbody id="ccBody"></tbody>
  </table>
  </div>
- <div class="cc-foot">Showing flagged inverters only (${num(k.inverters-k.flagged)} healthy hidden). Peer-measured under the same sky. $ at ~$${energyRate().toFixed(2)}/kWh + ${REC_PER_MWH}/MWh RECs.</div>`;
+ ${byArrayRiskHTML()}
+ <div class="cc-foot">Showing flagged inverters only (${num(k.inverters-k.flagged)} healthy hidden). Peer-measured under the same sky. $ at ~$${energyRate().toFixed(2)}/kWh + ${REC_PER_MWH}/MWh RECs · per-array totals above for claims.</div>`;
 
  renderBody();
  wire();
  applyTriageState(); // keep the collapse pill's flagged-count fresh
+ }
+
+ // Per-array $ at risk rollup (Colleen / insurance-claim ask). Reuses the same
+ // per-inverter lossMo already on MODEL.rows — no new math, just site grouping.
+ // Compact chips under the table so the design stays one instrument, not a
+ // second panel.
+ function byArrayRiskHTML(){
+ if(!MODEL || !MODEL.rows || !MODEL.rows.length) return "";
+ const by = {};
+ MODEL.rows.forEach(r => {
+  const k = r.arrayId != null ? String(r.arrayId) : r.site;
+  if(!by[k]) by[k] = { site: r.site, lossMo: 0, n: 0 };
+  by[k].lossMo += (r.lossMo || 0);
+  by[k].n += 1;
+ });
+ const list = Object.values(by)
+  .filter(x => x.lossMo >= 1)
+  .sort((a,b) => b.lossMo - a.lossMo);
+ if(!list.length) return "";
+ const chips = list.map(x =>
+  `<span class="cc-arrisk" title="${esc(x.site)}: ${x.n} flagged inverter${x.n===1?"":"s"} · est. at $${energyRate().toFixed(2)}/kWh + RECs"><b>${esc(x.site)}</b> ${usd0(x.lossMo)}<small>/mo</small></span>`
+ ).join("");
+ return `<div class="cc-arrisk-row" aria-label="Estimated recoverable dollars by array">${chips}</div>`;
  }
 
  function chip(id,label,n,dot){

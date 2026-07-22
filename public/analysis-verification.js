@@ -207,7 +207,7 @@
  var html = '<div class="anver-head"><div>' +
  '<div class="anver-num">' + (pi != null ? pi.toFixed(2) : "—") + '<span class="u">PI</span></div>' +
  '<div class="anver-alt">Portfolio performance index · last ' + win + ' days</div>' +
- '<div class="anver-cap">Measured energy prefers utility meter days, else inverter AC. Expected uses weather POA × nameplate × labeled PR. Methods consistent with IEC 61724-1 / 61724-3.</div>' +
+ '<div class="anver-cap">Measured energy uses the utility meter when available; otherwise inverter AC output. Expected energy is weather irradiance (plane-of-array) × nameplate × performance ratio. Methods consistent with IEC 61724-1 / 61724-3.</div>' +
  '<div class="anver-chips">' +
  (b ? '<span class="anver-chip bnd-' + esc(b) + '"><b>' + esc(boundaryLabel(b)) + '</b> boundary</span>' : '') +
  '<span class="anver-chip"><b>' + (port.array_count || 0) + '</b> modeled</span>' +

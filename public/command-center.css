@@ -167,6 +167,18 @@ button.cc-inv-link:hover{ text-decoration:underline; }
 
 .cc-empty{ padding:34px 16px; text-align:center; color:var(--faint); font-size:13.5px; }
 .cc-foot{ color:var(--faint); font-size:12px; margin-top:10px; line-height:1.6; }
+/* Per-array recoverable $ chips under the attention table (insurance/claims). */
+.cc-arrisk-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.cc-arrisk{
+  display:inline-flex; align-items:baseline; gap:6px;
+  padding:6px 10px; border-radius:999px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+  font-size:12px; font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.cc-arrisk b{ font-weight:700; color:var(--muted); max-width:14em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cc-arrisk small{ font-size:10px; font-weight:600; color:var(--faint); }
 
 /* divider that demotes the old fleet tree to a per-site drill-down */
 .cc-treedivider{ display:flex; align-items:baseline; gap:10px; margin:30px 0 4px; padding-top:20px; border-top:1px solid var(--line); }

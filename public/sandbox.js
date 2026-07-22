@@ -3247,11 +3247,26 @@
  function showArrayCtxMenu(x, y, id, name){
  closeArrayCtxMenu(); // only ever one menu
  const menu = el(`<div class="sb-ctxmenu" role="menu">
+ <button type="button" class="sb-ctxmenu-mute" role="menuitem">Exclude from fleet</button>
  <button type="button" class="sb-ctxmenu-del" role="menuitem">Delete array</button>
  </div>`);
  menu.style.left = x + "px";
  menu.style.top = y + "px";
  menu.addEventListener("click", ev => ev.stopPropagation());
+ // Exclude keeps history (personal/home arrays out of a business fleet) and is
+ // undoable; Delete soft-removes the card entirely. Both fit the same chrome.
+ const muteBtn = menu.querySelector(".sb-ctxmenu-mute");
+ if(muteBtn) muteBtn.onclick = async () => {
+ closeArrayCtxMenu();
+ const ok = await AODialog.confirm(
+  "Hides it from the fleet, Trends, and monitoring. History stays; you can undo right after.",
+  { title: `Exclude "${name}" from this fleet?`, confirmLabel: "Exclude" }
+ );
+ if(ok && FleetStore.excludeArray){
+  FleetStore.excludeArray(id);
+  toast(`Excluded "${name}" from the fleet. Press ↶ Undo to bring it back.`, "ok");
+ }
+ };
  menu.querySelector(".sb-ctxmenu-del").onclick = async () => {
  closeArrayCtxMenu(); // don't leave the tiny menu floating behind the dialog
  const ok = await AODialog.confirm("You can undo this (↶ Undo or Ctrl/Cmd+Z) right after.", { title: `Delete array "${name}"?`, danger: true, confirmLabel: "Delete" });
