@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-21",
+  "updated": "2026-07-23",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
@@ -85,7 +85,7 @@
       "name": "Massachusetts",
       "comp": "1:1 retail-rate net metering for residential ≤ 25 kW (Class I) — credits ≈ $0.2836/kWh (Eversource), ≈ $0.32/kWh (National Grid).",
       "how": "On top of net metering, SMART 3.0 (PY2026) pays a flat $0.03/kWh incentive (residential ≤ 25 kW; $0.06/kWh low-income).",
-      "note": "DPU Docket 25-200 (delivery rate design) is examining whether to reduce the value of net-metering credits; no changes have been ordered and existing systems are expected to be grandfathered. DOER filed SMART 3.0 emergency regulations (225 CMR 28.00) on June 26, 2026 — comments run through an Aug 5, 2026 public hearing; Program Year 2026 carries 600 MW-AC of capacity.",
+      "note": "DPU Docket 25-200 (delivery rate design) is examining whether to reduce the value of net-metering credits; no changes have been ordered and existing systems are expected to be grandfathered. The DPU approved DOER's redesigned SMART 3.0 program (225 CMR 28.00) on May 19, 2026, replacing the declining-block model with annually adjusted incentive blocks; Program Year 2026 carries 600 MW-AC of capacity, and utilities estimate roughly $4.5 billion in ratepayer cost over 20 years for 2025–2026 projects.",
       "utils": ["Eversource", "National Grid", "Unitil"],
       "reg": "MA Dept. of Public Utilities (DPU); the SMART incentive is administered by DOER.",
       "sources": [

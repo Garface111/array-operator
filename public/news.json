@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-21",
+  "updated": "2026-07-23",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -28,6 +28,15 @@
       "summary": "PURA unanimously adopted a final decision closing its investigation of a March 2025 equipment failure and brush fire at a NextEra-affiliated solar facility in Broad Brook, clearing Eversource and ordering a power-quality review of the NextEra site.",
       "source": "Daily Energy Insider",
       "url": "https://dailyenergyinsider.com/hearing-summaries/53041-connecticut-pura-clears-eversource-in-solar-facility-fire-investigation-orders-power-quality-review-of-nextera-site/"
+    },
+    {
+      "date": "2026-07-12",
+      "state": "region",
+      "tag": "Update",
+      "title": "Rooftop solar eased New England's grid through the late-June/July heat wave",
+      "summary": "During the region's late-June–early-July heat wave, behind-the-meter solar across the six states produced roughly 3,594 MW at the hottest hours — more than the Millstone and Seabrook nuclear plants combined — and at times met about 25% of demand. An Acadia Center analysis found distributed solar saved New England customers at least $130 million in wholesale energy costs between June 28 and July 4; the July 1 peak hit 23,729 MW.",
+      "source": "Maine Public / New England News Collaborative",
+      "url": "https://www.mainepublic.org/climate/2026-07-12/rooftop-solar-eases-new-englands-electric-demand-in-heat-wave"
     },
     {
       "date": "2026-07-10",
@@ -75,15 +84,6 @@
       "url": "https://acadiacenter.org/rhode-islands-2026-legislative-session-recap"
     },
     {
-      "date": "2026-06-26",
-      "state": "ma",
-      "tag": "Rulemaking",
-      "title": "Massachusetts DOER files SMART 3.0 emergency regulations; public hearing Aug 5",
-      "summary": "On June 26, 2026 DOER filed emergency regulations for the redesigned SMART 3.0 program (225 CMR 28.00), with a written-comment window running through Aug 5, 2026 and a virtual public hearing that day. Program Year 2026 carries 600 MW-AC of capacity, and utilities now estimate roughly $4.5 billion in ratepayer cost over 20 years for 2025–2026 projects.",
-      "source": "Solar Power World",
-      "url": "https://www.solarpowerworldonline.com/2026/06/explained-massachusetts-smart-program-changes-in-2026/"
-    },
-    {
       "date": "2026-06-25",
       "state": "me",
       "tag": "Rulemaking",
@@ -120,13 +120,13 @@
       "url": "https://isonewswire.com/2026/05/21/new-england-power-system-prepared-for-summer-heat/"
     },
     {
-      "date": "2026-05-11",
-      "state": "region",
-      "tag": "Update",
-      "title": "ISO-NE adds behind-the-meter batteries to its 2026 forecast",
-      "summary": "The 2026 CELT Report for the first time includes behind-the-meter battery storage (about 111 MW region-wide today, mostly in Massachusetts) and projects behind-the-meter PV reaching about 5,500 MW by end of 2026 and 7,950 MW by 2035, offsetting more than 7,000 GWh of grid energy this year.",
-      "source": "ISO Newswire",
-      "url": "https://isonewswire.com/2026/05/11/iso-ne-expands-behind-the-meter-forecast-to-include-batteries/"
+      "date": "2026-05-19",
+      "state": "ma",
+      "tag": "Rulemaking",
+      "title": "Massachusetts DPU approves DOER's SMART 3.0 program redesign",
+      "summary": "On May 19, 2026 the Department of Public Utilities approved DOER's redesigned SMART 3.0 program (225 CMR 28.00), replacing the declining-block model with annually adjusted incentive rates and capacity blocks. Program Year 2026 carries 600 MW-AC of capacity, and utilities estimate roughly $4.5 billion in ratepayer cost over 20 years for 2025–2026 projects.",
+      "source": "Solar Power World",
+      "url": "https://www.solarpowerworldonline.com/2026/06/explained-massachusetts-smart-program-changes-in-2026/"
     },
     {
       "date": "2026-05-07",
