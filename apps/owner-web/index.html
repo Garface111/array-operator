@@ -1,6 +1,25 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Bounce browser windows off broken /m → desktop SPA (2026-07-23).
+         Capacitor native shells keep /m. QA: /m/?mobile=1 or ao_force_mobile.
+         Keep in sync with public/m/index.html after vite builds. -->
+    <script>
+    (function () {
+      try {
+        if (window.Capacitor) return;
+        var qs = location.search || "";
+        if (/[?&]mobile=1(?:&|$)/.test(qs)) {
+          try { localStorage.setItem("ao_force_mobile", "1"); } catch (e) {}
+          return;
+        }
+        try {
+          if (localStorage.getItem("ao_force_mobile") === "1") return;
+        } catch (e) {}
+        location.replace("/" + qs + (location.hash || ""));
+      } catch (e) {}
+    })();
+    </script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"

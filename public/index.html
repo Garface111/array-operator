@@ -64,25 +64,35 @@
  });
 })();
 </script>
-<!-- Phone → app redirect (Ford 2026-07-20): a signed-in owner on a PHONE gets the
- dedicated React app at /m instead of the desktop layout squeezed onto a small
- screen. Tablets + desktop are untouched (≤600px width only, matching app.js's
- isNarrow). Prospects with no session stay on the marketing/onboarding pages.
- search + hash carry through so a magic-link /?token= handoff lands in the app.
- Escape hatch: /?desktop=1 persists ao_force_desktop and keeps the desktop site.
+<!-- Phone → /m redirect DISABLED (2026-07-23): the dedicated React mobile app
+ at /m is broken. Browser windows (any width, including narrow side-by-side)
+ must always stay on the desktop SPA. Previously a signed-in owner with
+ viewport ≤600px was auto-sent to /m — that path is off until /m is fixed.
+ Escape hatches:
+   /?desktop=1  → persist ao_force_desktop (already the default here)
+   /?mobile=1   → opt back into the old /m redirect for QA only
  Runs after session-tabscope.js so the so_session read reflects this tab. -->
 <script>
 (function () {
  try {
  var qs = location.search || "";
- if (/[?&]desktop=1(?:&|$)/.test(qs)) { try { localStorage.setItem("ao_force_desktop", "1"); } catch (e) {} return; }
- try { if (localStorage.getItem("ao_force_desktop")) return; } catch (e) {}
- var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
- if (!isPhone) return;
- var hasToken = /[?&]token=/.test(qs), hasSession = false;
- try { hasSession = !!localStorage.getItem("so_session"); } catch (e) {}
- if (!hasSession && !hasToken) return;
- location.replace("/m/" + qs + (location.hash || ""));
+ // Explicit mobile QA: allow the old phone redirect only when asked.
+ if (/[?&]mobile=1(?:&|$)/.test(qs)) {
+  try { localStorage.removeItem("ao_force_desktop"); localStorage.setItem("ao_force_mobile", "1"); } catch (e) {}
+  var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+  if (!isPhone) return;
+  var hasToken = /[?&]token=/.test(qs), hasSession = false;
+  try { hasSession = !!localStorage.getItem("so_session"); } catch (e) {}
+  if (!hasSession && !hasToken) return;
+  location.replace("/m/" + qs + (location.hash || ""));
+  return;
+ }
+ // Default: force desktop for every browser open. Never auto-jump to /m.
+ try {
+  localStorage.setItem("ao_force_desktop", "1");
+  localStorage.removeItem("ao_force_mobile");
+ } catch (e) {}
+ if (/[?&]desktop=1(?:&|$)/.test(qs)) return;
  } catch (e) {}
 })();
 </script>
