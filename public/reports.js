@@ -738,7 +738,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260724addclient1";
+ const GENREP_V = "20260724livesync1";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -858,6 +858,21 @@
  mountGenrepEmbed(document.getElementById("rbGenrepEmbedHost") || host);
  delete host.dataset.genrepBoot;
  }
+ // ── Embed → shell freshness bridge (REBUILD-MAP layer 2, 2026-07-24). The
+ // fold left two reactive systems with zero cross-membrane signaling: embed
+ // mutations (new client, arrays attached) never reached shell surfaces on
+ // their own TTL clocks. The embed broadcasts DOM "so:fleet-changed" for every
+ // local AND server-pushed change; one debounced listener nudges FleetStore
+ // (the shell's own refresh idiom — see sandbox.js FleetStore.refetch calls).
+ let _genrepBridgeTimer = null;
+ window.addEventListener("so:fleet-changed", () => {
+ if (_genrepBridgeTimer) return;
+ _genrepBridgeTimer = setTimeout(() => {
+ _genrepBridgeTimer = null;
+ try { if (window.FleetStore && FleetStore.refetch) FleetStore.refetch(); } catch (e) {}
+ }, 1200);
+ });
+
  function mountGenrepEmbed(host) {
  if (!host || _genrepMounted) return;
  _genrepMounted = true;
