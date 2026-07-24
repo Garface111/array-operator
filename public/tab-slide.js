@@ -20,7 +20,7 @@
      every hop into or out of Marketplace snapped instead of sliding. If you add
      a top tab, add it BOTH places — the check below shouts if you forget. */
   var STAGE_IDS = [
-    "panelDashboard","panelAccount","panelSovereign",
+    "panelDashboard","panelAccount",
     "panelAnalysis","panelTrends","panelResources","panelReports",
     "panelMarketplace","panelOps"
   ];

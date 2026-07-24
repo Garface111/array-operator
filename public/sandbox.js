@@ -7894,7 +7894,6 @@
  marketplace: { panel: "panelMarketplace", tab: "tabMarketplace" },
  ops: { panel: "panelOps", tab: "tabOps" },
  /* Resources is a sub-view of Analysis (#resources → panelResources). */
- /* Sovereign desk is developer-only (#sovereign) — panel toggled separately. */
  };
  function tabFromHash(){
  const h = location.hash;
@@ -7905,7 +7904,6 @@
  if(h === "#analysis" || h === "#trends" || h === "#resources") return "analysis";
  if(h === "#reports" || h.indexOf("#reports/") === 0) return "reports";
  if(h === "#marketplace" || h.indexOf("#marketplace/") === 0) return "marketplace";
- if(h === "#sovereign") return "account"; // keep Account tab lit; panel handled below
  return "dashboard";
  }
 
@@ -8039,7 +8037,6 @@
  let _firstApply = true;
  function applyView(){
  const active = tabFromHash();
- const isSov = location.hash === "#sovereign";
  // Tab pager disabled (Ford 2026-07-22): instant panel swap only — horizontal
  // slides were more trouble than they were worth. Keep the flags false so the
  // rest of applyView still toggles .active the simple way.
@@ -8048,12 +8045,11 @@
  const t = TABS[name];
  const panel = document.getElementById(t.panel);
  const tab = document.getElementById(t.tab);
- // Sovereign desk takes over the main stage (Account tab stays highlighted).
  // Skip the instant toggle for the sliding pair — the pager owns their .active.
  if(panel && !(_willSlide && (panel === _prevPanel || panel === _toPanel))){
- panel.classList.toggle("active", !isSov && name === active);
+ panel.classList.toggle("active", name === active);
  }
- if(tab) tab.classList.toggle("active", name === active || (isSov && name === "account"));
+ if(tab) tab.classList.toggle("active", name === active);
  });
  if(_willSlide){
  // Slide direction must match visible tab order:
@@ -8075,23 +8071,6 @@
  try { if (typeof window.__eaPrepareForView === "function") window.__eaPrepareForView(); } catch (_ea) {}
  try { window.__aoTabSlide(_prevPanel, _toPanel, _ti >= _fi ? 1 : -1); }
  catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
- }
- const pSov = document.getElementById("panelSovereign");
- if(pSov){
- if(isSov){
- pSov.hidden = false;
- pSov.removeAttribute("hidden");
- pSov.classList.add("active");
- try{
- if(window.__aoSovereignDeskBoot) window.__aoSovereignDeskBoot().then(function(ok){
- if(ok && window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
- });
- else if(window.__aoOpenSovereignDesk) window.__aoOpenSovereignDesk();
- }catch(_){}
- } else {
- pSov.classList.remove("active");
- pSov.hidden = true;
- }
  }
  // Sibling Analysis sub-panels (not in TABS): hide when Analysis top-tab is off
  if(active !== "analysis" || isSov){
