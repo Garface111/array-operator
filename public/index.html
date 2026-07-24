@@ -64,35 +64,49 @@
  });
 })();
 </script>
-<!-- Phone → /m redirect DISABLED (2026-07-23): the dedicated React mobile app
- at /m is broken. Browser windows (any width, including narrow side-by-side)
- must always stay on the desktop SPA. Previously a signed-in owner with
- viewport ≤600px was auto-sent to /m — that path is off until /m is fixed.
- Escape hatches:
-   /?desktop=1  → persist ao_force_desktop (already the default here)
-   /?mobile=1   → opt back into the old /m redirect for QA only
+<!-- Phone → /m redirect RE-ENABLED (Ford, 2026-07-24). The 07-23 block sent every
+ browser to the desktop SPA on the grounds that /m was broken; /m in fact boots
+ and renders its full shell (fleet, stat tiles, Agent sheet, bottom nav) with no
+ JS errors, so phones were being held on a desktop layout for no gain. /m also
+ carries a boot-failure fallback now, so a genuine SPA failure lands the owner on
+ the desktop site instead of a white screen — re-enabling can't strand anyone.
+
+ The 07-23 code wrote ao_force_desktop=1 on EVERY browser open, so returning
+ phones all carry a machine-set flag that was never a user choice. Honoring it
+ would silently keep them on desktop forever, so it is always cleared here; real
+ user intent now lives in ao_desktop_pref (set only by an explicit /?desktop=1).
+
+ Phones only — tablets and desktop keep the desktop SPA (it works well there).
+ Escape hatches:  /?desktop=1 → stay on desktop for good;  /?mobile=1 → force /m.
  Runs after session-tabscope.js so the so_session read reflects this tab. -->
 <script>
 (function () {
  try {
  var qs = location.search || "";
- // Explicit mobile QA: allow the old phone redirect only when asked.
- if (/[?&]mobile=1(?:&|$)/.test(qs)) {
-  try { localStorage.removeItem("ao_force_desktop"); localStorage.setItem("ao_force_mobile", "1"); } catch (e) {}
-  var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
-  if (!isPhone) return;
-  var hasToken = /[?&]token=/.test(qs), hasSession = false;
-  try { hasSession = !!localStorage.getItem("so_session"); } catch (e) {}
-  if (!hasSession && !hasToken) return;
-  location.replace("/m/" + qs + (location.hash || ""));
+ // Legacy auto-set flag: machine-written on every open, never a user choice.
+ try { localStorage.removeItem("ao_force_desktop"); } catch (e) {}
+
+ // Explicit, persisted user choices win over any width sniffing.
+ if (/[?&]desktop=1(?:&|$)/.test(qs)) {
+  try { localStorage.setItem("ao_desktop_pref", "1"); localStorage.removeItem("ao_force_mobile"); } catch (e) {}
   return;
  }
- // Default: force desktop for every browser open. Never auto-jump to /m.
- try {
-  localStorage.setItem("ao_force_desktop", "1");
-  localStorage.removeItem("ao_force_mobile");
- } catch (e) {}
- if (/[?&]desktop=1(?:&|$)/.test(qs)) return;
+ if (/[?&]mobile=1(?:&|$)/.test(qs)) {
+  try { localStorage.setItem("ao_force_mobile", "1"); localStorage.removeItem("ao_desktop_pref"); } catch (e) {}
+ }
+ try { if (localStorage.getItem("ao_desktop_pref") === "1") return; } catch (e) {}
+
+ var forced = false;
+ try { forced = localStorage.getItem("ao_force_mobile") === "1"; } catch (e) {}
+ var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+ if (!isPhone && !forced) return;
+
+ // Prospects with no session stay on the marketing/onboarding pages.
+ var hasToken = /[?&]token=/.test(qs), hasSession = false;
+ try { hasSession = !!localStorage.getItem("so_session"); } catch (e) {}
+ if (!hasSession && !hasToken) return;
+
+ location.replace("/m/" + qs + (location.hash || ""));
  } catch (e) {}
 })();
 </script>

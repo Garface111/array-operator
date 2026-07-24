@@ -1,22 +1,46 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Bounce browser windows off broken /m → desktop SPA (2026-07-23).
-         Capacitor native shells keep /m. QA: /m/?mobile=1 or ao_force_mobile.
+    <!-- Boot-failure fallback (Ford, 2026-07-24) — replaces the 07-23 bounce that
+         sent every browser back to the desktop SPA. If the SPA has painted
+         nothing into #root a few seconds in (bad bundle, boot crash), fall back
+         to the desktop site instead of stranding the owner on a white screen. A
+         healthy boot paints immediately and this never fires. ?desktop=1 stops
+         the desktop page bouncing straight back, so there is no redirect loop.
          Keep in sync with public/m/index.html after vite builds. -->
     <script>
     (function () {
       try {
-        if (window.Capacitor) return;
-        var qs = location.search || "";
-        if (/[?&]mobile=1(?:&|$)/.test(qs)) {
-          try { localStorage.setItem("ao_force_mobile", "1"); } catch (e) {}
-          return;
+        if (window.Capacitor) return;   // native shell: no desktop site to fall back to
+        var done = false;
+        function bail(why) {
+          if (done) return;
+          done = true;
+          try { sessionStorage.setItem("ao_m_boot_fail", why || "1"); } catch (e) {}
+          location.replace("/?desktop=1");
         }
-        try {
-          if (localStorage.getItem("ao_force_mobile") === "1") return;
-        } catch (e) {}
-        location.replace("/" + qs + (location.hash || ""));
+        // Primary signal: the app bundle itself failing to load (404 after a bad
+        // deploy, dropped connection). Capture phase, because resource errors do
+        // not bubble. This is the real "/m is broken" case and it bails at once.
+        window.addEventListener("error", function (e) {
+          var t = e && e.target;
+          if (!t || t === window) return;
+          var src = t.src || t.href || "";
+          if ((t.tagName === "SCRIPT" || t.tagName === "LINK") && /\/m\/assets\//.test(src)) {
+            bail("asset-error");
+          }
+        }, true);
+
+        // Backstop only, deliberately generous. A blocked/slow webfont stylesheet
+        // defers the module script, so #root can still be empty several seconds
+        // in on a bad connection while the app is perfectly healthy — bailing at
+        // ~8s would strand those owners on desktop for no reason. Armed at parse
+        // time, not on DOMContentLoaded: a failed module leaves the document at
+        // readyState "interactive" and DCL never fires.
+        setTimeout(function () {
+          var r = document.getElementById("root");
+          if (!r || r.childElementCount === 0) bail("empty-root");
+        }, 20000);
       } catch (e) {}
     })();
     </script>
