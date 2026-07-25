@@ -1,12 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   SKY THEME — MOBILE + FOLDABLE DEEP PASS (≤960px touch shell, + 380 squeeze)
+   SKY THEME — PHONE DEEP PASS (phone-only touch shell, + 380 squeeze)
    ─────────────────────────────────────────────────────────────────────────────
    Loads LAST of the sky set (after theme-sky.css + the five per-view
    fragments), so on a phone/fold this file is the final word. Every rule is
    scoped under html.sky AND inside a max-width media query — flag off or
    desktop wide, this file is inert.
 
-   2026-07-14 Fold 5: raised from 600→960 so the open main screen gets the
+   2026-07-24 Fold 5 REVERSED: the open main screen is a TABLET and gets the
+   full desktop site. Was raised 600→960 on 2026-07-14 for the opposite. The
    floating glass dock + full-width sheets (not squeezed desktop chrome).
 
    What lives here:
@@ -27,7 +28,7 @@
        low on the ridge crest), gradient underlayers for instant paint
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@media (max-width:960px){
+@media (max-width: 600px), (max-height: 500px) and (max-width: 900px){
 
   /* ── 0 · TOKENS — tighter radius scale on a phone. Everything in the sky
         vocabulary that consumes these vars follows automatically. ─────────── */
@@ -298,12 +299,12 @@
   }
 }
 
-/* ── 6b · PLATE DENSITY TIERS (top-level — must beat the ≤960px base ::before) ─
+/* ── 6b · PLATE DENSITY TIERS (top-level — must beat the phone base ::before) ─
       1x  → world-m-828
-      2x+ → world-m-1284 (default inside ≤960)
+      2x+ → world-m-1284 (default inside the phone tier)
       2.5x+ → world-m-2496
       3x+ → world-m-3328 (full portrait master) ────────────────────────────── */
-@media (max-width:960px) and (max-resolution:1.5dppx){
+@media (max-width: 600px) and (max-resolution:1.5dppx), (max-height: 500px) and (max-width: 900px) and (max-resolution:1.5dppx){
   html.sky body::before{
     background-image:
       url("img/sky/world-zo6-2560.jpg"),
@@ -316,7 +317,7 @@
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
 }
-@media (max-width:960px) and (min-resolution:2.5dppx){
+@media (max-width: 600px) and (min-resolution:2.5dppx), (max-height: 500px) and (max-width: 900px) and (min-resolution:2.5dppx){
   html.sky body::before{
     background-image:
       url("img/sky/world-zo6-2560.jpg"),
@@ -329,7 +330,7 @@
       linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-horizon) 100%);
   }
 }
-@media (max-width:960px) and (min-resolution:3dppx){
+@media (max-width: 600px) and (min-resolution:3dppx), (max-height: 500px) and (max-width: 900px) and (min-resolution:3dppx){
   html.sky body::before{
     background-image:
       url("img/sky/world-zo6-2560.jpg"),
@@ -344,46 +345,6 @@
 }
 
 /* ── 7 · THE SMALLEST PHONES (mirrors mobile.css's 380px tier) ────────────── */
-/* Fold open: roomier gutters + floating dock insets (pairs with mobile.css 601–960) */
-@media (min-width:601px) and (max-width:960px){
-  html.sky .wrap{padding:0 20px}
-  html.sky #reportsRoot,
-  html.sky #analysisRoot,
-  html.sky #trendsRoot,
-  html.sky #rsHost,
-  html.sky .rb2{
-    padding:18px 20px 28px;
-    border-radius:26px;
-  }
-  html.sky .rb2-head{padding:22px 22px 18px !important}
-  html.sky .rb2-pipe{padding:18px 22px 20px !important}
-  html.sky .rb2-listwrap,
-  html.sky .rb2 > .rb-au{padding:20px 22px 28px !important}
-  html.sky .tabbar{
-    left:18px !important; right:18px !important; bottom:12px !important;
-    border-radius:22px !important;
-  }
-  html.sky body{
-    padding-bottom:calc(88px + env(safe-area-inset-bottom,0px)) !important;
-  }
-  html.sky .mob-more{
-    left:28px; right:28px;
-    bottom:calc(86px + env(safe-area-inset-bottom,0px));
-  }
-  html.sky #fsWrap{bottom:calc(96px + env(safe-area-inset-bottom,0px)) !important}
-  html.sky .ao-al-fab{
-    left:18px !important; right:auto !important;
-    bottom:calc(96px + env(safe-area-inset-bottom,0px)) !important;
-  }
-  html.sky .ao-al-panel{
-    left:16px !important; right:auto !important;
-    bottom:calc(150px + env(safe-area-inset-bottom,0px)) !important;
-  }
-  /* 2-col account / portal grids already in mobile.css; keep sheets breathable */
-  html.sky #panelDashboard .dash-wrap{padding:22px 18px 48px !important}
-  html.sky #sbWrap{padding:16px 16px 18px}
-}
-
 @media (max-width:380px){
   html.sky .wrap{padding:0 6px}
   html.sky .tabbar{

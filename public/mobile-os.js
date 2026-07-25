@@ -1,5 +1,6 @@
 /* ============================================================================
- * Mobile OS, Energy Agent is the home surface on phones / foldables (≤960px).
+ * Mobile OS, Energy Agent is the home surface on PHONES only. A foldable
+ * counts while folded; unfolded it is a tablet and keeps the desktop site.
  *
  * Setup is woven into the Agent home (not a bolted-on tour modal):
  *   · Hands-off pillars (arrays → auto-refresh → utility → offtakers → send → pay)
@@ -12,7 +13,8 @@
 (function () {
   "use strict";
 
-  var MQ = "(max-width: 960px)";
+  // Short side is phone-sized. Same predicate as mobile.css / index.html.
+  var MQ = "(max-width: 600px), (max-height: 500px) and (max-width: 900px)";
   var DETAIL_KEY = "ao_mh_detail";
   var STORY_KEY = "ao_mh_story";
   var SKIP_KEY = "ao_mh_skip"; // JSON {stepId: true}
@@ -357,7 +359,7 @@
     try {
       return !!(window.matchMedia && matchMedia(MQ).matches);
     } catch (e) {
-      return innerWidth <= 960;
+      return innerWidth <= 600 || (innerHeight <= 500 && innerWidth <= 900);
     }
   }
   function session() {

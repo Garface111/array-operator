@@ -1,5 +1,5 @@
 /* ============================================================================
-   Mobile OS — Energy Agent as the operating layer (≤960px, signed-in)
+   Mobile OS — Energy Agent as the operating layer (phones only, signed-in)
    Setup steps woven into Agent home; Detail unlocks full tab UI.
    ============================================================================ */
 
@@ -9,7 +9,7 @@
   display: none;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px), (max-height: 500px) and (max-width: 900px) {
   body.mh-active #mhOs {
     display: block;
     position: fixed;
@@ -713,7 +713,8 @@ body.mh-os #mhFabTray {
   display: none !important;
 }
 
-@media (min-width: 961px) {
+/* Not a phone (tablet / unfolded foldable / desktop): no mobile chrome. */
+@media (min-width: 601px) and (min-height: 501px), (min-width: 901px) {
   #mhOs,
   #mhDock,
   #mhFabTray {
