@@ -20,34 +20,6 @@
           try { sessionStorage.setItem("ao_m_boot_fail", why || "1"); } catch (e) {}
           location.replace("/?desktop=1");
         }
-        // FORM FACTOR: /m is the PHONE app. A tablet-sized viewport -- an
-        // unfolded foldable, an iPad -- belongs on the desktop site, which is
-        // the better product at that width. A Fold does not reload when it
-        // opens, so this is re-checked on resize, not just at boot.
-        //
-        // Hands back to "/" and deliberately NOT "/?desktop=1": that flag is
-        // permanent, so folding the phone shut would never return here.
-        // Only an explicit ?mobile=1 in THIS url pins us here. The persisted
-        // ao_force_mobile flag is sticky forever and would strand an unfolded
-        // foldable in the phone app, which is the bug this guard exists for.
-        var mForced = /[?&]mobile=1(?:&|$)/.test(location.search || "");
-        function mIsPhone() {
-          var w = window.innerWidth, h = window.innerHeight;
-          return w <= 600 || (h <= 500 && w <= 900);
-        }
-        function mCheckFormFactor() {
-          if (mForced || done) return;
-          if (mIsPhone()) return;
-          done = true;
-          location.replace("/" + (location.hash || ""));
-        }
-        mCheckFormFactor();
-        var mT = null;
-        window.addEventListener("resize", function () {
-          clearTimeout(mT);
-          mT = setTimeout(mCheckFormFactor, 250);
-        });
-
         // Primary signal: the app bundle itself failing to load (404 after a bad
         // deploy, dropped connection). Capture phase, because resource errors do
         // not bubble. This is the real "/m is broken" case and it bails at once.
@@ -80,6 +52,56 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
+    <script>
+    // FORM FACTOR: /m is the PHONE app. A tablet-sized viewport -- an unfolded
+    // foldable, an iPad -- belongs on the desktop site, which is better at that
+    // width. A foldable does not reload when it opens, so this re-checks on
+    // resize, not just at boot.
+    //
+    // MUST stay below the viewport meta above. Before that meta is parsed a
+    // phone reports its default ~980px layout viewport, which reads as a tablet
+    // and bounces to "/", which bounces straight back here. That was a real
+    // reload loop on 2026-07-24.
+    //
+    // Hands back to "/" and deliberately NOT "/?desktop=1": that flag is
+    // permanent, so folding the phone shut would never return here.
+    (function () {
+      try {
+        if (window.Capacitor) return;   // native shell: nowhere to hand back to
+        // Only an explicit ?mobile=1 in THIS url pins us here. The persisted
+        // ao_force_mobile flag is sticky forever and would strand an unfolded
+        // foldable in the phone app -- the bug this guard exists for.
+        if (/[?&]mobile=1(?:&|$)/.test(location.search || "")) return;
+
+        // Loop breaker: however wrong a measurement gets, never leave the owner
+        // on a page that reloads forever. Three hand-offs and we stay put.
+        var HOPS = "ao_ff_hops";
+        function hops() {
+          try { return parseInt(sessionStorage.getItem(HOPS) || "0", 10) || 0; }
+          catch (e) { return 0; }
+        }
+        if (hops() >= 3) return;
+
+        var gone = false;
+        function isPhone() {
+          var w = window.innerWidth, h = window.innerHeight;
+          return w <= 600 || (h <= 500 && w <= 900);
+        }
+        function check() {
+          if (gone || isPhone()) return;
+          gone = true;
+          try { sessionStorage.setItem(HOPS, String(hops() + 1)); } catch (e) {}
+          location.replace("/" + (location.hash || ""));
+        }
+        check();
+        var t = null;
+        window.addEventListener("resize", function () {
+          clearTimeout(t);
+          t = setTimeout(check, 250);
+        });
+      } catch (e) {}
+    })();
+    </script>
     <meta name="theme-color" content="#56B4F0" />
     <meta
       name="description"

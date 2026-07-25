@@ -75,7 +75,30 @@ for (const [name, w, h, wantPhone] of DEVICES) {
         got === wantPhone, got === wantPhone ? "" : `got ${got ? "phone" : "desktop"}`);
 }
 
-// ── 3. the two redirects are mutually exclusive (no ping-pong) ────────────
+// ── 3. anything that MEASURES must sit below the viewport meta ────────────
+// The 2026-07-24 reload loop: /m's form-factor guard ran above the viewport
+// meta, so a phone reported its default ~980px layout viewport, read as a
+// tablet, and handed back to "/" -- which measured 390px and handed straight
+// back. Order is load-bearing and nothing else here would catch it.
+for (const [file, marker] of [
+  ["public/m/index.html", "FORM FACTOR"],
+  ["apps/owner-web/index.html", "FORM FACTOR"],
+  ["public/index.html", "function aoIsPhone()"],
+]) {
+  const html = R(file);
+  const meta = html.search(/<meta[^>]*name=["']viewport["']/i);
+  const measure = html.indexOf(marker);
+  check(`${file}: viewport meta precedes the measuring script`,
+        meta >= 0 && measure > meta,
+        meta < 0 ? "no viewport meta" : `meta@${meta} measure@${measure}`);
+}
+
+// ── 4. a loop breaker exists, so no measurement bug can brick the app ─────
+for (const f of ["public/m/index.html", "apps/owner-web/index.html"]) {
+  check(`${f} caps redirect hand-offs`, R(f).includes("ao_ff_hops"));
+}
+
+// ── 5. the two redirects are mutually exclusive (no ping-pong) ────────────
 // index.html sends phones to /m; /m hands non-phones back. If both could be
 // true for one viewport the browser would bounce forever.
 let overlap = 0;
@@ -88,5 +111,5 @@ for (let w = 200; w <= 2000; w += 1) {
 }
 check("index.html and /m can never both redirect", overlap === 0, `${overlap} overlaps`);
 
-console.log(`\n${DEVICES.length + surfaces.length + 5} checks, ${fails} failed`);
+console.log(`\n${fails ? "FAILED" : "all checks passed"} — ${fails} failure(s)`);
 process.exit(fails ? 1 : 0);
