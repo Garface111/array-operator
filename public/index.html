@@ -96,9 +96,18 @@
  }
  try { if (localStorage.getItem("ao_desktop_pref") === "1") return; } catch (e) {}
 
- var forced = false;
- try { forced = localStorage.getItem("ao_force_mobile") === "1"; } catch (e) {}
- var isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 600px)").matches);
+ // ?mobile=1 in THIS url still forces the phone app, so QA on a desktop works.
+ // The PERSISTED flag deliberately does not: it is sticky forever, and a stale
+ // one would pin a tablet to /m at any width. Form factor beats stale state.
+ var forced = /[?&]mobile=1(?:&|$)/.test(qs);
+ // PHONE = the short side is phone-sized. Matches mobile.css and /m exactly,
+ // and is rotation-proof. An UNFOLDED foldable (Fold 5 inner ~690x829) is a
+ // TABLET: it stays here on the full desktop site.
+ function aoIsPhone() {
+  var w = window.innerWidth, h = window.innerHeight;
+  return w <= 600 || (h <= 500 && w <= 900);
+ }
+ var isPhone = aoIsPhone();
  if (!isPhone && !forced) return;
 
  // Prospects with no session stay on the marketing/onboarding pages.
@@ -107,6 +116,29 @@
  if (!hasSession && !hasToken) return;
 
  location.replace("/m/" + qs + (location.hash || ""));
+ } catch (e) {}
+})();
+</script>
+<!-- A foldable does not reload when it closes, so the routing above never
+     re-runs. Watch the viewport and hand a now-phone-sized screen to /m.
+     Same predicate as /m's hand-back, so the two cannot ping-pong. -->
+<script>
+(function () {
+ try {
+  if (window.Capacitor) return;
+  var t = null;
+  window.addEventListener("resize", function () {
+   clearTimeout(t);
+   t = setTimeout(function () {
+    try {
+     var w = window.innerWidth, h = window.innerHeight;
+     if (!(w <= 600 || (h <= 500 && w <= 900))) return;  // still a tablet: stay
+     if (localStorage.getItem("ao_desktop_pref") === "1") return;
+     if (!localStorage.getItem("so_session")) return;    // prospect: marketing
+     location.replace("/m/" + (location.hash || ""));
+    } catch (e) {}
+   }, 250);
+  });
  } catch (e) {}
 })();
 </script>

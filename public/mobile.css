@@ -4,9 +4,9 @@
 
    Tiers (Ford Fold-5 QA 2026-07-14):
      · ≤600px  — cover screen / classic phone: dense single-column, bottom nav
-     · 601–960 — Z Fold main / large phone: touch chrome + balanced full-width
+     · tablet / unfolded foldable — the DESKTOP site, no touch shell
                  content (desktop top-nav was leaving a skinny left card + empty sky)
-     · ≥961px  — desktop: unchanged
+     · desktop — unchanged
 
    Principles: thumb-zone nav · full-bleed content on fold · no horizontal page
    scroll · tap ≥42px · tables scroll inside wraps · breathing room scales up with
@@ -23,10 +23,12 @@
 .tabbar .tab-more { display: none !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TOUCH SHELL (≤960px) — bottom nav + overflow safety + full-width sheets
+   TOUCH SHELL (phones only) — bottom nav + overflow safety + full-width
+   sheets. Short side ≤600 (or ≤500 in landscape); an UNFOLDED foldable is
+   a tablet and keeps the desktop site.
    Covers classic phones AND foldable open (Fold 5 main ≈700–900 CSS px).
    ═══════════════════════════════════════════════════════════════════════════ */
-@media (max-width: 960px) {
+@media (max-width: 600px), (max-height: 500px) and (max-width: 900px) {
   /* Full-width canvas — kill the "skinny left card + empty mountain" imbalance */
   .wrap {
     max-width: 100% !important;
@@ -337,122 +339,6 @@
 
   /* Identity was desktop-only in top bar; stay hidden in bottom nav */
   .tab.tab-whoami, .tab.tab-signout { display: none !important; }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   FOLD OPEN / COMPACT TABLET (601–960px) — Z Fold 5 main, large phones
-   Breathing room + 2–3 col content; still thumb-nav, never cramped desktop.
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media (min-width: 601px) and (max-width: 960px) {
-  .wrap {
-    padding: 0 22px;
-    max-width: 100% !important;
-  }
-
-  /* Floating dock with side insets — balanced, not edge-to-edge slab */
-  .tabbar {
-    left: 18px !important;
-    right: 18px !important;
-    bottom: 12px !important;
-    width: auto !important;
-    border-radius: 20px !important;
-    border: 1px solid var(--line, rgba(15,23,42,.08));
-    box-shadow: 0 12px 40px -16px rgba(15, 23, 42, .45) !important;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-  body {
-    padding-bottom: calc(72px + 78px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-  .mob-more {
-    left: 24px; right: 24px;
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-  }
-  #fsWrap { bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important; }
-  .ao-al-fab {
-    left: 18px !important;
-    right: auto !important;
-    bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-  .ao-al-panel {
-    left: 16px !important;
-    right: auto !important;
-    bottom: calc(142px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-
-  /* ── Fleet Triage: roomy KPI strip ─────────────────────────────────────── */
-  .cc-kpis {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 12px;
-  }
-  .cc-kpi { padding: 14px 16px; }
-  .cc-kpi .v { font-size: 24px; }
-  .fcg { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-  .fcg-tile { min-height: 96px; padding: 14px 16px; }
-  .fcg-v b { font-size: 26px; }
-
-  /* ── Inverters / Master Account portal grids: 2-up ─────────────────────── */
-  .ar-inv-api { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .ar-inv-vault { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .ar-panel .ar-group,
-  .ar-stack .ar-group {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 12px;
-  }
-  .ar-panel { padding: 18px 20px !important; }
-
-  /* ── Arrays sandbox: taller canvas, tools in a clean row ───────────────── */
-  #sbWrap { padding: 16px 16px 18px; border-radius: 20px; }
-  .sb-viewport { height: 48vh; min-height: 380px; max-height: 520px; }
-  .sb-head-actions, .sb-head-btns {
-    flex-wrap: wrap; gap: 10px;
-  }
-
-  /* ── Analysis / Trends: content uses full width with roomy padding ─────── */
-  #analysisRoot, #trendsRoot, #reportsRoot, #rsHost {
-    padding: 16px 18px 28px !important;
-    margin-top: 12px;
-    border-radius: 22px;
-  }
-  .an-head h2 { font-size: 22px; }
-  .ansg-search input { width: 220px; }
-  /* Tables still scroll inside wrap but need less min-width on fold */
-  .ansg-table { min-width: 720px; }
-  .tr-table { min-width: 520px; }
-
-  /* ── Invoices: pipeline stays 3-across; rates/forms 2-col ──────────────── */
-  .rb2-pipe-row {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    align-items: stretch;
-  }
-  .rb2-pcell {
-    min-width: 0 !important;
-    border-radius: 14px !important;
-    border: 1px solid var(--line, #e2e8f0) !important;
-  }
-  .rb2-pcell + .rb2-pcell { border-left: 1px solid var(--line, #e2e8f0) !important; }
-  .rb2-moderow { flex-wrap: wrap; gap: 10px; }
-  .rb-mform-grid, .rb-cust-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  .rb-gr-main, .rb-globalrate {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: end;
-  }
-  .rb2-id p { max-width: none; }
-
-  /* ── Account: 2-col cards ──────────────────────────────────────────────── */
-  #panelAccount .acct-row {
-    grid-template-columns: 160px minmax(0, 1fr) auto;
-  }
-  .acct-list { max-width: none; }
-
-  /* Comfortable section rhythm */
-  .cc-head h2, .rb2-id h1 { font-size: 22px; }
-  .panel { padding-bottom: 8px; }
 }
 
 /* Extra squeeze for the smallest cover screens. */
