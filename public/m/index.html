@@ -88,7 +88,14 @@
           return w <= 600 || (h <= 500 && w <= 900);
         }
         function check() {
-          if (gone || isPhone()) return;
+          if (gone) return;
+          if (isPhone()) {
+            // Landed somewhere stable, so whatever hand-offs got us here were
+            // not a loop. Clear the budget or a few honest fold/unfold cycles
+            // would exhaust it and disable the guard for the rest of the session.
+            try { sessionStorage.removeItem(HOPS); } catch (e) {}
+            return;
+          }
           gone = true;
           try { sessionStorage.setItem(HOPS, String(hops() + 1)); } catch (e) {}
           location.replace("/" + (location.hash || ""));
