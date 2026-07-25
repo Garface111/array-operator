@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-24",
+  "updated": "2026-07-25",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -66,6 +66,15 @@
       "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
     },
     {
+      "date": "2026-07-04",
+      "state": "region",
+      "tag": "Deadline",
+      "title": "Federal commercial solar ITC 'begin construction' deadline passes July 4",
+      "summary": "Under the One Big Beautiful Bill Act, commercial and larger solar projects (Section 48E) had to begin construction on or before July 4, 2026 to keep the standard timeline for the full 30% investment tax credit (placed in service by end of 2030); projects starting later must be in service by Dec 31, 2027 to claim any credit. The residential Section 25D credit had already expired Dec 31, 2025.",
+      "source": "Environment+Energy Leader",
+      "url": "https://www.environmentenergyleader.com/stories/solar-itc-rules-tighten-as-july-2026-deadline-looms,115943"
+    },
+    {
       "date": "2026-07-01",
       "state": "me",
       "tag": "Rates",
@@ -91,6 +100,15 @@
       "summary": "Maine's Department of Energy Resources held Public Webinar #1 on June 25, 2026, presenting its approach and timeline for a new front-of-the-meter distributed energy resources program to replace community-solar NEB. The proposed successor program must be submitted to the MPUC by the statutory deadline of September 30, 2026.",
       "source": "Maine Department of Energy Resources",
       "url": "https://www.maine.gov/energy/divisions/planning-and-policy/ftm-der"
+    },
+    {
+      "date": "2026-06-16",
+      "state": "vt",
+      "tag": "Law",
+      "title": "Vermont enacts S.202 (Act 84) legalizing plug-in 'balcony' solar",
+      "summary": "Gov. Phil Scott signed S.202 (Act 84) on June 16, 2026, effective July 1, legalizing plug-in solar devices up to 1,200 watts AC per meter with no permit, utility fee, or interconnection approval required. Vermont became the eighth state to legalize plug-in solar; customers with an existing net-metering system cannot also add a plug-in device.",
+      "source": "Plug-In Solar US",
+      "url": "https://pluginsolarus.com/learn/vermont-s202-plug-in-solar"
     },
     {
       "date": "2026-06-11",
