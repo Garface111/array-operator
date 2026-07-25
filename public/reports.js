@@ -738,7 +738,7 @@
  // same so_session and calls the same /v1 API, so there's no auth plumbing.
  // Flag-gated while the spike bakes: ?genrep=1 persists the flag, ?genrep=0
  // clears it. Map: C:\Users\fordg\CC\nepool-fold\MAP.md.
- const GENREP_V = "20260725rm1";
+ const GENREP_V = "20260725onepage1";
  function genrepFlag() {
  try {
  const m = location.search.match(/[?&]genrep=([01])/);
@@ -841,6 +841,9 @@
  // Banner is additive honesty when the account flag is still off. Embed still
  // mounts for exploration even without the flag (backend may soft-open).
  host.dataset.genrepBoot = "1";
+ // Start (or reuse) the bundle fetch NOW so it downloads in parallel with the
+ // account probe below instead of after it.
+ preloadGenrepAssets();
  host.innerHTML = '<div class="rb-fin-loading">Loading generation reports…</div>';
  let showBanner = false;
  try {
@@ -873,6 +876,30 @@
  }, 1200);
  });
 
+ // Warm the embed's CSS + JS before the operator ever clicks the pill —
+ // fetching ~360KB gz ON CLICK was most of the perceived load (Ford
+ // 2026-07-24 "make it load faster"). The bundle only registers
+ // window.NepoolGenReports (no mount side effects) and the CSS is scoped
+ // under #so-genrep, so eager injection is inert until mount.
+ function preloadGenrepAssets() {
+ try {
+ if (!document.getElementById("genrepCss")) {
+ const l = document.createElement("link");
+ l.id = "genrepCss"; l.rel = "stylesheet";
+ l.href = "/genrep/embed.css?v=" + GENREP_V;
+ document.head.appendChild(l);
+ }
+ if (!window.NepoolGenReports && !document.getElementById("genrepJs")) {
+ const s = document.createElement("script");
+ s.id = "genrepJs";
+ s.src = "/genrep/embed.js?v=" + GENREP_V;
+ document.head.appendChild(s);
+ }
+ } catch (e) { /* preload is best-effort */ }
+ }
+ if (window.requestIdleCallback) requestIdleCallback(preloadGenrepAssets, { timeout: 8000 });
+ else setTimeout(preloadGenrepAssets, 3000);
+
  function mountGenrepEmbed(host) {
  if (!host || _genrepMounted) return;
  _genrepMounted = true;
@@ -889,7 +916,22 @@
  document.head.appendChild(l);
  }
  if (window.NepoolGenReports) { host.innerHTML = ""; window.NepoolGenReports.mount(host); return; }
+ const pre = document.getElementById("genrepJs");
+ if (pre) {
+ // The idle preload is already fetching the bundle — piggyback on it
+ // instead of injecting a duplicate script tag.
+ pre.addEventListener("load", () => {
+ try {
+ if (!window.NepoolGenReports) throw new Error("embed bundle didn't register");
+ host.innerHTML = "";
+ window.NepoolGenReports.mount(host);
+ } catch (e) { fail(e); }
+ });
+ pre.addEventListener("error", () => fail(new Error("couldn't fetch the module")));
+ return;
+ }
  const s = document.createElement("script");
+ s.id = "genrepJs";
  s.src = "/genrep/embed.js?v=" + GENREP_V;
  s.onload = () => {
  try {
