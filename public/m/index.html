@@ -2,13 +2,12 @@
 <html lang="en">
   <head>
     <!-- Boot-failure fallback (Ford, 2026-07-24) — replaces the 07-23 bounce that
-         sent every browser back to the desktop SPA. Instead of assuming /m is
-         broken, prove it at runtime: if the SPA has painted nothing into #root a
-         few seconds in (bad bundle, boot crash), fall back to the desktop site
-         rather than stranding the owner on a white screen. A healthy boot paints
-         immediately and this never fires. ?desktop=1 stops the desktop page from
-         bouncing straight back here, so there is no redirect loop.
-         Keep in sync with apps/owner-web/index.html. -->
+         sent every browser back to the desktop SPA. If the SPA has painted
+         nothing into #root a few seconds in (bad bundle, boot crash), fall back
+         to the desktop site instead of stranding the owner on a white screen. A
+         healthy boot paints immediately and this never fires. ?desktop=1 stops
+         the desktop page bouncing straight back, so there is no redirect loop.
+         Keep in sync with public/m/index.html after vite builds. -->
     <script>
     (function () {
       try {
@@ -45,8 +44,6 @@
       } catch (e) {}
     })();
     </script>
-    <script src="/scroll-boost.js?v=20260721omnidian1"></script>
-
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -121,8 +118,8 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/m/assets/index-C_yA7_Ps.js"></script>
-    <link rel="stylesheet" crossorigin href="/m/assets/index-BjEAuVnq.css">
+    <script type="module" crossorigin src="/m/assets/index-CleD3kYo.js"></script>
+    <link rel="stylesheet" crossorigin href="/m/assets/index-kvqKrmit.css">
   </head>
   <body class="text-ink antialiased">
     <div id="root"></div>
