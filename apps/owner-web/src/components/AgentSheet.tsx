@@ -14,6 +14,7 @@ import {
   type AgentUploadAsset,
 } from "@/lib/api";
 import type { EnergyAgentPending } from "@/lib/types";
+import { SetupWidget, type SetupWidgetSpec } from "./SetupWidget";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AgentMarkdown } from "./AgentMarkdown";
 
@@ -22,6 +23,9 @@ type Msg = {
   text: string;
   tools?: string[];
   attachments?: string[];
+  /** Interactive setup card the agent opened (open_setup_widget). Rendered
+   *  under the message so the owner finishes the job in the conversation. */
+  widget?: SetupWidgetSpec;
 };
 
 type PendingAttach = AgentUploadAsset & { localName: string };
@@ -197,16 +201,32 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   }, [open, onClose]);
 
   function applyUiCommands(
-    cmds?: Array<{ type?: string; url?: string; hash?: string; label?: string }>
+    cmds?: Array<Record<string, unknown>>
   ) {
     if (!cmds?.length) return;
     for (const c of cmds) {
-      if (c.type === "open_url" && c.url) {
+      if (c.type === "open_url" && typeof c.url === "string") {
         try {
           window.open(c.url, "_blank", "noopener,noreferrer");
         } catch {
           /* ignore */
         }
+        continue;
+      }
+      // The agent opened a real setup form. Attach it to the message it just
+      // sent so it renders inline, right under what the agent said about it.
+      if (c.type === "setup_widget") {
+        const spec = c as unknown as SetupWidgetSpec;
+        setMsgs((prev) => {
+          const next = [...prev];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === "agent") {
+              next[i] = { ...next[i], widget: spec };
+              return next;
+            }
+          }
+          return [...next, { role: "agent", text: "", widget: spec }];
+        });
       }
     }
   }
@@ -695,6 +715,14 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
                     </div>
                   ) : null}
                 </div>
+                {m.widget ? (
+                  <SetupWidget
+                    spec={m.widget}
+                    onResult={(line) =>
+                      setMsgs((prev) => [...prev, { role: "agent", text: line }])
+                    }
+                  />
+                ) : null}
                 {m.tools?.length ? (
                   <div className="mt-1 flex max-w-[92%] flex-wrap gap-1 px-0.5">
                     {m.tools.map((t) => (
