@@ -854,3 +854,37 @@ html.sky .rb2-railtools .rb2-ti--rate{background:#6366f1;color:#fff;
 @supports (corner-shape: squircle){
   html.sky .rb2-ti{corner-shape:squircle}
 }
+
+/* ── landing6 sky ────────────────────────────────────────────────────────────
+   1 · rate row = the exact white glass pill the .rb-btn system paints */
+html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool{
+  background:rgba(255,255,255,.7)!important;
+  border:1px solid rgba(255,255,255,.9)!important;
+  border-radius:999px!important;
+  box-shadow:0 2px 10px rgba(20,60,120,.07)}
+html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool:hover{
+  background:rgba(255,255,255,.92)!important}
+/* 2 · the offtaker search bar — a proper sky glass pill with a real focus ring */
+html.sky #rbList .rb-osearch.rb-osearch-lg{
+  background:rgba(255,255,255,.8);
+  border:1px solid rgba(255,255,255,.92);
+  border-radius:999px;
+  padding:13px 20px;gap:11px;
+  box-shadow:0 8px 26px -10px rgba(20,60,120,.16), inset 0 1px 0 rgba(255,255,255,.95);
+}
+html.sky #rbList .rb-osearch.rb-osearch-lg:focus-within{
+  background:rgba(255,255,255,.96);
+  border-color:rgba(33,150,243,.55);
+  box-shadow:0 0 0 4px rgba(33,150,243,.14), 0 8px 26px -10px rgba(20,60,120,.16);
+}
+html.sky #rbList .rb-osearch-lg .rb-osearch-ico{color:var(--sky-primary-deep,#1976D2)}
+html.sky #rbList .rb-osearch-lg .rb-osearch-ico svg{width:17px;height:17px}
+html.sky #rbList .rb-osearch-lg input{font-size:13.5px;color:var(--ink,#1e293b)}
+html.sky #rbList .rb-osearch-lg input::placeholder{color:#6b83a6}
+html.sky #rbList .rb-osearch-lg .rb-osearch-hint,
+html.sky #rbList .rb-osearch-lg .rb-osearch-n{
+  background:rgba(33,150,243,.10);color:#1565C0;border-radius:999px;
+  padding:4px 12px;font-size:11px;font-weight:700;white-space:nowrap}
+@supports (corner-shape: squircle){
+  html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool{corner-shape:squircle}
+}

@@ -1924,6 +1924,32 @@
  let _billArchivePromise = null;
  let _archiveOpen = false; // remember the panel's open/closed state across refreshes
  let _billArchiveOpen = false;
+
+ // Keep the rail entry rows + the left-column panel visibility honest against
+ // the open states (closing both via the panels' own summaries re-hides the
+ // panel; the rail rows' pressed state always mirrors reality).
+ function _syncArchiveEntryPoints() {
+ const host = $("#rbArchiveHost");
+ if (host && host.innerHTML) host.hidden = !(_archiveOpen || _billArchiveOpen);
+ const a = document.getElementById("rb2RailArch");
+ if (a) a.setAttribute("aria-pressed", String(!!_archiveOpen));
+ const b = document.getElementById("rb2RailBillArch");
+ if (b) b.setAttribute("aria-pressed", String(!!_billArchiveOpen));
+ }
+
+ // Rail entry point: toggle one archive panel open/closed. Opening reveals the
+ // panel in the list column and scrolls to it.
+ function toggleArchivePanel(which) {
+ if (which === "bills") _billArchiveOpen = !_billArchiveOpen;
+ else _archiveOpen = !_archiveOpen;
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (_archiveOpen || _billArchiveOpen) {
+ const host = $("#rbArchiveHost");
+ if (host && !host.hidden) requestAnimationFrame(() =>
+ host.scrollIntoView({ behavior: "smooth", block: "start" }));
+ }
+ }
  function loadArchive() {
  if (ARCHIVE) return Promise.resolve(ARCHIVE);
  if (_archivePromise) return _archivePromise;
@@ -1990,7 +2016,23 @@
  const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
  const billCount = (BILL_ARCHIVE && BILL_ARCHIVE.count) || bills.length || 0;
  if (!ARCHIVE && !BILL_ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
- host.hidden = false;
+ // The archives' ENTRY POINTS live in the rail (Ford 2026-07-28); the panel
+ // itself only occupies the list column while one of them is open.
+ host.hidden = !(_archiveOpen || _billArchiveOpen);
+ const railArch = document.getElementById("rb2RailArch");
+ if (railArch) {
+ railArch.hidden = !ARCHIVE;
+ railArch.setAttribute("aria-pressed", String(!!_archiveOpen));
+ const meta = document.getElementById("rb2RailArchMeta");
+ if (meta) meta.textContent = total ? `${fmt0(total)} month${total === 1 ? "" : "s"}` : "empty";
+ }
+ const railBill = document.getElementById("rb2RailBillArch");
+ if (railBill) {
+ railBill.hidden = !BILL_ARCHIVE;
+ railBill.setAttribute("aria-pressed", String(!!_billArchiveOpen));
+ const meta = document.getElementById("rb2RailBillArchMeta");
+ if (meta) meta.textContent = billCount ? `${fmt0(billCount)} bills` : "empty";
+ }
 
  // ── Invoice archive ────────────────────────────────────────────────────
  let invHtml = "";
@@ -2173,9 +2215,15 @@
  }
  function wireArchiveToggle() {
  const det = $("#rbArch");
- if (det) det.addEventListener("toggle", () => { _archiveOpen = det.open; });
+ if (det) det.addEventListener("toggle", () => {
+ _archiveOpen = det.open;
+ _syncArchiveEntryPoints();
+ });
  const billDet = $("#rbBillArch");
- if (billDet) billDet.addEventListener("toggle", () => { _billArchiveOpen = billDet.open; });
+ if (billDet) billDet.addEventListener("toggle", () => {
+ _billArchiveOpen = billDet.open;
+ _syncArchiveEntryPoints();
+ });
  }
  async function downloadUtilityBill(url, filename, btn) {
  if (!url || btn.disabled) return;
@@ -2800,6 +2848,10 @@
  if (xp) xp.onclick = () => { setRailEditing(false); const b = document.getElementById("rb2ExportBtn"); if (b) b.click(); };
  const em = document.getElementById("rb2RailMiniEmail");
  if (em) em.onclick = () => { const b = document.getElementById("rbEmailStudio"); if (b) b.click(); };
+ const ar = document.getElementById("rb2RailArch");
+ if (ar) ar.onclick = () => toggleArchivePanel("inv");
+ const br = document.getElementById("rb2RailBillArch");
+ if (br) br.onclick = () => toggleArchivePanel("bills");
  }
 
  // Renders the rail's cycle card from PIPE (the send-pipeline BAND is gone —
@@ -2903,6 +2955,8 @@
  // ── wiring ──
  const cellLast = host.querySelector("#rb2CellLast");
  if (cellLast) cellLast.onclick = () => {
+ // The archive panel is rail-toggled now — open it if it isn't, then scroll.
+ if (!_archiveOpen) { toggleArchivePanel("inv"); return; }
  const a = document.getElementById("rbArchiveHost");
  if (a && !a.hidden) a.scrollIntoView({ behavior: "smooth", block: "start" });
  };
@@ -3274,6 +3328,12 @@
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
  </details>
+ <div class="rb2-toolsep" aria-hidden="true"></div>
+ <!-- Archives live in the rail now (Ford 2026-07-28): the rows reveal the
+ full archive panel in the list column and scroll to it; hidden until a
+ manifest actually has content. -->
+ <button class="ao-btn rb-btn rb2-tool" id="rb2RailArch" type="button" hidden aria-pressed="false" title="Every completed month's invoices, offtaker bills, and array bills — with per-month .zip downloads."><span class="rb2-ti rb2-ti--arch" aria-hidden="true">🗂&#xFE0E;</span><span class="rb2-tl">Invoice archive</span><span class="rb2-tv" id="rb2RailArchMeta"></span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rb2RailBillArch" type="button" hidden aria-pressed="false" title="Every captured utility bill PDF on file, grouped by year."><span class="rb2-ti rb2-ti--billarch" aria-hidden="true">🗞&#xFE0E;</span><span class="rb2-tl">Utility bill archive</span><span class="rb2-tv" id="rb2RailBillArchMeta"></span></button>
  </div>
  </aside>
  <aside class="rb2-railmini" id="rb2RailMini" hidden aria-label="Invoicing rail, minimized while editing">
