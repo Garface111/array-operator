@@ -888,3 +888,6 @@ html.sky #rbList .rb-osearch-lg .rb-osearch-n{
 @supports (corner-shape: squircle){
   html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool{corner-shape:squircle}
 }
+
+/* landing7: every chip carries the same soft lift on sky */
+html.sky .rb2-railtools .rb2-ti{box-shadow:0 3px 8px -2px rgba(20,60,120,.28)}

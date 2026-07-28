@@ -1937,18 +1937,45 @@
  if (b) b.setAttribute("aria-pressed", String(!!_billArchiveOpen));
  }
 
- // Rail entry point: toggle one archive panel open/closed. Opening reveals the
- // panel in the list column and scrolls to it.
- function toggleArchivePanel(which) {
- if (which === "bills") _billArchiveOpen = !_billArchiveOpen;
- else _archiveOpen = !_archiveOpen;
- renderArchive();
- _syncArchiveEntryPoints();
- if (_archiveOpen || _billArchiveOpen) {
+ // Opening an archive folds the whole offtaker tree first (Ford 2026-07-28:
+ // "collapse all the other rows so everything folds, then take me to the
+ // archive") — close any open editor, collapse every source + array group,
+ // re-render the list, then land on the archive.
+ function _foldListForArchive() {
+ if (ACTIVE_SUB_ID != null) collapseAccordion(String(ACTIVE_SUB_ID));
+ Object.keys(PROVIDER_COLLAPSED).forEach(k => { PROVIDER_COLLAPSED[k] = true; });
+ Object.keys(GROUP_COLLAPSED).forEach(k => { GROUP_COLLAPSED[k] = true; });
+ if (LAST_LIST_ARGS) renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
+ }
+ function _scrollToArchive() {
  const host = $("#rbArchiveHost");
  if (host && !host.hidden) requestAnimationFrame(() =>
  host.scrollIntoView({ behavior: "smooth", block: "start" }));
  }
+
+ // Rail entry point: toggle one archive panel open/closed. Opening folds the
+ // list, reveals the panel in the list column, and scrolls to it. If the bill
+ // manifest failed to load earlier (the endpoint used to 504 on big fleets),
+ // opening retries the fetch instead of silently doing nothing.
+ function toggleArchivePanel(which) {
+ if (which === "bills" && !BILL_ARCHIVE) {
+ const meta = document.getElementById("rb2RailBillArchMeta");
+ if (meta) meta.textContent = "loading…";
+ _billArchiveOpen = true;
+ loadBillArchive().then(() => {
+ if (!BILL_ARCHIVE) _billArchiveOpen = false; // failed again — honest state
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (BILL_ARCHIVE) { _foldListForArchive(); _scrollToArchive(); }
+ });
+ return;
+ }
+ const opening = which === "bills" ? !_billArchiveOpen : !_archiveOpen;
+ if (which === "bills") _billArchiveOpen = !_billArchiveOpen;
+ else _archiveOpen = !_archiveOpen;
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (opening) { _foldListForArchive(); _scrollToArchive(); }
  }
  function loadArchive() {
  if (ARCHIVE) return Promise.resolve(ARCHIVE);
@@ -1971,6 +1998,7 @@
  })().then(v => { _archivePromise = null; return v; });
  return _archivePromise;
  }
+ let _billArchiveFailed = false; // last fetch definitively failed (e.g. edge 504)
  function loadBillArchive() {
  if (BILL_ARCHIVE) return Promise.resolve(BILL_ARCHIVE);
  if (_billArchivePromise) return _billArchivePromise;
@@ -1978,10 +2006,11 @@
  _billArchivePromise = fetch(API + "/utility-bill-archive", { headers: authHeaders() })
  .then(r => (r.ok ? r.json() : null))
  .then(d => {
- if (d && d.ok) BILL_ARCHIVE = d;
+ if (d && d.ok) { BILL_ARCHIVE = d; _billArchiveFailed = false; }
+ else _billArchiveFailed = true;
  return BILL_ARCHIVE;
  })
- .catch(() => null)
+ .catch(() => { _billArchiveFailed = true; return null; })
  .then(v => { _billArchivePromise = null; return v; });
  return _billArchivePromise;
  }
@@ -2028,10 +2057,14 @@
  }
  const railBill = document.getElementById("rb2RailBillArch");
  if (railBill) {
- railBill.hidden = !BILL_ARCHIVE;
+ // Show the row when the manifest loaded OR when the fetch failed — a
+ // failed load renders an honest "retry" the click actually retries.
+ railBill.hidden = !BILL_ARCHIVE && !_billArchiveFailed;
  railBill.setAttribute("aria-pressed", String(!!_billArchiveOpen));
  const meta = document.getElementById("rb2RailBillArchMeta");
- if (meta) meta.textContent = billCount ? `${fmt0(billCount)} bills` : "empty";
+ if (meta) meta.textContent = BILL_ARCHIVE
+ ? (billCount ? `${fmt0(billCount)} bills` : "empty")
+ : "couldn't load · retry";
  }
 
  // ── Invoice archive ────────────────────────────────────────────────────
@@ -3243,10 +3276,10 @@
  and space and color in between the buttons"). Hairline separators split
  grow-the-book / send-and-connect / settings. Ids + wiring unchanged. -->
  <button class="ao-btn rb-btn rb2-tool rb2-railadd" id="rbCustAdd" type="button"><span class="rb2-ti rb2-ti--add" aria-hidden="true">＋</span><span class="rb2-tl">Add an offtaker</span></button>
- <button class="ao-btn rb-btn rb2-tool" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating."><span class="rb2-ti rb2-ti--bulk" aria-hidden="true">⬆</span><span class="rb2-tl">Bulk import</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating."><span class="rb2-ti rb2-ti--bulk" aria-hidden="true">↑</span><span class="rb2-tl">Bulk import</span></button>
  <div class="rb2-toolsep" aria-hidden="true"></div>
  <div class="rb2-exportwrap">
- <button class="ao-btn rb-btn rb2-tool" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="rb2-ti rb2-ti--export" aria-hidden="true">⬇</span><span class="rb2-tl">Export to accounting</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="rb2-ti rb2-ti--export" aria-hidden="true">↓</span><span class="rb2-tl">Export to accounting</span></button>
  <div class="rb2-exportpop" id="rb2ExportPop" hidden>
  <div class="rb2-exportpop-h">Export invoices to accounting</div>
  <p class="rb2-exportpop-p">Pick your accounting system, the invoice date, and the billing cycle. The batch drafts every offtaker's invoice and downloads a file that imports directly.</p>
@@ -3286,7 +3319,7 @@
  </div>
  </div>
  </div>
- <button class="ao-btn rb-btn rb2-tool" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills."><span class="rb2-ti rb2-ti--link" aria-hidden="true">🔗</span><span class="rb2-tl">Link utility bills</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills."><span class="rb2-ti rb2-ti--link" aria-hidden="true">🔗&#xFE0E;</span><span class="rb2-tl">Link utility bills</span></button>
  <div class="rb2-toolsep" aria-hidden="true"></div>
  <!-- The two MASTER settings sit together as a matched pair (Ford 2026-07-28):
  same indigo chip family, same label + value-pill anatomy. -->

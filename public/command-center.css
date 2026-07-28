@@ -4228,3 +4228,12 @@ body.ho-shell-open .vs-inv-sub{
 /* archive chips (rail entry rows) */
 .rb2-ti--arch{background:rgba(180,83,9,.12);color:#92600a}
 .rb2-ti--billarch{background:rgba(100,116,139,.13);color:#475569}
+
+/* ── landing7: chip makeover — ONE treatment for all eight (Ford: "some are
+   just gray or a really light shade... common theme"). Every chip is a solid
+   colored squircle with a white glyph. */
+.rb2-ti--bulk{background:#0891b2;color:#fff}
+.rb2-ti--export{background:#0d9488;color:#fff}
+.rb2-ti--link{background:#059669;color:#fff}
+.rb2-ti--arch{background:#d97706;color:#fff}
+.rb2-ti--billarch{background:#64748b;color:#fff}
