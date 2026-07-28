@@ -1410,6 +1410,7 @@
  wireSubtabs();
  wireGenTabs(); // "Offtakers | Bill audit" segmented toggle
  wireGlobalRate();
+ wireRail(); // the rail's mini-strip buttons (expand / approve / add / export / email)
  // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
  // spreadsheet); the upload zone + live doc-preview live inside that panel
  // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
@@ -2240,6 +2241,7 @@
  el.innerHTML = shell();
  wireGenTabs(); // the "Offtakers | Bill audit" toggle works in the demo too (audit shows the sign-in state)
  wireMasterEmail(); // sample preview card + Customize CTA (demo-nudged)
+ wireRail(); // rail mini-strip works in the demo too (open a card → rail minimizes)
  _demoBuilt = true;
  }
  // Demo note, big-operator snapshot (scale from AO_DEMO.meta when present).
@@ -2746,10 +2748,58 @@
  } catch (e) { /* the band stays hidden, never blocks the tab */ }
  }
 
+ // ═══ THE RAIL (2026-07-28 landing redesign) ═══════════════════════════════
+ // The rail minimizes to an icon strip while an offtaker editor is open so the
+ // editor + live preview get the width (Ford: "too cramped when the preview is
+ // displayed"). « on the strip brings the full rail back without closing the card.
+ function setRailEditing(on) {
+ const main = document.getElementById("rb2Main");
+ if (!main) return;
+ main.classList.toggle("rb2-editing", !!on);
+ const full = document.getElementById("rb2Rail");
+ const mini = document.getElementById("rb2RailMini");
+ if (full) full.hidden = !!on;
+ if (mini) mini.hidden = !on;
+ }
+
+ // Open the first offtaker whose draft awaits approval. The card may live inside
+ // a lazily-collapsed (unrendered) group, so set ACTIVE_SUB_ID first and re-render
+ // from the cached list args — renderAccordion force-opens the groups holding it.
+ let LAST_LIST_ARGS = null;
+ function openFirstApproval() {
+ const first = (OFFTAKERS || []).find(s => DRAFT_BY_SUB[String(s.id)]);
+ if (!first) return;
+ const sid = String(first.id);
+ if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
+ ACTIVE_SUB_ID = sid;
+ renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
+ }
+ expandAccordion(sid);
+ }
+
+ // One-time wiring for the rail's static mini-strip buttons (shell()-rendered,
+ // shared by the signed-in and demo paths).
+ function wireRail() {
+ const ex = document.getElementById("rb2RailExpand");
+ if (ex) ex.onclick = () => setRailEditing(false);
+ const badge = document.getElementById("rb2RailMiniBadge");
+ if (badge) badge.onclick = () => openFirstApproval();
+ const add = document.getElementById("rb2RailMiniAdd");
+ if (add) add.onclick = () => { const b = document.getElementById("rbCustAdd"); if (b) b.click(); };
+ const xp = document.getElementById("rb2RailMiniExport");
+ if (xp) xp.onclick = () => { setRailEditing(false); const b = document.getElementById("rb2ExportBtn"); if (b) b.click(); };
+ const em = document.getElementById("rb2RailMiniEmail");
+ if (em) em.onclick = () => { const b = document.getElementById("rbEmailStudio"); if (b) b.click(); };
+ }
+
+ // Renders the rail's cycle card from PIPE (the send-pipeline BAND is gone —
+ // Ford 2026-07-28: "delete the send pipeline visual, it's too busy" — but every
+ // fact and control it carried lives on: approve count + $, delivered line →
+ // archive, next run, pause/resume, and the delivery-mode slider, all here).
  function renderPipeline() {
- const host = document.getElementById("rb2Pipe");
+ const host = document.getElementById("rb2RailCycle");
  if (!host) return;
- // Signed-out demo paints a frozen pipeline from AO_DEMO.pipeline.
+ // Signed-out demo paints a frozen cycle card from AO_DEMO.pipeline.
  if (!PIPE || (!authHeaders() && !(window.AO_DEMO && window.AO_DEMO.pipeline))) {
  host.hidden = true; return;
  }
@@ -2760,23 +2810,51 @@
  const lastRun = last.last_run_at
  ? new Date(last.last_run_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
  : "—";
- const approvalTotal = (monthly.approval || 0) + (quarterly.approval || 0);
- const autoTotal = (monthly.auto || 0) + (quarterly.auto || 0);
  const days = _daysUntil(monthly.fires_at);
- // The "now" divider between last-delivered and this-cycle shows the ACTUAL current
- // date (Ford 2026-07-11, a bare vertical "NOW" read as cramped/odd).
- const todayLabel = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+ // Honest split (Ford 2026-07-07): an auto-send draft is NOT "awaiting
+ // approval", it sends itself. Lead with what actually needs the operator.
+ const appr = inf.pending_approval != null ? inf.pending_approval : (inf.pending_drafts || 0);
+ const au = inf.pending_auto || 0;
+ const wait = inf.waiting || 0;
+ // $ across the pending-drafts inbox — best-effort display sum only.
+ let apprUsd = 0;
+ (INBOX_DRAFTS || []).forEach(d => { if (d && d.amount_usd != null) apprUsd += Number(d.amount_usd) || 0; });
+ const big = appr > 0
+ ? `${fmt0(appr)} <span>to approve</span>`
+ : (au > 0 ? `${fmt0(au)} <span>auto-sending</span>`
+ : (wait > 0 ? `${fmt0(wait)} <span>waiting on bills</span>`
+ : `<span>all caught up</span>`));
+ const cap = appr > 0 && apprUsd > 0
+ ? `${money0(apprUsd)} drafted from settled bills`
+ : `drafted from settled utility bills`;
+ const chips = [
+ au > 0 ? `<span class="rb2-pc b">${fmt0(au)} auto-sending</span>` : "",
+ wait > 0 ? `<span class="rb2-pc m">${fmt0(wait)} waiting on bills</span>` : "",
+ ].filter(Boolean).join("");
  host.hidden = false;
- host.className = "rb2-pipe" + (paused ? " paused" : "");
- // Pipeline stages only, no animated "energy balls" (visual misstep, removed).
+ host.className = "rb2-railcycle" + (paused ? " paused" : "");
  host.innerHTML = `
- <div class="rb2-pipe-label">
- <h2>Send pipeline</h2>
- ${paused ? '<span class="rb2-pausechip">⏸ SENDING PAUSED</span>' : ""}
- <small class="rb2-rules">monthly invoices fire the 1st · an invoice only generates once its utility bill settles</small>
+ <div class="rb2-rc-head">
+ <span class="rb2-rc-eyebrow">This cycle</span>
+ ${paused ? '<span class="rb2-pausechip">⏸ PAUSED</span>' : ""}
  <span class="rb2-sp"></span>
  <span class="rb2-draftstat" id="rb2DraftStatus" hidden></span>
- <small class="rb2-runstamp"><b>last run</b> ${esc(lastRun)} · next ${esc(_fireLabel(monthly.fires_at))}</small>
+ </div>
+ <div class="rb2-rc-big">${big}</div>
+ <div class="rb2-rc-cap">${cap}</div>
+ ${appr > 0 ? `<button class="ao-btn ao-btn-primary rb-btn rb2-rc-review" id="rb2RailReview" type="button">Review &amp; approve →</button>` : ""}
+ ${chips ? `<div class="rb2-rc-chips">${chips}</div>` : ""}
+ <div class="rb2-rc-rows">
+ <div class="rb2-rc-row" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive. Download this month as a .zip there.">
+ <span class="rb2-rc-check">✓</span><b>${esc(_monthName(last.period_month))}</b>
+ <span>${fmt0(last.delivered || 0)} of ${fmt0(p.total_enabled || 0)} sent${last.dollars ? " · " + money0(last.dollars) : ""}</span>
+ <span class="rb2-sp"></span><span class="rb2-rc-quiet">archive</span>
+ </div>
+ <div class="rb2-rc-row">
+ <span class="rb2-rc-dot" aria-hidden="true"></span><b>${esc(_fireLabel(monthly.fires_at))}</b>
+ <span>next run · ${fmt0(monthly.scheduled || 0)} scheduled${paused ? " · paused" : (days != null ? " · in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</span>
+ </div>
+ ${paused ? `<div class="rb2-pausednote">⏸ Paused. Runs won't fire until you resume. Manual sends still work.</div>` : ""}
  </div>
  <div class="rb2-moderow" title="The default for every offtaker once its invoice drafts. Approve to send: it waits for your OK. Auto-send: it emails itself on schedule. Per-offtaker settings still override; demo accounts don't send real mail.">
  <span class="rb2-modelab">When an invoice is drafted</span>
@@ -2787,43 +2865,16 @@
  ${paused ? `<button class="rb2-pswitch" id="rb2Pause" role="switch" aria-checked="true" type="button">
  <span class="rb2-knob" aria-hidden="true"></span>Resume sending
  </button>` : ""}
- </div>
- <div class="rb2-pipe-row">
- <div class="rb2-pcell done" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive. Download this month as a .zip there.">
- <div class="rb2-when"><b>${esc(_monthName(last.period_month))} · delivered</b><small>ran ${esc(lastRun)}</small></div>
- <div class="rb2-big">${fmt0(last.delivered || 0)} <span>of ${fmt0(p.total_enabled || 0)}${last.dollars ? " · " + money0(last.dollars) : ""}</span></div>
- <div class="rb2-chips"><span class="rb2-pc g">✓ ${fmt0(last.delivered || 0)} sent</span></div>
- </div>
- <div class="rb2-nowmark" aria-hidden="true"><span class="rb2-now-pill"><em>Today</em><b>${esc(todayLabel)}</b></span></div>
- <div class="rb2-pcell now">
- <div class="rb2-when"><b>This cycle</b><small>drafted from settled bills</small></div>
- ${(() => {
- // Honest split (Ford 2026-07-07): an auto-send draft is NOT "awaiting
- // approval", it sends itself. Lead with what actually needs the operator;
- // if nothing does, lead with what's flowing automatically.
- const appr = inf.pending_approval != null ? inf.pending_approval : (inf.pending_drafts || 0);
- const au = inf.pending_auto || 0;
- const wait = inf.waiting || 0;
- const primary = appr > 0
- ? `${fmt0(appr)} <span>awaiting your approval</span>`
- : (au > 0 ? `${fmt0(au)} <span>sending automatically</span>`
- : `${fmt0(wait)} <span>waiting on bills</span>`);
- const chips = [
- appr > 0 ? `<span class="rb2-pc a">${fmt0(appr)} to approve</span>` : "",
- au > 0 ? `<span class="rb2-pc b">${fmt0(au)} auto-sending</span>` : "",
- wait > 0 ? `<span class="rb2-pc m">${fmt0(wait)} waiting on bills</span>` : "",
- ].filter(Boolean).join("");
- return `<div class="rb2-big">${primary}</div>
- <div class="rb2-chips">${chips || '<span class="rb2-pc g">✓ all caught up</span>'}</div>`;
- })()}
- </div>
- <div class="rb2-pcell sched">
- <div class="rb2-when"><b>${esc(_fireLabel(monthly.fires_at))} · next run</b><small>${paused ? "paused" : (days != null ? "fires in " + fmt0(days) + " day" + (days === 1 ? "" : "s") : "")}</small></div>
- <div class="rb2-big">${fmt0(monthly.scheduled || 0)} <span>scheduled</span></div>
- <div class="rb2-chips"><span class="rb2-pc b">${fmt0(monthly.auto || 0)} auto-send</span><span class="rb2-pc m">${fmt0(monthly.approval || 0)} draft for approval</span></div>
- ${paused ? `<div class="rb2-pausednote">⏸ Paused. This run won't fire until you resume. Manual sends still work.</div>` : ""}
- </div>
  </div>`;
+ // Mini-strip badge mirrors the approve count while the rail is minimized.
+ const badge = document.getElementById("rb2RailMiniBadge");
+ if (badge) {
+ badge.hidden = !(appr > 0);
+ badge.textContent = fmt0(appr);
+ badge.title = `${fmt0(appr)} to approve${apprUsd > 0 ? " · " + money0(apprUsd) : ""} — open the first`;
+ }
+ const review = host.querySelector("#rb2RailReview");
+ if (review) review.onclick = () => openFirstApproval();
 
  // Keep the header promise HONEST against the visible auto-send counts (sim #5):
  // the blanket "Review before you send it" contradicts an "Auto-sending N"
@@ -3073,39 +3124,42 @@
  function shell() {
  return `
  <div id="rbSubInvoice" class="rb-subpanel rb2">
- <!-- ═ Redesign (Ford-approved mock, 2026-07-03): header band (title + KPIs)
- + send-pipeline band + connection rail + sticky action bar over the
- collapsed hierarchy. Every legacy id/host below is PRESERVED, only
- the frame around them changed, so all existing wiring keeps working. ═ -->
+ <!-- ═ Landing redesign (Ford-approved sketch, 2026-07-28, sketches/
+ invoices-landing-redesign): Data source → Array → Offtaker hierarchy,
+ the send-pipeline band is GONE (its essentials live in a sticky right
+ rail that MINIMIZES while an offtaker editor is open), and the master
+ credit rate is a chip in the "Your offtakers" bar. Every legacy id
+ below is PRESERVED so all existing wiring keeps working; the offtaker
+ editor level is untouched by design ("only the top-down picture"). ═ -->
  <div class="rb2-head">
  <div class="rb2-id">
  <h1>Offtaker invoicing</h1>
  <p id="rb2Sub">Every offtaker's solar credit invoice, generated from their settled utility bills. <b>Review before you send it.</b></p>
- <!-- Tabs + a slim glance-line share one row (Ford 2026-07-10 declutter). The
- old 4-card KPI strip just restated the send-pipeline band below it, so it's
- gone, only the ONE signal the pipeline doesn't carry (do the bills reconcile
- against GMP?) survives, as an inline status. Same #rb2Kpis host + renderKpis
- wiring; it renders one line now instead of four cards. -->
- <!-- Sub-nav lives above the sheet (index.html .inv-sub-seg), matching
- Analysis Fleet analysis | Trends | Resources. KPI glance stays here. -->
+ <!-- Sub-nav lives above the sheet (index.html .inv-sub-seg). The KPI
+ glance keeps the one fact the rail doesn't carry (reconcile). -->
  <div class="rb2-tabrow rb2-tabrow--kpis-only">
  <div class="rb2-kpis" id="rb2Kpis" hidden></div>
  </div>
  </div>
  </div>
- <div class="rb2-pipe" id="rb2Pipe" hidden></div>
  <div id="rbAuditView" class="rb-au" style="display:none"></div>
  <div id="rbFinTrends" class="rb-fin" style="display:none" aria-label="Invoice trends"></div>
  <div id="rbGenReportsView" class="rb-genrep" style="display:none" aria-label="Generation reports"></div>
  <div id="rbGenList">
- <!-- Master solar credit rate — collapsed by default (fleet-wide optional override).
- Wired by wireGlobalRate() → GET/PUT /v1/array-operator/billing/global-rate. -->
- <details class="rb-fleet-fold rb-globalrate rep-card" id="rbGlobalRate">
- <summary class="rb-fleet-fold-sum">
- <span class="rb-fleet-fold-title">Master solar credit rate</span>
- <span class="rb-fleet-fold-hint">Optional · blank = each offtaker’s own bill rate</span>
- </summary>
- <div class="rb-fleet-fold-body">
+ <div class="rb2-main" id="rb2Main">
+ <div class="rb2-listcol">
+ <div class="rb-listwrap rb2-listwrap">
+ <div class="rb2-controls">
+ <span class="rb2-controls-label">Your offtakers</span>
+ <!-- Sources status pill (same host id + refreshGmpBillsStatus wiring). -->
+ <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
+ <span class="rb2-sp"></span>
+ <!-- Master solar credit rate — now a CHIP in this bar (Ford 2026-07-28);
+ opens the same optional-fleet-override editor as a popover. Same ids,
+ wired by wireGlobalRate() → GET/PUT /global-rate. -->
+ <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">
+ <summary class="rb2-ratechip-sum" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate.">Master rate · <b id="rbGrChipVal">per-bill</b></summary>
+ <div class="rb2-ratechip-pop">
  <div class="rb-gr-main">
  <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
  the solar credit rate on <b>their own utility sub-account bill</b>
@@ -3138,22 +3192,26 @@
  <div class="rb-gr-eff" id="rbGrEff"></div>
  </div>
  </details>
- <!-- Master offtaker email is edited only via the toolbar "✉ Master email · all
- offtakers" button next to Link utility bills (Ford 2026-07-21: drop the
- fleet-fold dropdown; one entry point). -->
- <div class="rb-listwrap rb2-listwrap">
- <div class="rb2-controls">
- <span class="rb2-controls-label">Your offtakers</span>
- <!-- Connection rail folded INTO the toolbar row (Ford 2026-07-10 declutter):
- the ✓-sources line + ⚡ auto-refresh nudge used to stack as two full-width
- banners above the list, now they render as one slim inline status pill
- right of the label. Same host id + refreshGmpBillsStatus wiring. -->
- <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
- <span class="rb2-sp"></span>
- <div class="rb-head-actions rb2-actions">
- <!-- Portfolio-level batch export, now folded into ONE Export popover
- (approved mock): same two CSV buttons + the Xero AccountCode
- field, same ids, same wiring (wireExport). -->
+ </div>
+ <!-- Invoice archive (monthly directory), collapsible month-close surface. -->
+ <div id="rbArchiveHost" hidden></div>
+ <div id="rbCustManual"></div>
+ <div id="rbBulkHost"></div>
+ <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
+ <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
+ <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
+ </div>
+ </div>
+ <!-- ═ THE RAIL: cycle status + every portfolio tool, one sticky column.
+ renderPipeline() fills #rb2RailCycle; the tools are static so the
+ existing load()-time wiring finds the same ids. While an offtaker
+ card is open the rail minimizes to the icon strip (#rb2RailMini). ═ -->
+ <div class="rb2-railslot">
+ <aside class="rb2-railfull" id="rb2Rail" aria-label="Invoicing rail">
+ <div class="rb2-railcycle" id="rb2RailCycle" hidden></div>
+ <div class="rb2-railtools">
+ <button class="ao-btn rb-btn rb2-railadd" id="rbCustAdd" type="button">＋ Add an offtaker</button>
+ <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating.">⬆ Bulk import</button>
  <div class="rb2-exportwrap">
  <button class="ao-btn rb-btn" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false">⬇ Export</button>
  <div class="rb2-exportpop" id="rb2ExportPop" hidden>
@@ -3197,18 +3255,17 @@
  </div>
  <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only.">✉ Master email · all offtakers</button>
  <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
- <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating.">⬆ Bulk import</button>
- <button class="ao-btn ao-btn-primary rb-btn" id="rbCustAdd" type="button">＋ Add an offtaker</button>
  </div>
+ </aside>
+ <aside class="rb2-railmini" id="rb2RailMini" hidden aria-label="Invoicing rail, minimized while editing">
+ <button class="rb2-rm" id="rb2RailExpand" type="button" title="Show the rail">«</button>
+ <button class="rb2-rm rb2-rm-badge" id="rb2RailMiniBadge" type="button" hidden title="Invoices to approve">0</button>
+ <button class="rb2-rm" id="rb2RailMiniAdd" type="button" title="Add an offtaker">＋</button>
+ <button class="rb2-rm" id="rb2RailMiniExport" type="button" title="Export to accounting">⬇</button>
+ <button class="rb2-rm" id="rb2RailMiniEmail" type="button" title="Master email · all offtakers">✉</button>
+ </aside>
  </div>
- <!-- Invoice archive (monthly directory), collapsible month-close surface. -->
- <div id="rbArchiveHost" hidden></div>
- <div id="rbCustManual"></div>
- <div id="rbBulkHost"></div>
- <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
- <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
- <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
- </div>
+ </div><!-- /rb2Main -->
  <!-- ONE wired invoice-template box, PER-OFFTAKER: it folds into whichever
  offtaker card is open and rebinds to that offtaker's own template
  (foldTplIntoInbox → rebindTpl). Parked here (#rbTplHome, kept HIDDEN) when
@@ -3684,6 +3741,13 @@
  function renderEff() {
  const d = disc.value.trim() === "" ? effDisc * 100 : Number(disc.value);
  const raw = net.value.trim();
+ // The bar CHIP shows the effective master rate at a glance (Ford 2026-07-28);
+ // blank master → "per-bill" (each offtaker priced from their own bill).
+ const chipVal = document.getElementById("rbGrChipVal");
+ if (chipVal) {
+ const n = Number(raw);
+ chipVal.textContent = raw === "" || isNaN(n) ? "per-bill" : "$" + n.toFixed(4) + "/kWh";
+ }
  if (eff) {
  if (raw === "") {
  // Blank master → per-offtaker bill rates (no single $/kWh to preview).
@@ -3720,6 +3784,14 @@
  renderEff();
  net.addEventListener("input", renderEff);
  disc.addEventListener("input", renderEff);
+ // The chip's editor is a popover now — any outside click closes it.
+ if (!wireGlobalRate._closerWired) {
+ wireGlobalRate._closerWired = true;
+ document.addEventListener("click", (e) => {
+ const d = document.getElementById("rbGlobalRate");
+ if (d && d.open && !d.contains(e.target)) d.removeAttribute("open");
+ });
+ }
 
  save.onclick = async () => {
  const body = {};
@@ -6130,7 +6202,13 @@
  const arrName = (((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name || "").trim();
  const label = arrName || (acct ? utilityIdentity(acct)
  : (s.utility_account_name || "Ungrouped"));
+ // Data-source hierarchy (Ford 2026-07-28): the top level buckets by the
+ // DATA SOURCE the group's master bill is pulled from. An array group with
+ // no bound account at all is UNTETHERED → the "No data source yet" bucket.
+ const isArray = s.array_id != null;
+ const source = provider ? provider : (acct ? "other" : "none");
  groups[key] = { key, provider, providerLabel: provider ? provider.toUpperCase() : "Other",
+ source, host: acct || null, isArray,
  label, pctSum: 0, hasDraft: false, rows: [], shareMode: "meter" };
  order.push(key);
  }
@@ -6152,29 +6230,39 @@
  return list;
  }
 
- // Roll the per-utility-account groups UP into provider buckets (Ford: "organized by
- // utility (GMP VEC WEC etc), and THOSE can be collapsed and expanded as well, so it
- // goes utility → utility account → offtaker"). Returns an ORDERED array of
- // {provider, providerLabel, key, groups:[…], offtakerCount, hasDraft}. Buckets with a
- // pending draft float first (the "important things first" rule again), then alpha by
- // label; account-group order WITHIN each bucket is preserved from the input.
+ // Roll the per-array groups UP into DATA SOURCE buckets (Ford 2026-07-28:
+ // "the hierarchy is Data source → Array → Offtaker"). A source = the utility
+ // whose master bills the arrays under it invoice from; untethered array groups
+ // (no bound account) sink into a trailing "No data source yet" bucket. Returns
+ // an ORDERED array of {provider, providerLabel, key, groups:[…], offtakerCount,
+ // hasDraft, hosts}. Buckets with a pending draft float first, then alpha; the
+ // untethered bucket always renders LAST; group order within is preserved.
+ const PROV_NAME = { gmp: "Green Mountain Power", gmcs: "Green Mountain Power",
+ vec: "Vermont Electric Co-op", wec: "Washington Electric Co-op",
+ bed: "Burlington Electric", cvps: "CVPS", vppsa: "VPPSA" };
  function groupByProvider(accountGroups) {
  const buckets = {};
  const order = [];
  accountGroups.forEach(g => {
- const p = g.provider || "";
+ const p = g.source || g.provider || "other";
  if (!buckets[p]) {
- buckets[p] = { provider: p, providerLabel: g.providerLabel, key: "prov:" + (p || "other"),
- groups: [], offtakerCount: 0, hasDraft: false };
+ buckets[p] = { provider: p,
+ providerLabel: p === "none" ? "No data source yet"
+ : (PROV_NAME[p] || (p === "other" ? "Other utilities" : g.providerLabel)),
+ key: "prov:" + p,
+ groups: [], offtakerCount: 0, hasDraft: false, hosts: new Map() };
  order.push(p);
  }
  const b = buckets[p];
  b.groups.push(g);
  b.offtakerCount += g.rows.length;
  if (g.hasDraft) b.hasDraft = true;
+ if (g.host && g.host.utility_account_id != null) b.hosts.set(String(g.host.utility_account_id), g.host);
  });
  const list = order.map(p => buckets[p]);
  list.sort((a, b) => {
+ const an = a.provider === "none" ? 1 : 0, bn = b.provider === "none" ? 1 : 0;
+ if (an !== bn) return an - bn; // untethered sinks last, always
  const ap = a.hasDraft ? 0 : 1, bp = b.hasDraft ? 0 : 1;
  if (ap !== bp) return ap - bp;
  return a.providerLabel.localeCompare(b.providerLabel);
@@ -6393,6 +6481,16 @@
  ? `<button type="button" class="rb-grp-add" data-grpadd="${esc(grpArrayId)}"
  title="Add an offtaker to ${esc(g.label)}">＋ Add offtaker</button>`
  : "";
+ // The TETHER (Ford 2026-07-28): every array row names the master account
+ // bill it invoices from. Tethered → the account's identity (click opens the
+ // utility-source manager); untethered → a dashed "Tether to master bill" CTA.
+ const tether = g.isArray
+ ? (g.host
+ ? `<button type="button" class="rb-grp-tether" data-tether="${esc(grpArrayId)}"
+ title="${esc("This array invoices from " + utilityIdentity(g.host) + (g.host.latest_period_label ? " · latest bill " + g.host.latest_period_label : "") + ". Opens Link utility bills to manage sources.")}">🔗 ${esc(utilityIdentity(g.host))}</button>`
+ : `<button type="button" class="rb-grp-tether rb-grp-tether--none" data-tether="${esc(grpArrayId)}"
+ title="Pick which master account bill this array invoices from — its offtakers can't draft until it's tethered.">🔗 Tether to master bill</button>`)
+ : "";
  // Always wrap every master in the floating group card (Ford 2026-07-14):
  // a 1-offtaker group (Timberworks) must look like a multi-offtaker one
  // (Waterford), same shell, same padding, same alternating zebra tone.
@@ -6407,6 +6505,7 @@
  ${addBtn}
  ${pctSumPill(g)}
  ${vacancyChip(g)}
+ ${tether}
  </div>
  <div class="rb-grp-rows"${collapsed ? " hidden" : ""}>
  ${collapsed ? "" : g.rows.map(s => subCard(s, arrs, utilAccts)).join("")}
@@ -6432,21 +6531,35 @@
  }
  }
  body = providers.map(pv => {
- // Provider opens for a small fleet OR whenever there is a lone provider with a
- // modest number of accounts, a single collapsed GMP header is pure indirection,
- // and opening it only paints account-group headers (cards under still honor
+ // Source opens for a small fleet OR whenever there is a lone source with a
+ // modest number of arrays, a single collapsed GMP header is pure indirection,
+ // and opening it only paints array headers (cards under still honor
  // GROUP_COLLAPSED). Bounded by group count so an 800-offtaker fleet stays collapsed.
  const _loneProvider = providers.length === 1 && pv.groups.length <= AUTO_EXPAND_MAX;
- if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = !(_smallFleet || _loneProvider); // small OR lone-modest provider → expanded
+ if (PROVIDER_COLLAPSED[pv.key] === undefined) PROVIDER_COLLAPSED[pv.key] = !(_smallFleet || _loneProvider); // small OR lone-modest source → expanded
  const pCollapsed = !!PROVIDER_COLLAPSED[pv.key];
+ const untethered = pv.provider === "none";
  const nAcct = pv.groups.length;
  // Array-grouped fleets (own-meter shape): the middle level is arrays,
  // not utility accounts, say so.
  const grpNoun = pv.groups.length && pv.groups.every(g => g.shareMode === "array")
  ? `array${nAcct === 1 ? "" : "s"}`
  : `utility account${nAcct === 1 ? "" : "s"}`;
- // Redesign: sent-this-period progress + flagged count on the provider
- // header, exact period compare against the pipeline's last period.
+ // DATA SOURCE identity line (Ford 2026-07-28): which master account bill(s)
+ // this source pulls. One host → its identity + latest bill; several → count.
+ const hosts = pv.hosts ? Array.from(pv.hosts.values()) : [];
+ let srcLine = "";
+ if (untethered) {
+ srcLine = `<span class="rb2-srcline rb2-srcline--warn">arrays here can't invoice until tethered to a master bill</span>`;
+ } else if (hosts.length === 1) {
+ const h = hosts[0];
+ const latest = h.latest_period_label ? ` · latest bill ${esc(String(h.latest_period_label))}` : "";
+ srcLine = `<span class="rb2-srcline">${esc(utilityIdentity(h))}${latest}</span>`;
+ } else if (hosts.length > 1) {
+ srcLine = `<span class="rb2-srcline">${fmt0(hosts.length)} master accounts</span>`;
+ }
+ // Sent-this-period progress + flagged count on the source header,
+ // exact period compare against the pipeline's last period.
  const _lp = PIPE && PIPE.last && PIPE.last.period_end;
  const sentN = _lp ? pv.groups.reduce((n, g) =>
  n + g.rows.filter(s => s.last_sent_period_end === _lp).length, 0) : 0;
@@ -6458,13 +6571,14 @@
  const provFlag = provFlagN
  ? `<span class="rb2-provflag">⚑ ${fmt0(provFlagN)} to review</span>` : "";
  return `
- <div class="rb-prov${pCollapsed ? " collapsed" : ""}">
+ <div class="rb-prov${pCollapsed ? " collapsed" : ""}${untethered ? " rb-prov--none" : ""}">
  <div class="rb-prov-head" data-provcollapse="${esc(pv.key)}" role="button" tabindex="0"
- style="border-left-color:${provHue(pv.provider)}"
- aria-expanded="${!pCollapsed}" title="${pCollapsed ? "Expand" : "Collapse"} all ${esc(pv.providerLabel)} utility accounts">
+ style="border-left-color:${untethered ? "#94a3b8" : provHue(pv.provider)}"
+ aria-expanded="${!pCollapsed}" title="${pCollapsed ? "Expand" : "Collapse"} the ${esc(pv.providerLabel)} arrays">
  <span class="rb-prov-caret" aria-hidden="true">▾</span>
  <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
  <span class="rb-prov-count">${nAcct} ${grpNoun} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
+ ${srcLine}
  <span class="rb2-provsp"></span>${provFlag}${provBar}
  </div>
  <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
@@ -6490,7 +6604,18 @@
  ? `<div class="rb-listtools${searchHTML ? " rb-listtools-searchfirst" : ""}">${searchHTML}${filterStripHTML}</div>`
  : "";
  list.innerHTML = toolsHTML + body;
+ // Cache this render's args so openFirstApproval() can force-render a lazily
+ // collapsed group, and sync the rail to the (possibly restored) open card.
+ LAST_LIST_ARGS = [subs, arrs, utilAccts, drafts];
+ setRailEditing(ACTIVE_SUB_ID != null);
  renderKpis(); // the KPI band tracks the freshly-rendered list's counts
+ // Tether chips: open the utility-source manager (same flow as Link utility
+ // bills). stopPropagation so the group header doesn't also toggle.
+ list.querySelectorAll("[data-tether]").forEach(b => b.onclick = (e) => {
+ e.stopPropagation();
+ if (window.__aoLinkUtility) window.__aoLinkUtility();
+ else location.hash = "#arrays";
+ });
  // Wire the GMP-vs-non-GMP filter chips, flip the scope + re-render in place.
  list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
  OFFTAKER_FILTER = b.getAttribute("data-ofilter") || "all";
@@ -7098,6 +7223,8 @@
  if (head) head.setAttribute("aria-expanded", "true");
  const body = card.querySelector("[data-accbody]");
  if (body) body.hidden = false;
+ // Editing state: minimize the rail so the editor + live preview get the width.
+ setRailEditing(true);
  renderAccordionBody(sid);
  // The cached draft renders instantly; then recompute from the LIVE bill so the email
  // cover + invoice PDF agree (a draft frozen before newer generation/a new bill landed
@@ -7126,7 +7253,10 @@
  if (head) head.setAttribute("aria-expanded", "false");
  const body = card.querySelector("[data-accbody]");
  if (body) { body.hidden = true; body.innerHTML = ""; }
- if (String(ACTIVE_SUB_ID) === sid) ACTIVE_SUB_ID = null;
+ if (String(ACTIVE_SUB_ID) === sid) {
+ ACTIVE_SUB_ID = null;
+ setRailEditing(false); // no editor open → bring the full rail back
+ }
  }
 
  // renderInboxBody() is the compatibility shim the rest of the module calls to

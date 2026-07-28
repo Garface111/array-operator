@@ -762,3 +762,55 @@ html.sky #rbSubInvoice.rb2-genrep{
 /* The AO title band is hidden for this sub-view (reports.js) — belt-and-braces
    in case JS is mid-swap, so there's never a duplicate "Generation reports". */
 html.sky #rbSubInvoice.rb2-genrep > .rb2-head{display:none}
+
+/* ── 20 · LANDING 2026-07-28 — THE RAIL + SOURCE HIERARCHY (sky skin) ────────
+   The pipe band is gone; the rail's cycle card inherits its blur allowance
+   (still ≤3 blurred top-level bands on this tab: head, cycle card, listwrap).
+   Tools/mini cards are SOLID-tier translucent white, no blur. */
+html.sky .rb2-railcycle{
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:var(--sky-sheet-blur);
+  backdrop-filter:var(--sky-sheet-blur);
+  border:1px solid var(--sky-glass-edge);
+  border-radius:22px;
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .rb2-railtools,
+html.sky .rb2-railmini{
+  background:rgba(255,255,255,.78);
+  border:1px solid rgba(255,255,255,.88);
+  border-radius:18px;
+  box-shadow:var(--sky-shadow-card);
+}
+html.sky .rb2-railcycle .rb2-rc-rows,
+html.sky .rb2-railcycle .rb2-moderow{border-top-color:rgba(20,60,120,.12)}
+html.sky .rb2-railcycle .rb2-moderow{background:transparent;border-left:0;border-right:0;border-bottom:0;border-radius:0}
+html.sky .rb2-rc-row[role="button"]:hover{background:rgba(33,150,243,.07)}
+html.sky .rb2-rm:hover{background:rgba(33,150,243,.08)}
+html.sky .rb2-ratechip-sum{
+  background:rgba(255,255,255,.75);
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 2px 8px rgba(20,60,120,.05);
+}
+html.sky .rb2-ratechip-sum:hover{border-color:rgba(33,150,243,.4)}
+html.sky .rb2-ratechip-pop{
+  background:#fff;border:1px solid rgba(20,60,120,.14);
+  border-radius:16px;box-shadow:var(--sky-shadow-float);
+}
+html.sky .rb-grp-tether{
+  color:#1565C0;background:rgba(33,150,243,.09);
+  border-color:rgba(33,150,243,.28);
+}
+html.sky .rb-grp-tether:hover{background:rgba(33,150,243,.15)}
+html.sky .rb-grp-tether--none{
+  background:rgba(255,255,255,.85);
+  border:1px dashed rgba(33,150,243,.55);
+}
+html.sky .rb2-srcline{color:#46658C}
+html.sky .rb2-srcline--warn{color:var(--amber-ink,#8a5a00)}
+@supports (corner-shape: squircle){
+  html.sky .rb2-railcycle,
+  html.sky .rb2-railtools,
+  html.sky .rb2-railmini,
+  html.sky .rb2-ratechip-pop{corner-shape:squircle}
+}

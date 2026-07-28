@@ -4020,3 +4020,118 @@ body.ho-shell-open .vs-inv-sub{
       90px;                 /* synced */
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INVOICES LANDING 2026-07-28 — Data source → Array → Offtaker + THE RAIL
+   (Ford-approved sketch: sketches/invoices-landing-redesign). The send-pipeline
+   band is gone; its facts live in a sticky right rail that MINIMIZES to an icon
+   strip while an offtaker editor is open. Day palette here; sky skin follows in
+   theme-sky-reports.css. Editor-level styles untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.rb2-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.rb2-main.rb2-editing{grid-template-columns:minmax(0,1fr) 56px}
+.rb2-listcol{min-width:0;display:flex;flex-direction:column;gap:14px}
+.rb2-railslot{position:sticky;top:8px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.rb2-railfull{display:flex;flex-direction:column;gap:12px}
+
+/* cycle card — the pipeline's surviving essentials */
+.rb2-railcycle{border:1px solid var(--so-cream-bd);border-radius:14px;
+  background:var(--so-cream);box-shadow:var(--so-shadow-card);padding:15px 17px}
+.rb2-rc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rb2-rc-eyebrow{font:700 10.5px/1 inherit;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint,#94a3b8)}
+.rb2-rc-big{margin-top:8px;font-size:22px;font-weight:800;letter-spacing:-.02em;
+  color:var(--ink,#0f172a);font-variant-numeric:tabular-nums}
+.rb2-rc-big span{font-size:13px;font-weight:650;color:var(--muted,#475569);letter-spacing:0}
+.rb2-rc-cap{margin-top:2px;font-size:11.5px;color:var(--faint,#94a3b8);
+  font-variant-numeric:tabular-nums}
+.rb2-rc-review{width:100%;margin-top:12px;justify-content:center;padding:9px 14px;font-size:13px}
+.rb2-rc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.rb2-rc-rows{display:flex;flex-direction:column;gap:7px;margin-top:13px;padding-top:11px;
+  border-top:1px solid var(--so-cream-bd)}
+.rb2-rc-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted,#475569);
+  flex-wrap:wrap;font-variant-numeric:tabular-nums;border-radius:8px}
+.rb2-rc-row[role="button"]{cursor:pointer;margin:0 -6px;padding:3px 6px}
+.rb2-rc-row[role="button"]:hover{background:var(--day-hover,rgba(140,78,28,.06))}
+.rb2-rc-row b{color:var(--ink,#0f172a);font-weight:700}
+.rb2-rc-check{color:#059669;font-weight:800}
+.rb2-rc-dot{width:7px;height:7px;border-radius:999px;background:#94a3b8;flex:none}
+.rb2-rc-quiet{font-size:10.5px;color:var(--faint,#94a3b8)}
+.rb2-railcycle .rb2-moderow{margin-top:13px;padding-top:11px;border-top:1px solid var(--so-cream-bd);
+  display:flex;flex-direction:column;align-items:flex-start;gap:7px}
+.rb2-railcycle .rb2-modelab{font-size:10.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--faint,#94a3b8)}
+
+/* tools card — every portfolio action, one quiet vertical list */
+.rb2-railtools{border:1px solid var(--so-cream-bd);border-radius:14px;
+  background:var(--so-cream);box-shadow:var(--so-shadow-card);
+  padding:7px;display:flex;flex-direction:column;gap:2px}
+.rb2-railtools > .rb-btn, .rb2-railtools .rb2-exportwrap > .rb-btn{
+  width:100%;justify-content:flex-start;text-align:left;
+  padding:9px 12px;font-size:12px;font-weight:640;border:0;background:transparent;
+  border-radius:9px;box-shadow:none}
+.rb2-railtools > .rb-btn:hover, .rb2-railtools .rb2-exportwrap > .rb-btn:hover{
+  background:var(--day-hover,rgba(140,78,28,.06))}
+.rb2-railtools .rb2-railadd{color:#047857;font-weight:750}
+.rb2-railtools .rb2-exportwrap{position:relative;width:100%}
+.rb2-railtools .rb2-exportpop{left:auto;right:0}
+
+/* the minimized strip (editing state) */
+.rb2-railmini{border:1px solid var(--so-cream-bd);border-radius:14px;
+  background:var(--so-cream);box-shadow:var(--so-shadow-card);
+  padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rb2-rm{width:38px;height:38px;display:grid;place-items:center;cursor:pointer;
+  border:1px solid transparent;border-radius:10px;background:transparent;
+  color:var(--muted,#475569);font-size:15px;font-weight:650}
+.rb2-rm:hover{background:var(--day-hover,rgba(140,78,28,.06));color:var(--ink,#0f172a)}
+.rb2-rm-badge{border-radius:999px;background:rgba(245,158,11,.14);color:#92600a;
+  font-weight:750;font-size:13px;font-variant-numeric:tabular-nums}
+.rb2-rm-badge:hover{background:rgba(245,158,11,.22);color:#92600a}
+
+/* master-rate CHIP in the Your offtakers bar (popover editor, same ids) */
+.rb2-ratechip{position:relative}
+.rb2-ratechip-sum{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:640;color:var(--muted,#475569);
+  background:var(--card2,#fff);border:1px solid var(--line,#e8e2d9);border-radius:999px;
+  padding:5px 11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rb2-ratechip-sum::-webkit-details-marker{display:none}
+.rb2-ratechip-sum:hover{border-color:#94a3b8;color:var(--ink,#0f172a)}
+.rb2-ratechip-sum b{color:var(--ink,#0f172a);font-weight:750}
+.rb2-ratechip-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:40;
+  width:480px;max-width:calc(100vw - 32px);
+  background:var(--card,#fff);border:1px solid var(--line,#e2e8f0);border-radius:14px;
+  box-shadow:0 18px 50px -12px rgba(15,23,42,.18);padding:14px 16px}
+
+/* tether chip on every array row */
+.rb-grp-tether{display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  font-size:10.5px;font-weight:700;white-space:nowrap;
+  color:#1565C0;background:rgba(37,99,235,.08);
+  border:1px solid rgba(37,99,235,.26);border-radius:999px;padding:4px 10px}
+.rb-grp-tether:hover{background:rgba(37,99,235,.14)}
+.rb-grp-tether--none{color:#1565C0;background:var(--card2,#fff);
+  border:1px dashed rgba(37,99,235,.55)}
+.rb2-srcline{font-size:10.5px;color:var(--faint,#94a3b8);font-variant-numeric:tabular-nums}
+.rb2-srcline--warn{color:#92600a}
+.rb-prov--none .rb-prov-head{opacity:.92}
+
+/* stacked layout — tablets and phones: rail becomes a full-width card ABOVE
+   the list; the mini strip never shows (no room economy to win on one column) */
+@media (max-width:1000px){
+  .rb2-main{display:flex;flex-direction:column}
+  .rb2-main.rb2-editing{display:flex}
+  .rb2-railslot{position:static;order:-1}
+  .rb2-railmini{display:none!important}
+  .rb2-railfull[hidden]{display:flex} /* editing keeps the rail visible when stacked */
+  .rb2-ratechip-pop{width:min(480px,calc(100vw - 32px))}
+}
+
+/* [hidden] must beat the base display rules above (the rail swaps full/mini
+   via the hidden attribute; without these the two would render together) */
+.rb2-railfull[hidden]{display:none}
+.rb2-railmini[hidden]{display:none}
+.rb2-rm[hidden]{display:none}
+.rb2-railcycle[hidden]{display:none}
+@media (max-width:1000px){
+  /* stacked layout: the full rail stays visible even while editing */
+  .rb2-railfull[hidden]{display:flex}
+}
