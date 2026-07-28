@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<title>Invoices · Offtakers — array-first directory + rail (sky glass)</title>
+<title>Invoices · Offtakers — data source → array → offtaker (sky glass)</title>
 <style>
   /* ═══ Chrome tokens (theme-aware). Mockups run the app's own SKY theme,
      lifted from array-operator/public/theme-sky.css — deliberately light. ═══ */
@@ -173,24 +173,39 @@
   .quiet { font-size: 11.5px; color: var(--faint); }
   .eyebrow { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--sky-primary-deep); }
 
-  /* Provider/array heads + offtaker cards */
-  .prov {
+  /* Data-source, array, and offtaker levels (shared) */
+  .src {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 13px 16px;
-    background: rgba(255,255,255,.8);
-    border: 1px solid rgba(255,255,255,.9);
+    padding: 12px 16px;
+    background: rgba(255,255,255,.88);
+    border: 1px solid rgba(255,255,255,.92);
     border-left: 3px solid var(--emerald);
     border-radius: 16px; box-shadow: var(--sky-shadow-card);
     cursor: pointer; font-size: 13.5px;
   }
+  .src:hover { background: rgba(255,255,255,.97); }
+  .src.vec { border-left-color: #2563eb; }
+  .src.none { border-left-color: #94a3b8; }
+  .src b { color: var(--ink); font-weight: 800; }
+  .src .count { color: var(--faint); font-size: 12.5px; }
+  .src .sp { flex: 1; }
+  .srcbody { margin-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+
+  .prov {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 15px;
+    background: rgba(255,255,255,.8);
+    border: 1px solid rgba(255,255,255,.9);
+    border-radius: 16px; box-shadow: 0 2px 10px rgba(20,60,120,.06);
+    cursor: pointer; font-size: 13.5px;
+  }
   .prov:hover { background: rgba(255,255,255,.95); }
-  .prov.vec { border-left-color: #2563eb; }
   .prov .caret { color: var(--faint); font-size: 11px; }
   .prov b { color: var(--ink); font-weight: 700; }
   .prov .count { color: var(--faint); font-size: 12.5px; }
   .prov .flag { font-size: 12px; font-weight: 700; color: var(--amber); }
   .prov .track { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); }
-  .prov .track i { display: block; width: 72px; height: 5px; border-radius: 99px; background: rgba(20,60,120,.12); position: relative; overflow: hidden; }
+  .prov .track i { display: block; width: 64px; height: 5px; border-radius: 99px; background: rgba(20,60,120,.12); position: relative; overflow: hidden; }
   .prov .track i::after { content: ""; position: absolute; inset: 0; width: var(--w, 90%); background: var(--sky-green); border-radius: 99px; }
   .prov .sp { flex: 1; }
   .tether {
@@ -219,6 +234,14 @@
   .acc .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
   .acc .meta { margin-top: 3px; font-size: 12px; color: var(--faint); }
   .listcol { display: flex; flex-direction: column; gap: 8px; }
+  .arr-open {
+    background: rgba(255,255,255,.55);
+    border: 1px solid rgba(33,150,243,.22);
+    border-radius: 18px;
+    padding: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .arr-open .prov { box-shadow: none; background: rgba(255,255,255,.88); }
 
   .osearch {
     display: inline-flex; align-items: center; gap: 8px;
@@ -252,27 +275,7 @@
   details.fold[open] summary .chev { transform: rotate(90deg); }
   @media (prefers-reduced-motion: reduce) { details.fold summary .chev { transition: none; } }
 
-  /* ═══ Design 0 — ARRAY-FIRST (Ford's spec) ═══ */
-  .d0-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; padding: 20px 28px 16px; }
-  .d0-head h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
-  .d0-head .honesty { font-size: 12.5px; color: var(--muted); }
-  .d0-head .honesty b { color: var(--ink); }
-  .d0-head .sp { flex: 1; }
-
-  .d0-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 13px 20px; position: sticky; top: 8px; z-index: 10; }
-  .d0-bar .lbl { font-size: 14px; font-weight: 800; color: var(--ink); }
-  .d0-bar .n { font-size: 12.5px; color: var(--faint); font-weight: 600; }
-  .d0-bar .sp { flex: 1; }
-
-  .arr-open {
-    background: rgba(255,255,255,.55);
-    border: 1px solid rgba(33,150,243,.22);
-    border-radius: 18px;
-    padding: 8px;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .arr-open .prov { box-shadow: none; background: rgba(255,255,255,.88); }
-
+  /* ═══ Offtaker open card — the editor level, reproduced from the live app ═══ */
   .off-open {
     margin-left: 22px;
     background: rgba(255,255,255,.92);
@@ -283,18 +286,82 @@
     overflow: hidden;
   }
   .off-open-head {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    padding: 13px 16px;
+    padding: 12px 16px;
     background: rgba(33,150,243,.06);
     border-bottom: 1px solid rgba(20,60,120,.12);
     font-size: 13.5px; cursor: pointer;
   }
-  .off-open-head b { font-weight: 700; color: var(--ink); }
-  .off-open-head .meta { color: var(--faint); font-size: 12px; }
-  .off-open-head .sp { flex: 1; }
-  .off-open-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; padding: 16px 18px 18px; }
-  @media (max-width: 780px) { .off-open-body { grid-template-columns: 1fr; } }
+  .oh-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .oh-dot { width: 9px; height: 9px; border-radius: 99px; background: var(--sky-primary); }
+  .oh-top b { font-weight: 800; color: var(--ink); font-size: 14.5px; }
+  .oh-del {
+    margin-left: auto; appearance: none; border: 0; background: transparent; cursor: pointer;
+    color: var(--faint); font-size: 14px; padding: 2px 6px; border-radius: 8px;
+  }
+  .oh-del:hover { background: rgba(220,60,60,.1); color: #b3372f; }
+  .oh-sent { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+  .oh-sent b { color: var(--ink); font-weight: 700; }
+  .oh-meta { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  .off-open-head .chev { transition: transform .15s ease; display: inline-block; color: var(--faint); font-size: 11px; }
+  @media (prefers-reduced-motion: reduce) { .off-open-head .chev { transition: none; } }
 
+  .ed-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    padding: 14px 18px 2px; font-size: 13px; color: var(--muted);
+  }
+  .ed-bar .due b { color: var(--ink); font-weight: 800; }
+  .ed-bar .sp { flex: 1; }
+
+  .off-open-body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; padding: 14px 18px 18px; }
+
+  .inv-head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 12px; }
+  .inv-head .to {
+    width: 34px; height: 34px; flex: none; border-radius: 99px;
+    background: rgba(33,150,243,.12); color: #1565C0;
+    font-weight: 800; display: grid; place-items: center; font-size: 11px;
+  }
+  .inv-head h5 { margin: 0; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #1565C0; font-weight: 800; }
+  .inv-head .nm { font-size: 14.5px; font-weight: 800; color: var(--ink); }
+  .inv-head .per { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+
+  .seccol { display: flex; flex-direction: column; gap: 8px; }
+  .sec {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 15px; border-radius: 12px; cursor: pointer;
+    font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .sec .car { font-size: 10px; opacity: .6; }
+  .sec .d { width: 8px; height: 8px; border-radius: 99px; flex: none; }
+  .sec .hint { margin-left: auto; font-weight: 600; font-size: 11.5px; letter-spacing: 0; text-transform: none; color: var(--faint); }
+  .sec.amber { background: rgba(255,193,7,.13); color: #8a5a00; }
+  .sec.amber .d { background: #f59e0b; }
+  .sec.green { background: rgba(76,175,80,.12); color: #2e6b31; }
+  .sec.green .d { background: #4CAF50; }
+  .sec.blue { background: rgba(33,150,243,.10); color: #1565C0; }
+  .sec.blue .d { background: #2196F3; }
+  .sec-foot { font-size: 11.5px; color: var(--faint); line-height: 1.5; padding: 8px 2px 0; margin: 0; }
+  .sec-foot b { color: var(--muted); }
+
+  .pv-label { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+  .pv {
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 24px 60px -22px rgba(15,50,110,.38), 0 6px 18px -8px rgba(20,60,120,.16);
+    font-size: 12px; color: #333;
+  }
+  .pv .meta { padding: 12px 14px; border-bottom: 1px solid #eef1f5; }
+  .pv .mrow { display: flex; gap: 10px; padding: 2.5px 0; }
+  .pv .mrow label { width: 54px; flex: none; font-size: 9.5px; font-weight: 800; letter-spacing: .06em; color: #9aa7b8; text-transform: uppercase; padding-top: 2px; }
+  .pv .mrow .v { color: #222; }
+  .pv .mrow .v small { color: #8b98a9; }
+  .pv .body { padding: 13px 15px 15px; }
+  .pv .body p { margin: 0 0 10px; line-height: 1.55; color: #444; }
+  .pv .tbl { border-top: 1px solid #eef1f5; margin-top: 4px; padding-top: 8px; }
+  .pv .trow { display: flex; justify-content: space-between; gap: 12px; padding: 3.5px 0; color: #555; }
+  .pv .trow b { color: #222; font-weight: 600; }
+  .pv .trow.big { font-weight: 800; color: #123c2c; font-size: 13px; }
+  .pv .attn { font-size: 10.5px; color: #999; margin-top: 8px; }
+
+  /* Legacy editor bits used by the alternates (design A) */
   .calc {
     background: rgba(255,255,255,.88);
     border: 1px solid rgba(255,255,255,.9);
@@ -307,7 +374,6 @@
   .calc .total { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; font-weight: 800; color: var(--ink); display: flex; justify-content: space-between; }
   .calc .total .amt { color: var(--emerald); }
   .calc .foot { margin-top: 9px; font-size: 11px; color: var(--faint); line-height: 1.5; }
-
   .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 14px; font-size: 12.5px; }
   .dgrid .f label { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
   .dgrid .f .v { color: var(--ink); font-weight: 600; }
@@ -316,7 +382,6 @@
     background: rgba(33,150,243,.07); border: 1px solid rgba(33,150,243,.25); border-radius: 12px;
   }
   .off-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
-
   .paper {
     background: #fff; border-radius: 10px; overflow: hidden; align-self: start;
     box-shadow: 0 24px 60px -22px rgba(15,50,110,.38), 0 6px 18px -8px rgba(20,60,120,.16);
@@ -332,7 +397,20 @@
   .paper .pfoot { margin-top: 10px; font-size: 9.5px; color: #999; line-height: 1.5; }
   .paper-cap { text-align: center; margin-top: 8px; }
 
-  /* ═══ Design 1 — One Question First ═══ */
+  /* ═══ Design 0 — array-first stack (alternate) ═══ */
+  .d0-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; padding: 20px 28px 16px; }
+  .d0-head h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+  .d0-head .honesty { font-size: 12.5px; color: var(--muted); }
+  .d0-head .honesty b { color: var(--ink); }
+  .d0-head .sp { flex: 1; }
+  .d0-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 13px 20px; position: sticky; top: 8px; z-index: 10; }
+  .d0-bar .lbl { font-size: 14px; font-weight: 800; color: var(--ink); }
+  .d0-bar .n { font-size: 12.5px; color: var(--faint); font-weight: 600; }
+  .d0-bar .sp { flex: 1; }
+  #d0 .off-open-body { grid-template-columns: minmax(0, 1fr) 300px; }
+  @media (max-width: 780px) { #d0 .off-open-body { grid-template-columns: 1fr; } }
+
+  /* ═══ Design 1 — One Question First (alternate) ═══ */
   .d1-hero { padding: 26px 32px 24px; display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: center; }
   .d1-hero .lead { min-width: 260px; flex: 1; }
   .d1-hero h1 { margin: 8px 0 6px; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
@@ -347,7 +425,7 @@
   .d1-dirhead .n { color: var(--faint); font-weight: 600; font-size: 13px; }
   .d1-dirhead .sp { flex: 1; }
 
-  /* ═══ Design 2 — The Pipeline Is the Page ═══ */
+  /* ═══ Design 2 — The Pipeline Is the Page (alternate) ═══ */
   .d2-head { padding: 22px 30px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
   .d2-head h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
   .d2-head .honesty { font-size: 12.5px; color: var(--muted); }
@@ -376,18 +454,15 @@
   .d2-inner .row { display: flex; gap: 12px; align-items: center; padding: 6px 0; }
   .d2-inner .row .sp { flex: 1; }
 
-  /* ═══ Design 3 — Directory + Rail ═══ */
+  /* ═══ Design 3 — Directory + Rail, data source → array → offtaker (the pick) ═══ */
   .d3-grid { display: grid; grid-template-columns: minmax(0, 1fr) 292px; gap: 16px; align-items: start; }
-  @media (max-width: 820px) { .d3-grid { grid-template-columns: 1fr; } .d3-rail { position: static; } }
-  /* Inside the pick's narrower directory column, the open editor's preview
-     slims down and stacks earlier. */
-  #d3 .off-open-body { grid-template-columns: minmax(0, 1fr) 250px; }
-  @media (max-width: 1000px) { #d3 .off-open-body { grid-template-columns: 1fr; } }
+  @media (max-width: 820px) { .d3-grid { grid-template-columns: 1fr; } .railslot { position: static; } }
   .d3-dir { padding: 20px 22px 24px; }
   .d3-dirhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
   .d3-dirhead h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); }
   .d3-dirhead .n { color: var(--faint); font-weight: 600; font-size: 13px; }
-  .d3-rail { position: sticky; top: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .railslot { position: sticky; top: 14px; }
+  .d3-rail { display: flex; flex-direction: column; gap: 12px; }
   .railcycle { padding: 20px 20px 18px; }
   .railcycle .big { margin: 10px 0 2px; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
   .railcycle .cap { font-size: 12px; color: var(--faint); }
@@ -404,37 +479,276 @@
   }
   .raillinks button:hover { background: rgba(33,150,243,.08); color: var(--ink); }
   .raillinks button.add { color: var(--sky-primary-deep); }
+
+  /* Editing state: the rail minimizes to a slim strip so the editor + live
+     preview get the width (Ford: "too cramped when the preview is displayed"). */
+  #d3 .d3-grid.editing { grid-template-columns: minmax(0, 1fr) 60px; }
+  #d3 .d3-grid.editing .d3-rail { display: none; }
+  .d3-railmini { display: none; }
+  #d3 .d3-grid.editing .d3-railmini {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 10px 6px;
+  }
+  .rm {
+    appearance: none; cursor: pointer; width: 38px; height: 38px;
+    display: grid; place-items: center;
+    border: 1px solid rgba(20,60,120,.16); border-radius: 11px;
+    background: rgba(255,255,255,.85); color: var(--muted); font-size: 15px;
+  }
+  .rm:hover { border-color: rgba(33,150,243,.5); color: var(--ink); background: #fff; }
+  .rm-badge {
+    width: 38px; height: 38px; display: grid; place-items: center;
+    border-radius: 99px; background: var(--amber-bg); color: var(--amber);
+    font-weight: 800; font-size: 14px;
+  }
+
+  /* The pick's editor: full two-pane only while the rail is minimized;
+     with the rail expanded the preview stacks below instead of cramping. */
+  #d3 .off-open-body { grid-template-columns: 1fr; }
+  #d3 .d3-grid.editing .off-open-body { grid-template-columns: minmax(0, 1fr) 380px; }
+  @media (max-width: 1000px) { #d3 .d3-grid.editing .off-open-body { grid-template-columns: 1fr; } }
 </style>
 
 <header class="chrome">
   <div class="chrome-top">
     <span class="chrome-eyebrow">Array Operator</span>
-    <span class="chrome-title">Invoices · Offtakers — array-first landing</span>
-    <span class="chrome-note">Sky glass · same functionality, reorganized landing · keys 1–4</span>
+    <span class="chrome-title">Invoices · Offtakers — data source → array → offtaker</span>
+    <span class="chrome-note">Sky glass · landing reorganized, editor level untouched · keys 1–4</span>
   </div>
   <nav class="switcher" aria-label="Design switcher">
-    <button type="button" data-d="3" aria-pressed="true"><b>★</b>The pick — array-first + rail</button>
+    <button type="button" data-d="3" aria-pressed="true"><b>★</b>The pick — source → array → offtaker</button>
     <button type="button" data-d="0" aria-pressed="false"><b>A</b>Array-first stack</button>
     <button type="button" data-d="1" aria-pressed="false"><b>1</b>One Question First</button>
     <button type="button" data-d="2" aria-pressed="false"><b>2</b>Pipeline Page</button>
   </nav>
 </header>
 
-<p class="tagline" id="tag3"><b>The pick: Directory + Rail, array-first.</b> Send-pipeline band deleted. Left: arrays at the top, each with its tether button to the master account bill; array → offtakers → the existing editor with the invoice preview, unchanged. Master credit rate is a chip in the Your offtakers bar. Right: one sticky rail with the cycle (3 to approve), delivery mode, bill health, and every tool. Chester is expanded; Brooks House shows the open editor; Hartland shows the untethered state.</p>
-<p class="tagline" id="tag0" hidden><b>Array-first stack.</b> The same array-first spec as a single column, no rail — cycle facts live as chips in the bar.</p>
+<p class="tagline" id="tag3"><b>The pick, updated.</b> Hierarchy is now <b>Data source → Array → Offtaker</b>: sources on top (GMP master settled ✓, VEC waiting, and a no-source bucket with the tether CTA), arrays nested under the bill that feeds them, offtakers under arrays. The editor level is your screenshot, untouched — billing period, Approve &amp; send / Send to me / Preview, the five tinted sections, live email preview. <b>Click Town of Glover's header</b>: while an offtaker is open for editing the right rail minimizes to a slim strip (« brings it back), so the preview never cramps.</p>
+<p class="tagline" id="tag0" hidden><b>Array-first stack.</b> Alternate — the array-first spec as a single column, no rail; cycle facts live as chips in the bar.</p>
 <p class="tagline" id="tag1" hidden><b>One question first.</b> Earlier direction — opens with "3 invoices need your approval" + one button; pipeline compressed to a status line; tools folded into ⋯.</p>
 <p class="tagline" id="tag2" hidden><b>The pipeline is the page.</b> Earlier direction — the pipeline cells become a vertical timeline with approval rows inline; directory collapsed below.</p>
 
 <div class="stagewrap">
 
-  <!-- ════════════ DESIGN 0 — ARRAY-FIRST (single-column alternate) ════════════ -->
+  <!-- ════════════ DESIGN 3 — THE PICK: DATA SOURCE → ARRAY → OFFTAKER + RAIL ════════════ -->
+  <section class="design active" id="d3" aria-label="The pick: data source, array, offtaker, with rail">
+    <div class="viewport">
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <div class="appnav">
+        <span class="brand"><span class="sun"></span>Array Operator</span>
+        <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
+        <span class="who">ford.genereaux@gmail.com</span>
+      </div>
+      <div class="sheet">
+
+        <div class="glass d0-head">
+          <h1>Offtaker invoicing</h1>
+          <span class="honesty"><b>Nothing sends until you approve it.</b></span>
+          <span class="sp"></span>
+          <span class="pillseg" role="group" aria-label="View">
+            <button type="button" class="on">Offtakers</button>
+            <button type="button">Bill audit <span class="chip amber num" style="margin-left:4px">⚑ 1</span></button>
+          </span>
+        </div>
+
+        <div class="d3-grid editing" id="pickGrid">
+
+          <div class="glass d3-dir">
+            <div class="d3-dirhead">
+              <h2>Your offtakers</h2><span class="n num">17 · 4 arrays · 2 sources</span>
+              <span class="chip blue num" title="The blended net-metering credit rate from your settled master bills. Every offtaker invoice prices at this rate unless its own bill overrides it.">master credit rate · $0.14850/kWh</span>
+              <span style="flex:1"></span>
+              <span class="osearch" style="min-width:180px"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker…" aria-label="Find an offtaker"></span>
+            </div>
+            <div class="listcol">
+
+              <!-- ── DATA SOURCE 1 · GMP — expanded ── -->
+              <div class="src" role="button" tabindex="0" aria-expanded="true">
+                <span class="caret" style="color:var(--faint);font-size:11px">▾</span>
+                <b>Green Mountain Power</b>
+                <span class="count num">master #08211-3 · 2 arrays · 11 offtakers</span>
+                <span class="sp"></span>
+                <span class="chip green num">Jul bill settled ✓</span>
+              </div>
+              <div class="srcbody">
+
+                <!-- Array: Tannery Brook (expanded, screenshot controls) -->
+                <div class="arr-open">
+                  <div class="prov" role="button" tabindex="0" aria-expanded="true">
+                    <span class="caret">▾</span><b>Tannery Brook</b>
+                    <span class="count num">1 offtaker</span>
+                    <span class="sp"></span>
+                    <button type="button" class="btn sm">＋ Add offtaker</button>
+                    <span class="chip blue num">ⓘ 15.00% allocated</span>
+                    <span class="chip amber num">⚡ $15/yr unallocated · $6 nearing expiry · est.</span>
+                    <button type="button" class="tether num" title="Tethered to the master account bill pulled for this array. Click to change.">🔗 #08211-3</button>
+                  </div>
+
+                  <!-- OFFTAKER OPEN — the editing system from the screenshot, untouched -->
+                  <div class="off-open" id="offGlover">
+                    <div class="off-open-head" role="button" tabindex="0" aria-expanded="true">
+                      <div class="oh-top">
+                        <span class="chev" style="transform:rotate(90deg)">▶</span>
+                        <span class="oh-dot"></span>
+                        <b>Town of Glover</b>
+                        <span class="chip green num">$2,000.00 ready</span>
+                        <span class="chip gray num">Delivered · Jul 28</span>
+                        <span class="chip green num">Paid online · $7.58</span>
+                        <span class="chip blue">Auto-send</span>
+                        <button type="button" class="oh-del" title="Delete this offtaker" aria-label="Delete offtaker">🗑</button>
+                      </div>
+                      <div class="oh-sent"><b>Town of Glover</b> receives <b>15.00%</b> of <b>Tannery Brook</b>'s generation. <b>Monthly</b> PDF, auto-sent to ford.genereaux@gmail.com.</div>
+                      <div class="oh-meta num">Next Aug 1, 2026 · last sent Jul 13</div>
+                    </div>
+
+                    <div class="ed-bar">
+                      <span>Billing period</span>
+                      <button type="button" class="btn sm num">July 2026 · latest ▾</button>
+                      <span class="due num">Receives <b>15%</b> · 2026-06-23 → 2026-07-22 · <b>$2,000.00 due</b></span>
+                      <span class="sp"></span>
+                      <button type="button" class="btn primary sm">Approve &amp; send</button>
+                      <button type="button" class="btn sm">Send to me</button>
+                      <button type="button" class="btn sm">Preview ↗</button>
+                    </div>
+
+                    <div class="off-open-body">
+                      <div>
+                        <div class="inv-head">
+                          <span class="to">TO</span>
+                          <div><h5>Offtaker invoice</h5><div class="nm">Town of Glover</div></div>
+                          <span class="per num">2026-06-23 → 2026-07-22</span>
+                        </div>
+                        <div class="seccol">
+                          <div class="sec amber" role="button" tabindex="0"><span class="car">▸</span><span class="d"></span>How this was calculated<span class="hint num">kWh × rate × share = the amount</span></div>
+                          <div class="sec green" role="button" tabindex="0"><span class="car">▸</span><span class="d"></span>Offtaker details<span class="hint">share, rate, budget, delivery</span></div>
+                          <div class="sec amber" role="button" tabindex="0"><span class="car">▸</span><span class="d"></span>Edit email<span class="hint">master · all offtakers</span></div>
+                          <div class="sec blue" role="button" tabindex="0"><span class="car">▸</span><span class="d"></span>Invoice template<span class="hint">PDF / Excel format</span></div>
+                          <div class="sec green" role="button" tabindex="0"><span class="car">▸</span><span class="d"></span>Generation spreadsheet<span class="hint">their tracking sheet</span></div>
+                        </div>
+                        <p class="sec-foot">Sends to <b>Town of Glover</b> per the delivery setting, with the offtaker invoice attached. Use <b>Approve &amp; send</b> at the top when ready.</p>
+                      </div>
+                      <div>
+                        <div class="pv-label">Live preview, the email Town of Glover receives</div>
+                        <div class="pv">
+                          <div class="meta">
+                            <div class="mrow"><label>From</label><span class="v">Dyson Swarm Technologies <small>via Array Operator</small></span></div>
+                            <div class="mrow"><label>To</label><span class="v">Town of Glover &lt;ford.genereaux@gmail.com&gt;</span></div>
+                            <div class="mrow"><label>Subject</label><span class="v"><b>Your solar credit invoice — Town of Glover (2026-07)</b></span></div>
+                          </div>
+                          <div class="body">
+                            <p>Dear Town of Glover,</p>
+                            <p class="num">Attached is your solar credit invoice for 2026-06-23 → 2026-07-22. Your share of the array's production this period came to 5,089 kWh, for a total of $2,000.00.</p>
+                            <p>Your full invoice is attached, along with the GMP source bill behind it, so you can see exactly how the amount was calculated. If anything looks off, just reply to this email and we'll take a look together.</p>
+                            <p>Thank you,<br>Ford Genereaux<br>ford.genereaux@gmail.com</p>
+                            <div class="tbl num">
+                              <div class="trow"><span>Billing period</span><b>2026-06-23 → 2026-07-22</b></div>
+                              <div class="trow"><span>Your production</span><b>5,089 kWh</b></div>
+                              <div class="trow"><span>Solar credit value due</span><b>$1,007.62</b></div>
+                              <div class="trow big"><span>Budgeted amount</span><span>$2,000.00</span></div>
+                            </div>
+                            <div class="attn">The full invoice is attached.</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Array: Putney Rd (collapsed) -->
+                <div class="prov" role="button" tabindex="0" aria-expanded="false">
+                  <span class="caret">▸</span><b>Putney Rd</b>
+                  <span class="count num">10 offtakers</span>
+                  <span class="flag num">⚑ 1</span>
+                  <span class="sp"></span>
+                  <span class="chip blue num">ⓘ 100% allocated</span>
+                  <button type="button" class="tether num">🔗 #08211-3</button>
+                  <span class="track num"><i style="--w:100%"></i><small>10 sent</small></span>
+                </div>
+
+              </div>
+
+              <!-- ── DATA SOURCE 2 · VEC — collapsed ── -->
+              <div class="src vec" role="button" tabindex="0" aria-expanded="false">
+                <span class="caret" style="color:var(--faint);font-size:11px">▸</span>
+                <b>Vermont Electric Co-op</b>
+                <span class="count num">master #40122-7 · 1 array · 6 offtakers</span>
+                <span class="sp"></span>
+                <span class="chip amber num">waiting on Jul bill</span>
+              </div>
+
+              <!-- ── NO DATA SOURCE — untethered bucket ── -->
+              <div class="src none" role="button" tabindex="0" aria-expanded="true">
+                <span class="caret" style="color:var(--faint);font-size:11px">▾</span>
+                <b>No data source yet</b>
+                <span class="count num">1 array</span>
+                <span class="sp"></span>
+                <span class="quiet">invoices can't draft until it's tethered</span>
+              </div>
+              <div class="srcbody">
+                <div class="prov" role="button" tabindex="0" aria-expanded="false">
+                  <span class="caret">▸</span><b>Hartland</b>
+                  <span class="count num">0 offtakers</span>
+                  <span class="sp"></span>
+                  <button type="button" class="tether none" title="Pick which master account bill this array invoices from.">🔗 Tether to master bill</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="railslot">
+            <aside class="d3-rail">
+              <div class="glass railcycle">
+                <span class="eyebrow">July cycle</span>
+                <div class="big num">3 to approve</div>
+                <span class="cap num">$2,700.29 drafted from settled bills</span>
+                <button type="button" class="btn primary">Review &amp; approve →</button>
+                <span class="quiet" style="display:block;margin-top:8px;text-align:center">Nothing sends until you approve it.</span>
+                <div class="mini num">
+                  <span class="r"><span class="chip green">✓</span> June — 16 of 17 · $6,481 <span class="sp"></span><span class="quiet">archive</span></span>
+                  <span class="r">2 auto-sending · 4 waiting on bills</span>
+                  <span class="r">Next run <b>Aug 1</b> · in 4 days</span>
+                </div>
+              </div>
+              <div class="glass railmode">
+                <span style="font-weight:700;color:var(--muted)">When an invoice is drafted</span>
+                <span class="pillseg"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
+                <span class="num">✓ Bills reconcile · <span style="color:var(--amber);font-weight:700">⚑ 1 to review → Bill audit</span></span>
+              </div>
+              <div class="glass raillinks">
+                <button type="button" class="add">＋ Add an offtaker</button>
+                <button type="button">⬆ Bulk import</button>
+                <button type="button">⬇ Export to accounting</button>
+                <button type="button">✉ Customize email</button>
+                <button type="button">🔗 Link utility bills</button>
+                <button type="button">🗂 Invoice archive</button>
+              </div>
+            </aside>
+
+            <aside class="glass d3-railmini" aria-label="Rail, minimized while editing">
+              <button type="button" class="rm" id="railExpand" title="Expand the rail">«</button>
+              <span class="rm-badge num" title="3 invoices to approve · $2,700.29">3</span>
+              <button type="button" class="rm" title="Add an offtaker">＋</button>
+              <button type="button" class="rm" title="Export to accounting">⬇</button>
+              <button type="button" class="rm" title="Customize email">✉</button>
+              <button type="button" class="rm" title="Invoice archive">🗂</button>
+            </aside>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ DESIGN 0 — ARRAY-FIRST STACK (alternate) ════════════ -->
   <section class="design" id="d0" aria-label="Array-first stack">
     <div class="viewport">
       <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
       <div class="appnav">
         <span class="brand"><span class="sun"></span>Array Operator</span>
         <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
-        <span class="who">anna@vermontsolar.co</span>
+        <span class="who">ford.genereaux@gmail.com</span>
       </div>
       <div class="sheet">
 
@@ -450,8 +764,8 @@
 
         <div class="glass d0-bar">
           <span class="lbl">Your offtakers</span>
-          <span class="n num">24 across 3 arrays</span>
-          <span class="chip blue num" title="The blended net-metering credit rate from your settled master bills. Every offtaker invoice prices at this rate unless its own bill overrides it.">master credit rate · $0.14850/kWh</span>
+          <span class="n num">17 across 4 arrays</span>
+          <span class="chip blue num">master credit rate · $0.14850/kWh</span>
           <span class="chip amber num">3 to approve</span>
           <span class="sp"></span>
           <span class="osearch"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker…" aria-label="Find an offtaker"></span>
@@ -469,120 +783,52 @@
         </div>
 
         <div class="listcol">
-
-          <!-- ── ARRAY 1 · Chester — EXPANDED ── -->
           <div class="arr-open">
             <div class="prov" role="button" tabindex="0" aria-expanded="true">
-              <span class="caret">▾</span><b>Chester</b>
-              <span class="count num">8 offtakers</span>
-              <span class="flag num">⚑ 1</span>
+              <span class="caret">▾</span><b>Tannery Brook</b>
+              <span class="count num">1 offtaker</span>
               <span class="sp"></span>
-              <button type="button" class="tether num" title="This array bills from GMP account #08211-3. Click to change which master bill it's tethered to.">🔗 GMP #08211-3 · Jun bill settled ✓</button>
-              <span class="track num"><i style="--w:88%"></i><small>7 sent · Jun</small></span>
-            </div>
-
-            <!-- Offtaker OPEN — the existing editor, kept as-is -->
-            <div class="off-open">
-              <div class="off-open-head" role="button" tabindex="0" aria-expanded="true">
-                <span class="chev" style="transform:rotate(90deg)">▶</span>
-                <b>Brooks House Apartments</b>
-                <span class="chip green num">$402.14 ready</span>
-                <span class="chip gray">Draft for approval</span>
-                <span class="sp"></span>
-                <span class="meta num">next Aug 1 · last sent Jun 3</span>
-              </div>
-              <div class="off-open-body">
-                <div>
-                  <div class="calc">
-                    <h4>How this was calculated</h4>
-                    <div class="r num"><span>Master bill excess — June, GMP #08211-3</span><b>5,416 kWh</b></div>
-                    <div class="r num"><span>Brooks House share</span><b>50%</b></div>
-                    <div class="r num"><span>Credited to Brooks House</span><b>2,708 kWh</b></div>
-                    <div class="r num"><span>Solar credit rate</span><b>$0.14850 / kWh</b></div>
-                    <div class="total num"><span>Amount due</span><span class="amt">$402.14</span></div>
-                    <div class="foot num">2,708 kWh × $0.14850 = $402.14 · billed from the settled June master bill.</div>
-                  </div>
-                  <div class="dgrid">
-                    <div class="f"><label>Share</label><span class="v num">50% of Chester master</span></div>
-                    <div class="f"><label>Email</label><span class="v">billing@brookshouse.com</span></div>
-                    <div class="f"><label>Delivery</label>
-                      <span class="pillseg mini"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
-                    </div>
-                    <div class="f"><label>Invoice format</label><span class="v">Default · <span style="color:var(--sky-primary-deep);cursor:pointer">upload template</span></span></div>
-                  </div>
-                  <div class="note">Hi Abigail — June's solar credit is attached. 2,708 kWh at $0.14850/kWh comes to $402.14. Reply here with any questions.</div>
-                  <div class="off-actions">
-                    <button type="button" class="btn primary sm num">Approve &amp; send $402.14</button>
-                    <button type="button" class="btn sm">⬇ Download PDF</button>
-                    <span class="quiet">Edits save as you go.</span>
-                  </div>
-                </div>
-                <div>
-                  <div class="paper">
-                    <div class="band"><b>VERMONT SOLAR CO.</b><small>Solar credit invoice · June 2026</small></div>
-                    <div class="pbody">
-                      <div class="prow"><span>Billed to</span><b>Brooks House Apartments</b></div>
-                      <div class="prow"><span>Invoice №</span><b class="num">2026-0614</b></div>
-                      <div class="prow num"><span>Solar credits — 2,708 kWh</span><b>$402.14</b></div>
-                      <div class="prow num"><span>Rate</span><b>$0.14850 / kWh</b></div>
-                      <div class="ptotal num"><span>Amount due</span><span>$402.14</span></div>
-                      <div class="pfoot">Generated from your settled June utility bill, GMP account #08211-3. Questions: anna@vermontsolar.co</div>
-                    </div>
-                  </div>
-                  <div class="quiet paper-cap">Live preview — updates as you edit</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="acc">
-              <span class="caret">▸</span>
-              <div class="main">
-                <div class="nm">Maple Lane Farm <span class="chip amber">⚑ doesn't match GMP</span></div>
-                <div class="meta num">25% share · next Aug 1 · last sent Jun 3</div>
-              </div>
+              <button type="button" class="btn sm">＋ Add offtaker</button>
+              <span class="chip blue num">ⓘ 15.00% allocated</span>
+              <button type="button" class="tether num" title="Tethered to the master account bill pulled for this array.">🔗 GMP #08211-3 · Jul ✓</button>
             </div>
             <div class="acc">
               <span class="caret">▸</span>
               <div class="main">
-                <div class="nm">Abigail Chen <span class="chip blue">Auto-send</span></div>
-                <div class="meta num">12% share · next Aug 1 · last sent Jun 3</div>
+                <div class="nm">Town of Glover <span class="chip green num">$2,000.00 ready</span> <span class="chip blue">Auto-send</span></div>
+                <div class="meta num">15% share · next Aug 1 · last sent Jul 13</div>
               </div>
             </div>
-            <div class="quiet num" style="padding:2px 16px 6px">+ 5 more offtakers on Chester</div>
           </div>
-
-          <!-- ── ARRAY 2 · Putney Rd — collapsed, tethered ── -->
           <div class="prov" role="button" tabindex="0" aria-expanded="false">
             <span class="caret">▸</span><b>Putney Rd</b>
             <span class="count num">10 offtakers</span>
+            <span class="flag num">⚑ 1</span>
             <span class="sp"></span>
-            <button type="button" class="tether num">🔗 GMP #99820-4 · Jun bill settled ✓</button>
-            <span class="track num"><i style="--w:100%"></i><small>10 sent · Jun</small></span>
+            <button type="button" class="tether num">🔗 GMP #08211-3 · Jul ✓</button>
+            <span class="track num"><i style="--w:100%"></i><small>10 sent</small></span>
           </div>
-
-          <!-- ── ARRAY 3 · Hartland — collapsed, UNTETHERED ── -->
-          <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
+          <div class="prov" role="button" tabindex="0" aria-expanded="false">
             <span class="caret">▸</span><b>Hartland</b>
             <span class="count num">6 offtakers</span>
             <span class="sp"></span>
             <button type="button" class="tether none" title="Pick which master account bill this array invoices from.">🔗 Tether to master bill</button>
             <span class="track num"><i style="--w:0%"></i><small>waiting on bill</small></span>
           </div>
-
         </div>
 
       </div>
     </div>
   </section>
 
-  <!-- ════════════ DESIGN 1 — ONE QUESTION FIRST ════════════ -->
+  <!-- ════════════ DESIGN 1 — ONE QUESTION FIRST (alternate) ════════════ -->
   <section class="design" id="d1" aria-label="Design 1: One Question First">
     <div class="viewport">
       <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
       <div class="appnav">
         <span class="brand"><span class="sun"></span>Array Operator</span>
         <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
-        <span class="who">anna@vermontsolar.co</span>
+        <span class="who">ford.genereaux@gmail.com</span>
       </div>
       <div class="sheet">
 
@@ -590,7 +836,7 @@
           <div class="lead">
             <span class="eyebrow">Offtaker invoicing · July cycle</span>
             <h1>3 invoices need your approval</h1>
-            <p class="sub num">$1,102.40 drafted from settled utility bills. Everything else is flowing on its own — <b>nothing sends until you approve it.</b></p>
+            <p class="sub num">$2,700.29 drafted from settled utility bills. Everything else is flowing on its own — <b>nothing sends until you approve it.</b></p>
           </div>
           <div class="go">
             <button type="button" class="btn primary" style="padding:10px 18px;font-size:14px">Review &amp; approve 3 →</button>
@@ -602,7 +848,7 @@
         </div>
 
         <div class="glass d1-statusline num">
-          <span class="seg"><span class="chip green">✓</span> June — 23 of 24 sent · $8,914</span>
+          <span class="seg"><span class="chip green">✓</span> June — 16 of 17 sent · $6,481</span>
           <span class="dotsep">·</span>
           <span class="seg">2 auto-sending · 4 waiting on bills</span>
           <span class="dotsep">·</span>
@@ -615,7 +861,7 @@
 
         <div class="glass d1-dir">
           <div class="d1-dirhead">
-            <h2>Your offtakers</h2><span class="n num">24 · ✓ GMP + VEC bills current</span>
+            <h2>Your offtakers</h2><span class="n num">17 · ✓ GMP + VEC bills current</span>
             <span class="sp"></span>
             <span class="osearch"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker — name, email, or account…" aria-label="Find an offtaker"></span>
             <details class="tools">
@@ -633,30 +879,30 @@
           <div class="listcol">
             <div class="prov" role="button" tabindex="0" aria-expanded="true">
               <span class="caret">▾</span><b>Green Mountain Power</b>
-              <span class="count num">2 net-meter groups · 14 offtakers</span>
+              <span class="count num">2 arrays · 11 offtakers</span>
               <span class="flag num">⚑ 1 to review</span>
               <span class="sp"></span>
-              <span class="track num"><i style="--w:93%"></i><small>13 sent · June</small></span>
+              <span class="track num"><i style="--w:93%"></i><small>10 sent · June</small></span>
             </div>
             <div class="acc">
               <span class="caret">▸</span>
               <div class="main">
-                <div class="nm">Brooks House Apartments <span class="chip green num">$402.14 ready</span> <span class="chip gray">Draft for approval</span></div>
-                <div class="meta num">50% of Putney Rd master · next Aug 1 · last sent Jun 3</div>
+                <div class="nm">Town of Glover <span class="chip green num">$2,000.00 ready</span> <span class="chip blue">Auto-send</span></div>
+                <div class="meta num">15% of Tannery Brook · next Aug 1 · last sent Jul 13</div>
               </div>
             </div>
             <div class="acc">
               <span class="caret">▸</span>
               <div class="main">
                 <div class="nm">Maple Lane Farm <span class="chip amber">⚑ doesn't match GMP</span></div>
-                <div class="meta num">25% of Putney Rd master · next Aug 1 · last sent Jun 3</div>
+                <div class="meta num">25% of Putney Rd · next Aug 1 · last sent Jul 3</div>
               </div>
             </div>
             <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
               <span class="caret">▸</span><b>Vermont Electric Co-op</b>
-              <span class="count num">1 account · 10 offtakers</span>
+              <span class="count num">1 array · 6 offtakers</span>
               <span class="sp"></span>
-              <span class="track num"><i style="--w:100%"></i><small>10 sent · June</small></span>
+              <span class="track num"><i style="--w:100%"></i><small>6 sent · June</small></span>
             </div>
           </div>
         </div>
@@ -665,14 +911,14 @@
     </div>
   </section>
 
-  <!-- ════════════ DESIGN 2 — THE PIPELINE IS THE PAGE ════════════ -->
+  <!-- ════════════ DESIGN 2 — THE PIPELINE IS THE PAGE (alternate) ════════════ -->
   <section class="design" id="d2" aria-label="Design 2: The Pipeline Is the Page">
     <div class="viewport">
       <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
       <div class="appnav">
         <span class="brand"><span class="sun"></span>Array Operator</span>
         <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
-        <span class="who">anna@vermontsolar.co</span>
+        <span class="who">ford.genereaux@gmail.com</span>
       </div>
       <div class="sheet">
 
@@ -691,7 +937,7 @@
             <span class="d2-node" aria-hidden="true"></span>
             <summary class="glass d2-sum num">
               <span class="chev">▶</span><b>June · delivered</b>
-              <span>23 of 24 sent · $8,914</span>
+              <span>16 of 17 sent · $6,481</span>
               <span class="chip green">✓ done</span>
               <span class="sp"></span><span class="quiet">ran Jul 1 · archive ↓</span>
             </summary>
@@ -705,9 +951,9 @@
             <div class="glass d2-nowcard">
               <div class="d2-nowhead">
                 <span class="eyebrow">This cycle · today, Jul 28</span>
-                <h2 class="num">3 invoices awaiting your approval — $1,102.40</h2>
+                <h2 class="num">3 invoices awaiting your approval — $2,700.29</h2>
               </div>
-              <div class="d2-approw num"><b>Brooks House Apartments</b><span class="m">2,708 kWh · from settled GMP bill</span><span class="amt">$402.14</span><button type="button" class="btn sm">Review</button></div>
+              <div class="d2-approw num"><b>Town of Glover</b><span class="m">5,089 kWh · from settled GMP bill</span><span class="amt">$2,000.00</span><button type="button" class="btn sm">Review</button></div>
               <div class="d2-approw num"><b>Hilltop Orchard</b><span class="m">2,411 kWh · from settled GMP bill</span><span class="amt">$358.04</span><button type="button" class="btn sm">Review</button></div>
               <div class="d2-approw num"><b>Stone Barn Winery</b><span class="m">2,305 kWh · from settled VEC bill</span><span class="amt">$342.25</span><button type="button" class="btn sm">Review</button></div>
               <div class="d2-nowfoot">
@@ -723,13 +969,13 @@
             <span class="d2-node" aria-hidden="true"></span>
             <summary class="glass d2-sum num">
               <span class="chev">▶</span><b>Aug 1 · next run</b>
-              <span>24 scheduled · fires in 4 days</span>
+              <span>17 scheduled · fires in 4 days</span>
               <span class="sp"></span><span class="quiet">default: approve to send</span>
             </summary>
             <div class="glass d2-inner">
               <div class="row"><span>When an invoice is drafted</span>
                 <span class="pillseg"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
-                <span class="sp"></span><span class="quiet num">22 approve · 2 auto</span></div>
+                <span class="sp"></span><span class="quiet num">15 approve · 2 auto</span></div>
               <div class="row"><span class="quiet">Monthly invoices fire the 1st · an invoice only generates once its utility bill settles.</span></div>
             </div>
           </details>
@@ -738,7 +984,7 @@
         <details class="fold">
           <summary class="glass d2-sum num">
             <span class="chev">▶</span><b>Your offtakers</b>
-            <span>24 across GMP + VEC · ✓ bills current</span>
+            <span>17 across GMP + VEC · ✓ bills current</span>
             <span class="chip amber">⚑ 1 to review</span>
             <span class="sp"></span>
             <button type="button" class="btn sm" onclick="event.preventDefault()">＋ Add an offtaker</button>
@@ -748,186 +994,21 @@
             <div class="listcol">
               <div class="prov" role="button" tabindex="0" aria-expanded="false">
                 <span class="caret">▸</span><b>Green Mountain Power</b>
-                <span class="count num">2 net-meter groups · 14 offtakers</span>
+                <span class="count num">2 arrays · 11 offtakers</span>
                 <span class="flag num">⚑ 1 to review</span>
                 <span class="sp"></span>
-                <span class="track num"><i style="--w:93%"></i><small>13 sent · June</small></span>
+                <span class="track num"><i style="--w:93%"></i><small>10 sent · June</small></span>
               </div>
               <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
                 <span class="caret">▸</span><b>Vermont Electric Co-op</b>
-                <span class="count num">1 account · 10 offtakers</span>
+                <span class="count num">1 array · 6 offtakers</span>
                 <span class="sp"></span>
-                <span class="track num"><i style="--w:100%"></i><small>10 sent · June</small></span>
+                <span class="track num"><i style="--w:100%"></i><small>6 sent · June</small></span>
               </div>
             </div>
           </div>
         </details>
 
-      </div>
-    </div>
-  </section>
-
-  <!-- ════════════ DESIGN 3 — DIRECTORY + RAIL, ARRAY-FIRST (the pick) ════════════ -->
-  <section class="design active" id="d3" aria-label="The pick: Directory plus Rail, array-first">
-    <div class="viewport">
-      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
-      <div class="appnav">
-        <span class="brand"><span class="sun"></span>Array Operator</span>
-        <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
-        <span class="who">anna@vermontsolar.co</span>
-      </div>
-      <div class="sheet">
-
-        <div class="glass d0-head">
-          <h1>Offtaker invoicing</h1>
-          <span class="honesty"><b>Nothing sends until you approve it.</b></span>
-          <span class="sp"></span>
-          <span class="pillseg" role="group" aria-label="View">
-            <button type="button" class="on">Offtakers</button>
-            <button type="button">Bill audit <span class="chip amber num" style="margin-left:4px">⚑ 1</span></button>
-          </span>
-        </div>
-
-        <div class="d3-grid">
-
-          <div class="glass d3-dir">
-            <div class="d3-dirhead">
-              <h2>Your offtakers</h2><span class="n num">24 across 3 arrays</span>
-              <span class="chip blue num" title="The blended net-metering credit rate from your settled master bills. Every offtaker invoice prices at this rate unless its own bill overrides it.">master credit rate · $0.14850/kWh</span>
-              <span style="flex:1"></span>
-              <span class="osearch" style="min-width:190px"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker…" aria-label="Find an offtaker"></span>
-            </div>
-            <div class="listcol">
-
-              <!-- ── ARRAY 1 · Chester — EXPANDED ── -->
-              <div class="arr-open">
-                <div class="prov" role="button" tabindex="0" aria-expanded="true">
-                  <span class="caret">▾</span><b>Chester</b>
-                  <span class="count num">8 offtakers</span>
-                  <span class="flag num">⚑ 1</span>
-                  <span class="sp"></span>
-                  <button type="button" class="tether num" title="This array bills from GMP account #08211-3. Click to change which master bill it's tethered to.">🔗 GMP #08211-3 · Jun ✓</button>
-                  <span class="track num"><i style="--w:88%"></i><small>7 sent</small></span>
-                </div>
-
-                <!-- Offtaker OPEN — the existing editor, kept as-is -->
-                <div class="off-open">
-                  <div class="off-open-head" role="button" tabindex="0" aria-expanded="true">
-                    <span class="chev" style="transform:rotate(90deg)">▶</span>
-                    <b>Brooks House Apartments</b>
-                    <span class="chip green num">$402.14 ready</span>
-                    <span class="sp"></span>
-                    <span class="meta num">next Aug 1 · last sent Jun 3</span>
-                  </div>
-                  <div class="off-open-body">
-                    <div>
-                      <div class="calc">
-                        <h4>How this was calculated</h4>
-                        <div class="r num"><span>Master bill excess — June, GMP #08211-3</span><b>5,416 kWh</b></div>
-                        <div class="r num"><span>Brooks House share</span><b>50%</b></div>
-                        <div class="r num"><span>Credited to Brooks House</span><b>2,708 kWh</b></div>
-                        <div class="r num"><span>Solar credit rate</span><b>$0.14850 / kWh</b></div>
-                        <div class="total num"><span>Amount due</span><span class="amt">$402.14</span></div>
-                        <div class="foot num">2,708 kWh × $0.14850 = $402.14 · billed from the settled June master bill.</div>
-                      </div>
-                      <div class="dgrid">
-                        <div class="f"><label>Share</label><span class="v num">50% of Chester master</span></div>
-                        <div class="f"><label>Email</label><span class="v">billing@brookshouse.com</span></div>
-                        <div class="f"><label>Delivery</label>
-                          <span class="pillseg mini"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
-                        </div>
-                        <div class="f"><label>Invoice format</label><span class="v">Default · <span style="color:var(--sky-primary-deep);cursor:pointer">upload template</span></span></div>
-                      </div>
-                      <div class="note">Hi Abigail — June's solar credit is attached. 2,708 kWh at $0.14850/kWh comes to $402.14. Reply here with any questions.</div>
-                      <div class="off-actions">
-                        <button type="button" class="btn primary sm num">Approve &amp; send $402.14</button>
-                        <button type="button" class="btn sm">⬇ Download PDF</button>
-                      </div>
-                    </div>
-                    <div>
-                      <div class="paper">
-                        <div class="band"><b>VERMONT SOLAR CO.</b><small>Solar credit invoice · June 2026</small></div>
-                        <div class="pbody">
-                          <div class="prow"><span>Billed to</span><b>Brooks House Apartments</b></div>
-                          <div class="prow"><span>Invoice №</span><b class="num">2026-0614</b></div>
-                          <div class="prow num"><span>Solar credits — 2,708 kWh</span><b>$402.14</b></div>
-                          <div class="prow num"><span>Rate</span><b>$0.14850 / kWh</b></div>
-                          <div class="ptotal num"><span>Amount due</span><span>$402.14</span></div>
-                          <div class="pfoot">Generated from your settled June utility bill, GMP account #08211-3. Questions: anna@vermontsolar.co</div>
-                        </div>
-                      </div>
-                      <div class="quiet paper-cap">Live preview — updates as you edit</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="acc">
-                  <span class="caret">▸</span>
-                  <div class="main">
-                    <div class="nm">Maple Lane Farm <span class="chip amber">⚑ doesn't match GMP</span></div>
-                    <div class="meta num">25% share · next Aug 1 · last sent Jun 3</div>
-                  </div>
-                </div>
-                <div class="acc">
-                  <span class="caret">▸</span>
-                  <div class="main">
-                    <div class="nm">Abigail Chen <span class="chip blue">Auto-send</span></div>
-                    <div class="meta num">12% share · next Aug 1 · last sent Jun 3</div>
-                  </div>
-                </div>
-                <div class="quiet num" style="padding:2px 16px 6px">+ 5 more offtakers on Chester</div>
-              </div>
-
-              <!-- ── ARRAY 2 · Putney Rd — collapsed, tethered ── -->
-              <div class="prov" role="button" tabindex="0" aria-expanded="false">
-                <span class="caret">▸</span><b>Putney Rd</b>
-                <span class="count num">10 offtakers</span>
-                <span class="sp"></span>
-                <button type="button" class="tether num">🔗 GMP #99820-4 · Jun ✓</button>
-                <span class="track num"><i style="--w:100%"></i><small>10 sent</small></span>
-              </div>
-
-              <!-- ── ARRAY 3 · Hartland — collapsed, UNTETHERED ── -->
-              <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
-                <span class="caret">▸</span><b>Hartland</b>
-                <span class="count num">6 offtakers</span>
-                <span class="sp"></span>
-                <button type="button" class="tether none" title="Pick which master account bill this array invoices from.">🔗 Tether to master bill</button>
-                <span class="track num"><i style="--w:0%"></i><small>waiting on bill</small></span>
-              </div>
-
-            </div>
-          </div>
-
-          <aside class="d3-rail">
-            <div class="glass railcycle">
-              <span class="eyebrow">July cycle</span>
-              <div class="big num">3 to approve</div>
-              <span class="cap num">$1,102.40 drafted from settled bills</span>
-              <button type="button" class="btn primary">Review &amp; approve →</button>
-              <span class="quiet" style="display:block;margin-top:8px;text-align:center">Nothing sends until you approve it.</span>
-              <div class="mini num">
-                <span class="r"><span class="chip green">✓</span> June — 23 of 24 · $8,914 <span class="sp"></span><span class="quiet">archive</span></span>
-                <span class="r">2 auto-sending · 4 waiting on bills</span>
-                <span class="r">Next run <b>Aug 1</b> · in 4 days</span>
-              </div>
-            </div>
-            <div class="glass railmode">
-              <span style="font-weight:700;color:var(--muted)">When an invoice is drafted</span>
-              <span class="pillseg"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
-              <span class="num">✓ Bills reconcile · <span style="color:var(--amber);font-weight:700">⚑ 1 to review → Bill audit</span></span>
-            </div>
-            <div class="glass raillinks">
-              <button type="button" class="add">＋ Add an offtaker</button>
-              <button type="button">⬆ Bulk import</button>
-              <button type="button">⬇ Export to accounting</button>
-              <button type="button">✉ Customize email</button>
-              <button type="button">🔗 Link utility bills</button>
-              <button type="button">🗂 Invoice archive</button>
-            </div>
-          </aside>
-
-        </div>
       </div>
     </div>
   </section>
@@ -955,6 +1036,36 @@
       if (e.key === "2") show(0);
       if (e.key === "3") show(1);
       if (e.key === "4") show(2);
+    });
+  })();
+
+  /* The pick's live interaction: opening/closing the offtaker editor
+     minimizes/restores the rail so the preview never cramps. */
+  (function () {
+    var grid = document.getElementById("pickGrid");
+    var card = document.getElementById("offGlover");
+    if (!grid || !card) return;
+    var head = card.querySelector(".off-open-head");
+    var body = card.querySelector(".off-open-body");
+    var bar = card.querySelector(".ed-bar");
+    var chev = head.querySelector(".chev");
+    function setOpen(open) {
+      body.hidden = !open;
+      bar.hidden = !open;
+      head.setAttribute("aria-expanded", String(open));
+      chev.style.transform = open ? "rotate(90deg)" : "";
+      grid.classList.toggle("editing", open);
+    }
+    head.addEventListener("click", function (e) {
+      if (e.target.closest("button")) return;
+      setOpen(body.hidden);
+    });
+    head.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(body.hidden); }
+    });
+    var expand = document.getElementById("railExpand");
+    if (expand) expand.addEventListener("click", function () {
+      grid.classList.remove("editing");
     });
   })();
 </script>
