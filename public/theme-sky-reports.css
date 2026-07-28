@@ -841,3 +841,16 @@ html.sky .rb2-railtools .rb2-ratechip.rb-globalrate{padding:0;margin:0;border:0;
 /* landing4: the master pair reads identically on sky too */
 html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool{color:var(--muted,#33415A);font-weight:650}
 html.sky .rb2-railtools .rb2-tool .rb2-tl{color:var(--ink,#1e293b)}
+
+/* landing5: the floating mini strip reads as detached glass in the margin */
+html.sky #rb2Main.rb2-editing .rb2-railmini{
+  background:rgba(255,255,255,.85);
+  -webkit-backdrop-filter:var(--sky-sheet-blur);backdrop-filter:var(--sky-sheet-blur);
+  box-shadow:var(--sky-shadow-float);
+}
+html.sky .rb2-railtools .rb2-ti--email,
+html.sky .rb2-railtools .rb2-ti--rate{background:#6366f1;color:#fff;
+  box-shadow:0 3px 8px -2px rgba(99,102,241,.45)}
+@supports (corner-shape: squircle){
+  html.sky .rb2-ti{corner-shape:squircle}
+}

@@ -3236,7 +3236,7 @@
  <div class="rb2-toolsep" aria-hidden="true"></div>
  <!-- The two MASTER settings sit together as a matched pair (Ford 2026-07-28):
  same indigo chip family, same label + value-pill anatomy. -->
- <button class="ao-btn rb-btn rb2-tool" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only."><span class="rb2-ti rb2-ti--email" aria-hidden="true">✉</span><span class="rb2-tl">Master email</span><span class="rb2-tv">all offtakers</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only."><span class="rb2-ti rb2-ti--email" aria-hidden="true">✉&#xFE0E;</span><span class="rb2-tl">Master email</span><span class="rb2-tv">all offtakers</span></button>
  <!-- Master solar credit rate — opens the same optional-fleet-override editor
  as a leftward popover. Same ids, wired by wireGlobalRate() → /global-rate. -->
  <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">

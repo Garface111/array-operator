@@ -4200,3 +4200,18 @@ body.ho-shell-open .vs-inv-sub{
 /* all six tool labels share one ink (the rate summary isn't an .ao-btn, so
    without this it rendered a step lighter than its five button siblings) */
 .rb2-railtools .rb2-tool .rb2-tl{color:var(--ink,#0f172a)}
+
+/* ── landing5: while editing, the editor takes the WHOLE sheet width and the
+   mini strip floats OUT into the page margin (Ford 2026-07-28: no cutoff
+   dead-space column). Fixed to the viewport edge, so it also survives scroll
+   as the always-reachable restore control. */
+#rb2Main.rb2-editing{grid-template-columns:minmax(0,1fr)}
+#rb2Main.rb2-editing .rb2-railslot{position:static}
+#rb2Main.rb2-editing .rb2-railmini{position:fixed;right:8px;top:clamp(120px,24vh,230px);
+  z-index:60;box-shadow:0 10px 34px -8px rgba(15,23,42,.28)}
+/* landing5b: the master pair's chips are BOTH solid indigo squircles with
+   white glyphs (Ford: "make master rate look the same as master email" —
+   the ✉ was rendering solid via the color-emoji font while $ stayed thin
+   text; solid + text-presentation makes the pair deterministic). */
+.rb2-railtools .rb2-ti--email,
+.rb2-railtools .rb2-ti--rate{background:#6366f1;color:#fff;font-weight:800}
