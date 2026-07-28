@@ -819,3 +819,22 @@ html.sky .rb2-srcline--warn{color:var(--amber-ink,#8a5a00)}
 html.sky .rb2-railtools .rb2-ratechip-sum{background:transparent;border:0;box-shadow:none}
 html.sky .rb2-railtools .rb2-ratechip-sum:hover{background:rgba(33,150,243,.08)}
 html.sky .rb2-railhide:hover{background:rgba(33,150,243,.08)}
+
+/* landing3: rail tools texture — a soft glass gradient on the card, sky-blue
+   hover, and the action chip in the sky primary. Chip tints are cross-theme. */
+html.sky .rb2-railtools{
+  background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.68));
+  border:1px solid rgba(255,255,255,.9);
+}
+html.sky .rb2-railtools .rb-btn.rb2-tool,
+html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool{
+  background:transparent;border:0;box-shadow:none}
+html.sky .rb2-railtools .rb-btn.rb2-tool:hover,
+html.sky .rb2-railtools .rb2-ratechip-sum.rb2-tool:hover{
+  background:rgba(33,150,243,.08)}
+html.sky .rb2-ti--add{background:var(--sky-primary,#2196F3);
+  box-shadow:0 3px 8px -2px rgba(33,150,243,.5)}
+html.sky .rb2-toolsep{background:rgba(20,60,120,.10)}
+html.sky .rb2-tv{background:rgba(20,60,120,.07)}
+html.sky .rb2-railtools .rb2-ratechip.rb-globalrate{padding:0;margin:0;border:0;
+  background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}

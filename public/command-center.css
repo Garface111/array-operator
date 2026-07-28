@@ -4159,3 +4159,35 @@ body.ho-shell-open .vs-inv-sub{
   font-size:10.5px;font-weight:650;color:var(--faint,#94a3b8);margin-bottom:-6px}
 .rb2-railhide:hover{background:var(--day-hover,rgba(140,78,28,.06));color:var(--ink,#0f172a)}
 #rb2Main.rb2-hasopen .rb2-railfull:not([hidden]) .rb2-railhide{display:inline-flex}
+
+/* ── landing3: the rail tools card, rebalanced (Ford 2026-07-28: "more texture
+   and space and color in between the buttons"). Rows = tinted icon chip +
+   label; hairlines split grow-the-book / send-and-connect / settings. ────── */
+.rb2-railtools{padding:9px;gap:3px}
+.rb2-railtools .rb-btn.rb2-tool,
+.rb2-railtools .rb2-ratechip-sum.rb2-tool{
+  display:flex;align-items:center;gap:11px;width:100%;box-sizing:border-box;
+  padding:8px 9px;font-size:12px;font-weight:650;color:var(--muted,#475569);
+  border:0;background:transparent;border-radius:11px;box-shadow:none;
+  text-align:left;white-space:nowrap;cursor:pointer}
+.rb2-railtools .rb-btn.rb2-tool:hover,
+.rb2-railtools .rb2-ratechip-sum.rb2-tool:hover{
+  background:var(--day-hover,rgba(140,78,28,.06));color:var(--ink,#0f172a);
+  border:0;box-shadow:none}
+.rb2-tl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.rb2-ti{width:27px;height:27px;flex:none;display:grid;place-items:center;
+  border-radius:9px;font-size:13px;line-height:1;font-weight:700}
+.rb2-ti--add{background:var(--good,#2563eb);color:#fff;font-size:15px}
+.rb2-ti--bulk{background:rgba(8,145,178,.13);color:#0e7490}
+.rb2-ti--export{background:rgba(13,148,136,.13);color:#0f766e}
+.rb2-ti--email{background:rgba(79,70,229,.11);color:#4f46e5}
+.rb2-ti--link{background:rgba(5,150,105,.12);color:#047857}
+.rb2-ti--rate{background:rgba(71,85,105,.12);color:#475569;font-weight:800}
+.rb2-tv{flex:none;font-size:11px;color:var(--muted,#475569);
+  background:rgba(71,85,105,.08);border-radius:999px;padding:3px 10px;
+  font-variant-numeric:tabular-nums}
+.rb2-tv b{font-weight:700;color:var(--ink,#0f172a)}
+.rb2-toolsep{height:1px;background:var(--line,#e8e2d9);margin:5px 9px;flex:none}
+/* the rail's rate row must not inherit the old global-rate CARD shell */
+.rb2-railtools .rb2-ratechip.rb-globalrate{padding:0;margin:0;border:0;
+  background:transparent;box-shadow:none;border-radius:11px;width:100%}

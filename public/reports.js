@@ -3185,10 +3185,14 @@
  <button class="rb2-railhide" id="rb2RailHide" type="button" title="Minimize the rail while editing">Minimize »</button>
  <div class="rb2-railcycle" id="rb2RailCycle" hidden></div>
  <div class="rb2-railtools">
- <button class="ao-btn rb-btn rb2-railadd" id="rbCustAdd" type="button">＋ Add an offtaker</button>
- <button class="ao-btn rb-btn" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating.">⬆ Bulk import</button>
+ <!-- Tool rows: tinted icon chip + label (Ford 2026-07-28: "more texture
+ and space and color in between the buttons"). Hairline separators split
+ grow-the-book / send-and-connect / settings. Ids + wiring unchanged. -->
+ <button class="ao-btn rb-btn rb2-tool rb2-railadd" id="rbCustAdd" type="button"><span class="rb2-ti rb2-ti--add" aria-hidden="true">＋</span><span class="rb2-tl">Add an offtaker</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbBulkImport" type="button" title="Add many offtakers from any spreadsheet, utility export, Excel, or Google Sheets. We detect columns; you review before creating."><span class="rb2-ti rb2-ti--bulk" aria-hidden="true">⬆</span><span class="rb2-tl">Bulk import</span></button>
+ <div class="rb2-toolsep" aria-hidden="true"></div>
  <div class="rb2-exportwrap">
- <button class="ao-btn rb-btn" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false">⬇ Export</button>
+ <button class="ao-btn rb-btn rb2-tool" id="rb2ExportBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="rb2-ti rb2-ti--export" aria-hidden="true">⬇</span><span class="rb2-tl">Export to accounting</span></button>
  <div class="rb2-exportpop" id="rb2ExportPop" hidden>
  <div class="rb2-exportpop-h">Export invoices to accounting</div>
  <p class="rb2-exportpop-p">Pick your accounting system, the invoice date, and the billing cycle. The batch drafts every offtaker's invoice and downloads a file that imports directly.</p>
@@ -3228,13 +3232,14 @@
  </div>
  </div>
  </div>
- <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only.">✉ Master email · all offtakers</button>
- <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only."><span class="rb2-ti rb2-ti--email" aria-hidden="true">✉</span><span class="rb2-tl">Master email · all offtakers</span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills."><span class="rb2-ti rb2-ti--link" aria-hidden="true">🔗</span><span class="rb2-tl">Link utility bills</span></button>
+ <div class="rb2-toolsep" aria-hidden="true"></div>
  <!-- Master solar credit rate — a rail tool (Ford 2026-07-28 follow-up: moved
  off the Your-offtakers bar). Opens the same optional-fleet-override editor
  as a leftward popover. Same ids, wired by wireGlobalRate() → /global-rate. -->
  <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">
- <summary class="rb2-ratechip-sum" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate.">＄ Master rate · <b id="rbGrChipVal">per-bill</b></summary>
+ <summary class="rb2-ratechip-sum rb2-tool" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate."><span class="rb2-ti rb2-ti--rate" aria-hidden="true">$</span><span class="rb2-tl">Master rate</span><span class="rb2-tv"><b id="rbGrChipVal">per-bill</b></span></summary>
  <div class="rb2-ratechip-pop">
  <div class="rb-gr-main">
  <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
