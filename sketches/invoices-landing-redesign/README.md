@@ -1,49 +1,52 @@
-# Invoices · Offtakers — landing redesign, 3 sky-glass directions (2026-07-28)
+# Invoices · Offtakers — landing redesign (2026-07-28)
 
-Ford's read on the current landing: overwhelming and busy. Today the tab stacks
-three dense glass bands (`shell()` in `public/reports.js` → the `.rb2` world):
-the header band (h1 + honesty line + Offtakers/Bill-audit pills + reconcile
-glance), the send-pipeline band (rules microcopy + mode slider + 3 cells × 3
-chips each), and the list band (5-action toolbar + search/filter + the
-provider → account → offtaker accordion + archive host).
+**PICKED (Ford, 2026-07-28): Directory + Rail, rebuilt array-first.** Open
+`index.html` — the pick is the default view (★); the three earlier directions
+remain as alternates on the switcher (keys 1–4).
 
-This sketch reorganizes ONLY the landing. Deeper functionality — offtaker
-cards/drawers, add/bulk/export/email-studio flows, bill audit, archive,
-pipeline logic — is untouched; every existing surface keeps an entry point.
-All three run the sky theme verbatim (`theme-sky.css` tokens: white glass,
-#2196F3 action blue, 22/32px radii, blur(18px) saturate(1.7); amber = review
-flag, emerald = positive, provider hue spines preserved).
+## The picked design — spec (Ford's words, distilled)
 
-Open `index.html` in a browser (or the published artifact) — top switcher,
-keys 1/2/3. Same sample fleet in all three (24 offtakers, GMP + VEC,
-3 awaiting approval, 1 audit flag).
+- **Organize by ARRAY first.** Top level of the list = arrays (not utility
+  accounts — that grouping level is removed). Click an array → its offtakers
+  expand beneath, like today. Click an offtaker → the EXISTING editing system
+  opens in place (how-this-was-calculated, offtaker details, edit email, etc.,
+  with the live invoice preview on the right). That editor is good — keep it.
+- **Delete the send-pipeline visual** (`.rb2-pipe`) — too busy. Its essentials
+  survive in the sticky right rail: "N to approve" + approve button, June
+  delivered line, auto/waiting counts, next-run date, and the delivery-mode
+  slider.
+- **Master solar credit rate → a small chip in the "Your offtakers" bar.**
+- **Tether button per array row** — binds the array to the master account
+  bill pulled for it. Tethered state shows the account + settled month
+  ("🔗 GMP #08211-3 · Jun ✓"); untethered shows a dashed "Tether to master
+  bill" CTA.
+- **Right rail** (from direction 3): cycle card (count + $ + Review & approve),
+  mode + bill-health card (reconcile status → Bill audit), and all tools as a
+  quiet link list (Add / Bulk import / Export / Customize email / Link utility
+  bills / Archive).
 
-## The three directions
+Landing-only reorganization; deeper flows unchanged. Sky theme verbatim
+(`theme-sky.css` tokens; amber = review flag, emerald = positive, blur budget
+respected: glass on top-level bands, near-solid repeated cards, paper stays
+paper for the invoice preview).
 
-1. **One Question First** — the landing opens with the only thing that needs
-   the operator ("3 invoices need your approval" + one primary button). The
-   whole pipeline band compresses to a single status line (June ✓ · auto/
-   waiting counts · next run + mode chip). Toolbar collapses to ＋ Add and a
-   ⋯ Tools popover (Export / Email / Link / Bulk / Archive). Directory below,
-   unchanged.
+## Implementation notes
 
-2. **The Pipeline Is the Page** — the three pipeline cells become a vertical
-   timeline with a spine: June folded, THIS CYCLE expanded with the approval
-   rows inline (review/approve straight from the landing), next run folded
-   (mode slider lives inside it). The directory is its own sheet, collapsed
-   to provider headers.
+- Re-frame `shell()` + `renderAccordion()` in `public/reports.js`: group by
+  `array_id` instead of provider → utility-account; the account identity moves
+  into the array row's tether button. Remove the `.rb2-pipe` render; add the
+  rail (new top-level flex/grid inside `.rb2`).
+- The offtaker open-card editor (`.rb-acc[data-open]` + folded template box +
+  preview) is untouched.
+- Follow-on pass in `theme-sky-reports.css`; bump the `?v=` tokens in
+  `public/index.html` in the SAME commit; deploy only via
+  `scripts/deploy-and-verify.sh`. Read DESIGN.md first.
 
-3. **Directory + Rail** — the offtaker directory IS the page (search, GMP/
-   Other filter, accordion); everything operational moves to one sticky rail:
-   cycle card (count + $ + approve button + mini pipeline), mode + bill-health
-   card, and all tools as a quiet link list.
+## Earlier directions (kept for reference)
 
-## Shared principles
-
-- The pipeline's honesty rules survive verbatim ("Nothing sends until you
-  approve it", the auto-send exception wording, honest chip splits).
-- Status is stated once per fact — no more chip + cell + subline restating.
-- Amber/emerald/octarine semantics and per-provider hues pass through.
-- Implementation is a re-frame of `shell()` + the pipe/list renderers in
-  `public/reports.js` and a follow-on pass in `theme-sky-reports.css`; no
-  backend or endpoint changes.
+1. **One Question First** — hero leads with what needs approval; pipeline
+   compressed to a status line; tools folded into ⋯.
+2. **The Pipeline Is the Page** — pipeline cells as a vertical timeline with
+   approval rows inline; directory collapsed below.
+3. **Directory + Rail (v1, utility-grouped)** — superseded by the pick.
+A. **Array-first stack** — the array-first spec as a single column, no rail.
