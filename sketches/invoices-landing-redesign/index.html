@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Invoices · Offtakers — 3 sky-glass landing redesigns</title>
+<style>
+  /* ═══ Chrome tokens (theme-aware). Mockups run the app's own SKY theme,
+     lifted from array-operator/public/theme-sky.css — deliberately light. ═══ */
+  :root {
+    --ground: #dfe9f2;
+    --chrome: #0e2b4d;
+    --chrome-ink: #e7f0fa;
+    --chrome-dim: #8fa9c4;
+    --chrome-accent: #56B4F0;
+    --note-ink: #3d5570;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground: #0d1420; --note-ink: #9db4cc; }
+  }
+  :root[data-theme="dark"] { --ground: #0d1420; --note-ink: #9db4cc; }
+  :root[data-theme="light"] { --ground: #dfe9f2; --note-ink: #3d5570; }
+
+  /* App sky tokens — verbatim from theme-sky.css */
+  :root {
+    --sky-top: #1E90E8;
+    --sky-mid: #56B4F0;
+    --sky-horizon: #BEE3FA;
+    --sky-primary: #2196F3;
+    --sky-primary-deep: #1976D2;
+    --sky-green: #4CAF50;
+    --sky-r-pill: 999px;
+    --sky-r-btn: 12px;
+    --sky-r-card: 22px;
+    --sky-r-sheet: 32px;
+    --sky-glass-content: rgba(255,255,255,.56);
+    --sky-glass-solid: rgba(255,255,255,.74);
+    --sky-sheet-blur: blur(18px) saturate(1.7);
+    --sky-glass-edge: rgba(255,255,255,.5);
+    --sky-shadow-card: 0 8px 30px rgba(20,60,120,.08);
+    --sky-shadow-sheet: 0 18px 50px -12px rgba(20,60,120,.16);
+    --sky-shadow-float: 0 24px 70px -18px rgba(15,50,110,.28);
+    --ink: #1e293b;
+    --muted: #33415A;
+    --faint: #46658C;
+    --line: rgba(20,60,120,.13);
+    --amber: #b45309;
+    --amber-bg: rgba(255,193,7,.16);
+    --emerald: #059669;
+    --octarine: #a368ff;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; }
+
+  /* ═══ Chrome: header + switcher ═══ */
+  .chrome { background: var(--chrome); color: var(--chrome-ink); padding: 18px 24px 0; }
+  .chrome-top { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+  .chrome-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--chrome-accent); }
+  .chrome-title { font-size: 15px; font-weight: 600; }
+  .chrome-note { margin-left: auto; font-size: 12px; color: var(--chrome-dim); }
+  .switcher { max-width: 1100px; margin: 14px auto 0; display: flex; gap: 6px; flex-wrap: wrap; }
+  .switcher button {
+    appearance: none; border: 0; cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--chrome-dim); background: transparent; padding: 9px 14px 11px;
+    border-radius: 10px 10px 0 0;
+  }
+  .switcher button:hover { color: var(--chrome-ink); }
+  .switcher button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: -2px; }
+  .switcher button[aria-pressed="true"] { color: #0e2b4d; background: var(--ground); }
+  .switcher button b { color: var(--chrome-accent); margin-right: 7px; }
+  .switcher button[aria-pressed="true"] b { color: var(--sky-primary-deep); }
+  :root[data-theme="dark"] .switcher button[aria-pressed="true"],
+  html:not([data-theme]) .dark-switch-ink { color: var(--chrome-ink); }
+  @media (prefers-color-scheme: dark) {
+    .switcher button[aria-pressed="true"] { color: var(--chrome-ink); }
+  }
+  :root[data-theme="light"] .switcher button[aria-pressed="true"] { color: #0e2b4d; }
+
+  .tagline { max-width: 1100px; margin: 0 auto; padding: 16px 24px 6px; font-size: 13.5px; line-height: 1.55; color: var(--note-ink); }
+  .tagline b { font-weight: 650; }
+
+  .stagewrap { padding: 14px 24px 56px; }
+  .design { display: none; }
+  .design.active { display: block; }
+
+  /* ═══ The sky viewport — gradient sky + soft clouds, glass on top ═══ */
+  .viewport {
+    position: relative; max-width: 1100px; margin: 0 auto;
+    border-radius: 18px; overflow: hidden;
+    background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-horizon) 100%);
+    box-shadow: 0 18px 60px rgba(10, 35, 80, .28);
+  }
+  .cloud { position: absolute; border-radius: 999px; background: rgba(255,255,255,.5); filter: blur(30px); pointer-events: none; }
+  .c1 { width: 420px; height: 110px; top: 60px; left: -80px; }
+  .c2 { width: 520px; height: 130px; top: 220px; right: -140px; background: rgba(255,255,255,.38); }
+  .c3 { width: 380px; height: 100px; bottom: 140px; left: 12%; background: rgba(255,255,255,.3); }
+
+  /* Faux app nav — frosted chrome bar like the real command center */
+  .appnav {
+    position: relative; z-index: 2;
+    display: flex; align-items: center; gap: 18px;
+    margin: 14px 18px 0; padding: 0 18px; height: 54px;
+    background: rgba(255,255,255,.60);
+    -webkit-backdrop-filter: var(--sky-sheet-blur); backdrop-filter: var(--sky-sheet-blur);
+    border: 1px solid var(--sky-glass-edge); border-radius: var(--sky-r-pill);
+    box-shadow: var(--sky-shadow-card);
+    font-size: 13.5px;
+  }
+  .appnav .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+  .appnav .brand .sun { width: 20px; height: 20px; border-radius: 7px; background: linear-gradient(135deg, #FFD54F, #FB8C00); }
+  .appnav .tabs { display: flex; gap: 4px; }
+  .appnav .tabs span { padding: 7px 14px; border-radius: var(--sky-r-pill); color: var(--muted); font-weight: 600; }
+  .appnav .tabs .on { background: var(--sky-primary); color: #fff; box-shadow: 0 4px 12px -4px rgba(33,150,243,.55); }
+  .appnav .who { margin-left: auto; color: var(--faint); font-size: 12px; }
+
+  /* The safe-zone sheet (the .rb2 ruling: one calm plane over the sky) */
+  .sheet {
+    position: relative; z-index: 1;
+    margin: 16px 18px 22px; padding: 18px 18px 26px;
+    background: rgba(255,255,255,.66);
+    border: 1px solid var(--sky-glass-edge);
+    border-radius: var(--sky-r-sheet);
+    box-shadow: var(--sky-shadow-sheet);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Glass materials */
+  .glass {
+    background: rgba(255,255,255,.86);
+    -webkit-backdrop-filter: var(--sky-sheet-blur); backdrop-filter: var(--sky-sheet-blur);
+    border: 1px solid var(--sky-glass-edge);
+    border-radius: var(--sky-r-card);
+    box-shadow: var(--sky-shadow-card);
+  }
+  .solid {
+    background: rgba(255,255,255,.74);
+    border: 1px solid rgba(255,255,255,.85);
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(20,60,120,.06);
+  }
+
+  /* Atoms */
+  .btn {
+    appearance: none; cursor: pointer; font-size: 13px; font-weight: 600;
+    border-radius: var(--sky-r-btn); padding: 8px 14px;
+    border: 1px solid rgba(20,60,120,.16);
+    background: rgba(255,255,255,.85); color: var(--muted);
+  }
+  .btn:hover { border-color: rgba(33,150,243,.5); color: var(--ink); background: #fff; }
+  .btn:focus-visible { outline: 2px solid var(--sky-primary); outline-offset: 2px; }
+  .btn.primary {
+    background: var(--sky-primary); border-color: var(--sky-primary); color: #fff;
+    padding: 10px 18px; font-size: 14px;
+    box-shadow: 0 6px 18px -6px rgba(33,150,243,.6);
+  }
+  .btn.primary:hover { background: var(--sky-primary-deep); border-color: var(--sky-primary-deep); color: #fff; }
+  .btn.sm { padding: 6px 11px; font-size: 12px; border-radius: 10px; }
+  .pillseg {
+    display: inline-flex; gap: 4px; padding: 4px;
+    background: rgba(255,255,255,.55);
+    border: 1px solid var(--sky-glass-edge); border-radius: var(--sky-r-pill);
+    box-shadow: 0 2px 10px rgba(20,60,120,.06);
+  }
+  .pillseg button {
+    appearance: none; border: 0; cursor: pointer; font-size: 12.5px; font-weight: 600;
+    color: var(--muted); background: transparent; padding: 7px 14px; border-radius: var(--sky-r-pill);
+  }
+  .pillseg button.on { background: var(--sky-primary); color: #fff; box-shadow: 0 3px 10px -3px rgba(33,150,243,.55); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: var(--sky-r-pill); }
+  .chip.green { background: rgba(76,175,80,.16); color: #2e7d32; }
+  .chip.amber { background: var(--amber-bg); color: var(--amber); }
+  .chip.blue { background: rgba(33,150,243,.13); color: #1565C0; }
+  .chip.gray { background: rgba(100,116,139,.14); color: var(--faint); }
+  .quiet { font-size: 11.5px; color: var(--faint); }
+  .eyebrow { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--sky-primary-deep); }
+  .hairline { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+  details.fold > summary { list-style: none; cursor: pointer; }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold summary .chev { transition: transform .15s ease; display: inline-block; color: var(--faint); font-size: 11px; }
+  details.fold[open] summary .chev { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) { details.fold summary .chev { transition: none; } }
+
+  /* Provider heads + offtaker cards (shared across designs) */
+  .prov {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 13px 16px;
+    background: rgba(255,255,255,.8);
+    border: 1px solid rgba(255,255,255,.9);
+    border-left: 3px solid var(--emerald);
+    border-radius: 16px; box-shadow: var(--sky-shadow-card);
+    cursor: pointer; font-size: 13.5px;
+  }
+  .prov:hover { background: rgba(255,255,255,.95); }
+  .prov.vec { border-left-color: #2563eb; }
+  .prov .caret { color: var(--faint); font-size: 11px; }
+  .prov b { color: var(--ink); font-weight: 700; }
+  .prov .count { color: var(--faint); font-size: 12.5px; }
+  .prov .flag { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--amber); }
+  .prov .track { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); }
+  .prov .track i { display: block; width: 72px; height: 5px; border-radius: 99px; background: rgba(20,60,120,.12); position: relative; overflow: hidden; }
+  .prov .track i::after { content: ""; position: absolute; inset: 0; width: var(--w, 90%); background: var(--sky-green); border-radius: 99px; }
+  .acc {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 14px; margin-left: 22px;
+    background: rgba(255,255,255,.72);
+    border: 1px solid rgba(255,255,255,.85);
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(20,60,120,.06);
+  }
+  .acc:hover { border-color: rgba(33,150,243,.35); }
+  .acc .caret { color: var(--faint); font-size: 11px; margin-top: 3px; }
+  .acc .main { min-width: 0; flex: 1; }
+  .acc .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
+  .acc .meta { margin-top: 3px; font-size: 12px; color: var(--faint); }
+  .listcol { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Search pill */
+  .osearch {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.75); border: 1px solid rgba(255,255,255,.9);
+    border-radius: var(--sky-r-pill); padding: 8px 15px;
+    box-shadow: 0 2px 10px rgba(20,60,120,.06);
+    color: var(--faint); font-size: 13px; min-width: 240px;
+  }
+  .osearch input { border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); width: 100%; }
+  .osearch:focus-within { border-color: rgba(33,150,243,.5); box-shadow: 0 0 0 3px rgba(33,150,243,.15); }
+
+  /* Overflow tools popover (mock: shown via <details>) */
+  .tools { position: relative; }
+  .tools > summary { list-style: none; cursor: pointer; }
+  .tools > summary::-webkit-details-marker { display: none; }
+  .toolspop {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
+    min-width: 230px; padding: 6px;
+    background: #fff; border: 1px solid rgba(20,60,120,.14);
+    border-radius: 16px; box-shadow: var(--sky-shadow-float);
+  }
+  .toolspop button {
+    display: flex; width: 100%; align-items: center; gap: 10px;
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left;
+  }
+  .toolspop button:hover { background: rgba(33,150,243,.08); color: var(--ink); }
+
+  /* ═══ Design 1 — One Question First ═══ */
+  .d1-hero { padding: 26px 32px 24px; display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: center; }
+  .d1-hero .lead { min-width: 260px; flex: 1; }
+  .d1-hero h1 { margin: 8px 0 6px; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+  .d1-hero .sub { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .d1-hero .go { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .d1-statusline {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px;
+    padding: 13px 22px; font-size: 12.5px; color: var(--muted);
+  }
+  .d1-statusline .seg { display: inline-flex; align-items: center; gap: 7px; }
+  .d1-statusline .dotsep { color: rgba(20,60,120,.25); }
+  .d1-dir { padding: 20px 24px 24px; }
+  .d1-dirhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .d1-dirhead h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); }
+  .d1-dirhead .n { color: var(--faint); font-weight: 600; font-size: 13px; }
+  .d1-dirhead .sp { flex: 1; }
+
+  /* ═══ Design 2 — The Pipeline Is the Page ═══ */
+  .d2-head { padding: 22px 30px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+  .d2-head h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+  .d2-head .honesty { font-size: 12.5px; color: var(--muted); }
+  .d2-head .honesty b { color: var(--ink); }
+  .d2-head .sp { flex: 1; }
+  .d2-flow { position: relative; display: flex; flex-direction: column; gap: 12px; padding-left: 26px; }
+  .d2-flow::before { content: ""; position: absolute; left: 9px; top: 18px; bottom: 18px; width: 2px; background: rgba(255,255,255,.75); border-radius: 2px; }
+  .d2-node { position: absolute; left: 2px; width: 16px; height: 16px; border-radius: 99px; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(20,60,120,.25); }
+  .d2-stage { position: relative; }
+  .d2-stage .d2-node { top: 16px; }
+  .d2-stage.done .d2-node { background: var(--sky-green); }
+  .d2-stage.now .d2-node { background: var(--sky-primary); }
+  .d2-stage.sched .d2-node { background: #9db8d6; }
+  .d2-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 14px 20px; font-size: 13.5px; color: var(--muted); }
+  .d2-sum b { color: var(--ink); font-weight: 700; }
+  .d2-sum .sp { flex: 1; }
+  .d2-nowcard { border: 1px solid rgba(33,150,243,.4); box-shadow: 0 12px 40px -12px rgba(33,150,243,.35); }
+  .d2-nowhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 16px 22px 12px; }
+  .d2-nowhead .eyebrow { color: var(--sky-primary-deep); }
+  .d2-nowhead h2 { margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--ink); width: 100%; }
+  .d2-approw { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 11px 22px; border-top: 1px solid var(--line); font-size: 13.5px; }
+  .d2-approw b { color: var(--ink); font-weight: 700; }
+  .d2-approw .m { color: var(--faint); font-size: 12.5px; }
+  .d2-approw .amt { margin-left: auto; font-weight: 800; color: var(--ink); }
+  .d2-nowfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 22px 18px; border-top: 1px solid var(--line); }
+  .d2-inner { padding: 6px 20px 16px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+  .d2-inner .row { display: flex; gap: 12px; align-items: center; padding: 6px 0; }
+  .d2-inner .row .sp { flex: 1; }
+
+  /* ═══ Design 3 — Directory + Rail ═══ */
+  .d3-grid { display: grid; grid-template-columns: minmax(0, 1fr) 292px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .d3-grid { grid-template-columns: 1fr; } .d3-rail { position: static; } }
+  .d3-dir { padding: 20px 22px 24px; }
+  .d3-dirhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .d3-dirhead h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); }
+  .d3-dirhead .n { color: var(--faint); font-weight: 600; font-size: 13px; }
+  .d3-rail { position: sticky; top: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .railcycle { padding: 20px 20px 18px; }
+  .railcycle .big { margin: 10px 0 2px; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+  .railcycle .cap { font-size: 12px; color: var(--faint); }
+  .railcycle .btn.primary { width: 100%; margin-top: 14px; }
+  .railcycle .mini { display: flex; flex-direction: column; gap: 7px; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  .railcycle .mini .r { display: flex; gap: 8px; align-items: center; }
+  .railcycle .mini .r .sp { flex: 1; }
+  .railmode { display: flex; flex-direction: column; gap: 8px; padding: 14px 18px 16px; font-size: 12px; color: var(--faint); }
+  .raillinks { padding: 6px 0; }
+  .raillinks button {
+    display: flex; width: 100%; align-items: center; gap: 10px;
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    padding: 10px 18px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left;
+  }
+  .raillinks button:hover { background: rgba(33,150,243,.08); color: var(--ink); }
+  .raillinks button.add { color: var(--sky-primary-deep); }
+</style>
+
+<header class="chrome">
+  <div class="chrome-top">
+    <span class="chrome-eyebrow">Array Operator</span>
+    <span class="chrome-title">Invoices · Offtakers — landing redesign, 3 directions</span>
+    <span class="chrome-note">Sky glass throughout · same functionality, reorganized landing · keys 1 · 2 · 3</span>
+  </div>
+  <nav class="switcher" aria-label="Design switcher">
+    <button type="button" data-d="1" aria-pressed="true"><b>1</b>One Question First</button>
+    <button type="button" data-d="2" aria-pressed="false"><b>2</b>The Pipeline Is the Page</button>
+    <button type="button" data-d="3" aria-pressed="false"><b>3</b>Directory + Rail</button>
+  </nav>
+</header>
+
+<p class="tagline" id="tag1"><b>One question first.</b> The landing opens with the only thing that needs you — "3 invoices need your approval" — and one button. The whole pipeline band compresses to a single status line; the toolbar's five actions fold into ＋ Add and a ⋯ Tools menu; the directory keeps its search and accordion below, unchanged.</p>
+<p class="tagline" id="tag2" hidden><b>The pipeline is the page.</b> The three pipeline cells become a vertical timeline: June folded, THIS CYCLE expanded with the three approval rows inline (approve right from the landing), next run folded. The directory sits below as its own calm sheet, collapsed to provider headers.</p>
+<p class="tagline" id="tag3" hidden><b>Directory + rail.</b> Your offtakers become the page; everything operational — cycle status, approve button, mode, bill health, and all five tools — moves to one sticky rail. Nothing competes with the list, and the list never competes with the run.</p>
+
+<div class="stagewrap">
+
+  <!-- ════════════ DESIGN 1 — ONE QUESTION FIRST ════════════ -->
+  <section class="design active" id="d1" aria-label="Design 1: One Question First">
+    <div class="viewport">
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <div class="appnav">
+        <span class="brand"><span class="sun"></span>Array Operator</span>
+        <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
+        <span class="who">anna@vermontsolar.co</span>
+      </div>
+      <div class="sheet">
+
+        <div class="glass d1-hero">
+          <div class="lead">
+            <span class="eyebrow">Offtaker invoicing · July cycle</span>
+            <h1>3 invoices need your approval</h1>
+            <p class="sub num">$1,102.40 drafted from settled utility bills. Everything else is flowing on its own — <b>nothing sends until you approve it.</b></p>
+          </div>
+          <div class="go">
+            <button type="button" class="btn primary">Review &amp; approve 3 →</button>
+            <span class="pillseg" role="group" aria-label="View">
+              <button type="button" class="on">Offtakers</button>
+              <button type="button">Bill audit <span class="chip amber num" style="margin-left:4px">⚑ 1</span></button>
+            </span>
+          </div>
+        </div>
+
+        <div class="glass d1-statusline num">
+          <span class="seg"><span class="chip green">✓</span> June — 23 of 24 sent · $8,914</span>
+          <span class="dotsep">·</span>
+          <span class="seg">2 auto-sending · 4 waiting on bills</span>
+          <span class="dotsep">·</span>
+          <span class="seg">next run <b style="color:var(--ink)">Aug 1</b> · in 4 days</span>
+          <span class="seg" style="margin-left:auto">
+            <span class="quiet">default: approve to send</span>
+            <button type="button" class="btn sm">change</button>
+          </span>
+        </div>
+
+        <div class="glass d1-dir">
+          <div class="d1-dirhead">
+            <h2>Your offtakers</h2><span class="n num">24 · ✓ GMP + VEC bills current</span>
+            <span class="sp"></span>
+            <span class="osearch"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker — name, email, or account…" aria-label="Find an offtaker"></span>
+            <details class="tools">
+              <summary class="btn sm">⋯ Tools</summary>
+              <div class="toolspop">
+                <button type="button">⬇ Export to accounting</button>
+                <button type="button">✉ Customize email</button>
+                <button type="button">🔗 Link utility bills</button>
+                <button type="button">⬆ Bulk import</button>
+                <button type="button">🗂 Invoice archive</button>
+              </div>
+            </details>
+            <button type="button" class="btn sm" style="border-color:var(--sky-primary);color:var(--sky-primary-deep)">＋ Add an offtaker</button>
+          </div>
+          <div class="listcol">
+            <div class="prov" role="button" tabindex="0" aria-expanded="true">
+              <span class="caret">▾</span><b>Green Mountain Power</b>
+              <span class="count num">2 net-meter groups · 14 offtakers</span>
+              <span class="flag num">⚑ 1 to review</span>
+              <span class="track num"><i style="--w:93%"></i><small>13 sent · June</small></span>
+            </div>
+            <div class="acc">
+              <span class="caret">▸</span>
+              <div class="main">
+                <div class="nm">Brooks House Apartments <span class="chip green num">$402.11 ready</span> <span class="chip gray">Draft for approval</span></div>
+                <div class="meta num">50% of Putney Rd master · next Aug 1 · last sent Jun 3</div>
+              </div>
+            </div>
+            <div class="acc">
+              <span class="caret">▸</span>
+              <div class="main">
+                <div class="nm">Maple Lane Farm <span class="chip amber">⚑ doesn't match GMP</span></div>
+                <div class="meta num">25% of Putney Rd master · next Aug 1 · last sent Jun 3</div>
+              </div>
+            </div>
+            <div class="acc">
+              <span class="caret">▸</span>
+              <div class="main">
+                <div class="nm">Norwich Food Co-op <span class="chip blue">Auto-send</span></div>
+                <div class="meta num">solar credit from Hartland array · next Aug 1 · last sent Jun 3</div>
+              </div>
+            </div>
+            <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
+              <span class="caret">▸</span><b>Vermont Electric Co-op</b>
+              <span class="count num">1 account · 10 offtakers</span>
+              <span class="track num"><i style="--w:100%"></i><small>10 sent · June</small></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ DESIGN 2 — THE PIPELINE IS THE PAGE ════════════ -->
+  <section class="design" id="d2" aria-label="Design 2: The Pipeline Is the Page">
+    <div class="viewport">
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <div class="appnav">
+        <span class="brand"><span class="sun"></span>Array Operator</span>
+        <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
+        <span class="who">anna@vermontsolar.co</span>
+      </div>
+      <div class="sheet">
+
+        <div class="glass d2-head">
+          <h1>Offtaker invoicing</h1>
+          <span class="honesty"><b>Nothing sends until you approve it</b> — auto-send only where you turned it on.</span>
+          <span class="sp"></span>
+          <span class="pillseg" role="group" aria-label="View">
+            <button type="button" class="on">Offtakers</button>
+            <button type="button">Bill audit <span class="chip amber num" style="margin-left:4px">⚑ 1</span></button>
+          </span>
+        </div>
+
+        <div class="d2-flow">
+          <details class="fold d2-stage done">
+            <span class="d2-node" aria-hidden="true"></span>
+            <summary class="glass d2-sum num">
+              <span class="chev">▶</span><b>June · delivered</b>
+              <span>23 of 24 sent · $8,914</span>
+              <span class="chip green">✓ done</span>
+              <span class="sp"></span><span class="quiet">ran Jul 1 · archive ↓</span>
+            </summary>
+            <div class="glass d2-inner num">
+              <div class="row"><span>Every June invoice, its PDF, and the .zip download live in the archive.</span><span class="sp"></span><button type="button" class="btn sm">Open June archive</button></div>
+            </div>
+          </details>
+
+          <div class="d2-stage now">
+            <span class="d2-node" aria-hidden="true"></span>
+            <div class="glass d2-nowcard">
+              <div class="d2-nowhead">
+                <span class="eyebrow">This cycle · today, Jul 28</span>
+                <h2 class="num">3 invoices awaiting your approval — $1,102.40</h2>
+              </div>
+              <div class="d2-approw num"><b>Brooks House Apartments</b><span class="m">2,708 kWh · from settled GMP bill</span><span class="amt">$402.11</span><button type="button" class="btn sm">Review</button></div>
+              <div class="d2-approw num"><b>Hilltop Orchard</b><span class="m">2,411 kWh · from settled GMP bill</span><span class="amt">$358.04</span><button type="button" class="btn sm">Review</button></div>
+              <div class="d2-approw num"><b>Stone Barn Winery</b><span class="m">2,305 kWh · from settled VEC bill</span><span class="amt">$342.25</span><button type="button" class="btn sm">Review</button></div>
+              <div class="d2-nowfoot">
+                <button type="button" class="btn primary num">Approve all 3 →</button>
+                <span class="chip blue num">2 auto-sending</span>
+                <span class="chip gray num">4 waiting on bills</span>
+                <span class="quiet" style="margin-left:auto">Each opens for a last look before it sends.</span>
+              </div>
+            </div>
+          </div>
+
+          <details class="fold d2-stage sched">
+            <span class="d2-node" aria-hidden="true"></span>
+            <summary class="glass d2-sum num">
+              <span class="chev">▶</span><b>Aug 1 · next run</b>
+              <span>24 scheduled · fires in 4 days</span>
+              <span class="sp"></span><span class="quiet">default: approve to send</span>
+            </summary>
+            <div class="glass d2-inner">
+              <div class="row"><span>When an invoice is drafted</span>
+                <span class="pillseg"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
+                <span class="sp"></span><span class="quiet num">22 approve · 2 auto</span></div>
+              <div class="row"><span class="quiet">Monthly invoices fire the 1st · an invoice only generates once its utility bill settles.</span></div>
+            </div>
+          </details>
+        </div>
+
+        <details class="fold">
+          <summary class="glass d2-sum num">
+            <span class="chev">▶</span><b>Your offtakers</b>
+            <span>24 across GMP + VEC · ✓ bills current</span>
+            <span class="chip amber">⚑ 1 to review</span>
+            <span class="sp"></span>
+            <button type="button" class="btn sm" onclick="event.preventDefault()">＋ Add an offtaker</button>
+            <span class="quiet">⋯ Tools</span>
+          </summary>
+          <div class="glass" style="padding:16px 18px">
+            <div class="listcol">
+              <div class="prov" role="button" tabindex="0" aria-expanded="false">
+                <span class="caret">▸</span><b>Green Mountain Power</b>
+                <span class="count num">2 net-meter groups · 14 offtakers</span>
+                <span class="flag num">⚑ 1 to review</span>
+                <span class="track num"><i style="--w:93%"></i><small>13 sent · June</small></span>
+              </div>
+              <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
+                <span class="caret">▸</span><b>Vermont Electric Co-op</b>
+                <span class="count num">1 account · 10 offtakers</span>
+                <span class="track num"><i style="--w:100%"></i><small>10 sent · June</small></span>
+              </div>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ DESIGN 3 — DIRECTORY + RAIL ════════════ -->
+  <section class="design" id="d3" aria-label="Design 3: Directory plus Rail">
+    <div class="viewport">
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <div class="appnav">
+        <span class="brand"><span class="sun"></span>Array Operator</span>
+        <span class="tabs"><span>Arrays</span><span>Analysis</span><span class="on">Invoices</span><span>Resources</span></span>
+        <span class="who">anna@vermontsolar.co</span>
+      </div>
+      <div class="sheet">
+        <div class="d3-grid">
+
+          <div class="glass d3-dir">
+            <div class="d3-dirhead">
+              <h2>Your offtakers</h2><span class="n num">24</span>
+              <span class="pillseg" role="group" aria-label="Filter by utility">
+                <button type="button" class="on">All <span class="num">24</span></button>
+                <button type="button">GMP <span class="num">14</span></button>
+                <button type="button">Other <span class="num">10</span></button>
+              </span>
+              <span class="sp" style="flex:1"></span>
+              <span class="osearch" style="min-width:200px"><span aria-hidden="true">⌕</span><input type="search" placeholder="Find an offtaker…" aria-label="Find an offtaker"></span>
+            </div>
+            <div class="listcol">
+              <div class="prov" role="button" tabindex="0" aria-expanded="true">
+                <span class="caret">▾</span><b>Green Mountain Power</b>
+                <span class="count num">2 net-meter groups · 14 offtakers</span>
+                <span class="flag num">⚑ 1</span>
+                <span class="track num"><i style="--w:93%"></i><small>13 sent</small></span>
+              </div>
+              <div class="acc">
+                <span class="caret">▸</span>
+                <div class="main">
+                  <div class="nm">Brooks House Apartments <span class="chip green num">$402.11 ready</span></div>
+                  <div class="meta num">50% of Putney Rd master · last sent Jun 3</div>
+                </div>
+              </div>
+              <div class="acc">
+                <span class="caret">▸</span>
+                <div class="main">
+                  <div class="nm">Maple Lane Farm <span class="chip amber">⚑ doesn't match GMP</span></div>
+                  <div class="meta num">25% of Putney Rd master · last sent Jun 3</div>
+                </div>
+              </div>
+              <div class="acc">
+                <span class="caret">▸</span>
+                <div class="main">
+                  <div class="nm">Norwich Food Co-op <span class="chip blue">Auto-send</span></div>
+                  <div class="meta num">Hartland array · last sent Jun 3</div>
+                </div>
+              </div>
+              <div class="acc">
+                <span class="caret">▸</span>
+                <div class="main">
+                  <div class="nm">Abigail Chen <span class="chip gray">Draft for approval</span></div>
+                  <div class="meta num">12% of Putney Rd master · last sent Jun 3</div>
+                </div>
+              </div>
+              <div class="prov vec" role="button" tabindex="0" aria-expanded="false">
+                <span class="caret">▸</span><b>Vermont Electric Co-op</b>
+                <span class="count num">1 account · 10 offtakers</span>
+                <span class="track num"><i style="--w:100%"></i><small>10 sent</small></span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="d3-rail">
+            <div class="glass railcycle">
+              <span class="eyebrow">July cycle</span>
+              <div class="big num">3 to approve</div>
+              <span class="cap num">$1,102.40 drafted from settled bills</span>
+              <button type="button" class="btn primary">Review &amp; approve →</button>
+              <span class="quiet" style="display:block;margin-top:8px;text-align:center">Nothing sends until you approve it.</span>
+              <div class="mini num">
+                <span class="r"><span class="chip green">✓</span> June — 23 of 24 · $8,914 <span class="sp"></span><span class="quiet">archive</span></span>
+                <span class="r">2 auto-sending · 4 waiting on bills</span>
+                <span class="r">Next run <b>Aug 1</b> · in 4 days</span>
+              </div>
+            </div>
+            <div class="glass railmode">
+              <span style="font-weight:700;color:var(--muted)">When an invoice is drafted</span>
+              <span class="pillseg"><button type="button" class="on">Approve to send</button><button type="button">Auto-send</button></span>
+              <span class="num">✓ Bills reconcile · <span style="color:var(--amber);font-weight:700">⚑ 1 to review → Bill audit</span></span>
+            </div>
+            <div class="glass raillinks">
+              <button type="button" class="add">＋ Add an offtaker</button>
+              <button type="button">⬆ Bulk import</button>
+              <button type="button">⬇ Export to accounting</button>
+              <button type="button">✉ Customize email</button>
+              <button type="button">🔗 Link utility bills</button>
+              <button type="button">🗂 Invoice archive</button>
+            </div>
+          </aside>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll(".switcher button");
+    function show(n) {
+      for (var i = 1; i <= 3; i++) {
+        document.getElementById("d" + i).classList.toggle("active", i === n);
+        document.getElementById("tag" + i).hidden = i !== n;
+      }
+      buttons.forEach(function (b) {
+        b.setAttribute("aria-pressed", b.dataset.d === String(n) ? "true" : "false");
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () { show(Number(b.dataset.d)); });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "1" || e.key === "2" || e.key === "3") show(Number(e.key));
+    });
+  })();
+</script>
+
+</body>
+</html>
