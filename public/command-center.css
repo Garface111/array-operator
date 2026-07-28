@@ -4191,3 +4191,12 @@ body.ho-shell-open .vs-inv-sub{
 /* the rail's rate row must not inherit the old global-rate CARD shell */
 .rb2-railtools .rb2-ratechip.rb-globalrate{padding:0;margin:0;border:0;
   background:transparent;box-shadow:none;border-radius:11px;width:100%}
+/* landing4: Master email + Master rate are a matched pair — same indigo
+   family, same anatomy, identical label ink and row height */
+.rb2-ti--rate{background:rgba(79,70,229,.11);color:#4f46e5}
+.rb2-railtools .rb-btn.rb2-tool,
+.rb2-railtools .rb2-ratechip-sum.rb2-tool{min-height:45px;
+  color:var(--muted,#475569);font-weight:650}
+/* all six tool labels share one ink (the rate summary isn't an .ao-btn, so
+   without this it rendered a step lighter than its five button siblings) */
+.rb2-railtools .rb2-tool .rb2-tl{color:var(--ink,#0f172a)}

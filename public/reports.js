@@ -3232,11 +3232,12 @@
  </div>
  </div>
  </div>
- <button class="ao-btn rb-btn rb2-tool" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only."><span class="rb2-ti rb2-ti--email" aria-hidden="true">✉</span><span class="rb2-tl">Master email · all offtakers</span></button>
  <button class="ao-btn rb-btn rb2-tool" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills."><span class="rb2-ti rb2-ti--link" aria-hidden="true">🔗</span><span class="rb2-tl">Link utility bills</span></button>
  <div class="rb2-toolsep" aria-hidden="true"></div>
- <!-- Master solar credit rate — a rail tool (Ford 2026-07-28 follow-up: moved
- off the Your-offtakers bar). Opens the same optional-fleet-override editor
+ <!-- The two MASTER settings sit together as a matched pair (Ford 2026-07-28):
+ same indigo chip family, same label + value-pill anatomy. -->
+ <button class="ao-btn rb-btn rb2-tool" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only."><span class="rb2-ti rb2-ti--email" aria-hidden="true">✉</span><span class="rb2-tl">Master email</span><span class="rb2-tv">all offtakers</span></button>
+ <!-- Master solar credit rate — opens the same optional-fleet-override editor
  as a leftward popover. Same ids, wired by wireGlobalRate() → /global-rate. -->
  <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">
  <summary class="rb2-ratechip-sum rb2-tool" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate."><span class="rb2-ti rb2-ti--rate" aria-hidden="true">$</span><span class="rb2-tl">Master rate</span><span class="rb2-tv"><b id="rbGrChipVal">per-bill</b></span></summary>
