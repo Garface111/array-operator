@@ -8073,7 +8073,10 @@
  catch(_e){ _prevPanel.classList.remove("active"); _toPanel.classList.add("active"); }
  }
  // Sibling Analysis sub-panels (not in TABS): hide when Analysis top-tab is off
- if(active !== "analysis" || isSov){
+ // (`|| isSov` removed 2026-07-28: the sovereign desk is gone and the dangling
+ // reference threw on every #analysis switch, killing applyView BEFORE the
+ // applyAnalysisSub dispatch — the tab stuck on "Loading analysis…" forever.)
+ if(active !== "analysis"){
  ["panelTrends", "panelResources"].forEach(function(id){
  const p = document.getElementById(id);
  if(p) p.classList.remove("active");
