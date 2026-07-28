@@ -6119,15 +6119,17 @@
  : s.utility_account_id != null ? "u:" + s.utility_account_id
  : "u:none";
  if (!groups[key]) {
- // Label + provider come from the group's MASTER (host) account, vendor-free
- // (utilityIdentity: nickname → service address → provider+acct#), never the
- // sub-account or the array/inverter name.
+ // Label: the ARRAY's name whenever the group IS an array (Ford 2026-07-28:
+ // under the utility comes the array — "Chester" — so the header matches the
+ // "receives X% of Chester's generation" sentence on every card beneath it).
+ // Account-keyed groups (no array) keep the host account's vendor-free
+ // identity (utilityIdentity: nickname → service address → provider+acct#).
  const host = s.array_id != null ? hostByArray[String(s.array_id)] : null;
  const acct = host || (s.utility_account_id != null ? acctById[String(s.utility_account_id)] : null);
  const provider = (acct && acct.provider) ? String(acct.provider).toLowerCase() : "";
- const arrName = ((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name;
- const label = acct ? utilityIdentity(acct)
- : (s.utility_account_name || arrName || "Ungrouped");
+ const arrName = (((ACC_ARRS || []).find(a => String(a.id) === String(s.array_id)) || {}).name || "").trim();
+ const label = arrName || (acct ? utilityIdentity(acct)
+ : (s.utility_account_name || "Ungrouped"));
  groups[key] = { key, provider, providerLabel: provider ? provider.toUpperCase() : "Other",
  label, pctSum: 0, hasDraft: false, rows: [], shareMode: "meter" };
  order.push(key);
@@ -7706,7 +7708,13 @@
  }
  // The selected OFFTAKER is the billing basis; its latest pending draft renders.
  if (ACTIVE_SUB_ID != null && DRAFT_BY_SUB[String(ACTIVE_SUB_ID)]) return DRAFT_BY_SUB[String(ACTIVE_SUB_ID)];
- return INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || null;
+ // Stale-id guard (Ford 2026-07-28, dad's account): ACTIVE_DRAFT_ID can outlive
+ // the card that set it. With an offtaker open, never fall back to ANOTHER
+ // offtaker's draft — a draftless card shows its own empty state, not a
+ // neighbor's invoice.
+ const fb = INBOX_DRAFTS.find(d => String(d.id) === String(ACTIVE_DRAFT_ID)) || null;
+ if (fb && ACTIVE_SUB_ID != null && String(fb.subscription_id) !== String(ACTIVE_SUB_ID)) return null;
+ return fb;
  }
 
  /* Live invoice preview beside the approval draft, a styled mock of exactly
