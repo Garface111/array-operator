@@ -4135,3 +4135,27 @@ body.ho-shell-open .vs-inv-sub{
   /* stacked layout: the full rail stays visible even while editing */
   .rb2-railfull[hidden]{display:flex}
 }
+
+/* ── landing2 follow-ups (Ford 2026-07-28 screenshot review) ─────────────────
+   1 · mode slider must stay in its lane inside the 300px rail card */
+.rb2-railcycle{overflow:hidden}
+.rb2-railcycle .rb2-moderow{width:100%;min-width:0;box-sizing:border-box}
+.rb2-railcycle .rb-seg.rb2-modeslider{display:flex;width:100%;box-sizing:border-box}
+.rb2-railcycle .rb2-modeslider button{flex:1 1 0;min-width:0;padding:7px 6px;
+  font-size:11px;line-height:1.25;white-space:normal;text-align:center}
+/* 2 · master rate is a rail TOOL row now (moved off the Your-offtakers bar) */
+.rb2-railtools .rb2-ratechip{width:100%}
+.rb2-railtools .rb2-ratechip-sum{display:flex;width:100%;align-items:center;gap:5px;
+  background:transparent;border:0;border-radius:9px;box-shadow:none;
+  padding:9px 12px;font-size:12px;font-weight:640;color:var(--muted,#475569);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb2-railtools .rb2-ratechip-sum:hover{background:var(--day-hover,rgba(140,78,28,.06));
+  border:0;color:var(--ink,#0f172a)}
+.rb2-railtools .rb2-ratechip-pop{top:auto;bottom:calc(100% + 8px)}
+/* 3 · re-minimize control — visible only while a card is open AND the full
+   rail was brought back with « */
+.rb2-railhide{display:none;align-self:flex-end;appearance:none;cursor:pointer;
+  border:0;background:transparent;border-radius:8px;padding:4px 9px;
+  font-size:10.5px;font-weight:650;color:var(--faint,#94a3b8);margin-bottom:-6px}
+.rb2-railhide:hover{background:var(--day-hover,rgba(140,78,28,.06));color:var(--ink,#0f172a)}
+#rb2Main.rb2-hasopen .rb2-railfull:not([hidden]) .rb2-railhide{display:inline-flex}

@@ -2762,6 +2762,14 @@
  if (mini) mini.hidden = !on;
  }
 
+ // Tracks whether ANY offtaker card is open — independent of the rail's
+ // min/max state, so the full rail can show its "Minimize »" control after
+ // « brought it back while a card is still open.
+ function setRailOpenCard() {
+ const main = document.getElementById("rb2Main");
+ if (main) main.classList.toggle("rb2-hasopen", ACTIVE_SUB_ID != null);
+ }
+
  // Open the first offtaker whose draft awaits approval. The card may live inside
  // a lazily-collapsed (unrendered) group, so set ACTIVE_SUB_ID first and re-render
  // from the cached list args — renderAccordion force-opens the groups holding it.
@@ -2782,6 +2790,8 @@
  function wireRail() {
  const ex = document.getElementById("rb2RailExpand");
  if (ex) ex.onclick = () => setRailEditing(false);
+ const hide = document.getElementById("rb2RailHide");
+ if (hide) hide.onclick = () => setRailEditing(true);
  const badge = document.getElementById("rb2RailMiniBadge");
  if (badge) badge.onclick = () => openFirstApproval();
  const add = document.getElementById("rb2RailMiniAdd");
@@ -3154,44 +3164,6 @@
  <!-- Sources status pill (same host id + refreshGmpBillsStatus wiring). -->
  <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
  <span class="rb2-sp"></span>
- <!-- Master solar credit rate — now a CHIP in this bar (Ford 2026-07-28);
- opens the same optional-fleet-override editor as a popover. Same ids,
- wired by wireGlobalRate() → GET/PUT /global-rate. -->
- <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">
- <summary class="rb2-ratechip-sum" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate.">Master rate · <b id="rbGrChipVal">per-bill</b></summary>
- <div class="rb2-ratechip-pop">
- <div class="rb-gr-main">
- <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
- the solar credit rate on <b>their own utility sub-account bill</b>
- (custom per offtaker). Fill this in to force one rate for everyone
- who doesn't have a per-offtaker override.</p>
- </div>
- <div class="rb-gr-ctl">
- <label class="rb-gr-field">
- <span class="rb-gr-lbl">Solar credit rate</span>
- <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
- <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="per bill"
- inputmode="decimal" autocomplete="off"
- title="Optional master $/kWh. Blank = each offtaker uses the credit rate from their own utility bill.">
- <span class="rb-gr-unit">/kWh</span></span>
- </label>
- <label class="rb-gr-field">
- <span class="rb-gr-lbl">Discount</span>
- <span class="rb-gr-inwrap">
- <input type="number" id="rbGrDisc" min="0" max="99" step="1" placeholder="10"
- inputmode="numeric" autocomplete="off"
- title="Percent off the credit rate offtakers pay (their solar savings). Blank = 10% default.">
- <span class="rb-gr-unit">% off</span></span>
- </label>
- <div class="rb-gr-field rb-gr-save">
- <span class="rb-gr-lbl rb-gr-lbl-spacer" aria-hidden="true">&nbsp;</span>
- <button class="ao-btn rb-btn" id="rbGrSave" type="button">Save rate</button>
- </div>
- <span class="rb-status" id="rbGrStatus"></span>
- </div>
- <div class="rb-gr-eff" id="rbGrEff"></div>
- </div>
- </details>
  </div>
  <!-- Invoice archive (monthly directory), collapsible month-close surface. -->
  <div id="rbArchiveHost" hidden></div>
@@ -3208,6 +3180,9 @@
  card is open the rail minimizes to the icon strip (#rb2RailMini). ═ -->
  <div class="rb2-railslot">
  <aside class="rb2-railfull" id="rb2Rail" aria-label="Invoicing rail">
+ <!-- Visible only while an offtaker card is open (rb2-hasopen): re-minimize
+ the rail after « brought it back (Ford 2026-07-28 follow-up). -->
+ <button class="rb2-railhide" id="rb2RailHide" type="button" title="Minimize the rail while editing">Minimize »</button>
  <div class="rb2-railcycle" id="rb2RailCycle" hidden></div>
  <div class="rb2-railtools">
  <button class="ao-btn rb-btn rb2-railadd" id="rbCustAdd" type="button">＋ Add an offtaker</button>
@@ -3255,6 +3230,44 @@
  </div>
  <button class="ao-btn rb-btn" id="rbEmailStudio" type="button" title="Edit the master email every offtaker invoice uses. One template for all offtakers; merge tags personalize each send. A per-offtaker note still overrides one send only.">✉ Master email · all offtakers</button>
  <button class="ao-btn rb-btn" id="rbLinkUtility" type="button" title="Connect the utility whose bills you invoice against: GMP, VEC, or any of ~470 supported utilities nationwide. Offtakers bill from these utility bills.">🔗 Link utility bills</button>
+ <!-- Master solar credit rate — a rail tool (Ford 2026-07-28 follow-up: moved
+ off the Your-offtakers bar). Opens the same optional-fleet-override editor
+ as a leftward popover. Same ids, wired by wireGlobalRate() → /global-rate. -->
+ <details class="rb-globalrate rb2-ratechip" id="rbGlobalRate">
+ <summary class="rb2-ratechip-sum" title="The optional master $/kWh. Blank = each offtaker is priced from their own utility bill's solar credit rate.">＄ Master rate · <b id="rbGrChipVal">per-bill</b></summary>
+ <div class="rb2-ratechip-pop">
+ <div class="rb-gr-main">
+ <p><b>Optional fleet override.</b> Leave blank and each offtaker is priced from
+ the solar credit rate on <b>their own utility sub-account bill</b>
+ (custom per offtaker). Fill this in to force one rate for everyone
+ who doesn't have a per-offtaker override.</p>
+ </div>
+ <div class="rb-gr-ctl">
+ <label class="rb-gr-field">
+ <span class="rb-gr-lbl">Solar credit rate</span>
+ <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
+ <input type="number" id="rbGrNet" min="0" max="5" step="0.001" placeholder="per bill"
+ inputmode="decimal" autocomplete="off"
+ title="Optional master $/kWh. Blank = each offtaker uses the credit rate from their own utility bill.">
+ <span class="rb-gr-unit">/kWh</span></span>
+ </label>
+ <label class="rb-gr-field">
+ <span class="rb-gr-lbl">Discount</span>
+ <span class="rb-gr-inwrap">
+ <input type="number" id="rbGrDisc" min="0" max="99" step="1" placeholder="10"
+ inputmode="numeric" autocomplete="off"
+ title="Percent off the credit rate offtakers pay (their solar savings). Blank = 10% default.">
+ <span class="rb-gr-unit">% off</span></span>
+ </label>
+ <div class="rb-gr-field rb-gr-save">
+ <span class="rb-gr-lbl rb-gr-lbl-spacer" aria-hidden="true">&nbsp;</span>
+ <button class="ao-btn rb-btn" id="rbGrSave" type="button">Save rate</button>
+ </div>
+ <span class="rb-status" id="rbGrStatus"></span>
+ </div>
+ <div class="rb-gr-eff" id="rbGrEff"></div>
+ </div>
+ </details>
  </div>
  </aside>
  <aside class="rb2-railmini" id="rb2RailMini" hidden aria-label="Invoicing rail, minimized while editing">
@@ -6608,6 +6621,7 @@
  // collapsed group, and sync the rail to the (possibly restored) open card.
  LAST_LIST_ARGS = [subs, arrs, utilAccts, drafts];
  setRailEditing(ACTIVE_SUB_ID != null);
+ setRailOpenCard();
  renderKpis(); // the KPI band tracks the freshly-rendered list's counts
  // Tether chips: open the utility-source manager (same flow as Link utility
  // bills). stopPropagation so the group header doesn't also toggle.
@@ -7225,6 +7239,7 @@
  if (body) body.hidden = false;
  // Editing state: minimize the rail so the editor + live preview get the width.
  setRailEditing(true);
+ setRailOpenCard();
  renderAccordionBody(sid);
  // The cached draft renders instantly; then recompute from the LIVE bill so the email
  // cover + invoice PDF agree (a draft frozen before newer generation/a new bill landed
@@ -7257,6 +7272,7 @@
  ACTIVE_SUB_ID = null;
  setRailEditing(false); // no editor open → bring the full rail back
  }
+ setRailOpenCard();
  }
 
  // renderInboxBody() is the compatibility shim the rest of the module calls to

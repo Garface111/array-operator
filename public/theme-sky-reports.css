@@ -814,3 +814,8 @@ html.sky .rb2-srcline--warn{color:var(--amber-ink,#8a5a00)}
   html.sky .rb2-railmini,
   html.sky .rb2-ratechip-pop{corner-shape:squircle}
 }
+
+/* landing2 follow-ups: the rail-tool master-rate row + minimize control */
+html.sky .rb2-railtools .rb2-ratechip-sum{background:transparent;border:0;box-shadow:none}
+html.sky .rb2-railtools .rb2-ratechip-sum:hover{background:rgba(33,150,243,.08)}
+html.sky .rb2-railhide:hover{background:rgba(33,150,243,.08)}
