@@ -4237,3 +4237,26 @@ body.ho-shell-open .vs-inv-sub{
 .rb2-ti--link{background:#059669;color:#fff}
 .rb2-ti--arch{background:#d97706;color:#fff}
 .rb2-ti--billarch{background:#64748b;color:#fff}
+
+/* ── "+ Add array" dropdown (Bruce 2026-07-29) — a real high-res picker,
+   scoped to one data source, listing its arrays with no offtakers yet. ────── */
+.rb2-srcaddwrap{position:relative;display:inline-flex}
+.rb-srcadd-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:50;
+  box-sizing:border-box;width:320px;max-width:calc(100vw - 32px);
+  background:var(--card,#fff);border:1px solid var(--line,#e2e8f0);
+  border-radius:14px;box-shadow:0 18px 50px -12px rgba(15,23,42,.22);
+  padding:6px;max-height:360px;overflow-y:auto}
+.rb-srcadd-h{display:flex;align-items:baseline;gap:6px;padding:9px 11px 8px;
+  font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint,#94a3b8);border-bottom:1px solid var(--line,#e8e2d9);margin-bottom:4px}
+.rb-srcadd-h span{font-weight:800;letter-spacing:0;text-transform:none;color:var(--ink,#0f172a)}
+.rb-srcadd-row{display:flex;flex-direction:column;gap:2px;width:100%;
+  appearance:none;border:0;background:transparent;cursor:pointer;text-align:left;
+  padding:9px 11px;border-radius:9px;font:inherit}
+.rb-srcadd-row:hover{background:rgba(5,150,105,.08)}
+.rb-srcadd-row:focus-visible{outline:2px solid #059669;outline-offset:-2px}
+.rb-srcadd-name{font-size:13px;font-weight:700;color:var(--ink,#0f172a)}
+.rb-srcadd-meta{font-size:11.5px;color:var(--faint,#94a3b8);font-variant-numeric:tabular-nums}
+.rb-srcadd-empty{padding:14px 12px;font-size:12.5px;color:var(--faint,#94a3b8);line-height:1.5}
+.rb-srcadd-empty a{color:#059669;font-weight:700;text-decoration:none}
+.rb-srcadd-empty a:hover{text-decoration:underline}

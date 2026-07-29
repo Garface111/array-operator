@@ -4689,6 +4689,106 @@
  return name + bills;
  }
 
+ // ═══════════════════════════════════════════════════════════════════════════
+ // "+ Add array" dropdown (Bruce 2026-07-29): scoped to ONE data source (e.g.
+ // GMP), lists that source's arrays that exist in the system but have no
+ // offtakers yet — the same array/utility-account data the offtaker tree
+ // already has loaded, just filtered differently. No new backend: an Array's
+ // provider is derived from its lowest-id utility account (the "host"), same
+ // rule groupOfftakersByUtility uses to label a card by its master array.
+ // ═══════════════════════════════════════════════════════════════════════════
+ function _hostByArrayFresh(utilAccts) {
+ const m = {};
+ (utilAccts || []).forEach(a => {
+ if (a.array_id == null || a.utility_account_id == null) return;
+ const k = String(a.array_id);
+ if (!m[k] || Number(a.utility_account_id) < Number(m[k].utility_account_id)) m[k] = a;
+ });
+ return m;
+ }
+ // Arrays tethered to `provider` that don't already have offtakers (i.e. would
+ // duplicate a card already shown under this source). Sorted by name.
+ function candidateArraysForSource(provider) {
+ const hostByArray = _hostByArrayFresh(INBOX_UTIL_ACCTS);
+ const providerOf = (arrId) => {
+ const h = hostByArray[String(arrId)];
+ if (!h) return null; // no utility account at all → belongs in "no data source"
+ return h.provider ? String(h.provider).toLowerCase() : "other";
+ };
+ const existing = new Set(
+ (OFFTAKERS || [])
+ .filter(s => s.array_id != null && providerOf(s.array_id) === provider)
+ .map(s => String(s.array_id))
+ );
+ return (ACC_ARRS || [])
+ .filter(a => providerOf(a.id) === provider && !existing.has(String(a.id)))
+ .map(a => ({ id: a.id, name: a.name, host: hostByArray[String(a.id)] }))
+ .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+ }
+ function sourceAddPopoverHTML(provider, label) {
+ const cands = candidateArraysForSource(provider);
+ const rows = cands.map(a => {
+ const h = a.host;
+ const identity = h ? utilityIdentity(h) : "";
+ const billBit = h && h.bill_count
+ ? `${fmt0(h.bill_count)} bill${h.bill_count === 1 ? "" : "s"}${h.latest_period_label ? " · latest " + esc(String(h.latest_period_label)) : ""}`
+ : "no bill yet";
+ return `<button type="button" class="rb-srcadd-row" data-pickarr="${esc(a.id)}">
+ <span class="rb-srcadd-name">${esc(a.name || ("Array " + a.id))}</span>
+ <span class="rb-srcadd-meta">${identity ? esc(identity) + " · " : ""}${billBit}</span>
+ </button>`;
+ }).join("");
+ const body = cands.length ? rows
+ : `<div class="rb-srcadd-empty">Every ${esc(label)} array already has offtakers.
+ <a href="#" data-linkutil>Link another utility bill →</a></div>`;
+ return `<div class="rb-srcadd-pop" role="menu" aria-label="Add an array for ${esc(label)}">
+ <div class="rb-srcadd-h">Add an array <span>${esc(label)}</span></div>
+ ${body}
+ </div>`;
+ }
+ let _srcAddOpenBtn = null;
+ function closeSourceAddPopover() {
+ document.querySelectorAll(".rb-srcadd-pop").forEach(p => p.remove());
+ document.querySelectorAll('[data-srcadd][aria-expanded="true"]').forEach(b => b.setAttribute("aria-expanded", "false"));
+ _srcAddOpenBtn = null;
+ }
+ function toggleSourceAddPopover(btn) {
+ const reopening = _srcAddOpenBtn === btn;
+ closeSourceAddPopover();
+ if (reopening) return;
+ const provider = btn.getAttribute("data-srcadd");
+ const label = btn.getAttribute("data-srclabel") || provider;
+ const wrap = btn.closest(".rb2-srcaddwrap") || btn.parentElement;
+ const holder = document.createElement("div");
+ holder.innerHTML = sourceAddPopoverHTML(provider, label);
+ const el = holder.firstElementChild;
+ wrap.appendChild(el);
+ btn.setAttribute("aria-expanded", "true");
+ _srcAddOpenBtn = btn;
+ el.querySelectorAll("[data-pickarr]").forEach(row => row.onclick = (e) => {
+ e.stopPropagation();
+ const aid = row.getAttribute("data-pickarr");
+ closeSourceAddPopover();
+ openAddOfftakerForMaster(aid);
+ });
+ const linkA = el.querySelector("[data-linkutil]");
+ if (linkA) linkA.onclick = (e) => {
+ e.preventDefault(); e.stopPropagation();
+ closeSourceAddPopover();
+ if (window.__aoLinkUtility) window.__aoLinkUtility();
+ };
+ }
+ if (!toggleSourceAddPopover._closerWired) {
+ toggleSourceAddPopover._closerWired = true;
+ document.addEventListener("click", (e) => {
+ if (_srcAddOpenBtn && !e.target.closest(".rb-srcadd-pop") && !e.target.closest("[data-srcadd]"))
+ closeSourceAddPopover();
+ });
+ document.addEventListener("keydown", (e) => {
+ if (e.key === "Escape" && _srcAddOpenBtn) closeSourceAddPopover();
+ });
+ }
+
  // Open the add-offtaker form pre-set to a master net-meter group (from a group
  // header's "+ Add offtaker"): park the master array_id, open the Type-it-in panel,
  // and scroll it into view. wireArrayFirst applies the pre-pick once it populates.
@@ -6696,8 +6796,11 @@
  <span class="rb-prov-count">${nAcct} ${grpNoun} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
  ${srcLine}
  <span class="rb2-provsp"></span>${provFlag}${provBar}${untethered ? "" : `
- <button type="button" class="rb-grp-add rb2-srcadd" data-srcadd="${esc(pv.key)}"
- title="Add a new array under ${esc(pv.providerLabel)}: pick the array's master account bill in the add panel, then add offtakers to it (Bruce 2026-07-29).">＋ Add array</button>`}
+ <span class="rb2-srcaddwrap">
+ <button type="button" class="rb-grp-add rb2-srcadd" data-srcadd="${esc(pv.provider)}" data-srclabel="${esc(pv.providerLabel)}"
+ aria-haspopup="true" aria-expanded="false"
+ title="Add one of your existing ${esc(pv.providerLabel)} arrays that doesn't have offtakers yet.">＋ Add array</button>
+ </span>`}
  </div>
  <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
  ${pCollapsed ? "" : pv.groups.map(acctGroupHTML).join("")}
@@ -6745,18 +6848,14 @@
  if (window.__aoLinkUtility) window.__aoLinkUtility();
  else location.hash = "#arrays";
  });
- // "+ Add array" on a source header (Bruce 2026-07-29): the election opens the
- // existing add panel — picking a master account there IS adding the array;
- // offtakers then attach under it exactly as today. Focus the first picker so
- // the array choice leads.
+ // "+ Add array" on a source header (Bruce 2026-07-29): a dropdown scoped to
+ // THIS source, listing its existing arrays that don't have offtakers yet
+ // (no duplicates against arrays already shown as cards below). Picking one
+ // pre-selects it in the existing add-offtaker panel — same downstream flow
+ // as a group's own "+ Add offtaker", no new backend, no parallel mechanism.
  list.querySelectorAll("[data-srcadd]").forEach(b => b.onclick = (e) => {
  e.stopPropagation();
- const add = document.getElementById("rbCustAdd");
- if (add) add.click();
- requestAnimationFrame(() => {
- const f = document.querySelector("#rbCustManual select, #rbCustManual .nmg-combo-input, #rbCustManual input");
- if (f) { try { f.focus({ preventScroll: true }); } catch (_) { /* older browsers */ } }
- });
+ toggleSourceAddPopover(b);
  });
  // Wire the GMP-vs-non-GMP filter chips, flip the scope + re-render in place.
  list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
