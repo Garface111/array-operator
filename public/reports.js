@@ -3248,6 +3248,10 @@
  <div class="rb-listwrap rb2-listwrap">
  <div class="rb2-controls">
  <span class="rb2-controls-label">Your offtakers</span>
+ <!-- Summary counts up front (Bruce 2026-07-29: "the user is expecting to
+ see the summary info of how many arrays and offtakers they have").
+ Filled by renderAccordion. -->
+ <span class="rb2-srcline" id="rb2BarCounts" hidden></span>
  <!-- Sources status pill (same host id + refreshGmpBillsStatus wiring). -->
  <div class="rb-gmpbills-status rb2-rail" id="rbGmpBillsStatus"></div>
  <span class="rb2-sp"></span>
@@ -6691,7 +6695,9 @@
  <span class="rb-prov-label">${esc(pv.providerLabel)}</span>
  <span class="rb-prov-count">${nAcct} ${grpNoun} · ${pv.offtakerCount} offtaker${pv.offtakerCount === 1 ? "" : "s"}</span>
  ${srcLine}
- <span class="rb2-provsp"></span>${provFlag}${provBar}
+ <span class="rb2-provsp"></span>${provFlag}${provBar}${untethered ? "" : `
+ <button type="button" class="rb-grp-add rb2-srcadd" data-srcadd="${esc(pv.key)}"
+ title="Add a new array under ${esc(pv.providerLabel)}: pick the array's master account bill in the add panel, then add offtakers to it (Bruce 2026-07-29).">＋ Add array</button>`}
  </div>
  <div class="rb-prov-rows"${pCollapsed ? " hidden" : ""}>
  ${pCollapsed ? "" : pv.groups.map(acctGroupHTML).join("")}
@@ -6721,6 +6727,16 @@
  LAST_LIST_ARGS = [subs, arrs, utilAccts, drafts];
  setRailEditing(ACTIVE_SUB_ID != null);
  setRailOpenCard();
+ // Summary counts in the Your-offtakers bar (arrays counted like renderKpis:
+ // distinct arrays that actually have offtakers).
+ const barCounts = document.getElementById("rb2BarCounts");
+ if (barCounts) {
+ const nOff = (OFFTAKERS || []).length;
+ const nArr = new Set((OFFTAKERS || []).map(s => s.array_id).filter(a => a != null)).size;
+ barCounts.hidden = !nOff;
+ if (nOff) barCounts.textContent =
+ `${fmt0(nOff)} offtaker${nOff === 1 ? "" : "s"}${nArr ? ` · ${fmt0(nArr)} array${nArr === 1 ? "" : "s"}` : ""}`;
+ }
  renderKpis(); // the KPI band tracks the freshly-rendered list's counts
  // Tether chips: open the utility-source manager (same flow as Link utility
  // bills). stopPropagation so the group header doesn't also toggle.
@@ -6728,6 +6744,19 @@
  e.stopPropagation();
  if (window.__aoLinkUtility) window.__aoLinkUtility();
  else location.hash = "#arrays";
+ });
+ // "+ Add array" on a source header (Bruce 2026-07-29): the election opens the
+ // existing add panel — picking a master account there IS adding the array;
+ // offtakers then attach under it exactly as today. Focus the first picker so
+ // the array choice leads.
+ list.querySelectorAll("[data-srcadd]").forEach(b => b.onclick = (e) => {
+ e.stopPropagation();
+ const add = document.getElementById("rbCustAdd");
+ if (add) add.click();
+ requestAnimationFrame(() => {
+ const f = document.querySelector("#rbCustManual select, #rbCustManual .nmg-combo-input, #rbCustManual input");
+ if (f) { try { f.focus({ preventScroll: true }); } catch (_) { /* older browsers */ } }
+ });
  });
  // Wire the GMP-vs-non-GMP filter chips, flip the scope + re-render in place.
  list.querySelectorAll("[data-ofilter]").forEach(b => b.onclick = () => {
@@ -8037,12 +8066,33 @@
  <div class="rb-calc-row total"><span class="rb-calc-k">Amount due<small>budget bill this period</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`
  : `<div class="rb-calc-row total"><span class="rb-calc-k">Solar credit value due<small>${esc(rateMath)}</small></span><span class="rb-calc-v">${money(d.amount_usd)}</span></div>`;
  const anat = billAnatomyHTML(d.bill_anatomy);
- const poolLabel = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
+ // Pool hierarchy (Bruce 2026-07-29): lead with the ARRAY's generation pool —
+ // Group Excess Shared from the master bill — then share, rate, value due.
+ // A draft that predates/lacks the pool falls back to the reconcile sweep's
+ // REAL figure for this offtaker (never derived, never fabricated); when no
+ // pool exists anywhere, relabel honestly instead of presenting the
+ // offtaker's own credited kWh as "Array generation".
+ let poolKwh = trip.total;
+ let poolLabel = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
   ? "Group excess shared"
   : (d.array_group_excess_kwh != null ? "Group excess shared" : "Array generation");
- const poolHint = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
+ let poolHint = (d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
   ? "offtaker credit pool on the host bill"
   : "metered on the bill";
+ const _noPool = !(d.bill_anatomy && d.bill_anatomy.group_excess_shared_kwh != null)
+  && d.array_group_excess_kwh == null;
+ if (_noPool) {
+  const rec = reconFor(d.subscription_id);
+  if (rec && rec.array_group_excess_kwh != null) {
+   poolKwh = rec.array_group_excess_kwh;
+   poolLabel = "Array generation";
+   poolHint = "group excess shared · from the master bill";
+  } else if (pct != null && pct < 100 && trip.total != null && d.customer_kwh != null
+    && Math.abs(Number(trip.total) - Number(d.customer_kwh)) < 1) {
+   poolLabel = `Credited to ${d.customer_name || "this offtaker"}`;
+   poolHint = "on their own utility bill";
+  }
+ }
  const warnNote = (d.bill_anatomy_warnings && d.bill_anatomy_warnings.length)
   ? d.bill_anatomy_warnings.map(w =>
      `<div class="rb-anat-warn" role="status">⚠ ${esc(w)}</div>`).join("")
@@ -8055,7 +8105,7 @@
  <span class="rb-calc-v">${esc(d.period_label || "latest period")}${billUrl ? ` <button type="button" class="rb-calc-link" data-dl="${esc(billUrl)}" data-fn="${esc(gmpBillFilename(d))}">view ↓</button>` : ""}</span></div>
  ${anat || ""}
  ${warnNote && !anat ? `<div class="rb-anat-warns">${warnNote}</div>` : ""}
- <div class="rb-calc-row"><span class="rb-calc-k">${esc(poolLabel)}<small>${esc(poolHint)}</small></span><span class="rb-calc-v">${fmt0(trip.total)} kWh</span></div>
+ <div class="rb-calc-row"><span class="rb-calc-k">${esc(poolLabel)}<small>${esc(poolHint)}</small></span><span class="rb-calc-v">${fmt0(poolKwh)} kWh</span></div>
  <div class="rb-calc-row"><span class="rb-calc-k">${esc(d.customer_name || "This offtaker")}'s share${trip.fromBill ? "<small>from their own utility bill</small>" : ""}</span>
  <span class="rb-calc-v">${pct != null ? pct + "%" : "—"}${pct != null ? ` <span class="rb-calc-eq">= ${fmt0(d.customer_kwh)} kWh</span>` : ""}</span></div>
  ${rateRow}
