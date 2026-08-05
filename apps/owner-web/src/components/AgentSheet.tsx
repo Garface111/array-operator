@@ -17,6 +17,7 @@ import type { EnergyAgentPending } from "@/lib/types";
 import { SetupWidget, type SetupWidgetSpec } from "./SetupWidget";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AgentMarkdown } from "./AgentMarkdown";
+import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 
 type Msg = {
   role: "user" | "agent";
@@ -99,6 +100,35 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
 
   const vv = useVisualViewport(open);
 
+  // Voice: Realtime is ears+mouth only. A finished utterance goes through the
+  // SAME send() as typing, so spoken answers use the same tools, the same
+  // confirm-before-write gate, and the same DB-backed thread.
+  const voice = useRealtimeVoice({
+    onUserTranscript: (t) => {
+      setMsgs((m) => [...m, { role: "user", text: t }]);
+    },
+    onAgentTranscript: (t) => {
+      setMsgs((m) => [...m, { role: "agent", text: t }]);
+    },
+    // consult_deep_brain — the voice's only tool. Routes through the SAME
+    // /chat brain as typing, so spoken answers use real tools and land in
+    // the same DB-backed thread.
+    onConsult: async (question) => {
+      let sid = sessionId;
+      if (!sid) {
+        const s = await startAgentSession({ ...MOBILE_CTX });
+        sid = s.session_id || null;
+        setSessionId(sid);
+      }
+      if (!sid) throw new Error("No agent session");
+      const res = await agentChat(sid, question, { ...MOBILE_CTX }, []);
+      return String(
+        res.reply || res.speak || res.message || res.content || ""
+      );
+    },
+    onError: (m) => setErr(m),
+  });
+
   // ── Body scroll lock while chat is open ────────────────────────────────
   useEffect(() => {
     if (!open) return;
@@ -126,6 +156,7 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   // ── Session bootstrap (no autofocus — user taps to type) ───────────────
   useEffect(() => {
     if (!open) {
+      voice.stop();
       seeded.current = false;
       setPending(null);
       setDragOffset(0);
@@ -145,10 +176,24 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
         const s = await startAgentSession({ ...MOBILE_CTX });
         if (cancelled) return;
         setSessionId(s.session_id || null);
-        const intro =
-          s.intro ||
-          "Hi — **Energy Agent on mobile**. Fleet, offtakers, repairs, marketplace — ask me. Tap **+** to attach a photo or file.";
-        setMsgs([{ role: "agent", text: intro }]);
+        // Restore the conversation. The server resumes the tenant's open session
+        // by default and returns its turns on THIS call (intro is null on resume),
+        // so the thread survives close/reopen and is the SAME thread as desktop.
+        // Painting the intro unconditionally here is what used to wipe history.
+        const restored: Msg[] = (s.messages || [])
+          .map((m) => ({
+            role: (m.role === "user" ? "user" : "agent") as Msg["role"],
+            text: String(m.content ?? "").trim(),
+          }))
+          .filter((m) => m.text.length > 0);
+        if (restored.length) {
+          setMsgs(restored);
+        } else {
+          const intro =
+            s.intro ||
+            "Hi — **Energy Agent on mobile**. Fleet, offtakers, repairs, marketplace — ask me. Tap **+** to attach a photo or file.";
+          setMsgs([{ role: "agent", text: intro }]);
+        }
         setReady(true);
       } catch (e) {
         if (!cancelled)
@@ -926,6 +971,21 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
               aria-expanded={showAttachMenu}
             >
               {showAttachMenu ? "×" : "+"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || uploading}
+              onClick={() => (voice.active ? voice.stop() : void voice.start())}
+              className={[
+                "mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg leading-none ring-1 transition",
+                voice.active
+                  ? "bg-rose-500 text-white ring-rose-500"
+                  : "bg-white text-sky-700 ring-sky-200 active:bg-sky-100",
+              ].join(" ")}
+              aria-label={voice.active ? "Stop voice" : "Talk to Energy Agent"}
+              aria-pressed={voice.active}
+            >
+              {voice.status === "connecting" ? "\u2026" : "\ud83c\udfa4"}
             </button>
             <textarea
               ref={inputRef}
