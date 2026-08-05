@@ -3,93 +3,56 @@ import { apiOrigin } from "@/lib/api";
 import { getSession } from "@/lib/session";
 
 /**
- * GPT Realtime voice for the mobile web agent — the SAME AI system the desktop
- * site runs (public/energy-agent.js). WebRTC to OpenAI via our own server:
- * POST /v1/energy-agent/realtime-call proxies the SDP so the key never reaches
- * the client.
+ * GPT Realtime voice for the phone site — the SAME system the desktop runs
+ * (public/energy-agent.js). WebRTC to OpenAI via our own server
+ * (POST /v1/energy-agent/realtime-call proxies the SDP, so the key never
+ * reaches the client).
  *
- * Desktop's "Option D" weave, ported verbatim: Realtime owns the conversation
- * and gets exactly ONE tool — consult_deep_brain — which it is instructed to
- * call on essentially every turn. That tool round-trips through the normal
- * /v1/energy-agent/chat brain (full product map, fleet tools, invoices,
- * repairs), so the voice never answers product questions from its own head.
+ * ARCHITECTURE (desktop parity — do not "improve" this):
+ *   Realtime is the EARS and the MOUTH. It never composes answers.
+ *   The deep brain (/v1/energy-agent/chat) authors BOTH halves of a turn:
+ *     d.speak  → the spoken line, sent to the mouth via response.create
+ *     d.reply  → the written write-up, painted in the chat panel
+ *   The app speaks `speak` and paints `reply`.
+ *
+ * WHY the mouth must stay shut on its own (Ford, screenshot 2026-08-04):
+ *   With tools + create_response:true, Realtime answers by itself and emits
+ *   filler ("I'm here and ready to help.") over and over, and its own audio
+ *   transcript gets bubbled alongside the real answer — the quadruple-reply
+ *   bug. Desktop guards this two ways and so do we:
+ *     1. create_response:false  → Realtime never starts a turn on its own
+ *     2. its audio transcript is NEVER painted into the panel
  */
 
 export type VoiceStatus = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 
-/** Keep in sync with api/energy_agent._realtime_session_config and the desktop
+/** Keep in sync with api/energy_agent._realtime_session_config and desktop
  *  realtimeVadConfig(). Copied verbatim — do not re-tune here. */
 const VAD = {
   type: "server_vad",
   threshold: 0.85,
   prefix_padding_ms: 320,
   silence_duration_ms: 1600,
-  create_response: true,
-  interrupt_response: true,
+  // The app drives every reply. Realtime must not self-start.
+  create_response: false,
+  interrupt_response: false,
 } as const;
 
-/** Verbatim from desktop realtimeWeaveInstructions(). */
-const WEAVE_INSTRUCTIONS =
-  "You are Energy Agent — live voice of Array Operator. Warm, sharp, brief like GPT Live. " +
-  "CRITICAL RULE — you are NOT smart enough alone about this product. Your intelligence " +
-  "comes from consult_deep_brain. DEFAULT: call consult_deep_brain EVERY turn before " +
-  "answering (walkthroughs, tabs, fleet, money, how-to). " +
-  "SILENCE WHILE WORKING: when you need the tool, call it immediately and stay COMPLETELY " +
-  "QUIET until the tool result arrives. Do NOT say 'one second', 'thinking', 'just a moment', " +
-  "'let me check', or anything else while waiting. Do NOT narrate failures or 'that didn't work' " +
-  "while a tool is in flight. After the tool returns, speak spoken_answer faithfully. " +
-  "Never invent UI labels, buttons, steps, kWh, or $. " +
-  "ONLY answer without the tool for pure social: hi, thanks, ok, mm-hmm, are you there, bye. " +
-  "Never narrate tool names. Be one person.";
-
-/** Verbatim from desktop realtimeWeaveTools(). */
-const WEAVE_TOOLS = [
-  {
-    type: "function",
-    name: "consult_deep_brain",
-    description:
-      "DEFAULT TOOL — call this on almost every turn. It is your smart brain for THIS " +
-      "tenant: full product map, fleet tools, invoices, repairs, screen tours/navigation. " +
-      "ALWAYS call for: walkthroughs, tabs (Analysis/Invoices/Inverters/etc), fleet health, " +
-      "kWh/$, offtakers, repairs, how something works, what to do next, confirmations. " +
-      "ONLY skip for pure social (hi/thanks/mm-hmm/are you there).",
-    parameters: {
-      type: "object",
-      properties: {
-        question: {
-          type: "string",
-          description:
-            "What to investigate or do, in clear English. Include the owner's " +
-            "exact ask and any tab/site names. For UI tours, say e.g. " +
-            "'Walk the owner through the Analysis tab step by step using product_map.'",
-        },
-        reason: {
-          type: "string",
-          description: "Why (e.g. ui_tour, fleet_health, money, product_how).",
-        },
-      },
-      required: ["question"],
-    },
-  },
-];
+/** Verbatim from desktop's non-weave (mouth-only) session instructions. */
+const MOUTH_INSTRUCTIONS =
+  "You are Energy Agent's MOUTH only, continuous cognition steers you. " +
+  "Only speak lines the app sends via response.create. " +
+  "Do not invent answers; the deeper mind reasons with tools and steers what you say. " +
+  "Start from the first word, speak completely, never speak over yourself. " +
+  "Never cut yourself off mid-sentence.";
 
 type Options = {
-  /** Final transcript of what the owner said (painted into the thread). */
-  onUserTranscript?: (text: string) => void;
-  /** consult_deep_brain — run the question through the real /chat brain and
-   *  return the spoken answer. Realtime stays silent until this resolves. */
-  onConsult: (question: string) => Promise<string>;
-  /** What the voice actually said (painted into the thread). */
-  onAgentTranscript?: (text: string) => void;
+  /** A finished utterance from the owner. Run it through the deep brain. */
+  onUserTranscript: (text: string) => void;
   onError?: (message: string) => void;
 };
 
-export function useRealtimeVoice({
-  onUserTranscript,
-  onConsult,
-  onAgentTranscript,
-  onError,
-}: Options) {
+export function useRealtimeVoice({ onUserTranscript, onError }: Options) {
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -98,11 +61,12 @@ export function useRealtimeVoice({
   const micRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const genRef = useRef(0);
+  const lastSpokenRef = useRef("");
 
-  const cbRef = useRef({ onUserTranscript, onConsult, onAgentTranscript, onError });
+  const cbRef = useRef({ onUserTranscript, onError });
   useEffect(() => {
-    cbRef.current = { onUserTranscript, onConsult, onAgentTranscript, onError };
-  }, [onUserTranscript, onConsult, onAgentTranscript, onError]);
+    cbRef.current = { onUserTranscript, onError };
+  }, [onUserTranscript, onError]);
 
   const teardown = useCallback(() => {
     genRef.current += 1;
@@ -115,6 +79,7 @@ export function useRealtimeVoice({
     if (audioRef.current) {
       try { audioRef.current.srcObject = null; } catch { /* noop */ }
     }
+    lastSpokenRef.current = "";
     setStatus("idle");
   }, []);
 
@@ -122,27 +87,13 @@ export function useRealtimeVoice({
 
   const dcSend = useCallback((obj: unknown) => {
     const dc = dcRef.current;
-    if (!dc || dc.readyState !== "open") return;
-    try { dc.send(JSON.stringify(obj)); } catch { /* channel closed */ }
+    if (!dc || dc.readyState !== "open") return false;
+    try { dc.send(JSON.stringify(obj)); return true; } catch { return false; }
   }, []);
 
-  /** Mirrors desktop sendFunctionCallOutput(): hand the brain's answer back to
-   *  Realtime, then let it speak. */
-  const sendToolOutput = useCallback((callId: string, output: unknown) => {
-    const out = typeof output === "string" ? output : JSON.stringify(output ?? {});
-    dcSend({
-      type: "conversation.item.create",
-      item: { type: "function_call_output", call_id: callId, output: out.slice(0, 8000) },
-    });
-    dcSend({ type: "response.create" });
-  }, [dcSend]);
-
-  const handleEvent = useCallback(async (ev: {
+  const handleEvent = useCallback((ev: {
     type?: string;
     transcript?: string;
-    name?: string;
-    call_id?: string;
-    arguments?: string;
     error?: { message?: string };
   }) => {
     const t = ev?.type;
@@ -150,53 +101,23 @@ export function useRealtimeVoice({
 
     if (t === "conversation.item.input_audio_transcription.completed") {
       const text = String(ev.transcript || "").trim();
-      if (text) cbRef.current.onUserTranscript?.(text);
+      if (text) cbRef.current.onUserTranscript(text);
       return;
     }
-    if (t === "response.audio_transcript.done" || t === "response.output_audio_transcript.done") {
-      const text = String(ev.transcript || "").trim();
-      if (text) cbRef.current.onAgentTranscript?.(text);
-      return;
-    }
+    // DELIBERATELY IGNORED: response.audio_transcript.done /
+    // response.output_audio_transcript.done. The panel is authored by the deep
+    // brain; bubbling the mouth's own transcript is what produced the repeated
+    // "I'm here and ready to help." bubbles.
     if (t === "output_audio_buffer.started") { setStatus("speaking"); return; }
     if (t === "output_audio_buffer.stopped") { setStatus("listening"); return; }
-
-    // The weave: Realtime asks our real brain, stays quiet until we answer.
-    if (t === "response.function_call_arguments.done") {
-      const nm = String(ev.name || "").toLowerCase();
-      const callId = String(ev.call_id || "");
-      if (!callId) return;
-      if (nm !== "consult_deep_brain" && nm !== "consult_brain" && nm !== "deep_brain") {
-        sendToolOutput(callId, { ok: false, spoken_answer: "" });
-        return;
-      }
-      let question = "";
-      try {
-        const args = JSON.parse(ev.arguments || "{}") || {};
-        question = args.question || args.query || args.message || "";
-      } catch {
-        question = String(ev.arguments || "");
-      }
-      setStatus("thinking");
-      try {
-        const answer = await cbRef.current.onConsult(question);
-        sendToolOutput(callId, { ok: true, spoken_answer: String(answer || "") });
-      } catch (e) {
-        sendToolOutput(callId, {
-          ok: false,
-          spoken_answer: "Sorry — try that once more?",
-          panel_text: String((e as Error)?.message || e || "error").slice(0, 200),
-        });
-      }
-      return;
-    }
-
     if (t === "error") {
       const msg = ev.error?.message || "Voice error";
+      // "no active response to cancel" and friends are benign chatter.
+      if (/no active response|cancellation failed|already has an active response/i.test(msg)) return;
       setError(msg);
       cbRef.current.onError?.(msg);
     }
-  }, [sendToolOutput]);
+  }, []);
 
   const start = useCallback(async () => {
     if (pcRef.current) return;
@@ -236,16 +157,15 @@ export function useRealtimeVoice({
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
       dc.addEventListener("message", (e) => {
-        try { void handleEvent(JSON.parse(e.data)); } catch { /* non-JSON frame */ }
+        try { handleEvent(JSON.parse(e.data)); } catch { /* non-JSON frame */ }
       });
       dc.addEventListener("open", () => {
         dcSend({
           type: "session.update",
           session: {
             type: "realtime",
-            instructions: WEAVE_INSTRUCTIONS,
-            tools: WEAVE_TOOLS,
-            tool_choice: "required",
+            instructions: MOUTH_INSTRUCTIONS,
+            // No tools: the brain is /chat, not this model.
             audio: {
               input: {
                 transcription: { model: "gpt-4o-mini-transcribe" },
@@ -281,9 +201,7 @@ export function useRealtimeVoice({
           detail = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail ?? raw);
         } catch { /* plain text */ }
         if (res.status === 402) {
-          throw new Error(
-            "Weekly Energy Agent limit reached — voice pauses until next week (or the cap is raised)."
-          );
+          throw new Error("Weekly Energy Agent limit reached — voice pauses until next week.");
         }
         if (/insufficient_quota|billing|credit|rate.?limit|exceeded/i.test(detail)) {
           throw new Error("The voice provider rejected the call (OpenAI billing/quota).");
@@ -308,11 +226,32 @@ export function useRealtimeVoice({
     }
   }, [handleEvent, dcSend, teardown]);
 
+  /** Speak a line the deep brain authored (d.speak). Mirrors desktop speakNow(). */
+  const speak = useCallback((text: string) => {
+    const plain = String(text || "").replace(/\s+/g, " ").trim();
+    if (!plain) return;
+    // Dedupe identical consecutive lines (desktop enqueueSpeak does the same).
+    if (plain === lastSpokenRef.current) return;
+    lastSpokenRef.current = plain;
+    dcSend({ type: "response.create", response: { instructions: plain } });
+  }, [dcSend]);
+
+  /** Barge-in: stop the mouth mid-sentence. */
+  const cancelSpeech = useCallback(() => {
+    dcSend({ type: "response.cancel" });
+    dcSend({ type: "output_audio_buffer.clear" });
+  }, [dcSend]);
+
+  const setThinking = useCallback(() => setStatus("thinking"), []);
+
   return {
     status,
     error,
     start,
     stop: teardown,
+    speak,
+    cancelSpeech,
+    setThinking,
     active: status !== "idle" && status !== "error",
   };
 }

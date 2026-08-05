@@ -103,28 +103,11 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
   // Voice: Realtime is ears+mouth only. A finished utterance goes through the
   // SAME send() as typing, so spoken answers use the same tools, the same
   // confirm-before-write gate, and the same DB-backed thread.
+  // Voice: Realtime is ears + mouth ONLY. A finished utterance runs through
+  // the deep brain, which authors both halves of the turn (speak + reply).
   const voice = useRealtimeVoice({
     onUserTranscript: (t) => {
-      setMsgs((m) => [...m, { role: "user", text: t }]);
-    },
-    onAgentTranscript: (t) => {
-      setMsgs((m) => [...m, { role: "agent", text: t }]);
-    },
-    // consult_deep_brain — the voice's only tool. Routes through the SAME
-    // /chat brain as typing, so spoken answers use real tools and land in
-    // the same DB-backed thread.
-    onConsult: async (question) => {
-      let sid = sessionId;
-      if (!sid) {
-        const s = await startAgentSession({ ...MOBILE_CTX });
-        sid = s.session_id || null;
-        setSessionId(sid);
-      }
-      if (!sid) throw new Error("No agent session");
-      const res = await agentChat(sid, question, { ...MOBILE_CTX }, []);
-      return String(
-        res.reply || res.speak || res.message || res.content || ""
-      );
+      void voiceTurn(t);
     },
     onError: (m) => setErr(m),
   });
@@ -369,6 +352,45 @@ export function AgentSheet({ open, onClose, seedPrompt }: Props) {
       setErr(e instanceof Error ? e.message : "Chat failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * One spoken turn — desktop parity (consultDeepBrain).
+   * The deep brain authors BOTH halves: res.speak is what the mouth says,
+   * res.reply is the written write-up that goes in the panel. Realtime never
+   * composes; it only reads the line we hand it.
+   */
+  async function voiceTurn(said: string) {
+    const t = said.trim();
+    if (!t) return;
+    setMsgs((m) => [...m, { role: "user", text: t }]);
+    voice.cancelSpeech();
+    voice.setThinking();
+    setErr(null);
+    try {
+      let sid = sessionId;
+      if (!sid) {
+        const s = await startAgentSession({ ...MOBILE_CTX });
+        sid = s.session_id || null;
+        setSessionId(sid);
+      }
+      if (!sid) throw new Error("No agent session");
+      const res = await agentChat(
+        sid,
+        t,
+        { ...MOBILE_CTX, voice_active: true, voice_weave: true },
+        []
+      );
+      const written = String(res.reply || res.message || res.content || "");
+      const spokenLine = String(res.speak || "").trim() || written;
+      if (written) setMsgs((m) => [...m, { role: "agent", text: written }]);
+      if (spokenLine) voice.speak(spokenLine);
+      const pend = res.pending as EnergyAgentPending | null | undefined;
+      if (pend && typeof pend === "object") setPending(pend);
+      applyUiCommands(res.ui_commands);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Voice turn failed");
     }
   }
 
