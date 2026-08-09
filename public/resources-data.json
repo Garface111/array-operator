@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-29",
+  "updated": "2026-08-09",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
@@ -113,7 +113,7 @@
       "how": "Whichever option you choose at enrollment is locked for 20 years; Eversource and United Illuminating administer it identically.",
       "note": "Utility-vs-state tension is running hot: Connecticut (Gov. Lamont, AG Tong, DEEP, OCC) filed a FERC complaint in June 2026 to strip the ~0.50% RTO transmission incentive adder Eversource and UI collect (projected ~$4.5M/yr in CT savings), and on June 30 the two utilities sued the state in federal court challenging Public Act 25-173 (SB 4). Eversource also asked PURA to keep ~300,000 pages of its rate-case filing confidential.",
       "utils": ["Eversource", "United Illuminating (UI)"],
-      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022. Eversource filed a rate case on July 14, 2026 seeking ~$451M in distribution revenue (~11% residential), rising to a headline ~$727M (~18%) once ~$1B of 2018–2023 storm costs are included; new rates would take effect July 1, 2027. Standard-service supply rates fell July 1, 2026 (Eversource to ≈11.58¢/kWh, UI to ≈11.99¢/kWh), and a May 1, 2026 Rate Adjustment Mechanism decision cut interim delivery rates.",
+      "reg": "Public Utilities Regulatory Authority (PURA) — RRES replaced net metering in 2022. Eversource filed a rate case on July 14, 2026 seeking ~$451M in distribution revenue (~11% residential), rising to a headline ~$727M (~18%) once ~$1B of 2018–2023 storm costs are included; new rates would take effect July 1, 2027. Separately, PURA's July 29, 2026 final storm-cost decision approved about $861M in deferred 2018–2023 storm costs while rejecting ~$400M in retrospective carrying charges, with roughly $668M to be securitized. Standard-service supply rates fell July 1, 2026 (Eversource to ≈11.58¢/kWh, UI to ≈11.99¢/kWh), and a May 1, 2026 Rate Adjustment Mechanism decision cut interim delivery rates.",
       "sources": [
         { "l": "CT PURA", "u": "https://portal.ct.gov/pura" },
         { "l": "Office of Consumer Counsel", "u": "https://portal.ct.gov/occ" }
@@ -138,7 +138,7 @@
       "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
       "note": "The 2026 legislative session (ended June 11) killed a proposed solar 'grid access fee' on systems ≥ 1 MW but set up lower virtual-net-metering compensation for large projects and lowers the net-metering program cap from 275 MW toward 175 MW by 2031. The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027. A separate net-metering tariff docket (25-50-EL), updating RI Energy's Net Metering Provision to reflect the 2025 changes to Excess Renewable Net Metering Credit valuation, reached its Division closing memo on June 22, 2026 with a final PUC order still pending.",
       "utils": ["Rhode Island Energy"],
-      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) entered post-hearing briefing on July 16, 2026 with a decision expected before the ~September 2026 effective date, and Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
+      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) reached post-hearing memoranda on July 31, 2026 (seeking a first-year increase of ~$65.9M electric and ~$114.7M gas); no final PUC decision had issued as of early August, with new rates targeted for fall 2026. On July 23, 2026 Gov. McKee signed Executive Order 26-05 declaring an energy-affordability emergency and directing ~$28M of RGGI reserves toward residential bill relief (pending PUC approval); the order was filed into the rate-case docket Aug 6. Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
       "sources": [
         { "l": "RI PUC", "u": "https://ripuc.ri.gov/" },
         { "l": "Office of Energy Resources", "u": "https://energy.ri.gov/renewable-energy/net-metering" }
@@ -160,14 +160,14 @@
   },
   "rec_market": {
     "headline": "New England REC market",
-    "as_of": "2026-07",
+    "as_of": "2026-08",
     "summary": "Renewable Energy Certificates (RECs) are the tradable proof that 1 MWh of renewable electricity was generated. Across New England they are issued and tracked in NEPOOL-GIS, typically one quarter after generation. Class I RECs (new renewables, post-1997 facilities) are the main commodity solar operators care about; MA and CT demand often set the regional price. SRECs are a legacy Massachusetts solar carve-out that still pays higher while individual terms last, then rolls to Class I.",
     "class_i": {
       "label": "NEPOOL Class I (region)",
       "price_display": "≈ $38–42 / MWh",
       "price_usd_per_mwh_low": 38,
       "price_usd_per_mwh_high": 42,
-      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. As of July 2026, broker/tracker quotes (Gridwealth, Competitive Energy Services) put MA Class I certificates at $38–$42/MWh — trading near the ceiling in a supply-constrained market. The MA Class I Alternative Compliance Payment (ACP) remains $40/MWh (225 CMR 14.08, flat since Compliance Year 2023 — confirmed unchanged for 2026) and caps the market; do not confuse it with the separate Clean Peak (CPES) ACP (~$65). The MA Class I minimum standard is roughly 30% of retail sales for 2026. Connecticut's Class I RPS obligation drops to 25% for 2026 (and excludes new biomass/landfill-gas as of Oct 1, 2025), shifting some supply toward the higher-priced NH market. Prices have historically swung from single digits to the cap.",
+      "note": "Indicative broker-quoted range for dual-qualified New England Class I. Not a live bid. The most current verifiable public quote is July 2026: Gridwealth pegs MA Class I at $38–$42/MWh and Competitive Energy Services describes the market 'trading just below $40,' with 2025 compliance met partly via Alternative Compliance Payments — i.e. genuinely at/near the ceiling in a supply-constrained market (no newer August broker quote was published; live Xpansiv/MassCEC feeds are subscriber-gated). The MA Class I ACP remains $40/MWh (225 CMR 14.08, flat since Compliance Year 2023 — confirmed unchanged for 2026) and caps the market; do not confuse it with the separate Clean Peak (CPES) ACP (~$65). The MA Class I minimum standard is roughly 30% of retail sales for 2026. Connecticut's Class I RPS obligation drops from 32% to 25% for 2026 (and excludes new biomass/methane as of Oct 1, 2025), shifting some supply toward the higher-priced NH market. Prices have historically swung from single digits to the cap.",
       "registry": "NEPOOL-GIS",
       "mint_lag": "Issued quarterly, roughly one quarter after generation (e.g. Q1 generation mints mid-year).",
       "eligible_states": ["ma", "ct", "ri", "nh", "me", "vt"]
