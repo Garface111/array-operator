@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-10",
+  "updated": "2026-08-11",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -10,6 +10,15 @@
       "summary": "Post-hearing memoranda in Rhode Island Energy's base-distribution case were filed July 31, 2026, followed August 6 by Walmart's reply memo and a letter from Gov. McKee attaching Executive Order 26-05. The filing seeks a first-year increase of roughly $65.9M electric and $114.7M gas; no final PUC decision had issued as of early August, with new rates targeted for fall 2026.",
       "source": "Rhode Island PUC",
       "url": "https://ripuc.ri.gov/Docket-25-45-GE"
+    },
+    {
+      "date": "2026-08-03",
+      "state": "ct",
+      "tag": "Deadline",
+      "title": "Eversource opens Program Year 5 NRES August solicitation for non-residential solar (up to 5 MW)",
+      "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). Posted caps include roughly 31 MW / $6.7M for large and 25 MW / $5.1M for medium zero-emission projects.",
+      "source": "Eversource (NRES)",
+      "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
     },
     {
       "date": "2026-07-29",
@@ -28,6 +37,15 @@
       "summary": "Executive Order 26-05 declares an energy-affordability emergency and directs about $28 million in RGGI reserve funds toward residential ratepayer relief (proposed as bill credits in early 2027, pending PUC approval) ahead of a proposed double-digit winter rate increase. The order was filed into the RI Energy rate-case docket days later.",
       "source": "Rhode Island Governor's Office",
       "url": "https://governor.ri.gov/executive-orders"
+    },
+    {
+      "date": "2026-07-20",
+      "state": "me",
+      "tag": "Rulemaking",
+      "title": "Maine DOER files first competitive energy-storage solicitation seeking up to 360 MW",
+      "summary": "Maine's Department of Energy Resources filed its first competitive energy-storage solicitation on July 20, 2026, seeking up to 360 MW toward the state's statutory 400 MW-by-2030 storage goal. The MPUC has up to 120 days to review the filing for statutory compliance before a formal RFP issues, with project selections expected by the end of 2026.",
+      "source": "mgrid.org",
+      "url": "https://mgrid.org/2026/07/22/maine-files-its-first-competitive-energy-storage-solicitation-seeking-360-mw/"
     },
     {
       "date": "2026-07-17",
