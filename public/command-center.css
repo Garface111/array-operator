@@ -1619,6 +1619,23 @@ body.sb-fs-lock{ overflow:hidden; }
 /* The adder's optional end date sits tight under the adder input as one unit. */
 .rb-adder-until{ margin-top:-2px; }
 
+/* Template upload that landed but can't be used — wrong file type, or an .xlsx with
+   no cached formula values (Ford 2026-08-12, Paul's silently-ignored PDF). Persistent
+   rather than a transient status line: the operator has to act on it, and needs it
+   still there while they go find the right file. */
+.rb-tpl-warn{
+  margin:0 0 10px; padding:10px 12px; border-radius:10px;
+  font-size:12.5px; line-height:1.55; color:#78350f;
+  background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.38);
+  border-left:3px solid rgba(245,158,11,.85);
+}
+.rb-tpl-warn b{ color:#92400e; font-weight:700; }
+@media (prefers-color-scheme: dark){
+  .rb-tpl-warn{ color:#fde68a; background:rgba(245,158,11,.13);
+    border-color:rgba(245,158,11,.42); }
+  .rb-tpl-warn b{ color:#fbbf24; }
+}
+
 /* ---- Required-field marking (Bruce C5) ------------------------------------ */
 /* "Mandatory entries should have a unique coloring, optional ones can be clear."
    .req is applied ONLY to fields whose blank value actually blocks a save — modal:

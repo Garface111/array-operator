@@ -3672,11 +3672,18 @@
  }
  function paint(t) {
  const has = t && t.has_template;
- status.textContent = has
- ? "On file: " + (t.filename || "your template") + ". " +
- (t.enabled ? "Used for this offtaker’s invoices." : "Saved, turn on below to use it.")
- : "No template yet, this offtaker’s invoices use the standard format.";
- status.className = "rb-tpl-status" + (has ? " rb-tpl-have" : "");
+ // A stored file is NOT the same as a working template: only token-HTML or an
+ // .xlsx can actually render, so a PDF/Word upload sits on file doing nothing.
+ // Saying "On file" for one of those is what made Paul think his re-upload had
+ // taken effect (Ford 2026-08-12). Name the state honestly instead.
+ const dead = has && t.renderable === false;
+ status.textContent = !has
+ ? "No template yet, this offtaker’s invoices use the standard format."
+ : dead
+ ? "Saved “" + (t.filename || "your file") + "”, but we can’t build invoices from that file type, so the standard format is still being used. Upload the .xlsx or .html version."
+ : "On file: " + (t.filename || "your template") + ". " +
+ (t.enabled ? "Used for this offtaker’s invoices." : "Saved, turn on below to use it.");
+ status.className = "rb-tpl-status" + (dead ? " rb-err" : has ? " rb-tpl-have" : "");
  if (view) view.hidden = !(t && t.filename);
  if (del) del.hidden = !has;
  // The Use-this-template / Default-format slider only makes sense with a
@@ -3753,6 +3760,33 @@
  };
  showFmt("repro"); // default inline view = the reproduced template
  }
+ // A persistent notice above the template box for an upload that landed but can't
+ // be used. Deliberately NOT the transient status line — the operator needs to be
+ // able to read it, act on it, and still see it while they find the right file.
+ function tplWarnEl() {
+ let el = document.getElementById("rbTplWarn");
+ if (!el) {
+ const host = document.getElementById("rbTpl");
+ if (!host) return null;
+ el = document.createElement("div");
+ el.id = "rbTplWarn";
+ el.className = "rb-tpl-warn";
+ el.setAttribute("role", "note");
+ host.insertBefore(el, host.firstChild);
+ }
+ return el;
+ }
+ function showTplWarning(msg) {
+ const el = tplWarnEl();
+ if (!el) return;
+ el.innerHTML = "<b>That file was saved, but it isn’t being used.</b> " + esc(msg);
+ el.hidden = false;
+ }
+ function clearTplWarning() {
+ const el = document.getElementById("rbTplWarn");
+ if (el) { el.hidden = true; el.innerHTML = ""; }
+ }
+
  async function refresh() {
  const base = tplApi();
  if (!base || !authHeaders()) { paint(null); return; } // no offtaker bound (parked) / demo
@@ -3777,7 +3811,17 @@
  const r = await fetch(base, { method: "POST", headers: authHeaders(), body: fd });
  const d = await r.json().catch(() => ({}));
  if (!r.ok) { status.textContent = (d && d.detail) || "Upload failed."; status.className = "rb-tpl-status rb-err"; }
- else { if (htmlBox) htmlBox.dataset.dirty = ""; await refresh(); }
+ else {
+ if (htmlBox) htmlBox.dataset.dirty = "";
+ await refresh();
+ // The server tells us when an upload landed but can't be used (wrong file
+ // type, or an .xlsx with no cached formula values). That warning used to be
+ // parsed and thrown away, so a dead upload reported success and the operator
+ // was left to guess — exactly what happened to Paul. Show it, and leave it
+ // up (refresh() has already repainted the status line beneath it).
+ if (d && d.warning) showTplWarning(d.warning);
+ else clearTplWarning();
+ }
  } catch (e) { status.textContent = "Upload failed, check your connection."; status.className = "rb-tpl-status rb-err"; }
  }
  fileIn.onchange = async () => { await doUpload(fileIn.files && fileIn.files[0]); fileIn.value = ""; };
