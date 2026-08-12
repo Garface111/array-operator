@@ -7815,6 +7815,9 @@
  // payload lacks, merge it so the editable rate field shows the true default.
  "default_net_rate_per_kwh", "default_net_rate_source", "default_net_rate_note",
  "resolved_net_rate_per_kwh", "resolved_net_rate_source",
+ // Incentive adder + "did a human state this price?" — drives the adder field's
+ // all-in readout and the unconfirmed-rate prompt (Ford 2026-08-12).
+ "adder_per_kwh", "adder_source", "adder_note", "rate_is_operator_entered",
  // The server re-renders the email LETTER + SUBJECT with the fresh figures on
  // every /draft response; merge them so the live preview's letter (kWh + $)
  // tracks a re-sync/new bill instead of showing the old amount until a hard
@@ -7855,7 +7858,8 @@
  const cur = DRAFT_BY_SUB[sid];
  const figKeys = ["amount_usd", "customer_kwh", "array_total_kwh", "period_label",
  "invoice_number", "email_letter_default", "email_subject_default", "solar_credit_value",
- "net_rate_per_kwh", "discount_pct", "gmp_auto_status", "has_gmp_pdf"];
+ "net_rate_per_kwh", "discount_pct", "gmp_auto_status", "has_gmp_pdf",
+ "adder_per_kwh", "rate_is_operator_entered"];
  const changed = !cur || figKeys.some(k => (k in dg.draft) && dg.draft[k] !== cur[k]);
  if (cur) Object.assign(cur, dg.draft); else DRAFT_BY_SUB[sid] = dg.draft;
  // Re-render ONLY when something actually moved (no jitter on the common fresh case).
@@ -8726,7 +8730,53 @@
  : `<span class="rb-rate-auto rb-rate-def">${def.html}</span>`;
  return `<label class="rep-fld rb-rate-fld"><span class="rl">Solar credit rate ($/kWh)</span>
  <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${val}" placeholder="${ph}">
- ${helper}</label>`;
+ ${helper}</label>
+ ${adderFieldHTML(d)}
+ ${unconfirmedRateHTML(d)}`;
+ }
+
+ // ── Incentive adder + the unconfirmed-rate prompt (Ford 2026-08-12) ──────────
+ // Colleen's deal — like a lot of real ones — is "tariff + adder": $0.18398 plus a
+ // $0.04 incentive = $0.22398. There was nowhere to say that, so HCT's invoices ran
+ // for months on a rate scraped off the GMP bill ($0.23298, +4%). The adder sits
+ // directly under the rate because together they ARE the price; the live all-in
+ // readout is there so the operator can eyeball it against their contract.
+ function adderFieldHTML(d) {
+ const sub = OFFTAKERS.find(x => String(x.id) === String(d.subscription_id)) || {};
+ const add = sub.net_rate_adder_per_kwh != null ? Number(sub.net_rate_adder_per_kwh) : "";
+ const until = sub.net_rate_adder_until || "";
+ const base = d.net_rate_per_kwh != null ? Number(d.net_rate_per_kwh) : null;
+ // All-in only means something once the operator has stated a base rate — with a
+ // blank base the invoice is still pricing off the bill and the adder is inert.
+ const allIn = (base != null && add !== "" && !isNaN(add))
+ ? `<span class="rb-rate-auto rb-rate-def">All-in <b>$${(base + Number(add)).toFixed(5)}/kWh</b> before your ${
+ d.discount_pct != null ? (100 - d.discount_pct * 100).toFixed(0) + "% billing rate" : "billing rate"}</span>`
+ : `<span class="rb-rate-auto rb-rate-def">Optional. Add it only if your contract prices as tariff <b>+</b> an incentive, and enter the tariff above.</span>`;
+ const expiry = `<label class="rep-fld rb-adder-until"><span class="rl">Incentive ends (optional)</span>
+ <input type="date" data-of="net_rate_adder_until" value="${esc(until)}">
+ <span class="rb-rate-auto rb-rate-def">Most adders are term-limited. After this date we stop applying it instead of over-billing.</span></label>`;
+ return `<label class="rep-fld rb-rate-fld"><span class="rl">Incentive adder ($/kWh)</span>
+ <input type="number" data-of="net_rate_adder_per_kwh" min="0" step="0.0001" value="${add}" placeholder="none">
+ ${allIn}</label>
+ ${(add !== "" && !isNaN(add)) ? expiry : ""}`;
+ }
+
+ // The loud version of the backend's "Unconfirmed rate" warning: this invoice is
+ // priced at a number nobody entered. We still draft it and you can still send it
+ // by hand — but it will not go out on autopilot until a human states the price.
+ function unconfirmedRateHTML(d) {
+ if (d.rate_is_operator_entered !== false) return "";
+ const r = d.net_rate_per_kwh != null ? Number(d.net_rate_per_kwh)
+ : (d.resolved_net_rate_per_kwh != null ? Number(d.resolved_net_rate_per_kwh) : null);
+ if (r == null || !(r > 0)) return "";
+ return `<div class="rb-rate-unconfirmed" role="note">
+ <b>This rate came from the utility bill, not from you.</b>
+ We're pricing at <b>$${r.toFixed(5)}/kWh</b> because no rate is set for this offtaker
+ or as your master rate. That's often right — but if your contract says something
+ else (a tariff plus an incentive, for example), enter it above so we bill your
+ price. <span class="rb-rate-unconfirmed-hold">Automatic sending stays paused for
+ this offtaker until a rate is entered.</span>
+ </div>`;
  }
 
  function offtakerEditor(d, utilAccts) {
@@ -9179,7 +9229,7 @@
  // ── Live offtaker-edit wiring ──────────────────────────────────────────────
  // Money fields change the invoiced amount, so a change recomputes the draft;
  // copy fields only repaint the preview envelope.
- const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd"]);
+ const OF_MONEY_FIELDS = new Set(["utility_account_id", "allocation_pct", "discount_pct", "net_rate_per_kwh", "budget_amount_usd", "net_rate_adder_per_kwh", "net_rate_adder_until"]);
  // Recheck fields (Bruce 2026-07-07): they don't move the amount, but they DO
  // change the Bill-accuracy cross-check verdict, so a change re-runs the draft's
  // cross-check and flips the strip live (the flush treats them like money for the
@@ -9370,6 +9420,11 @@
  case "allocation_pct": return v === "" ? null : { allocation_pct: Number(v) / 100 };
  case "discount_pct": return v === "" ? { discount_pct: null } : { discount_pct: Number(v) / 100 };
  case "net_rate_per_kwh": return { net_rate_per_kwh: v === "" ? null : Number(v) };
+ // Incentive adder + its optional end date (Ford 2026-08-12, "tariff + adder"
+ // pricing). Blank clears either one. The adder is a MONEY field — it changes
+ // the invoice total — so the patch triggers a recalculation like the rate does.
+ case "net_rate_adder_per_kwh": return { net_rate_adder_per_kwh: v === "" ? null : Number(v) };
+ case "net_rate_adder_until": return { net_rate_adder_until: v === "" ? null : v };
  case "budget_amount_usd": return { budget_amount_usd: v === "" ? null : Number(v) };
  case "annual_trueup": return { annual_trueup: v === "true" || v === true };
  // Bill-accuracy flag threshold (Bruce 2026-07-07): percentage points, sent as-is;
