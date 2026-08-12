@@ -3348,6 +3348,17 @@
  title="Optional master $/kWh. Blank = each offtaker uses the credit rate from their own utility bill.">
  <span class="rb-gr-unit">/kWh</span></span>
  </label>
+ <!-- Incentive adder (Ford 2026-08-12). Must live BESIDE the master rate: an
+ operator whose deal is "tariff + adder" who set only the tariff here would be
+ UNDER-billing by the adder, the same silent-wrong-price failure in reverse. -->
+ <label class="rb-gr-field">
+ <span class="rb-gr-lbl">Incentive adder</span>
+ <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
+ <input type="number" id="rbGrAdder" min="0" max="5" step="0.001" placeholder="none"
+ inputmode="decimal" autocomplete="off"
+ title="Optional $/kWh incentive added to the master rate, for contracts priced as tariff + adder. Blank = none.">
+ <span class="rb-gr-unit">/kWh</span></span>
+ </label>
  <label class="rb-gr-field">
  <span class="rb-gr-lbl">Discount</span>
  <span class="rb-gr-inwrap">
@@ -3847,11 +3858,18 @@
  // bound utility sub-account bill (custom per offtaker). Never a fleet median.
  async function wireGlobalRate() {
  const net = $("#rbGrNet");
+ const adder = $("#rbGrAdder");
  const disc = $("#rbGrDisc");
  const save = $("#rbGrSave");
  const st = $("#rbGrStatus");
  const eff = $("#rbGrEff");
  if (!net || !disc || !save) return;
+ // Adder value as a number, 0 when blank/invalid (the field is optional).
+ const adderNum = () => {
+ const v = adder && adder.value.trim();
+ const n = v ? Number(v) : 0;
+ return isNaN(n) ? 0 : n;
+ };
 
  let effDisc = 0.10, effSrc = "per_offtaker_bill", effNote = "";
  function renderEff() {
@@ -3861,8 +3879,8 @@
  // blank master → "per-bill" (each offtaker priced from their own bill).
  const chipVal = document.getElementById("rbGrChipVal");
  if (chipVal) {
- const n = Number(raw);
- chipVal.textContent = raw === "" || isNaN(n) ? "per-bill" : "$" + n.toFixed(4) + "/kWh";
+ const n = Number(raw) + adderNum();   // chip shows the ALL-IN master rate
+ chipVal.textContent = raw === "" || isNaN(Number(raw)) ? "per-bill" : "$" + n.toFixed(4) + "/kWh";
  }
  if (eff) {
  if (raw === "") {
@@ -3877,10 +3895,16 @@
  }
  const n = Number(raw);
  if (isNaN(n) || isNaN(d)) { eff.textContent = ""; return; }
- const rate = n * (1 - d / 100);
+ const ad = adderNum();
+ const rate = (n + ad) * (1 - d / 100);
+ // Spell the adder out in the preview — a tariff+adder operator must be able to
+ // see that BOTH halves of their price made it in before they save.
+ const basis = ad > 0
+ ? `credit $${n.toFixed(5)} + $${ad.toFixed(5)} incentive − ${d.toFixed(0)}% off`
+ : `credit $${n.toFixed(5)} − ${d.toFixed(0)}% off`;
  eff.innerHTML =
  `Master rate is set, offtakers without a custom rate pay ` +
- `<b>$${rate.toFixed(4)}/kWh</b> (credit $${n.toFixed(5)} − ${d.toFixed(0)}% off). ` +
+ `<b>$${rate.toFixed(4)}/kWh</b> (${basis}). ` +
  `Clear the box to go back to each offtaker's own utility-bill rate.`;
  }
  }
@@ -3894,12 +3918,15 @@
  // Only show a number when the operator has SAVED a master override.
  if (data.default_net_rate_per_kwh != null) net.value = data.default_net_rate_per_kwh;
  else net.value = "";
+ if (adder) adder.value = data.default_net_rate_adder_per_kwh != null
+ ? data.default_net_rate_adder_per_kwh : "";
  if (data.default_discount_pct != null) disc.value = Math.round(data.default_discount_pct * 100);
  }
  } catch (e) { /* leave blank */ }
  renderEff();
  net.addEventListener("input", renderEff);
  disc.addEventListener("input", renderEff);
+ if (adder) adder.addEventListener("input", renderEff);
  // The chip's editor is a popover now — any outside click closes it.
  if (!wireGlobalRate._closerWired) {
  wireGlobalRate._closerWired = true;
@@ -3920,6 +3947,18 @@
  st.className = "rb-status rb-err"; st.textContent = "Solar credit rate must be 0–5 $/kWh, or blank to clear."; return;
  }
  body.default_net_rate_per_kwh = n;
+ }
+ // incentive adder: blank clears (→ no adder)
+ if (adder) {
+ const rawAdd = adder.value.trim();
+ if (rawAdd === "") body.default_net_rate_adder_per_kwh = null;
+ else {
+ const a = Number(rawAdd);
+ if (isNaN(a) || a < 0 || a > 5) {
+ st.className = "rb-status rb-err"; st.textContent = "Incentive adder must be 0–5 $/kWh, or blank for none."; return;
+ }
+ body.default_net_rate_adder_per_kwh = a;
+ }
  }
  // discount: blank clears (→ 10% default); UI is whole-% → fraction
  const rawDisc = disc.value.trim();
