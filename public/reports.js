@@ -8715,8 +8715,13 @@
  const billScraped = boundProv === "gmp" && !legacyFlat && (!wb || d.allocation_pct != null);
  if (!billScraped) {
  const rate = d.net_rate_per_kwh != null ? d.net_rate_per_kwh : "";
+ // The adder belongs here too: VEC/SmartHub offtakers price off an operator-
+ // entered rate (delivery applies sh_adder on that path), so a tariff+incentive
+ // deal must be enterable for them as well — not only for GMP-bound offtakers.
  return `<label class="rep-fld rb-rate-fld"><span class="rl">Solar credit rate ($/kWh)</span>
- <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>`;
+ <input type="number" data-of="net_rate_per_kwh" min="0" step="0.0001" value="${rate}" placeholder="blank = auto from bill"></label>
+ ${adderFieldHTML(d)}
+ ${unconfirmedRateHTML(d)}`;
  }
  // GMP-bound: editable input defaulting to the bill's rate, overridable.
  const def = gmpDefaultRate(d);
