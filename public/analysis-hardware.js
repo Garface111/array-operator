@@ -204,6 +204,9 @@
  ".anhw-row{display:grid;grid-template-columns:minmax(0,1.6fr) 88px minmax(0,1.5fr) minmax(140px,1.1fr);align-items:center;gap:14px;padding:9px 18px 9px 44px;border-top:1px solid var(--line)}",
  ".anhw-row:hover{background:var(--bg2)}",
  ".anhw-row.live-warn{background:rgba(217,119,6,.04)}",
+ ".anhw-row.anhw-t-warn{box-shadow:inset 3px 0 0 var(--warn)}",
+ ".anhw-row.anhw-t-bad{box-shadow:inset 3px 0 0 var(--bad)}",
+ ".anhw-row.anhw-t-info{box-shadow:inset 3px 0 0 var(--sky)}",
  ".anhw-dev{min-width:0;line-height:1.25}",
  ".anhw-dname{font-size:13px;font-weight:640;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
  ".anhw-dmodel{font-size:11px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -286,7 +289,7 @@
  ? '<span class="anhw-rcomm" title="Last reading from this inverter">Last ' + esc(comm) + '</span>'
  : '';
 
- var rowCls = "anhw-row" + (st.tone === "warn" || st.tone === "bad" ? " live-warn" : "");
+ var rowCls = "anhw-row anhw-t-" + st.tone + (st.tone === "warn" || st.tone === "bad" ? " live-warn" : "");
  return '<div class="' + rowCls + '">' +
  '<div class="anhw-dev"><div class="anhw-dname">' + name + '</div>' +
  (model ? '<div class="anhw-dmodel">' + model + '</div>' : '') + '</div>' +
