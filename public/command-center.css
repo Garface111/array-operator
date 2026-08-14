@@ -1600,21 +1600,19 @@ body.sb-fs-lock{ overflow:hidden; }
 
 /* Unconfirmed rate (Ford 2026-08-12, the HCT mis-bill): this invoice is priced at a
    number the operator never entered — inferred from the utility bill. Not an error
-   (it's often right) and not a blocker for a human send, so it reads as a firm
-   amber NOTICE rather than a red failure. Sits directly under the rate + adder
-   fields, which are the two inputs that resolve it. */
+   (it's often right) and not a blocker for a human send. Sits directly under the
+   rate + adder fields, which are the two inputs that resolve it. Slate-neutral so
+   bold words don't render as highlight-swatch bands over the body text. */
 .rb-rate-unconfirmed{
   grid-column:1 / -1; margin-top:2px; padding:10px 12px; border-radius:10px;
-  font-size:12.5px; line-height:1.55; color:#78350f;
-  background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.38);
-  border-left:3px solid rgba(245,158,11,.85);
+  font-size:12.5px; line-height:1.55; color:var(--muted,#475569);
+  background:rgba(100,116,139,.07); border:1px solid rgba(100,116,139,.22);
+  border-left:3px solid rgba(100,116,139,.45);
 }
-.rb-rate-unconfirmed b{ color:#92400e; font-weight:700; }
+.rb-rate-unconfirmed b{ font-weight:700; }
 .rb-rate-unconfirmed-hold{ display:block; margin-top:5px; font-weight:600; opacity:.92; }
 @media (prefers-color-scheme: dark){
-  .rb-rate-unconfirmed{ color:#fde68a; background:rgba(245,158,11,.13);
-    border-color:rgba(245,158,11,.42); }
-  .rb-rate-unconfirmed b{ color:#fbbf24; }
+  .rb-rate-unconfirmed{ background:rgba(100,116,139,.12); border-color:rgba(100,116,139,.30); }
 }
 /* The adder's optional end date sits tight under the adder input as one unit. */
 .rb-adder-until{ margin-top:-2px; }
