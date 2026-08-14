@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
 
-/** Desktop tab order: Fleet · Analysis · Invoices · Repairs · Marketplace · Account */
+/** Desktop tab order: Fleet · Analysis · Statements · Repairs · Marketplace · Account */
 const ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/fleet", label: "Fleet", end: true },
   { to: "/analysis", label: "Analysis" },
-  { to: "/invoices", label: "Invoices" },
+  { to: "/invoices", label: "Statements" },
   { to: "/repairs", label: "Repairs" },
   { to: "/marketplace", label: "Market" },
   { to: "/account", label: "Account" },

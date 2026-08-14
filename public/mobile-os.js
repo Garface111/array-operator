@@ -91,7 +91,7 @@
       prompt:
         "Help me save my utility login (GMP or SmartHub co-op) so bills keep landing for offtaker invoices without opening the portal.",
       hash: "#reports",
-      detailHint: "Invoices · bill sources",
+      detailHint: "Statements · bill sources",
       open: {},
       openLabel: "Bill sources",
       statusLine: function (L) {
@@ -137,7 +137,7 @@
       prompt:
         "Help me set up offtakers for solar-credit invoices, name, email, share %, bill source. If I only monitor, tell me how to skip. Offer bulk import if I have a spreadsheet.",
       hash: "#reports",
-      detailHint: "Invoices · Offtakers",
+      detailHint: "Statements · Offtakers",
       open: { openOfftakers: true },
       openLabel: "Open roster",
       optional: true,
@@ -161,7 +161,7 @@
       prompt:
         "Help me choose invoice send mode: Approve to send vs Auto-send when a utility bill settles. Explain tradeoffs briefly, then guide me.",
       hash: "#reports",
-      detailHint: "Invoices · pipeline",
+      detailHint: "Statements · pipeline",
       open: { openPreview: true },
       openLabel: "Preview invoice",
       needsOfftakers: true,
@@ -284,7 +284,7 @@
       sub: "Whole roster at once",
       why: "Import offtaker spreadsheets instead of typing dozens of rows.",
       prompt:
-        "I have a spreadsheet of offtakers. Walk me through bulk import on Invoices, what columns you need and how review works.",
+        "I have a spreadsheet of offtakers. Walk me through bulk import on Statements, what columns you need and how review works.",
       hash: "#reports",
       open: { openBulk: true },
       openLabel: "Bulk import",
@@ -296,7 +296,7 @@
       sub: "Share vs utility",
       why: "Compare utility-credited allocation to your offtaker shares.",
       prompt:
-        "Explain Bill audit on Invoices, when it runs, what a mismatch means, and how I fix shares.",
+        "Explain Bill audit on Statements, when it runs, what a mismatch means, and how I fix shares.",
       hash: "#reports",
       open: { openAudit: true },
       openLabel: "Bill audit",
@@ -1105,7 +1105,7 @@
       actions.innerHTML =
         '<button type="button" class="mh-cta" id="mhPrimaryCta">Status brief</button>' +
         '<button type="button" class="mh-cta ghost" id="mhAskAttention">Needs attention</button>' +
-        '<button type="button" class="mh-cta ghost" id="mhAskInvoices">Invoices</button>' +
+        '<button type="button" class="mh-cta ghost" id="mhAskInvoices">Statements</button>' +
         '<button type="button" class="mh-cta ghost" id="mhAskFeeds">Feeds &amp; sync</button>';
     }
 

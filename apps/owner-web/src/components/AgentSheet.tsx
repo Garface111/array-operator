@@ -57,7 +57,7 @@ const QUICK_ACTIONS: Array<{ label: string; prompt: string }> = [
     prompt: "Repair system status and O&M roster — what's open and who do we contact?",
   },
   {
-    label: "Invoices",
+    label: "Statements",
     prompt: "Offtaker invoice pipeline status — drafted, waiting on bills, next send?",
   },
 ];

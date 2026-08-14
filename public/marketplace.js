@@ -296,7 +296,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         '</section>'+
 
         '<section class="mk-sec mk-sec-demand">'+
-          '<div class="mk-sec-head"><h3>Waitlist</h3><span class="mk-sec-sub">People who want bill credits in your territory. Draft → Invoices pipeline.</span></div>'+
+          '<div class="mk-sec-head"><h3>Waitlist</h3><span class="mk-sec-sub">People who want bill credits in your territory. Draft → Statements pipeline.</span></div>'+
           intakeForm()+
           (leads.length
             ? '<div class="mk-leads">'+leads.map(leadRow).join("")+'</div>'
@@ -306,7 +306,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         '<section class="mk-sec mk-sec-board">'+
           '<div class="mk-board">'+
             '<div class="mk-board-ic" aria-hidden="true">⚙</div>'+
-            '<div class="mk-board-copy"><b>Host confirms. Utility files.</b> Suggestions never auto-enroll. Drafting creates an offtaker in Invoices — you still submit the GNM membership change to the utility.</div>'+
+            '<div class="mk-board-copy"><b>Host confirms. Utility files.</b> Suggestions never auto-enroll. Drafting creates an offtaker in Statements — you still submit the GNM membership change to the utility.</div>'+
           '</div>'+
         '</section>'+
       '</div>';
@@ -432,7 +432,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         return;
       }
       _leads = null; _sugg = null;
-      // Land in Invoices so the operator finishes share / utility paper.
+      // Land in Statements so the operator finishes share / utility paper.
       try { location.hash = "#reports"; } catch(_){}
       loadData(document.getElementById("mkSubContent"), { keepVac: true });
     }).catch(function(err){

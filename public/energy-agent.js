@@ -389,7 +389,7 @@
  nav_tabs: [
  { label: "Fleet", hash: "#dashboard", note: "Sub-views: Triage · Table · Sandbox" },
  { label: "Analysis", hash: "#analysis", note: "Sub-views: Fleet analysis, Trends, Resources" },
- { label: "Invoices", hash: "#reports" },
+ { label: "Statements", hash: "#reports", note: "Offtaker invoices + client generation reports" },
  { label: "Marketplace", hash: "#marketplace", note: "Credit Exchange + Array Market" },
  { label: "Repairs", hash: "#ops", note: "Chat-first O&M — hunger for full repair roster; agent watches faults" },
  { label: "Account", hash: "#account" },
@@ -398,7 +398,7 @@
  surface: surface,
  product_jobs: [
  "Watch the fleet (Fleet: Triage/Table/Sandbox + Analysis)",
- "Invoice offtakers (Invoices; utility bills × share)",
+ "Invoice offtakers (Statements; utility bills × share)",
  "Complete O&M roster + heal down sites (Repairs)",
  ],
  // Extra steer when owner is on Repairs: agent must fill the contact sheet
@@ -3573,7 +3573,7 @@
  "2. **Inverters** — live canvas of every inverter; columns are sites\n" +
  "3. **Analysis** — deeper digs; *Through time* / trends live here as a sub-view. " +
  "There is no separate Trends tab.\n" +
- "4. **Invoices** — offtaker invoices, drafts, send pipeline\n" +
+ "4. **Statements** — offtaker invoices, drafts, send pipeline\n" +
  "5. **Resources** — net-metering rates and regulatory news\n" +
  "6. **Account** — company, email, plan, card, auto-refresh, files\n\n" +
  "Want me to open one and walk you through it?"
@@ -3762,7 +3762,7 @@
  addMsg("agent", tabsCheatSheet());
  try {
  enqueueSpeak(
- "Those are the tabs in the top bar: Fleet, Analysis, Invoices, Repairs, Marketplace, and Account.",
+ "Those are the tabs in the top bar: Fleet, Analysis, Statements, Repairs, Marketplace, and Account.",
  { source: "chat", force: true }
  );
  } catch (e) {}
@@ -4651,7 +4651,7 @@
  "#sandbox": "Inverters",
  "#analysis": "Analysis",
  "#trends": "Trends",
- "#reports": "Invoices",
+ "#reports": "Statements",
  "#resources": "Resources",
  "#ops": "Repairs",
  "#claims": "Repairs",
@@ -4772,7 +4772,7 @@
  "#dashboard": "Fleet",
  "#arrays": "Inverters",
  "#analysis": "Analysis",
- "#reports": "Invoices",
+ "#reports": "Statements",
  "#ops": "Repairs",
  "#claims": "Repairs",
  "#resources": "Resources",
@@ -5027,7 +5027,7 @@
  },
  {
  selector: "#aoBill",
- say: "**Your bill**, what Array Operator charges *you* for this subscription. Not the offtaker invoices on the Invoices tab.",
+ say: "**Your bill**, what Array Operator charges *you* for this subscription. Not the offtaker invoices on the Statements tab.",
  optional: true,
  },
  {
@@ -5059,11 +5059,11 @@
  return [
  {
  hash: "#reports",
- say: "Invoices, offtaker solar-credit billing. Nothing emails until you approve it.",
+ say: "Statements, offtaker solar-credit billing and client generation reports. Nothing emails until you approve it.",
  },
  {
  selector: "#tabReports",
- say: "You're on **Invoices** in the top bar. An offtaker is a customer who gets a share of your solar credits.",
+ say: "You're on **Statements** in the top bar. An offtaker is a customer who gets a share of your solar credits.",
  },
  {
  selector: "#panelReports .rb2-head, #rbSubInvoice",
@@ -5127,7 +5127,7 @@
  optional: true,
  },
  {
- say: "That's Invoices end to end, real controls only, top to bottom. Say *Bill audit* or name an offtaker if you want to go deeper.",
+ say: "That's Statements end to end, real controls only, top to bottom. Say *Bill audit* or name an offtaker if you want to go deeper.",
  },
  ];
  }
@@ -5862,7 +5862,7 @@
  description:
  "DEFAULT TOOL — call this on almost every turn. It is your smart brain for THIS " +
  "tenant: full product map, fleet tools, invoices, repairs, screen tours/navigation. " +
- "ALWAYS call for: walkthroughs, tabs (Analysis/Invoices/Inverters/etc), fleet health, " +
+ "ALWAYS call for: walkthroughs, tabs (Analysis/Statements/Inverters/etc), fleet health, " +
  "kWh/$, offtakers, repairs, how something works, what to do next, confirmations. " +
  "ONLY skip for pure social (hi/thanks/mm-hmm/are you there).",
  parameters: {
@@ -7726,7 +7726,7 @@
  } catch (e2) {}
  };
 
- // Leaving Repairs: minimize EA first (no wide→narrow morph onto Invoices).
+ // Leaving Repairs: minimize EA first (no wide→narrow morph onto Statements).
  // Owner reopens on any other tab via the top control if they want it.
  if (leaving) {
  clearEaAlignTimers();

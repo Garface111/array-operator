@@ -63,7 +63,7 @@ export function InvoicesScreen() {
   return (
     <div className="space-y-3.5">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight">Invoices</h1>
+        <h1 className="text-xl font-extrabold tracking-tight">Statements</h1>
         <p className="text-sm font-medium text-muted">
           Offtakers · send pipeline · desktop parity
         </p>
