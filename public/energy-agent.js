@@ -1372,6 +1372,7 @@
  improve.activeId = id;
  improve.since = Date.now();
  improve._toldFail = false;
+ improve._heldSlow = false;
  improve._pendingEscalateId = null;
  improve.journeyCollapsed = false;
  improve.lastSt = opts.initialStatus || "new";
@@ -1446,11 +1447,20 @@
  "Want me to **escalate this to the developer (Ford)** so it gets a human review?");
  improve._pendingEscalateId = improve.activeId;
  }
- if (improve.poll) { clearInterval(improve.poll); improve.poll = null; }
+ if (!improve._heldSlow) {
+ improve._heldSlow = true;
+ if (improve.poll) clearInterval(improve.poll);
+ improve.poll = setInterval(tickBuildStatus, 20000);
+ }
  } else {
  renderEaJourney("reviewed", { detail: d.detail });
  }
  } else {
+ if (improve._heldSlow && d.status === "building") {
+ improve._heldSlow = false;
+ if (improve.poll) clearInterval(improve.poll);
+ improve.poll = setInterval(tickBuildStatus, 4000);
+ }
  renderEaJourney(d.status, { detail: d.detail });
  }
  })
@@ -1485,7 +1495,7 @@
 
  var JOURNEY_STEPS = [
  { key: "received", label: "Received" },
- { key: "mind", label: "In mind" },
+ { key: "mind", label: "Processing" },
  { key: "building", label: "Building" },
  { key: "deploying", label: "Deploying" },
  { key: "live", label: "Live" },
