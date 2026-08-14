@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-13",
+  "updated": "2026-08-14",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -10,6 +10,15 @@
       "summary": "Post-hearing memoranda in Rhode Island Energy's base-distribution case were filed July 31, 2026, followed August 6 by Walmart's reply memo and a letter from Gov. McKee attaching Executive Order 26-05. The filing seeks a first-year increase of roughly $65.9M electric and $114.7M gas; no final PUC decision had issued as of early August, with new rates targeted for fall 2026.",
       "source": "Rhode Island PUC",
       "url": "https://ripuc.ri.gov/Docket-25-45-GE"
+    },
+    {
+      "date": "2026-08-05",
+      "state": "region",
+      "tag": "Update",
+      "title": "ISO-NE: New England solar tops 9,600 MW, with over 5,100 MW behind the meter",
+      "summary": "An updated ISO New England explainer (Aug 5, 2026) details how the grid operator tracks solar it can't directly meter. The region ended 2025 with nearly 9,600 MW of solar nameplate capacity — more than 5,100 MW of it behind-the-meter, a segment projected to reach roughly 8,000 MW within ten years. Behind-the-meter output shows up as a midday demand trough rather than as dispatchable supply.",
+      "source": "ISO Newswire (ISO New England)",
+      "url": "https://isonewswire.com/2026/08/05/explainer-how-does-iso-ne-track-production-from-behind-the-meter-and-other-solar-resources/"
     },
     {
       "date": "2026-08-03",
@@ -145,15 +154,6 @@
       "summary": "In Case 26-0291-INV the Public Utility Commission's May 29, 2026 biennial order reduces net-metering compensation for new systems and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. A complete CPG application must be filed on or before July 31, 2026 to lock in the prior rate framework.",
       "source": "VTDigger",
       "url": "https://vtdigger.org/2026/06/11/opinion-vermonts-net-metering-decision-just-made-solar-harder/"
-    },
-    {
-      "date": "2026-05-19",
-      "state": "ma",
-      "tag": "Rulemaking",
-      "title": "Massachusetts DPU approves DOER's SMART 3.0 program redesign",
-      "summary": "On May 19, 2026 the Department of Public Utilities approved DOER's redesigned SMART 3.0 program (225 CMR 28.00), replacing the declining-block model with annually adjusted incentive rates and capacity blocks. Program Year 2026 carries 600 MW-AC of capacity; the 20-year ratepayer cost estimate for 2025–2026 enrollees was revised down to roughly $4.5 billion on lower-than-expected 2025 enrollment.",
-      "source": "Solar Power World",
-      "url": "https://www.solarpowerworldonline.com/2026/06/explained-massachusetts-smart-program-changes-in-2026/"
     },
     {
       "date": "2026-05-07",

@@ -1,12 +1,12 @@
 {
-  "updated": "2026-08-13",
+  "updated": "2026-08-14",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
       "name": "Vermont",
-      "comp": "Blended residential ≈ $0.1839/kWh; Category I (≤15 kW) effective ≈ $0.1439/kWh after the Aug 1, 2026 siting charge rose 4¢ → 5¢.",
+      "comp": "Blended residential ≈ $0.2071/kWh (raised from $0.1839 by the May 29, 2026 biennial update, now in effect for permits Aug 1, 2026 onward); Category I (≤15 kW) effective ≈ $0.1571/kWh after the siting charge rose 4¢ → 5¢.",
       "how": "Rates are set by the PUC's biennial update; an array's rate locks ~10 years from its permit, then rolls to the blended rate. Small systems add +$0.01/kWh, or +$0.03/kWh if RECs go to the utility.",
-      "note": "Group / offsite (community) net metering is being phased out under H.289 — existing arrays keep running. Gov. Scott signed S.202 (Act 84) on June 16, 2026 (effective July 1) legalizing plug-in 'balcony' solar up to 1,200 W AC per meter, though it can't be combined with an existing net-metering system. Separately, Green Mountain Power filed for a 7.5% rate increase effective Oct 1, 2026 (Case 26-0096-TF), the final step of its 2023–2026 Multi-Year Regulation Plan. Gov. Scott vetoed H.710 on June 17, 2026 — a permitting/decommissioning bill that would have narrowed PUC 'single plant' determinations for adjacent small solar — drawing criticism from Renewable Energy Vermont. Note the July 31, 2026 CPG-application deadline to lock in the prior net-metering rate framework before the Aug 1 cuts.",
+      "note": "Group / offsite (community) net metering is being phased out under H.289 — existing arrays keep running. Gov. Scott signed S.202 (Act 84) on June 16, 2026 (effective July 1) legalizing plug-in 'balcony' solar up to 1,200 W AC per meter, though it can't be combined with an existing net-metering system. Separately, Green Mountain Power filed for a 7.5% rate increase effective Oct 1, 2026 (Case 26-0096-TF), the final step of its 2023–2026 Multi-Year Regulation Plan. Gov. Scott vetoed H.710 on June 17, 2026 — a permitting/decommissioning bill that would have narrowed PUC 'single plant' determinations for adjacent small solar — drawing criticism from Renewable Energy Vermont. The July 31, 2026 CPG-application deadline to lock the prior framework has now passed; systems permitted Aug 1, 2026 onward take the updated blended rate (≈ $0.2071/kWh) with the higher 5¢/kWh siting charge.",
       "utils": ["Green Mountain Power", "Vermont Electric Cooperative"],
       "reg": "PUC Case 26-0291-INV — 2026 biennial update, order May 29, 2026 (the 7th consecutive Category I cut).",
       "sources": [
