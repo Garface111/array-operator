@@ -3354,7 +3354,7 @@
  <label class="rb-gr-field">
  <span class="rb-gr-lbl">Incentive adder</span>
  <span class="rb-gr-inwrap"><span class="rb-gr-dollar">$</span>
- <input type="number" id="rbGrAdder" min="0" max="5" step="0.001" placeholder="none"
+ <input type="number" id="rbGrAdder" min="0" max="5" step="0.001" placeholder="e.g. 0.0400"
  inputmode="decimal" autocomplete="off"
  title="Optional $/kWh incentive added to the master rate, for contracts priced as tariff + adder. Blank = none.">
  <span class="rb-gr-unit">/kWh</span></span>
