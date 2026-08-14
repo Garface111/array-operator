@@ -8844,7 +8844,7 @@
  <input type="date" data-of="net_rate_adder_until" value="${esc(until)}">
  <span class="rb-rate-auto rb-rate-def">Most adders are term-limited. After this date we stop applying it instead of over-billing.</span></label>`;
  return `<label class="rep-fld rb-rate-fld"><span class="rl">Incentive adder ($/kWh)</span>
- <input type="number" data-of="net_rate_adder_per_kwh" min="0" step="0.0001" value="${add}" placeholder="none">
+ <input type="number" data-of="net_rate_adder_per_kwh" min="0" step="0.0001" value="${add}" placeholder="e.g. 0.0400">
  ${allIn}</label>
  ${(add !== "" && !isNaN(add)) ? expiry : ""}`;
  }
