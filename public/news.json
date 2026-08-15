@@ -1,7 +1,16 @@
 {
-  "updated": "2026-08-14",
+  "updated": "2026-08-15",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-08-14",
+      "state": "ct",
+      "tag": "Rate case",
+      "title": "Acadia Center granted intervenor status in Eversource's Connecticut distribution rate case",
+      "summary": "On August 14, 2026 Acadia Center was granted intervenor status in Eversource's pending PURA rate case, where the utility seeks up to an 18% bill increase. Acadia is challenging the requested 10.25% return on equity as 'unreasonable and out of step with ROEs nationwide' and is pushing for performance-based ratemaking.",
+      "source": "Acadia Center",
+      "url": "https://acadiacenter.org/acadia-center-intervenes-in-eversource-rate-case"
+    },
     {
       "date": "2026-08-06",
       "state": "ri",
@@ -118,15 +127,6 @@
       "summary": "Central Maine Power's refundable temporary distribution rates began July 1, 2026, cutting a typical residential bill about $4/month with no distribution-charge increase for roughly ten months (through April 2027) while its full one-year rate case is reviewed. The Public Advocate notes expiring storm costs alone would have lowered bills about $11/month.",
       "source": "Central Maine Power",
       "url": "https://www.cmpco.com/w/cmp-proposes-to-reduce-customer-bills-beginning-in-july"
-    },
-    {
-      "date": "2026-06-30",
-      "state": "ct",
-      "tag": "Law",
-      "title": "Eversource and UI sue Connecticut over 2025 law targeting ISO-NE transmission adder",
-      "summary": "Eversource and United Illuminating filed a federal suit in U.S. District Court (Connecticut) on June 30 against AG Tong, the Consumer Counsel, DEEP and PURA members, challenging Public Act 25-173 (SB 4), which the state used to ask FERC to remove the utilities' RTO incentive adder for ISO-NE participation. Connecticut projects roughly $4.5M/year in ratepayer savings from the FERC complaint.",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/07/02/eversource-ui-iso-new-england-lawsuit/"
     },
     {
       "date": "2026-06-25",
