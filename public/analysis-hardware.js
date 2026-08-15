@@ -207,7 +207,13 @@
  ".anhw-row.anhw-t-warn{box-shadow:inset 3px 0 0 var(--warn)}",
  ".anhw-row.anhw-t-bad{box-shadow:inset 3px 0 0 var(--bad)}",
  ".anhw-row.anhw-t-info{box-shadow:inset 3px 0 0 var(--sky)}",
- ".anhw-dev{min-width:0;line-height:1.25}",
+ ".anhw-dev{display:flex;align-items:center;gap:10px;min-width:0;line-height:1.25}",
+ ".anhw-dot{flex:0 0 auto;width:9px;height:9px;border-radius:999px;background:var(--faint)}",
+ ".anhw-dot.ok{background:var(--good)}",
+ ".anhw-dot.warn{background:var(--warn)}",
+ ".anhw-dot.bad{background:var(--bad)}",
+ ".anhw-dot.info{background:var(--sky)}",
+ ".anhw-dev-txt{min-width:0}",
  ".anhw-dname{font-size:13px;font-weight:640;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
  ".anhw-dmodel{font-size:11px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
  ".anhw-cf{font-variant-numeric:tabular-nums;text-align:right}",
@@ -291,8 +297,9 @@
 
  var rowCls = "anhw-row anhw-t-" + st.tone + (st.tone === "warn" || st.tone === "bad" ? " live-warn" : "");
  return '<div class="' + rowCls + '">' +
- '<div class="anhw-dev"><div class="anhw-dname">' + name + '</div>' +
- (model ? '<div class="anhw-dmodel">' + model + '</div>' : '') + '</div>' +
+ '<div class="anhw-dev"><span class="anhw-dot ' + st.tone + '" aria-hidden="true"></span>' +
+ '<div class="anhw-dev-txt"><div class="anhw-dname">' + name + '</div>' +
+ (model ? '<div class="anhw-dmodel">' + model + '</div>' : '') + '</div></div>' +
  cfCell + capCell +
  '<div class="anhw-end"><div class="anhw-end-top">' + pill + '</div>' + basis + commCell + '</div>' +
  '</div>';
