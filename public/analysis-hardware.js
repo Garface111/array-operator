@@ -200,19 +200,14 @@
  ".anhw-rows{display:none}",
  ".anhw-grp.open .anhw-rows{display:block}",
  ".anhw-sort{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);padding:6px 18px 6px 44px;background:var(--card2);border-top:1px solid var(--line)}",
- ".anhw-cols{display:grid;grid-template-columns:minmax(0,1.6fr) 88px minmax(0,1.5fr) minmax(140px,1.1fr);align-items:center;gap:14px;padding:4px 18px 4px 44px;font-size:10px;font-weight:720;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}",
- ".anhw-row{display:grid;grid-template-columns:minmax(0,1.6fr) 88px minmax(0,1.5fr) minmax(140px,1.1fr);align-items:center;gap:14px;padding:9px 18px 9px 44px;border-top:1px solid var(--line)}",
+ ".anhw-cols{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(0,1.5fr) 84px minmax(0,1.4fr);align-items:center;gap:14px;padding:4px 18px 4px 44px;font-size:10px;font-weight:720;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}",
+ ".anhw-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(0,1.5fr) 84px minmax(0,1.4fr);align-items:center;gap:14px;padding:9px 18px 9px 44px;border-top:1px solid var(--line)}",
  ".anhw-row:hover{background:var(--bg2)}",
  ".anhw-row.live-warn{background:rgba(217,119,6,.04)}",
  ".anhw-row.anhw-t-warn{box-shadow:inset 3px 0 0 var(--warn)}",
  ".anhw-row.anhw-t-bad{box-shadow:inset 3px 0 0 var(--bad)}",
  ".anhw-row.anhw-t-info{box-shadow:inset 3px 0 0 var(--sky)}",
  ".anhw-dev{display:flex;align-items:center;gap:10px;min-width:0;line-height:1.25}",
- ".anhw-dot{flex:0 0 auto;width:9px;height:9px;border-radius:999px;background:var(--faint)}",
- ".anhw-dot.ok{background:var(--good)}",
- ".anhw-dot.warn{background:var(--warn)}",
- ".anhw-dot.bad{background:var(--bad)}",
- ".anhw-dot.info{background:var(--sky)}",
  ".anhw-dev-txt{min-width:0}",
  ".anhw-dname{font-size:13px;font-weight:640;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
  ".anhw-dmodel{font-size:11px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -224,8 +219,7 @@
  ".anhw-cap b{color:var(--ink);font-weight:680}",
  ".anhw-cap .anhw-of{color:var(--faint);font-weight:500}",
  ".anhw-cap .anhw-live-tag{display:inline-block;font-size:9.5px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-left:4px}",
- ".anhw-end{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:0}",
- ".anhw-end-top{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}",
+ ".anhw-stat{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}",
  ".anhw-pill{flex:0 0 auto;font-size:11px;font-weight:680;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}",
  ".anhw-pill.ok{color:var(--good);background:rgba(37,99,235,.10);border-color:rgba(37,99,235,.22)}",
  ".anhw-pill.warn{color:var(--warn);background:rgba(217,119,6,.10);border-color:rgba(217,119,6,.24)}",
@@ -236,12 +230,12 @@
  ".anhw-empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:13px}",
 
  "@media (max-width:760px){",
- " .anhw-row,.anhw-cols{grid-template-columns:minmax(0,1fr) 70px;gap:8px 12px;padding-left:38px}",
+ " .anhw-row,.anhw-cols{grid-template-columns:auto minmax(0,1fr);gap:6px 12px;padding-left:38px}",
+ " .anhw-cf{grid-column:1 / -1;text-align:left}",
  " .anhw-cap{grid-column:1 / -1;padding-left:0}",
- " .anhw-end{grid-column:1 / -1;align-items:flex-start}",
- " .anhw-sort,.anhw-cols{padding-left:38px}",
+ " .anhw-sort{padding-left:38px}",
  " .anhw-gcomm{display:none}",
- " .anhw-cols .anhw-c-live,.anhw-cols .anhw-c-status{display:none}",
+ " .anhw-cols .anhw-c-cf,.anhw-cols .anhw-c-live{display:none}",
  "}"
  ].join("\n");
  document.head.appendChild(st);
@@ -297,11 +291,11 @@
 
  var rowCls = "anhw-row anhw-t-" + st.tone + (st.tone === "warn" || st.tone === "bad" ? " live-warn" : "");
  return '<div class="' + rowCls + '">' +
- '<div class="anhw-dev"><span class="anhw-dot ' + st.tone + '" aria-hidden="true"></span>' +
+ '<div class="anhw-stat">' + pill + basis + commCell + '</div>' +
+ '<div class="anhw-dev">' +
  '<div class="anhw-dev-txt"><div class="anhw-dname">' + name + '</div>' +
  (model ? '<div class="anhw-dmodel">' + model + '</div>' : '') + '</div></div>' +
  cfCell + capCell +
- '<div class="anhw-end"><div class="anhw-end-top">' + pill + '</div>' + basis + commCell + '</div>' +
  '</div>';
  }
 
@@ -337,10 +331,10 @@
  } else {
  var colsHead =
  '<div class="anhw-cols" aria-hidden="true">' +
+ '<span class="anhw-c-status">Status</span>' +
  '<span>Inverter</span>' +
- '<span style="text-align:right">' + win + 'd CF</span>' +
+ '<span class="anhw-c-cf" style="text-align:right">' + win + 'd CF</span>' +
  '<span class="anhw-c-live">Live / cap</span>' +
- '<span class="anhw-c-status" style="text-align:right">Status</span>' +
  '</div>';
  var body = withCf.map(function (x) { return rowHtml(x.inv, x.cf, ctx, col, win); }).join("");
  rows = '<div class="anhw-rows">' +
