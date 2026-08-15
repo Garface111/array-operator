@@ -1792,7 +1792,7 @@
  cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
- h += `<div class="vs-row vs-inv${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" style="--vi:${_vii}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
+ h += `<div class="vs-row vs-inv vs-inv-t-${ist.cls}${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" style="--vi:${_vii}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
  <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
  <span class="vs-c-name vs-inv-name">${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
  <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>

@@ -3112,6 +3112,14 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
+/* Status-first scan cue (Bruce pilot, suggestion #188): a left status-accent bar so a
+   flagged inverter jumps out of a long list at a glance — the SAME left-bar language the
+   Analysis › Hardware rows use (.anhw-t-*). Only attention tones get a bar; healthy/quiet
+   rows stay calm so the eye lands on what needs a look, not on noise. Inset box-shadow, so
+   it never nudges the shared 9-column grid out of alignment. */
+.vs-inv.vs-inv-t-bad{ box-shadow:inset 3px 0 0 var(--bad); }
+.vs-inv.vs-inv-t-warn{ box-shadow:inset 3px 0 0 var(--warn); }
+.vs-inv.vs-inv-t-watch{ box-shadow:inset 3px 0 0 var(--sky); }
 /* flash a row when deep-linked here from the Fleet Triage queue (focusInverter) */
 .vs-row-flash{ animation:vsRowFlash 2.1s ease-out 1; border-radius:8px; }
 @keyframes vsRowFlash{
