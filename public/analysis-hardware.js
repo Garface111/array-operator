@@ -193,6 +193,9 @@
  ".anhw-gname{font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}",
  ".anhw-vtag{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 7px}",
  ".anhw-gcount{flex:0 0 auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}",
+ ".anhw-gflag{flex:0 0 auto;font-size:11px;font-weight:720;padding:2px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent;font-variant-numeric:tabular-nums}",
+ ".anhw-gflag.warn{color:var(--warn);background:rgba(217,119,6,.10);border-color:rgba(217,119,6,.24)}",
+ ".anhw-gflag.bad{color:var(--bad);background:rgba(220,38,38,.10);border-color:rgba(220,38,38,.24)}",
  ".anhw-gspacer{flex:1 1 auto}",
  ".anhw-gcomm{flex:0 0 auto;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}",
  ".anhw-gcomm b{font-weight:600;color:var(--muted)}",
@@ -322,11 +325,24 @@
  var comm = siteComm(col);
  var vendor = col.vendor ? esc(col.vendor) : "";
 
+ // Status roll-up so a collapsed site still shows whether any inverter needs
+ // a look — scan the site list without expanding every group.
+ var flagged = 0, anyBad = false;
+ invs.forEach(function (inv) {
+ var tone = resolveStatus(inv, invs, col).tone;
+ if (tone === "bad") { flagged++; anyBad = true; }
+ else if (tone === "warn") { flagged++; }
+ });
+ var flagChip = flagged
+ ? '<span class="anhw-gflag ' + (anyBad ? "bad" : "warn") + '" title="Inverters needing a look at this site (below-peer, dark, or faulted)">' + flagged + ' flagged</span>'
+ : '';
+
  var head = '<button type="button" class="anhw-ghead" data-aid="' + esc(aid) + '" aria-expanded="' + (open ? "true" : "false") + '">' +
  CHEVRON +
  '<span class="anhw-gname">' + esc(col.array_name || ("Array " + aid)) + '</span>' +
  (vendor ? '<span class="anhw-vtag">' + vendor + '</span>' : '') +
  '<span class="anhw-gcount">' + n + (n === 1 ? ' inverter' : ' inverters') + '</span>' +
+ flagChip +
  '<span class="anhw-gspacer"></span>' +
  (comm ? '<span class="anhw-gcomm" title="When this site last synced from the vendor portal"><b>Last sync</b> ' + esc(comm) + '</span>' : '') +
  '</button>';
