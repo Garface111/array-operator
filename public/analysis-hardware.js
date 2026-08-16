@@ -219,14 +219,16 @@
  ".anhw-cap b{color:var(--ink);font-weight:680}",
  ".anhw-cap .anhw-of{color:var(--faint);font-weight:500}",
  ".anhw-cap .anhw-live-tag{display:inline-block;font-size:9.5px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-left:4px}",
- ".anhw-stat{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}",
- ".anhw-pill{flex:0 0 auto;font-size:11px;font-weight:680;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}",
+ ".anhw-stat{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}",
+ ".anhw-pill{flex:0 0 auto;font-size:11.5px;font-weight:720;padding:3px 10px;border-radius:999px;white-space:nowrap;border:1px solid transparent}",
  ".anhw-pill.ok{color:var(--good);background:rgba(37,99,235,.10);border-color:rgba(37,99,235,.22)}",
  ".anhw-pill.warn{color:var(--warn);background:rgba(217,119,6,.10);border-color:rgba(217,119,6,.24)}",
  ".anhw-pill.bad{color:var(--bad);background:rgba(220,38,38,.10);border-color:rgba(220,38,38,.24)}",
  ".anhw-pill.info{color:var(--sky);background:rgba(8,145,178,.10);border-color:rgba(8,145,178,.22)}",
+ ".anhw-submeta{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;line-height:1.2}",
+ ".anhw-mdot{flex:0 0 auto;color:var(--line);font-size:10px}",
  ".anhw-basis{font-size:10px;color:var(--faint);font-weight:600;letter-spacing:.02em}",
- ".anhw-rcomm{flex:0 0 auto;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}",
+ ".anhw-rcomm{flex:0 0 auto;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}",
  ".anhw-empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:13px}",
 
  "@media (max-width:760px){",
@@ -289,9 +291,13 @@
  ? '<span class="anhw-rcomm" title="Last reading from this inverter">Last ' + esc(comm) + '</span>'
  : '';
 
+ // Pill leads; basis + last-reading collapse into one quiet meta line beneath it.
+ var submeta = '<div class="anhw-submeta">' + basis +
+ (commCell ? '<span class="anhw-mdot" aria-hidden="true">·</span>' + commCell : '') + '</div>';
+
  var rowCls = "anhw-row anhw-t-" + st.tone + (st.tone === "warn" || st.tone === "bad" ? " live-warn" : "");
  return '<div class="' + rowCls + '">' +
- '<div class="anhw-stat">' + pill + basis + commCell + '</div>' +
+ '<div class="anhw-stat">' + pill + submeta + '</div>' +
  '<div class="anhw-dev">' +
  '<div class="anhw-dev-txt"><div class="anhw-dname">' + name + '</div>' +
  (model ? '<div class="anhw-dmodel">' + model + '</div>' : '') + '</div></div>' +
