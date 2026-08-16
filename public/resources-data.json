@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-15",
+  "updated": "2026-08-16",
   "note": "Per-state net-metering briefing + New England REC market reference for array operators. Refreshed daily by a research agent; every figure is sourced — always verify against the linked authority before relying on it. Array Operator invoices bill from the offtaker's real settled-bill rate regardless.",
   "states": {
     "vt": {
@@ -138,7 +138,7 @@
       "how": "Net metering credits your excess up to 125% of on-site use; the Renewable Energy Growth (REG) program pays a fixed rate for all production instead.",
       "note": "The 2026 legislative session (ended June 11) killed a proposed solar 'grid access fee' on systems ≥ 1 MW but set up lower virtual-net-metering compensation for large projects and lowers the net-metering program cap from 275 MW toward 175 MW by 2031. The OER and PUC are reviewing both programs; a CRNM v2 community-solar tier (40 MW cap) is expected in 2026–2027. A separate net-metering tariff docket (25-50-EL), updating RI Energy's Net Metering Provision to reflect the 2025 changes to Excess Renewable Net Metering Credit valuation, reached its Division closing memo on June 22, 2026 with a final PUC order still pending.",
       "utils": ["Rhode Island Energy"],
-      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) reached post-hearing memoranda on July 31, 2026 (seeking a first-year increase of ~$65.9M electric and ~$114.7M gas); no final PUC decision had issued as of early August, with new rates targeted for fall 2026. On July 23, 2026 Gov. McKee signed Executive Order 26-05 declaring an energy-affordability emergency and directing ~$28M of RGGI reserves toward residential bill relief (pending PUC approval); the order was filed into the rate-case docket Aug 6. Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
+      "reg": "RI PUC + Office of Energy Resources (OER). RI Energy's base distribution rate case (Docket 25-45-GE) reached post-hearing memoranda on July 31, 2026 (seeking a first-year increase of ~$65.9M electric and ~$114.7M gas); the PUC faces a Sept 1, 2026 statutory deadline to decide, with new rates targeted for fall 2026. On July 23, 2026 Gov. McKee signed Executive Order 26-05 declaring an energy-affordability emergency and directing ~$28M of RGGI reserves toward residential bill relief (pending PUC approval); the order was filed into the rate-case docket Aug 6. Executive Order 26-01 directs OER to complete a net-metering / REG review by Oct 1, 2026.",
       "sources": [
         { "l": "RI PUC", "u": "https://ripuc.ri.gov/" },
         { "l": "Office of Energy Resources", "u": "https://energy.ri.gov/renewable-energy/net-metering" }

@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-15",
+  "updated": "2026-08-16",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -15,8 +15,8 @@
       "date": "2026-08-06",
       "state": "ri",
       "tag": "Rate case",
-      "title": "RI Energy rate case (Docket 25-45-GE) in final briefing as McKee files affordability order into the record",
-      "summary": "Post-hearing memoranda in Rhode Island Energy's base-distribution case were filed July 31, 2026, followed August 6 by Walmart's reply memo and a letter from Gov. McKee attaching Executive Order 26-05. The filing seeks a first-year increase of roughly $65.9M electric and $114.7M gas; no final PUC decision had issued as of early August, with new rates targeted for fall 2026.",
+      "title": "RI Energy rate case (Docket 25-45-GE) awaits Sept 1 PUC deadline as McKee files affordability order into the record",
+      "summary": "Post-hearing memoranda in Rhode Island Energy's base-distribution case were filed July 31, 2026, followed August 6 by Walmart's reply memo and a letter from Gov. McKee attaching Executive Order 26-05. The filing seeks a first-year increase of roughly $65.9M electric and $114.7M gas; the PUC faces a Sept 1, 2026 statutory deadline to decide, with new rates targeted for fall 2026.",
       "source": "Rhode Island PUC",
       "url": "https://ripuc.ri.gov/Docket-25-45-GE"
     },
