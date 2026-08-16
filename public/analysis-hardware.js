@@ -26,6 +26,9 @@
  ok: "ok", underperforming: "warn", comm_gap: "warn", dead: "bad",
  fault: "bad", monitoring: "info"
  };
+ // Triage rank so flagged inverters float to the top of a site group
+ // (worst-first). Mirrors vendor-sheet.js _INV_STATUS_RANK on resolved tone.
+ var STATUS_RANK = { bad: 3, warn: 2, info: 1, ok: 0 };
 
  function num(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
 
@@ -313,8 +316,14 @@
  var aid = String(col.array_id);
  var invs = Array.isArray(col.inverters) ? col.inverters.slice() : [];
 
- var withCf = invs.map(function (inv) { return { inv: inv, cf: cfPct(inv, win) }; });
+ // Status-first triage: flagged inverters (dark/low/below-peer/faulted) lead the
+ // group, then capacity factor within a status band — scan the ones that need a
+ // look without reading every row.
+ var withCf = invs.map(function (inv) {
+ return { inv: inv, cf: cfPct(inv, win), rank: STATUS_RANK[resolveStatus(inv, invs, col).tone] || 0 };
+ });
  withCf.sort(function (a, b) {
+ if (a.rank !== b.rank) return b.rank - a.rank;
  if (a.cf == null && b.cf == null) return 0;
  if (a.cf == null) return 1;
  if (b.cf == null) return -1;
@@ -360,7 +369,7 @@
  '</div>';
  var body = withCf.map(function (x) { return rowHtml(x.inv, x.cf, ctx, col, win); }).join("");
  rows = '<div class="anhw-rows">' +
- '<div class="anhw-sort">Sorted by ' + win + '-day capacity factor · status = 14-day peer + live check</div>' +
+ '<div class="anhw-sort">Flagged first · then ' + win + '-day capacity factor · status = 14-day peer + live check</div>' +
  colsHead + body + '</div>';
  }
 
