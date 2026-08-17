@@ -1814,20 +1814,19 @@
  cls: "vs-inv-rowspark", w: 132, h: 28, mini: true,
  nameplate_kw: iv.nameplate_kw,
  });
- // Status-first leading dot (Bruce pilot, suggestion #197: "status-first layout,
- // easier scan"): the row's verdict tone at the exact point the eye lands — the name —
- // so a flagged inverter reads status BEFORE the eye travels to the far-right pill.
- // Pairs with the existing left status bar the way the offtaker cards pair theirs
- // (.rb-acc-dot). Only attention tones render (palette law); healthy/quiet rows stay
- // calm with no dot, so the list gains scannability without added noise.
+ // Status-first inline label (suggestion #198: "status-first layout, less visual noise,
+ // easier scan"): replaces the circular dot (suggestion #197) with the actual verdict
+ // text so the eye reads status AT the name column without travelling to the far-right
+ // pill. Gauge SVG suppressed for inverter rows — the left bar + inline label already
+ // carry tone; per-inverter animated speedometers added noise without new information.
  const _invDotTone = (ist.cls === "bad" || ist.cls === "warn" || ist.cls === "watch") ? ist.cls : "";
  const _invDot = _invDotTone
- ? `<span class="vs-inv-dot vs-inv-dot-${_invDotTone}" aria-hidden="true"${ist.label ? ` title="${esc(ist.label)}"` : ""}></span>`
+ ? `<span class="vs-inv-name-tag ${_invDotTone}" aria-hidden="true"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span>`
  : "";
  h += `<div class="vs-row vs-inv vs-inv-t-${ist.cls}${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" style="--vi:${_vii}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
  <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
  <span class="vs-c-name vs-inv-name">${_invDot}${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
- <span class="vs-c-gauge">${gauge(invFrac(iv), { idle: c.is_daylight === false, label: esc(_nm), statusCls: ist.cls, statusLabel: ist.label })}</span>
+ <span class="vs-c-gauge"></span>
  <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${_liveTip}>${_live}</span>
  <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
