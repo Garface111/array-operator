@@ -1046,6 +1046,9 @@
  _mountOutageLog(ov, iv);
  }
  let _sort = { key: "name", dir: "asc" }; // sort within each vendor group
+ // Until an operator clicks a column header, inverter rows fall back to status-first
+ // triage (see sortInvs) instead of the array/name default, so flagged units lead.
+ let _sortExplicit = false;
  // "table" is the product name (was "spreadsheet"); keep reading the old key.
  let _view = (() => {
    try {
@@ -1223,6 +1226,7 @@
  }
  function setSort(key) {
  if (!key) return;
+ _sortExplicit = true;
  if (_sort.key === key) _sort.dir = _sort.dir === "asc" ? "desc" : "asc";
  else _sort = { key, dir: key === "name" ? "asc" : "desc" }; // numbers default biggest-first
  }
@@ -1241,11 +1245,29 @@
  default: return (iv.name || iv.sn || "").toLowerCase(); // name
  }
  }
- function sortInvs(invs, isDaylight) {
- if (!_INV_SORT_KEYS[_sort.key] || (invs || []).length < 2) return invs;
+ function sortInvs(invs, isDaylight, parentCol) {
+ const list = invs || [];
+ if (list.length < 2) return invs;
+ // Default view = status-first triage (AO-SUG196 status-first inverter triage):
+ // worst status floats to the top of the array, then live output, so an operator
+ // scans the inverters that need a look without reading every row. Mirrors the
+ // flagged-first ordering analysis-hardware.js already uses. Rank on the SAME
+ // status the row's pill/stripe shows (parentCol passed through) so order and tone
+ // agree. A column-header click opts into an explicit sort and takes over.
+ if (!_sortExplicit || !_INV_SORT_KEYS[_sort.key]) {
+ return list.slice().sort((a, b) => {
+ const ra = _INV_STATUS_RANK[invStatus(a, list, isDaylight, parentCol || null).cls] || 0;
+ const rb = _INV_STATUS_RANK[invStatus(b, list, isDaylight, parentCol || null).cls] || 0;
+ if (ra !== rb) return rb - ra; // worst status first
+ const pa = a.current_power_w == null ? -1 : a.current_power_w;
+ const pb = b.current_power_w == null ? -1 : b.current_power_w;
+ if (pa !== pb) return pb - pa; // then live output, biggest first
+ return String(a.name || a.sn || "").localeCompare(String(b.name || b.sn || ""));
+ });
+ }
  const m = _sort.dir === "desc" ? -1 : 1;
- return invs.slice().sort((a, b) => {
- const va = invSortVal(a, _sort.key, invs, isDaylight), vb = invSortVal(b, _sort.key, invs, isDaylight);
+ return list.slice().sort((a, b) => {
+ const va = invSortVal(a, _sort.key, list, isDaylight), vb = invSortVal(b, _sort.key, list, isDaylight);
  if (va < vb) return -1 * m;
  if (va > vb) return 1 * m;
  return String(a.name || a.sn || "").localeCompare(String(b.name || b.sn || "")); // stable tiebreak
@@ -1755,7 +1777,7 @@
  h += `<div class="vs-inv-empty">No inverters captured for this array yet.</div>`;
  } else {
  const cohortScale = cohortSpark(invs); // shared y-scale across this array's inverters (order-independent)
- const sortedInvs = sortInvs(invs, c.is_daylight);
+ const sortedInvs = sortInvs(invs, c.is_daylight, c);
  const showAll = !!_invShowAll[c.array_id] || !!_query;
  const page = showAll ? sortedInvs : sortedInvs.slice(0, INV_PAGE);
  page.forEach((iv, _vii) => {
