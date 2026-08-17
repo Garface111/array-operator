@@ -3150,6 +3150,19 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   font-weight:600; color:var(--ink,#0f172a);
   max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+/* Status-first leading dot on flagged inverter rows (Bruce pilot, suggestion #197:
+   "status-first layout, easier scan"). Brings the row's verdict tone to the exact point
+   the eye lands — the name — so status reads BEFORE travelling to the far-right pill.
+   Same halo language as the offtaker cards' leading dot (.rb-acc-dot), and paired with
+   the existing left status bar the same way. Only attention tones render a dot (palette
+   law); healthy/quiet rows stay calm with no dot — scannability without added noise. */
+.vs-inv-dot{ width:8px; height:8px; border-radius:50%; flex:none; align-self:center; }
+.vs-inv-dot-bad{ background:var(--bad);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 20%, transparent); }
+.vs-inv-dot-warn{ background:var(--warn);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--warn) 20%, transparent); }
+.vs-inv-dot-watch{ background:var(--sky);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--sky) 20%, transparent); }
 .vs-inv-peercol{ font-variant-numeric:tabular-nums; color:var(--muted); }
 .vs-inv-nospark{ font-size:10.5px; color:var(--faint); font-style:italic; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
