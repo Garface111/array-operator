@@ -3163,6 +3163,15 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   box-shadow:0 0 0 3px color-mix(in srgb, var(--warn) 20%, transparent); }
 .vs-inv-dot-watch{ background:var(--sky);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--sky) 20%, transparent); }
+/* Inline status label in the name column (suggestion #198: status-first, less noise):
+   replaces the circular dot with the verdict text so "Warn / Fault / Watch" is readable
+   at column 2 without travelling right. Same palette as .vs-pill; smaller for inline fit. */
+.vs-inv-name-tag{ display:inline-flex; align-items:center; font-size:10px; font-weight:700;
+  letter-spacing:.04em; padding:1px 7px; border-radius:999px; line-height:1.5; flex:none;
+  text-transform:uppercase; white-space:nowrap; }
+.vs-inv-name-tag.bad{ color:#991b1b; background:rgba(220,38,38,.18); }
+.vs-inv-name-tag.warn{ color:#92400e; background:rgba(217,119,6,.22); }
+.vs-inv-name-tag.watch{ color:#0e7490; background:rgba(8,145,178,.18); }
 .vs-inv-peercol{ font-variant-numeric:tabular-nums; color:var(--muted); }
 .vs-inv-nospark{ font-size:10.5px; color:var(--faint); font-style:italic; }
 .vs-inv-empty{ padding:12px 16px 12px 42px; color:var(--faint); font-size:12.5px; }
