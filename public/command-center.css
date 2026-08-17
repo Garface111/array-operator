@@ -3112,14 +3112,23 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 .vs-inv:focus-visible{ outline:2px solid var(--good,#2563eb); outline-offset:-2px; border-radius:6px; }
 .vs-inv:first-child{ border-top:0; }
 .vs-inv:hover{ background:rgba(37,99,235,.04); }
-/* Status-first scan cue (Bruce pilot, suggestion #188): a left status-accent bar so a
-   flagged inverter jumps out of a long list at a glance — the SAME left-bar language the
+/* Status-first scan cue (Bruce pilot, suggestions #188 + #195): a left status-accent bar so
+   a flagged inverter jumps out of a long list at a glance — the SAME left-bar language the
    Analysis › Hardware rows use (.anhw-t-*). Only attention tones get a bar; healthy/quiet
    rows stay calm so the eye lands on what needs a look, not on noise. Inset box-shadow, so
-   it never nudges the shared 9-column grid out of alignment. */
-.vs-inv.vs-inv-t-bad{ box-shadow:inset 3px 0 0 var(--bad); }
-.vs-inv.vs-inv-t-warn{ box-shadow:inset 3px 0 0 var(--warn); }
+   it never nudges the shared 9-column grid out of alignment.
+   #195 ("status-first, less noise, easier scan"): pair the bar with the SAME barely-there
+   attention tint Hardware gives flagged rows (.anhw .live-warn, ~.04 alpha) so a genuine
+   fault/underperformer reads status-first even mid-scroll — no new column, no grid reflow,
+   healthy rows stay pure white. Watch (soft feed state, deliberately calmer) keeps its calm
+   cyan bar and NO tint, so only genuine warnings carry warm color (palette law). */
+.vs-inv.vs-inv-t-bad{ box-shadow:inset 3px 0 0 var(--bad); background:rgba(220,38,38,.045); }
+.vs-inv.vs-inv-t-warn{ box-shadow:inset 3px 0 0 var(--warn); background:rgba(217,119,6,.05); }
 .vs-inv.vs-inv-t-watch{ box-shadow:inset 3px 0 0 var(--sky); }
+/* Keep the flagged tint's warm cast on hover (the generic row-hover wash is bluish and would
+   otherwise wash it out) and give a touch more presence as hover feedback. */
+.vs-inv.vs-inv-t-bad:hover{ background:rgba(220,38,38,.075); }
+.vs-inv.vs-inv-t-warn:hover{ background:rgba(217,119,6,.08); }
 /* flash a row when deep-linked here from the Fleet Triage queue (focusInverter) */
 .vs-row-flash{ animation:vsRowFlash 2.1s ease-out 1; border-radius:8px; }
 @keyframes vsRowFlash{
