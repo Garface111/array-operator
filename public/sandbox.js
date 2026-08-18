@@ -2870,12 +2870,13 @@
  : "no live reading";
 
  const stat = (k,v,cls) => v ? `<div class="sb-dc-stat"><span class="sb-dc-sk">${k}</span><span class="sb-dc-sv ${cls||""}">${v}</span></div>` : "";
+ // status-first: operators triage "is it alive?" before "what's the cost?"
  const statsHTML = [
+ stat("Last seen", lastSeen, _cardKey==="producing" ? "ok" : (d.status==="comm_gap"||d.status==="dead") ? "warn" : ""),
  lossMo>=1 ? `<div class="sb-dc-stat hero" title="${riskTip()}"><span class="sb-dc-sk">$ at stake <small style="opacity:.65;font-weight:600">est.</small></span><span class="sb-dc-sv bad">${usd0(lossMo)}<small>/mo</small></span></div>` : "",
  stat("Peer index", isFinite(piNum) ? `${piNum.toFixed(2)} <small>vs neighbors</small>` : "", sCls),
  stat("Nameplate", npKw ? `${npKw} kW` : ""),
  stat("Last 14 days", isFinite(winKwh) ? `${winKwh.toLocaleString()} kWh` : ""),
- stat("Last seen", lastSeen, _cardKey==="producing" ? "ok" : (d.status==="comm_gap"||d.status==="dead") ? "warn" : ""),
  stat("Best day", isFinite(peak) ? `${peak} kWh` : ""),
  stat("Lowest day", isFinite(minD) ? `${minD} kWh` : ""),
  stat("Model", d.model || ""),
