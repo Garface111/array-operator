@@ -854,7 +854,10 @@
  : (iv.diagnosis ? `<div class="vs-dc-diag">${esc(iv.diagnosis)}</div>` : "");
  const sub = [iv.model, iv.nameplate_kw != null ? iv.nameplate_kw + " kW" : null, iv.sn ? "SN " + iv.sn : null]
  .filter(Boolean).map(esc).join(" · ");
- return `<div class="vs-dc-head"><h3>${esc(iv.name || iv.sn || "Inverter")}</h3>${sub ? `<span class="vs-dc-sub">${sub}</span>` : ""}</div>
+ // Status-first: health verdict leads so the eye lands on it before name/metadata.
+ const ist = invStatus(iv, peers, isDaylight, null);
+ return `<div class="vs-dc-status-leader"><span class="vs-pill ${esc(ist.cls)}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></div>
+ <div class="vs-dc-head"><h3>${esc(iv.name || iv.sn || "Inverter")}</h3>${sub ? `<span class="vs-dc-sub">${sub}</span>` : ""}</div>
  ${diag}
  <div class="vs-dc-stats">${_invStats(iv)}</div>
  <div class="vs-dc-chartwrap">
