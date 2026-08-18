@@ -2856,12 +2856,12 @@ body.ea-shell-open #panelReports .inv-sub-seg{
   grid-template-columns:
     minmax(118px,.72fr)   /* vendor — fits long uppercased names (SolarEdge, AlsoEnergy) */
     minmax(0,1.5fr)       /* name / array / inverter */
-    minmax(0,1.1fr)       /* status — col 3: right after name for instant scan (sug-201) */
     56px                  /* gauge (Output) */
     minmax(48px,.55fr)    /* units count / peer */
     minmax(68px,.8fr)     /* live kW */
     minmax(72px,.85fr)    /* today */
     minmax(72px,104px)    /* 14-day spark */
+    minmax(0,1.1fr)       /* status */
     minmax(0,.72fr);      /* synced / details */
   align-items:center; gap:8px; padding:10px 12px;
   box-sizing:border-box; text-align:left;
@@ -3217,9 +3217,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
 @media(max-width:760px){
   .vs-row{
     grid-template-columns:
-      minmax(72px,.55fr) minmax(0,1.4fr) minmax(0,1.05fr) 48px minmax(40px,.5fr)
+      minmax(72px,.55fr) minmax(0,1.4fr) 48px minmax(40px,.5fr)
       minmax(56px,.75fr) minmax(64px,.8fr)
-      minmax(64px,88px) minmax(0,.65fr);
+      minmax(64px,88px) minmax(0,1.05fr) minmax(0,.65fr);
     gap:6px; padding:8px 10px;
     width:100%; min-width:0;
   }
@@ -3230,9 +3230,9 @@ button.vs-vbadge:hover{ text-decoration:underline; }
   .vs-c-spark, .vs-colhead .vs-c-spark, .vs-inv-rowspark-wrap{ display:none !important; }
   .vs-row{
     grid-template-columns:
-      minmax(64px,.5fr) minmax(0,1.45fr) minmax(0,1.1fr) 44px minmax(36px,.45fr)
+      minmax(64px,.5fr) minmax(0,1.45fr) 44px minmax(36px,.45fr)
       minmax(56px,.8fr) minmax(60px,.85fr)
-      0px minmax(0,.65fr);
+      0px minmax(0,1.1fr) minmax(0,.65fr);
     gap:6px; width:100%; min-width:0;
   }
 }
@@ -3925,12 +3925,12 @@ body.ho-shell-open .vs-row{
   grid-template-columns:
     72px                  /* vendor */
     minmax(0,1fr)         /* name — takes the slack */
-    88px                  /* status — promoted col 3 (sug-201) */
     40px                  /* gauge */
     44px                  /* units */
     64px                  /* live kW */
     66px                  /* today */
     108px                 /* spark — fits the 14-day graph exactly */
+    88px                  /* status */
     94px;                 /* synced — "synced 12m" / "25d ago" never clips */
   width:100%;
   min-width:0;
@@ -4064,12 +4064,12 @@ body.ho-shell-open .vs-inv-sub{
     grid-template-columns:
       68px                  /* vendor */
       minmax(0,1fr)         /* name — takes the slack */
-      86px                  /* status — col 3 */
       0px                   /* gauge hidden */
       42px                  /* units */
       62px                  /* live kW */
       64px                  /* today */
       104px                 /* spark — kept */
+      86px                  /* status */
       92px;                 /* synced */
   }
 }
@@ -4087,12 +4087,12 @@ body.ho-shell-open .vs-inv-sub{
     grid-template-columns:
       64px                  /* vendor */
       minmax(0,1fr)         /* name — takes the slack */
-      82px                  /* status — col 3 */
       0px                   /* gauge hidden */
       0px                   /* units hidden */
       60px                  /* live kW */
       62px                  /* today */
       96px                  /* spark — kept */
+      82px                  /* status */
       90px;                 /* synced */
   }
 }

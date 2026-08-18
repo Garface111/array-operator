@@ -1200,12 +1200,12 @@
  const COLS = [
  { key: null, cls: "vs-c-vendor", label: "Vendor", tip: "Monitoring brand (grouping)" },
  { key: "name", cls: "vs-c-name", label: "Name", tip: "Array or inverter name — click to rename" },
- { key: "status", cls: "vs-c-status", label: "Status", tip: "Health: 14-day peer + live anomalies" },
  { key: null, cls: "vs-c-gauge", label: "Output", tip: "Live output as % of nameplate" },
  { key: "inv", cls: "vs-c-inv", label: "Units", tip: "Inverter count (array) · peer index (inverter)" },
  { key: "pow", cls: "vs-c-pow", label: "Live / max", tip: "Instant power now vs the rated nameplate ceiling — read it as \"producing X of Y\". (— at night or when the feed is offline; the max is hidden when no nameplate is on file.)" },
  { key: "today", cls: "vs-c-today", label: "Today", tip: "Energy produced today (kWh)" },
  { key: null, cls: "vs-c-spark", label: "14-day", tip: "Daily yield sparkline (last 14 days)" },
+ { key: "status", cls: "vs-c-status", label: "Status", tip: "Health: 14-day peer + live anomalies" },
  { key: "fresh", cls: "vs-c-fresh", label: "Synced", tip: "When we last received data" },
  ];
  function sortVal(c, key) {
@@ -1700,12 +1700,12 @@
  aria-expanded="${!vCollapsed}" title="${vCollapsed ? "Expand" : "Collapse"} every ${esc(vlabel(v))} array">
  <span class="vs-c-vendor"><span class="vs-caret vs-vcollapse-caret" aria-hidden="true">▸</span>${badge}</span>
  <span class="vs-c-name"><span class="vs-vcount">${list.length} array${list.length === 1 ? "" : "s"}</span>${lagChip ? ` ${lagChip}` : ""}</span>
- <span class="vs-c-status">${statusPillsHtml(vStatus)}</span>
  <span class="vs-c-gauge">${gauge(vendorFrac(list), { idle: !list.some(c => c.is_daylight !== false), label: vlabel(v) + " fleet", statusCls: vStatus.cls, statusLabel: vStatus.label })}</span>
  <span class="vs-c-inv">${nInv}</span>
  <span class="vs-c-pow"${vtot == null ? ` title="${esc(liveEmptyTip(_vDay))}"` : (vAlloc ? ` title="${esc(ARR_ALLOC_TIP(v))}"` : "")}>${vAlloc ? "~" : ""}${kw(vtot)}</span>
  <span class="vs-c-today"${vTodayTot == null ? ` title="${esc(todayEmptyTip(_vDay))}"` : ""}>${kwh0(vTodayTot)}</span>
  <span class="vs-c-spark">${_venSparkHtml}</span>
+ <span class="vs-c-status">${statusPillsHtml(vStatus)}</span>
  <span class="vs-c-fresh${vSync && vSync.stale ? " vs-stale-syn" : ""}" title="${vSync ? esc(vSync.title) : ""}">${vSync ? esc(vSync.text) : ""}</span>
  </div>${vnote}
  <div class="vs-vgroup-rows"${vCollapsed ? " hidden" : ""}>`;
@@ -1729,12 +1729,12 @@
  h += `<button type="button" class="vs-row vs-arr${open ? " open" : ""}${isNewArr ? " is-enter" : ""}" data-arr="${esc(String(c.array_id))}" aria-expanded="${open}">
  <span class="vs-c-vendor"><span class="vs-vchip">${esc(vlabel(v))}</span></span>
  <span class="vs-c-name"><span class="vs-caret">▸</span>${ICON_ARRAY}<span class="vs-editable vs-name-edit" data-edit-arr="${esc(String(c.array_id))}" title="Click to rename this array">${esc(c.array_name || "Array")}</span></span>
- <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
  <span class="vs-c-gauge">${gauge(arrFrac(c), { idle: c.is_daylight === false, label: esc(c.array_name || "Array"), statusCls: st.cls, statusLabel: st.label })}</span>
  <span class="vs-c-inv">${c.inverter_count != null ? c.inverter_count : "—"}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${c.current_power_w == null ? ` title="${esc(liveEmptyTip(c.is_daylight))}"` : powTitle}>${powOfMax(c.current_power_w, arrCapKw(c), { alloc: allocArr })}</span>
  ${(() => { const tp = todayProvenance(c); const _t = c.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : (tp.est ? ` title="${esc(tp.tip)}"` : ""); return `<span class="vs-c-today${tp.est ? " vs-est" : ""}"${_t}>${tp.est ? "~" : ""}${kwh0(c.produced_today_kwh)}${tp.est ? ` <span class="vs-est-tag">est.</span>` : ""}</span>`; })()}
  <span class="vs-c-spark">${_aggSpark(_arrDailies[_ci])}</span>
+ <span class="vs-c-status"><span class="vs-pill ${st.cls}"${st.tip ? ` title="${esc(st.tip)}"` : ""}>${esc(st.label)}</span></span>
  <span class="vs-c-fresh${syncStale(c) ? " vs-stale-syn" : ""}" title="${esc(freshTip(c))}">${esc(syncFreshness(c))}</span>
  </button>`;
  if (open) {
@@ -1829,12 +1829,12 @@
  h += `<div class="vs-row vs-inv vs-inv-t-${ist.cls}${ikey === _focusFlashKey ? " vs-row-flash" : ""}" data-inv-row="${esc(ikey)}" style="--vi:${_vii}" role="button" tabindex="0" aria-label="Open ${esc(_nm)} performance detail">
  <span class="vs-c-vendor vs-c-vendor-empty" aria-hidden="true"></span>
  <span class="vs-c-name vs-inv-name">${_invDot}${ICON_INVERTER}<span class="vs-inv-name-stack"><span class="vs-editable vs-name-edit" data-edit-inv="${esc(String(iv.inverter_id))}" title="Click to rename this inverter">${esc(_nm)}</span>${_sub ? `<span class="vs-inv-sub" title="${esc(_subParts.join(" · "))}">${_sub}</span>` : ""}</span></span>
- <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
  <span class="vs-c-gauge"></span>
  <span class="vs-c-inv vs-inv-peercol"${_peerTip}>${esc(_peer)}</span>
  <span class="vs-c-pow${stale ? " vs-stale" : ""}"${_liveTip}>${_live}</span>
  <span class="vs-c-today"${iv.produced_today_kwh == null ? ` title="${esc(todayEmptyTip(c.is_daylight))}"` : ""}>${_today}</span>
  <span class="vs-c-spark"><span class="vs-inv-rowspark-wrap" title="14-day daily yield (kWh per kW nameplate) vs neighbors, fair across different inverter sizes. Click for the full chart.">${_rowspark}</span></span>
+ <span class="vs-c-status"><span class="vs-pill ${ist.cls}"${ist.tip ? ` title="${esc(ist.tip)}"` : ""}>${esc(ist.label)}</span></span>
  <span class="vs-c-fresh"><button type="button" class="vs-inv-details" data-inv-detail="${esc(ikey)}" title="Open the full 14-day chart + array comparison">Details →</button></span>
  </div>`;
  });
