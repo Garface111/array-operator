@@ -2265,9 +2265,9 @@
  : st4.key === "nometer" ? "info" : obTone;
  // Cards are FIRM in place, not draggable until the owner picks "Move" from
  // the right-click menu (which sets draggable + .sb-movable). Re-locks on drop.
- // Status-first layout (Bruce #193): the four-state word leads inside the
- // plate — right under the name, ABOVE the sparkline — so a bad inverter reads
- // at a glance before the eye reaches the graph/perf. Order below is deliberate.
+ // Status-first layout (#193, #202): chip then perf then history (sparkline last).
+ // State word sits right under the name; performance follows immediately; the
+ // 14-day sparkline moves to the bottom as supporting context, not the first read.
  return `
  <div class="sb-inv ${sCls}${sleeping?' sleep':''} st-${st4.key}" tabindex="0" data-tone="${cardTone}"
  data-inv-id="${esc(inv.inverter_id)}" data-array-id="${esc(col.array_id)}" data-vendor="${esc(inv.vendor||"")}"
@@ -2288,8 +2288,8 @@
  ${np ? `<span class="sb-inv-size">${esc(np)}</span>` : ""}
  </div>
  ${stateChip}
- ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
  ${perfBlock(inv, sortedInvs, st4)}
+ ${spark || `<div class="sb-inv-nospark">no history yet</div>`}
  </div>
  </div>`;
  }).join("")
