@@ -1,24 +1,33 @@
 {
-  "updated": "2026-08-19",
+  "updated": "2026-08-20",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-08-17",
+      "state": "rec",
+      "tag": "Market",
+      "title": "Power Advisory: New England Class I RECs hold near the $40 ACP but forward prices ease into the low-to-mid $30s",
+      "summary": "An August 17, 2026 Power Advisory update reports New England Class I RECs have traded close to the $40 Alternative Compliance Payment through a sixth straight undersupplied year, but forward prices show mild erosion into the low-to-mid $30s following Connecticut's SB4 (July 2025) and the Massachusetts Senate's S.3143 (July 2026). The $40 ACP ceiling is now uniform across MA, CT and RI.",
+      "source": "Power Advisory LLC",
+      "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
+    },
+    {
+      "date": "2026-08-14",
+      "state": "ri",
+      "tag": "Rulemaking",
+      "title": "Rhode Island Energy files revised net-metering tariff (Docket 26-30-EL) cutting the remote-net-metering cap to 175 MW",
+      "summary": "On August 14, 2026 Rhode Island Energy filed a revised net-metering provision with the PUC (Docket 26-30-EL, proposed effective Sept 13, 2026) that lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) over 25 years for public, educational, hospital and nonprofit systems.",
+      "source": "UpriseRI",
+      "url": "https://upriseri.com/article/utility-seeks-new-solar-credit-rules-from-regulators/"
+    },
     {
       "date": "2026-08-14",
       "state": "ct",
       "tag": "Rate case",
       "title": "Acadia Center granted intervenor status in Eversource's Connecticut distribution rate case",
       "summary": "On August 14, 2026 Acadia Center was granted intervenor status in Eversource's pending PURA rate case, where the utility seeks up to an 18% bill increase. Acadia is challenging the requested 10.25% return on equity as 'unreasonable and out of step with ROEs nationwide' and is pushing for performance-based ratemaking.",
-      "source": "Acadia Center",
-      "url": "https://acadiacenter.org/acadia-center-intervenes-in-eversource-rate-case"
-    },
-    {
-      "date": "2026-08-06",
-      "state": "ri",
-      "tag": "Rate case",
-      "title": "RI Energy rate case (Docket 25-45-GE) awaits Sept 1 PUC deadline as McKee files affordability order into the record",
-      "summary": "Post-hearing memoranda in Rhode Island Energy's base-distribution case were filed July 31, 2026, followed August 6 by Walmart's reply memo and a letter from Gov. McKee attaching Executive Order 26-05. The filing seeks a first-year increase of roughly $65.9M electric and $114.7M gas; the PUC faces a Sept 1, 2026 statutory deadline to decide, with new rates targeted for fall 2026.",
-      "source": "Rhode Island PUC",
-      "url": "https://ripuc.ri.gov/Docket-25-45-GE"
+      "source": "CT News Junkie",
+      "url": "https://ctnewsjunkie.com/2026/08/17/clean-energy-nonprofit-files-intervenor-status-in-eversource-rate-case/"
     },
     {
       "date": "2026-08-05",
@@ -37,15 +46,6 @@
       "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). Posted caps include roughly 31 MW / $6.7M for large and 25 MW / $5.1M for medium zero-emission projects.",
       "source": "Eversource (NRES)",
       "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
-    },
-    {
-      "date": "2026-07-29",
-      "state": "ct",
-      "tag": "Rate case",
-      "title": "PURA cuts over $500M from Eversource storm-cost recovery request",
-      "summary": "PURA's July 29 final decision approved about $861 million in deferred 2018–2023 storm costs while rejecting roughly $400 million in retrospective carrying charges; after existing recovery and mutual aid, about $668 million will be securitized, an outcome the utility says saves customers an estimated $6–$7 per month versus the original ask. AG William Tong called it an important ratepayer victory.",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/07/29/pura-eversource-storm-recovery-costs/"
     },
     {
       "date": "2026-07-23",
@@ -121,21 +121,21 @@
     },
     {
       "date": "2026-07-01",
+      "state": "ma",
+      "tag": "Law",
+      "title": "Massachusetts Senate-passed S.3143 would trim net-metering credits for large non-residential solar",
+      "summary": "The Massachusetts Senate passed S.3143 ('An Act to Save People Money, Repair the Climate and Grow the Economy') on July 1, 2026; it is now in conference with the House's H.5175. The bill leaves residential and customer-sited rooftop net metering intact but reduces net-metering credit values for larger standalone non-residential facilities, targeting about $75 million in ratepayer savings over ten years — a change cited as a factor easing regional Class I REC forwards.",
+      "source": "Massachusetts Legislature",
+      "url": "https://malegislature.gov/PressRoom/Detail?pressReleaseId=1423"
+    },
+    {
+      "date": "2026-07-01",
       "state": "me",
       "tag": "Rates",
       "title": "CMP temporary distribution rates take effect July 1 (~$4/mo decrease) as rate case proceeds",
       "summary": "Central Maine Power's refundable temporary distribution rates began July 1, 2026, cutting a typical residential bill about $4/month with no distribution-charge increase for roughly ten months (through April 2027) while its full one-year rate case is reviewed. The Public Advocate notes expiring storm costs alone would have lowered bills about $11/month.",
       "source": "Central Maine Power",
       "url": "https://www.cmpco.com/w/cmp-proposes-to-reduce-customer-bills-beginning-in-july"
-    },
-    {
-      "date": "2026-06-25",
-      "state": "me",
-      "tag": "Rulemaking",
-      "title": "Maine DOER holds first public webinar on front-of-the-meter DER successor program",
-      "summary": "Maine's Department of Energy Resources held Public Webinar #1 on June 25, 2026, presenting its approach and timeline for a new front-of-the-meter distributed energy resources program to replace community-solar NEB. The proposed successor program must be submitted to the MPUC by the statutory deadline of September 30, 2026.",
-      "source": "Maine Department of Energy Resources",
-      "url": "https://www.maine.gov/energy/divisions/planning-and-policy/ftm-der"
     },
     {
       "date": "2026-06-17",
@@ -154,15 +154,6 @@
       "summary": "In Case 26-0291-INV the Public Utility Commission's May 29, 2026 biennial order reduces net-metering compensation for new systems and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. A complete CPG application must be filed on or before July 31, 2026 to lock in the prior rate framework.",
       "source": "VTDigger",
       "url": "https://vtdigger.org/2026/06/11/opinion-vermonts-net-metering-decision-just-made-solar-harder/"
-    },
-    {
-      "date": "2026-05-07",
-      "state": "rec",
-      "tag": "RECs",
-      "title": "MA Class I RECs trend toward the $40 ACP as MassCEC auctions 2025-vintage certificates",
-      "summary": "MassCEC's May 14, 2026 REC auction offered 4,629 Vintage 2025 MA Class I RECs and 67 Solar Carve-Out II RECs; Evolution Markets said Class I 2025 REC pricing has been trending toward the $40/MWh Alternative Compliance Payment in a supply-constrained market ahead of the 2025 compliance deadline.",
-      "source": "Xpansiv / Evolution Markets",
-      "url": "https://www.xpansiv.com/blogs/evolution-markets-to-auction-4629-ma-class-i-and-67-sco-ii-recs-for-massachusetts-clean-energy-center-on-may-14"
     }
   ]
 }
