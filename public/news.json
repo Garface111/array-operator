@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-20",
+  "updated": "2026-08-21",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -46,6 +46,15 @@
       "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). Posted caps include roughly 31 MW / $6.7M for large and 25 MW / $5.1M for medium zero-emission projects.",
       "source": "Eversource (NRES)",
       "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
+    },
+    {
+      "date": "2026-07-29",
+      "state": "ct",
+      "tag": "Rate case",
+      "title": "PURA approves $667.8M of Eversource storm costs for securitization, cutting the request by ~$500M",
+      "summary": "On July 29, 2026 PURA voted unanimously to let Eversource recover $667.8 million of a $1.376 billion request for 2018–2023 'catastrophic' storm costs, cutting more than $500 million and rejecting about $396.7 million in carrying charges that accrued before the agency's prudence review. The approved costs will be securitized via low-interest bonds, which Eversource estimates saves customers roughly $6–7/month versus a shorter payback.",
+      "source": "CT Mirror",
+      "url": "https://ctmirror.org/2026/07/29/pura-eversource-storm-recovery-costs/"
     },
     {
       "date": "2026-07-23",
