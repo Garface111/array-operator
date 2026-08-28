@@ -1,7 +1,16 @@
 {
-  "updated": "2026-08-22",
+  "updated": "2026-08-28",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-08-19",
+      "state": "ri",
+      "tag": "Rulemaking",
+      "title": "Rhode Island Energy files net-metering overhaul in Docket 26-30-EL cutting the remote cap to 175 MW",
+      "summary": "On August 14, 2026 Rhode Island Energy filed a revised net-metering provision (Docket 26-30-EL, proposed effective Sept 13, 2026) that lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. The filing is pending before the PUC.",
+      "source": "UpriseRI",
+      "url": "https://upriseri.com/article/utility-seeks-new-solar-credit-rules-from-regulators/"
+    },
     {
       "date": "2026-08-17",
       "state": "rec",
@@ -12,13 +21,13 @@
       "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
     },
     {
-      "date": "2026-08-14",
+      "date": "2026-08-17",
       "state": "ri",
-      "tag": "Rulemaking",
-      "title": "Rhode Island Energy files revised net-metering tariff (Docket 26-30-EL) cutting the remote-net-metering cap to 175 MW",
-      "summary": "On August 14, 2026 Rhode Island Energy filed a revised net-metering provision with the PUC (Docket 26-30-EL, proposed effective Sept 13, 2026) that lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) over 25 years for public, educational, hospital and nonprofit systems.",
-      "source": "UpriseRI",
-      "url": "https://upriseri.com/article/utility-seeks-new-solar-credit-rules-from-regulators/"
+      "tag": "RECs",
+      "title": "Rhode Island aligns its RES Alternative Compliance Payment to $40 flat, adding regional Class I supply",
+      "summary": "Rhode Island's FY2027 budget (enacted June 2026) lowered the state's Renewable Energy Standard Alternative Compliance Payment to $40/MWh flat nominal — down from roughly $87 and no longer indexed to CPI — bringing it in line with Massachusetts and Connecticut, per an Aug 17, 2026 Power Advisory analysis. The change, together with broadened existing-renewable eligibility, effectively increases regional Class I REC supply.",
+      "source": "Power Advisory LLC",
+      "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
     },
     {
       "date": "2026-08-14",
@@ -43,7 +52,7 @@
       "state": "ct",
       "tag": "Deadline",
       "title": "Eversource opens Program Year 5 NRES August solicitation for non-residential solar (up to 5 MW)",
-      "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). Posted caps include roughly 31 MW / $6.7M for large and 25 MW / $5.1M for medium zero-emission projects.",
+      "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). PURA's latest program review raised price caps to reflect federal ITC changes.",
       "source": "Eversource (NRES)",
       "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
     },
@@ -51,19 +60,19 @@
       "date": "2026-07-29",
       "state": "ct",
       "tag": "Rate case",
-      "title": "PURA approves $667.8M of Eversource storm costs for securitization, cutting the request by ~$500M",
-      "summary": "On July 29, 2026 PURA voted unanimously to let Eversource recover $667.8 million of a $1.376 billion request for 2018–2023 'catastrophic' storm costs, cutting more than $500 million and rejecting about $396.7 million in carrying charges that accrued before the agency's prudence review. The approved costs will be securitized via low-interest bonds, which Eversource estimates saves customers roughly $6–7/month versus a shorter payback.",
+      "title": "PURA cuts ~$500M from Eversource storm-cost recovery and approves securitization",
+      "summary": "On July 29, 2026 PURA unanimously approved about $861 million in deferred 2018–2023 storm costs but cut Eversource's request by more than $500 million, chiefly denying roughly $400 million in retrospective carrying charges. About $668 million will be recovered via low-interest securitization bonds, which Eversource estimates saves customers roughly $6–7/month.",
       "source": "CT Mirror",
       "url": "https://ctmirror.org/2026/07/29/pura-eversource-storm-recovery-costs/"
     },
     {
-      "date": "2026-07-23",
+      "date": "2026-07-24",
       "state": "ri",
-      "tag": "Law",
-      "title": "Gov. McKee signs Executive Order 26-05 declaring an energy-affordability emergency",
-      "summary": "Executive Order 26-05 declares an energy-affordability emergency and directs about $28 million in RGGI reserve funds toward residential ratepayer relief (proposed as bill credits in early 2027, pending PUC approval) ahead of a proposed double-digit winter rate increase. The order was filed into the RI Energy rate-case docket days later.",
-      "source": "Rhode Island Governor's Office",
-      "url": "https://governor.ri.gov/executive-orders"
+      "tag": "Rates",
+      "title": "Rhode Island Energy proposes ~15% winter electric rate increase (Docket 26-27-EL)",
+      "summary": "Rhode Island Energy filed to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the winter period Oct 1, 2026 through Mar 31, 2027 — roughly 15% higher than the prior winter — in PUC Docket 26-27-EL. The proposal requires PUC approval before taking effect.",
+      "source": "Isaksen Solar",
+      "url": "https://isaksensolar.com/rhode-island-energy-proposes-15-winter-rate-increase-for-2026/"
     },
     {
       "date": "2026-07-20",
@@ -75,15 +84,6 @@
       "url": "https://mgrid.org/2026/07/22/maine-files-its-first-competitive-energy-storage-solicitation-seeking-360-mw/"
     },
     {
-      "date": "2026-07-17",
-      "state": "ct",
-      "tag": "Rate case",
-      "title": "Eversource CT rate case: ~$451M distribution ask (~11%), ~18% all-in with storm costs",
-      "summary": "Eversource's PURA filing seeks roughly $451 million in new distribution revenue — about an 11% residential increase — which rises to a headline ~$727 million (~18%) ask once about $1 billion of 2018–2023 storm-recovery costs are layered in. New rates would take effect July 1, 2027; Attorney General William Tong called the request a 'tone-deaf insult.'",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/07/17/ct-politics-eversource-blumenthal-data-centers/"
-    },
-    {
       "date": "2026-07-14",
       "state": "rec",
       "tag": "Market",
@@ -91,15 +91,6 @@
       "summary": "Gridwealth Electric launched six new C&I supply structures for New England, including a 100% MA Class I REC bundle aimed at Boston BERDO compliance, stating MA Class I certificates 'currently trade around $38 to $42' per MWh. Competitive Energy Services corroborates the market 'trading just below $40,' with 2025 compliance met partly via Alternative Compliance Payments.",
       "source": "Gridwealth Electric",
       "url": "https://gridwealthelectric.com/2026/07/14/six-new-ways-to-buy-power-gridwealths-expanded-product-lineup-is-live/"
-    },
-    {
-      "date": "2026-07-12",
-      "state": "region",
-      "tag": "Update",
-      "title": "Rooftop solar eased New England's grid through the July heat wave",
-      "summary": "During the region's late-June–early-July heat wave, behind-the-meter solar across the six states produced roughly 3,594 MW at the hottest hours — more than the Millstone and Seabrook nuclear plants combined — and at times met about 25% of demand. The July 1 peak hit 23,729 MW, and distributed solar pushed the daily peak later into the evening.",
-      "source": "Maine Public / New England News Collaborative",
-      "url": "https://www.mainepublic.org/climate/2026-07-12/rooftop-solar-eases-new-englands-electric-demand-in-heat-wave"
     },
     {
       "date": "2026-07-10",
@@ -111,15 +102,6 @@
       "url": "https://www.cleanenergynh.org/post/all-solar-big-and-small-plug-in-solar-is-coming-to-new-hampshire"
     },
     {
-      "date": "2026-07-10",
-      "state": "nh",
-      "tag": "Law",
-      "title": "NH enacts HB 1718 creating net-metering credits for solar-charged batteries",
-      "summary": "Gov. Kelly Ayotte signed HB 1718 on July 10, 2026 (Chapter 309), directing the Department of Energy and PUC to build a framework compensating customers for electricity exported to the grid from batteries charged by renewable generators, clarifying that storage can pair with net-metered solar without affecting system-size limits.",
-      "source": "New Hampshire Public Radio",
-      "url": "https://www.nhpr.org/nh-news/2026-05-20/solar-charged-batteries-net-metering-heads-to-ayotte-nh"
-    },
-    {
       "date": "2026-07-09",
       "state": "ma",
       "tag": "Update",
@@ -129,13 +111,22 @@
       "url": "https://nuwattenergy.com/en/massachusetts/smart-program-tracker-2026"
     },
     {
+      "date": "2026-07-08",
+      "state": "nh",
+      "tag": "Law",
+      "title": "New Hampshire enacts plug-in 'balcony' solar law (SB 540), effective January 2027",
+      "summary": "Gov. Kelly Ayotte signed SB 540 (Chapter 262) on July 2, 2026, legalizing portable solar generation devices up to 1,200 watts AC per customer and exempting them from interconnection agreements, utility approval, and net-metering rules; the law takes effect Jan 1, 2027. It places NH alongside Maine, Vermont and Connecticut among New England states regulating the technology.",
+      "source": "New Hampshire Bulletin",
+      "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
+    },
+    {
       "date": "2026-07-01",
       "state": "ma",
       "tag": "Law",
-      "title": "Massachusetts Senate-passed S.3143 would trim net-metering credits for large non-residential solar",
-      "summary": "The Massachusetts Senate passed S.3143 ('An Act to Save People Money, Repair the Climate and Grow the Economy') on July 1, 2026; it is now in conference with the House's H.5175. The bill leaves residential and customer-sited rooftop net metering intact but reduces net-metering credit values for larger standalone non-residential facilities, targeting about $75 million in ratepayer savings over ten years — a change cited as a factor easing regional Class I REC forwards.",
-      "source": "Massachusetts Legislature",
-      "url": "https://malegislature.gov/PressRoom/Detail?pressReleaseId=1423"
+      "title": "Massachusetts energy bill S.3143 heads to conference; no final bill signed as of late August",
+      "summary": "The Massachusetts Senate passed omnibus energy bill S.3143 on July 1, 2026, sending it to a conference committee led by Sen. Mike Barrett to reconcile with the House-passed H.5175. The bill leaves residential and customer-sited rooftop net metering intact but would trim net-metering credit values for larger standalone non-residential facilities; key disputes (including a proposed $1B Mass Save cut) remained unresolved and no final bill had been signed as of late August 2026.",
+      "source": "CommonWealth Beacon",
+      "url": "https://commonwealthbeacon.org/energy/senate-energy-chair-signals-departure-from-house-on-1b-cut-to-mass-save/"
     },
     {
       "date": "2026-07-01",
@@ -160,7 +151,7 @@
       "state": "vt",
       "tag": "Rulemaking",
       "title": "Vermont PUC's 2026 net-metering order cuts solar compensation for a 7th straight year",
-      "summary": "In Case 26-0291-INV the Public Utility Commission's May 29, 2026 biennial order reduces net-metering compensation for new systems and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. A complete CPG application must be filed on or before July 31, 2026 to lock in the prior rate framework.",
+      "summary": "In Case 26-0291-INV the Public Utility Commission's May 29, 2026 biennial order reduces net-metering compensation for new systems and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. Renewable Energy Vermont estimates the change cuts lifetime compensation for a typical 7 kW system by roughly $4,292, hitting community and off-site net-metering customers hardest.",
       "source": "VTDigger",
       "url": "https://vtdigger.org/2026/06/11/opinion-vermonts-net-metering-decision-just-made-solar-harder/"
     }
