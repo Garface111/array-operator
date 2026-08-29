@@ -1,7 +1,16 @@
 {
-  "updated": "2026-08-28",
+  "updated": "2026-08-29",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-08-21",
+      "state": "ri",
+      "tag": "Rate case",
+      "title": "Rhode Island PUC approves a modified RI Energy distribution rate hike and holds ROE at 9.275% (Docket 25-45-GE)",
+      "summary": "On August 21, 2026 the Rhode Island PUC approved a modified base distribution increase of $44.1 million electric and $93.7 million gas — well below Rhode Island Energy's request — with new rates effective September 1, 2026. The Commission denied the utility's bid to raise its return on equity from 9.275% to 10.75% and, siding with the Attorney General, secured roughly $170 million in accelerated bill credits for ratepayers from October 2026 through September 2027.",
+      "source": "Providence Business News",
+      "url": "https://pbn.com/puc-decision-secures-170m-in-benefits-for-r-i-ratepayers/"
+    },
     {
       "date": "2026-08-19",
       "state": "ri",
@@ -64,15 +73,6 @@
       "summary": "On July 29, 2026 PURA unanimously approved about $861 million in deferred 2018–2023 storm costs but cut Eversource's request by more than $500 million, chiefly denying roughly $400 million in retrospective carrying charges. About $668 million will be recovered via low-interest securitization bonds, which Eversource estimates saves customers roughly $6–7/month.",
       "source": "CT Mirror",
       "url": "https://ctmirror.org/2026/07/29/pura-eversource-storm-recovery-costs/"
-    },
-    {
-      "date": "2026-07-24",
-      "state": "ri",
-      "tag": "Rates",
-      "title": "Rhode Island Energy proposes ~15% winter electric rate increase (Docket 26-27-EL)",
-      "summary": "Rhode Island Energy filed to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the winter period Oct 1, 2026 through Mar 31, 2027 — roughly 15% higher than the prior winter — in PUC Docket 26-27-EL. The proposal requires PUC approval before taking effect.",
-      "source": "Isaksen Solar",
-      "url": "https://isaksensolar.com/rhode-island-energy-proposes-15-winter-rate-increase-for-2026/"
     },
     {
       "date": "2026-07-20",
