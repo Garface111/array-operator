@@ -1,7 +1,16 @@
 {
-  "updated": "2026-08-31",
+  "updated": "2026-09-01",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-09-01",
+      "state": "ri",
+      "tag": "Rates",
+      "title": "Rhode Island Energy's new base distribution rates take effect September 1 (Docket 25-45-GE compliance)",
+      "summary": "Rhode Island Energy made its compliance filing on August 27, 2026 and the RI PUC-approved base distribution increase took effect September 1, 2026. A typical residential electric bill rises about $7.78/month (≈4.83%) in the first year, while roughly $170 million in accelerated bill credits flow to customers from October 2026 through September 2027 under a hold-harmless structure.",
+      "source": "Rhode Island Current",
+      "url": "https://rhodeislandcurrent.com/2026/08/31/buckle-up-the-energy-bill-roller-coaster-is-about-to-begin/"
+    },
     {
       "date": "2026-08-21",
       "state": "ri",
