@@ -1,7 +1,34 @@
 {
-  "updated": "2026-09-03",
+  "updated": "2026-09-10",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-09-08",
+      "state": "vt",
+      "tag": "Rate case",
+      "title": "Vermont PUC finalizes a 5.5% Green Mountain Power rate increase (Case 26-0096-TF), below the 7.5% requested",
+      "summary": "The Vermont Public Utility Commission's Aug 28, 2026 order approved a 5.5% distribution rate increase for Green Mountain Power's 275,000+ customers — below the 7.5% the utility sought (Case 26-0096-TF) — effective Oct 1, 2026. Regulators approved about $113 million of 'resilience' infrastructure spending, roughly a third of GMP's $341 million request, citing affordability as central to the analysis.",
+      "source": "VTDigger",
+      "url": "https://vtdigger.org/2026/09/08/vermont-regulators-finalize-5-5-percent-rate-increase-for-green-mountain-power-customers/"
+    },
+    {
+      "date": "2026-09-08",
+      "state": "me",
+      "tag": "Rulemaking",
+      "title": "Maine DOER proposes a Front-of-the-Meter DER program for renewables cut out of Net Energy Billing",
+      "summary": "Maine's Department of Energy Resources published a draft Front-of-the-Meter Distributed Energy Resources (FTM DER) program proposal in late August 2026 — a successor pathway for larger renewable projects excluded from Net Energy Billing under LD 1777. DOER held a Sept 2 webinar, took written comments through Sept 11, and must submit a program design to the MPUC by Sept 30, 2026; the program would let projects contract with utilities and feed the standard offer.",
+      "source": "Maine Morning Star",
+      "url": "https://mainemorningstar.com/2026/09/08/energy-department-proposes-new-plan-to-encourage-renewable-projects-cut-out-of-net-energy-billing/"
+    },
+    {
+      "date": "2026-09-08",
+      "state": "ma",
+      "tag": "Law",
+      "title": "Gov. Healey signs data-center executive order shielding ratepayers as omnibus energy bill stays in conference",
+      "summary": "Governor Maura Healey signed an executive order on Sept 8, 2026 requiring new data centers to meet their power demand with clean energy, obtain local approval, and cover their own grid costs to protect ratepayers. Advocates urged it as a model for the stalled energy-affordability bill (S.3143 / H.5175), which remained in conference committee; that bill would leave residential rooftop net metering intact while trimming credits for large non-residential facilities.",
+      "source": "Union of Concerned Scientists",
+      "url": "https://www.ucs.org/about/news/gov-healey-data-center-executive-order-can-strengthen-energy-affordability-bill"
+    },
     {
       "date": "2026-09-01",
       "state": "ri",
@@ -10,15 +37,6 @@
       "summary": "Rhode Island Energy made its compliance filing on August 27, 2026 and the RI PUC-approved base distribution increase took effect September 1, 2026. A typical residential electric bill rises about $7.78/month (≈4.83%) in the first year, while roughly $170 million in accelerated bill credits flow to customers from October 2026 through September 2027 under a hold-harmless structure.",
       "source": "Rhode Island Current",
       "url": "https://rhodeislandcurrent.com/2026/08/31/buckle-up-the-energy-bill-roller-coaster-is-about-to-begin/"
-    },
-    {
-      "date": "2026-08-21",
-      "state": "ri",
-      "tag": "Rate case",
-      "title": "Rhode Island PUC approves a modified RI Energy distribution rate hike and holds ROE at 9.275% (Docket 25-45-GE)",
-      "summary": "On August 21, 2026 the Rhode Island PUC approved a modified base distribution increase of $44.1 million electric and $93.7 million gas — well below Rhode Island Energy's request — with new rates effective September 1, 2026. The Commission denied the utility's bid to raise its return on equity from 9.275% to 10.75% and, siding with the Attorney General, secured roughly $170 million in accelerated bill credits for ratepayers from October 2026 through September 2027.",
-      "source": "Providence Business News",
-      "url": "https://pbn.com/puc-decision-secures-170m-in-benefits-for-r-i-ratepayers/"
     },
     {
       "date": "2026-08-19",
@@ -33,8 +51,8 @@
       "date": "2026-08-17",
       "state": "rec",
       "tag": "Market",
-      "title": "Power Advisory: New England Class I RECs hold near the $40 ACP but forward prices ease into the low-to-mid $30s",
-      "summary": "An August 17, 2026 Power Advisory update reports New England Class I RECs have traded close to the $40 Alternative Compliance Payment through a sixth straight undersupplied year, but forward prices show mild erosion into the low-to-mid $30s following Connecticut's SB4 (July 2025) and the Massachusetts Senate's S.3143 (July 2026). The $40 ACP ceiling is now uniform across MA, CT and RI.",
+      "title": "Power Advisory: New England Class I RECs hold near the $40 ACP into a sixth undersupplied year",
+      "summary": "An August 2026 Power Advisory update reports New England Class I RECs have traded close to the $40 Alternative Compliance Payment through a sixth straight undersupplied year, with forwards (Marex Spectron, as of Aug 13, 2026) still near the cap. Rhode Island has aligned its RES ACP to $40 flat, making the ceiling uniform across MA, CT and RI; separately, NECEC Quebec hydro (delivering since January 2026) is expected to cover nearly all of the Massachusetts Clean Energy Standard requirement in CY2026.",
       "source": "Power Advisory LLC",
       "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
     },
@@ -75,15 +93,6 @@
       "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
     },
     {
-      "date": "2026-07-29",
-      "state": "ct",
-      "tag": "Rate case",
-      "title": "PURA cuts ~$500M from Eversource storm-cost recovery and approves securitization",
-      "summary": "On July 29, 2026 PURA unanimously approved about $861 million in deferred 2018–2023 storm costs but cut Eversource's request by more than $500 million, chiefly denying roughly $400 million in retrospective carrying charges. About $668 million will be recovered via low-interest securitization bonds, which Eversource estimates saves customers roughly $6–7/month.",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/07/29/pura-eversource-storm-recovery-costs/"
-    },
-    {
       "date": "2026-07-20",
       "state": "me",
       "tag": "Rulemaking",
@@ -115,7 +124,7 @@
       "state": "ma",
       "tag": "Update",
       "title": "SMART 3.0 applications flow but Final Qualifications await DPU tariff approval (Docket 25-175)",
-      "summary": "As of July 9, 2026, DOER continues accepting SMART 3.0 applications and issuing Preliminary Statements of Qualification but will not issue Final Statements — or start incentive payments — until the model tariff clears DPU Docket 25-175; roughly 191.9 MW had been submitted against the 600 MW PY2026 cap.",
+      "summary": "As of July 2026, DOER continues accepting SMART 3.0 applications and issuing Preliminary Statements of Qualification but will not issue Final Statements — or start incentive payments — until the model tariff clears DPU Docket 25-175. The DPU approved the model tariffs without modification on May 19, 2026, but deferred outstanding issues to a Phase II of the proceeding; roughly 191.9 MW had been submitted against the 600 MW PY2026 cap.",
       "source": "NuWatt Energy (SMART Program Tracker 2026)",
       "url": "https://nuwattenergy.com/en/massachusetts/smart-program-tracker-2026"
     },
@@ -127,33 +136,6 @@
       "summary": "Gov. Kelly Ayotte signed SB 540 (Chapter 262) on July 2, 2026, legalizing portable solar generation devices up to 1,200 watts AC per customer and exempting them from interconnection agreements, utility approval, and net-metering rules; the law takes effect Jan 1, 2027. It places NH alongside Maine, Vermont and Connecticut among New England states regulating the technology.",
       "source": "New Hampshire Bulletin",
       "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
-    },
-    {
-      "date": "2026-07-01",
-      "state": "ma",
-      "tag": "Law",
-      "title": "Massachusetts energy bill S.3143 heads to conference; no final bill signed as of late August",
-      "summary": "The Massachusetts Senate passed omnibus energy bill S.3143 on July 1, 2026, sending it to a conference committee led by Sen. Mike Barrett to reconcile with the House-passed H.5175. The bill leaves residential and customer-sited rooftop net metering intact but would trim net-metering credit values for larger standalone non-residential facilities; key disputes (including a proposed $1B Mass Save cut) remained unresolved and no final bill had been signed as of late August 2026.",
-      "source": "CommonWealth Beacon",
-      "url": "https://commonwealthbeacon.org/energy/senate-energy-chair-signals-departure-from-house-on-1b-cut-to-mass-save/"
-    },
-    {
-      "date": "2026-07-01",
-      "state": "me",
-      "tag": "Rates",
-      "title": "CMP temporary distribution rates take effect July 1 (~$4/mo decrease) as rate case proceeds",
-      "summary": "Central Maine Power's refundable temporary distribution rates began July 1, 2026, cutting a typical residential bill about $4/month with no distribution-charge increase for roughly ten months (through April 2027) while its full one-year rate case is reviewed. The Public Advocate notes expiring storm costs alone would have lowered bills about $11/month.",
-      "source": "Central Maine Power",
-      "url": "https://www.cmpco.com/w/cmp-proposes-to-reduce-customer-bills-beginning-in-july"
-    },
-    {
-      "date": "2026-06-17",
-      "state": "vt",
-      "tag": "Law",
-      "title": "Vermont Gov. Scott vetoes H.710 renewable-energy permitting bill",
-      "summary": "Governor Phil Scott vetoed H.710 on June 17, 2026, a bill that would have narrowed PUC 'single plant' determinations for adjacent small solar and started a new solar-decommissioning funding framework; Scott said it went 'too far' on wind expansion and community input. Renewable Energy Vermont criticized the veto, saying the bill simply cut redundant permitting requirements for adjacent small solar.",
-      "source": "Vermont Business Magazine",
-      "url": "https://vermontbiz.com/news/2026/june/18/scott-vetoes-renewable-energy-bill-h710-and-mental-health-literacy-bill-h817"
     },
     {
       "date": "2026-06-11",
