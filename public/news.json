@@ -1,7 +1,16 @@
 {
-  "updated": "2026-09-10",
+  "updated": "2026-09-17",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-09-17",
+      "state": "ct",
+      "tag": "Rates",
+      "title": "Connecticut standard-service rates keep falling as public-benefits bill credit runs through April 2027",
+      "summary": "A Sept 17, 2026 CT Mirror report notes electricity prices are falling heading into the election: Eversource standard-service supply dropped to 11.577¢/kWh on July 1, 2026 and a public-benefits bill credit of roughly $30–34/month runs through April 2027, driven largely by long-term Millstone and Seabrook nuclear contracts. Eversource's pending PURA distribution rate case still seeks a double-digit increase for July 2027.",
+      "source": "CT Mirror",
+      "url": "https://ctmirror.org/2026/09/17/cts-electricity-prices-are-falling/"
+    },
     {
       "date": "2026-09-08",
       "state": "vt",
@@ -84,13 +93,13 @@
       "url": "https://isonewswire.com/2026/08/05/explainer-how-does-iso-ne-track-production-from-behind-the-meter-and-other-solar-resources/"
     },
     {
-      "date": "2026-08-03",
-      "state": "ct",
-      "tag": "Deadline",
-      "title": "Eversource opens Program Year 5 NRES August solicitation for non-residential solar (up to 5 MW)",
-      "summary": "Connecticut's Non-Residential Renewable Energy Solutions (NRES) August window opened Aug 3, 2026 at 1 p.m. and runs through 1 p.m. Sept 14, 2026, taking competitive bids for zero-emission projects from 200 kW up to 5,000 kW-AC (with first-come tranches for systems ≤200 kW and school solar). PURA's latest program review raised price caps to reflect federal ITC changes.",
-      "source": "Eversource (NRES)",
-      "url": "https://www.eversource.com/business/save-money-energy/clean-energy-options/connecticut-non-residential-renewable-energy-solutions"
+      "date": "2026-07-24",
+      "state": "ri",
+      "tag": "Rates",
+      "title": "Rhode Island Energy asks PUC to raise winter Last Resort Service to 17.029¢/kWh (Docket 26-27-EL)",
+      "summary": "On July 22–24, 2026 Rhode Island Energy filed to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the Oct 1, 2026–Mar 31, 2027 winter period — about 15% above last winter's 14.77¢/kWh, roughly $12/month more for a typical 500 kWh home. The rate remained subject to final PUC approval as of mid-September 2026, with the interim page still showing 11.092¢/kWh through September.",
+      "source": "UpriseRI",
+      "url": "https://upriseri.com/article/ri-energy-seeks-winter-rate-hike-wont-say-how-much/"
     },
     {
       "date": "2026-07-20",
@@ -124,7 +133,7 @@
       "state": "ma",
       "tag": "Update",
       "title": "SMART 3.0 applications flow but Final Qualifications await DPU tariff approval (Docket 25-175)",
-      "summary": "As of July 2026, DOER continues accepting SMART 3.0 applications and issuing Preliminary Statements of Qualification but will not issue Final Statements — or start incentive payments — until the model tariff clears DPU Docket 25-175. The DPU approved the model tariffs without modification on May 19, 2026, but deferred outstanding issues to a Phase II of the proceeding; roughly 191.9 MW had been submitted against the 600 MW PY2026 cap.",
+      "summary": "As of mid-September 2026, DOER continues accepting SMART 3.0 applications and issuing Preliminary Statements of Qualification but will not issue Final Statements — or start incentive payments — until the model tariff clears DPU Docket 25-175. The DPU approved the model tariffs without modification on May 19, 2026 but deferred outstanding issues to a Phase II; the 20-year SMART term begins only after tariff approval and a project's Final Statement of Qualification.",
       "source": "NuWatt Energy (SMART Program Tracker 2026)",
       "url": "https://nuwattenergy.com/en/massachusetts/smart-program-tracker-2026"
     },
