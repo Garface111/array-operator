@@ -1501,6 +1501,7 @@
  Promise.all([
  loadArchive().catch(() => null),
  loadBillArchive().catch(() => null),
+ loadMonthly().catch(() => null),
  ]).then(() => renderArchive()).catch(() => {});
  }
  }
@@ -1924,17 +1925,23 @@
  let _billArchivePromise = null;
  let _archiveOpen = false; // remember the panel's open/closed state across refreshes
  let _billArchiveOpen = false;
+ let _monthlyOpen = false;
+ let MONTHLY = null;            // /monthly-report/manifest (cached)
+ let _monthlyFailed = false;
+ let _monthlyPromise = null;
 
  // Keep the rail entry rows + the left-column panel visibility honest against
  // the open states (closing both via the panels' own summaries re-hides the
  // panel; the rail rows' pressed state always mirrors reality).
  function _syncArchiveEntryPoints() {
  const host = $("#rbArchiveHost");
- if (host && host.innerHTML) host.hidden = !(_archiveOpen || _billArchiveOpen);
+ if (host && host.innerHTML) host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen);
  const a = document.getElementById("rb2RailArch");
  if (a) a.setAttribute("aria-pressed", String(!!_archiveOpen));
  const b = document.getElementById("rb2RailBillArch");
  if (b) b.setAttribute("aria-pressed", String(!!_billArchiveOpen));
+ const m = document.getElementById("rb2RailMonthly");
+ if (m) m.setAttribute("aria-pressed", String(!!_monthlyOpen));
  }
 
  // Opening an archive folds the whole offtaker tree first (Ford 2026-07-28:
@@ -1958,6 +1965,25 @@
  // manifest failed to load earlier (the endpoint used to 504 on big fleets),
  // opening retries the fetch instead of silently doing nothing.
  function toggleArchivePanel(which) {
+ if (which === "monthly" && !MONTHLY) {
+ const meta = document.getElementById("rb2RailMonthlyMeta");
+ if (meta) meta.textContent = "loading…";
+ _monthlyOpen = true;
+ loadMonthly().then(() => {
+ if (!MONTHLY) _monthlyOpen = false;   // failed — don't claim an open panel
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (MONTHLY) { _foldListForArchive(); _scrollToArchive(); }
+ });
+ return;
+ }
+ if (which === "monthly") {
+ _monthlyOpen = !_monthlyOpen;
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (_monthlyOpen) { _foldListForArchive(); _scrollToArchive(); }
+ return;
+ }
  if (which === "bills" && !BILL_ARCHIVE) {
  const meta = document.getElementById("rb2RailBillArchMeta");
  if (meta) meta.textContent = "loading…";
@@ -2014,6 +2040,23 @@
  .then(v => { _billArchivePromise = null; return v; });
  return _billArchivePromise;
  }
+ // Monthly offtaker summary manifest: past sheets + when the next is due.
+ function loadMonthly(force) {
+ if (MONTHLY && !force) return Promise.resolve(MONTHLY);
+ if (_monthlyPromise) return _monthlyPromise;
+ if (!authHeaders()) return Promise.resolve(null);
+ _monthlyPromise = fetch(API + "/monthly-report/manifest", { headers: authHeaders() })
+ .then(r => (r.ok ? r.json() : null))
+ .then(d => {
+ if (d && d.ok) { MONTHLY = d; _monthlyFailed = false; }
+ else _monthlyFailed = true;
+ return MONTHLY;
+ })
+ .catch(() => { _monthlyFailed = true; return null; })
+ .then(v => { _monthlyPromise = null; return v; });
+ return _monthlyPromise;
+ }
+
  function fmtBytes(n) {
  n = Number(n) || 0;
  if (n < 1024) return n + " B";
@@ -2044,10 +2087,10 @@
  const total = (ARCHIVE && ARCHIVE.month_count) || 0;
  const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
  const billCount = (BILL_ARCHIVE && BILL_ARCHIVE.count) || bills.length || 0;
- if (!ARCHIVE && !BILL_ARCHIVE) { host.hidden = true; host.innerHTML = ""; return; }
+ if (!ARCHIVE && !BILL_ARCHIVE && !MONTHLY) { host.hidden = true; host.innerHTML = ""; return; }
  // The archives' ENTRY POINTS live in the rail (Ford 2026-07-28); the panel
  // itself only occupies the list column while one of them is open.
- host.hidden = !(_archiveOpen || _billArchiveOpen);
+ host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen);
  const railArch = document.getElementById("rb2RailArch");
  if (railArch) {
  railArch.hidden = !ARCHIVE;
@@ -2065,6 +2108,21 @@
  if (meta) meta.textContent = BILL_ARCHIVE
  ? (billCount ? `${fmt0(billCount)} bills` : "empty")
  : "couldn't load · retry";
+ }
+ const railMonthly = document.getElementById("rb2RailMonthly");
+ if (railMonthly) {
+ railMonthly.hidden = !MONTHLY && !_monthlyFailed;
+ railMonthly.setAttribute("aria-pressed", String(!!_monthlyOpen));
+ const meta = document.getElementById("rb2RailMonthlyMeta");
+ if (meta) {
+ const reps = (MONTHLY && MONTHLY.reports) || [];
+ const nx = (MONTHLY && MONTHLY.next) || null;
+ meta.textContent = !MONTHLY
+ ? "couldn't load · retry"
+ : (nx && !nx.already_sent && nx.due_at)
+ ? ("next " + shortDate(nx.due_at))
+ : (reps.length ? `${fmt0(reps.length)} sent` : "none yet");
+ }
  }
 
  // ── Invoice archive ────────────────────────────────────────────────────
@@ -2232,8 +2290,9 @@
  </div></details>`;
  }
 
- host.innerHTML = invHtml + billHtml;
+ host.innerHTML = invHtml + billHtml + renderMonthlyPanel();
  wireArchiveToggle();
+ wireMonthlyPanel(host);
  // Per-month .zip download (authenticated blob download, same helper as the CSV export).
  host.querySelectorAll("[data-arch-zip]").forEach(btn => {
  btn.onclick = () => downloadArchiveMonth(btn.getAttribute("data-arch-zip"), btn, host);
@@ -2246,6 +2305,181 @@
  );
  });
  }
+ // ── Monthly offtaker summary ───────────────────────────────────────────
+ // Deliberately the same <details class="rb-arch"> shell as the two archives
+ // beside it: one rail row, one panel in the list column, one visual language.
+ function renderMonthlyPanel() {
+ if (!MONTHLY) {
+ if (!_monthlyFailed) return "";
+ return `<details class="rb-arch rb-monthly"${_monthlyOpen ? " open" : ""} id="rbMonthly">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Monthly summary</span>
+ <span class="rb-arch-sub">couldn’t load</span></summary>
+ <div class="rb-arch-body"><p class="rb-arch-empty">Couldn’t load the monthly summaries. Click the rail row to retry.</p></div></details>`;
+ }
+ const reps = MONTHLY.reports || [];
+ const st = MONTHLY.settings || {};
+ const nx = MONTHLY.next || null;
+ const lag = Number(st.lag_days != null ? st.lag_days : 15);
+
+ // The schedule sentence — says what will happen, in words, before any control.
+ let when;
+ if (!st.enabled) {
+ when = "Automatic sending is off.";
+ } else if (nx && nx.already_sent) {
+ when = `The ${esc(nx.period_key)} summary has been sent. The next one goes out ${lag} days after that period’s last invoice.`;
+ } else if (nx && nx.due_at) {
+ const due = new Date(nx.due_at);
+ const overdue = due <= new Date();
+ when = overdue
+ ? `The ${esc(nx.period_key)} summary is due now — it goes out on the next scheduled pass.`
+ : `The ${esc(nx.period_key)} summary goes out ${esc(longDate(nx.due_at))} — ${lag} days after that period’s last invoice.`;
+ } else {
+ when = `No invoices have gone out yet. The first summary follows ${lag} days after a period’s last invoice.`;
+ }
+
+ const rowsHtml = reps.length ? reps.map(r => {
+ const bits = [];
+ if (r.offtaker_count != null) bits.push(`${fmt0(r.offtaker_count)} offtaker${r.offtaker_count === 1 ? "" : "s"}`);
+ if (r.total_billed_usd != null) bits.push("$" + Number(r.total_billed_usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " billed");
+ if (r.paid_count != null) bits.push(`${fmt0(r.paid_count)} paid`);
+ const state = r.sent_at
+ ? `sent ${esc(shortDate(r.sent_at))}` + (r.trigger === "manual" ? " · manual" : "")
+ : (r.error ? `<span class="rb-mo-err">${esc(r.error)}</span>` : "not sent");
+ return `<div class="rb-mo-row">
+ <div class="rb-mo-main">
+ <span class="rb-mo-period">${esc(monthLabel(r.period_key) || r.period_key)}</span>
+ <span class="rb-mo-sub">${state}${bits.length ? " · " + esc(bits.join(" · ")) : ""}</span>
+ </div>
+ <button class="ao-btn rb-btn rb-mo-dl" type="button" data-monthly-dl="${r.id}" data-monthly-name="${esc(r.filename || ("offtaker-summary-" + r.period_key + ".xlsx"))}">Download</button>
+ <span class="rb-bill-dl-stat" data-monthly-stat="${r.id}"></span>
+ </div>`;
+ }).join("") : `<p class="rb-arch-empty">No summaries sent yet. One is generated automatically after a billing period’s invoices have all gone out.</p>`;
+
+ const sendLabel = (nx && !nx.already_sent && nx.period_key)
+ ? `Send ${esc(nx.period_key)} now` : "Send now";
+ const canSend = !!(nx && !nx.already_sent && nx.period_key);
+
+ return `<details class="rb-arch rb-monthly"${_monthlyOpen ? " open" : ""} id="rbMonthly">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Monthly summary</span>
+ <span class="rb-arch-sub">every offtaker · generated, billed, paid${reps.length ? " · " + reps.length + " sent" : ""}</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-mo-when">${when}</p>
+ <div class="rb-mo-ctl">
+ <label class="rb-mo-f"><span>Send to</span>
+ <input type="email" id="rbMoTo" value="${esc(st.recipient || "")}" placeholder="you@example.com"></label>
+ <label class="rb-mo-f rb-mo-f-sm"><span>Days after last invoice</span>
+ <input type="number" id="rbMoLag" min="0" max="90" step="1" value="${lag}"></label>
+ <label class="rb-mo-chk"><input type="checkbox" id="rbMoOn"${st.enabled ? " checked" : ""}><span>Send automatically</span></label>
+ <button class="ao-btn rb-btn" id="rbMoSave" type="button">Save</button>
+ <button class="ao-btn rb-btn rb-mo-now" id="rbMoNow" type="button"${canSend ? "" : " disabled"}>${sendLabel}</button>
+ <span class="rb-status" id="rbMoStatus"></span>
+ </div>
+ <div class="rb-mo-list">${rowsHtml}</div>
+ </div></details>`;
+ }
+
+ function wireMonthlyPanel(host) {
+ const det = host.querySelector("#rbMonthly");
+ if (det) det.addEventListener("toggle", () => {
+ _monthlyOpen = det.open;
+ _syncArchiveEntryPoints();
+ });
+ host.querySelectorAll("[data-monthly-dl]").forEach(btn => {
+ btn.onclick = async () => {
+ const id = btn.getAttribute("data-monthly-dl");
+ const name = btn.getAttribute("data-monthly-name") || "offtaker-summary.xlsx";
+ const stat = host.querySelector(`[data-monthly-stat="${CSS.escape(id)}"]`);
+ const setStat = (cls, msg) => {
+ if (!stat) return;
+ stat.className = "rb-bill-dl-stat" + (cls ? " " + cls : "");
+ stat.textContent = msg || "";
+ };
+ if (btn.disabled) return;
+ btn.disabled = true;
+ setStat("rb-busy", "…");
+ try {
+ await authBlobDownload(API + "/monthly-report/" + id + ".xlsx", name);
+ setStat("rb-ok", "✓");
+ setTimeout(() => setStat("", ""), 2500);
+ } catch (e) {
+ setStat("rb-err", (e && e.message) || "Failed");
+ } finally {
+ btn.disabled = false;
+ }
+ };
+ });
+
+ const status = host.querySelector("#rbMoStatus");
+ const say = (cls, msg) => {
+ if (!status) return;
+ status.className = "rb-status" + (cls ? " " + cls : "");
+ status.textContent = msg || "";
+ };
+
+ const save = host.querySelector("#rbMoSave");
+ if (save) save.onclick = async () => {
+ const to = (host.querySelector("#rbMoTo") || {}).value || "";
+ const lag = (host.querySelector("#rbMoLag") || {}).value;
+ const on = !!(host.querySelector("#rbMoOn") || {}).checked;
+ save.disabled = true;
+ say("rb-busy", "Saving…");
+ try {
+ const r = await fetch(API + "/monthly-report/settings", {
+ method: "POST",
+ headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+ body: JSON.stringify({ enabled: on, lag_days: Number(lag), recipient: to.trim() }),
+ });
+ const d = await r.json().catch(() => null);
+ if (!r.ok) throw new Error((d && d.detail) || "Couldn’t save");
+ say("rb-ok", "Saved");
+ await loadMonthly(true);
+ renderArchive();
+ } catch (e) {
+ say("rb-err", (e && e.message) || "Couldn’t save");
+ } finally {
+ save.disabled = false;
+ }
+ };
+
+ const now = host.querySelector("#rbMoNow");
+ if (now) now.onclick = async () => {
+ // A real email to a real inbox — confirm, because the automatic send is
+ // the normal path and this one jumps the queue.
+ const nx = (MONTHLY && MONTHLY.next) || {};
+ const to = ((MONTHLY && MONTHLY.settings) || {}).recipient || "you";
+ if (!confirm(`Email the ${nx.period_key || "current"} offtaker summary to ${to} now?`)) return;
+ now.disabled = true;
+ say("rb-busy", "Sending…");
+ try {
+ const r = await fetch(API + "/monthly-report/send-now", {
+ method: "POST", headers: authHeaders(),
+ });
+ const d = await r.json().catch(() => null);
+ if (!r.ok) throw new Error((d && d.detail) || "Couldn’t send");
+ say("rb-ok", d && d.ok ? "Sent" : "Recorded, but the mailer refused it");
+ await loadMonthly(true);
+ renderArchive();
+ } catch (e) {
+ say("rb-err", (e && e.message) || "Couldn’t send");
+ } finally {
+ now.disabled = false;
+ }
+ };
+ }
+
+ // "2026-08-11T…Z" → "Aug 11" / "August 11, 2026". Falls back to the raw
+ // string rather than printing "Invalid Date".
+ function shortDate(iso) {
+ const d = new Date(String(iso || ""));
+ return isNaN(d) ? String(iso || "") : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+ }
+ function longDate(iso) {
+ const d = new Date(String(iso || ""));
+ return isNaN(d) ? String(iso || "") : d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+ }
+
  function wireArchiveToggle() {
  const det = $("#rbArch");
  if (det) det.addEventListener("toggle", () => {
@@ -2885,6 +3119,8 @@
  if (ar) ar.onclick = () => toggleArchivePanel("inv");
  const br = document.getElementById("rb2RailBillArch");
  if (br) br.onclick = () => toggleArchivePanel("bills");
+ const mo = document.getElementById("rb2RailMonthly");
+ if (mo) mo.onclick = () => toggleArchivePanel("monthly");
  }
 
  // Renders the rail's cycle card from PIPE (the send-pipeline BAND is gone —
@@ -3382,6 +3618,7 @@
  manifest actually has content. -->
  <button class="ao-btn rb-btn rb2-tool" id="rb2RailArch" type="button" hidden aria-pressed="false" title="Every completed month's invoices, offtaker bills, and array bills — with per-month .zip downloads."><span class="rb2-ti rb2-ti--arch" aria-hidden="true">🗂&#xFE0E;</span><span class="rb2-tl">Invoice archive</span><span class="rb2-tv" id="rb2RailArchMeta"></span></button>
  <button class="ao-btn rb-btn rb2-tool" id="rb2RailBillArch" type="button" hidden aria-pressed="false" title="Every captured utility bill PDF on file, grouped by year."><span class="rb2-ti rb2-ti--billarch" aria-hidden="true">🗞&#xFE0E;</span><span class="rb2-tl">Utility bill archive</span><span class="rb2-tv" id="rb2RailBillArchMeta"></span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rb2RailMonthly" type="button" hidden aria-pressed="false" title="One spreadsheet per billing period covering every offtaker — generation, amount billed, and whether they have paid. Sent automatically once a period's invoices have all gone out."><span class="rb2-ti rb2-ti--monthly" aria-hidden="true">📊&#xFE0E;</span><span class="rb2-tl">Monthly summary</span><span class="rb2-tv" id="rb2RailMonthlyMeta"></span></button>
  </div>
  </aside>
  <aside class="rb2-railmini" id="rb2RailMini" hidden aria-label="Invoicing rail, minimized while editing">
