@@ -2356,9 +2356,23 @@
  </div>`;
  }).join("") : `<p class="rb-arch-empty">No summaries sent yet. One is generated automatically after a billing period’s invoices have all gone out.</p>`;
 
+ // Who it goes to, spelled out — with several addresses the input alone
+ // becomes an unreadable run-on, and "who receives this" is the fact an
+ // operator double-checks before trusting an automatic send.
+ const recips = (st.recipients && st.recipients.length)
+ ? st.recipients
+ : (st.recipient ? [st.recipient] : []);
+ const recipChips = recips.length
+ ? `<p class="rb-mo-chips"><span class="rb-mo-chips-l">Goes to</span>${
+ recips.map(a => `<span class="rb-mo-chip">${esc(a)}</span>`).join("")
+ }${st.recipient_is_default ? `<span class="rb-mo-chip-note">account email</span>` : ""}</p>`
+ : `<p class="rb-mo-chips"><span class="rb-mo-chips-l rb-mo-chips-none">No recipient set — the summary can’t be delivered.</span></p>`;
+
  const sendLabel = (nx && !nx.already_sent && nx.period_key)
  ? `Send ${esc(nx.period_key)} now` : "Send now";
- const canSend = !!(nx && !nx.already_sent && nx.period_key);
+ // recips is in scope above: a period to report on is not enough — with no
+ // recipient the send can only fail, so the button must not invite it.
+ const canSend = !!(nx && !nx.already_sent && nx.period_key) && recips.length > 0;
 
  return `<details class="rb-arch rb-monthly"${_monthlyOpen ? " open" : ""} id="rbMonthly">
  <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
@@ -2368,14 +2382,17 @@
  <p class="rb-mo-when">${when}</p>
  <div class="rb-mo-ctl">
  <label class="rb-mo-f"><span>Send to</span>
- <input type="email" id="rbMoTo" value="${esc(st.recipient || "")}" placeholder="you@example.com"></label>
+ <input type="text" id="rbMoTo" value="${esc(st.recipient || "")}" placeholder="you@example.com, billing@theirs.com"
+ autocomplete="off" spellcheck="false"></label>
  <label class="rb-mo-f rb-mo-f-sm"><span>Days after last invoice</span>
  <input type="number" id="rbMoLag" min="0" max="90" step="1" value="${lag}"></label>
  <label class="rb-mo-chk"><input type="checkbox" id="rbMoOn"${st.enabled ? " checked" : ""}><span>Send automatically</span></label>
  <button class="ao-btn rb-btn" id="rbMoSave" type="button">Save</button>
  <button class="ao-btn rb-btn rb-mo-now" id="rbMoNow" type="button"${canSend ? "" : " disabled"}>${sendLabel}</button>
  <span class="rb-status" id="rbMoStatus"></span>
+ <p class="rb-mo-hint">Separate several addresses with commas — yours and whoever else should receive it.</p>
  </div>
+ ${recipChips}
  <div class="rb-mo-list">${rowsHtml}</div>
  </div></details>`;
  }
@@ -2428,8 +2445,11 @@
  // later change of account email would stop following. Send "" (clear the
  // override) unless the operator actually typed a different address.
  const st0 = (MONTHLY && MONTHLY.settings) || {};
- const unchangedDefault = st0.recipient_is_default &&
- to.toLowerCase() === String(st0.recipient || "").toLowerCase();
+ // Compare as normalised address SETS: "a@x, b@y" and "b@y,a@x" are the same
+ // instruction, and neither should count as an edit that pins the default.
+ const norm = v => String(v || "").split(/[,;\s]+/).map(x => x.trim().toLowerCase())
+ .filter(Boolean).sort().join(",");
+ const unchangedDefault = st0.recipient_is_default && norm(to) === norm(st0.recipient);
  const recipient = unchangedDefault ? "" : to;
  save.disabled = true;
  say("rb-busy", "Saving…");
@@ -2456,7 +2476,12 @@
  // A real email to a real inbox — confirm, because the automatic send is
  // the normal path and this one jumps the queue.
  const nx = (MONTHLY && MONTHLY.next) || {};
- const to = ((MONTHLY && MONTHLY.settings) || {}).recipient || "you";
+ const stx = (MONTHLY && MONTHLY.settings) || {};
+ const list = (stx.recipients && stx.recipients.length)
+ ? stx.recipients : (stx.recipient ? [stx.recipient] : []);
+ const to = list.length
+ ? (list.length === 1 ? list[0] : list.slice(0, -1).join(", ") + " and " + list[list.length - 1])
+ : "nobody — no recipient is set";
  if (!confirm(`Email the ${nx.period_key || "current"} offtaker summary to ${to} now?`)) return;
  now.disabled = true;
  say("rb-busy", "Sending…");
@@ -2466,7 +2491,9 @@
  });
  const d = await r.json().catch(() => null);
  if (!r.ok) throw new Error((d && d.detail) || "Couldn’t send");
- say("rb-ok", d && d.ok ? "Sent" : "Recorded, but the mailer refused it");
+ const okd = !!(d && d.ok);
+ say(okd ? "rb-ok" : "rb-err",
+ okd ? "Sent" : "Recorded, but the mailer refused it");
  await loadMonthly(true);
  renderArchive();
  } catch (e) {
