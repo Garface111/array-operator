@@ -2420,16 +2420,24 @@
 
  const save = host.querySelector("#rbMoSave");
  if (save) save.onclick = async () => {
- const to = (host.querySelector("#rbMoTo") || {}).value || "";
+ const to = ((host.querySelector("#rbMoTo") || {}).value || "").trim();
  const lag = (host.querySelector("#rbMoLag") || {}).value;
  const on = !!(host.querySelector("#rbMoOn") || {}).checked;
+ // The field is PRE-FILLED with the account email when no explicit
+ // recipient is set. Posting that value back would silently pin it, so a
+ // later change of account email would stop following. Send "" (clear the
+ // override) unless the operator actually typed a different address.
+ const st0 = (MONTHLY && MONTHLY.settings) || {};
+ const unchangedDefault = st0.recipient_is_default &&
+ to.toLowerCase() === String(st0.recipient || "").toLowerCase();
+ const recipient = unchangedDefault ? "" : to;
  save.disabled = true;
  say("rb-busy", "Saving…");
  try {
  const r = await fetch(API + "/monthly-report/settings", {
  method: "POST",
  headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
- body: JSON.stringify({ enabled: on, lag_days: Number(lag), recipient: to.trim() }),
+ body: JSON.stringify({ enabled: on, lag_days: Number(lag), recipient: recipient }),
  });
  const d = await r.json().catch(() => null);
  if (!r.ok) throw new Error((d && d.detail) || "Couldn’t save");
