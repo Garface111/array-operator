@@ -1410,6 +1410,7 @@
  wireSubtabs();
  wireGenTabs(); // "Offtakers | Bill audit" segmented toggle
  wireGlobalRate();
+ wireCollectionSettings();
  wireRail(); // the rail's mini-strip buttons (expand / approve / add / export / email)
  // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
  // spreadsheet); the upload zone + live doc-preview live inside that panel
@@ -3533,6 +3534,7 @@
  <div id="rbBulkHost"></div>
  <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
  <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
+ <details class="rep-card" id="rbCollectionSettings"><summary>Payment collection</summary><div id="rbCollectionBody">Loading…</div></details>
  <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
  </div>
  </div>
@@ -4172,6 +4174,87 @@
  // Master rate SET → fleet override for offtakers without a per-offtaker rate.
  // Master rate BLANK → each offtaker uses the EXCESS credit rate on THEIR own
  // bound utility sub-account bill (custom per offtaker). Never a fleet median.
+ async function wireCollectionSettings() {
+ const host = document.getElementById("rbCollectionBody");
+ if (!host) return;
+ async function request(path, options = {}) {
+ const r = await fetch(API + path, { ...options, headers: { ...authHeaders(), "Content-Type": "application/json" } });
+ const j = await r.json();
+ if (!r.ok || j.ok === false) {
+ const error = new Error(typeof j.detail === "string" ? j.detail : (j.error || "Could not save payment details."));
+ error.definitive = r.status >= 400 && r.status < 500;
+ throw error;
+ }
+ return j;
+ }
+ try {
+ const policy = await request("/payment-policy");
+ host.innerHTML = `<form id="rbCollectionPolicy">
+ <label class="rep-fld"><span>Collection method</span><select name="policy">
+ <option value="online_required">Online payment required</option><option value="offline">Offline — check, cash or bank transfer</option></select></label>
+ <button class="ao-btn" type="submit">Save collection method</button></form>
+ <p>Online invoices wait for a working payment link. Offline invoices require you to record each payment.</p>
+ <form id="rbOfflinePayment" hidden>
+ <label class="rep-fld"><span>Issued invoice</span><select name="invoice" required><option value="">Choose invoice</option></select></label>
+ <label class="rep-fld"><span>Amount received ($)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+ <label class="rep-fld"><span>Received on</span><input name="received" type="date" required></label>
+ <label class="rep-fld"><span>Method</span><select name="method"><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option></select></label>
+ <label class="rep-fld"><span>Payment reference</span><input name="note" maxlength="2000" required placeholder="Check number or bank reference"></label>
+ <button class="ao-btn" type="submit">Record payment</button></form>
+ <p id="rbCollectionStatus" role="status"></p>`;
+ const settings = host.querySelector("#rbCollectionPolicy");
+ const payment = host.querySelector("#rbOfflinePayment");
+ const status = host.querySelector("#rbCollectionStatus");
+ settings.elements.policy.value = policy.policy;
+ payment.elements.received.value = new Date().toLocaleDateString("en-CA");
+ let requestKey = crypto.randomUUID();
+ let pendingPayload = null;
+ async function loadInvoices() {
+ payment.hidden = settings.elements.policy.value !== "offline";
+ if (payment.hidden) return;
+ const data = await request("/issued-invoices");
+ payment.elements.invoice.innerHTML = '<option value="">Choose invoice</option>' + (data.invoices || []).filter(x => x.status === "accepted" && x.outstanding_cents > 0).map(x =>
+ `<option value="${esc(String(x.id))}" data-balance="${esc(String(x.outstanding_cents))}">${esc(x.customer_name || "Offtaker")} · ${esc(x.invoice_number || x.period_key || String(x.id))} · ${esc(moneyFmt(x.outstanding_cents / 100))} outstanding</option>`).join("");
+ if (payment.elements.invoice.options.length === 1) status.textContent = "No issued invoices awaiting payment.";
+ }
+ settings.onsubmit = async e => {
+ e.preventDefault();
+ const button = settings.querySelector("button"); button.disabled = true;
+ try {
+ await request("/payment-policy", {method: "PATCH", body: JSON.stringify({policy: settings.elements.policy.value})});
+ status.textContent = "Collection method saved.";
+ await loadInvoices();
+ } catch (err) { status.textContent = err.message; }
+ finally { button.disabled = false; }
+ };
+ payment.elements.invoice.onchange = () => {
+ const selected = payment.elements.invoice.selectedOptions[0];
+ payment.elements.amount.value = selected && selected.dataset.balance ? (Number(selected.dataset.balance) / 100).toFixed(2) : "";
+ };
+ payment.onsubmit = async e => {
+ e.preventDefault();
+ const amount = Number(payment.elements.amount.value);
+ const cents = Math.round(amount * 100);
+ if (!Number.isFinite(amount) || cents <= 0 || Math.abs(amount * 100 - cents) > 0.00001) { status.textContent = "Enter a positive amount with at most two decimal places."; return; }
+ const invoiceId = payment.elements.invoice.value;
+ const body = {amount_cents: cents, received_on: payment.elements.received.value, method: payment.elements.method.value, note: payment.elements.note.value.trim()};
+ const signature = JSON.stringify([invoiceId, body]);
+ if (pendingPayload && pendingPayload !== signature) { status.textContent = "Retry the unchanged payment first; its previous response was uncertain."; return; }
+ pendingPayload = signature;
+ const button = payment.querySelector("button"); button.disabled = true;
+ try {
+ await request("/invoices/" + encodeURIComponent(invoiceId) + "/offline-payments", {method: "POST", body: JSON.stringify({...body, request_key: requestKey})});
+ requestKey = crypto.randomUUID(); pendingPayload = null;
+ payment.elements.note.value = ""; payment.elements.amount.value = "";
+ status.textContent = "Payment recorded.";
+ await loadInvoices();
+ } catch (err) { if (err.definitive) { pendingPayload = null; requestKey = crypto.randomUUID(); } status.textContent = err.message; }
+ finally { button.disabled = false; }
+ };
+ await loadInvoices();
+ } catch (err) { host.textContent = err.message; }
+ }
+
  async function wireGlobalRate() {
  const net = $("#rbGrNet");
  const adder = $("#rbGrAdder");
