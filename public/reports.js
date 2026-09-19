@@ -3193,12 +3193,29 @@
  const kind = { invoice: "Invoice email", monthly_report: "Monthly summary", receipt: "Payment receipt" }[item.kind] || "Email request";
  return `<li><b>${esc(kind)} #${esc(String(item.id))}: ${esc(state(item.status))}</b>
  <div>${esc(item.reason || "Delivery confirmation needs review.")}</div>
- <div>${esc(String(Number(item.attempts) || 0))} attempt(s). ${esc(action)}</div></li>`;
+ <div>${esc(String(Number(item.attempts) || 0))} attempt(s). ${esc(action)}</div>
+ ${uncertain && Number.isSafeInteger(Number(item.id)) ? `<form data-reconcile-dispatch="${Number(item.id)}"><label>Provider email ID <input name="receipt" required maxlength="100" autocomplete="off"></label> <button type="submit" class="ao-btn">Verify receipt</button><span role="status"></span></form>` : ""}</li>`;
  }).join("");
  host.innerHTML = `<h3>Invoices needing attention</h3>
  <p>These invoices or emails need review before the cycle is complete. Provider acceptance confirms a send request; it does not confirm inbox delivery or payment.</p>
  ${rows ? `<div style="overflow-x:auto"><table class="rb-track-pays"><thead><tr><th>Offtaker</th><th>Period</th><th>Amount</th><th>Status</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
  ${emailRows ? `<h4>Email delivery checks</h4><ul>${emailRows}</ul>` : ""}`;
+ host.querySelectorAll("[data-reconcile-dispatch]").forEach(form => { form.onsubmit = async event => {
+ event.preventDefault();
+ const button = form.querySelector("button"), status = form.querySelector('[role="status"]');
+ const receipt = form.querySelector('[name="receipt"]').value.trim();
+ if (!receipt) return;
+ button.disabled = true; status.textContent = "Verifying…";
+ try {
+ const response = await fetch(API + "/dispatches/" + form.dataset.reconcileDispatch + "/reconcile", {
+ method: "POST", headers: jsonHdr(), body: JSON.stringify({ receipt_id: receipt }) });
+ const result = await response.json();
+ if (!response.ok) throw new Error(result.detail || "Verification failed; the email remains held.");
+ status.textContent = "Provider acceptance verified.";
+ await loadPipeline(); renderPipeline();
+ } catch (error) { status.textContent = error.message || "Verification unavailable; the email remains held."; }
+ finally { button.disabled = false; }
+ }; });
  host.querySelectorAll("[data-hold-sub]").forEach(button => { button.onclick = () => {
  const sid = button.dataset.holdSub;
  if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
@@ -4256,15 +4273,30 @@
  const status = host.querySelector("#rbCollectionStatus");
  settings.elements.policy.value = policy.policy;
  payment.elements.received.value = new Date().toLocaleDateString("en-CA");
- let requestKey = crypto.randomUUID();
- let pendingPayload = null;
+ const ownerBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(authHeaders())));
+ const pendingKey = "ao_pending_offline_receipt:" + Array.from(new Uint8Array(ownerBytes)).map(x => x.toString(16).padStart(2, "0")).join("");
+ let savedReceipt = JSON.parse(sessionStorage.getItem(pendingKey) || "null");
+ let requestKey = savedReceipt ? savedReceipt.requestKey : crypto.randomUUID();
+ let pendingPayload = savedReceipt ? savedReceipt.signature : null;
  async function loadInvoices() {
  payment.hidden = settings.elements.policy.value !== "offline";
  if (payment.hidden) return;
  const data = await request("/issued-invoices");
  payment.elements.invoice.innerHTML = '<option value="">Choose invoice</option>' + (data.invoices || []).filter(x => x.status === "accepted" && x.outstanding_cents > 0).map(x =>
  `<option value="${esc(String(x.id))}" data-balance="${esc(String(x.outstanding_cents))}">${esc(x.customer_name || "Offtaker")} · ${esc(x.invoice_number || x.period_key || String(x.id))} · ${esc(moneyFmt(x.outstanding_cents / 100))} outstanding</option>`).join("");
- if (payment.elements.invoice.options.length === 1) status.textContent = "No issued invoices awaiting payment.";
+ if (savedReceipt) {
+ const invoiceId = String(savedReceipt.invoiceId);
+ if (!Array.from(payment.elements.invoice.options).some(option => option.value === invoiceId)) {
+ const option = document.createElement("option"); option.value = invoiceId; option.textContent = "Verify previous receipt for invoice " + invoiceId;
+ payment.elements.invoice.appendChild(option);
+ }
+ payment.elements.invoice.value = invoiceId;
+ payment.elements.amount.value = (savedReceipt.body.amount_cents / 100).toFixed(2);
+ payment.elements.received.value = savedReceipt.body.received_on;
+ payment.elements.method.value = savedReceipt.body.method;
+ payment.elements.note.value = savedReceipt.body.note;
+ status.textContent = "Verify the previous receipt by submitting it unchanged. Its request ID has been preserved.";
+ } else if (payment.elements.invoice.options.length === 1) status.textContent = "No issued invoices awaiting payment.";
  }
  settings.onsubmit = async e => {
  e.preventDefault();
@@ -4290,14 +4322,18 @@
  const signature = JSON.stringify([invoiceId, body]);
  if (pendingPayload && pendingPayload !== signature) { status.textContent = "Retry the unchanged payment first; its previous response was uncertain."; return; }
  pendingPayload = signature;
+ savedReceipt = { invoiceId, body, signature, requestKey };
+ try { sessionStorage.setItem(pendingKey, JSON.stringify(savedReceipt)); }
+ catch (error) { status.textContent = "Receipt recovery storage is unavailable. No payment was recorded."; return; }
  const button = payment.querySelector("button"); button.disabled = true;
  try {
  await request("/invoices/" + encodeURIComponent(invoiceId) + "/offline-payments", {method: "POST", body: JSON.stringify({...body, request_key: requestKey})});
+ sessionStorage.removeItem(pendingKey); savedReceipt = null;
  requestKey = crypto.randomUUID(); pendingPayload = null;
  payment.elements.note.value = ""; payment.elements.amount.value = "";
  status.textContent = "Payment recorded.";
  await loadInvoices();
- } catch (err) { if (err.definitive) { pendingPayload = null; requestKey = crypto.randomUUID(); } status.textContent = err.message; }
+ } catch (err) { if (err.definitive) { sessionStorage.removeItem(pendingKey); savedReceipt = null; pendingPayload = null; requestKey = crypto.randomUUID(); } status.textContent = err.message; }
  finally { button.disabled = false; }
  };
  await loadInvoices();
