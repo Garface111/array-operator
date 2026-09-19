@@ -89,8 +89,8 @@
 <body>
  <div class="card" id="card">
  <div class="mark ok" id="mark" aria-hidden="true">✓</div>
- <h1 id="title">Payment received</h1>
- <p class="sub" id="sub">Thank you, your solar credit invoice is paid. A receipt is on its way from Stripe to the email you used at checkout.</p>
+ <h1 id="title">Check your payment confirmation</h1>
+ <p class="sub" id="sub">Use your confirmation email to verify payment. Bank payments may still be processing; please do not pay again while a payment is pending.</p>
  <div class="hint" id="hint">You can close this tab now. There’s nothing else you need to do here.</div>
  <div class="actions">
  <button type="button" class="close" id="closeBtn">Close this tab</button>
@@ -116,11 +116,11 @@
  if (cancelled) {
  document.getElementById("mark").className = "mark cancel";
  document.getElementById("mark").textContent = "–";
- document.getElementById("title").textContent = "Payment not completed";
+ document.getElementById("title").textContent = "Checkout closed";
  document.getElementById("sub").textContent =
- "No charge was made. You can close this tab and use the pay link in your invoice email whenever you’re ready.";
+ "If you submitted a payment, check its status using the original invoice link before trying again.";
  document.getElementById("hint").textContent =
- "Your invoice is still open. Nothing changed on your account.";
+ "You can close this tab.";
  }
  // Best-effort close. Browsers only allow window.close() for script-opened
  // tabs; otherwise the button still gives a clear "you're done" action.
