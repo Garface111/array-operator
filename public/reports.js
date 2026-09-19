@@ -1410,6 +1410,7 @@
  wireSubtabs();
  wireGenTabs(); // "Offtakers | Bill audit" segmented toggle
  wireGlobalRate();
+ wireCollectionSettings();
  wireRail(); // the rail's mini-strip buttons (expand / approve / add / export / email)
  // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
  // spreadsheet); the upload zone + live doc-preview live inside that panel
@@ -3162,7 +3163,71 @@
  // Ford 2026-07-28: "delete the send pipeline visual, it's too busy" — but every
  // fact and control it carried lives on: approve count + $, delivered line →
  // archive, next run, pause/resume, and the delivery-mode slider, all here).
+ function renderDeliveryHolds() {
+ const host = document.getElementById("rbDeliveryHolds");
+ if (!host) return;
+ const invoices = PIPE && Array.isArray(PIPE.holds) ? PIPE.holds : [];
+ const dispatches = PIPE && Array.isArray(PIPE.dispatch_holds) ? PIPE.dispatch_holds : [];
+ host.hidden = !invoices.length && !dispatches.length;
+ if (host.hidden) { host.innerHTML = ""; return; }
+ const names = new Map((OFFTAKERS || []).map(s => [String(s.id), s.customer_name || s.name || "Offtaker"]));
+ const labels = { held: "On hold", prepared: "Queued", failed: "Retry pending", sending: "Acceptance not yet confirmed", uncertain: "Acceptance uncertain", accepted: "Provider accepted" };
+ const state = value => labels[value] || String(value || "Needs review");
+ const rows = invoices.map(item => {
+ const sid = Number(item.subscription_id);
+ const canOpen = Number.isSafeInteger(sid) && sid > 0 && names.has(String(sid));
+ const who = names.get(String(item.subscription_id)) || `Offtaker ${item.subscription_id || "unknown"}`;
+ const amount = item.amount_cents != null && !(item.status === "held" && Number(item.amount_cents) === 0)
+ ? moneyFmt(Number(item.amount_cents) / 100) : "Not yet confirmed";
+ return `<tr><td>${canOpen ? `<button type="button" class="ao-btn" data-hold-sub="${sid}">${esc(who)}</button>` : esc(who)}</td>
+ <td>${esc(item.period || "Unknown period")}</td><td>${esc(amount)}</td>
+ <td>${esc(state(item.status))}</td><td>${esc(item.reason || "Review the invoice source and delivery status.")}</td></tr>`;
+ }).join("");
+ const emailRows = dispatches.map(item => {
+ const retry = item.retry_at ? new Date(item.retry_at) : null;
+ const when = retry && !isNaN(retry.getTime()) ? retry.toLocaleString() : null;
+ const uncertain = item.status === "sending" || item.status === "uncertain";
+ const action = uncertain ? "Check the email provider and reconcile acceptance before retrying."
+ : (Number(item.attempts) >= 8 ? "Retry limit reached; operator review required."
+ : when ? `Next retry eligible ${when}.` : "Waiting for an eligible retry.");
+ const kind = { invoice: "Invoice email", monthly_report: "Monthly summary", receipt: "Payment receipt" }[item.kind] || "Email request";
+ return `<li><b>${esc(kind)} #${esc(String(item.id))}: ${esc(state(item.status))}</b>
+ <div>${esc(item.reason || "Delivery confirmation needs review.")}</div>
+ <div>${esc(String(Number(item.attempts) || 0))} attempt(s). ${esc(action)}</div>
+ ${uncertain && Number.isSafeInteger(Number(item.id)) ? `<form data-reconcile-dispatch="${Number(item.id)}"><label>Provider email ID <input name="receipt" required maxlength="100" autocomplete="off"></label> <button type="submit" class="ao-btn">Verify receipt</button><span role="status"></span></form>` : ""}</li>`;
+ }).join("");
+ host.innerHTML = `<h3>Invoices needing attention</h3>
+ <p>These invoices or emails need review before the cycle is complete. Provider acceptance confirms a send request; it does not confirm inbox delivery or payment.</p>
+ ${rows ? `<div style="overflow-x:auto"><table class="rb-track-pays"><thead><tr><th>Offtaker</th><th>Period</th><th>Amount</th><th>Status</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+ ${emailRows ? `<h4>Email delivery checks</h4><ul>${emailRows}</ul>` : ""}`;
+ host.querySelectorAll("[data-reconcile-dispatch]").forEach(form => { form.onsubmit = async event => {
+ event.preventDefault();
+ const button = form.querySelector("button"), status = form.querySelector('[role="status"]');
+ const receipt = form.querySelector('[name="receipt"]').value.trim();
+ if (!receipt) return;
+ button.disabled = true; status.textContent = "Verifying…";
+ try {
+ const response = await fetch(API + "/dispatches/" + form.dataset.reconcileDispatch + "/reconcile", {
+ method: "POST", headers: jsonHdr(), body: JSON.stringify({ receipt_id: receipt }) });
+ const result = await response.json();
+ if (!response.ok) throw new Error(result.detail || "Verification failed; the email remains held.");
+ status.textContent = "Provider acceptance verified.";
+ await loadPipeline(); renderPipeline();
+ } catch (error) { status.textContent = error.message || "Verification unavailable; the email remains held."; }
+ finally { button.disabled = false; }
+ }; });
+ host.querySelectorAll("[data-hold-sub]").forEach(button => { button.onclick = () => {
+ const sid = button.dataset.holdSub;
+ if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
+ ACTIVE_SUB_ID = sid;
+ renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
+ }
+ expandAccordion(sid);
+ }; });
+ }
+
  function renderPipeline() {
+ renderDeliveryHolds();
  const host = document.getElementById("rb2RailCycle");
  if (!host) return;
  // Signed-out demo paints a frozen cycle card from AO_DEMO.pipeline.
@@ -3182,6 +3247,7 @@
  const appr = inf.pending_approval != null ? inf.pending_approval : (inf.pending_drafts || 0);
  const au = inf.pending_auto || 0;
  const wait = inf.waiting || 0;
+ const attention = (Array.isArray(p.holds) ? p.holds.length : 0) + (Array.isArray(p.dispatch_holds) ? p.dispatch_holds.length : 0);
  // $ across the pending-drafts inbox — best-effort display sum only.
  let apprUsd = 0;
  (INBOX_DRAFTS || []).forEach(d => { if (d && d.amount_usd != null) apprUsd += Number(d.amount_usd) || 0; });
@@ -3189,7 +3255,7 @@
  ? `${fmt0(appr)} <span>to approve</span>`
  : (au > 0 ? `${fmt0(au)} <span>auto-sending</span>`
  : (wait > 0 ? `${fmt0(wait)} <span>waiting on bills</span>`
- : `<span>all caught up</span>`));
+ : (attention > 0 ? `${fmt0(attention)} <span>need attention</span>` : `<span>all caught up</span>`)));
  const cap = appr > 0 && apprUsd > 0
  ? `${money0(apprUsd)} drafted from settled bills`
  : `drafted from settled utility bills`;
@@ -3213,7 +3279,7 @@
  <div class="rb2-rc-rows">
  <div class="rb2-rc-row" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive. Download this month as a .zip there.">
  <span class="rb2-rc-check">✓</span><b>${esc(_monthName(last.period_month))}</b>
- <span>${fmt0(last.delivered || 0)} of ${fmt0(p.total_enabled || 0)} sent${last.dollars ? " · " + money0(last.dollars) : ""}</span>
+ <span>${fmt0(last.delivered || 0)} of ${fmt0(p.total_enabled || 0)} provider accepted${last.dollars ? " · " + money0(last.dollars) : ""}</span>
  <span class="rb2-sp"></span><span class="rb2-rc-quiet">archive</span>
  </div>
  <div class="rb2-rc-row">
@@ -3533,6 +3599,8 @@
  <div id="rbBulkHost"></div>
  <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
  <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
+ <details class="rep-card" id="rbCollectionSettings"><summary>Payment collection</summary><div id="rbCollectionBody">Loading…</div></details>
+ <section class="rep-card" id="rbDeliveryHolds" aria-label="Invoices needing attention" hidden></section>
  <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
  </div>
  </div>
@@ -4172,6 +4240,106 @@
  // Master rate SET → fleet override for offtakers without a per-offtaker rate.
  // Master rate BLANK → each offtaker uses the EXCESS credit rate on THEIR own
  // bound utility sub-account bill (custom per offtaker). Never a fleet median.
+ async function wireCollectionSettings() {
+ const host = document.getElementById("rbCollectionBody");
+ if (!host) return;
+ async function request(path, options = {}) {
+ const r = await fetch(API + path, { ...options, headers: { ...authHeaders(), "Content-Type": "application/json" } });
+ const j = await r.json();
+ if (!r.ok || j.ok === false) {
+ const error = new Error(typeof j.detail === "string" ? j.detail : (j.error || "Could not save payment details."));
+ error.definitive = r.status >= 400 && r.status < 500;
+ throw error;
+ }
+ return j;
+ }
+ try {
+ const policy = await request("/payment-policy");
+ host.innerHTML = `<form id="rbCollectionPolicy">
+ <label class="rep-fld"><span>Collection method</span><select name="policy">
+ <option value="online_required">Online payment required</option><option value="offline">Offline — check, cash or bank transfer</option></select></label>
+ <button class="ao-btn" type="submit">Save collection method</button></form>
+ <p>Online invoices wait for a working payment link. Offline invoices require you to record each payment.</p>
+ <form id="rbOfflinePayment" hidden>
+ <label class="rep-fld"><span>Issued invoice</span><select name="invoice" required><option value="">Choose invoice</option></select></label>
+ <label class="rep-fld"><span>Amount received ($)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+ <label class="rep-fld"><span>Received on</span><input name="received" type="date" required></label>
+ <label class="rep-fld"><span>Method</span><select name="method"><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option></select></label>
+ <label class="rep-fld"><span>Payment reference</span><input name="note" maxlength="2000" required placeholder="Check number or bank reference"></label>
+ <button class="ao-btn" type="submit">Record payment</button></form>
+ <p id="rbCollectionStatus" role="status"></p>`;
+ const settings = host.querySelector("#rbCollectionPolicy");
+ const payment = host.querySelector("#rbOfflinePayment");
+ const status = host.querySelector("#rbCollectionStatus");
+ settings.elements.policy.value = policy.policy;
+ payment.elements.received.value = new Date().toLocaleDateString("en-CA");
+ const ownerBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(authHeaders())));
+ const pendingKey = "ao_pending_offline_receipt:" + Array.from(new Uint8Array(ownerBytes)).map(x => x.toString(16).padStart(2, "0")).join("");
+ let savedReceipt = JSON.parse(sessionStorage.getItem(pendingKey) || "null");
+ let requestKey = savedReceipt ? savedReceipt.requestKey : crypto.randomUUID();
+ let pendingPayload = savedReceipt ? savedReceipt.signature : null;
+ async function loadInvoices() {
+ payment.hidden = settings.elements.policy.value !== "offline";
+ if (payment.hidden) return;
+ const data = await request("/issued-invoices");
+ payment.elements.invoice.innerHTML = '<option value="">Choose invoice</option>' + (data.invoices || []).filter(x => x.status === "accepted" && x.outstanding_cents > 0).map(x =>
+ `<option value="${esc(String(x.id))}" data-balance="${esc(String(x.outstanding_cents))}">${esc(x.customer_name || "Offtaker")} · ${esc(x.invoice_number || x.period_key || String(x.id))} · ${esc(moneyFmt(x.outstanding_cents / 100))} outstanding</option>`).join("");
+ if (savedReceipt) {
+ const invoiceId = String(savedReceipt.invoiceId);
+ if (!Array.from(payment.elements.invoice.options).some(option => option.value === invoiceId)) {
+ const option = document.createElement("option"); option.value = invoiceId; option.textContent = "Verify previous receipt for invoice " + invoiceId;
+ payment.elements.invoice.appendChild(option);
+ }
+ payment.elements.invoice.value = invoiceId;
+ payment.elements.amount.value = (savedReceipt.body.amount_cents / 100).toFixed(2);
+ payment.elements.received.value = savedReceipt.body.received_on;
+ payment.elements.method.value = savedReceipt.body.method;
+ payment.elements.note.value = savedReceipt.body.note;
+ status.textContent = "Verify the previous receipt by submitting it unchanged. Its request ID has been preserved.";
+ } else if (payment.elements.invoice.options.length === 1) status.textContent = "No issued invoices awaiting payment.";
+ }
+ settings.onsubmit = async e => {
+ e.preventDefault();
+ const button = settings.querySelector("button"); button.disabled = true;
+ try {
+ await request("/payment-policy", {method: "PATCH", body: JSON.stringify({policy: settings.elements.policy.value})});
+ status.textContent = "Collection method saved.";
+ await loadInvoices();
+ } catch (err) { status.textContent = err.message; }
+ finally { button.disabled = false; }
+ };
+ payment.elements.invoice.onchange = () => {
+ const selected = payment.elements.invoice.selectedOptions[0];
+ payment.elements.amount.value = selected && selected.dataset.balance ? (Number(selected.dataset.balance) / 100).toFixed(2) : "";
+ };
+ payment.onsubmit = async e => {
+ e.preventDefault();
+ const amount = Number(payment.elements.amount.value);
+ const cents = Math.round(amount * 100);
+ if (!Number.isFinite(amount) || cents <= 0 || Math.abs(amount * 100 - cents) > 0.00001) { status.textContent = "Enter a positive amount with at most two decimal places."; return; }
+ const invoiceId = payment.elements.invoice.value;
+ const body = {amount_cents: cents, received_on: payment.elements.received.value, method: payment.elements.method.value, note: payment.elements.note.value.trim()};
+ const signature = JSON.stringify([invoiceId, body]);
+ if (pendingPayload && pendingPayload !== signature) { status.textContent = "Retry the unchanged payment first; its previous response was uncertain."; return; }
+ pendingPayload = signature;
+ savedReceipt = { invoiceId, body, signature, requestKey };
+ try { sessionStorage.setItem(pendingKey, JSON.stringify(savedReceipt)); }
+ catch (error) { status.textContent = "Receipt recovery storage is unavailable. No payment was recorded."; return; }
+ const button = payment.querySelector("button"); button.disabled = true;
+ try {
+ await request("/invoices/" + encodeURIComponent(invoiceId) + "/offline-payments", {method: "POST", body: JSON.stringify({...body, request_key: requestKey})});
+ sessionStorage.removeItem(pendingKey); savedReceipt = null;
+ requestKey = crypto.randomUUID(); pendingPayload = null;
+ payment.elements.note.value = ""; payment.elements.amount.value = "";
+ status.textContent = "Payment recorded.";
+ await loadInvoices();
+ } catch (err) { if (err.definitive) { sessionStorage.removeItem(pendingKey); savedReceipt = null; pendingPayload = null; requestKey = crypto.randomUUID(); } status.textContent = err.message; }
+ finally { button.disabled = false; }
+ };
+ await loadInvoices();
+ } catch (err) { host.textContent = err.message; }
+ }
+
  async function wireGlobalRate() {
  const net = $("#rbGrNet");
  const adder = $("#rbGrAdder");
