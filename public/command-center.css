@@ -4480,3 +4480,27 @@ body.ho-shell-open .vs-inv-sub{
 .rb-mr-warn{ font-size:12px; color:#9a5b00; background:rgba(217,119,6,.08); border-radius:7px; padding:5px 9px; }
 .rb-mr-overlay .rb-es-left{ width:52%; } .rb-mr-overlay .rb-es-right{ width:48%; }
 @media (max-width: 900px){ .rb-mr-overlay .rb-es-cols{ flex-direction:column; overflow:auto; } .rb-mr-overlay .rb-es-left, .rb-mr-overlay .rb-es-right{ width:auto; border-right:0; } }
+
+/* ── Mail room audit: what to look for, fixes, jumps, filters ─────────── */
+.rb-mr-audit-head{ display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+.rb-mr-audit-head .rb-mr-audit-sumtext{ flex:1 1 320px; }
+.rb-mr-audit-actions{ display:flex; gap:6px; align-items:center; }
+.rb-mr-verdict{ font-size:11.5px; padding:3px 10px; }
+.rb-mr-look{ border:1px solid rgba(37,99,235,.18); background:rgba(37,99,235,.045); border-radius:10px; padding:9px 12px 6px; margin:4px 0 10px; }
+.rb-mr-look h5, .rb-mr-findsec h5{ margin:0 0 6px; font-size:12.5px; font-weight:750; color:var(--ink,#16202b); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rb-mr-look ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+.rb-mr-look li label{ display:flex; align-items:flex-start; gap:8px; font-size:12.5px; line-height:1.45; color:var(--ink,#16202b); cursor:pointer; }
+.rb-mr-look li input{ margin-top:3px; flex:none; }
+.rb-mr-look li input:checked + span{ color:var(--faint,#94a3b8); text-decoration:line-through; }
+.rb-mr-fix{ display:flex; gap:8px; align-items:flex-start; margin-top:5px; font-size:12.5px; color:var(--ink,#16202b); background:rgba(10,125,79,.06); border-radius:7px; padding:5px 9px; }
+.rb-mr-fix-l{ flex:none; font-size:10.5px; font-weight:750; letter-spacing:.05em; text-transform:uppercase; color:#0a7d4f; padding-top:2px; }
+.rb-mr-targets{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.rb-mr-tbtn{ font-size:11.5px; padding:4px 9px; }
+.rb-mr-sevs{ display:inline-flex; gap:4px; flex-wrap:wrap; margin-left:auto; }
+.rb-mr-sev{ font:inherit; font-size:11px; font-weight:650; padding:2px 8px; border-radius:20px; border:1px solid var(--line,#e2e8f0); background:var(--card,#fff); color:var(--muted,#475569); cursor:pointer; }
+.rb-mr-sev span{ font-variant-numeric:tabular-nums; opacity:.7; margin-left:2px; }
+.rb-mr-sev.on{ border-color:var(--good,#2563eb); color:var(--good,#2563eb); background:rgba(37,99,235,.08); }
+.rb-mr-sev--bad.on{ border-color:#e5484d; color:#b42318; background:rgba(229,72,77,.1); }
+.rb-mr-sev--warn.on{ border-color:#d97706; color:#9a5b00; background:rgba(217,119,6,.1); }
+.rb-mr-findsec{ margin-top:4px; display:flex; flex-direction:column; gap:6px; }
+.rb-mr-legacynote{ padding:10px 14px; font-size:12px; }

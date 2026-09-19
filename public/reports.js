@@ -2691,7 +2691,7 @@
  <p class="rb-mo-when">${esc(outSentence)}${esc(sentSentence)}${paused}</p>
  <div class="rb-mr-tools">
  <input type="search" class="rb-mr-search" id="rbMrSearch" value="${esc(MAIL_FILTER)}" placeholder="Search offtaker, invoice #, email, account, array…" autocomplete="off" spellcheck="false">
- <button class="ao-btn ao-btn-primary rb-btn rb-mr-auditbtn" id="rbMrAudit" type="button"${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? " disabled" : ""}>${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? "Auditing…" : "Audit with Claude"}</button>
+ <button class="ao-btn ao-btn-primary rb-btn rb-mr-auditbtn" id="rbMrAudit" type="button"${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? " disabled" : ""}>${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? "Auditing…" : (MAIL_AUDIT && MAIL_AUDIT.status === "done" ? "Audit again" : "Audit with Claude")}</button>
  <button class="ao-btn rb-btn" id="rbMrRefresh" type="button" title="Reload the board">Refresh</button>
  <span class="rb-status" id="rbMrStatus"></span>
  </div>
@@ -2709,9 +2709,21 @@
  </div></details>`;
  }
 
+ // ── Audit box: verdict → summary → what to look for → findings with fixes ──
+ let MAIL_SEV_FILTER = "all";
+ const MAIL_LOOK_KEY = "ao_mr_look";
+ function mrLookState() { try { return JSON.parse(localStorage.getItem(MAIL_LOOK_KEY) || "{}") || {}; } catch (e) { return {}; } }
+ function mrLookSet(runId, i, on) {
+ try { const st = mrLookState(); st[runId + ":" + i] = !!on; localStorage.setItem(MAIL_LOOK_KEY, JSON.stringify(st)); } catch (e) {}
+ }
+ const MR_SEV_ORDER = ["critical", "high", "medium", "low", "info"];
+ const MR_SEV_TONE = { critical: "bad", high: "bad", medium: "warn", low: "dim", info: "dim" };
+ const mrVerdictLabel = v => ({ ready: "Ready to send", caution: "Look before sending", stop: "Stop — something is wrong" })[v] || (v || "—");
+ const mrVerdictTone = v => ({ ready: "ok", caution: "warn", stop: "bad" })[v] || "warn";
+
  function renderMailAudit() {
  const a = MAIL_AUDIT;
- if (!a) return `<div class="rb-mr-audit rb-mr-audit--none" id="rbMrAuditBox"><span class="rb-mr-dim">No audit yet. <b>Audit with Claude</b> checks every invoice on this board — duplicate months, amounts that jumped, rates nobody entered, invoices with no utility bill behind them, over-allocated arrays, bounces, unpaid ageing — then has Claude read the same evidence for anything else a billing clerk would question.</span></div>`;
+ if (!a) return `<div class="rb-mr-audit rb-mr-audit--none" id="rbMrAuditBox"><span class="rb-mr-dim">No audit yet. <b>Audit with Claude</b> checks every invoice on this board — duplicate months, amounts that jumped, rates nobody entered, invoices with no utility bill behind them, over-allocated arrays, bounces, unpaid ageing — then has Claude read the same evidence for anything else a billing clerk would question. Every finding comes with a suggested fix and a button to the place that fixes it.</span></div>`;
  if (a.status === "running") {
  return `<div class="rb-mr-audit rb-mr-audit--run" id="rbMrAuditBox"><span class="rb2-spin" aria-hidden="true"></span> Auditing… reading every issued and pending invoice, then asking Claude. Started ${esc(mrWhen(a.started_at))}.</div>`;
  }
@@ -2719,34 +2731,118 @@
  return `<div class="rb-mr-audit rb-mr-audit--bad" id="rbMrAuditBox"><b>The last audit failed</b> (${esc(mrWhen(a.started_at))}): ${esc(a.error || "unknown error")}. Run it again.</div>`;
  }
  const v = a.verdict || "caution";
- const vLabel = { ready: "Ready to send", caution: "Look before sending", stop: "Stop — something is wrong" }[v] || v;
- const vTone = { ready: "ok", caution: "warn", stop: "bad" }[v] || "warn";
+ const vTone = mrVerdictTone(v);
  const findings = a.findings || [];
  const st = a.stats || {};
- const who = a.model ? `${esc(a.model)}` : "rules only (no model key)";
+ const look = a.what_to_look_for || st.what_to_look_for || [];
+ const who = a.model
+ ? `${esc(a.model)}${a.provider === "claude-cli" ? " · your subscription" : (a.provider === "anthropic" ? " · API" : "")}`
+ : "rules only (no model available)";
  const bySev = {};
  findings.forEach(f => { (bySev[f.severity] = bySev[f.severity] || []).push(f); });
- const order = ["critical", "high", "medium", "low", "info"];
- const rows = order.flatMap(sev => (bySev[sev] || []).map(f => {
- const tone = { critical: "bad", high: "bad", medium: "warn", low: "dim", info: "dim" }[sev];
- const link = f.invoice_id != null && !String(f.invoice_id).startsWith("legacy")
- ? `<button class="rb-mr-link" type="button" data-mr-open-inv="${esc(String(f.invoice_id))}">open invoice</button>`
- : (f.subscription_id != null ? `<button class="rb-mr-link" type="button" data-mr-open-sub="${esc(String(f.subscription_id))}">open offtaker</button>` : "");
+ const filt = MAIL_SEV_FILTER === "all" ? findings : findings.filter(f => f.severity === MAIL_SEV_FILTER);
+ const sevChips = ["all"].concat(MR_SEV_ORDER).map(sv => {
+ const n = sv === "all" ? findings.length : (bySev[sv] || []).length;
+ if (sv !== "all" && !n) return "";
+ return `<button type="button" class="rb-mr-sev rb-mr-sev--${sv === "all" ? "all" : MR_SEV_TONE[sv]}${MAIL_SEV_FILTER === sv ? " on" : ""}" data-mr-sev="${sv}">${sv === "all" ? "All" : esc(sv)} <span>${n}</span></button>`;
+ }).join("");
+ const order = f => MR_SEV_ORDER.indexOf(f.severity);
+ const rows = filt.slice().sort((x, y) => order(x) - order(y)).map(f => {
+ const tone = MR_SEV_TONE[f.severity] || "dim";
+ const targets = (f.targets || []).map(t =>
+ `<button type="button" class="ao-btn rb-btn rb-mr-tbtn" data-mr-jump="${esc(JSON.stringify(t))}">${esc(t.label || t.kind)}</button>`).join("");
  return `<div class="rb-mr-find rb-mr-find--${tone}">
- <div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${tone}">${esc(sev)}</span> <b>${esc(f.title || "")}</b>${f.source === "model" ? ` <span class="rb-mr-chip rb-mr-chip--dim" title="raised by the model, not a rule">Claude</span>` : ""}${f.customer_name ? ` <span class="rb-mr-dim">· ${esc(f.customer_name)}</span>` : ""} ${link}</div>
- <div class="rb-mr-find-d">${esc(f.detail || "")}${f.action ? ` <span class="rb-mr-act">→ ${esc(f.action)}</span>` : ""}</div>
+ <div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${tone}">${esc(f.severity)}</span> <b>${esc(f.title || "")}</b>${f.source === "model" ? ` <span class="rb-mr-chip rb-mr-chip--dim" title="raised by Claude, not a rule">Claude</span>` : ""}${f.customer_name ? ` <span class="rb-mr-dim">· ${esc(f.customer_name)}</span>` : ""}</div>
+ <div class="rb-mr-find-d">${esc(f.detail || "")}</div>
+ ${f.fix || f.action ? `<div class="rb-mr-fix"><span class="rb-mr-fix-l">Suggested fix</span><span>${esc(f.fix || f.action)}</span></div>` : ""}
+ ${targets ? `<div class="rb-mr-targets">${targets}</div>` : ""}
  </div>`;
- }));
- const counts = order.filter(s => (st.by_severity || {})[s]).map(s => `${(st.by_severity || {})[s]} ${s}`).join(" · ");
+ });
+ const lookState = mrLookState();
+ const lookHtml = look.length ? `<section class="rb-mr-look">
+ <h5>What to look for <span class="rb-mr-hsub">checks only you can make — tick them off as you go</span></h5>
+ <ul>${look.map((x, i) => `<li><label><input type="checkbox" data-mr-look="${i}"${lookState[a.id + ":" + i] ? " checked" : ""}><span>${esc(x)}</span></label></li>`).join("")}</ul>
+ </section>` : "";
+ const counts = MR_SEV_ORDER.filter(s2 => (st.by_severity || {})[s2]).map(s2 => `${(st.by_severity || {})[s2]} ${s2}`).join(" · ");
  return `<details class="rb-mr-audit rb-mr-audit--${vTone}" id="rbMrAuditBox" open>
- <summary class="rb-mr-audit-sum"><span class="rb-mr-chip rb-mr-chip--${vTone}">${esc(vLabel)}</span>
- <span class="rb-mr-audit-meta">${esc(mrWhen(a.finished_at || a.started_at))} · ${who} · ${fmt0(st.sent || 0)} sent + ${fmt0(st.outgoing || 0)} queued checked${counts ? " · " + esc(counts) : " · no findings"}</span></summary>
+ <summary class="rb-mr-audit-sum"><span class="rb-mr-chip rb-mr-chip--${vTone} rb-mr-verdict">${esc(mrVerdictLabel(v))}</span>
+ <span class="rb-mr-audit-meta">${esc(mrWhen(a.finished_at || a.started_at))} · ${who} · ${fmt0(st.sent || 0)} sent + ${fmt0(st.outgoing || 0)} queued checked${counts ? " · " + esc(counts) : " · nothing flagged"}</span></summary>
  <div class="rb-mr-audit-body">
- ${a.summary ? `<p class="rb-mr-audit-sumtext">${esc(a.summary)}</p>` : ""}
- ${rows.length ? rows.join("") : `<p class="rb-arch-empty">Nothing flagged.</p>`}
+ <div class="rb-mr-audit-head">
+ ${a.summary ? `<p class="rb-mr-audit-sumtext">${esc(a.summary)}</p>` : `<p class="rb-mr-audit-sumtext rb-mr-dim">No summary.</p>`}
+ <div class="rb-mr-audit-actions"><button type="button" class="ao-btn rb-btn" id="rbMrCopy" title="Copy the verdict, checks and findings as text">Copy report</button></div>
+ </div>
+ ${lookHtml}
+ <section class="rb-mr-findsec">
+ <h5>Findings <span class="rb-mr-count">${fmt0(findings.length)}</span>${findings.length ? `<span class="rb-mr-sevs">${sevChips}</span>` : ""}</h5>
+ ${rows.length ? rows.join("") : `<p class="rb-arch-empty">${findings.length ? "Nothing at this severity." : "Nothing flagged. The checks above are what is left for a human."}</p>`}
+ </section>
  ${st.model_error ? `<p class="rb-mr-dim rb-mr-audit-note">Model review skipped: ${esc(st.model_error)}</p>` : ""}
  ${(st.model_skipped && st.model_skipped.length) ? `<p class="rb-mr-dim rb-mr-audit-note">Also tried: ${esc(st.model_skipped.join("; "))}</p>` : ""}
  </div></details>`;
+ }
+
+ // Jump to the place that fixes a finding. The off-taker list is FOLDED while
+ // the mail room is open, so a card may not exist in the DOM yet — re-render
+ // the list around the target first (the holds panel does the same), then
+ // expand it.
+ function mrOpenOfftaker(sid) {
+ sid = String(sid);
+ const ov = document.getElementById("mrOverlay");
+ if (ov && !ov.hidden) { ov.hidden = true; document.body.style.overflow = ""; }
+ if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
+ ACTIVE_SUB_ID = sid;
+ renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
+ }
+ if (!document.querySelector(`.rb-acc[data-id="${sid}"]`)) {
+ bulkToast("That offtaker isn’t in the list — it may have been removed or is filtered out");
+ return false;
+ }
+ expandAccordion(sid);
+ return true;
+ }
+ function mrJump(t) {
+ if (!t || !t.kind) return;
+ const scrollTo = el => { if (el) { el.hidden = false; requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" })); } };
+ switch (t.kind) {
+ case "invoice": openMailDrawer(t.id); return;
+ case "draft": mrOpenOfftaker(t.subscription_id != null ? t.subscription_id : t.id); return;
+ case "offtaker": mrOpenOfftaker(t.id); return;
+ case "bill_audit": applyInvoicesSub("audit"); return;
+ case "holds": {
+ const el = document.getElementById("rbDeliveryHolds");
+ if (!el || el.hidden || !el.innerHTML.trim()) { bulkToast("No delivery holds right now"); return; }
+ scrollTo(el); return;
+ }
+ case "collection": {
+ const el = document.getElementById("rbCollectionSettings");
+ if (el) { el.open = true; scrollTo(el); } return;
+ }
+ case "cycle": { scrollTo(document.getElementById("rb2RailCycle")); return; }
+ default: return;
+ }
+ }
+ function mrCopyAudit() {
+ const a = MAIL_AUDIT;
+ if (!a || a.status !== "done") return;
+ const lines = [];
+ lines.push(`Mail room audit — ${mrWhen(a.finished_at || a.started_at)} — ${mrVerdictLabel(a.verdict || "caution")}`);
+ lines.push(a.model ? `Reviewed by ${a.model}${a.provider === "claude-cli" ? " (subscription)" : ""}` : "Rules only (no model available)");
+ if (a.summary) lines.push("", a.summary);
+ const look = a.what_to_look_for || (a.stats || {}).what_to_look_for || [];
+ if (look.length) { lines.push("", "What to look for:"); look.forEach(x => lines.push(`- ${x}`)); }
+ const fs = a.findings || [];
+ lines.push("", `Findings (${fs.length}):`);
+ if (!fs.length) lines.push("- nothing flagged");
+ fs.forEach(f => {
+ lines.push(`[${f.severity}] ${f.title}${f.customer_name ? " — " + f.customer_name : ""}${f.source === "model" ? " (Claude)" : ""}`);
+ if (f.detail) lines.push(`  ${f.detail}`);
+ if (f.fix || f.action) lines.push(`  Suggested fix: ${f.fix || f.action}`);
+ });
+ const text = lines.join("\n");
+ const done = () => bulkToast("Audit report copied");
+ if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => bulkToast("Couldn’t copy"));
+ else { try { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); done(); } catch (e) { bulkToast("Couldn’t copy"); } }
  }
 
  function wireMailroomPanel(host) {
@@ -2775,12 +2871,19 @@
  card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
  });
  det.querySelectorAll("[data-mr-sub]").forEach(card => {
- const open = () => { const sid = card.getAttribute("data-mr-sub"); if (sid) expandAccordion(String(sid), { scroll: true }); };
+ const open = () => { const sid = card.getAttribute("data-mr-sub"); if (sid) mrOpenOfftaker(sid); };
  card.onclick = open;
  card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
  });
- det.querySelectorAll("[data-mr-open-inv]").forEach(b => { b.onclick = e => { e.stopPropagation(); openMailDrawer(b.getAttribute("data-mr-open-inv")); }; });
- det.querySelectorAll("[data-mr-open-sub]").forEach(b => { b.onclick = e => { e.stopPropagation(); expandAccordion(String(b.getAttribute("data-mr-open-sub")), { scroll: true }); }; });
+ det.querySelectorAll("[data-mr-jump]").forEach(b => { b.onclick = e => {
+ e.stopPropagation();
+ let t = null; try { t = JSON.parse(b.getAttribute("data-mr-jump") || "null"); } catch (err) { t = null; }
+ mrJump(t);
+ }; });
+ det.querySelectorAll("[data-mr-sev]").forEach(b => { b.onclick = e => { e.stopPropagation(); MAIL_SEV_FILTER = b.getAttribute("data-mr-sev") || "all"; renderArchive(); }; });
+ det.querySelectorAll("[data-mr-look]").forEach(cb => { cb.onchange = () => { if (MAIL_AUDIT) mrLookSet(MAIL_AUDIT.id, cb.getAttribute("data-mr-look"), cb.checked); }; });
+ const copy = det.querySelector("#rbMrCopy");
+ if (copy) copy.onclick = e => { e.stopPropagation(); mrCopyAudit(); };
  }
 
  async function mrRunAudit() {
@@ -2830,21 +2933,32 @@
  }
  async function openMailDrawer(id) {
  const ov = mrDrawerBuild();
- const item = (MAILROOM && MAILROOM.sent || []).find(x => String(x.id) === String(id)) || null;
+ const sid = String(id);
+ const item = (MAILROOM && MAILROOM.sent || []).find(x => String(x.id) === sid) || null;
  ov.hidden = false; document.body.style.overflow = "hidden";
  const left = ov.querySelector("#mrLeft"), right = ov.querySelector("#mrRight");
- ov.querySelector("#mrTitle").textContent = item ? `${item.customer_name || "Invoice"} · ${mrMoney(item.amount_usd)}` : "Invoice";
- ov.querySelector("#mrSub").textContent = item ? [item.invoice_number ? "#" + item.invoice_number : "", item.period_label, mrWhen(item.sent_at)].filter(Boolean).join(" · ") : "";
+ const setHead = inv => {
+ ov.querySelector("#mrTitle").textContent = inv ? `${inv.customer_name || "Invoice"} · ${mrMoney(inv.amount_usd)}` : "Invoice";
+ ov.querySelector("#mrSub").textContent = inv ? [inv.invoice_number ? "#" + inv.invoice_number : "", inv.period_label, mrWhen(inv.sent_at), inv.legacy ? "older record" : ""].filter(Boolean).join(" · ") : "";
  const openSub = ov.querySelector("#mrOpenSub");
- openSub.onclick = () => { if (item && item.subscription_id != null) { ov.hidden = true; document.body.style.overflow = ""; expandAccordion(String(item.subscription_id), { scroll: true }); } };
+ openSub.hidden = !(inv && inv.subscription_id != null);
+ openSub.onclick = () => { if (inv && inv.subscription_id != null) mrOpenOfftaker(inv.subscription_id); };
+ };
+ setHead(item);
  left.innerHTML = `<p class="rb-mr-dim">loading…</p>`; right.innerHTML = "";
- let inv = item;
- if (item && !item.legacy) {
- const d = await fetch(API + "/mailroom/invoice/" + encodeURIComponent(id), { headers: authHeaders() })
- .then(r => r.ok ? r.json() : null).catch(() => null);
- if (d && d.invoice) inv = Object.assign({}, item, d.invoice);
+ // Always fetch: the board may hold a different page, the finding may cite an
+ // invoice the list never loaded, and older sends have their own endpoint.
+ const legacy = sid.startsWith("legacy:");
+ let url = null;
+ if (legacy) { const parts = sid.split(":"); if (parts.length === 3) url = API + "/mailroom/legacy/" + encodeURIComponent(parts[1]) + "/" + encodeURIComponent(parts[2]); }
+ else if (/^\d+$/.test(sid)) url = API + "/mailroom/invoice/" + sid;
+ const d = url ? await fetch(url, { headers: authHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null) : null;
+ const inv = d && d.invoice ? Object.assign({}, item || {}, d.invoice) : item;
+ if (!inv) {
+ left.innerHTML = `<p class="rb-arch-empty">Couldn’t load that invoice. It may belong to another period than the board has loaded, or it was removed.</p>`;
+ return;
  }
- if (!inv) { left.innerHTML = `<p class="rb-arch-empty">This invoice is no longer on the board.</p>`; return; }
+ setHead(inv);
  mrRenderDrawer(inv, left, right);
  }
  function mrRow(label, valueHtml, opts) {
@@ -2862,19 +2976,23 @@
  ${(inv.bcc || []).length ? `<div><span class="rb-es-envlab">BCC</span> ${esc(inv.bcc.join(", "))}</div>` : ""}
  ${em.reply_to || inv.reply_to ? `<div><span class="rb-es-envlab">REPLY-TO</span> ${esc(em.reply_to || inv.reply_to)}</div>` : ""}
  </div>
- <div class="rb-es-mail-body rb-mr-mailbody">${inv.legacy
- ? `<p class="rb-mr-dim">This invoice was issued before the platform kept a frozen copy of each email, so the exact message cannot be shown. The figures above are from the send record.</p>`
- : `<iframe class="rb-mr-frame" id="mrFrame" title="The email as sent" sandbox="" referrerpolicy="no-referrer"></iframe>`}</div>
+ <div class="rb-es-mail-body rb-mr-mailbody"><iframe class="rb-mr-frame" id="mrFrame" title="The email as sent" sandbox="" referrerpolicy="no-referrer"></iframe>${inv.legacy ? `<p class="rb-mr-dim rb-mr-legacynote">Older record: the figures are from the send stamp; the email is shown only if the archive still holds it.</p>` : ""}</div>
  <div class="rb-es-mail-att">${(inv.attachment_files || []).length
  ? inv.attachment_files.map(a => `<button class="rb-mr-link" type="button" data-mr-att="${esc(a.filename)}">📄 ${esc(a.filename)}</button>${a.size_bytes ? ` <span class="rb-mr-dim">${fmt0(Math.round(a.size_bytes / 1024))} KB</span>` : ""}`).join(" &nbsp;·&nbsp; ")
  : ((inv.attachments || []).length ? esc(inv.attachments.join(" · ")) : `<span class="rb-mr-dim">no attachments on file</span>`)}</div>
  </div>`;
  left.innerHTML = `<div class="rb-es-prevlabel">THE EMAIL AS SENT</div>${env}`;
- if (!inv.legacy) {
- fetch(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/email", { headers: authHeaders() })
+ const sidStr = String(inv.id);
+ const emailUrl = sidStr.startsWith("legacy:")
+ ? (() => { const p = sidStr.split(":"); return p.length === 3 ? API + "/mailroom/legacy/" + encodeURIComponent(p[1]) + "/" + encodeURIComponent(p[2]) + "/email" : null; })()
+ : API + "/mailroom/invoice/" + encodeURIComponent(sidStr) + "/email";
+ if (emailUrl) {
+ fetch(emailUrl, { headers: authHeaders() })
  .then(r => r.ok ? r.text() : "<p style='font:14px sans-serif;padding:20px'>Couldn’t load the email body.</p>")
  .then(html => { const f = document.getElementById("mrFrame"); if (f) f.srcdoc = html; })
  .catch(() => null);
+ }
+ if (!inv.legacy) {
  left.querySelectorAll("[data-mr-att]").forEach(b => {
  b.onclick = () => authBlobDownload(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/attachment/" + encodeURIComponent(b.getAttribute("data-mr-att")), b.getAttribute("data-mr-att"));
  });
@@ -2895,7 +3013,7 @@
  const settl = (inv.settlements || []).map(s => `<div class="rb-mr-dim">${mrMoney(s.amount_usd)} by ${esc(s.method || "offline")} on ${esc(s.received_on || "")}${s.note ? " — " + esc(s.note) : ""}</div>`).join("");
  const findings = (MAIL_AUDIT && MAIL_AUDIT.status === "done" ? (MAIL_AUDIT.findings || []) : [])
  .filter(f => String(f.invoice_id) === String(inv.id) || (f.invoice_id == null && String(f.subscription_id) === String(inv.subscription_id)));
- const findHtml = findings.length ? findings.map(f => `<div class="rb-mr-find rb-mr-find--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}"><div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}">${esc(f.severity)}</span> <b>${esc(f.title)}</b></div><div class="rb-mr-find-d">${esc(f.detail || "")}</div></div>`).join("") : "";
+ const findHtml = findings.length ? findings.map(f => `<div class="rb-mr-find rb-mr-find--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}"><div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}">${esc(f.severity)}</span> <b>${esc(f.title)}</b>${f.source === "model" ? ` <span class="rb-mr-chip rb-mr-chip--dim">Claude</span>` : ""}</div><div class="rb-mr-find-d">${esc(f.detail || "")}</div>${f.fix || f.action ? `<div class="rb-mr-fix"><span class="rb-mr-fix-l">Suggested fix</span><span>${esc(f.fix || f.action)}</span></div>` : ""}</div>`).join("") : "";
  const timeline = [
  inv.prepared_at ? ["Frozen", inv.prepared_at] : null,
  inv.sent_at ? ["Sent", inv.sent_at] : null,
