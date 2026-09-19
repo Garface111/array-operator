@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-17",
+  "updated": "2026-09-19",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -10,6 +10,15 @@
       "summary": "A Sept 17, 2026 CT Mirror report notes electricity prices are falling heading into the election: Eversource standard-service supply dropped to 11.577¢/kWh on July 1, 2026 and a public-benefits bill credit of roughly $30–34/month runs through April 2027, driven largely by long-term Millstone and Seabrook nuclear contracts. Eversource's pending PURA distribution rate case still seeks a double-digit increase for July 2027.",
       "source": "CT Mirror",
       "url": "https://ctmirror.org/2026/09/17/cts-electricity-prices-are-falling/"
+    },
+    {
+      "date": "2026-09-09",
+      "state": "vt",
+      "tag": "Rulemaking",
+      "title": "Vermont PUC opens a rulemaking to update net-metering Rule 5.100, with an Oct 2 workshop",
+      "summary": "On September 9, 2026 the Vermont Public Utility Commission issued an order opening an investigation to update Commission Rule 5.100 (Regulations Pertaining to Construction and Operation of Net-Metering Systems). A stakeholder workshop is scheduled for October 2, 2026 at 9:30 a.m. The rulemaking follows the Commission's May 29, 2026 biennial compensation update that cut Category I rates for a seventh straight year.",
+      "source": "Vermont PUC",
+      "url": "https://puc.vermont.gov/news/order-opening-rulemaking-update-net-metering-rule"
     },
     {
       "date": "2026-09-08",
@@ -145,15 +154,6 @@
       "summary": "Gov. Kelly Ayotte signed SB 540 (Chapter 262) on July 2, 2026, legalizing portable solar generation devices up to 1,200 watts AC per customer and exempting them from interconnection agreements, utility approval, and net-metering rules; the law takes effect Jan 1, 2027. It places NH alongside Maine, Vermont and Connecticut among New England states regulating the technology.",
       "source": "New Hampshire Bulletin",
       "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
-    },
-    {
-      "date": "2026-06-11",
-      "state": "vt",
-      "tag": "Rulemaking",
-      "title": "Vermont PUC's 2026 net-metering order cuts solar compensation for a 7th straight year",
-      "summary": "In Case 26-0291-INV the Public Utility Commission's May 29, 2026 biennial order reduces net-metering compensation for new systems and raises the small-solar siting charge from 4¢ to 5¢/kWh for systems permitted Aug 1, 2026 through Jul 31, 2028. Renewable Energy Vermont estimates the change cuts lifetime compensation for a typical 7 kW system by roughly $4,292, hitting community and off-site net-metering customers hardest.",
-      "source": "VTDigger",
-      "url": "https://vtdigger.org/2026/06/11/opinion-vermonts-net-metering-decision-just-made-solar-harder/"
     }
   ]
 }
