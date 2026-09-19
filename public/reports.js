@@ -3163,7 +3163,54 @@
  // Ford 2026-07-28: "delete the send pipeline visual, it's too busy" — but every
  // fact and control it carried lives on: approve count + $, delivered line →
  // archive, next run, pause/resume, and the delivery-mode slider, all here).
+ function renderDeliveryHolds() {
+ const host = document.getElementById("rbDeliveryHolds");
+ if (!host) return;
+ const invoices = PIPE && Array.isArray(PIPE.holds) ? PIPE.holds : [];
+ const dispatches = PIPE && Array.isArray(PIPE.dispatch_holds) ? PIPE.dispatch_holds : [];
+ host.hidden = !invoices.length && !dispatches.length;
+ if (host.hidden) { host.innerHTML = ""; return; }
+ const names = new Map((OFFTAKERS || []).map(s => [String(s.id), s.customer_name || s.name || "Offtaker"]));
+ const labels = { held: "On hold", prepared: "Queued", failed: "Retry pending", sending: "Acceptance not yet confirmed", uncertain: "Acceptance uncertain", accepted: "Provider accepted" };
+ const state = value => labels[value] || String(value || "Needs review");
+ const rows = invoices.map(item => {
+ const sid = Number(item.subscription_id);
+ const canOpen = Number.isSafeInteger(sid) && sid > 0 && names.has(String(sid));
+ const who = names.get(String(item.subscription_id)) || `Offtaker ${item.subscription_id || "unknown"}`;
+ const amount = item.amount_cents != null && !(item.status === "held" && Number(item.amount_cents) === 0)
+ ? moneyFmt(Number(item.amount_cents) / 100) : "Not yet confirmed";
+ return `<tr><td>${canOpen ? `<button type="button" class="ao-btn" data-hold-sub="${sid}">${esc(who)}</button>` : esc(who)}</td>
+ <td>${esc(item.period || "Unknown period")}</td><td>${esc(amount)}</td>
+ <td>${esc(state(item.status))}</td><td>${esc(item.reason || "Review the invoice source and delivery status.")}</td></tr>`;
+ }).join("");
+ const emailRows = dispatches.map(item => {
+ const retry = item.retry_at ? new Date(item.retry_at) : null;
+ const when = retry && !isNaN(retry.getTime()) ? retry.toLocaleString() : null;
+ const uncertain = item.status === "sending" || item.status === "uncertain";
+ const action = uncertain ? "Check the email provider and reconcile acceptance before retrying."
+ : (Number(item.attempts) >= 8 ? "Retry limit reached; operator review required."
+ : when ? `Next retry eligible ${when}.` : "Waiting for an eligible retry.");
+ const kind = { invoice: "Invoice email", monthly_report: "Monthly summary", receipt: "Payment receipt" }[item.kind] || "Email request";
+ return `<li><b>${esc(kind)} #${esc(String(item.id))}: ${esc(state(item.status))}</b>
+ <div>${esc(item.reason || "Delivery confirmation needs review.")}</div>
+ <div>${esc(String(Number(item.attempts) || 0))} attempt(s). ${esc(action)}</div></li>`;
+ }).join("");
+ host.innerHTML = `<h3>Invoices needing attention</h3>
+ <p>These invoices or emails need review before the cycle is complete. Provider acceptance confirms a send request; it does not confirm inbox delivery or payment.</p>
+ ${rows ? `<div style="overflow-x:auto"><table class="rb-track-pays"><thead><tr><th>Offtaker</th><th>Period</th><th>Amount</th><th>Status</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+ ${emailRows ? `<h4>Email delivery checks</h4><ul>${emailRows}</ul>` : ""}`;
+ host.querySelectorAll("[data-hold-sub]").forEach(button => { button.onclick = () => {
+ const sid = button.dataset.holdSub;
+ if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
+ ACTIVE_SUB_ID = sid;
+ renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
+ }
+ expandAccordion(sid);
+ }; });
+ }
+
  function renderPipeline() {
+ renderDeliveryHolds();
  const host = document.getElementById("rb2RailCycle");
  if (!host) return;
  // Signed-out demo paints a frozen cycle card from AO_DEMO.pipeline.
@@ -3183,6 +3230,7 @@
  const appr = inf.pending_approval != null ? inf.pending_approval : (inf.pending_drafts || 0);
  const au = inf.pending_auto || 0;
  const wait = inf.waiting || 0;
+ const attention = (Array.isArray(p.holds) ? p.holds.length : 0) + (Array.isArray(p.dispatch_holds) ? p.dispatch_holds.length : 0);
  // $ across the pending-drafts inbox — best-effort display sum only.
  let apprUsd = 0;
  (INBOX_DRAFTS || []).forEach(d => { if (d && d.amount_usd != null) apprUsd += Number(d.amount_usd) || 0; });
@@ -3190,7 +3238,7 @@
  ? `${fmt0(appr)} <span>to approve</span>`
  : (au > 0 ? `${fmt0(au)} <span>auto-sending</span>`
  : (wait > 0 ? `${fmt0(wait)} <span>waiting on bills</span>`
- : `<span>all caught up</span>`));
+ : (attention > 0 ? `${fmt0(attention)} <span>need attention</span>` : `<span>all caught up</span>`)));
  const cap = appr > 0 && apprUsd > 0
  ? `${money0(apprUsd)} drafted from settled bills`
  : `drafted from settled utility bills`;
@@ -3214,7 +3262,7 @@
  <div class="rb2-rc-rows">
  <div class="rb2-rc-row" id="rb2CellLast" role="button" tabindex="0" title="Scrolls to the invoice archive. Download this month as a .zip there.">
  <span class="rb2-rc-check">✓</span><b>${esc(_monthName(last.period_month))}</b>
- <span>${fmt0(last.delivered || 0)} of ${fmt0(p.total_enabled || 0)} sent${last.dollars ? " · " + money0(last.dollars) : ""}</span>
+ <span>${fmt0(last.delivered || 0)} of ${fmt0(p.total_enabled || 0)} provider accepted${last.dollars ? " · " + money0(last.dollars) : ""}</span>
  <span class="rb2-sp"></span><span class="rb2-rc-quiet">archive</span>
  </div>
  <div class="rb2-rc-row">
@@ -3535,6 +3583,7 @@
  <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
  <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
  <details class="rep-card" id="rbCollectionSettings"><summary>Payment collection</summary><div id="rbCollectionBody">Loading…</div></details>
+ <section class="rep-card" id="rbDeliveryHolds" aria-label="Invoices needing attention" hidden></section>
  <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
  </div>
  </div>
