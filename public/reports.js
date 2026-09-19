@@ -2745,6 +2745,7 @@
  ${a.summary ? `<p class="rb-mr-audit-sumtext">${esc(a.summary)}</p>` : ""}
  ${rows.length ? rows.join("") : `<p class="rb-arch-empty">Nothing flagged.</p>`}
  ${st.model_error ? `<p class="rb-mr-dim rb-mr-audit-note">Model review skipped: ${esc(st.model_error)}</p>` : ""}
+ ${(st.model_skipped && st.model_skipped.length) ? `<p class="rb-mr-dim rb-mr-audit-note">Also tried: ${esc(st.model_skipped.join("; "))}</p>` : ""}
  </div></details>`;
  }
 
