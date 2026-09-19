@@ -1503,6 +1503,7 @@
  loadArchive().catch(() => null),
  loadBillArchive().catch(() => null),
  loadMonthly().catch(() => null),
+ loadMailroom().catch(() => null),
  ]).then(() => renderArchive()).catch(() => {});
  }
  }
@@ -1936,13 +1937,15 @@
  // panel; the rail rows' pressed state always mirrors reality).
  function _syncArchiveEntryPoints() {
  const host = $("#rbArchiveHost");
- if (host && host.innerHTML) host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen);
+ if (host && host.innerHTML) host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen || _mailroomOpen);
  const a = document.getElementById("rb2RailArch");
  if (a) a.setAttribute("aria-pressed", String(!!_archiveOpen));
  const b = document.getElementById("rb2RailBillArch");
  if (b) b.setAttribute("aria-pressed", String(!!_billArchiveOpen));
  const m = document.getElementById("rb2RailMonthly");
  if (m) m.setAttribute("aria-pressed", String(!!_monthlyOpen));
+ const mr = document.getElementById("rb2RailMail");
+ if (mr) mr.setAttribute("aria-pressed", String(!!_mailroomOpen));
  }
 
  // Opening an archive folds the whole offtaker tree first (Ford 2026-07-28:
@@ -1966,6 +1969,25 @@
  // manifest failed to load earlier (the endpoint used to 504 on big fleets),
  // opening retries the fetch instead of silently doing nothing.
  function toggleArchivePanel(which) {
+ if (which === "mailroom" && !MAILROOM) {
+ const meta = document.getElementById("rb2RailMailMeta");
+ if (meta) meta.textContent = "loading…";
+ _mailroomOpen = true;
+ loadMailroom(true).then(() => {
+ if (!MAILROOM) _mailroomOpen = false;   // failed — don't claim an open panel
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (MAILROOM) { _foldListForArchive(); _scrollToArchive(); }
+ });
+ return;
+ }
+ if (which === "mailroom") {
+ _mailroomOpen = !_mailroomOpen;
+ renderArchive();
+ _syncArchiveEntryPoints();
+ if (_mailroomOpen) { _foldListForArchive(); _scrollToArchive(); }
+ return;
+ }
  if (which === "monthly" && !MONTHLY) {
  const meta = document.getElementById("rb2RailMonthlyMeta");
  if (meta) meta.textContent = "loading…";
@@ -2088,10 +2110,10 @@
  const total = (ARCHIVE && ARCHIVE.month_count) || 0;
  const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
  const billCount = (BILL_ARCHIVE && BILL_ARCHIVE.count) || bills.length || 0;
- if (!ARCHIVE && !BILL_ARCHIVE && !MONTHLY) { host.hidden = true; host.innerHTML = ""; return; }
+ if (!ARCHIVE && !BILL_ARCHIVE && !MONTHLY && !MAILROOM && !_mailroomFailed) { host.hidden = true; host.innerHTML = ""; return; }
  // The archives' ENTRY POINTS live in the rail (Ford 2026-07-28); the panel
  // itself only occupies the list column while one of them is open.
- host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen);
+ host.hidden = !(_archiveOpen || _billArchiveOpen || _monthlyOpen || _mailroomOpen);
  const railArch = document.getElementById("rb2RailArch");
  if (railArch) {
  railArch.hidden = !ARCHIVE;
@@ -2123,6 +2145,18 @@
  : (nx && !nx.already_sent && nx.due_at)
  ? ("next " + shortDate(nx.due_at))
  : (reps.length ? `${fmt0(reps.length)} sent` : "none yet");
+ }
+ }
+
+ const railMail = document.getElementById("rb2RailMail");
+ if (railMail) {
+ railMail.hidden = !MAILROOM && !_mailroomFailed;
+ railMail.setAttribute("aria-pressed", String(!!_mailroomOpen));
+ const meta = document.getElementById("rb2RailMailMeta");
+ if (meta) {
+ const c = (MAILROOM && MAILROOM.counts) || {};
+ meta.textContent = !MAILROOM ? "couldn’t load · retry"
+ : `${fmt0(c.outgoing || 0)} out · ${fmt0(c.sent_total || 0)} sent`;
  }
  }
 
@@ -2291,9 +2325,10 @@
  </div></details>`;
  }
 
- host.innerHTML = invHtml + billHtml + renderMonthlyPanel();
+ host.innerHTML = invHtml + billHtml + renderMonthlyPanel() + renderMailroomPanel();
  wireArchiveToggle();
  wireMonthlyPanel(host);
+ wireMailroomPanel(host);
  // Per-month .zip download (authenticated blob download, same helper as the CSV export).
  host.querySelectorAll("[data-arch-zip]").forEach(btn => {
  btn.onclick = () => downloadArchiveMonth(btn.getAttribute("data-arch-zip"), btn, host);
@@ -2515,6 +2550,383 @@
  const d = new Date(String(iso || ""));
  return isNaN(d) ? String(iso || "") : d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
  }
+
+ // ── Mail room ─────────────────────────────────────────────────────────
+ // Ford (2026-09-19): "a command center or mail room" — LEFT: what invoices
+ // are going out and when; RIGHT: every invoice that went out, click into one
+ // and see everything (amount, who, which utility the data came from, the
+ // email as sent, delivery, payment); plus an Audit button that has Claude
+ // read the whole board and flag anything wrong. Backend: /mailroom*.
+ let MAILROOM = null, _mailroomPromise = null, _mailroomFailed = false, _mailroomOpen = false;
+ let MAIL_FILTER = "", MAIL_AUDIT = null, _mailAuditTimer = null, MAIL_SENT_SHOWN = 60;
+
+ function loadMailroom(force) {
+ if (MAILROOM && !force) return Promise.resolve(MAILROOM);
+ if (_mailroomPromise) return _mailroomPromise;
+ if (!authHeaders()) return Promise.resolve(null);
+ _mailroomPromise = fetch(API + "/mailroom?limit=300", { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null)
+ .then(d => { MAILROOM = (d && d.ok) ? d : null; _mailroomFailed = !MAILROOM; return MAILROOM; })
+ .catch(() => { _mailroomFailed = true; return null; })
+ .finally(() => { _mailroomPromise = null; });
+ return _mailroomPromise.then(d => { loadMailAudit().catch(() => null); return d; });
+ }
+ function loadMailAudit() {
+ if (!authHeaders()) return Promise.resolve(null);
+ return fetch(API + "/mailroom/audit?limit=5", { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null)
+ .then(async d => {
+ const latest = d && d.latest;
+ if (latest && latest.status === "done") {
+ const full = await fetch(API + "/mailroom/audit/" + latest.id, { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null).catch(() => null);
+ MAIL_AUDIT = (full && full.run) || latest;
+ } else {
+ MAIL_AUDIT = latest || null;
+ }
+ if (MAIL_AUDIT && MAIL_AUDIT.status === "running") mrPollAudit(MAIL_AUDIT.id);
+ renderArchive();
+ return MAIL_AUDIT;
+ })
+ .catch(() => null);
+ }
+
+ const mrMoney = v => (v == null || isNaN(Number(v))) ? "—"
+ : "$" + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+ const mrKwh = v => (v == null || isNaN(Number(v))) ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " kWh";
+ const mrRate = v => (v == null || isNaN(Number(v))) ? "—" : "$" + Number(v).toFixed(5) + "/kWh";
+ const mrPct = v => (v == null || isNaN(Number(v))) ? "—" : (Number(v) * 100).toFixed(2).replace(/\.?0+$/, "") + "%";
+ function mrWhen(iso) {
+ if (!iso) return "";
+ const d = new Date(iso); if (isNaN(d)) return String(iso);
+ return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+ }
+ function mrUtil(u) {
+ if (!u) return "";
+ const prov = (u.provider || "").toUpperCase();
+ return esc([prov, u.account_number].filter(Boolean).join(" · ")) + (u.nickname ? ` <span class="rb-mr-dim">${esc(u.nickname)}</span>` : "");
+ }
+ function mrDeliveryChip(d) {
+ const s = (d && d.status) || "accepted";
+ const map = { delivered: ["ok", "delivered"], bounced: ["bad", "bounced"], unconfirmed: ["warn", "unconfirmed"], accepted: ["dim", "accepted by mailer"] };
+ const [tone, label] = map[s] || ["dim", s];
+ return `<span class="rb-mr-chip rb-mr-chip--${tone}" title="${esc((d && d.reason) || "")}">${esc(label)}</span>`;
+ }
+ function mrPayChip(x) {
+ const s = x.payment_summary || "not_tracked";
+ const map = { paid: ["ok", "paid"], partial: ["warn", "partly paid"], unpaid: ["bad", "unpaid"], refunded: ["dim", "refunded"], not_tracked: ["dim", "payment not tracked"] };
+ const [tone, label] = map[s] || ["dim", s];
+ const extra = (s === "unpaid" || s === "partial") && x.outstanding_usd != null ? ` · ${mrMoney(x.outstanding_usd)} due` : "";
+ return `<span class="rb-mr-chip rb-mr-chip--${tone}">${esc(label + extra)}</span>`;
+ }
+ function mrMatches(x) {
+ const q = MAIL_FILTER.trim().toLowerCase();
+ if (!q) return true;
+ const hay = [x.customer_name, x.invoice_number, x.email, (x.to || []).join(" "), (x.cc || []).join(" "),
+ x.period_label, x.subject, x.utility && x.utility.account_number, x.utility && x.utility.provider,
+ (x.arrays || []).join(" ")].filter(Boolean).join(" ").toLowerCase();
+ return hay.includes(q);
+ }
+
+ function renderMailroomPanel() {
+ if (!MAILROOM) {
+ if (!_mailroomFailed) return "";
+ return `<details class="rb-arch rb-mailroom"${_mailroomOpen ? " open" : ""} id="rbMailroom">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Mail room</span><span class="rb-arch-sub">couldn’t load</span></summary>
+ <div class="rb-arch-body"><p class="rb-arch-empty">Couldn’t load the mail room. Click the rail row to retry.</p></div></details>`;
+ }
+ const c = MAILROOM.counts || {};
+ const out = (MAILROOM.outgoing || []).filter(mrMatches);
+ const sentAll = (MAILROOM.sent || []).filter(mrMatches);
+ const sent = sentAll.slice(0, MAIL_SENT_SHOWN);
+
+ // The board in one sentence, before any list.
+ const bits = [];
+ if (c.drafts) bits.push(`${fmt0(c.drafts)} wait${c.drafts === 1 ? "s" : ""} on your approval`);
+ if (c.held) bits.push(`${fmt0(c.held)} held or retrying`);
+ if (c.scheduled) bits.push(`${fmt0(c.scheduled)} scheduled`);
+ const outSentence = c.outgoing
+ ? `${fmt0(c.outgoing)} invoice${c.outgoing === 1 ? " is" : "s are"} on the way out — ${bits.join(", ")}.`
+ : "Nothing is queued to go out.";
+ const sentSentence = c.sent_total
+ ? ` ${fmt0(c.sent_total)} ${c.sent_total === 1 ? "has" : "have"} gone out: ${fmt0(c.paid || 0)} paid, ${mrMoney(c.collected_usd)} collected of ${mrMoney(c.billed_usd)} billed` +
+ (c.bounced ? `, ${fmt0(c.bounced)} bounced` : "") + (c.unconfirmed ? `, ${fmt0(c.unconfirmed)} unconfirmed` : "") + "."
+ : " No invoice has gone out yet.";
+ const paused = MAILROOM.paused ? ` <span class="rb-mr-chip rb-mr-chip--warn">sending paused</span>` : "";
+
+ const outHtml = out.length ? out.map(x => {
+ const kindLabel = { draft: "Draft · needs your approval", held: "Held", retrying: "Retrying", unconfirmed: "Unconfirmed send",
+ prepared: "Frozen · sending next run", scheduled: (x.status === "auto" ? "Auto-send" : (x.status === "paused" ? "Paused" : "Draft for approval")) }[x.kind] || x.kind;
+ const tone = { draft: "warn", held: "bad", retrying: "warn", unconfirmed: "bad", prepared: "dim", scheduled: (x.status === "auto" ? "ok" : "dim") }[x.kind] || "dim";
+ const amt = x.amount_usd == null ? "—" : (x.amount_is_estimate ? "~" : "") + mrMoney(x.amount_usd);
+ const to = x.email ? esc(x.email) : `<span class="rb-mr-dim">no customer email</span>`;
+ return `<div class="rb-mr-card rb-mr-out" data-mr-sub="${x.subscription_id}" data-mr-draft="${x.draft_id || ""}" role="button" tabindex="0">
+ <div class="rb-mr-l1"><b>${esc(x.customer_name || "(unnamed)")}</b><span class="rb-mr-amt" title="${x.amount_is_estimate ? "last invoice amount — the next one is computed from the next bill" : "amount"}">${amt}</span></div>
+ <div class="rb-mr-l2"><span class="rb-mr-chip rb-mr-chip--${tone}">${esc(kindLabel)}</span> <span>${esc(x.when_label || "")}</span>${x.period_label ? ` <span class="rb-mr-dim">· ${esc(x.period_label)}</span>` : ""}</div>
+ <div class="rb-mr-l3"><span>${to}</span>${x.utility ? ` <span class="rb-mr-sep">·</span> <span>${mrUtil(x.utility)}</span>` : ""}${(x.arrays || []).length ? ` <span class="rb-mr-sep">·</span> <span class="rb-mr-dim">${esc(x.arrays.join(", "))}</span>` : ""}</div>
+ ${x.reason ? `<div class="rb-mr-reason">${esc(x.reason)}</div>` : ""}
+ </div>`;
+ }).join("") : `<p class="rb-arch-empty">${MAIL_FILTER ? "Nothing going out matches." : "Nothing is queued. Enabled offtakers appear here as soon as they have a draft, a hold, or a scheduled run."}</p>`;
+
+ const sentHtml = sent.length ? sent.map(x => {
+ const legacy = x.legacy ? ` <span class="rb-mr-chip rb-mr-chip--dim" title="issued before frozen evidence existed — figures from the send stamp">older record</span>` : "";
+ const test = x.kind === "trueup" ? ` <span class="rb-mr-chip rb-mr-chip--dim">true-up</span>` : "";
+ const to = (x.to || []).length ? esc(x.to.join(", ")) : `<span class="rb-mr-dim">no customer recipient</span>`;
+ return `<div class="rb-mr-card rb-mr-sentc" data-mr-inv="${esc(String(x.id))}" role="button" tabindex="0">
+ <div class="rb-mr-l1"><b>${esc(x.customer_name || "(unnamed)")}</b><span class="rb-mr-amt">${mrMoney(x.amount_usd)}</span></div>
+ <div class="rb-mr-l2"><span>${esc(mrWhen(x.sent_at))}</span>${x.invoice_number ? ` <span class="rb-mr-dim">· #${esc(String(x.invoice_number))}</span>` : ""}${x.period_label ? ` <span class="rb-mr-dim">· ${esc(x.period_label)}</span>` : ""}${x.kwh != null ? ` <span class="rb-mr-dim">· ${esc(mrKwh(x.kwh))}</span>` : ""}</div>
+ <div class="rb-mr-l3">${mrDeliveryChip(x.delivery)} ${mrPayChip(x)}${legacy}${test}${x.utility ? ` <span class="rb-mr-sep">·</span> <span>${mrUtil(x.utility)}</span>` : ""}</div>
+ <div class="rb-mr-l4"><span class="rb-mr-dim">to</span> ${to}</div>
+ </div>`;
+ }).join("") : `<p class="rb-arch-empty">${MAIL_FILTER ? "No sent invoice matches." : "No invoice has gone out yet. Each one will appear here the moment the mailer accepts it, with the exact figures, email and attachments it carried."}</p>`;
+ const more = sentAll.length > sent.length
+ ? `<button class="ao-btn rb-btn rb-mr-more" id="rbMrMore" type="button">Show ${fmt0(Math.min(60, sentAll.length - sent.length))} more (${fmt0(sentAll.length - sent.length)} left)</button>` : "";
+
+ return `<details class="rb-arch rb-mailroom"${_mailroomOpen ? " open" : ""} id="rbMailroom">
+ <summary class="rb-arch-sum"><span class="rb-sec-caret" aria-hidden="true">▸</span>
+ <span class="rb-arch-t">Mail room</span>
+ <span class="rb-arch-sub">${fmt0(c.outgoing || 0)} going out · ${fmt0(c.sent_total || 0)} sent${c.collected_usd ? " · " + mrMoney(c.collected_usd) + " collected" : ""}</span></summary>
+ <div class="rb-arch-body">
+ <p class="rb-mo-when">${esc(outSentence)}${esc(sentSentence)}${paused}</p>
+ <div class="rb-mr-tools">
+ <input type="search" class="rb-mr-search" id="rbMrSearch" value="${esc(MAIL_FILTER)}" placeholder="Search offtaker, invoice #, email, account, array…" autocomplete="off" spellcheck="false">
+ <button class="ao-btn ao-btn-primary rb-btn rb-mr-auditbtn" id="rbMrAudit" type="button"${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? " disabled" : ""}>${MAIL_AUDIT && MAIL_AUDIT.status === "running" ? "Auditing…" : "Audit with Claude"}</button>
+ <button class="ao-btn rb-btn" id="rbMrRefresh" type="button" title="Reload the board">Refresh</button>
+ <span class="rb-status" id="rbMrStatus"></span>
+ </div>
+ ${renderMailAudit()}
+ <div class="rb-mr-cols">
+ <section class="rb-mr-col rb-mr-col--out" aria-label="Invoices going out">
+ <h4 class="rb-mr-h">Going out <span class="rb-mr-count">${fmt0(out.length)}</span><span class="rb-mr-hsub">what reaches an offtaker, and when</span></h4>
+ <div class="rb-mr-list">${outHtml}</div>
+ </section>
+ <section class="rb-mr-col rb-mr-col--sent" aria-label="Invoices sent">
+ <h4 class="rb-mr-h">Sent <span class="rb-mr-count">${fmt0(sentAll.length)}</span><span class="rb-mr-hsub">click one to see exactly what went out</span></h4>
+ <div class="rb-mr-list">${sentHtml}${more}</div>
+ </section>
+ </div>
+ </div></details>`;
+ }
+
+ function renderMailAudit() {
+ const a = MAIL_AUDIT;
+ if (!a) return `<div class="rb-mr-audit rb-mr-audit--none" id="rbMrAuditBox"><span class="rb-mr-dim">No audit yet. <b>Audit with Claude</b> checks every invoice on this board — duplicate months, amounts that jumped, rates nobody entered, invoices with no utility bill behind them, over-allocated arrays, bounces, unpaid ageing — then has Claude read the same evidence for anything else a billing clerk would question.</span></div>`;
+ if (a.status === "running") {
+ return `<div class="rb-mr-audit rb-mr-audit--run" id="rbMrAuditBox"><span class="rb2-spin" aria-hidden="true"></span> Auditing… reading every issued and pending invoice, then asking Claude. Started ${esc(mrWhen(a.started_at))}.</div>`;
+ }
+ if (a.status === "failed") {
+ return `<div class="rb-mr-audit rb-mr-audit--bad" id="rbMrAuditBox"><b>The last audit failed</b> (${esc(mrWhen(a.started_at))}): ${esc(a.error || "unknown error")}. Run it again.</div>`;
+ }
+ const v = a.verdict || "caution";
+ const vLabel = { ready: "Ready to send", caution: "Look before sending", stop: "Stop — something is wrong" }[v] || v;
+ const vTone = { ready: "ok", caution: "warn", stop: "bad" }[v] || "warn";
+ const findings = a.findings || [];
+ const st = a.stats || {};
+ const who = a.model ? `${esc(a.model)}` : "rules only (no model key)";
+ const bySev = {};
+ findings.forEach(f => { (bySev[f.severity] = bySev[f.severity] || []).push(f); });
+ const order = ["critical", "high", "medium", "low", "info"];
+ const rows = order.flatMap(sev => (bySev[sev] || []).map(f => {
+ const tone = { critical: "bad", high: "bad", medium: "warn", low: "dim", info: "dim" }[sev];
+ const link = f.invoice_id != null && !String(f.invoice_id).startsWith("legacy")
+ ? `<button class="rb-mr-link" type="button" data-mr-open-inv="${esc(String(f.invoice_id))}">open invoice</button>`
+ : (f.subscription_id != null ? `<button class="rb-mr-link" type="button" data-mr-open-sub="${esc(String(f.subscription_id))}">open offtaker</button>` : "");
+ return `<div class="rb-mr-find rb-mr-find--${tone}">
+ <div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${tone}">${esc(sev)}</span> <b>${esc(f.title || "")}</b>${f.source === "model" ? ` <span class="rb-mr-chip rb-mr-chip--dim" title="raised by the model, not a rule">Claude</span>` : ""}${f.customer_name ? ` <span class="rb-mr-dim">· ${esc(f.customer_name)}</span>` : ""} ${link}</div>
+ <div class="rb-mr-find-d">${esc(f.detail || "")}${f.action ? ` <span class="rb-mr-act">→ ${esc(f.action)}</span>` : ""}</div>
+ </div>`;
+ }));
+ const counts = order.filter(s => (st.by_severity || {})[s]).map(s => `${(st.by_severity || {})[s]} ${s}`).join(" · ");
+ return `<details class="rb-mr-audit rb-mr-audit--${vTone}" id="rbMrAuditBox" open>
+ <summary class="rb-mr-audit-sum"><span class="rb-mr-chip rb-mr-chip--${vTone}">${esc(vLabel)}</span>
+ <span class="rb-mr-audit-meta">${esc(mrWhen(a.finished_at || a.started_at))} · ${who} · ${fmt0(st.sent || 0)} sent + ${fmt0(st.outgoing || 0)} queued checked${counts ? " · " + esc(counts) : " · no findings"}</span></summary>
+ <div class="rb-mr-audit-body">
+ ${a.summary ? `<p class="rb-mr-audit-sumtext">${esc(a.summary)}</p>` : ""}
+ ${rows.length ? rows.join("") : `<p class="rb-arch-empty">Nothing flagged.</p>`}
+ ${st.model_error ? `<p class="rb-mr-dim rb-mr-audit-note">Model review skipped: ${esc(st.model_error)}</p>` : ""}
+ </div></details>`;
+ }
+
+ function wireMailroomPanel(host) {
+ const det = host && host.querySelector("#rbMailroom");
+ if (!det) return;
+ det.addEventListener("toggle", () => { _mailroomOpen = det.open; _syncArchiveEntryPoints(); });
+ const search = det.querySelector("#rbMrSearch");
+ if (search) {
+ let t = null;
+ search.addEventListener("input", () => {
+ clearTimeout(t);
+ t = setTimeout(() => { MAIL_FILTER = search.value || ""; MAIL_SENT_SHOWN = 60;
+ const pos = search.selectionStart; renderArchive();
+ const s2 = document.getElementById("rbMrSearch"); if (s2) { s2.focus(); try { s2.setSelectionRange(pos, pos); } catch (e) {} } }, 160);
+ });
+ }
+ const more = det.querySelector("#rbMrMore");
+ if (more) more.onclick = () => { MAIL_SENT_SHOWN += 60; renderArchive(); };
+ const refresh = det.querySelector("#rbMrRefresh");
+ if (refresh) refresh.onclick = () => { MAILROOM = null; loadMailroom(true).then(() => renderArchive()); };
+ const audit = det.querySelector("#rbMrAudit");
+ if (audit) audit.onclick = () => mrRunAudit();
+ det.querySelectorAll("[data-mr-inv]").forEach(card => {
+ const open = () => openMailDrawer(card.getAttribute("data-mr-inv"));
+ card.onclick = open;
+ card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+ });
+ det.querySelectorAll("[data-mr-sub]").forEach(card => {
+ const open = () => { const sid = card.getAttribute("data-mr-sub"); if (sid) expandAccordion(String(sid), { scroll: true }); };
+ card.onclick = open;
+ card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+ });
+ det.querySelectorAll("[data-mr-open-inv]").forEach(b => { b.onclick = e => { e.stopPropagation(); openMailDrawer(b.getAttribute("data-mr-open-inv")); }; });
+ det.querySelectorAll("[data-mr-open-sub]").forEach(b => { b.onclick = e => { e.stopPropagation(); expandAccordion(String(b.getAttribute("data-mr-open-sub")), { scroll: true }); }; });
+ }
+
+ async function mrRunAudit() {
+ const st = document.getElementById("rbMrStatus");
+ const setSt = (cls, txt) => { if (st) { st.className = cls; st.textContent = txt; } };
+ setSt("rb-status rb-busy", "starting…");
+ try {
+ const r = await fetch(API + "/mailroom/audit", { method: "POST", headers: authHeaders() });
+ const d = await r.json().catch(() => ({}));
+ if (!r.ok || !d.ok) { setSt("rb-status rb-err", apiErr(d, "couldn’t start the audit")); return; }
+ setSt("rb-status", "");
+ MAIL_AUDIT = { id: d.run_id, status: "running", started_at: new Date().toISOString() };
+ renderArchive();
+ mrPollAudit(d.run_id);
+ } catch (e) { setSt("rb-status rb-err", "couldn’t start the audit"); }
+ }
+ function mrPollAudit(runId) {
+ clearTimeout(_mailAuditTimer);
+ const tick = async () => {
+ const d = await fetch(API + "/mailroom/audit/" + runId, { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null).catch(() => null);
+ const run = d && d.run;
+ if (!run) { _mailAuditTimer = setTimeout(tick, 4000); return; }
+ MAIL_AUDIT = run;
+ if (run.status === "running") { _mailAuditTimer = setTimeout(tick, 3000); return; }
+ renderArchive();
+ bulkToast(run.status === "done" ? `Audit finished — ${(run.findings || []).length} finding${(run.findings || []).length === 1 ? "" : "s"}` : "Audit failed");
+ };
+ _mailAuditTimer = setTimeout(tick, 1500);
+ }
+
+ // ── the drawer: one invoice, everything ───────────────────────────────
+ function mrDrawerBuild() {
+ let ov = document.getElementById("mrOverlay");
+ if (ov) return ov;
+ ov = document.createElement("div");
+ ov.id = "mrOverlay"; ov.className = "rb-es-overlay rb-mr-overlay"; ov.hidden = true;
+ ov.innerHTML = `<div class="rb-es-head"><div><b id="mrTitle">Invoice</b><span class="rb-es-sub" id="mrSub"></span></div>
+ <button type="button" class="ao-btn rb-btn" id="mrOpenSub">Open offtaker</button>
+ <button type="button" class="rb-es-x" id="mrClose" aria-label="Close">✕</button></div>
+ <div class="rb-es-cols"><div class="rb-es-left" id="mrLeft"></div><div class="rb-es-right" id="mrRight"></div></div>`;
+ document.body.appendChild(ov);
+ const close = () => { ov.hidden = true; document.body.style.overflow = ""; };
+ ov.querySelector("#mrClose").onclick = close;
+ document.addEventListener("keydown", e => { if (e.key === "Escape" && !ov.hidden) close(); });
+ return ov;
+ }
+ async function openMailDrawer(id) {
+ const ov = mrDrawerBuild();
+ const item = (MAILROOM && MAILROOM.sent || []).find(x => String(x.id) === String(id)) || null;
+ ov.hidden = false; document.body.style.overflow = "hidden";
+ const left = ov.querySelector("#mrLeft"), right = ov.querySelector("#mrRight");
+ ov.querySelector("#mrTitle").textContent = item ? `${item.customer_name || "Invoice"} · ${mrMoney(item.amount_usd)}` : "Invoice";
+ ov.querySelector("#mrSub").textContent = item ? [item.invoice_number ? "#" + item.invoice_number : "", item.period_label, mrWhen(item.sent_at)].filter(Boolean).join(" · ") : "";
+ const openSub = ov.querySelector("#mrOpenSub");
+ openSub.onclick = () => { if (item && item.subscription_id != null) { ov.hidden = true; document.body.style.overflow = ""; expandAccordion(String(item.subscription_id), { scroll: true }); } };
+ left.innerHTML = `<p class="rb-mr-dim">loading…</p>`; right.innerHTML = "";
+ let inv = item;
+ if (item && !item.legacy) {
+ const d = await fetch(API + "/mailroom/invoice/" + encodeURIComponent(id), { headers: authHeaders() })
+ .then(r => r.ok ? r.json() : null).catch(() => null);
+ if (d && d.invoice) inv = Object.assign({}, item, d.invoice);
+ }
+ if (!inv) { left.innerHTML = `<p class="rb-arch-empty">This invoice is no longer on the board.</p>`; return; }
+ mrRenderDrawer(inv, left, right);
+ }
+ function mrRow(label, valueHtml, opts) {
+ if (valueHtml == null || valueHtml === "" || valueHtml === "—") { if (!(opts && opts.keep)) return ""; }
+ return `<div class="rb-mr-kv"><span class="rb-mr-k">${esc(label)}</span><span class="rb-mr-v">${valueHtml == null || valueHtml === "" ? "—" : valueHtml}</span></div>`;
+ }
+ function mrRenderDrawer(inv, left, right) {
+ const em = inv.email || {};
+ const env = `<div class="rb-es-mail">
+ <div class="rb-es-mail-subj">${esc(em.subject || inv.subject || "(no subject on file)")}</div>
+ <div class="rb-es-mail-env">
+ <div><span class="rb-es-envlab">FROM</span> ${esc(em.from_addr || inv.from_addr || "—")}</div>
+ <div><span class="rb-es-envlab">TO</span> ${esc((inv.to || []).join(", ") || "—")}</div>
+ ${(inv.cc || []).length ? `<div><span class="rb-es-envlab">CC</span> ${esc(inv.cc.join(", "))}</div>` : ""}
+ ${(inv.bcc || []).length ? `<div><span class="rb-es-envlab">BCC</span> ${esc(inv.bcc.join(", "))}</div>` : ""}
+ ${em.reply_to || inv.reply_to ? `<div><span class="rb-es-envlab">REPLY-TO</span> ${esc(em.reply_to || inv.reply_to)}</div>` : ""}
+ </div>
+ <div class="rb-es-mail-body rb-mr-mailbody">${inv.legacy
+ ? `<p class="rb-mr-dim">This invoice was issued before the platform kept a frozen copy of each email, so the exact message cannot be shown. The figures above are from the send record.</p>`
+ : `<iframe class="rb-mr-frame" id="mrFrame" title="The email as sent" sandbox="" referrerpolicy="no-referrer"></iframe>`}</div>
+ <div class="rb-es-mail-att">${(inv.attachment_files || []).length
+ ? inv.attachment_files.map(a => `<button class="rb-mr-link" type="button" data-mr-att="${esc(a.filename)}">📄 ${esc(a.filename)}</button>${a.size_bytes ? ` <span class="rb-mr-dim">${fmt0(Math.round(a.size_bytes / 1024))} KB</span>` : ""}`).join(" &nbsp;·&nbsp; ")
+ : ((inv.attachments || []).length ? esc(inv.attachments.join(" · ")) : `<span class="rb-mr-dim">no attachments on file</span>`)}</div>
+ </div>`;
+ left.innerHTML = `<div class="rb-es-prevlabel">THE EMAIL AS SENT</div>${env}`;
+ if (!inv.legacy) {
+ fetch(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/email", { headers: authHeaders() })
+ .then(r => r.ok ? r.text() : "<p style='font:14px sans-serif;padding:20px'>Couldn’t load the email body.</p>")
+ .then(html => { const f = document.getElementById("mrFrame"); if (f) f.srcdoc = html; })
+ .catch(() => null);
+ left.querySelectorAll("[data-mr-att]").forEach(b => {
+ b.onclick = () => authBlobDownload(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/attachment/" + encodeURIComponent(b.getAttribute("data-mr-att")), b.getAttribute("data-mr-att"));
+ });
+ }
+
+ const r = inv.rate || {};
+ const d = inv.delivery || {};
+ const p = inv.payment || null;
+ const rateLine = r.effective_rate_per_kwh != null
+ ? `${mrRate(r.effective_rate_per_kwh)}${r.adder_per_kwh ? ` <span class="rb-mr-dim">(${mrRate(r.net_rate_per_kwh)} + ${mrRate(r.adder_per_kwh)} incentive)</span>` : ""}`
+ : (r.net_rate_per_kwh != null ? mrRate(r.net_rate_per_kwh) : "—");
+ const rateSrc = r.operator_entered === true ? `<span class="rb-mr-chip rb-mr-chip--ok">entered by you</span>`
+ : (r.operator_entered === false ? `<span class="rb-mr-chip rb-mr-chip--warn" title="${esc(r.note || "")}">inferred from ${esc(r.source || "the bill")}</span>` : (r.source ? `<span class="rb-mr-dim">${esc(r.source)}</span>` : ""));
+ const basis = inv.has_utility_bill === true ? `<span class="rb-mr-chip rb-mr-chip--ok">settled utility bill</span>`
+ : (inv.has_utility_bill === false ? `<span class="rb-mr-chip rb-mr-chip--bad">${esc(inv.kwh_source || "telemetry")} — not a utility bill</span>` : (inv.kwh_source ? esc(inv.kwh_source) : ""));
+ const delivLine = `${mrDeliveryChip(d)}${d.delivered_at ? ` <span class="rb-mr-dim">delivered ${esc(mrWhen(d.delivered_at))}</span>` : ""}${d.bounced_at ? ` <span class="rb-mr-dim">bounced ${esc(mrWhen(d.bounced_at))}${d.reason ? " — " + esc(d.reason) : ""}</span>` : ""}${inv.dispatch && inv.dispatch.resend_email_id ? ` <span class="rb-mr-dim rb-mr-mono">${esc(inv.dispatch.resend_email_id)}</span>` : ""}${inv.dispatch && inv.dispatch.attempts > 1 ? ` <span class="rb-mr-dim">· ${inv.dispatch.attempts} attempts</span>` : ""}`;
+ const payLine = `${mrPayChip(inv)}${p && p.paid_at ? ` <span class="rb-mr-dim">paid ${esc(mrWhen(p.paid_at))}${p.fee_usd ? " · platform fee " + mrMoney(p.fee_usd) : ""}</span>` : ""}${p && p.refunded_usd ? ` <span class="rb-mr-dim">· refunded ${mrMoney(p.refunded_usd)}</span>` : ""}${p && p.pay_url ? ` <a class="rb-mr-link" href="${esc(p.pay_url)}" target="_blank" rel="noopener">pay link</a>` : ""}`;
+ const settl = (inv.settlements || []).map(s => `<div class="rb-mr-dim">${mrMoney(s.amount_usd)} by ${esc(s.method || "offline")} on ${esc(s.received_on || "")}${s.note ? " — " + esc(s.note) : ""}</div>`).join("");
+ const findings = (MAIL_AUDIT && MAIL_AUDIT.status === "done" ? (MAIL_AUDIT.findings || []) : [])
+ .filter(f => String(f.invoice_id) === String(inv.id) || (f.invoice_id == null && String(f.subscription_id) === String(inv.subscription_id)));
+ const findHtml = findings.length ? findings.map(f => `<div class="rb-mr-find rb-mr-find--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}"><div class="rb-mr-find-h"><span class="rb-mr-chip rb-mr-chip--${({ critical: "bad", high: "bad", medium: "warn" })[f.severity] || "dim"}">${esc(f.severity)}</span> <b>${esc(f.title)}</b></div><div class="rb-mr-find-d">${esc(f.detail || "")}</div></div>`).join("") : "";
+ const timeline = [
+ inv.prepared_at ? ["Frozen", inv.prepared_at] : null,
+ inv.sent_at ? ["Sent", inv.sent_at] : null,
+ d.delivered_at ? ["Delivered", d.delivered_at] : null,
+ d.bounced_at ? ["Bounced", d.bounced_at] : null,
+ p && p.paid_at ? ["Paid", p.paid_at] : null,
+ ].filter(Boolean).map(([l, t]) => `<div class="rb-mr-tl"><span class="rb-mr-k">${esc(l)}</span><span class="rb-mr-v">${esc(mrWhen(t))}</span></div>`).join("");
+ const warn = (inv.warnings || []).length ? `<div class="rb-mr-warns">${inv.warnings.map(w => `<div class="rb-mr-warn">⚠ ${esc(typeof w === "string" ? w : JSON.stringify(w))}</div>`).join("")}</div>` : "";
+
+ right.innerHTML = `
+ <div class="rb-es-prevlabel">THE FIGURES THAT WERE BILLED</div>
+ <div class="rb-mr-kvs">
+ ${mrRow("Amount due", `<b>${mrMoney(inv.amount_usd)}</b>${inv.credit_applied_usd ? ` <span class="rb-mr-dim">after ${mrMoney(inv.credit_applied_usd)} credit</span>` : ""}`, { keep: true })}
+ ${mrRow("Billing period", esc(inv.period_label || inv.period_key || ""))}
+ ${mrRow("Offtaker kWh", inv.kwh != null ? `${esc(mrKwh(inv.kwh))}${inv.allocation_pct != null ? ` <span class="rb-mr-dim">= ${mrPct(inv.allocation_pct)} of ${esc(mrKwh(inv.array_kwh))}</span>` : ""}` : "")}
+ ${mrRow("Rate", rateLine + " " + rateSrc)}
+ ${r.discount_pct ? mrRow("Discount", mrPct(r.discount_pct)) : ""}
+ ${mrRow("Data source", basis)}
+ ${mrRow("Utility account", inv.utility ? mrUtil(inv.utility) : "")}
+ ${mrRow("Array", (inv.arrays || []).length ? esc(inv.arrays.join(", ")) : "")}
+ ${inv.array_share_pct != null ? mrRow("Group share", mrPct(inv.array_share_pct)) : ""}
+ </div>
+ <div class="rb-es-prevlabel">DELIVERY</div>
+ <div class="rb-mr-kvs">${mrRow("Email", delivLine, { keep: true })}${timeline}</div>
+ <div class="rb-es-prevlabel">PAYMENT</div>
+ <div class="rb-mr-kvs">${mrRow("Status", payLine, { keep: true })}${inv.outstanding_usd != null ? mrRow("Outstanding", mrMoney(inv.outstanding_usd)) : ""}${settl ? mrRow("Offline receipts", settl) : ""}</div>
+ ${warn ? `<div class="rb-es-prevlabel">WARNINGS AT ISSUE</div>${warn}` : ""}
+ ${findHtml ? `<div class="rb-es-prevlabel">AUDIT FINDINGS</div>${findHtml}` : ""}
+ ${inv.last_error ? `<p class="rb-mr-dim">Last note: ${esc(inv.last_error)}</p>` : ""}
+ `;
+ }
+
 
  function wireArchiveToggle() {
  const det = $("#rbArch");
@@ -3157,6 +3569,8 @@
  if (br) br.onclick = () => toggleArchivePanel("bills");
  const mo = document.getElementById("rb2RailMonthly");
  if (mo) mo.onclick = () => toggleArchivePanel("monthly");
+ const mr = document.getElementById("rb2RailMail");
+ if (mr) mr.onclick = () => toggleArchivePanel("mailroom");
  }
 
  // Renders the rail's cycle card from PIPE (the send-pipeline BAND is gone —
@@ -3722,6 +4136,7 @@
  <button class="ao-btn rb-btn rb2-tool" id="rb2RailArch" type="button" hidden aria-pressed="false" title="Every completed month's invoices, offtaker bills, and array bills — with per-month .zip downloads."><span class="rb2-ti rb2-ti--arch" aria-hidden="true">🗂&#xFE0E;</span><span class="rb2-tl">Invoice archive</span><span class="rb2-tv" id="rb2RailArchMeta"></span></button>
  <button class="ao-btn rb-btn rb2-tool" id="rb2RailBillArch" type="button" hidden aria-pressed="false" title="Every captured utility bill PDF on file, grouped by year."><span class="rb2-ti rb2-ti--billarch" aria-hidden="true">🗞&#xFE0E;</span><span class="rb2-tl">Utility bill archive</span><span class="rb2-tv" id="rb2RailBillArchMeta"></span></button>
  <button class="ao-btn rb-btn rb2-tool" id="rb2RailMonthly" type="button" hidden aria-pressed="false" title="One spreadsheet per billing period covering every offtaker — generation, amount billed, and whether they have paid. Sent automatically once a period's invoices have all gone out."><span class="rb2-ti rb2-ti--monthly" aria-hidden="true">📊&#xFE0E;</span><span class="rb2-tl">Monthly summary</span><span class="rb2-tv" id="rb2RailMonthlyMeta"></span></button>
+ <button class="ao-btn rb-btn rb2-tool" id="rb2RailMail" type="button" hidden aria-pressed="false" title="Every invoice going out and when, every invoice that went out — with the exact email, figures, delivery and payment — and an independent audit."><span class="rb2-ti rb2-ti--mail" aria-hidden="true">✉&#xFE0E;</span><span class="rb2-tl">Mail room</span><span class="rb2-tv" id="rb2RailMailMeta"></span></button>
  </div>
  </aside>
  <aside class="rb2-railmini" id="rb2RailMini" hidden aria-label="Invoicing rail, minimized while editing">

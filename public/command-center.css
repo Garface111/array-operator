@@ -4313,6 +4313,7 @@ body.ho-shell-open .vs-inv-sub{
 .rb2-ti--link{background:#059669;color:#fff}
 .rb2-ti--arch{background:#d97706;color:#fff}
 .rb2-ti--billarch{background:#64748b;color:#fff}
+.rb2-ti--mail{background:#0ea5e9;color:#fff}
 
 /* ── "+ Add array" dropdown (Bruce 2026-07-29) — a real high-res picker,
    scoped to one data source, listing its arrays with no offtakers yet. ────── */
@@ -4420,3 +4421,62 @@ body.ho-shell-open .vs-inv-sub{
 .rb-mo-chip-note{
   font-size:10.5px; color:var(--faint,#94a3b8); font-style:italic;
 }
+
+/* ── Mail room (Statements rail panel, Ford 2026-09-19) ─────────────────── */
+.rb2-ti--mail{background:rgba(14,165,233,.14);color:#0369a1}
+.rb-mr-tools{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 10px; }
+.rb-mr-search{ flex:1 1 260px; min-width:0; font:inherit; font-size:13px; padding:8px 11px;
+  border:1px solid var(--line,#e2e8f0); border-radius:9px; background:var(--card,#fff); color:var(--ink,#0f172a); }
+.rb-mr-search:focus{ outline:none; border-color:var(--good,#2563eb); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.rb-mr-cols{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
+@media (max-width: 900px){ .rb-mr-cols{ grid-template-columns:minmax(0,1fr); } }
+.rb-mr-col{ min-width:0; border:1px solid var(--line,#e2e8f0); border-radius:12px; background:rgba(2,6,23,.008); padding:10px 12px 12px; }
+.rb-mr-h{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin:0 0 8px; font-size:13.5px; font-weight:750; color:var(--ink,#16202b); }
+.rb-mr-count{ font-size:11.5px; font-weight:700; color:var(--faint,#94a3b8); font-variant-numeric:tabular-nums; }
+.rb-mr-hsub{ font-size:11.5px; font-weight:500; color:var(--faint,#94a3b8); margin-left:auto; }
+.rb-mr-list{ display:flex; flex-direction:column; gap:6px; max-height:640px; overflow-y:auto; padding-right:2px; }
+.rb-mr-card{ border:1px solid var(--line,#e2e8f0); border-radius:10px; padding:9px 11px; background:var(--card,#fff);
+  cursor:pointer; transition:border-color .12s, box-shadow .12s; }
+.rb-mr-card:hover, .rb-mr-card:focus-visible{ border-color:var(--good,#2563eb); box-shadow:0 2px 12px rgba(20,60,120,.08); outline:none; }
+.rb-mr-l1{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:13.5px; color:var(--ink,#16202b); }
+.rb-mr-l1 b{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.rb-mr-amt{ font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rb-mr-l2, .rb-mr-l3, .rb-mr-l4{ font-size:11.5px; color:var(--muted,#475569); line-height:1.5; margin-top:3px;
+  display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-variant-numeric:tabular-nums; }
+.rb-mr-l4{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
+.rb-mr-dim{ color:var(--faint,#94a3b8); }
+.rb-mr-sep{ color:var(--faint,#94a3b8); }
+.rb-mr-mono{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:10.5px; }
+.rb-mr-reason{ margin-top:5px; font-size:11.5px; color:#9a3412; background:rgba(234,88,12,.07); border-radius:7px; padding:5px 8px; }
+.rb-mr-chip{ display:inline-block; font-size:10.5px; font-weight:650; padding:2px 8px; border-radius:20px; white-space:nowrap; line-height:1.5; }
+.rb-mr-chip--ok{ color:#0a7d4f; background:rgba(10,125,79,.1); }
+.rb-mr-chip--warn{ color:#9a5b00; background:rgba(217,119,6,.13); }
+.rb-mr-chip--bad{ color:#b42318; background:rgba(229,72,77,.12); }
+.rb-mr-chip--dim{ color:var(--muted,#475569); background:rgba(148,163,184,.14); }
+.rb-mr-more{ align-self:center; margin-top:4px; }
+.rb-mr-link{ font:inherit; font-size:11.5px; font-weight:650; color:var(--good,#2563eb); background:none; border:0; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.rb-mr-audit{ border:1px solid var(--line,#e2e8f0); border-radius:12px; padding:9px 12px; margin:0 0 12px; font-size:12.5px; line-height:1.5; background:var(--card,#fff); }
+.rb-mr-audit--ok{ border-color:rgba(10,125,79,.35); } .rb-mr-audit--warn{ border-color:rgba(217,119,6,.45); } .rb-mr-audit--bad{ border-color:rgba(229,72,77,.5); }
+.rb-mr-audit--run{ display:flex; align-items:center; gap:9px; color:var(--muted,#475569); }
+.rb-mr-audit-sum{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.rb-mr-audit-sum::-webkit-details-marker{ display:none; }
+.rb-mr-audit-meta{ font-size:11.5px; color:var(--faint,#94a3b8); }
+.rb-mr-audit-body{ margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+.rb-mr-audit-sumtext{ margin:0 0 4px; font-size:13px; color:var(--ink,#16202b); }
+.rb-mr-audit-note{ margin:4px 0 0; font-size:11.5px; }
+.rb-mr-find{ border-left:3px solid rgba(148,163,184,.5); padding:4px 10px; border-radius:0 8px 8px 0; background:rgba(2,6,23,.015); }
+.rb-mr-find--bad{ border-left-color:#e5484d; } .rb-mr-find--warn{ border-left-color:#d97706; } .rb-mr-find--dim{ border-left-color:rgba(148,163,184,.6); }
+.rb-mr-find-h{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12.5px; color:var(--ink,#16202b); }
+.rb-mr-find-d{ font-size:12px; color:var(--muted,#475569); margin-top:2px; }
+.rb-mr-act{ color:var(--ink,#16202b); font-weight:600; }
+.rb-mr-kvs{ display:flex; flex-direction:column; gap:0; margin-bottom:14px; border:1px solid var(--line,#e2e8f0); border-radius:10px; overflow:hidden; }
+.rb-mr-kv, .rb-mr-tl{ display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; padding:7px 12px; font-size:12.5px; line-height:1.5; }
+.rb-mr-kv + .rb-mr-kv, .rb-mr-tl + .rb-mr-tl, .rb-mr-kv + .rb-mr-tl{ border-top:1px solid rgba(20,60,120,.06); }
+.rb-mr-k{ color:var(--faint,#94a3b8); font-weight:650; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; padding-top:1px; }
+.rb-mr-v{ color:var(--ink,#16202b); min-width:0; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.rb-mr-frame{ width:100%; min-height:520px; border:0; background:#fff; border-radius:8px; }
+.rb-mr-mailbody{ padding:0 !important; }
+.rb-mr-warns{ display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+.rb-mr-warn{ font-size:12px; color:#9a5b00; background:rgba(217,119,6,.08); border-radius:7px; padding:5px 9px; }
+.rb-mr-overlay .rb-es-left{ width:52%; } .rb-mr-overlay .rb-es-right{ width:48%; }
+@media (max-width: 900px){ .rb-mr-overlay .rb-es-cols{ flex-direction:column; overflow:auto; } .rb-mr-overlay .rb-es-left, .rb-mr-overlay .rb-es-right{ width:auto; border-right:0; } }
