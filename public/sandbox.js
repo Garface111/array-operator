@@ -5286,7 +5286,7 @@
  <b>Array Operator ${esc(feeTxt || "0.5%")}</b> per online payment
  <span class="ao-pay-fee-sep">·</span> Stripe bank debit (ACH) ${esc(fees.ach)}
  <span class="ao-pay-fee-sep">·</span> Stripe card ${esc(fees.card)}
- <span class="ao-pay-fee-note">payments processed by Stripe${platformName && platformName !== "Stripe" ? " under " + esc(platformName) : ""}</span></span>
+ <span class="ao-pay-fee-note">payments processed by Stripe${platformName === "Energy Agent" ? " under Energy Agent" : ""}</span></span>
  </div>
  <div class="acct-msg" id="connectMsg"></div>
  </div>`;
