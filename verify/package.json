@@ -5,12 +5,16 @@
   "type": "module",
   "description": "Closed-loop invariant verification for the Array Operator onboarding sync. Replays the EnergyAgent extension's messages against the live page and asserts the guarantees we earned debugging the Chint hang.",
   "scripts": {
+    "test:invoice-attention": "node --test invoice-attention.test.mjs",
     "verify": "node onboarding-sync.mjs && node card-return.mjs",
     "verify:onboarding": "node onboarding-sync.mjs",
     "verify:card-return": "node card-return.mjs",
     "verify:headed": "HEADED=1 node onboarding-sync.mjs",
     "audit:animations": "node animation-audit.mjs",
     "audit:animations:headed": "HEADED=1 node animation-audit.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
   },
   "dependencies": {
     "playwright": "^1.49.0",
