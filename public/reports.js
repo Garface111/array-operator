@@ -3696,66 +3696,108 @@
  // Ford 2026-07-28: "delete the send pipeline visual, it's too busy" — but every
  // fact and control it carried lives on: approve count + $, delivered line →
  // archive, next run, pause/resume, and the delivery-mode slider, all here).
+ let HOLD_PAGE = 0;
+ const HOLD_PAGE_SIZE = 6;
+ let HOLD_NAME_BY_SUB = new Map();
+ const HOLD_RECEIPT_STATE = new Map();
+ function holdPeriodLabel(value) {
+ const text = String(value || "");
+ const monthly = /^(\d{4})-(\d{2})$/.exec(text);
+ if (monthly && Number(monthly[2]) >= 1 && Number(monthly[2]) <= 12) {
+ return new Date(Number(monthly[1]), Number(monthly[2]) - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+ }
+ const quarterly = /^(\d{4})-Q([1-4])$/.exec(text);
+ return quarterly ? `Q${quarterly[2]} ${quarterly[1]}` : text || "Period unavailable";
+ }
  function renderDeliveryHolds() {
  const host = document.getElementById("rbDeliveryHolds");
  if (!host) return;
  const invoices = PIPE && Array.isArray(PIPE.holds) ? PIPE.holds : [];
  const dispatches = PIPE && Array.isArray(PIPE.dispatch_holds) ? PIPE.dispatch_holds : [];
  host.hidden = !invoices.length && !dispatches.length;
- if (host.hidden) { host.innerHTML = ""; return; }
- const names = new Map((OFFTAKERS || []).map(s => [String(s.id), s.customer_name || s.name || "Offtaker"]));
- const labels = { held: "On hold", prepared: "Queued", failed: "Retry pending", sending: "Acceptance not yet confirmed", uncertain: "Acceptance uncertain", accepted: "Provider accepted" };
- const state = value => labels[value] || String(value || "Needs review");
- const rows = invoices.map(item => {
+ if (host.hidden) { host.innerHTML = ""; HOLD_PAGE = 0; return; }
+ // The subscription list and pipeline load independently. Resolve names again
+ // whenever either arrives, including names of disabled historical offtakers.
+ const names = new Map([...HOLD_NAME_BY_SUB, ...(OFFTAKERS || []).map(s => [String(s.id), s.customer_name || s.name || "Offtaker"])]);
+ const openable = new Set((OFFTAKERS || []).map(s => String(s.id)));
+ const labels = { held: "On hold", prepared: "Queued", failed: "Retry pending", sending: "Awaiting confirmation", uncertain: "Acceptance uncertain", accepted: "Provider accepted" };
+ const state = value => labels[value] || "Needs review";
+ const badge = value => `<span class="rb-attention-status" data-state="${esc(labels[value] ? value : "held")}">${esc(state(value))}</span>`;
+ HOLD_PAGE = Math.max(0, Math.min(HOLD_PAGE, Math.ceil(invoices.length / HOLD_PAGE_SIZE) - 1));
+ const start = HOLD_PAGE * HOLD_PAGE_SIZE;
+ const rows = invoices.slice(start, start + HOLD_PAGE_SIZE).map(item => {
  const sid = Number(item.subscription_id);
- const canOpen = Number.isSafeInteger(sid) && sid > 0 && names.has(String(sid));
- const who = names.get(String(item.subscription_id)) || `Offtaker ${item.subscription_id || "unknown"}`;
- const amount = item.amount_cents != null && !(item.status === "held" && Number(item.amount_cents) === 0)
- ? moneyFmt(Number(item.amount_cents) / 100) : "Not yet confirmed";
- return `<tr><td>${canOpen ? `<button type="button" class="ao-btn" data-hold-sub="${sid}">${esc(who)}</button>` : esc(who)}</td>
- <td>${esc(item.period || "Unknown period")}</td><td>${esc(amount)}</td>
- <td>${esc(state(item.status))}</td><td>${esc(item.reason || "Review the invoice source and delivery status.")}</td></tr>`;
+ const canOpen = Number.isSafeInteger(sid) && sid > 0 && openable.has(String(sid));
+ const who = names.get(String(item.subscription_id)) || item.customer_name || `Offtaker #${item.subscription_id || "unknown"}`;
+ const confirmed = item.amount_cents != null && Number.isFinite(Number(item.amount_cents)) && !(item.status === "held" && Number(item.amount_cents) === 0);
+ const amount = confirmed ? esc(moneyFmt(Number(item.amount_cents) / 100)) : '<span class="rb-attention-muted">Not confirmed</span>';
+ return `<tr><td data-label="Offtaker"><div class="rb-attention-person">${canOpen ? `<button type="button" class="rb-attention-person-link" data-hold-sub="${sid}" aria-label="Review ${esc(who)}">${esc(who)}</button>` : esc(who)}</div></td>
+ <td data-label="Period" class="rb-attention-period">${esc(holdPeriodLabel(item.period))}</td>
+ <td data-label="Amount" class="rb-attention-amount">${amount}</td>
+ <td data-label="Review"><div class="rb-attention-review">${badge(item.status)}<p class="rb-attention-reason">${esc(item.reason || "Review the invoice source and delivery status.")}</p></div></td></tr>`;
  }).join("");
  const emailRows = dispatches.map(item => {
  const retry = item.retry_at ? new Date(item.retry_at) : null;
  const when = retry && !isNaN(retry.getTime()) ? retry.toLocaleString() : null;
  const uncertain = item.status === "sending" || item.status === "uncertain";
- const action = uncertain ? "Check the email provider and reconcile acceptance before retrying."
- : (Number(item.attempts) >= 8 ? "Retry limit reached; operator review required."
+ const action = uncertain ? "Verify the provider receipt before retrying."
+ : (Number(item.attempts) >= 8 ? "Retry limit reached. Review this email in the mail room."
  : when ? `Next retry eligible ${when}.` : "Waiting for an eligible retry.");
  const kind = { invoice: "Invoice email", monthly_report: "Monthly summary", receipt: "Payment receipt" }[item.kind] || "Email request";
- return `<li><b>${esc(kind)} #${esc(String(item.id))}: ${esc(state(item.status))}</b>
- <div>${esc(item.reason || "Delivery confirmation needs review.")}</div>
- <div>${esc(String(Number(item.attempts) || 0))} attempt(s). ${esc(action)}</div>
- ${uncertain && Number.isSafeInteger(Number(item.id)) ? `<form data-reconcile-dispatch="${Number(item.id)}"><label>Provider email ID <input name="receipt" required maxlength="100" autocomplete="off"></label> <button type="submit" class="ao-btn">Verify receipt</button><span role="status"></span></form>` : ""}</li>`;
+ const id = Number(item.id);
+ return `<li class="rb-attention-email"><header><strong>${esc(kind)} <span class="rb-attention-muted">#${esc(String(item.id))}</span></strong>${badge(item.status)}</header>
+ <p class="rb-attention-reason">${esc(item.reason || "Delivery confirmation needs review.")}</p>
+ <p class="rb-attention-meta">${esc(String(Number(item.attempts) || 0))} attempt${Number(item.attempts) === 1 ? "" : "s"} · ${esc(action)}</p>
+ ${uncertain && Number.isSafeInteger(id) && id > 0 ? `<form class="rb-attention-reconcile" data-reconcile-dispatch="${id}"><label>Provider email ID <input name="receipt" required maxlength="100" autocomplete="off" placeholder="Paste the provider receipt ID"></label><button type="submit" class="rb-attention-button">Verify receipt</button><span role="status"></span></form>` : ""}</li>`;
  }).join("");
- host.innerHTML = `<h3>Invoices needing attention</h3>
- <p>These invoices or emails need review before the cycle is complete. Provider acceptance confirms a send request; it does not confirm inbox delivery or payment.</p>
- ${rows ? `<div style="overflow-x:auto"><table class="rb-track-pays"><thead><tr><th>Offtaker</th><th>Period</th><th>Amount</th><th>Status</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>` : ""}
- ${emailRows ? `<h4>Email delivery checks</h4><ul>${emailRows}</ul>` : ""}`;
- host.querySelectorAll("[data-reconcile-dispatch]").forEach(form => { form.onsubmit = async event => {
+ // Keep typed receipt IDs when a background list refresh supplies customer names.
+ const receipts = new Map(Array.from(host.querySelectorAll("[data-reconcile-dispatch]")).map(form => [form.dataset.reconcileDispatch, form.querySelector('[name="receipt"]').value]));
+ host.innerHTML = `<header class="rb-attention-header"><h3 id="rbAttentionTitle" tabindex="-1">Invoices needing attention</h3><span class="rb-attention-count">${invoices.length ? `${invoices.length} invoice${invoices.length === 1 ? "" : "s"}` : `${dispatches.length} email check${dispatches.length === 1 ? "" : "s"}`}</span></header>
+ ${rows ? `<div class="rb-attention-table-wrap"><table class="rb-attention-table" aria-labelledby="rbAttentionTitle"><thead><tr><th scope="col">Offtaker</th><th scope="col">Period</th><th scope="col">Amount</th><th scope="col">What needs review</th></tr></thead><tbody>${rows}</tbody></table></div>
+ <footer class="rb-attention-footer"><span class="rb-attention-range" aria-live="polite">${invoices.length > HOLD_PAGE_SIZE ? `${start + 1}–${Math.min(start + HOLD_PAGE_SIZE, invoices.length)} of ${invoices.length} invoices` : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"} to review`}</span><div>${invoices.length > HOLD_PAGE_SIZE ? `<button type="button" class="rb-attention-button" data-hold-page="previous" ${HOLD_PAGE === 0 ? "disabled" : ""} aria-label="Previous invoices">← Previous</button><button type="button" class="rb-attention-button" data-hold-page="next" ${start + HOLD_PAGE_SIZE >= invoices.length ? "disabled" : ""} aria-label="Next invoices">Next →</button>` : ""}<button type="button" class="rb-attention-button" data-hold-mailroom>Open mail room ↗</button></div></footer>` : ""}
+ ${emailRows ? `<section class="rb-attention-emails"><h4>Email delivery checks <span class="rb-attention-muted">(${dispatches.length})</span></h4><p class="rb-attention-meta">Provider acceptance confirms the send request, not inbox delivery or payment.</p><ul class="rb-attention-email-list">${emailRows}</ul>${!rows ? '<button type="button" class="rb-attention-button" data-hold-mailroom>Open mail room ↗</button>' : ""}</section>` : ""}`;
+ host.querySelectorAll("[data-reconcile-dispatch]").forEach(form => {
+ if (receipts.has(form.dataset.reconcileDispatch)) form.querySelector('[name="receipt"]').value = receipts.get(form.dataset.reconcileDispatch);
+ const dispatchId = form.dataset.reconcileDispatch;
+ const applyReceiptState = () => {
+ const liveForm = host.querySelector(`[data-reconcile-dispatch="${dispatchId}"]`);
+ if (!liveForm) return;
+ const state = HOLD_RECEIPT_STATE.get(dispatchId);
+ liveForm.querySelector("button").disabled = !!(state && state.pending);
+ liveForm.querySelector('[role="status"]').textContent = state ? state.message : "";
+ };
+ applyReceiptState();
+ form.onsubmit = async event => {
  event.preventDefault();
- const button = form.querySelector("button"), status = form.querySelector('[role="status"]');
+ if (HOLD_RECEIPT_STATE.get(dispatchId)?.pending) return;
  const receipt = form.querySelector('[name="receipt"]').value.trim();
  if (!receipt) return;
- button.disabled = true; status.textContent = "Verifying…";
+ const state = { pending: true, message: "Verifying…" };
+ HOLD_RECEIPT_STATE.set(dispatchId, state); applyReceiptState();
  try {
  const response = await fetch(API + "/dispatches/" + form.dataset.reconcileDispatch + "/reconcile", {
  method: "POST", headers: jsonHdr(), body: JSON.stringify({ receipt_id: receipt }) });
  const result = await response.json();
- if (!response.ok) throw new Error(result.detail || "Verification failed; the email remains held.");
- status.textContent = "Provider acceptance verified.";
+ if (!response.ok) throw new Error(apiErr(result, "Verification failed; the email remains held."));
+ state.message = "Provider acceptance verified."; applyReceiptState();
  await loadPipeline(); renderPipeline();
- } catch (error) { status.textContent = error.message || "Verification unavailable; the email remains held."; }
- finally { button.disabled = false; }
+ } catch (error) { state.message = error.message || "Verification unavailable; the email remains held."; }
+ finally { state.pending = false; applyReceiptState(); }
  }; });
+ host.querySelectorAll("[data-hold-page]").forEach(button => { button.onclick = () => {
+ HOLD_PAGE += button.dataset.holdPage === "next" ? 1 : -1;
+ renderDeliveryHolds();
+ host.querySelector("#rbAttentionTitle").focus();
+ }; });
+ host.querySelectorAll("[data-hold-mailroom]").forEach(button => { button.onclick = () => toggleArchivePanel("mailroom"); });
  host.querySelectorAll("[data-hold-sub]").forEach(button => { button.onclick = () => {
  const sid = button.dataset.holdSub;
- if (!document.querySelector(`.rb-acc[data-id="${sid}"]`) && LAST_LIST_ARGS) {
+ OFFTAKER_QUERY = ""; OFFTAKER_FILTER = "all";
+ if (LAST_LIST_ARGS) {
  ACTIVE_SUB_ID = sid;
  renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]);
  }
- expandAccordion(sid);
+ mrOpenOfftaker(sid);
  }; });
  }
 
@@ -4132,8 +4174,8 @@
  <div id="rbBulkHost"></div>
  <!-- V2 pay-links: nudge owners who haven't finished Stripe Connect yet. -->
  <div id="rbPayBanner" hidden class="rb-pay-banner" role="status"></div>
- <details class="rep-card" id="rbCollectionSettings"><summary>Payment collection</summary><div id="rbCollectionBody">Loading…</div></details>
- <section class="rep-card" id="rbDeliveryHolds" aria-label="Invoices needing attention" hidden></section>
+ <details class="rb-collection" id="rbCollectionSettings"><summary class="rb-collection-summary"><span class="rb-collection-heading"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/></svg><strong>Payment collection</strong></span><span id="rbCollectionCurrent" class="rb-collection-current">Loading…</span><span class="rb-collection-chevron" aria-hidden="true">⌄</span></summary><div id="rbCollectionBody" class="rb-collection-body">Loading…</div></details>
+ <section class="rb-attention" id="rbDeliveryHolds" aria-label="Invoices needing attention" hidden></section>
  <div id="rbList"><div class="empty" style="padding:22px 0;color:var(--faint)">Loading…</div></div>
  </div>
  </div>
@@ -4789,23 +4831,26 @@
  }
  try {
  const policy = await request("/payment-policy");
- host.innerHTML = `<form id="rbCollectionPolicy">
- <label class="rep-fld"><span>Collection method</span><select name="policy">
+ host.innerHTML = `<form id="rbCollectionPolicy" class="rb-collection-policy">
+ <label class="rb-collection-field"><span>Collection method</span><select name="policy" aria-describedby="rbCollectionHint">
  <option value="online_required">Online payment required</option><option value="offline">Offline — check, cash or bank transfer</option></select></label>
- <button class="ao-btn" type="submit">Save collection method</button></form>
- <p>Online invoices wait for a working payment link. Offline invoices require you to record each payment.</p>
- <form id="rbOfflinePayment" hidden>
- <label class="rep-fld"><span>Issued invoice</span><select name="invoice" required><option value="">Choose invoice</option></select></label>
- <label class="rep-fld"><span>Amount received ($)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
- <label class="rep-fld"><span>Received on</span><input name="received" type="date" required></label>
- <label class="rep-fld"><span>Method</span><select name="method"><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option></select></label>
- <label class="rep-fld"><span>Payment reference</span><input name="note" maxlength="2000" required placeholder="Check number or bank reference"></label>
- <button class="ao-btn" type="submit">Record payment</button></form>
- <p id="rbCollectionStatus" role="status"></p>`;
+ <button class="rb-attention-button rb-attention-button--primary" type="submit">Save changes</button></form>
+ <p class="rb-collection-hint" id="rbCollectionHint">Online invoices wait for a working payment link. Record offline payments manually.</p>
+ <form id="rbOfflinePayment" class="rb-offline-payment" hidden><h4>Record an offline payment</h4>
+ <label class="rb-collection-field"><span>Issued invoice</span><select name="invoice" required><option value="">Choose invoice</option></select></label>
+ <label class="rb-collection-field"><span>Amount received ($)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+ <label class="rb-collection-field"><span>Received on</span><input name="received" type="date" required></label>
+ <label class="rb-collection-field"><span>Method</span><select name="method"><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option></select></label>
+ <label class="rb-collection-field"><span>Payment reference</span><input name="note" maxlength="2000" required placeholder="Check number or bank reference"></label>
+ <button class="rb-attention-button rb-attention-button--primary" type="submit">Record payment</button></form>
+ <p id="rbCollectionStatus" class="rb-collection-status" role="status"></p>`;
  const settings = host.querySelector("#rbCollectionPolicy");
  const payment = host.querySelector("#rbOfflinePayment");
  const status = host.querySelector("#rbCollectionStatus");
  settings.elements.policy.value = policy.policy;
+ const current = document.getElementById("rbCollectionCurrent");
+ const updateCurrent = value => { if (current) current.textContent = value === "offline" ? "Offline payments" : "Online payment required"; };
+ updateCurrent(policy.policy);
  payment.elements.received.value = new Date().toLocaleDateString("en-CA");
  const ownerBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(authHeaders())));
  const pendingKey = "ao_pending_offline_receipt:" + Array.from(new Uint8Array(ownerBytes)).map(x => x.toString(16).padStart(2, "0")).join("");
@@ -4837,6 +4882,7 @@
  const button = settings.querySelector("button"); button.disabled = true;
  try {
  await request("/payment-policy", {method: "PATCH", body: JSON.stringify({policy: settings.elements.policy.value})});
+ updateCurrent(settings.elements.policy.value);
  status.textContent = "Collection method saved.";
  await loadInvoices();
  } catch (err) { status.textContent = err.message; }
@@ -4871,7 +4917,11 @@
  finally { button.disabled = false; }
  };
  await loadInvoices();
- } catch (err) { host.textContent = err.message; }
+ } catch (err) {
+ const current = document.getElementById("rbCollectionCurrent");
+ if (current) current.textContent = "Unavailable";
+ host.textContent = err.message;
+ }
  }
 
  async function wireGlobalRate() {
@@ -7637,6 +7687,8 @@
  ACC_ARRS = arrs || [];
  // Index the drafts (newest per offtaker) + build the dropdown-free OFFTAKERS list.
  _indexInbox(drafts || [], subs || []);
+ HOLD_NAME_BY_SUB = new Map((subs || []).map(s => [String(s.id), s.customer_name || s.name || "Offtaker"]));
+ renderDeliveryHolds();
  // OFFTAKERS is reused as the canonical ordered offtaker list (drafts float to top).
  if (!OFFTAKERS.length) {
  list.innerHTML = `<div class="empty" style="padding:22px 0;color:var(--faint)">No offtakers yet. Click <b>＋ Add an offtaker</b> above, or drop a billing spreadsheet to create one.</div>`;

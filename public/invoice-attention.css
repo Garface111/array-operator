@@ -1,0 +1,219 @@
+/* Scoped invoice attention and payment collection surfaces. */
+#rbCollectionSettings.rb-collection,
+#rbDeliveryHolds.rb-attention {
+  --rb-a-paper: #fff;
+  --rb-a-fill: #f7f9fc;
+  --rb-a-line: #dce4ed;
+  --rb-a-ink: #172b43;
+  --rb-a-muted: #52647a;
+  --rb-a-blue: #185abd;
+  --rb-a-blue-hover: #11478f;
+  --rb-a-blue-soft: #edf4ff;
+  --rb-a-amber: #8a4c08;
+  --rb-a-amber-soft: #fff4db;
+  --rb-a-red: #ad3030;
+  --rb-a-red-soft: #fff0ef;
+  --rb-a-green: #176b46;
+  --rb-a-green-soft: #eaf7ef;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  color: var(--rb-a-ink);
+  background: var(--rb-a-paper);
+  border: 1px solid var(--rb-a-line);
+  border-radius: 12px;
+  box-shadow: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+:where(#rbCollectionSettings, #rbDeliveryHolds) *,
+:where(#rbCollectionSettings, #rbDeliveryHolds) *::before,
+:where(#rbCollectionSettings, #rbDeliveryHolds) *::after { box-sizing: border-box; }
+#rbCollectionSettings[hidden], #rbDeliveryHolds[hidden],
+:where(#rbCollectionSettings, #rbDeliveryHolds) [hidden] { display: none !important; }
+
+#rbCollectionSettings .rb-collection-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  min-height: 60px;
+  border-radius: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+#rbCollectionSettings .rb-collection-summary::-webkit-details-marker { display: none; }
+#rbCollectionSettings .rb-collection-summary::marker { content: ''; }
+#rbCollectionSettings .rb-collection-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#rbCollectionSettings .rb-collection-heading strong { font-size: 14.5px; font-weight: 650; }
+#rbCollectionSettings .rb-collection-current { color: var(--rb-a-muted); font-size: 13px; text-align: right; overflow-wrap: anywhere; }
+#rbCollectionSettings .rb-collection-chevron,
+#rbCollectionSettings .rb-collection-summary > svg:last-child {
+  width: 16px;
+  height: 16px;
+  color: var(--rb-a-muted);
+  transition: transform .15s ease;
+}
+#rbCollectionSettings[open] .rb-collection-chevron,
+#rbCollectionSettings[open] .rb-collection-summary > svg:last-child { transform: rotate(180deg); }
+#rbCollectionSettings[open] .rb-collection-summary { border-radius: 12px 12px 0 0; }
+#rbCollectionSettings .rb-collection-body { display: grid; gap: 16px; padding: 0 20px 20px; min-width: 0; }
+#rbCollectionSettings .rb-collection-policy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 0;
+}
+#rbCollectionSettings .rb-collection-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; font-weight: 550; }
+#rbCollectionSettings .rb-collection-policy > .rb-collection-field { flex: 1 1 240px; }
+#rbCollectionSettings .rb-collection-hint { margin: 0; color: var(--rb-a-muted); font-size: 13px; overflow-wrap: anywhere; }
+#rbCollectionSettings .rb-offline-payment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding-top: 16px;
+  border-top: 1px solid var(--rb-a-line);
+  margin: 0;
+}
+#rbCollectionSettings .rb-offline-payment > label:first-of-type { grid-column: 1 / -1; }
+#rbCollectionSettings .rb-offline-payment > label:last-of-type { grid-column: span 2; }
+#rbCollectionSettings .rb-offline-payment h4 { grid-column: 1 / -1; margin: 0; font-size: 14px; font-weight: 650; }
+#rbCollectionSettings .rb-collection-status { grid-column: 1 / -1; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+#rbCollectionSettings .rb-collection-status:empty { display: none; }
+
+#rbDeliveryHolds .rb-attention-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; }
+#rbDeliveryHolds .rb-attention-header > div { min-width: 0; }
+#rbDeliveryHolds .rb-attention-eyebrow { color: var(--rb-a-amber); font-size: 12px; font-weight: 650; margin-bottom: 3px; }
+#rbDeliveryHolds .rb-attention-header h3 { margin: 0; font-size: 18px; font-weight: 650; line-height: 1.3; color: var(--rb-a-ink); overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-count { flex: 0 0 auto; font-size: 13px; font-weight: 650; color: var(--rb-a-amber); background: var(--rb-a-amber-soft); padding: 4px 10px; border-radius: 5px; }
+#rbDeliveryHolds .rb-attention-table-wrap { width: 100%; min-width: 0; }
+#rbDeliveryHolds table.rb-attention-table { display: table; width: 100%; table-layout: fixed; border-collapse: collapse; border-spacing: 0; margin: 0; font-size: 14px; }
+#rbDeliveryHolds .rb-attention-table th { background: var(--rb-a-fill); color: var(--rb-a-muted); font-size: 12px; font-weight: 650; text-align: left; padding: 10px 20px; border-top: 1px solid var(--rb-a-line); border-bottom: 1px solid var(--rb-a-line); }
+#rbDeliveryHolds .rb-attention-table th:nth-child(1) { width: 25%; }
+#rbDeliveryHolds .rb-attention-table th:nth-child(2) { width: 14%; }
+#rbDeliveryHolds .rb-attention-table th:nth-child(3) { width: 16%; }
+#rbDeliveryHolds .rb-attention-table th:nth-child(4) { width: 45%; }
+#rbDeliveryHolds .rb-attention-table td { padding: 16px 20px; vertical-align: top; text-align: left; border: 0; border-bottom: 1px solid var(--rb-a-line); overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-table tr:last-child td { border-bottom: 0; }
+#rbDeliveryHolds .rb-attention-person { font-weight: 600; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-person-link { display: inline-block; max-width: 100%; padding: 0; margin: 0; border: 0; border-radius: 3px; background: none; box-shadow: none; color: var(--rb-a-blue); font: inherit; font-weight: 600; line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+#rbDeliveryHolds .rb-attention-person-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+#rbDeliveryHolds .rb-attention-period { font-size: 13px; color: var(--rb-a-muted); }
+#rbDeliveryHolds .rb-attention-amount { font-weight: 650; font-variant-numeric: tabular-nums; }
+#rbDeliveryHolds .rb-attention-muted { display: block; color: var(--rb-a-muted); font-size: 12px; font-weight: 400; }
+#rbDeliveryHolds .rb-attention-review { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+#rbDeliveryHolds .rb-attention-status { display: inline-block; max-width: 100%; border-radius: 4px; padding: 3px 8px; background: var(--rb-a-amber-soft); color: var(--rb-a-amber); font-size: 12px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-status[data-state="prepared"],
+#rbDeliveryHolds .rb-attention-status[data-state="sending"] { color: var(--rb-a-blue); background: var(--rb-a-blue-soft); }
+#rbDeliveryHolds .rb-attention-status[data-state="failed"] { color: var(--rb-a-red); background: var(--rb-a-red-soft); }
+#rbDeliveryHolds .rb-attention-status[data-state="accepted"] { color: var(--rb-a-green); background: var(--rb-a-green-soft); }
+#rbDeliveryHolds .rb-attention-reason { margin: 0; color: var(--rb-a-ink); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--rb-a-line); }
+#rbDeliveryHolds .rb-attention-footer > div { display: flex; flex-wrap: wrap; gap: 8px; }
+#rbDeliveryHolds .rb-attention-range { margin-right: auto; color: var(--rb-a-muted); font-size: 13px; }
+
+#rbDeliveryHolds .rb-attention-emails { padding: 20px; border-top: 1px solid var(--rb-a-line); }
+#rbDeliveryHolds .rb-attention-emails > .rb-attention-button { margin-top: 16px; }
+#rbDeliveryHolds .rb-attention-emails > h4 { margin: 0 0 12px; font-size: 14px; font-weight: 650; }
+#rbDeliveryHolds .rb-attention-email-list { display: grid; gap: 16px; padding: 0; margin: 0; list-style: none; }
+#rbDeliveryHolds .rb-attention-email { padding: 0 0 16px; margin: 0; border: 0; border-bottom: 1px solid var(--rb-a-line); min-width: 0; }
+#rbDeliveryHolds .rb-attention-email:last-child { padding-bottom: 0; border-bottom: 0; }
+#rbDeliveryHolds .rb-attention-email > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; margin-bottom: 8px; }
+#rbDeliveryHolds .rb-attention-emails > h4 .rb-attention-muted,
+#rbDeliveryHolds .rb-attention-email > header .rb-attention-muted { display: inline; }
+#rbDeliveryHolds .rb-attention-email > header > :first-child { min-width: 0; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-email > p { margin: 6px 0; font-size: 13px; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-meta { color: var(--rb-a-muted); font-size: 12px; overflow-wrap: anywhere; }
+#rbDeliveryHolds .rb-attention-reconcile { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 12px; }
+#rbDeliveryHolds .rb-attention-reconcile label { display: flex; flex: 1 1 230px; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; }
+#rbDeliveryHolds .rb-attention-reconcile [role="status"] { flex-basis: 100%; font-size: 13px; overflow-wrap: anywhere; }
+
+:where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 38px; max-width: 100%; padding: 8px 12px; margin: 0;
+  border: 1px solid var(--rb-a-line); border-radius: 6px;
+  color: var(--rb-a-blue); background: var(--rb-a-paper); box-shadow: none;
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1.35;
+  text-align: center; white-space: normal; overflow-wrap: anywhere; cursor: pointer;
+}
+:where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button:hover:not(:disabled) { background: var(--rb-a-blue-soft); border-color: var(--rb-a-blue); }
+:where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button--primary { color: #fff; border-color: var(--rb-a-blue); background: var(--rb-a-blue); }
+:where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button--primary:hover:not(:disabled) { color: #fff; background: var(--rb-a-blue-hover); border-color: var(--rb-a-blue-hover); }
+:where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button:disabled { opacity: .5; cursor: not-allowed; }
+#rbCollectionSettings :is(select, input),
+#rbDeliveryHolds .rb-attention-reconcile :is(select, input) {
+  display: block; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 38px;
+  padding: 8px 10px; margin: 0; border: 1px solid var(--rb-a-line); border-radius: 6px;
+  background: var(--rb-a-paper); color: var(--rb-a-ink); box-shadow: none;
+  font: inherit; font-size: 14px; font-weight: 400; line-height: 1.4;
+}
+:where(#rbCollectionSettings, #rbDeliveryHolds) :is(button, summary, select, input):focus-visible { outline: 3px solid var(--rb-a-blue); outline-offset: 3px; }
+
+html[data-theme="night"]:not(.sky) :is(#rbCollectionSettings, #rbDeliveryHolds) {
+  --rb-a-paper: #152231; --rb-a-fill: #1c2c3e; --rb-a-line: #36495f;
+  --rb-a-ink: #e7eef7; --rb-a-muted: #b3c1d2;
+  --rb-a-blue: #84baff; --rb-a-blue-hover: #a6ceff; --rb-a-blue-soft: #203c5d;
+  --rb-a-amber: #f4c77d; --rb-a-amber-soft: #45341d;
+  --rb-a-red: #ffa49b; --rb-a-red-soft: #482a2d;
+  --rb-a-green: #8ad8af; --rb-a-green-soft: #1c3b30;
+}
+html[data-theme="night"]:not(.sky) :is(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button--primary { color: #12243b; }
+
+@media (min-width: 701px) and (max-width: 1200px) {
+  #rbDeliveryHolds .rb-attention-table :is(th, td) { padding-left: 12px; padding-right: 12px; }
+}
+
+/* Keep the review list first and full-width when the side rail stacks. */
+@media (max-width: 1000px) {
+  #rb2Main { align-items: stretch; }
+  #rb2Main > .rb2-listcol,
+  #rb2Main > .rb2-railslot { width: 100%; min-width: 0; }
+  #rb2Main > .rb2-railslot { order: 1; }
+}
+
+@media (max-width: 700px) {
+  #rbCollectionSettings .rb-collection-summary { grid-template-columns: minmax(0, 1fr) 16px; padding: 14px 16px; gap: 4px 12px; }
+  #rbCollectionSettings .rb-collection-heading { grid-column: 1; }
+  #rbCollectionSettings .rb-collection-current { grid-column: 1; text-align: left; }
+  #rbCollectionSettings .rb-collection-chevron,
+  #rbCollectionSettings .rb-collection-summary > svg:last-child { grid-column: 2; grid-row: 1 / span 2; }
+  #rbCollectionSettings .rb-collection-body { padding: 0 16px 16px; }
+  #rbCollectionSettings .rb-collection-policy > .rb-collection-field { flex-basis: 100%; }
+  #rbCollectionSettings .rb-offline-payment { grid-template-columns: minmax(0, 1fr); }
+  #rbCollectionSettings .rb-offline-payment > label:last-of-type { grid-column: 1 / -1; }
+  #rbDeliveryHolds .rb-attention-header { padding: 16px; align-items: flex-start; gap: 10px; }
+  #rbDeliveryHolds .rb-attention-header h3 { font-size: 17px; }
+  #rbDeliveryHolds .rb-attention-count { max-width: 42%; overflow-wrap: anywhere; }
+  #rbDeliveryHolds table.rb-attention-table,
+  #rbDeliveryHolds .rb-attention-table tbody { display: block; width: 100%; }
+  #rbDeliveryHolds .rb-attention-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #rbDeliveryHolds .rb-attention-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; padding: 16px; border-top: 1px solid var(--rb-a-line); }
+  #rbDeliveryHolds .rb-attention-table td { display: block; min-width: 0; padding: 0; border: 0; }
+  #rbDeliveryHolds .rb-attention-table td:first-child,
+  #rbDeliveryHolds .rb-attention-table td:last-child { grid-column: 1 / -1; }
+  #rbDeliveryHolds .rb-attention-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; color: var(--rb-a-muted); font-size: 12px; font-weight: 550; }
+  #rbDeliveryHolds .rb-attention-person-link { min-height: 44px; display: inline-flex; align-items: center; }
+  #rbDeliveryHolds .rb-attention-footer { padding: 14px 16px; }
+  #rbDeliveryHolds .rb-attention-range { flex-basis: 100%; }
+  #rbDeliveryHolds .rb-attention-emails { padding: 16px; }
+  :where(#rbCollectionSettings, #rbDeliveryHolds) .rb-attention-button { min-height: 44px; }
+  #rbCollectionSettings :is(input, select),
+  #rbDeliveryHolds .rb-attention-reconcile :is(input, select) { min-height: 44px; font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #rbCollectionSettings .rb-collection-chevron,
+  #rbCollectionSettings .rb-collection-summary > svg:last-child { transition: none; }
+}
