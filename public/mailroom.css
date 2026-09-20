@@ -1,0 +1,140 @@
+/* Mail Room: full-width operational list and invoice evidence drawer. */
+#rbMailroom, #mrOverlay {
+  --mr-paper:#fff; --mr-fill:#f7f9fc; --mr-line:#dce4ed; --mr-ink:#172b43;
+  --mr-muted:#52647a; --mr-blue:#185abd; --mr-blue-soft:#edf4ff;
+  --mr-amber:#8a4c08; --mr-amber-soft:#fff4db; --mr-green:#176b46;
+  --mr-red:#ad3030; --mr-red-soft:#fff0ef;
+  color:var(--mr-ink); font-size:14px; line-height:1.5;
+}
+:is(#rbMailroom, #mrOverlay) *, :is(#rbMailroom, #mrOverlay) *::before, :is(#rbMailroom, #mrOverlay) *::after { box-sizing:border-box; }
+#rbMailroom[hidden], #mrOverlay[hidden], :is(#rbMailroom, #mrOverlay) [hidden] { display:none !important; }
+#rbMailroom.rb-mailroom { width:100%; max-width:none; min-width:0; margin:0 0 16px; border:1px solid var(--mr-line); border-radius:12px; background:var(--mr-paper); box-shadow:none; }
+#rbMailroom > .rb-arch-sum { padding:16px 20px; min-height:56px; font-size:14.5px; color:var(--mr-ink); }
+#rbMailroom > .rb-arch-body { padding:0 20px 20px; min-width:0; }
+#rbMailroom .rb-mr-overview { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 16px; margin:4px 0 16px; }
+#rbMailroom .rb-mr-overview h3 { margin:0; font-size:18px; font-weight:650; color:var(--mr-ink); }
+#rbMailroom .rb-mr-overview :is(p, small, time) { margin:0; color:var(--mr-muted); font-size:13px; }
+#rbMailroom .rb-mr-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; padding:0 0 16px; margin-bottom:16px; border-bottom:1px solid var(--mr-line); }
+#rbMailroom .rb-mr-metric { min-width:0; padding:0 16px; border-left:1px solid var(--mr-line); }
+#rbMailroom .rb-mr-metric:first-child { padding-left:0; border-left:0; }
+#rbMailroom .rb-mr-metric strong { display:block; font-size:23px; font-weight:650; font-variant-numeric:tabular-nums; line-height:1.3; overflow-wrap:anywhere; }
+#rbMailroom .rb-mr-metric span { display:block; margin-top:3px; color:var(--mr-muted); font-size:12px; }
+#rbMailroom .rb-mr-tools { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 16px; }
+#rbMailroom #rbMrSearch { flex:1 1 250px; width:auto; min-width:0; max-width:100%; min-height:40px; padding:9px 12px; border:1px solid var(--mr-line); border-radius:6px; color:var(--mr-ink); background:var(--mr-paper); font:inherit; font-size:14px; box-shadow:none; }
+:is(#rbMailroom, #mrOverlay) button { min-height:36px; max-width:100%; padding:7px 11px; border:1px solid var(--mr-line); border-radius:6px; color:var(--mr-blue); background:var(--mr-paper); box-shadow:none; font:inherit; font-size:13px; font-weight:600; line-height:1.4; white-space:normal; cursor:pointer; }
+:is(#rbMailroom, #mrOverlay) button:hover:not(:disabled) { background:var(--mr-blue-soft); border-color:var(--mr-blue); }
+:is(#rbMailroom, #mrOverlay) button:disabled { opacity:.5; cursor:not-allowed; }
+#rbMailroom #rbMrCheck { color:#fff; background:var(--mr-blue); border-color:var(--mr-blue); }
+#rbMailroom #rbMrCheck:hover:not(:disabled) { background:#11478f; }
+#rbMailroom .rb-mr-notice { padding:10px 12px; margin:0 0 16px; border-left:3px solid var(--mr-amber); border-radius:0; background:var(--mr-amber-soft); color:var(--mr-amber); font-size:13px; overflow-wrap:anywhere; }
+#rbMailroom .rb-mr-notice:empty { display:none; }
+#rbMailroom .rb-mr-tabs { display:flex; flex-wrap:wrap; gap:4px 16px; padding:0; margin:0 0 16px; border-bottom:1px solid var(--mr-line); }
+#rbMailroom .rb-mr-tabs button { display:inline-flex; align-items:center; gap:7px; padding:10px 2px; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--mr-muted); background:none; }
+#rbMailroom .rb-mr-tabs button[aria-selected="true"] { color:var(--mr-blue); border-bottom-color:var(--mr-blue); }
+#rbMailroom .rb-mr-tabs button span { font-size:12px; font-variant-numeric:tabular-nums; font-weight:500; }
+#rbMailroom .rb-mr-results-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 16px; margin:0 0 8px; }
+#rbMailroom .rb-mr-results-head h4 { margin:0; font-size:14px; font-weight:650; }
+#rbMailroom .rb-mr-results-head > span { color:var(--mr-muted); font-size:12px; }
+#rbMailroom .rb-mr-list { display:flex; flex-direction:column; gap:0; max-height:none; height:auto; overflow:visible; padding:0; margin:0; width:100%; }
+#rbMailroom .rb-mr-card { min-width:0; padding:16px 0; border:0; border-bottom:1px solid var(--mr-line); border-radius:0; background:transparent; box-shadow:none; transition:background .12s ease; }
+#rbMailroom .rb-mr-card:first-child { border-top:1px solid var(--mr-line); }
+#rbMailroom .rb-mr-card:hover { background:var(--mr-fill); box-shadow:none; }
+#rbMailroom .rb-mr-l1 { display:flex; align-items:baseline; justify-content:space-between; gap:12px; font-size:14.5px; color:var(--mr-ink); }
+#rbMailroom .rb-mr-l1 b { min-width:0; font-weight:650; overflow:visible; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
+#rbMailroom .rb-mr-amt { flex-shrink:0; font-weight:650; color:var(--mr-ink); }
+#rbMailroom :is(.rb-mr-l2, .rb-mr-l3, .rb-mr-l4) { margin-top:5px; color:var(--mr-muted); font-size:13px; line-height:1.5; white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-dim { color:var(--mr-muted); }
+:is(#rbMailroom, #mrOverlay) .rb-mr-mono { font-size:12px; overflow-wrap:anywhere; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-chip { max-width:100%; padding:2px 7px; border-radius:4px; font-size:12px; line-height:1.5; white-space:normal; overflow-wrap:anywhere; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-chip--ok { color:var(--mr-green); background:rgba(23,107,70,.09); }
+:is(#rbMailroom, #mrOverlay) .rb-mr-chip--warn { color:var(--mr-amber); background:var(--mr-amber-soft); }
+:is(#rbMailroom, #mrOverlay) .rb-mr-chip--bad { color:var(--mr-red); background:var(--mr-red-soft); }
+:is(#rbMailroom, #mrOverlay) .rb-mr-chip--dim { color:var(--mr-muted); background:var(--mr-fill); }
+#rbMailroom .rb-mr-reason { margin-top:8px; padding:0 0 0 9px; border-left:2px solid var(--mr-amber); border-radius:0; background:none; color:var(--mr-amber); font-size:13px; }
+#rbMailroom .rb-mr-pagination { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:10px; padding-top:14px; }
+#rbMailroom .rb-mr-pagination > span { margin-right:auto; color:var(--mr-muted); font-size:13px; }
+#rbMailroom #rbMrAuditBox { margin:0 0 16px; padding:14px 0; border:0; border-top:1px solid var(--mr-line); border-bottom:1px solid var(--mr-line); border-radius:0; background:none; font-size:13px; }
+#rbMailroom .rb-mr-audit-sum { min-height:36px; gap:8px 12px; color:var(--mr-ink); }
+#rbMailroom .rb-mr-audit-meta { color:var(--mr-muted); font-size:12px; }
+#rbMailroom .rb-mr-audit-body { gap:12px; margin-top:12px; }
+#rbMailroom .rb-mr-audit-actions { flex-wrap:wrap; }
+#rbMailroom .rb-mr-repairs { display:grid; gap:10px; margin:0 0 12px; }
+#rbMailroom .rb-mr-repair { border:0; border-left:3px solid var(--mr-green); border-radius:0; padding:3px 0 3px 10px; background:none; font-size:13px; color:var(--mr-ink); overflow-wrap:anywhere; }
+#rbMailroom .rb-mr-look { margin:0; padding:10px 0; border:0; border-top:1px solid var(--mr-line); border-radius:0; background:none; }
+#rbMailroom .rb-mr-look > summary { min-height:36px; cursor:pointer; font-size:13px; font-weight:600; }
+#rbMailroom .rb-mr-look ul { gap:8px; padding:8px 0 0; }
+#rbMailroom .rb-mr-look li label { font-size:13px; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-find { padding:8px 0 8px 10px; border-radius:0; background:none; overflow-wrap:anywhere; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-find-h { gap:6px 8px; font-size:13px; color:var(--mr-ink); }
+:is(#rbMailroom, #mrOverlay) .rb-mr-find-d { margin-top:6px; color:var(--mr-muted); font-size:13px; line-height:1.55; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-fix { gap:6px 10px; flex-wrap:wrap; padding:0; margin-top:8px; border-radius:0; background:none; color:var(--mr-ink); font-size:13px; }
+:is(#rbMailroom, #mrOverlay) .rb-mr-fix-l { color:var(--mr-green); font-size:11px; }
+#rbMailroom .rb-mr-sevs { gap:6px; }
+#rbMailroom .rb-mr-sev { border-radius:4px; }
+:is(#rbMailroom, #mrOverlay) :is(button, input, summary, a, [role="button"]):focus-visible { outline:3px solid var(--mr-blue); outline-offset:3px; box-shadow:none; }
+#mrOverlay { background:var(--mr-paper); }
+#mrOverlay .rb-es-head { padding:16px 24px; align-items:flex-start; gap:12px; background:var(--mr-paper); border-bottom:1px solid var(--mr-line); }
+#mrOverlay .rb-es-head > div { min-width:0; }
+#mrOverlay #mrTitle { display:block; color:var(--mr-ink); font-size:18px; line-height:1.35; overflow-wrap:anywhere; }
+#mrOverlay #mrSub { display:block; color:var(--mr-muted); font-size:13px; margin-top:5px; overflow-wrap:anywhere; }
+#mrOverlay #mrClose { flex:0 0 40px; width:40px; min-height:40px; padding:5px; }
+#mrOverlay .rb-es-cols { min-width:0; }
+#mrOverlay :is(.rb-es-left, .rb-es-right) { min-width:0; padding:20px 24px; background:var(--mr-paper); }
+#mrOverlay .rb-es-left { width:52%; border-right:1px solid var(--mr-line); }
+#mrOverlay .rb-es-right { width:48%; gap:12px; }
+#mrOverlay .rb-es-prevlabel { color:var(--mr-muted); font-size:12px; margin-bottom:8px; }
+#mrOverlay .rb-mr-kvs { border:0; border-radius:0; border-top:1px solid var(--mr-line); margin-bottom:16px; }
+#mrOverlay :is(.rb-mr-kv, .rb-mr-tl) { grid-template-columns:120px minmax(0,1fr); padding:10px 0; gap:12px; font-size:13px; border-bottom:1px solid var(--mr-line); }
+#mrOverlay .rb-mr-k { color:var(--mr-muted); font-size:11px; }
+#mrOverlay .rb-mr-v { color:var(--mr-ink); }
+#mrOverlay .rb-mr-frame { display:block; width:100%; min-height:520px; border:1px solid var(--mr-line); border-radius:6px; }
+#mrOverlay .rb-mr-warn { color:var(--mr-amber); background:var(--mr-amber-soft); padding:9px 10px; border-radius:4px; font-size:13px; }
+html[data-theme="night"]:not(.sky) :is(#rbMailroom, #mrOverlay) { --mr-paper:#152231; --mr-fill:#1c2c3e; --mr-line:#36495f; --mr-ink:#e7eef7; --mr-muted:#b3c1d2; --mr-blue:#84baff; --mr-blue-soft:#203c5d; --mr-amber:#f4c77d; --mr-amber-soft:#45341d; --mr-green:#8ad8af; --mr-red:#ffa49b; --mr-red-soft:#482a2d; }
+html[data-theme="night"]:not(.sky) #rbMailroom #rbMrCheck { color:#12243b; }
+html[data-theme="night"]:not(.sky) #rbMailroom #rbMrCheck:hover:not(:disabled) { background:#a6ceff; }
+@media (max-width:900px) {
+  #mrOverlay .rb-es-cols { flex-direction:column; overflow:auto; }
+  #mrOverlay :is(.rb-es-left, .rb-es-right) { width:100%; overflow:visible; flex:none; border-right:0; }
+  #mrOverlay .rb-es-right { border-top:1px solid var(--mr-line); }
+}
+@media (max-width:700px) {
+  #rbMailroom > .rb-arch-sum { padding:14px 16px; }
+  #rbMailroom > .rb-arch-body { padding:0 16px 16px; }
+  #rbMailroom .rb-mr-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); row-gap:16px; }
+  #rbMailroom .rb-mr-metric:nth-child(3) { border-left:0; padding-left:0; }
+  #rbMailroom .rb-mr-metric strong { font-size:21px; }
+  #rbMailroom #rbMrSearch { flex-basis:100%; min-height:44px; font-size:16px; }
+  :is(#rbMailroom, #mrOverlay) button { min-height:44px; }
+  #rbMailroom .rb-mr-tabs { gap:2px 14px; }
+  #rbMailroom .rb-mr-card { padding:16px 0; }
+  #rbMailroom .rb-mr-l1 { flex-wrap:wrap; gap:4px 12px; }
+  #rbMailroom .rb-mr-l1 b { flex:1 1 160px; }
+  #rbMailroom .rb-mr-pagination > span { flex-basis:100%; }
+  #rbMailroom :is(.rb-mr-audit-sum, .rb-mr-look > summary) { min-height:44px; }
+  #mrOverlay .rb-es-head { display:grid; grid-template-columns:minmax(0,1fr) 44px; padding:14px 16px; }
+  #mrOverlay .rb-es-head > div { grid-column:1; }
+  #mrOverlay #mrClose { grid-column:2; grid-row:1; min-height:44px; width:44px; }
+  #mrOverlay #mrOpenSub { grid-column:1 / -1; justify-self:start; }
+  #mrOverlay :is(.rb-es-left, .rb-es-right) { padding:16px; }
+  #mrOverlay :is(.rb-mr-kv, .rb-mr-tl) { grid-template-columns:minmax(0,1fr); gap:3px; }
+}
+@media (prefers-reduced-motion:reduce) { #rbMailroom .rb-mr-card { transition:none; } }
+
+/* The Sky theme applies important pill styles to shared buttons. */
+html.sky :is(#rbMailroom, #mrOverlay) :is(.ao-btn, .rb-btn) {
+  border:1px solid var(--mr-line) !important; border-radius:6px !important;
+  color:var(--mr-blue) !important; background:var(--mr-paper) !important;
+  box-shadow:none !important; transform:none !important;
+}
+html.sky :is(#rbMailroom, #mrOverlay) :is(.ao-btn, .rb-btn):hover:not(:disabled) { background:var(--mr-blue-soft) !important; }
+html.sky #rbMailroom #rbMrCheck { color:#fff !important; background:var(--mr-blue) !important; border-color:var(--mr-blue) !important; }
+#rbMailroom .rb-mr-audit-head { justify-content:space-between; align-items:center; margin-bottom:10px; }
+#rbMailroom .rb-mr-audit-meta { margin:5px 0 0; }
+#rbMailroom .rb-mr-sevs { display:flex; flex-wrap:wrap; margin:12px 0; }
+#rbMailroom .rb-mr-repairs > summary { cursor:pointer; padding:6px 0; font-weight:600; color:var(--mr-green); }
+#rbMailroom .rb-mr-repair p { margin:4px 0; }
+#rbMailroom #rbMrStatus:not(:empty) { flex-basis:100%; color:var(--mr-amber); }
+#rbMailroom .rb-mr-pagination > div { display:flex; gap:8px; }
+
+#rbMailroom :is(.rb-mr-l2, .rb-mr-l3) { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+#rbMailroom .rb-mr-tools { gap:8px; }
