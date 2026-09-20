@@ -7383,6 +7383,7 @@
  } catch (e) { st = null; }
  if (!st || !st.ok) { el.hidden = true; return; }
  const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 50) / 100));
+ const stripeFees = st.stripe_fees || { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
  const feeTxt = (Math.round(feePct * 100) / 100) + "%";
  if (st.ready || st.charges_enabled) {
  // Quiet success: don't clutter the Reports tab once they're set up.
@@ -7399,7 +7400,7 @@
  } else {
  el.innerHTML =
  `<span class="rb-pay-banner-ic" aria-hidden="true">💳</span>` +
- `<span class="rb-pay-banner-tx"><b>Collect payments online</b>, offtaker invoices can include a secure pay link. We keep ${feeTxt}; the rest lands in your bank.</span>` +
+ `<span class="rb-pay-banner-tx"><b>Collect payments online</b>, offtaker invoices can include a secure pay link. We keep ${feeTxt}; Stripe takes its processing fee (bank debit ${esc(stripeFees.ach)}, card ${esc(stripeFees.card)}); the rest lands in your bank.</span>` +
  `<a class="rb-pay-banner-cta" href="#account">Enable online pay →</a>`;
  }
  }

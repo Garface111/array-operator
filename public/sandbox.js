@@ -5135,6 +5135,7 @@
  // Demo (signed-out)
  if(!h && window.AO_DEMO){
  paint(_payCardHTML({
+ fees, platformName,
  state: "ready",
  feeTxt: feeFallback,
  title: "Online payments on (demo)",
@@ -5145,6 +5146,7 @@
  }
  if(!h){
  paint(_payCardHTML({
+ fees, platformName,
  state: "off",
  feeTxt: feeFallback,
  title: "Get paid online",
@@ -5177,6 +5179,7 @@
 
  if(!st || !st.ok){
  paint(_payCardHTML({
+ fees, platformName,
  state: "err",
  feeTxt: feeFallback,
  title: "Couldn't check payment setup",
@@ -5189,13 +5192,20 @@
 
  const feePct = (st.fee_percent != null ? Number(st.fee_percent) : (Number(st.fee_bps || 50) / 100));
  const feeTxt = (Math.round(feePct * 100) / 100) + "%";
+ // Two separate deductions on every online payment, spelled out: ours, and
+ // Stripe's processing (bank debit vs card). Ford 2026-09-20: "the billing
+ // should be clear — ours is 0.5%, and Stripe's rates should be listed".
+ const fees = st.stripe_fees || { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
+ const platformName = st.platform_name || "Stripe";
+ const feeSplit = `Array Operator keeps ${feeTxt}. Stripe takes its processing fee too: bank debit (ACH) ${fees.ach}, card ${fees.card}. Both come out of each payment before it reaches your bank.`;
 
  if(st.ready || st.charges_enabled){
  paint(_payCardHTML({
+ fees, platformName,
  state: "ready",
  feeTxt,
  title: "You're set, offtakers can pay online",
- body: "Every invoice email we send now includes a secure <b>Pay</b> button. Money goes to your bank. We keep " + feeTxt + " per payment, that's it.",
+ body: "Every invoice email we send now includes a secure <b>Pay</b> button. Money goes straight to your bank. " + esc(feeSplit),
  steps: null,
  cta: { label: "Update bank details", action: "update", secondary: true },
  }));
@@ -5206,6 +5216,7 @@
  if(st.connected || st.account_id){
  // Mid-flow: they started but didn't finish Stripe's form.
  paint(_payCardHTML({
+ fees, platformName,
  state: justReturned ? "almost" : "almost",
  feeTxt,
  title: justReturned ? "Almost done, finish bank details" : "Continue bank setup",
@@ -5227,10 +5238,11 @@
 
  // Fresh: never started.
  paint(_payCardHTML({
+ fees, platformName,
  state: "off",
  feeTxt,
  title: "Get paid online, one setup",
- body: "Offtakers click <b>Pay</b> on their invoice. You get the money in your bank. We keep " + feeTxt + ". Takes about two minutes.",
+ body: "Offtakers click <b>Pay</b> on their invoice, by bank debit or card. The money lands in your bank. " + esc(feeSplit) + " Setup takes about two minutes.",
  steps: [
  { n: "1", t: "Click the button", d: "We open Stripe securely" },
  { n: "2", t: "Enter bank or debit card", d: "You type it once, we never store it" },
@@ -5241,7 +5253,8 @@
  _wirePayCard();
  }
 
- function _payCardHTML({ state, feeTxt, title, body, steps, cta }){
+ function _payCardHTML({ state, feeTxt, title, body, steps, cta, fees, platformName }){
+ fees = fees || { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
  const stateCls = state === "ready" ? "is-ready"
  : state === "almost" ? "is-almost"
  : state === "err" ? "is-err" : "is-off";
@@ -5269,7 +5282,11 @@
  ${stepsHtml}
  <div class="ao-pay-foot">
  ${ctaHtml}
- <span class="ao-pay-fee" title="Platform fee on each offtaker card payment">Fee ${esc(feeTxt || "0.5%")} · powered by Stripe</span>
+ <span class="ao-pay-fee" title="Deducted from each online payment before it reaches your bank">
+ <b>Array Operator ${esc(feeTxt || "0.5%")}</b> per online payment
+ <span class="ao-pay-fee-sep">·</span> Stripe bank debit (ACH) ${esc(fees.ach)}
+ <span class="ao-pay-fee-sep">·</span> Stripe card ${esc(fees.card)}
+ <span class="ao-pay-fee-note">payments processed by Stripe${platformName && platformName !== "Stripe" ? " under " + esc(platformName) : ""}</span></span>
  </div>
  <div class="acct-msg" id="connectMsg"></div>
  </div>`;

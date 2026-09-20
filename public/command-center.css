@@ -4504,3 +4504,8 @@ body.ho-shell-open .vs-inv-sub{
 .rb-mr-sev--warn.on{ border-color:#d97706; color:#9a5b00; background:rgba(217,119,6,.1); }
 .rb-mr-findsec{ margin-top:4px; display:flex; flex-direction:column; gap:6px; }
 .rb-mr-legacynote{ padding:10px 14px; font-size:12px; }
+
+/* Account card: the fee split (ours + Stripe's) reads as one line, wrapping cleanly */
+.ao-pay-fee{ display:inline-flex; flex-wrap:wrap; align-items:baseline; gap:4px 6px; line-height:1.45; max-width:100%; }
+.ao-pay-fee-sep{ opacity:.45; }
+.ao-pay-fee-note{ flex-basis:100%; font-size:11px; opacity:.7; }
