@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-20",
+  "updated": "2026-09-21",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -10,6 +10,15 @@
       "summary": "A Sept 17, 2026 CT Mirror report notes electricity prices are falling heading into the election: Eversource standard-service supply dropped to 11.577¢/kWh on July 1, 2026 and a public-benefits bill credit of roughly $30–34/month runs through April 2027, driven largely by long-term Millstone and Seabrook nuclear contracts. Eversource's pending PURA distribution rate case still seeks a double-digit increase for July 2027.",
       "source": "CT Mirror",
       "url": "https://ctmirror.org/2026/09/17/cts-electricity-prices-are-falling/"
+    },
+    {
+      "date": "2026-09-14",
+      "state": "region",
+      "tag": "Rates",
+      "title": "Power Advisory: New England basic service rates jump ~14% for 2H 2026, lifting net-metering payouts",
+      "summary": "A Sept 14, 2026 Power Advisory report finds second-half 2026 basic/standard-service supply rates rose about 14% on average across six New England utilities year-over-year — roughly 14% in Massachusetts, 15% in Rhode Island, 25% in New Hampshire and 3% in Connecticut — driven by elevated gas prices, a harsh winter and NECEC underperformance. Because net-metering and community-solar compensation is linked to basic service rates, the analysis notes project owners will see higher payouts, with a further ~12% average increase projected for 1H 2027 (Eversource CT up ~25%).",
+      "source": "Power Advisory LLC",
+      "url": "https://www.poweradvisoryllc.com/reports/geopolitics-harsh-winters-and-limited-necec-impact-drive-new-england-basic-service-rates-dramatically-higher"
     },
     {
       "date": "2026-09-09",
