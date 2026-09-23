@@ -1,7 +1,25 @@
 {
-  "updated": "2026-09-22",
+  "updated": "2026-09-23",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-09-21",
+      "state": "region",
+      "tag": "Update",
+      "title": "ISO New England logs its 500th 'duck curve' day as behind-the-meter solar keeps climbing",
+      "summary": "ISO New England said the grid hit its 500th 'duck curve' day on September 21, 2026 — the 107th of 2026 alone — as rooftop and other behind-the-meter solar drive midday grid demand below overnight levels. Behind-the-meter PV set a record estimated output of about 7,068 MW around 1 p.m. on April 8, 2026, and the ISO estimates these resources generated 9,926 GWh in 2025.",
+      "source": "ISO Newswire (ISO New England)",
+      "url": "https://isonewswire.com/2026/09/21/500-duck-curves-and-counting-growth-of-solar-power-brings-another-new-england-electricity-milestone/"
+    },
+    {
+      "date": "2026-09-21",
+      "state": "ma",
+      "tag": "Advocacy",
+      "title": "Massachusetts energy-affordability bill stays stalled in conference as Healey weighs winter relief",
+      "summary": "As of late September 2026 the Massachusetts omnibus energy-affordability bill remained in a House-Senate conference committee with no deal, prompting Gov. Maura Healey to say her administration is weighing direct relief for households heading into winter. The pending legislation would leave residential rooftop net metering intact while trimming net-metering credit values for larger non-residential facilities.",
+      "source": "Daily Hampshire Gazette",
+      "url": "https://gazettenet.com/2026/09/21/healey-eyes-winter-energy-relief-as-affordability-bill-remains-stalled/"
+    },
     {
       "date": "2026-09-17",
       "state": "ct",
@@ -102,15 +120,6 @@
       "url": "https://ctnewsjunkie.com/2026/08/17/clean-energy-nonprofit-files-intervenor-status-in-eversource-rate-case/"
     },
     {
-      "date": "2026-08-05",
-      "state": "region",
-      "tag": "Update",
-      "title": "ISO-NE: New England solar tops 9,600 MW, with over 5,100 MW behind the meter",
-      "summary": "An updated ISO New England explainer (Aug 5, 2026) details how the grid operator tracks solar it can't directly meter. The region ended 2025 with nearly 9,600 MW of solar nameplate capacity — more than 5,100 MW of it behind-the-meter, a segment projected to reach roughly 8,000 MW within ten years. Behind-the-meter output shows up as a midday demand trough rather than as dispatchable supply.",
-      "source": "ISO Newswire (ISO New England)",
-      "url": "https://isonewswire.com/2026/08/05/explainer-how-does-iso-ne-track-production-from-behind-the-meter-and-other-solar-resources/"
-    },
-    {
       "date": "2026-07-24",
       "state": "ri",
       "tag": "Rates",
@@ -154,15 +163,6 @@
       "summary": "As of mid-September 2026, DOER continues accepting SMART 3.0 applications and issuing Preliminary Statements of Qualification but will not issue Final Statements — or start incentive payments — until the model tariff clears DPU Docket 25-175. The DPU approved the model tariffs without modification on May 19, 2026 but deferred outstanding issues to a Phase II; the 20-year SMART term begins only after tariff approval and a project's Final Statement of Qualification.",
       "source": "NuWatt Energy (SMART Program Tracker 2026)",
       "url": "https://nuwattenergy.com/en/massachusetts/smart-program-tracker-2026"
-    },
-    {
-      "date": "2026-07-08",
-      "state": "nh",
-      "tag": "Law",
-      "title": "New Hampshire enacts plug-in 'balcony' solar law (SB 540), effective January 2027",
-      "summary": "Gov. Kelly Ayotte signed SB 540 (Chapter 262) on July 2, 2026, legalizing portable solar generation devices up to 1,200 watts AC per customer and exempting them from interconnection agreements, utility approval, and net-metering rules; the law takes effect Jan 1, 2027. It places NH alongside Maine, Vermont and Connecticut among New England states regulating the technology.",
-      "source": "New Hampshire Bulletin",
-      "url": "https://newhampshirebulletin.com/2026/07/07/new-hampshire-joins-growing-contingent-of-states-with-laws-on-plug-in-solar/"
     }
   ]
 }
