@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -28,6 +28,15 @@
       "summary": "A Sept 17, 2026 CT Mirror report notes electricity prices are falling heading into the election: Eversource standard-service supply dropped to 11.577¢/kWh on July 1, 2026 and a public-benefits bill credit of roughly $30–34/month runs through April 2027, driven largely by long-term Millstone and Seabrook nuclear contracts. Eversource's pending PURA distribution rate case still seeks a double-digit increase for July 2027.",
       "source": "CT Mirror",
       "url": "https://ctmirror.org/2026/09/17/cts-electricity-prices-are-falling/"
+    },
+    {
+      "date": "2026-09-16",
+      "state": "ri",
+      "tag": "Rulemaking",
+      "title": "RI net-metering overhaul (Docket 26-30-EL) draws OER and Ameresco intervention as PUC reviews cap cut to 175 MW",
+      "summary": "Rhode Island Energy's revised net-metering provision — filed Aug 14, 2026 (Docket 26-30-EL, proposed effective Sept 13, 2026) — lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. In September the Office of Energy Resources (Sept 8) and Ameresco (Sept 16) filed to intervene, and the tariff advice filing remains under PUC review.",
+      "source": "RI PUC (Docket 26-30-EL)",
+      "url": "https://ripuc.ri.gov/Docket-26-30-EL"
     },
     {
       "date": "2026-09-14",
@@ -82,15 +91,6 @@
       "summary": "Rhode Island Energy made its compliance filing on August 27, 2026 and the RI PUC-approved base distribution increase took effect September 1, 2026. A typical residential electric bill rises about $7.78/month (≈4.83%) in the first year, while roughly $170 million in accelerated bill credits flow to customers from October 2026 through September 2027 under a hold-harmless structure.",
       "source": "Rhode Island Current",
       "url": "https://rhodeislandcurrent.com/2026/08/31/buckle-up-the-energy-bill-roller-coaster-is-about-to-begin/"
-    },
-    {
-      "date": "2026-08-19",
-      "state": "ri",
-      "tag": "Rulemaking",
-      "title": "Rhode Island Energy files net-metering overhaul in Docket 26-30-EL cutting the remote cap to 175 MW",
-      "summary": "On August 14, 2026 Rhode Island Energy filed a revised net-metering provision (Docket 26-30-EL, proposed effective Sept 13, 2026) that lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. The filing is pending before the PUC.",
-      "source": "UpriseRI",
-      "url": "https://upriseri.com/article/utility-seeks-new-solar-credit-rules-from-regulators/"
     },
     {
       "date": "2026-08-17",
