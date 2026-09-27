@@ -577,7 +577,7 @@ html.sky .hero .hero-main::before{
   content:""; position:absolute; z-index:-1; pointer-events:none;
   inset:-52px -48px -44px -64px;
   background:radial-gradient(78% 74% at 42% 44%,
-    rgba(9,44,88,.17) 0%, rgba(9,44,88,.11) 52%, rgba(9,44,88,0) 82%);
+    rgba(9,44,88,.24) 0%, rgba(9,44,88,.16) 52%, rgba(9,44,88,0) 84%);  /* +.07: sub + trust lines read over the sun-flare band (Vesper 09-26) */
 }
 html.sky .hero .db-badge{
   background:rgba(255,255,255,.26) !important;
@@ -634,7 +634,8 @@ html.sky .hero .db-signin{
 html.sky .hero .db-signin:hover{background:rgba(11,42,82,.36);color:#ffffff}
 /* the trust line crosses the plate's bright horizon haze at wide viewports —
    near-solid white + a tight shadow keep the ✓s honest (calibration R1) */
-html.sky .hero .hero-trust{color:rgba(255,255,255,.95);text-shadow:0 1px 3px rgba(8,44,90,.55), 0 2px 16px rgba(8,44,90,.5)}
+html.sky .hero .hero-trust,
+html.sky .hero .hero-privacy{color:rgba(255,255,255,.95);text-shadow:0 1px 3px rgba(8,44,90,.55), 0 2px 16px rgba(8,44,90,.5)}
 /* the pricing aside: a floating content-glass card over the scene */
 html.sky .hero .hero-price{
   background:var(--sky-glass-content) !important;
