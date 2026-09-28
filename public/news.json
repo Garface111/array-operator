@@ -1,15 +1,15 @@
 {
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
-      "date": "2026-09-21",
+      "date": "2026-09-23",
       "state": "region",
       "tag": "Update",
-      "title": "ISO New England logs its 500th 'duck curve' day as behind-the-meter solar keeps climbing",
-      "summary": "ISO New England said the grid hit its 500th 'duck curve' day on September 21, 2026 — the 107th of 2026 alone — as rooftop and other behind-the-meter solar drive midday grid demand below overnight levels. Behind-the-meter PV set a record estimated output of about 7,068 MW around 1 p.m. on April 8, 2026, and the ISO estimates these resources generated 9,926 GWh in 2025.",
-      "source": "ISO Newswire (ISO New England)",
-      "url": "https://isonewswire.com/2026/09/21/500-duck-curves-and-counting-growth-of-solar-power-brings-another-new-england-electricity-milestone/"
+      "title": "Rooftop solar forces New England to rethink its grid as behind-the-meter PV nears 7,000 MW",
+      "summary": "A Sept 23, 2026 Concord Monitor report notes New England now has roughly 7,000 MW of rooftop and other behind-the-meter solar — capable of producing over five times Seabrook Station's output on a sunny day, and roughly doubling in the last couple of years — after ISO New England logged its 500th 'duck curve' day on Sept 21, 2026 (the 107th of 2026 alone). Analysts say billing and payment mechanisms built for a one-way grid, including net metering, need to adapt to the steep evening ramps.",
+      "source": "Concord Monitor",
+      "url": "https://www.concordmonitor.com/2026/09/23/new-england-power-grid-duck-curve/"
     },
     {
       "date": "2026-09-21",
