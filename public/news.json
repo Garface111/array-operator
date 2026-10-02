@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-01",
+  "updated": "2026-10-02",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -7,7 +7,7 @@
       "state": "me",
       "tag": "Rate case",
       "title": "Maine PUC to vote Oct 6 on CMP's temporary rate hike as staff urges denial; CMP pulls job postings",
-      "summary": "As of Sept 30, 2026 the Maine Public Utilities Commission is set to decide at its October 6 meeting whether to grant Central Maine Power a temporary distribution rate increase of about $7/month, after commission staff recommended denial. State law allows the PUC to approve only undisputed temporary rates, and eight groups disputed CMP's request; the temporary increase is part of CMP's broader $189 million distribution rate case (filed April 17). CMP removed several job postings following the staff recommendation.",
+      "summary": "The Maine Public Utilities Commission is set to decide at its October 6, 2026 meeting whether to grant Central Maine Power a temporary distribution rate increase of about $7/month (~$69M), after commission staff recommended denial on Sept 28; parties had until noon Monday, Oct 5 to file exceptions. State law allows the PUC to approve only undisputed temporary rates, and eight groups disputed CMP's request; the temporary increase is part of CMP's broader $189 million distribution rate case (filed April 17). CMP removed several job postings following the staff recommendation.",
       "source": "WAGM/WABI",
       "url": "https://www.wagmtv.com/2026/09/30/central-maine-power-removes-job-postings-after-public-utilities-commission-staff-recommendation-deny-temporary-rate-hike/"
     },
