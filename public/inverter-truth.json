@@ -1,7 +1,7 @@
 {
   "source": "demo",
   "array": {
-    "name": "Catamount Community Solar",
+    "name": "Birch Hollow (Northeast Community Solar)",
     "capacity_kw": 56.0,
     "vendor_mix": "SolarEdge + Fronius",
     "module_count": 132

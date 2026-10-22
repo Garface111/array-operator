@@ -25,6 +25,24 @@
 
  var SESSION_KEY = "so_session";
  function getSession() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } }
+ // Signed-out sample account: demo-api.js answers our /v1 calls with the sample
+ // operator's data, so the signed-out visitor goes down the SAME fetch + render
+ // path as an owner (writes come back as the shim's friendly read-only 403).
+ function sampleOn() { try { return !getSession() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; } }
+ function authHeaders(extra) {
+ var h = extra || {}, s = getSession();
+ if (s) h.Authorization = "Bearer " + s;
+ return h;
+ }
+ // Owner session OR the sample account: either can reach the API.
+ function canFetch() { return !!getSession() || sampleOn(); }
+ // A write error that remembers the sample shim's read-only 403, so a batch
+ // save can stop at the first one instead of firing every row at the shim.
+ function apiError(body, msg) {
+ var err = new Error(msg);
+ if (body && body.error === "demo-read-only") err.readOnly = true;
+ return err;
+ }
 
  // ---- shared formatters (every section uses these so numbers never drift) ----
  function _n(x) { return (typeof x === "number" && isFinite(x)) ? x : null; }
@@ -80,7 +98,7 @@
  function clearForecastCache() { try { sessionStorage.removeItem(_FC_CACHE_KEY); } catch (e) { } }
 
  function loadForecast() {
- var s = getSession(); if (!s) { _forecast = null; return; } // demo/anon → no forecast
+ if (!canFetch()) { _forecast = null; return; } // anon without the sample shim → no forecast
  // Paint the last-known forecast immediately (instant Expected/Sky), then revalidate.
  if (!_forecast) { var cached = readForecastCache(); if (cached) _forecast = cached; }
  if (_forecastInFlight) return;
@@ -90,7 +108,7 @@
  var n = Number(sessionStorage.getItem("ao_forecast_window_days"));
  if (n >= 3 && n <= 30) win = n;
  } catch (e) { }
- fetch("/v1/array-owners/forecast-fleet?window_days=" + win, { headers: { Authorization: "Bearer " + s } })
+ fetch("/v1/array-owners/forecast-fleet?window_days=" + win, { headers: authHeaders() })
  .then(function (r) { return r.ok ? r.json() : null; })
  .then(function (d) { _forecast = d || _forecast || null; if (d) writeForecastCache(d); _forecastTried = true; _forecastInFlight = false; scheduleRender(); })
  .catch(function () { _forecastTried = true; _forecastInFlight = false; scheduleRender(); });
@@ -105,16 +123,16 @@
  // model can run, then reload the forecast so its row appears. Used by the Sites
  // grid's "set location" affordance on arrays skipped as no_location.
  window.__aoSetArrayLocation = function (arrayId, opts) {
- var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to set a location"));
+ if (!canFetch()) return Promise.reject(new Error("Sign in to set a location"));
  opts = opts || {};
  var silent = !!opts.silent;
  var body = Object.assign({}, opts);
  delete body.silent;
  return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/location", {
- method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify(body)
  }).then(function (r) {
- return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.detail || ("Couldn't set location (" + r.status + ")")); });
+ return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) { throw apiError(e, e.detail || ("Couldn't set location (" + r.status + ")")); });
  }).then(function (d) { if (!silent) reloadForecast(); return d; });
  };
 
@@ -123,15 +141,15 @@
  // health section's per-row "target" affordance; reloads the forecast so
  // expected/ratio flip to the new basis everywhere at once.
  window.__aoSetArrayExpectedRatio = function (arrayId, kwhPerKwDay) {
- var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to set a target"));
+ if (!canFetch()) return Promise.reject(new Error("Sign in to set a target"));
  return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/expected-ratio", {
- method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify({ expected_kwh_per_kw_day: (kwhPerKwDay == null ? null : Number(kwhPerKwDay)) })
  }).then(function (r) {
  return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
  var msg = e && e.detail;
  if (msg && typeof msg === "object") msg = msg.message || msg.detail || JSON.stringify(msg);
- throw new Error(msg || ("Couldn't save the target (" + r.status + ")"));
+ throw apiError(e, msg || ("Couldn't save the target (" + r.status + ")"));
  });
  }).then(function (d) { reloadForecast(); return d; });
  };
@@ -139,7 +157,7 @@
  // Save tilt / azimuth / performance ratio for ONE array (or clear with nulls).
  // Pass { silent: true } when batching many arrays, then call __aoAnalysisReloadForecast once.
  window.__aoSetArrayGeometry = function (arrayId, opts) {
- var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to edit model inputs"));
+ if (!canFetch()) return Promise.reject(new Error("Sign in to edit model inputs"));
  opts = opts || {};
  var silent = !!opts.silent;
  var body = {
@@ -150,29 +168,29 @@
  else if (opts.performance_ratio != null && opts.performance_ratio !== "")
  body.performance_ratio = Number(opts.performance_ratio);
  return fetch("/v1/array-owners/arrays/" + encodeURIComponent(arrayId) + "/geometry", {
- method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify(body)
  }).then(function (r) {
  return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
  var msg = e && e.detail;
  if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
- throw new Error(msg || ("Couldn't save geometry (" + r.status + ")"));
+ throw apiError(e, msg || ("Couldn't save geometry (" + r.status + ")"));
  });
  }).then(function (d) { if (!silent) reloadForecast(); return d; });
  };
 
  // Bulk-apply model params across the fleet (only assumed values by default).
  window.__aoSetFleetForecastParams = function (opts) {
- var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to edit model inputs"));
+ if (!canFetch()) return Promise.reject(new Error("Sign in to edit model inputs"));
  opts = opts || {};
  return fetch("/v1/array-owners/forecast-params", {
- method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify(opts)
  }).then(function (r) {
  return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
  var msg = e && e.detail;
  if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
- throw new Error(msg || ("Couldn't save model params (" + r.status + ")"));
+ throw apiError(e, msg || ("Couldn't save model params (" + r.status + ")"));
  });
  }).then(function (d) { reloadForecast(); return d; });
  };
@@ -180,15 +198,15 @@
  // Auto-propagate model inputs: utility bill address → vendor site → place-from-name.
  // Never overwrites operator-set geometry. Returns {addresses_filled, newly_located, …}.
  window.__aoAutofillModel = function () {
- var s = getSession(); if (!s) return Promise.reject(new Error("Sign in to autofill"));
+ if (!canFetch()) return Promise.reject(new Error("Sign in to autofill"));
  return fetch("/v1/array-owners/model-autofill", {
- method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
  body: "{}"
  }).then(function (r) {
  return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (e) {
  var msg = e && e.detail;
  if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg || x; }).join("; ");
- throw new Error(msg || ("Couldn't autofill (" + r.status + ")"));
+ throw apiError(e, msg || ("Couldn't autofill (" + r.status + ")"));
  });
  }).then(function (d) { reloadForecast(); return d; });
  };
@@ -297,10 +315,14 @@
  function buildCtx() {
  var snap = (window.FleetStore && FleetStore.snapshot()) || { arrays: [], simulated: false };
  var cols = (window.FleetStore && FleetStore.toColumns()) || { columns: [], summary: { arrays_total: 0, inverters_total: 0, attention: 0 } };
- // Real signed-in fleet → the live forecast. Anonymous demo → synthesize one
- // (once) so the flagship renders; a real fleet NEVER gets a synthetic forecast.
+ // Real signed-in fleet → the live forecast. Signed-out sample account → the
+ // same /forecast-fleet call, answered by the sample shim (demo/analysis.js),
+ // so its numbers tie out with Verification / Trends / Statements. Only an
+ // anonymous visitor WITHOUT the shim falls back to the local synthesis; a
+ // real fleet NEVER gets a synthetic forecast.
+ var sample = sampleOn();
  var forecast = _forecast;
- if (!forecast && snap.simulated && (snap.arrays || []).length) {
+ if (!forecast && !sample && snap.simulated && (snap.arrays || []).length) {
  forecast = _simForecast || (_simForecast = buildSimulatedForecast(snap.arrays));
  }
  var forecastByArray = {};
@@ -316,7 +338,15 @@
  }
  return {
  signedIn: !!getSession(),
- simulated: !!snap.simulated,
+ // The sample account is served like a real account (its own API answers),
+ // so sections take their signed-in paths; `simulated` is reserved for the
+ // shim-less anonymous fleet. `sample` lets a section reach the API without a
+ // session; edit affordances stay keyed on `signedIn`.
+ sample: sample,
+ simulated: !!snap.simulated && !sample,
+ // First forecast fetch still in flight (cold load): panels say "loading",
+ // not "not modeled yet".
+ forecastLoading: !forecast && _forecastInFlight && !_forecastTried,
  // Has the fleet actually finished its first load? A cold sign-in's ctx.columns
  // is empty for the same reason a genuinely-empty fleet's would be, panels that
  // treat "0 flagged" as "all clear" must gate on this first, or a race between

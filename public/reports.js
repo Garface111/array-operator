@@ -29,6 +29,15 @@
 
  function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
  function authHeaders() { const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
+ // Signed-out sample account: demo-api.js answers this tab's /v1 reads with the
+ // sample operator's data (demo/statements.js), so read paths that used to stop
+ // at "no session" can run their normal fetch. Writes still get the shim's
+ // read-only 403 + its shared nudge.
+ function sampleOn() { try { return !session() && !!(window.AO_DEMO_API && window.AO_DEMO_API.on()); } catch (e) { return false; } }
+ function canFetch() { return !!authHeaders() || sampleOn(); }
+ // A 403 from the sample shim: the shim already showed its nudge, so callers
+ // stay quiet instead of stacking a second error on top of it.
+ function isSampleReadOnly(data) { return !!(data && data.error === "demo-read-only"); }
 
  // Extract a HUMAN-READABLE message from an API error body. FastAPI `detail`
  // comes in three shapes and only the first is a plain string:
@@ -84,9 +93,9 @@
  // chips repaint with the measured $ (collapse state persists in module maps, so
  // a re-render is safe). Fails soft — the chip just falls back to the % unassigned.
  function loadVacancyOnce(cb) {
- if (_vacLoaded || !authHeaders()) return;
+ if (_vacLoaded || !canFetch()) return;
  _vacLoaded = true;
- fetch(API + "/vacancy", { headers: authHeaders() })
+ fetch(API + "/vacancy", { headers: authHeaders() || {} })
  .then(r => r.ok ? r.json() : null)
  .then(j => {
  if (j && Array.isArray(j.arrays)) {
@@ -107,13 +116,13 @@
  function loadReconcile() {
  if (RECON) return Promise.resolve(RECON);
  if (_reconPromise) return _reconPromise;
- if (!authHeaders()) return Promise.resolve(null);
+ if (!canFetch()) return Promise.resolve(null);
  // The server computes the sweep in the background (63s at 800 offtakers
  // crossed the edge gateway timeout), {pending:true} means "poll again".
  _reconPromise = (async () => {
  for (let i = 0; i < 45; i++) { // ≤ ~7.5 min of 10s polls
  try {
- const r = await fetch(API + "/reconcile-bills", { headers: authHeaders() });
+ const r = await fetch(API + "/reconcile-bills", { headers: authHeaders() || {} });
  if (!r.ok) return null;
  const d = await r.json().catch(() => null);
  if (d && d.ok) { RECON = d; reconIndex(); return RECON; }
@@ -349,10 +358,14 @@
  }
  // Re-render the summary chip in place (after the reconcile data lands post-paint).
  function refreshBacSummary() {
+ // The summary-chip host left the shell in the landing redesign; the Bill
+ // audit tab badge + KPI line still need the reconcile result, so don't bail
+ // before them (they never filled once #rbBacSummary was gone).
  const host = document.getElementById("rbBacSummary");
- if (!host) return;
+ if (host) {
  host.innerHTML = bacSummaryHTML();
  wireBacChip(host);
+ }
  updateAuditTabBadge();
  renderKpis(); // the "Doesn't match GMP" KPI tile fills when RECON lands
  }
@@ -447,12 +460,12 @@
  function loadAudit() {
  if (AUDIT) return Promise.resolve(AUDIT);
  if (_auditPromise) return _auditPromise;
- if (!authHeaders()) return Promise.resolve(null);
+ if (!canFetch()) return Promise.resolve(null);
  // Server computes the sweep in the background, {pending:true} = poll again.
  _auditPromise = (async () => {
  for (let i = 0; i < 45; i++) { // ≤ ~7.5 min of 10s polls
  try {
- const r = await fetch(API + "/audit-by-array", { headers: authHeaders() });
+ const r = await fetch(API + "/audit-by-array", { headers: authHeaders() || {} });
  if (!r.ok) return null;
  const d = await r.json().catch(() => null);
  if (d && d.ok) { AUDIT = d; return AUDIT; }
@@ -569,7 +582,7 @@
  function renderAudit() {
  const host = document.getElementById("rbAuditView");
  if (!host) return;
- if (!authHeaders()) { host.innerHTML = auditEmptyHTML("Sign in to audit GMP's per-offtaker allocation."); return; }
+ if (!canFetch()) { host.innerHTML = auditEmptyHTML("Sign in to audit GMP's per-offtaker allocation."); return; }
  if (!AUDIT) {
  // not loaded yet, kick the fetch, show a light loading state.
  host.innerHTML = `<div class="rb-au-loading">Loading the bill audit…</div>`;
@@ -834,7 +847,12 @@
  const host = document.getElementById("rbGenReportsView");
  if (!host || _genrepMounted || host.dataset.genrepBoot === "1") return;
  if (!session()) {
- // Anonymous demo stays honest: no fabricated NEPOOL data, just the door.
+ // The embed hard-gates on a session (web/app/src/embed.tsx renders
+ // <SessionExpired/> when so_session is missing), so the sample account
+ // can't mount it. Show what it produces instead: the quarterly NEPOOL-GIS
+ // workbook for the sample fleet, built from the same monthly history every
+ // other tab uses. Without the sample shim, the honest door.
+ if (sampleOn() && window.AO_DEMO_API && window.AO_DEMO_API.monthly) { renderGenrepSample(host); return; }
  host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your real fleet — automated quarterly NEPOOL-GIS workbooks, emailed to each client. Sign in or start a trial to use them.</div>';
  return;
  }
@@ -860,6 +878,80 @@
  if (showBanner) wireGenrepEnableBanner(host);
  mountGenrepEmbed(document.getElementById("rbGenrepEmbedHost") || host);
  delete host.dataset.genrepBoot;
+ }
+ // Sample account: the quarterly NEPOOL-GIS workbook the Generation reports
+ // desk builds, for the sample fleet (window.AO_DEMO arrays, kWh from the
+ // shared AO_DEMO_API.monthly history). Same rules as the GMCS writer: one
+ // sheet per producing array titled "<Array> (<NEPOOL-GIS ID>)", a rolling six
+ // quarters ending on the quarter NEPOOL-GIS is minting (two back from the
+ // quarter in progress), 3 month rows + a gap row per quarter, MWh shown like
+ // Excel "General", RECs = whole MWh per month. Downloading or sending gets the
+ // sample nudge.
+ let _genrepSampleArray = null;
+ function renderGenrepSample(host) {
+ const DA = window.AO_DEMO_API;
+ const arrays = (window.AO_DEMO && window.AO_DEMO.arrays) || [];
+ if (!arrays.length) { host.innerHTML = '<div class="rb-au-empty">Generation reports manage NEPOOL/REC reporting for your fleet.</div>'; return; }
+ const now = new Date();
+ const qNow = Math.floor(now.getMonth() / 3); // quarter in progress (0-based)
+ const endIdx = now.getFullYear() * 4 + qNow - 2; // the minting quarter
+ const quarters = [];
+ for (let i = endIdx - 5; i <= endIdx; i++) quarters.push({ y: Math.floor(i / 4), q: i % 4 });
+ const qLabel = x => "Q" + (x.q + 1) + " " + x.y;
+ const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+ const gisId = a => "NCS" + (1000 + Number(a.id)); // fictional NEPOOL-GIS unit IDs
+ const general = mwh => String(Number(mwh.toFixed(3))); // Excel "General": 25.720 → 25.72
+ const sheet = a => {
+ const kwh = {};
+ DA.monthly(a.id, 30).forEach(r => { kwh[r.month] = r.kwh; });
+ return quarters.map(x => ({ label: qLabel(x), months: [0, 1, 2].map(j => {
+ const m = x.q * 3 + j, ym = x.y + "-" + String(m + 1).padStart(2, "0");
+ const mwh = (kwh[ym] || 0) / 1000;
+ return { name: MON[m] + " " + x.y, mwh, recs: Math.floor(mwh) };
+ }) }));
+ };
+ if (!arrays.some(a => String(a.id) === String(_genrepSampleArray))) _genrepSampleArray = arrays[0].id;
+ const cur = arrays.find(a => String(a.id) === String(_genrepSampleArray));
+ const rows = sheet(cur);
+ // Fleet totals for the minting quarter (every array produced, so every array gets a sheet).
+ let fleetMwh = 0, fleetRecs = 0;
+ arrays.forEach(a => { const q = sheet(a).slice(-1)[0]; q.months.forEach(m => { fleetMwh += m.mwh; fleetRecs += m.recs; }); });
+ const body = rows.map(q => q.months.map((m, j) => `<tr>
+ <td class="rb-fin-name">${j === 0 ? esc(q.label) : ""}</td><td>${esc(m.name)}</td>
+ <td class="rb-fin-num">${esc(general(m.mwh))}</td><td class="rb-fin-num">${fmt0(m.recs)}</td></tr>`).join("")
+ + `<tr aria-hidden="true"><td colspan="4" style="height:10px;padding:0"></td></tr>`).join("");
+ host.innerHTML = `
+ <div class="rb-fin-wrap">
+ <div class="rb-fin-intro">
+ <h2 class="rb-fin-h">Generation reports</h2>
+ <p class="rb-fin-p">Quarterly NEPOOL-GIS workbooks, built from each client’s utility bills and emailed automatically. This is the workbook for the sample fleet; the client desk (roster, NEPOOL-GIS IDs, auto-send per client) opens on your own account.</p>
+ </div>
+ <div class="rb-fin-kpis">
+ <div class="rb-fin-kpi"><div class="rb-fin-kl">Reporting window</div><div class="rb-fin-kv">${esc(qLabel(quarters[0]))} – ${esc(qLabel(quarters[5]))}</div><div class="rb-fin-ks">Ends on the quarter NEPOOL-GIS is minting</div></div>
+ <div class="rb-fin-kpi"><div class="rb-fin-kl">Arrays reported</div><div class="rb-fin-kv">${fmt0(arrays.length)}</div><div class="rb-fin-ks">One sheet per producing array</div></div>
+ <div class="rb-fin-kpi"><div class="rb-fin-kl">${esc(qLabel(quarters[5]))} generation</div><div class="rb-fin-kv">${esc(general(fleetMwh))} MWh</div><div class="rb-fin-ks">All arrays</div></div>
+ <div class="rb-fin-kpi"><div class="rb-fin-kl">${esc(qLabel(quarters[5]))} RECs</div><div class="rb-fin-kv">${fmt0(fleetRecs)}</div><div class="rb-fin-ks">Whole MWh per month</div></div>
+ </div>
+ <div class="rb-fin-card">
+ <div class="rb-fin-ch" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between">
+ <span>${esc(cur.name)} (${esc(gisId(cur))})</span>
+ <label style="font-weight:500;font-size:13px">Sheet
+ <select id="rbGenrepSampleArr" class="rb-export-sel">${arrays.map(a => `<option value="${esc(String(a.id))}"${String(a.id) === String(cur.id) ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>
+ </div>
+ <p class="rb-fin-cs">One of ${fmt0(arrays.length)} sheets in the workbook, rolling six quarters, monthly generation in MWh and the RECs it earns.</p>
+ <div class="rb-fin-scroll"><table class="rb-fin-table">
+ <thead><tr><th>Quarter</th><th>Month</th><th class="rb-fin-num">Generation (MWh)</th><th class="rb-fin-num">RECs</th></tr></thead>
+ <tbody>${body}</tbody>
+ </table></div>
+ <div class="rb-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+ <button type="button" class="ao-btn ao-btn-primary rb-btn" id="rbGenrepSampleDl">⬇ Download workbook</button>
+ <button type="button" class="ao-btn rb-btn" id="rbGenrepSampleSend">✉ Email it to the client</button>
+ </div>
+ </div>
+ </div>`;
+ const sel = host.querySelector("#rbGenrepSampleArr");
+ if (sel) sel.onchange = () => { _genrepSampleArray = sel.value; renderGenrepSample(host); };
+ ["#rbGenrepSampleDl", "#rbGenrepSampleSend"].forEach(id => { const b = host.querySelector(id); if (b) b.onclick = () => demoNudge(b); });
  }
  // ── Embed → shell freshness bridge (REBUILD-MAP layer 2, 2026-07-24). The
  // fold left two reactive systems with zero cross-membrane signaling: embed
@@ -897,8 +989,12 @@
  }
  } catch (e) { /* preload is best-effort */ }
  }
+ // Signed-out visitors can't mount the embed (it needs a session), so they
+ // never download its ~1.2 MB bundle.
+ if (session()) {
  if (window.requestIdleCallback) requestIdleCallback(preloadGenrepAssets, { timeout: 8000 });
  else setTimeout(preloadGenrepAssets, 3000);
+ }
 
  function mountGenrepEmbed(host) {
  if (!host || _genrepMounted) return;
@@ -982,48 +1078,15 @@
  const hdrs = authHeaders() || {};
  gains = await fetch("/v1/array-operator/billing/portfolio-gains", { headers: hdrs })
  .then(r => r.ok ? r.json() : null).catch(() => null);
- } catch (e) { /* demo / offline */ }
-
- // Demo fallback when signed out or API missing
- if (!gains && window.__AO_DEMO__) {
- gains = {
- ok: true,
- kpis: {
- enabled_offtakers: 4,
- with_last_invoice: 3,
- last_invoice_total_usd: 4550,
- pending_drafts: 2,
- pending_draft_usd: 1949,
- est_annual_usd: 54600,
- lifetime_sent_usd: 18200,
- },
- years: [2024, 2025, 2026],
- by_year: {
- "2024": { sent_usd: 41200, sent_count: 36 },
- "2025": { sent_usd: 48800, sent_count: 40 },
- "2026": { sent_usd: 18200, sent_count: 14 },
- },
- yoy: [
- { year: 2024, sent_usd: 41200, sent_count: 36, delta_pct: null },
- { year: 2025, sent_usd: 48800, sent_count: 40, delta_pct: 18.4 },
- { year: 2026, sent_usd: 18200, sent_count: 14, delta_pct: null },
- ],
- months: ["2026-01","2026-02","2026-03","2026-04","2026-05","2026-06"],
- by_month: {
- "2026-01": { sent_usd: 2800, sent_count: 3 },
- "2026-02": { sent_usd: 2650, sent_count: 3 },
- "2026-03": { sent_usd: 3100, sent_count: 3 },
- "2026-04": { sent_usd: 2900, sent_count: 2 },
- "2026-05": { sent_usd: 3200, sent_count: 2 },
- "2026-06": { sent_usd: 3550, sent_count: 1 },
- },
- offtakers: [
- { customer_name: "Valley Cares", enabled: true, cadence: "monthly", last_sent_amount_usd: 2150, last_sent_period_end: "2026-06-24", est_annual_usd: 25800, pending_amount_usd: 2150, sent_lifetime_usd: 9600, share_pct: 47.3 },
- { customer_name: "Town of Fairlee", enabled: true, cadence: "monthly", last_sent_amount_usd: 1250, last_sent_period_end: "2026-06-18", est_annual_usd: 15000, pending_amount_usd: 1250, sent_lifetime_usd: 5000, share_pct: 27.5 },
- { customer_name: "Town of Glover", enabled: true, cadence: "monthly", last_sent_amount_usd: 1150, last_sent_period_end: "2026-06-21", est_annual_usd: 13800, pending_amount_usd: null, sent_lifetime_usd: 3600, share_pct: 25.3 },
- { customer_name: "Norwich Fire District", enabled: true, cadence: "monthly", last_sent_amount_usd: null, last_sent_period_end: null, est_annual_usd: null, pending_amount_usd: 699, sent_lifetime_usd: null, share_pct: null },
- ],
- };
+ } catch (e) { /* offline */ }
+ // Signed out, demo-api.js answers this read with the sample book
+ // (demo/statements.js), so there is no separate fallback dataset here. A
+ // failed fetch says so instead of rendering a page of zeros.
+ if (!gains || gains.ok === false) {
+ host.innerHTML = `<div class="rb-fin-loading">Couldn’t load offtaker gains. <button type="button" class="rb-fin-link" id="rbFinRetry">Try again</button></div>`;
+ const retry = document.getElementById("rbFinRetry");
+ if (retry) retry.onclick = () => renderFinTrends(true);
+ return;
  }
 
  const k = (gains && gains.kpis) || {};
@@ -1387,11 +1450,10 @@
  const el = root();
  if (!el) return;
  if (!authHeaders()) {
- // Signed-out DEMO: render a fully-populated Offtaker Invoice Generator for
- // the fake operator (Catamount Community Solar), its offtaker list + an
- // approval inbox with a styled demo invoice, instead of the sign-in wall.
- // Gated on the demo module; the real signed-in path (authHeaders truthy)
- // is never affected.
+ // Signed-out SAMPLE ACCOUNT: the Offtaker Invoice Generator for the sample
+ // operator (Northeast Community Solar, window.AO_DEMO) instead of the
+ // sign-in wall; see renderDemo(). The real signed-in path (authHeaders
+ // truthy) is never affected.
  if (window.AO_DEMO && Array.isArray(window.AO_DEMO.offtakers)) {
  renderDemo(el);
  return;
@@ -1412,11 +1474,29 @@
  wireGlobalRate();
  wireCollectionSettings();
  wireRail(); // the rail's mini-strip buttons (expand / approve / add / export / email)
- // "＋ Add an offtaker" opens a tabbed panel (Type it in / Upload a
- // spreadsheet); the upload zone + live doc-preview live inside that panel
- // now, so wireUpload()/renderDoc() are wired when the upload tab opens.
+ wireRosterTools(refreshList);
+ // Master email card + toolbar "✉ Customize email" both open the mass studio.
+ wireMasterEmail();
+ // "⬇ Export to QuickBooks / Xero", revealed + wired here and (with sample
+ // data) on the signed-out sample path.
+ wireExport();
+ wireExportPopover();
+ el.dataset.rbBuilt = "1";
+ }
+ // Heavy invoice-template preview: wire ONCE, and only when the tab is really
+ // being viewed (skip during an idle prefetch so we never render a PDF for
+ // users who never open Reports).
+ if (!_tplWired && !prefetch) { _tplWired = true; wireInvoiceTemplate(); }
+ return loadData(built, prefetch);
+ }
+ // The roster tools in the rail: "＋ Add an offtaker" (a tabbed panel: Type it
+ // in / Upload a spreadsheet; the upload zone + live doc-preview live inside
+ // it, so wireUpload()/renderDoc() are wired when the upload tab opens),
+ // "⬆ Bulk import" and "Link utility bills". Shared by the signed-in and the
+ // sample paths; `afterAdd` refreshes the list after a successful add.
+ function wireRosterTools(afterAdd) {
  MANUAL_HOST_ID = "rbCustManual";
- MANUAL_AFTER_ADD = refreshList;
+ MANUAL_AFTER_ADD = afterAdd;
  MANUAL_OPEN = false;
  const addBtn = $("#rbCustAdd");
  if (addBtn) addBtn.onclick = () => {
@@ -1448,34 +1528,9 @@
  if (window.__aoLinkUtility) { window.__aoLinkUtility(); }
  else { location.hash = "#arrays"; } // defensive: sandbox owns the modal
  };
- // Master email card + toolbar "✉ Customize email" both open the mass studio.
- wireMasterEmail();
- // "⬇ Export to QuickBooks / Xero", this reaches shell() only on the signed-in
- // path (the signed-out/demo branch returns earlier), so revealing + wiring the
- // export box here inherently gates it to authed operators.
- wireExport();
- // The Export controls now live in ONE popover (approved redesign) —
- // the button toggles it; any outside click closes it.
- const xBtn = $("#rb2ExportBtn"), xPop = $("#rb2ExportPop");
- if (xBtn && xPop) {
- xBtn.onclick = (e) => {
- e.stopPropagation();
- xPop.hidden = !xPop.hidden;
- xBtn.setAttribute("aria-expanded", String(!xPop.hidden));
- };
- document.addEventListener("click", (e) => {
- if (!xPop.hidden && !xPop.contains(e.target) && e.target !== xBtn) {
- xPop.hidden = true;
- xBtn.setAttribute("aria-expanded", "false");
  }
- });
- }
- el.dataset.rbBuilt = "1";
- }
- // Heavy invoice-template preview: wire ONCE, and only when the tab is really
- // being viewed (skip during an idle prefetch so we never render a PDF for
- // users who never open Reports).
- if (!_tplWired && !prefetch) { _tplWired = true; wireInvoiceTemplate(); }
+ // The signed-in data sections (the signed-out sample fills its own in renderDemo).
+ function loadData(built, prefetch) {
  // Data sections: fill on first build; quiet background refresh when the cache
  // is stale. Fire-and-forget so the tab paints instantly (refreshList et al.
  // fetch-then-fill in place, so this never re-blanks a rendered tab).
@@ -1498,14 +1553,17 @@
  // Invoice archive + utility bill archive: fetch manifests (cached) on a real
  // view and render the collapsible directories. Skipped during idle prefetch;
  // fails soft (fetch error → section absent, never blocks the generator).
- if (!prefetch && authHeaders()) {
- Promise.all([
+ if (!prefetch && authHeaders()) loadArchives();
+ }
+ // Invoice archive, utility bill archive, monthly summary and mail room
+ // manifests (each cached), then the rail rows + panels. Fails soft.
+ function loadArchives() {
+ return Promise.all([
  loadArchive().catch(() => null),
  loadBillArchive().catch(() => null),
  loadMonthly().catch(() => null),
  loadMailroom().catch(() => null),
  ]).then(() => renderArchive()).catch(() => {});
- }
  }
  window.__aoLoadReports = load;
  // Hands-off tour: open Invoices and expand a specific offtaker (bill + draft lined up).
@@ -1804,6 +1862,26 @@
  throw new Error("Export is taking longer than usual, try again in a moment.");
  }
 
+ // The Export controls live in ONE popover (approved redesign) — the button
+ // toggles it; any outside click closes it. Shared by the signed-in and
+ // sample paths (shell() is built once per page either way).
+ function wireExportPopover() {
+ const xBtn = $("#rb2ExportBtn"), xPop = $("#rb2ExportPop");
+ if (!xBtn || !xPop || xBtn.dataset.popWired) return;
+ xBtn.dataset.popWired = "1";
+ xBtn.onclick = (e) => {
+ e.stopPropagation();
+ xPop.hidden = !xPop.hidden;
+ xBtn.setAttribute("aria-expanded", String(!xPop.hidden));
+ };
+ document.addEventListener("click", (e) => {
+ if (!xPop.hidden && !xPop.contains(e.target) && e.target !== xBtn) {
+ xPop.hidden = true;
+ xBtn.setAttribute("aria-expanded", "false");
+ }
+ });
+ }
+
  const EXPORT_ACCT_KEY = "ao_qb_export_account_code";
  const EXPORT_FMT_KEY = "ao_qb_export_format";
  const EXPORT_MEMO_KEY = "ao_qb_export_memo";
@@ -1815,7 +1893,7 @@
  const fmtSel = $("#rbExportFmt"), dateInp = $("#rbExportDate"), periodSel = $("#rbExportPeriod");
  const memoInp = $("#rbExportMemo"), iifNote = $("#rbExportIifNote"), go = $("#rbExportGo");
  if (!box || !go || !fmtSel) return;
- if (!authHeaders()) { box.hidden = true; return; } // defensive; demo never reaches here
+ if (!canFetch()) { box.hidden = true; return; } // sample: reads come from demo-api.js; the download gets its read-only 403
  box.hidden = false;
 
  // Restore remembered choices (format, income account, memo). Default the
@@ -1852,7 +1930,7 @@
  // just leaves the latest-bill default (the long-standing behavior).
  if (periodSel && !periodSel.dataset.loaded) {
  periodSel.dataset.loaded = "1";
- fetch(API + "/export-periods", { headers: authHeaders() })
+ fetch(API + "/export-periods", { headers: authHeaders() || {} })
  .then(r => r.ok ? r.json() : null)
  .then(d => {
  const periods = (d && d.periods) || [];
@@ -2029,13 +2107,13 @@
  function loadArchive() {
  if (ARCHIVE) return Promise.resolve(ARCHIVE);
  if (_archivePromise) return _archivePromise;
- if (!authHeaders()) return Promise.resolve(null);
+ if (!canFetch()) return Promise.resolve(null);
  // The manifest computes in a background sweep (a match per offtaker, ~60s
  // at 800 crossed the edge timeout); {pending:true} means "poll again".
  _archivePromise = (async () => {
  for (let i = 0; i < 30; i++) { // ≤ ~5 min of 10s polls
  try {
- const r = await fetch(API + "/invoice-archive", { headers: authHeaders() });
+ const r = await fetch(API + "/invoice-archive", { headers: authHeaders() || {} });
  if (!r.ok) return null;
  const d = await r.json().catch(() => null);
  if (d && d.ok) { ARCHIVE = d; return ARCHIVE; }
@@ -2051,8 +2129,8 @@
  function loadBillArchive() {
  if (BILL_ARCHIVE) return Promise.resolve(BILL_ARCHIVE);
  if (_billArchivePromise) return _billArchivePromise;
- if (!authHeaders()) return Promise.resolve(null);
- _billArchivePromise = fetch(API + "/utility-bill-archive", { headers: authHeaders() })
+ if (!canFetch()) return Promise.resolve(null);
+ _billArchivePromise = fetch(API + "/utility-bill-archive", { headers: authHeaders() || {} })
  .then(r => (r.ok ? r.json() : null))
  .then(d => {
  if (d && d.ok) { BILL_ARCHIVE = d; _billArchiveFailed = false; }
@@ -2067,8 +2145,8 @@
  function loadMonthly(force) {
  if (MONTHLY && !force) return Promise.resolve(MONTHLY);
  if (_monthlyPromise) return _monthlyPromise;
- if (!authHeaders()) return Promise.resolve(null);
- _monthlyPromise = fetch(API + "/monthly-report/manifest", { headers: authHeaders() })
+ if (!canFetch()) return Promise.resolve(null);
+ _monthlyPromise = fetch(API + "/monthly-report/manifest", { headers: authHeaders() || {} })
  .then(r => (r.ok ? r.json() : null))
  .then(d => {
  if (d && d.ok) { MONTHLY = d; _monthlyFailed = false; }
@@ -2105,7 +2183,7 @@
  function renderArchive() {
  const host = $("#rbArchiveHost");
  if (!host) return;
- if (!authHeaders()) { host.hidden = true; host.innerHTML = ""; return; }
+ if (!canFetch()) { host.hidden = true; host.innerHTML = ""; return; }
  const months = (ARCHIVE && ARCHIVE.months) || [];
  const total = (ARCHIVE && ARCHIVE.month_count) || 0;
  const bills = (BILL_ARCHIVE && BILL_ARCHIVE.bills) || [];
@@ -2572,8 +2650,8 @@
  function loadMailroom(force) {
  if (MAILROOM && !force) return Promise.resolve(MAILROOM);
  if (_mailroomPromise) return _mailroomPromise;
- if (!authHeaders()) return Promise.resolve(null);
- _mailroomPromise = fetch(API + "/mailroom?limit=300", { headers: authHeaders() })
+ if (!canFetch()) return Promise.resolve(null);
+ _mailroomPromise = fetch(API + "/mailroom?limit=300", { headers: authHeaders() || {} })
  .then(r => r.ok ? r.json() : null)
  .then(d => {
  if (!d || !d.ok) throw new Error("Mail room unavailable");
@@ -2584,18 +2662,18 @@
  return _mailroomPromise.then(d => { loadMailAudit().catch(() => null); return d; });
  }
  async function loadMailAudit() {
- if (!authHeaders()) return Promise.resolve(null);
+ if (!canFetch()) return Promise.resolve(null);
  if (_mailAuditStarting) return MAIL_AUDIT;
  const generation = _mailAuditGeneration, request = ++_mailAuditLoadGeneration;
  const current = () => generation === _mailAuditGeneration && request === _mailAuditLoadGeneration;
  try {
- const response = await fetch(API + "/mailroom/audit?limit=5", { headers: authHeaders() });
+ const response = await fetch(API + "/mailroom/audit?limit=5", { headers: authHeaders() || {} });
  if (!response.ok) throw new Error("Audit history unavailable");
  const d = await response.json();
  const latest = d && d.latest;
  let next = latest || null;
  if (latest && latest.status === "done") {
- const full = await fetch(API + "/mailroom/audit/" + latest.id, { headers: authHeaders() })
+ const full = await fetch(API + "/mailroom/audit/" + latest.id, { headers: authHeaders() || {} })
  .then(r => r.ok ? r.json() : null).catch(() => null);
  if (!full || !full.run) throw new Error("Audit details unavailable");
  next = full.run;
@@ -2724,7 +2802,7 @@
  const board = MAILROOM, offset = (board.sent || []).filter(x => !x.legacy).length;
  _mailHistoryLoading = true; _mailHistoryError = ""; renderArchive();
  try {
- const r = await fetch(API + "/mailroom?limit=300&legacy=0&offset=" + offset, { headers: authHeaders() });
+ const r = await fetch(API + "/mailroom?limit=300&legacy=0&offset=" + offset, { headers: authHeaders() || {} });
  const d = await r.json().catch(() => ({}));
  if (!r.ok || !d.ok) throw new Error(apiErr(d, "Could not load older invoices. Try again."));
  if (MAILROOM !== board) return;
@@ -2951,7 +3029,7 @@
  renderArchive();
  try {
  const route = options && options.check ? "/mailroom/check?force=" + (options.force ? "true" : "false") : "/mailroom/audit";
- const r = await fetch(API + route, { method: "POST", headers: authHeaders() });
+ const r = await fetch(API + route, { method: "POST", headers: authHeaders() || {} });
  const d = await r.json().catch(() => ({}));
  if (generation !== _mailAuditGeneration) return;
  if (!r.ok || !d.ok) throw new Error(apiErr(d, "Couldn’t start the audit."));
@@ -2971,7 +3049,7 @@
  const current = () => generation === _mailAuditGeneration && poll === _mailAuditPollGeneration;
  const tick = async () => {
  if (!current()) return;
- const d = await fetch(API + "/mailroom/audit/" + runId, { headers: authHeaders() })
+ const d = await fetch(API + "/mailroom/audit/" + runId, { headers: authHeaders() || {} })
  .then(r => r.ok ? r.json() : null).catch(() => null);
  const run = d && d.run;
  if (!current()) return;
@@ -3045,7 +3123,7 @@
  let url = null;
  if (legacy) { const parts = sid.split(":"); if (parts.length === 3) url = API + "/mailroom/legacy/" + encodeURIComponent(parts[1]) + "/" + encodeURIComponent(parts[2]); }
  else if (/^\d+$/.test(sid)) url = API + "/mailroom/invoice/" + sid;
- const d = url ? await fetch(url, { headers: authHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null) : null;
+ const d = url ? await fetch(url, { headers: authHeaders() || {} }).then(r => r.ok ? r.json() : null).catch(() => null) : null;
  if (generation !== _mailDrawerGeneration || ov.hidden) return;
  const inv = d && d.invoice ? Object.assign({}, item || {}, d.invoice) : null;
  if (!inv) {
@@ -3083,14 +3161,15 @@
  : API + "/mailroom/invoice/" + encodeURIComponent(sidStr) + "/email";
  if (emailUrl) {
  const frame = left.querySelector("#mrFrame");
- fetch(emailUrl, { headers: authHeaders() })
+ fetch(emailUrl, { headers: authHeaders() || {} })
  .then(r => r.ok ? r.text() : "<p style='font:14px sans-serif;padding:20px'>Couldn’t load the email body.</p>")
  .then(html => { if (frame.isConnected) frame.srcdoc = html; })
  .catch(() => { if (frame.isConnected) frame.srcdoc = "<p>Email body unavailable. Reopen the invoice to retry.</p>"; });
  }
  if (!inv.legacy) {
  left.querySelectorAll("[data-mr-att]").forEach(b => {
- b.onclick = () => authBlobDownload(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/attachment/" + encodeURIComponent(b.getAttribute("data-mr-att")), b.getAttribute("data-mr-att"));
+ b.onclick = () => authBlobDownload(API + "/mailroom/invoice/" + encodeURIComponent(inv.id) + "/attachment/" + encodeURIComponent(b.getAttribute("data-mr-att")), b.getAttribute("data-mr-att"))
+ .catch(e => { if (!sampleOn()) bulkToast((e && e.message) || "Download failed"); }); // sample: the shim's nudge already explained
  });
  }
 
@@ -3204,108 +3283,123 @@
  }
 
  /* ===========================================================================
- * ANONYMOUS DEMO, a fully-populated Offtaker Invoice Generator for the fake
- * operator (Catamount Community Solar) so a signed-out visitor sees the whole
- * surface working: the offtaker list, the approval inbox with a real invoice
- * email preview, and the dual bill model. Reuses subCard()/draftCard()/
- * renderInboxBody() so the demo can't drift from the live UI. Every action
- * button (Approve / Draft / Edit) is intercepted to a gentle "sign in" note
- * rather than firing a fetch that would 401.
+ * SIGNED-OUT SAMPLE ACCOUNT, the Offtaker Invoice Generator for the sample
+ * operator (Northeast Community Solar, window.AO_DEMO) so a visitor sees the
+ * whole surface working. The offtaker list + approval inbox render from
+ * AO_DEMO through the live subCard()/draftCard()/renderInboxBody() (drafts
+ * carry no subscription id, so no live PDF fetch; injectDemoInvoice() shows
+ * the document). Everything else on the tab runs its REAL code path: its reads
+ * are answered by demo-api.js with the sample book (demo/statements.js), and a
+ * write gets the shim's read-only 403 + its shared nudge. The draft's
+ * Approve / Send-to-me / AI-email / Preview buttons nudge directly instead of
+ * opening a send confirmation for an email that can't go out.
  * ==========================================================================*/
  let _demoBuilt = false;
+ let _demoStamps = null; // id → the roster's last-send stamps (GET /subscriptions), once loaded
+ let _demoStampsLoading = false;
  function renderDemo(el) {
  const D = window.AO_DEMO;
  if (!_demoBuilt) {
  el.innerHTML = shell();
- wireGenTabs(); // the "Offtakers | Bill audit" toggle works in the demo too (audit shows the sign-in state)
- wireMasterEmail(); // sample preview card + Customize CTA (demo-nudged)
- wireRail(); // rail mini-strip works in the demo too (open a card → rail minimizes)
+ wireGenTabs(); // Offtakers | Bill audit | Trends | Generation reports
+ wireMasterEmail(); // the master email studio (reads + live preview; saves are read-only)
+ wireRail(); // rail mini-strip works in the sample too (open a card → rail minimizes)
+ wireGlobalRate(); // master rate popover (GET /global-rate; Save → read-only)
+ wireCollectionSettings(); // payment collection card (+ payout account / fee split)
+ wireRosterTools(() => {}); // Add an offtaker / Bulk import / Link utility bills
+ wireExport(); // export popover: periods load; the download is read-only
+ wireExportPopover();
  _demoBuilt = true;
- }
- // Demo note, big-operator snapshot (scale from AO_DEMO.meta when present).
- const head = $(".rb-list-head");
- if (head && !$("#rbDemoNote")) {
- const note = document.createElement("div");
- note.id = "rbDemoNote";
- note.className = "rb-gmp-ok";
- note.style.cssText = "margin:2px 0 0;background:rgba(33,150,243,.08);border:1px solid rgba(33,150,243,.22);color:var(--muted)";
- const meta = D.meta || {};
- const scale = meta.offtakers
- ? `${meta.arrays || "—"} sites · ${meta.offtakers} offtakers`
- : "sample operator";
- note.innerHTML = `Demo · <b>Northeast Community Solar</b> (${scale}), sample mid-cycle state. <a href="/onboarding" style="color:var(--good);font-weight:650">Create an account →</a>`;
- head.parentNode.insertBefore(note, head.nextSibling);
  }
  const gmpStatus = $("#rbGmpBillsStatus");
  if (gmpStatus) gmpStatus.innerHTML =
  `<div class="rb-gmp-ok">✓ ${D.offtakers.length} offtakers billing from multi-utility bills (GMP · VEC · WEC · Eversource · CMP).</div>`;
 
- // Multi-array / multi-utility book (falls back to a single site if old shape).
- const demoArrays = (D.arrays && D.arrays.length)
- ? D.arrays.map(a => ({ id: a.id, name: a.name, client_name: a.client_name || "" }))
- : [{ id: 1, name: "Catamount Community Solar", client_name: "" }];
- const demoUtil = (D.utilAccounts && D.utilAccounts.length)
- ? D.utilAccounts.slice()
- : [{ utility_account_id: 9001, array_id: 1, provider: "gmp",
- nickname: "Catamount Community Solar", service_address: "120 Main St, Waterbury, VT",
- has_bill: true, bill_count: 6, account_number: "GMP-558210", latest_period_label: "2026-06" }];
-
- OFFTAKERS = D.offtakers.slice();
- INBOX_DRAFTS = D.drafts.slice();
- DRAFT_BY_SUB = {};
+ const demoArrays = (D.arrays || []).map(a => ({ id: a.id, name: a.name, client_name: a.client_name || "" }));
+ const demoUtil = (D.utilAccounts || []).slice();
+ // Copies, so the stamps merged in never leak into AO_DEMO (other tabs read it).
+ OFFTAKERS = (D.offtakers || []).map(s => Object.assign({}, s, (_demoStamps && _demoStamps[s.id]) || {}));
+ INBOX_DRAFTS = (D.drafts || []).map(d => Object.assign({}, d));
+ // AO_DEMO drafts carry no subscription id; tie each to its offtaker so the
+ // inbox index (_indexInbox) can find it. Name + email + amount is unique.
  INBOX_DRAFTS.forEach(d => {
- const sub = OFFTAKERS.find(s => s.customer_name === d.customer_name);
- if (sub) { d.subscription_id = null; DRAFT_BY_SUB[String(sub.id)] = d; }
+ const sub = OFFTAKERS.find(s => s.customer_name === d.customer_name &&
+ s.client_email === d.client_email && Number(s._demo_amount) === Number(d.amount_usd));
+ if (sub) d._demo_sub_id = sub.id;
  });
  INBOX_UTIL_ACCTS = demoUtil;
  ACC_ARRS = demoArrays;
  TEMPLATE_STATE = { has: false, enabled: false };
+ sampleWhyNoDraft();
 
- // Pipeline band, frozen mid-cycle action (healthy, not bounced).
- if (D.pipeline) {
- PIPE = D.pipeline;
- try { renderPipeline(); renderKpis(); } catch (_) { /* pipeline optional */ }
- }
-
- // Hierarchical offtaker list (utility → account → offtaker), same path as live
- // for fleets > a handful; defaults collapsed so 300 offtakers don't paint 300 cards.
- try {
+ // Hierarchical offtaker list (utility → array → offtaker), the live path;
+ // defaults collapsed so 300 offtakers don't paint 300 cards.
  renderAccordion(OFFTAKERS, demoArrays, demoUtil, INBOX_DRAFTS);
- } catch (_) {
- const list = $("#rbList");
- if (list) {
- list.innerHTML =
- OFFTAKERS.slice(0, 40).map(s => subCard(s, demoArrays, demoUtil)).join("") +
- (OFFTAKERS.length > 40
- ? `<div class="empty" style="padding:12px;color:var(--faint)">+ ${OFFTAKERS.length - 40} more offtakers, sign up to manage the full book.</div>`
- : "");
- wireAccordionHeaders(list);
- }
- }
- ACTIVE_SUB_ID = null;
- const list = $("#rbList");
- if (list) {
- const reintercept = () => {
- list.querySelectorAll("[data-dact]").forEach(b => {
- const act = b.getAttribute("data-dact");
- if (act === "approve" || act === "sendme" || act === "aiemail" || act === "savemsg" || act === "preview")
- b.onclick = (e) => { e.preventDefault(); demoNudge(b); };
+
+ // The same reads the signed-in tab makes, answered with the sample book.
+ const rerender = () => { if (LAST_LIST_ARGS) renderAccordion(LAST_LIST_ARGS[0], LAST_LIST_ARGS[1], LAST_LIST_ARGS[2], LAST_LIST_ARGS[3]); };
+ loadPipeline().then(() => {
+ if (!PIPE && D.pipeline) { PIPE = D.pipeline; try { renderPipeline(); } catch (_) {} }
+ renderKpis();
+ rerender(); // the source headers' "N sent · <month>" bars read PIPE.last
  });
- };
- reintercept();
- list.querySelectorAll("[data-acchead]").forEach(h => {
- h.addEventListener("click", () => requestAnimationFrame(reintercept));
+ loadReconcile().then(r => { if (r) refreshBacSummary(); }).catch(() => {});
+ loadVacancyOnce(rerender); // demo/market.js: the Credit Exchange's unallocated-credit chips
+ if (!_demoStamps && !_demoStampsLoading) {
+ _demoStampsLoading = true;
+ // Last-send stamps (so "last sent" on a card ties to its Mail room invoice)
+ // + pay-link chips, then one repaint.
+ Promise.all([
+ fetch(API + "/subscriptions", { headers: {} }).then(r => r.ok ? r.json() : null).catch(() => null),
+ loadOfftakerPayments().catch(() => null),
+ ]).then(([subs]) => {
+ _demoStamps = {};
+ ((subs && subs.subscriptions) || []).forEach(s => {
+ _demoStamps[s.id] = { last_sent_at: s.last_sent_at, last_sent_period_end: s.last_sent_period_end,
+ last_sent_amount_usd: s.last_sent_amount_usd, last_delivered_at: s.last_delivered_at,
+ next_send_at: s.next_send_at };
+ });
+ OFFTAKERS.forEach(s => Object.assign(s, _demoStamps[s.id] || {}));
+ if (LAST_LIST_ARGS) LAST_LIST_ARGS[0].forEach(s => Object.assign(s, _demoStamps[s.id] || {}));
+ sampleWhyNoDraft();
+ rerender();
+ }).finally(() => { _demoStampsLoading = false; });
+ }
+ loadArchives(); // invoice archive, bill archive, monthly summary, mail room
+ }
+
+ // What an offtaker card says in the sample when it has no draft to review: the
+ // live tab would mint one (a write), so say where its invoices actually are.
+ function sampleWhyNoDraft() {
+ const fmtD = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
+ (OFFTAKERS || []).forEach(s => {
+ const prov = auditProviderLabel(s._provider || "gmp");
+ const next = s.next_send_at ? fmtD(s.next_send_at) : "the next run";
+ const lastMonth = s.last_sent_period_end ? _monthName(String(s.last_sent_period_end).slice(0, 7)) : "";
+ let why;
+ if (!s.enabled) why = "Paused: no invoices go out until it’s turned back on.";
+ else if (s.delivery_mode === "auto" && s.last_sent_at) why = `Auto-send: the ${lastMonth ? lastMonth + " " : ""}invoice went out ${fmtD(s.last_sent_at)}. The next one sends itself on ${next} from the settled ${prov} bill. Every sent invoice is in the Mail room.`;
+ else if (s.delivery_mode === "auto") why = `New this cycle: the first invoice sends itself on ${next} from the settled ${prov} bill.`;
+ else why = `Draft for approval: this cycle’s invoice drafts here for your OK once the settled ${prov} bill lands${s.last_sent_at ? `. The last one went out ${fmtD(s.last_sent_at)}` : ""}.`;
+ GEN_FAIL[String(s.id)] = why;
  });
  }
 
- const addBtn = $("#rbCustAdd"); if (addBtn) addBtn.onclick = () => demoNudge(addBtn);
- const linkBtn = $("#rbLinkUtility"); if (linkBtn) linkBtn.onclick = () => demoNudge(linkBtn);
- const esBtn = $("#rbEmailStudio"); if (esBtn) esBtn.onclick = () => demoNudge(esBtn);
- const exBtn = $("#rb2ExportBtn"); if (exBtn) exBtn.onclick = () => demoNudge(exBtn);
+ // In the sample, the draft's send buttons nudge instead of opening a "send
+ // this email now?" confirmation for an email that can't go out.
+ const SAMPLE_NUDGE_ACTS = ["approve", "sendme", "aiemail", "savemsg", "preview", "autogmp", "summary"];
+ function guardSampleDraftActions(root) {
+ if (!root || !sampleOn()) return;
+ root.querySelectorAll("[data-dact]").forEach(b => {
+ if (SAMPLE_NUDGE_ACTS.indexOf(b.getAttribute("data-dact")) < 0) return;
+ b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); demoNudge(b); };
+ });
  }
 
- // A gentle, in-place "this is a demo" affordance, no fetch, no error.
+ // The shared "this is a sample account" nudge (demo-api.js), so every
+ // read-only moment on the site looks and reads the same.
  function demoNudge(near) {
+ if (window.AO_DEMO_API && window.AO_DEMO_API.nudge) { window.AO_DEMO_API.nudge(); return; }
  let tip = document.getElementById("rbDemoTip");
  if (!tip) {
  tip = document.createElement("div");
@@ -3316,7 +3410,7 @@
  "font:600 13px/1.4 inherit;box-shadow:0 10px 34px -10px rgba(0,0,0,.6);max-width:min(92vw,420px)";
  document.body.appendChild(tip);
  }
- tip.innerHTML = `This is a live demo. <a href="/onboarding" style="color:var(--good)">Start free →</a> to send real invoices.`;
+ tip.innerHTML = `This is a sample account. <a href="/onboarding" style="color:var(--good)">Start free →</a> to send real invoices.`;
  tip.style.opacity = "1";
  clearTimeout(demoNudge._t);
  demoNudge._t = setTimeout(() => { if (tip) tip.style.opacity = "0"; tip.style.transition = "opacity .4s"; }, 3200);
@@ -3440,10 +3534,13 @@
  // demo-data.js even when signed in — never use `|| window.AO_DEMO` here
  // (that was treating Ford's real account as a demo and blocking the studio).
  function wireMasterEmail() {
- const signedIn = !!authHeaders();
+ // Signed out, the sample account opens the real studio: the template + live
+ // preview come from demo/statements.js; saving/AI/test-send get the shim's
+ // read-only 403 and the status line says so.
+ const can = canFetch();
  const open = (e) => {
  if (e) { e.preventDefault(); e.stopPropagation(); }
- if (!signedIn) { demoNudge(e && e.currentTarget); return; }
+ if (!can) { demoNudge(e && e.currentTarget); return; }
  openEmailStudio();
  };
  const esBtn = $("#rbEmailStudio");
@@ -3717,9 +3814,9 @@
  }
 
  async function loadPipeline() {
- if (!authHeaders()) return;
+ if (!canFetch()) return;
  try {
- const r = await fetch(API + "/send-pipeline", { headers: authHeaders() });
+ const r = await fetch(API + "/send-pipeline", { headers: authHeaders() || {} });
  if (!r.ok) return;
  const d = await r.json().catch(() => null);
  if (d && d.ok) { PIPE = d; renderPipeline(); renderKpis(); }
@@ -3901,8 +3998,9 @@
  renderDeliveryHolds();
  const host = document.getElementById("rb2RailCycle");
  if (!host) return;
- // Signed-out demo paints a frozen cycle card from AO_DEMO.pipeline.
- if (!PIPE || (!authHeaders() && !(window.AO_DEMO && window.AO_DEMO.pipeline))) {
+ // PIPE comes from GET /send-pipeline (signed in, or the sample account via
+ // demo-api.js); nothing loaded → no card.
+ if (!PIPE) {
  host.hidden = true; return;
  }
  const p = PIPE;
@@ -4010,6 +4108,9 @@
  const want = b.getAttribute("data-v");
  const cur = (PIPE && PIPE.default_delivery_mode) || "approval";
  if (want === cur) return;
+ // Sample account: the fleet's delivery mode can't change, so say so
+ // instead of flipping the slider (no pretend success).
+ if (sampleOn()) { demoNudge(b); return; }
  if (want === "auto") {
  const n = (PIPE && PIPE.mode_split && PIPE.mode_split.approval) || 0;
  const ok = await AODialog.confirm(
@@ -4132,7 +4233,7 @@
  function renderKpis() {
  const host = document.getElementById("rb2Kpis");
  if (!host) return;
- if (!authHeaders()) { host.hidden = true; return; }
+ if (!canFetch()) { host.hidden = true; return; }
  const nOff = (OFFTAKERS || []).length;
  // "across N arrays" = distinct arrays that actually HAVE offtakers, not every
  // array on file (ACC_ARRS counted empty/non-solar ones → the misleading 80).
@@ -4187,6 +4288,11 @@
  if (pane.querySelector(".rb-demo-inv")) return;
  const credit = (window.AO_DEMO && window.AO_DEMO.creditRate) || 0.2576;
  const rate = "$" + credit.toFixed(4) + "/kWh";
+ // invoice = kWh × rate × (1 − discount), as the backend prices it.
+ const disc = Number(d.discount_pct) > 0 && Number(d.discount_pct) < 1 ? Number(d.discount_pct) : 0;
+ const discTxt = disc ? Math.round(disc * 1000) / 10 + "%" : "";
+ const operator = (window.AO_DEMO && window.AO_DEMO.account && window.AO_DEMO.account.company_name) || "Your company";
+ const prov = auditProviderLabel(d.attach_provider || "gmp");
  const inv = document.createElement("div");
  inv.className = "rb-demo-inv";
  inv.style.cssText = "margin-top:15px";
@@ -4195,7 +4301,7 @@
  <div style="border:1px solid var(--line);border-radius:12px;background:var(--card);padding:20px 22px">
  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px">
  <div>
- <div style="font-weight:800;font-size:15px;color:var(--ink)">Catamount Community Solar</div>
+ <div style="font-weight:800;font-size:15px;color:var(--ink)">${esc(operator)}</div>
  <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Solar credit invoice · ${esc(d.invoice_number || "")}</div>
  </div>
  <div style="text-align:right;font-size:11.5px;color:var(--muted)">
@@ -4213,11 +4319,13 @@
  <td style="padding:5px 0;text-align:right;color:var(--ink)">${fmt0(d.customer_kwh)} kWh</td></tr>
  <tr><td style="padding:5px 0;color:var(--muted)">Solar-credit rate</td>
  <td style="padding:5px 0;text-align:right;color:var(--ink)">${rate}</td></tr>
+ ${disc ? `<tr><td style="padding:5px 0;color:var(--muted)">Your discount</td>
+ <td style="padding:5px 0;text-align:right;color:var(--ink)">− ${discTxt}</td></tr>` : ""}
  <tr style="border-top:1px solid var(--line)"><td style="padding:9px 0 0;font-weight:800;color:var(--ink)">Amount due</td>
  <td style="padding:9px 0 0;text-align:right;font-weight:800;font-size:15px;color:var(--good)">${money(d.amount_usd)}</td></tr>
  </table>
  <div style="font-size:11px;color:var(--muted);margin-top:13px;line-height:1.5">
- ${fmt0(d.customer_kwh)} kWh × ${rate} = ${money(d.amount_usd)}. Billed from the operator's GMP utility bill at the net-metering credit rate.
+ ${fmt0(d.customer_kwh)} kWh × ${rate}${disc ? ` × (1 − ${discTxt})` : ""} = ${money(d.amount_usd)}. Billed from the settled ${esc(prov)} bill at its net-metering credit rate.
  </div>
  </div>
  <p class="rb-doc-hint">In the live app this is your real reproduced invoice PDF. <a href="/onboarding" style="color:var(--good)">Start free →</a> to generate it from your own bills.</p>`;
@@ -4932,6 +5040,7 @@
  <option value="online_required">Online payment required</option><option value="offline">Offline — check, cash or bank transfer</option></select></label>
  <button class="rb-attention-button rb-attention-button--primary" type="submit">Save changes</button></form>
  <p class="rb-collection-hint" id="rbCollectionHint">Online invoices wait for a working payment link. Record offline payments manually.</p>
+ <p class="rb-collection-hint" id="rbCollectionPayout" hidden></p>
  <form id="rbOfflinePayment" class="rb-offline-payment" hidden><h4>Record an offline payment</h4>
  <label class="rb-collection-field"><span>Issued invoice</span><select name="invoice" required><option value="">Choose invoice</option></select></label>
  <label class="rb-collection-field"><span>Amount received ($)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
@@ -4947,6 +5056,19 @@
  const current = document.getElementById("rbCollectionCurrent");
  const updateCurrent = value => { if (current) current.textContent = value === "offline" ? "Offline payments" : "Online payment required"; };
  updateCurrent(policy.policy);
+ // Where online payments land and what each one costs: ours + Stripe's,
+ // spelled out the same way as Account → Get paid online. Best-effort.
+ fetch(API + "/payments/connect", { headers: authHeaders() || {} })
+ .then(r => r.ok ? r.json() : null).then(st => {
+ const el = host.querySelector("#rbCollectionPayout");
+ if (!el || !st || !st.ok) return;
+ const pct = (Math.round((st.fee_percent != null ? Number(st.fee_percent) : Number(st.fee_bps || 50) / 100) * 100) / 100) + "%";
+ const fees = st.stripe_fees || { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
+ el.innerHTML = (st.ready || st.charges_enabled)
+ ? `<b>Payouts connected</b> through Stripe: each invoice carries a pay link and money lands in your bank. We keep ${esc(pct)} of each online payment; Stripe’s processing fee also applies (bank debit ${esc(fees.ach)}, card ${esc(fees.card)}). Checks and other offline payments: no fee.`
+ : `<b>No payout account yet.</b> Online pay links need one: Account → Get paid online. We keep ${esc(pct)}; Stripe adds bank debit ${esc(fees.ach)}, card ${esc(fees.card)}.`;
+ el.hidden = false;
+ }).catch(() => {});
  payment.elements.received.value = new Date().toLocaleDateString("en-CA");
  const ownerBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(authHeaders())));
  const pendingKey = "ao_pending_offline_receipt:" + Array.from(new Uint8Array(ownerBytes)).map(x => x.toString(16).padStart(2, "0")).join("");
@@ -5073,7 +5195,7 @@
  }
  }
  try {
- const r = await fetch(API + "/global-rate", { headers: authHeaders() });
+ const r = await fetch(API + "/global-rate", { headers: authHeaders() || {} });
  const data = await r.json().catch(() => ({}));
  if (r.ok) {
  if (data.effective_discount_pct != null) effDisc = data.effective_discount_pct;
@@ -5250,7 +5372,7 @@
  // list is tiny and this endpoint is cheap.
  async function fetchUtilityAccounts() {
  try {
- const r = await fetch(API + "/utility-accounts", { headers: authHeaders() });
+ const r = await fetch(API + "/utility-accounts", { headers: authHeaders() || {} });
  if (!r.ok) return [];
  const d = await r.json().catch(() => ({}));
  return (d.utility_accounts || []).filter(a => a.utility_account_id != null);
@@ -7150,9 +7272,10 @@
  try {
  // Cache-bust: the template endpoint sits behind an edge cache that would
  // otherwise serve a stale copy after a template update.
- const r = await fetch(API + "/offtaker-template.xlsx?v=" + Date.now(), { headers: authHeaders() });
+ const r = await fetch(API + "/offtaker-template.xlsx?v=" + Date.now(), { headers: authHeaders() || {} });
  if (!r.ok) {
- if (status) { status.className = "rb-status rb-err"; status.textContent = "Couldn't fetch the template (HTTP " + r.status + ")."; }
+ const d = await r.clone().json().catch(() => null);
+ if (status) { status.className = "rb-status rb-err"; status.textContent = apiErr(d, "Couldn't fetch the template (HTTP " + r.status + ")."); }
  return;
  }
  const blob = await r.blob();
@@ -7500,9 +7623,9 @@
  }
 
  async function loadOfftakerPayments() {
- if (!authHeaders()) { PAY_BY_SUB = {}; return; }
+ if (!canFetch()) { PAY_BY_SUB = {}; return; }
  try {
- const r = await fetch(API + "/payments?limit=200", { headers: authHeaders() });
+ const r = await fetch(API + "/payments?limit=200", { headers: authHeaders() || {} });
  if (!r.ok) return;
  const j = await r.json().catch(() => ({}));
  const map = {};
@@ -7521,10 +7644,10 @@
  async function refreshPayBanner() {
  const el = document.getElementById("rbPayBanner");
  if (!el) return;
- if (!authHeaders()) { el.hidden = true; el.innerHTML = ""; return; }
+ if (!canFetch()) { el.hidden = true; el.innerHTML = ""; return; }
  let st = null;
  try {
- const r = await fetch(API + "/payments/connect", { headers: authHeaders() });
+ const r = await fetch(API + "/payments/connect", { headers: authHeaders() || {} });
  if (r.ok) st = await r.json();
  } catch (e) { st = null; }
  if (!st || !st.ok) { el.hidden = true; return; }
@@ -8223,7 +8346,12 @@
  if (!ok) return;
  try {
  const r = await fetch(API + "/subscriptions/" + id, { method: "DELETE", headers: authHeaders() });
- if (!r.ok) { await AODialog.alert("HTTP " + r.status + ".", { title: "Couldn't delete the offtaker" }); return; }
+ if (!r.ok) {
+ const d = await r.json().catch(() => ({}));
+ if (isSampleReadOnly(d)) return; // sample account: the shared nudge already said why
+ await AODialog.alert(apiErr(d, "HTTP " + r.status + "."), { title: "Couldn't delete the offtaker" });
+ return;
+ }
  if (String(ACTIVE_SUB_ID) === String(id)) ACTIVE_SUB_ID = null;
  await refreshList();
  } catch (e) {
@@ -8558,8 +8686,11 @@
  // Index the NEWEST per offtaker so the inbox auto-switches to the latest draft and
  // never surfaces a superseded bill (Paul Bozuwa: a May $3,167 draft in front of June).
  drafts.forEach(d => {
- if (d.subscription_id == null) return;
- const k = String(d.subscription_id);
+ // Sample drafts keep subscription_id null (no live PDF fetch) and carry the
+ // offtaker on _demo_sub_id instead (renderDemo).
+ const sid = d.subscription_id != null ? d.subscription_id : d._demo_sub_id;
+ if (sid == null) return;
+ const k = String(sid);
  if (!DRAFT_BY_SUB[k] || _draftNewer(d, DRAFT_BY_SUB[k])) DRAFT_BY_SUB[k] = d;
  });
  // Dropdown rows = every enabled offtaker, PLUS any (even disabled) that has a
@@ -8979,6 +9110,7 @@
  // Consolidate: drop the (already-wired) invoice-template box at the bottom of
  // the open card so the page reads as one element.
  foldTplIntoInbox(wrap.querySelector(".rb-acc-inner"));
+ guardSampleDraftActions(wrap); // signed-out sample only
  }
 
  // Switch the whole approval section to a chosen offtaker. If they already have a

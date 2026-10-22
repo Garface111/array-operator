@@ -34,6 +34,13 @@
 
  var SESSION_KEY = "so_session";
  function getSession() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } }
+ // Signed-out sample account: demo-api.js answers /alert-events with the
+ // sample operator's log, so the real ledger renders; a status change comes
+ // back as the shim's read-only 403 (its nudge explains) and the row stays put.
+ function sampleOn() { try { return !getSession() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; } }
+ function authHeaders(extra) { var h = extra || {}, s = getSession(); if (s) h.Authorization = "Bearer " + s; return h; }
+ // The real log: an owner's fleet, or the sample account.
+ function useLiveLog(ctx) { return (ctx.signedIn && !ctx.simulated) || sampleOn(); }
 
  // ---- persisted state (module-level → survives the orchestrator's re-renders) -
  var selectedStatus = "all"; // "all" | "open" | "ack" | "resolved"
@@ -192,11 +199,10 @@
 
  // ---- live fetch (signed-in) ------------------------------------------------
  function loadEvents(ctx) {
- var s = getSession();
- if (!s) { liveEvents = null; return; }
+ if (!getSession() && !sampleOn()) { liveEvents = null; return; }
  if (fetchInFlight) return;
  fetchInFlight = true;
- fetch("/v1/array-owners/alert-events", { headers: { Authorization: "Bearer " + s } })
+ fetch("/v1/array-owners/alert-events", { headers: authHeaders() })
  .then(function (r) { return r.ok ? r.json() : null; })
  .then(function (d) {
  fetchInFlight = false; liveTried = true;
@@ -213,8 +219,7 @@
 
  // PATCH a ticket, then refetch the log on success.
  function patchEvent(ctx, id, status, note) {
- var s = getSession();
- if (!s || patchInFlight[id]) return;
+ if ((!getSession() && !sampleOn()) || patchInFlight[id]) return;
  patchInFlight[id] = true;
  resolvingId = null;
  repaint(ctx); // reflect the disabled/in-flight state immediately
@@ -222,7 +227,7 @@
  if (note != null) body.note = note;
  fetch("/v1/array-owners/alert-events/" + encodeURIComponent(id), {
  method: "PATCH",
- headers: { "Content-Type": "application/json", Authorization: "Bearer " + s },
+ headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify(body)
  })
  .then(function (r) { return r.ok ? r.json() : null; })
@@ -296,7 +301,7 @@
  // ---- pick the event set for the current mode -------------------------------
  // Returns { events:[…normalized…], demo:bool, unavailable:bool }
  function resolveEvents(ctx) {
- if (ctx.signedIn && !ctx.simulated) {
+ if (useLiveLog(ctx)) {
  var evs = (liveEvents || []).map(normalize);
  return { events: evs, demo: false, unavailable: liveUnavailable && evs.length === 0 };
  }
@@ -334,13 +339,13 @@
  var esc = ctx.esc, ago = ctx.fmt.ago;
 
  // kick off the live fetch once (per session presence); demo needs no fetch
- if (ctx.signedIn && !ctx.simulated && liveEvents == null && !fetchInFlight) {
+ if (useLiveLog(ctx) && liveEvents == null && !fetchInFlight) {
  loadEvents(ctx);
  }
 
  var res = resolveEvents(ctx);
  var all = res.events;
- var canAct = !res.demo && ctx.signedIn; // status controls only on the real log
+ var canAct = !res.demo && (ctx.signedIn || sampleOn()); // status controls only on the real log
 
  // counts by status
  var counts = { open: 0, ack: 0, resolved: 0 };

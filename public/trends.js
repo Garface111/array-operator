@@ -50,6 +50,12 @@
  const MULTIYEAR_VIEWS = { liquid: 1, spiral: 1, ridgeline: 1, heatfield: 1 };
 
  function session() { try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
+ // Signed-out sample account: demo-api.js answers /fleet-trends with the sample
+ // operator's multi-year history, so Trends renders exactly as for an owner.
+ // Downloads there show the shared "start free" nudge instead of a file.
+ function sampleOn() { try { return !session() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; } }
+ const DL_SAMPLE_MSG = "Downloads are available on your own account. Start free to export your arrays.";
+ function sampleDownloadNudge() { try { AO_DEMO_API.nudge(DL_SAMPLE_MSG); } catch (e) {} }
  function root() { return document.getElementById("trendsRoot"); }
  function savedView() { try { return localStorage.getItem(VIEW_KEY); } catch (e) { return null; } }
  function saveView(k) { try { localStorage.setItem(VIEW_KEY, k); } catch (e) {} }
@@ -119,7 +125,10 @@
  const parts = [];
  if (lastDay) {
  const dt = new Date(lastDay + "T00:00:00");
- const ago = Math.round((Date.now() - dt.getTime()) / 86400000);
+ // Calendar days, not elapsed hours: yesterday's data read "(2d ago)" every
+ // afternoon when this rounded (now - midnight) instead.
+ const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+ const ago = Math.round((today0.getTime() - dt.getTime()) / 86400000);
  const when = dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
  parts.push(`Through <b>${c.esc(when)}</b>${ago > 1 ? ` (${ago}d ago)` : ago === 1 ? " (yesterday)" : " (today)"}`);
  }
@@ -208,6 +217,7 @@
  // Master Array Data Pack: zip of per-array xlsx (utility bills + full history).
  // Direct-to-Railway on prod so the Netlify proxy can't 504 a long build.
  async function downloadMasterPackZip(btn) {
+  if (sampleOn()) { sampleDownloadNudge(); return; }
   const tok = session();
   if (!tok) {
    try { window.AODialog && AODialog.alert("Sign in to download master data packs.", { title: "Sign in" }); } catch (e) {}
@@ -249,6 +259,7 @@
 
  // Single-array master pack (from by-array table row buttons).
  async function downloadArrayMasterPack(arrayId, arrayName, btn) {
+  if (sampleOn()) { sampleDownloadNudge(); return; }
   const tok = session();
   if (!tok || !arrayId) return;
   const label = btn ? btn.textContent : "";
@@ -691,14 +702,14 @@
 
  function load(arrayId) {
  const s = session();
- if (!s) { empty("Sign in to see your fleet's multi-year production trends."); return; }
+ if (!s && !sampleOn()) { empty("Sign in to see your fleet's multi-year production trends."); return; }
  if (!window.AOTrends || !C().listViews().length) {
  return void setTimeout(() => load(arrayId), 60); // core/views not ready yet
  }
  if (arrayId !== undefined) _arrayId = arrayId; // explicit scope (incl. null = fleet)
  loading();
  const url = _arrayId != null ? `${API}?array_id=${encodeURIComponent(_arrayId)}` : API;
- fetch(url, { headers: { Authorization: "Bearer " + s } })
+ fetch(url, { headers: s ? { Authorization: "Bearer " + s } : {} })
  .then(res => {
  if (res.status === 401 || res.status === 403) { const e = new Error("auth"); e.auth = true; throw e; }
  if (!res.ok) throw new Error("http " + res.status);

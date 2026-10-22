@@ -29,6 +29,14 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
   const API = "/v1/array-operator/billing";
   function session(){ try { return localStorage.getItem("so_session"); } catch(_){ return null; } }
   function authHeaders(){ const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
+  // Signed-out visitors get the sample account: demo-api.js answers these same
+  // fetches with sample data and needs no Authorization header, so a missing
+  // session must not short-circuit the normal render path.
+  function sampleMode(){ return !session() && !!(window.AO_DEMO_API && window.AO_DEMO_API.on()); }
+  function reqHeaders(){ return authHeaders() || (sampleMode() ? {} : null); }
+  // The sample's read-only 403 ({error:"demo-read-only"}) already raised the
+  // shared "this is a sample account" nudge; callers just restore their UI.
+  function isSampleBlock(j){ return !!(j && j.error === "demo-read-only"); }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
   function money0(n){ const v = Number(n)||0; return "$" + Math.round(v).toLocaleString(); }
   function kwh0(n){ return (Math.round(Number(n)||0)).toLocaleString() + " kWh"; }
@@ -330,7 +338,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
       form._wired = true;
       form.addEventListener("submit", function(e){
         e.preventDefault();
-        const hdrs = authHeaders();
+        const hdrs = reqHeaders();
         const hint = container.querySelector("#mkIntakeHint");
         if(!hdrs){ if(hint){ hint.textContent = "Sign in to save a lead."; } return; }
         const body = {
@@ -352,7 +360,19 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
           method: "POST",
           headers: Object.assign({ "Content-Type": "application/json" }, hdrs),
           body: JSON.stringify(body)
-        }).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(){
+        }).then(function(r){
+          return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; });
+        }).then(function(res){
+          // A rejected save is not a success: keep what they typed, re-arm the
+          // button, and say why (the sample nudge already explains its 403).
+          if(!res.ok){
+            if(btn){ btn.disabled = false; btn.textContent = "Add to waitlist"; }
+            if(hint && !isSampleBlock(res.j)){
+              const d = res.j && res.j.detail;
+              hint.textContent = typeof d === "string" ? d : "Couldn’t save that — try again.";
+            }
+            return;
+          }
           _leads = null; _sugg = null;
           loadData(document.getElementById("mkSubContent"), { keepVac: true });
         }).catch(function(){
@@ -385,9 +405,11 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     container.addEventListener("change", function(e){
       const sel = e.target && e.target.closest ? e.target.closest("[data-mk-status]") : null;
       if(!sel) return;
-      const hdrs = authHeaders();
+      const hdrs = reqHeaders();
       if(!hdrs) return;
       const id = sel.getAttribute("data-mk-status");
+      const lead = ((_leads && _leads.leads) || []).find(function(l){ return String(l.id) === String(id); });
+      const prevStatus = lead ? (lead.status || "new") : null;
       fetch(API + "/exchange/demand/" + encodeURIComponent(id), {
         method: "PATCH",
         headers: Object.assign({ "Content-Type": "application/json" }, hdrs),
@@ -396,12 +418,16 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
         if(!r.ok) throw new Error("status");
         _leads = null; _sugg = null;
         return loadData(document.getElementById("mkSubContent"), { keepVac: true });
-      }).catch(function(){ /* leave UI; next refresh fixes */ });
+      }).catch(function(){
+        // Not saved (incl. the sample's read-only 403): snap the picker back to
+        // the stored status so it never looks like the change stuck.
+        if(prevStatus) sel.value = prevStatus;
+      });
     });
   }
 
   function runDraft(btn, container){
-    const hdrs = authHeaders();
+    const hdrs = reqHeaders();
     if(!hdrs){ alert("Sign in to draft an offtaker."); return; }
     const leadId = btn.getAttribute("data-mk-draft");
     const arrayId = btn.getAttribute("data-mk-array");
@@ -426,9 +452,10 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
     }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j, status: r.status }; }); })
     .then(function(res){
       if(!res.ok){
+        btn.disabled = false; btn.textContent = prev;
+        if(isSampleBlock(res.j)) return;   // sample account: the shared nudge already explained
         const msg = (res.j && (res.j.detail || res.j.message)) || ("HTTP "+res.status);
         alert(typeof msg === "string" ? msg : JSON.stringify(msg));
-        btn.disabled = false; btn.textContent = prev;
         return;
       }
       _leads = null; _sugg = null;
@@ -443,7 +470,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
 
   function loadData(container, opts){
     opts = opts || {};
-    const hdrs = authHeaders();
+    const hdrs = reqHeaders();
     if(!hdrs){ renderSignedOut(container); return; }
     if(!_vac && !opts.keepVac){
       container.innerHTML = '<div class="mk-wrap"><div class="mk-empty">Measuring your fleet’s unallocated credits…</div></div>';

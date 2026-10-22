@@ -991,7 +991,10 @@
    let session = null;
    try { session = localStorage.getItem("so_session"); } catch(e){ session = null; }
 
-   if(invId == null || !session){
+   // Signed out = the sample account: demo-api.js answers this read from the
+   // sample fleet (demo/fleet.js), so the log renders through the real path.
+   const sample = !session && !!(window.AO_DEMO_API && window.AO_DEMO_API.on());
+   if(invId == null || (!session && !sample)){
      host.innerHTML = `<div class="vs-dc-chart-h">Outage log</div>` +
        `<div class="vs-dc-nohist">The outage log reads from your own fleet — sign in to see it.</div>`;
      return;
@@ -1000,7 +1003,7 @@
 
    host.innerHTML = _olLoadingHTML();
    fetch(`/v1/array-owners/inverters/${encodeURIComponent(invId)}/outages?days=${OL_DAYS}`,
-         { headers: { Authorization: "Bearer " + session } })
+         { headers: session ? { Authorization: "Bearer " + session } : {} })
      .then(async r => {
        if(!r.ok){
          let detail = "";

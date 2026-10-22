@@ -29,6 +29,14 @@
  var API = "/v1/array-owners/files";
 
  function getSession() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } }
+ // Signed-out sample account: demo-api.js answers GET /files with the sample
+ // operator's documents, so the real panel renders. Upload / delete come back
+ // as the shim's read-only 403 (its nudge explains, the panel stays as it was);
+ // downloads show the same nudge instead of handing over a file.
+ function sampleOn() { try { return !getSession() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; } }
+ function authHeaders(extra) { var h = extra || {}, s = getSession(); if (s) h.Authorization = "Bearer " + s; return h; }
+ function canFetch() { return !!getSession() || sampleOn(); }
+ var DL_SAMPLE_MSG = "Downloads are available on your own account. Start free to export your arrays.";
 
  // ---- module-level state (survives live re-renders) -------------------------
  var STATE = "idle"; // idle | loading | ready | error (real-fetch lifecycle)
@@ -111,11 +119,12 @@
  // fresh signed-in session we lazily kick a fetch; results land in FILES and
  // request a repaint. A monotonic seq guards against out-of-order resolutions.
  function fetchList() {
- var s = getSession(); if (!s) return;
+ if (!canFetch()) return;
+ var s = getSession();
  var seq = ++FETCH_SEQ;
  STATE = "loading";
  LOADED_FOR = s;
- fetch(API, { headers: { Authorization: "Bearer " + s } })
+ fetch(API, { headers: authHeaders() })
  .then(function (r) { return r.ok ? r.json() : null; })
  .then(function (d) {
  if (seq !== FETCH_SEQ) return; // superseded
@@ -133,14 +142,14 @@
  }
  function ensureLoaded() {
  var s = getSession();
- if (!s) return; // demo path handles its own data
+ if (!s && !sampleOn()) return; // shim-less demo path handles its own data
  if (LOADED_FOR !== s) { FILES = null; STATE = "idle"; } // session changed → reload
  if (STATE === "idle") fetchList();
  }
 
  // ---- real data: upload / delete --------------------------------------------
  function doUpload(ctx) {
- var s = getSession(); if (!s) return;
+ if (!canFetch()) return;
  if (UPLOADING) return;
  if (!_pendingFile) { setNotice("bad", "Choose a file to upload first."); return; }
  if (!SEL_ARRAY) { setNotice("bad", "Pick a site to attach the file to."); return; }
@@ -149,7 +158,7 @@
  UPLOADING = true; NOTICE = null; repaint();
  fetch(API, {
  method: "POST",
- headers: { Authorization: "Bearer " + s, "Content-Type": "application/json" },
+ headers: authHeaders({ "Content-Type": "application/json" }),
  body: JSON.stringify({
  array_id: SEL_ARRAY,
  filename: _pendingFile.filename,
@@ -157,9 +166,13 @@
  data_b64: _pendingFile.data_b64
  })
  })
- .then(function (r) { return r.ok ? r.json() : null; })
+ .then(function (r) {
+ if (!r.ok && r.status === 403 && sampleOn()) return { _sampleReadOnly: true };
+ return r.ok ? r.json() : null;
+ })
  .then(function (d) {
  UPLOADING = false;
+ if (d && d._sampleReadOnly) { repaint(); return; } // shim's nudge already explained
  if (d && (d.ok || d.file)) {
  _pendingFile = null;
  setNotice("ok", "Uploaded.");
@@ -177,7 +190,13 @@
  }
 
  function doDelete(id) {
- var s = getSession(); if (!s || !id) return;
+ if (!canFetch() || !id) return;
+ if (sampleOn()) {
+ // Read-only sample: no optimistic removal, the shim answers 403 + nudge.
+ fetch(API + "/" + encodeURIComponent(id), { method: "DELETE" }).catch(function () { });
+ return;
+ }
+ var s = getSession();
  // optimistic: drop it locally so the row disappears immediately, then confirm
  var prev = FILES ? FILES.slice() : null;
  if (FILES) FILES = FILES.filter(function (f) { return String(f.id) !== String(id); });
@@ -191,6 +210,7 @@
  }
 
  function doDownload(id, filename) {
+ if (sampleOn()) { try { AO_DEMO_API.nudge(DL_SAMPLE_MSG); } catch (e) { } return; }
  var s = getSession(); if (!s || !id) return;
  fetch(API + "/" + encodeURIComponent(id) + "/download", { headers: { Authorization: "Bearer " + s } })
  .then(function (r) { return r.ok ? r.blob() : null; })
@@ -368,7 +388,7 @@
  _lastContainer = container;
  container._anfilesCtx = ctx;
 
- var esc = ctx.esc, demo = !ctx.signedIn;
+ var esc = ctx.esc, demo = !ctx.signedIn && !sampleOn();
  var arrays = ctx.arrays || [];
 
  // pick the data source
@@ -466,6 +486,7 @@
  doDownload(el.getAttribute("data-dl"), el.getAttribute("data-fn"));
  } else if (el.hasAttribute("data-del")) {
  var name = el.getAttribute("data-fn") || "this file";
+ if (sampleOn()) { doDelete(el.getAttribute("data-del")); return; } // read-only: straight to the nudge
  var ok = await AODialog.confirm("This can’t be undone.", { title: "Delete " + name + "?", danger: true, confirmLabel: "Delete" });
  if (ok) doDelete(el.getAttribute("data-del"));
  }

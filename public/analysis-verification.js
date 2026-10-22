@@ -18,6 +18,13 @@
 
  var SESSION_KEY = "so_session";
  function getSession() { try { return localStorage.getItem(SESSION_KEY); } catch (e) { return null; } }
+ // Signed-out sample account: demo-api.js answers /verification/summary with
+ // the sample operator's numbers, so the panel renders its signed-in UI.
+ function sampleOn() { try { return !getSession() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; } }
+ function authHeaders() { var s = getSession(); return s ? { Authorization: "Bearer " + s } : {}; }
+ var DL_SAMPLE_MSG = "Downloads are available on your own account. Start free to export your arrays.";
+ // Real owner fleet, or the sample account (never the shim-less demo fleet).
+ function canVerify(ctx) { return (ctx.signedIn && !ctx.simulated) || sampleOn(); }
 
  var _snap = null; // last verification summary json | null
  var _tried = false;
@@ -98,8 +105,7 @@
  }
 
  function loadSummary(force) {
- var s = getSession();
- if (!s) { _snap = null; _tried = true; return; }
+ if (!getSession() && !sampleOn()) { _snap = null; _tried = true; return; }
  if (_inFlight) return;
  if (_snap && !force) return;
  _inFlight = true;
@@ -109,7 +115,7 @@
  if (n >= 7 && n <= 90) win = n;
  } catch (e) { }
  fetch("/v1/array-owners/verification/summary?window_days=" + win, {
- headers: { Authorization: "Bearer " + s }
+ headers: authHeaders()
  })
  .then(function (r) {
  if (r.status === 401 || r.status === 403) throw new Error("auth");
@@ -161,6 +167,8 @@
  }
 
  function downloadWithAuth(url, filename) {
+ // Sample account: no file to hand over, say where downloads live instead.
+ if (sampleOn()) { try { AO_DEMO_API.nudge(DL_SAMPLE_MSG); } catch (e) { } return; }
  var s = getSession();
  if (!s) return;
  fetch(url, { headers: { Authorization: "Bearer " + s } })
@@ -181,7 +189,7 @@
  }
 
  function renderBody(ctx) {
- if (!ctx.signedIn || ctx.simulated) {
+ if (!canVerify(ctx)) {
  return '<div class="anver-empty">Performance Verification compares measured generation to weather-expected energy with a meter-first boundary. Sign in with a live fleet to see portfolio PI, deviation labels, and download the monthly pack.</div>';
  }
  if (!_tried && !_snap) {
@@ -284,7 +292,7 @@
  ' <div class="anver-body">' + body + '</div>' +
  '</div>';
  wireActions(container);
- if (ctx.signedIn && !ctx.simulated && !_snap && !_inFlight) loadSummary(false);
+ if (canVerify(ctx) && !_snap && !_inFlight) loadSummary(false);
  }
 
  window.AnalysisSections.push({

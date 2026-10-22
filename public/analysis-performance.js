@@ -196,11 +196,13 @@
  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>' +
  '</div>' +
  '<div class="anperf-empty-tx">' +
- '<b>Performance Index needs your weather-modeled data</b>' +
+ (ctx.forecastLoading
+ ? '<b>Loading the weather model…</b><span>Measured production vs weather-expected output, per site.</span></div></div>'
+ : '<b>Performance Index needs your weather-modeled data</b>' +
  '<span>' + (ctx.simulated
  ? 'The live demo fleet has no weather model. Sign in with real arrays to see how production compares against weather-expected output.'
  : 'Available once production has loaded for a few days, we compare measured output against the weather-expected output for each site.') +
- '</span></div></div>';
+ '</span></div></div>');
  }
 
  var pr = num(fc.performance_ratio_measured); // e.g. 0.84

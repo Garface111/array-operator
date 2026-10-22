@@ -10,7 +10,7 @@
  // ?v= token in index.html. If the console shows an OLD build while voice
  // misbehaves (freestyle lines like "let me think about that" / "I didn't catch
  // that" that are NOT in this code), the tab is stale — reload. (Ford 2026-07-16.)
- var EA_BUILD = "20260721eaCloseLeave2";
+ var EA_BUILD = "20261022eaSample";
 
  // Domain vocabulary fed to the speech-to-text so it transcribes the product's
  // own terms instead of phonetic neighbors ("Array Operator" -> "ray operator",
@@ -195,6 +195,18 @@
  return h;
  }
  function signedIn() { return !!token(); }
+ // Signed-out visitor on the sample account: demo-api.js answers this file's
+ // own /v1/energy-agent/* calls with sample data (public/demo/agent.js), so chat
+ // runs the normal path. Only what truly needs the real backend (voice, file
+ // uploads, screen vision, site-improve) degrades, via sampleNote().
+ function sampleMode() {
+ try { return !signedIn() && !!(window.AO_DEMO_API && window.AO_DEMO_API.on()); } catch (e) { return false; }
+ }
+ function sampleNote(text, nudgeDetail) {
+ addMsg("agent", text);
+ try { window.AO_DEMO_API.nudge(nudgeDetail); } catch (e) {}
+ setStatus("Sample account, text chat", "on");
+ }
 
  function packContext() {
  var sel = null;
@@ -987,6 +999,14 @@
 
  async function eaUploadFile(file) {
  if (!file) return;
+ if (sampleMode()) {
+ sampleNote(
+ "File analysis needs your own account, so I can't read uploads in the sample. " +
+ "I can still answer questions about this sample fleet and its billing.",
+ (window.AO_DEMO_API.agent || {}).UPLOAD_DETAIL
+ );
+ return;
+ }
  if (!signedIn()) {
  addMsg("agent", "Sign in to attach files for analysis.");
  return;
@@ -1090,6 +1110,16 @@
  function openImproveFlow(opts) {
  opts = opts || {};
  ensureUi();
+ // Improve ships changes to the owner's own workspace; nothing to change in the sample.
+ if (sampleMode()) {
+ var note = function () {
+ sampleNote("Improve lets you circle a spot and ship a change to your own workspace. That needs your own account, so it's off in the sample.",
+ "Site changes need your own account. Start free to use Improve on your workspace.");
+ };
+ if (state.open) note();
+ else setOpen(true).then(note).catch(function () {});
+ return;
+ }
  if (!state.open) {
  // Open dock without killing mic if already open path
  state.open = true;
@@ -1231,6 +1261,7 @@
  };
 
  async function submitImprove() {
+ if (sampleMode()) { closeImproveCompose(); openImproveFlow({}); return; }
  var ta = document.getElementById("eaImproveText");
  var msg = document.getElementById("eaImproveMsg");
  var text = (ta && ta.value || "").trim();
@@ -3029,7 +3060,7 @@
  return state.sessionId;
  }
 
- if (!signedIn()) {
+ if (!signedIn() && !sampleMode()) {
  addMsg("agent", "Sign in to use Energy Agent, I only work inside your own account.");
  return null;
  }
@@ -3055,7 +3086,9 @@
  return null;
  }
  state.sessionId = d.session_id;
- persistSessionId(d.session_id);
+ // A sample session lives only in this tab; never leave its id behind for a
+ // later signed-in owner's resume hint.
+ if (!sampleMode()) persistSessionId(d.session_id);
  state.brain = d.brain;
  state.realtimeReady = !!d.realtime_ready;
  setBudget(d.budget);
@@ -3093,7 +3126,10 @@
  state._historyPainted = true;
  }
 
- if (d.realtime_ready) {
+ if (sampleMode()) {
+ // No voice in the sample (and no server-key notice: that's operator plumbing).
+ setStatus("Sample account, text chat", "on");
+ } else if (d.realtime_ready) {
  if (!resumed) setStatus("GPT voice ready, connecting mic…", "on");
  else setStatus("Ready, conversation restored", "on");
  } else {
@@ -4288,6 +4324,11 @@
  }
  async function grantScreenVision() {
  if (screenVisionLive()) return true;
+ if (sampleMode()) {
+ sampleNote("Screen vision sends a picture of your screen to the live model, so it's off in the sample account. Ask me about anything you see and I'll answer from the sample data.",
+ "Screen vision needs your own account. Start free to let Energy Agent see your screen.");
+ return false;
+ }
  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
  addMsg("agent", "This browser can't share the screen for me to see — try Chrome or Edge.");
  return false;
@@ -4685,12 +4726,14 @@
  // camelCase / snake id → human-ish drop (don't invent jargon)
  return "";
  });
- // Clean gaps left by removals
+ // Clean gaps left by removals. Horizontal whitespace only: the old \s{2,}
+ // also flattened every "\n\n" paragraph break and nested-list indent into
+ // one space, so multi-paragraph answers rendered as a single run-on block.
  s = s
- .replace(/\s+([,.;:!?])/g, "$1")
+ .replace(/[ \t]+([,.;:!?])/g, "$1")
  .replace(/\(\s*\)/g, "")
- .replace(/\s{2,}/g, " ")
- .replace(/\s+via the\s+/gi, " via the ")
+ .replace(/(\S)[ \t]{2,}/g, "$1 ")
+ .replace(/[ \t]+via the[ \t]+/gi, " via the ")
  .trim();
  return s;
  }
@@ -7489,6 +7532,11 @@
  }
 
  async function startVoice(fromOpen) {
+ if (sampleMode()) {
+ sampleNote("Voice runs on the live model, so it's off in the sample account. Type below and I'll answer.",
+ (window.AO_DEMO_API.agent || {}).VOICE_DETAIL);
+ return;
+ }
  if (!signedIn()) {
  addMsg("agent", "Sign in first.");
  return;
@@ -7552,6 +7600,9 @@
  }
 
  function toggleMic() {
+ // Sample account: say why voice is off instead of raising the browser's mic
+ // permission prompt for a feature that can't run here.
+ if (sampleMode()) { startVoice(false); return; }
  if (state.voiceMuted) {
  // Voice fully off, Live mic would only burn credits with nowhere to send audio
  setStatus("Unmute first for voice · text still works", "on");

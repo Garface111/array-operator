@@ -19,6 +19,10 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
   const API = "/v1/array-owners";
   function session(){ try { return localStorage.getItem("so_session"); } catch(_){ return null; } }
   function authHeaders(){ const s = session(); return s ? { Authorization: "Bearer " + s } : null; }
+  // Signed-out visitors get the sample account: demo-api.js answers these same
+  // fetches with sample data and needs no Authorization header.
+  function sampleMode(){ return !session() && !!(window.AO_DEMO_API && window.AO_DEMO_API.on()); }
+  function reqHeaders(){ return authHeaders() || (sampleMode() ? {} : null); }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 
   let _desk = null;
@@ -143,7 +147,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
       const id = btn.getAttribute("data-rec-save");
       const card = container.querySelector('[data-rec-array="'+id+'"]');
       if(!card) return;
-      const hdrs = authHeaders();
+      const hdrs = reqHeaders();
       if(!hdrs){ alert("Sign in to save."); return; }
       const body = {};
       card.querySelectorAll("[data-f]").forEach(function(el){
@@ -167,6 +171,9 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
       .then(function(res){
         btn.disabled = false;
         if(!res.ok){
+          // Sample account: the read-only 403 already raised the shared nudge.
+          // Repaint from the stored desk so the card never looks saved.
+          if(res.j && res.j.error === "demo-read-only"){ if(_desk) render(container); return; }
           if(hint){ hint.hidden = false; hint.textContent = (res.j && res.j.detail) || "Save failed"; }
           return;
         }
@@ -183,7 +190,7 @@ window.__aoMarketplace = window.__aoMarketplace || (function () {
   }
 
   function load(container){
-    const hdrs = authHeaders();
+    const hdrs = reqHeaders();
     if(!hdrs){
       container.innerHTML = '<div class="mk-wrap"><div class="mk-empty mk-empty-signedout">'+
         '<b>Certificate desk</b><span>Sign in to see which arrays still own their RECs and what’s missing for mint/sale readiness.</span>'+

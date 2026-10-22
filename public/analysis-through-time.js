@@ -99,6 +99,11 @@
  function session() {
  try { return localStorage.getItem("so_session") || ""; } catch (e) { return ""; }
  }
+ // Signed-out sample account: demo-api.js answers /fleet-trends with the
+ // sample operator's history, so the panel takes its normal signed-in path.
+ function sampleOn() {
+ try { return !session() && !!(window.AO_DEMO_API && AO_DEMO_API.on()); } catch (e) { return false; }
+ }
  function kCompact(n) {
  if (n == null || !isFinite(n)) return "—";
  var a = Math.abs(n);
@@ -195,11 +200,11 @@
  }
  if (_inflight) return _inflight;
  var s = session();
- if (!s) {
+ if (!s && !sampleOn()) {
  _cache = { data: null, at: Date.now(), err: "signed-out" };
  return Promise.resolve(null);
  }
- _inflight = fetch(API, { headers: { Authorization: "Bearer " + s } })
+ _inflight = fetch(API, { headers: s ? { Authorization: "Bearer " + s } : {} })
  .then(function (r) {
  if (!r.ok) throw new Error("http " + r.status);
  return r.json();
@@ -227,7 +232,7 @@
  ' </div>' +
  ' <div class="antt-body">';
 
- if (!session() && !(ctx && ctx.signedIn)) {
+ if (!session() && !(ctx && ctx.signedIn) && !sampleOn()) {
  container.innerHTML = head +
  '<div class="antt-empty"><div><b>Sign in to see multi-year production</b>' +
  '<span>Once your arrays have history, this panel shows trailing months against last year and a 3-year average, the long view at a glance.</span></div></div>' +

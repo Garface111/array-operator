@@ -1344,26 +1344,26 @@ window.FleetStore = (function(){
      multi-vendor, mostly healthy with a few live issues so the fleet feels alive. */
   function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
   const DEMO_SITES = [
-    { name:"Londonderry",           region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:8.25 },
-    { name:"Starlake",              region:"Central VT",       host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:7.5 },
-    { name:"Timberworks",           region:"Northern VT",      host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:6.2 },
-    { name:"Waterford",             region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:6.0 },
-    { name:"Tannery Brook",         region:"Central VT",       host:"Northeast Community Solar", vendor:"sma",       inv:10, np:5.5 },
-    { name:"Chester Commons",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:5.0 },
-    { name:"Cover Catamount",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:5.3 },
-    { name:"West Glover Ridge",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"chint",     inv:8,  np:6.25 },
-    { name:"Danville Big Buck",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:14, np:7.1 },
-    { name:"Norwich Union Village", region:"Upper Valley",     host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:5.6 },
-    { name:"Hardwick Field",        region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"locus",     inv:8,  np:4.75 },
-    { name:"Craftsbury Common",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:8,  np:4.7 },
-    { name:"Mad River School",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:4.4 },
-    { name:"Waitsfield Flats",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:4.2 },
-    { name:"Enosburg Dairy",        region:"Northwest VT",     host:"Northeast Community Solar", vendor:"chint",     inv:10, np:6.0 },
-    { name:"Swanton Yard",          region:"Northwest VT",     host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:6.5 },
-    { name:"Lebanon Crossing",      region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:5.8 },
-    { name:"Hanover Meadows",       region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:5.5 },
-    { name:"Brunswick Landing",     region:"Coastal ME",       host:"Northeast Community Solar", vendor:"alsoenergy",inv:12, np:6.7 },
-    { name:"Augusta Commons",       region:"Central ME",       host:"Northeast Community Solar", vendor:"chint",     inv:12, np:5.4 },
+    { name:"Birch Hollow",           region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:8.25 },
+    { name:"Kettle Pond",              region:"Central VT",       host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:6.25 },
+    { name:"Sawmill Ridge",           region:"Northern VT",      host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:6.2 },
+    { name:"Heron Flats",             region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:6.0 },
+    { name:"Cobble Hill",         region:"Central VT",       host:"Northeast Community Solar", vendor:"sma",       inv:10, np:5.5 },
+    { name:"Maple Run Commons",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:5.0 },
+    { name:"Fox Meadow",       region:"Southern VT",      host:"Northeast Community Solar", vendor:"solaredge", inv:8,  np:4.0 },
+    { name:"North Branch Ridge",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"chint",     inv:8,  np:6.25 },
+    { name:"Granite Notch",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:14, np:7.14 },
+    { name:"Old Mill Village", region:"Upper Valley",     host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:4.5 },
+    { name:"Long Pasture",        region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"locus",     inv:8,  np:4.75 },
+    { name:"Blue Spruce Common",     region:"Northeast Kingdom", host:"Northeast Community Solar", vendor:"fronius",   inv:8,  np:3.5 },
+    { name:"Riverbend School",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:4.4 },
+    { name:"Clover Flats",      region:"Mad River Valley", host:"Northeast Community Solar", vendor:"solaredge", inv:10, np:4.2 },
+    { name:"Hilltop Dairy",        region:"Northwest VT",     host:"Northeast Community Solar", vendor:"chint",     inv:10, np:6.0 },
+    { name:"Rail Yard",          region:"Northwest VT",     host:"Northeast Community Solar", vendor:"sma",       inv:8,  np:6.5 },
+    { name:"Ferry Crossing",      region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"solaredge", inv:12, np:5.8 },
+    { name:"Elm Meadows",       region:"NH Upper Valley",  host:"Northeast Community Solar", vendor:"fronius",   inv:10, np:4.4 },
+    { name:"Harbor Landing",     region:"Coastal ME",       host:"Northeast Community Solar", vendor:"alsoenergy",inv:12, np:6.7 },
+    { name:"Pine Commons",       region:"Central ME",       host:"Northeast Community Solar", vendor:"chint",     inv:12, np:5.4 },
   ];
   function simulateFleet(){
     const rng = mulberry32(0xC0FFEE42);
@@ -1373,7 +1373,7 @@ window.FleetStore = (function(){
     }[vendor] || `SE${np}K`); };
     const arrays = [];
     // One deliberate "story" site with a live issue so Analysis isn't all green
-    const storyIdx = 7; // West Glover, underperforming Chint site
+    const storyIdx = 7; // North Branch Ridge, underperforming Chint site
     DEMO_SITES.forEach((site, n) => {
       const invCount = site.inv;
       const vendor = site.vendor;
@@ -1401,7 +1401,11 @@ window.FleetStore = (function(){
           else if(status==="underperforming") kwh = fairDay*(0.48+rng()*0.22);
           else if(status==="fault") kwh = fairDay*(0.12+rng()*0.18);
           else kwh = fairDay*(0.82+rng()*0.32);
-          daily.push({ date:`d-${WINDOW_DAYS-day}`, kwh: Math.round(kwh*10)/10 });
+          // Real calendar dates (oldest first, ending yesterday), so sample
+          // sparkline tooltips and date axes read like a live fleet, not "d-3".
+          const _dt = new Date(); _dt.setDate(_dt.getDate() - (WINDOW_DAYS - day));
+          const _iso = _dt.getFullYear() + "-" + String(_dt.getMonth()+1).padStart(2,"0") + "-" + String(_dt.getDate()).padStart(2,"0");
+          daily.push({ date:_iso, kwh: Math.round(kwh*10)/10 });
         }
         const kwhVals = daily.map(d=>d.kwh);
         inverters.push({

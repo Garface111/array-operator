@@ -22,6 +22,13 @@
  * ==========================================================================*/
 (function(){
  const SESSION_KEY = "so_session";
+ // Signed-out visitors are in the SAMPLE account (demo-api.js): every write
+ // explains itself the same way and shows the shared Start-free nudge, instead
+ // of a dead-end "Sign in first."
+ function sampleMsg(what){
+ try { if(window.AO_DEMO_API) window.AO_DEMO_API.nudge(); } catch(e){}
+ return "This is a sample account, so " + (what || "nothing here can be changed") + ".";
+ }
  const ORDER_KEY = "ao_array_order"; // persisted column order (array_id strings), harmless UI preference
  const RENAME_KEY = "ao_renames"; // persisted inline renames { arrays:{id:name}, inverters:{id:name} }
  const EXPAND_KEY = "ao_array_expanded"; // persisted set of array_ids whose inverter comb is expanded (JSON array)
@@ -276,7 +283,7 @@
  const session = getSession();
  const note = _ov && _ov.querySelector("#sbNote");
  if(!session){
- if(note){ note.className = "sb-note err"; note.innerHTML = `Please sign in first, <a href="onboarding.html">get started →</a>.`; }
+ if(note){ note.className = "sb-note err"; note.innerHTML = esc(sampleMsg()) + ` <a href="/onboarding">Start free →</a>`; }
  return;
  }
  const hdr = { "Content-Type":"application/json", "Authorization":"Bearer "+session };
@@ -896,8 +903,9 @@
  const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
  lostKwh += Math.max(0, fair-(inv.window_kwh||0));
  } else if(inv.status === "underperforming" && inv.peer_index){
- const fair = (inv.nameplate_kw||0)/totalNp*fleetWin;
- lostKwh += Math.max(0, fair/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
+ // expected = window_kwh / peer_index, loss = expected − actual (the same
+ // shortfall analysis-alarms.js and Energy Agent report).
+ lostKwh += Math.max(0, (inv.window_kwh||0)/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
  }
  }
  const lossMo = dollarVal(lostKwh)/SB_WINDOW_DAYS*30;
@@ -2183,7 +2191,7 @@
  const vendor = vs[0];
  const { cls, html } = freshInner(vendor, "live");
  return `<div class="sb-fresh ${cls}" role="status" data-fresh-vendor="${esc(String(vendor))}" data-fresh-age="live"
- title="Demo fleet uses cloud capture, feeds stay fresh without opening a vendor portal.">${html}</div>`;
+ title="The sample fleet uses cloud capture, so feeds stay fresh without opening a vendor portal.">${html}</div>`;
  }
  // Show for extension-captured (syncable) AND polled (SolarEdge) vendors, the
  // latter so an aging polled reading (15min–6h) gets an honest "Updated Xh ago"
@@ -4699,7 +4707,7 @@
  const session = getSession();
  if(!session){
  note.className = "sb-note err";
- note.innerHTML = `Please sign in first, <a href="onboarding.html">get started →</a>, then come back to add arrays.`;
+ note.innerHTML = esc(sampleMsg("arrays can't be added here")) + ` <a href="/onboarding">Start free →</a> to connect your own.`;
  return;
  }
  const config = {};
@@ -4841,7 +4849,7 @@
  for(const k of keys){ if(obj[k]!=null && obj[k]!=="") return obj[k]; }
  return dflt;
  }
- function signInPrompt(){ return `<div class="empty">Sign in to manage your account. <a href="onboarding.html" style="color:var(--good)">Get started →</a></div>`; }
+ function signInPrompt(){ return `<div class="empty">Sign in to manage your account. <a href="/onboarding" style="color:var(--good)">Start free →</a></div>`; }
  function sessionExpired(){ return `<div class="empty">Your session expired, <a href="onboarding.html" style="color:var(--good)">sign in again →</a></div>`; }
 
  /* ---- horizontal-row builders for the flat "all business" account list ---- */
@@ -4979,7 +4987,7 @@
  b.onclick = () => {
  if(demo){
  const s = document.getElementById("acctFilesStatus");
- if(s) s.textContent = "Sign in to open your own files.";
+ if(s) s.textContent = sampleMsg("these files are illustrative and can't be opened");
  return;
  }
  _flOpen(b.getAttribute("data-url"), document.getElementById("acctFilesStatus"));
@@ -5011,7 +5019,7 @@
  hero.onclick = () => {
  if(demo){
  const s = document.getElementById("acctFilesStatus");
- if(s) s.textContent = "Sign in to open your own files.";
+ if(s) s.textContent = sampleMsg("these files are illustrative and can't be opened");
  return;
  }
  _flOpen(hero.getAttribute("data-url"), document.getElementById("acctFilesStatus"));
@@ -5129,22 +5137,19 @@
  const card = document.getElementById("aoPayCard");
  if(!card) return;
  const feeFallback = "0.5%";
+ // Declared up front: every branch below paints the fee split, including the
+ // error and signed-out ones that run BEFORE the server's figures arrive (a
+ // const declared further down threw "Cannot access 'fees' before
+ // initialization" there and left the card stuck on "Checking…").
+ const DEFAULT_FEES = { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
+ let fees = DEFAULT_FEES, platformName = "Stripe";
+ // Signed out = the sample account: the real path below runs, and demo-api.js
+ // answers /payments/connect with the sample's connected payout account.
+ const sample = !h && !!(window.AO_DEMO_API && window.AO_DEMO_API.on());
 
  function paint(html){ card.innerHTML = html; }
 
- // Demo (signed-out)
- if(!h && window.AO_DEMO){
- paint(_payCardHTML({
- fees, platformName,
- state: "ready",
- feeTxt: feeFallback,
- title: "Online payments on (demo)",
- body: "In a real account, every offtaker invoice would include a Pay button. We keep " + feeFallback + "; the rest lands in your bank.",
- cta: null,
- }));
- return;
- }
- if(!h){
+ if(!h && !sample){
  paint(_payCardHTML({
  fees, platformName,
  state: "off",
@@ -5159,7 +5164,7 @@
  paint(`<div class="ao-pay-card-load">Checking online payments…</div>`);
  let st = null;
  try {
- const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h });
+ const r = await fetch("/v1/array-operator/billing/payments/connect", { headers: h || {} });
  if(r.ok) st = await r.json();
  } catch(e){ st = null; }
 
@@ -5195,8 +5200,8 @@
  // Two separate deductions on every online payment, spelled out: ours, and
  // Stripe's processing (bank debit vs card). Ford 2026-09-20: "the billing
  // should be clear — ours is 0.5%, and Stripe's rates should be listed".
- const fees = st.stripe_fees || { ach: "0.8%, capped at $5", card: "2.9% + 30¢" };
- const platformName = st.platform_name || "Stripe";
+ fees = st.stripe_fees || DEFAULT_FEES;
+ platformName = st.platform_name || "Stripe";
  const feeSplit = `Array Operator keeps ${feeTxt}. Stripe takes its processing fee too: bank debit (ACH) ${fees.ach}, card ${fees.card}. Both come out of each payment before it reaches your bank.`;
 
  if(st.ready || st.charges_enabled){
@@ -5331,7 +5336,7 @@
  const h = authHeaders();
  const msg = document.getElementById("connectMsg");
  const btn = document.querySelector(".ao-pay-cta") || document.getElementById("connectManage");
- if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+ if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = sampleMsg("bank details can't be entered here"); } return; }
  if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening Stripe’s secure bank form…"; }
  if(btn){ btn.disabled = true; btn.textContent = "Opening Stripe…"; }
  try {
@@ -7317,7 +7322,7 @@
  if(np !== cf){ setMsg("The two passwords don't match.", "err"); return; }
  if(hasPw && !(pwCurrent && pwCurrent.value)){ setMsg("Enter your current password to change it.", "err"); return; }
  const h = authHeaders();
- if(!h){ setMsg("Sign in first.", "err"); return; }
+ if(!h){ setMsg(sampleMsg("the password can't be changed"), "err"); return; }
  const body = { password: np };
  if(hasPw) body.current_password = pwCurrent.value;
  save.disabled = true; setMsg("Saving…");
@@ -7363,7 +7368,7 @@
  if(!val){ setMsg("", ""); return; } // never wipe a required field to blank
  if(field === "email" && !looksLikeEmail(val)){ setMsg("Keep typing your email…", ""); return; }
  const h = authHeaders();
- if(!h){ setMsg("Sign in first.", "err"); return; }
+ if(!h){ setMsg(sampleMsg("profile details can't be changed"), "err"); return; }
  const url = field === "company" ? "/v1/account/company-name"
  : field === "name" ? "/v1/account/name"
  : "/v1/account/email";
@@ -7408,7 +7413,7 @@
  const sub = btn.closest(".acct-row").querySelector(".r-sub");
  btn.onclick = async () => {
  const h = authHeaders();
- if(!h){ if(sub) sub.textContent = "Sign in first."; return; }
+ if(!h){ if(sub) sub.textContent = sampleMsg(); return; }
  const email = (_account && pick(_account, ["email","operator_email"], "")) || "your email";
  btn.disabled = true;
  if(sub) sub.textContent = "Sending…";
@@ -7774,7 +7779,7 @@
  const h = authHeaders();
  const msg = document.getElementById("billMsg");
  const btn = document.getElementById("billManage");
- if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = "Sign in first."; } return; }
+ if(!h){ if(msg){ msg.className = "acct-msg err"; msg.textContent = sampleMsg("billing can't be managed here"); } return; }
  if(msg){ msg.className = "acct-msg"; msg.textContent = "Opening secure billing…"; }
  if(btn) btn.disabled = true;
  try{

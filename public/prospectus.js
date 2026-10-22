@@ -31,7 +31,13 @@
 
   function sess(){ try { return localStorage.getItem("so_session"); } catch (e) { return null; } }
   function authed(){ return !!sess(); }
-  function H(json){ const h = { "Authorization": "Bearer " + sess() }; if (json) h["Content-Type"] = "application/json"; return h; }
+  // Signed-out visitors get the sample account: demo-api.js answers these same
+  // fetches with sample data (no Authorization header needed), so the normal
+  // signed-in render path runs. Writes come back as its read-only 403.
+  function sampleMode(){ return !authed() && !!(window.AO_DEMO_API && window.AO_DEMO_API.on()); }
+  function canRead(){ return authed() || sampleMode(); }
+  function sampleNudge(msg){ try { window.AO_DEMO_API.nudge(msg); } catch (_) {} }
+  function H(json){ const h = {}; const s = sess(); if (s) h["Authorization"] = "Bearer " + s; if (json) h["Content-Type"] = "application/json"; return h; }
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   const fmtDate = s => { if (!s) return "—"; try { return new Date(s).toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" }); } catch (e) { return String(s).slice(0,10); } }
   const money = n => (n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -39,7 +45,14 @@
   async function jfetch(path, opts){
     const r = await fetch(path, opts);
     let d = null; try { d = await r.json(); } catch (_) {}
-    if (!r.ok) { const m = (d && (d.detail || d.error || d.message)) || ("HTTP " + r.status); throw new Error(typeof m === "string" ? m : JSON.stringify(m)); }
+    if (!r.ok) {
+      const m = (d && (d.detail || d.error || d.message)) || ("HTTP " + r.status);
+      const err = new Error(typeof m === "string" ? m : JSON.stringify(m));
+      // The sample account's read-only 403: the shared nudge already showed, so
+      // callers restore their UI quietly instead of printing it as a failure.
+      err.sampleBlock = !!(d && d.error === "demo-read-only");
+      throw err;
+    }
     return d;
   }
 
@@ -123,7 +136,7 @@
   // ── the prospectus flow ──
   const AOProspectus = {
     async open(arrayId, arrayName){
-      if (!authed()) { toast("Sign in to prepare a prospectus for your arrays."); return; }
+      if (!canRead()) { toast("Sign in to prepare a prospectus for your arrays."); return; }
       const host = openOverlay();
       host.innerHTML = `<button class="aopx-close" aria-label="Close">×</button>
         <p class="aopx-eyebrow">Array Prospectus · data room</p>
@@ -135,10 +148,35 @@
           { method: "POST", headers: H(true), body: JSON.stringify({ purpose: "sale" }) });
         renderResult(host, res.document_id, res.prospectus);
       } catch (err) {
+        // Building persists a document, so the sample account can't: close the
+        // sheet (the shared nudge explains) rather than show a failure.
+        if (err.sampleBlock) { closeOverlay(); return; }
         host.querySelector(".aopx-spin, .aopx-body")?.remove();
         const d = document.createElement("div");
         d.className = "aopx-warn";
         d.textContent = "Couldn't build the prospectus: " + err.message;
+        host.appendChild(d);
+      }
+    },
+
+    // Re-open an already-generated prospectus (GET the stored payload) in the
+    // same data-room sheet, with its existing share link if it has one.
+    async view(documentId, arrayName){
+      if (!canRead()) { toast("Sign in to open your prospectuses."); return; }
+      const host = openOverlay();
+      host.innerHTML = `<button class="aopx-close" aria-label="Close">×</button>
+        <p class="aopx-eyebrow">Array Prospectus · data room</p>
+        <h2>${esc(arrayName || "Array")}</h2>
+        <div class="aopx-spin">Opening the stored prospectus…</div>`;
+      host.querySelector(".aopx-close").onclick = closeOverlay;
+      try {
+        const res = await jfetch(`${API}/prospectus/${encodeURIComponent(documentId)}`, { headers: H() });
+        renderResult(host, res.document_id, res.prospectus, (res.shares || [])[0] || null);
+      } catch (err) {
+        host.querySelector(".aopx-spin")?.remove();
+        const d = document.createElement("div");
+        d.className = "aopx-warn";
+        d.textContent = "Couldn't open the prospectus: " + err.message;
         host.appendChild(d);
       }
     }
@@ -150,7 +188,7 @@
     return `<span class="aopx-cov">${esc(cov.first)} → ${esc(cov.last)} · ${cov.day_count}d</span>`;
   }
 
-  function renderResult(host, documentId, p){
+  function renderResult(host, documentId, p, share){
     const s = p.sections || {};
     const a = s.asset || {}, prod = s.production || {}, exp = s.expectation || {},
       health = s.health || {}, rev = s.revenue || {}, util = s.utility || {}, est = s.estimate || {};
@@ -185,7 +223,7 @@
       <p class="aopx-hash">SHA-256 ${esc(p.content_sha256 || "")}</p>`;
     host.querySelector(".aopx-close").onclick = closeOverlay;
     host.querySelector('[data-a="pdf"]').onclick = () => downloadOwnerPdf(documentId, p.array_name);
-    host.querySelector('[data-a="share"]').onclick = () => openShare(host.querySelector(".aopx-share"), documentId, null);
+    host.querySelector('[data-a="share"]').onclick = () => openShare(host.querySelector(".aopx-share"), documentId, share || null);
   }
 
   async function downloadOwnerPdf(documentId, name){
@@ -208,11 +246,32 @@
           { method: "POST", headers: H(true), body: JSON.stringify({}) });
         share = r.share;
       }
-    } catch (e) { container.innerHTML = `<div class="aopx-warn">Couldn't create a share link: ${esc(e.message)}</div>`; return; }
+    } catch (e) {
+      if (e.sampleBlock) { container.innerHTML = ""; return; }   // sample: nudge already shown
+      container.innerHTML = `<div class="aopx-warn">Couldn't create a share link: ${esc(e.message)}</div>`;
+      return;
+    }
     renderShare(container, documentId, share);
   }
 
   function shareUrl(share){ return location.origin + share.share_path; }
+
+  // Sample account only: its share tokens exist inside the in-page sample
+  // (demo-api.js), so a plain navigation to the link would 404 on the real
+  // backend. Fetch the sample's public view through the shim and open that.
+  async function openSampleSharedView(share){
+    const tab = window.open("", "_blank");
+    try {
+      const r = await fetch(share.share_path);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const url = URL.createObjectURL(new Blob([await r.text()], { type: "text/html" }));
+      if (tab) tab.location.href = url; else window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      if (tab) tab.close();
+      toast("Couldn't open the shared view: " + e.message);
+    }
+  }
 
   function renderShare(container, documentId, share){
     const pub = !!share.published && !share.revoked;
@@ -241,15 +300,28 @@
         const r = await jfetch(`${API}/prospectus/share/${share.id}`,
           { method: "PATCH", headers: H(true), body: JSON.stringify(body) });
         renderShare(container, documentId, r.share);
-      } catch (e) { toast("Update failed: " + e.message); }
+      } catch (e) {
+        // Not saved: repaint from the last known share so a flipped toggle
+        // never looks applied (the sample's 403 already raised its nudge).
+        renderShare(container, documentId, share);
+        if (!e.sampleBlock) toast("Update failed: " + e.message);
+      }
     };
     const q = sel => container.querySelector(sel);
-    q('[data-s="copy"]').onclick = () => { navigator.clipboard?.writeText(shareUrl(share)).then(() => toast("Link copied")); };
+    q('[data-s="copy"]').onclick = () => {
+      // A sample link only resolves inside this page; don't hand out a URL
+      // that 404s when pasted elsewhere.
+      if (sampleMode()) { sampleNudge("Share links work for real prospectuses. Start free to share a data room for your own arrays."); return; }
+      navigator.clipboard?.writeText(shareUrl(share)).then(() => toast("Link copied"));
+    };
     q('[data-s="redact"]').onchange = e => patch({ redact_offtaker_pii: e.target.checked });
     if (q('[data-s="publish"]')) q('[data-s="publish"]').onclick = () => patch({ published: true });
     if (q('[data-s="unpublish"]')) q('[data-s="unpublish"]').onclick = () => patch({ published: false });
     if (q('[data-s="revoke"]')) q('[data-s="revoke"]').onclick = () => patch({ revoked: true });
-    if (q('[data-s="preview"]')) q('[data-s="preview"]').onclick = () => window.open(shareUrl(share), "_blank");
+    if (q('[data-s="preview"]')) q('[data-s="preview"]').onclick = () => {
+      if (sampleMode()) { openSampleSharedView(share); return; }
+      window.open(shareUrl(share), "_blank");
+    };
   }
 
   // ── the Array Market sub-tab ──
@@ -268,7 +340,11 @@
     // Arrays (from the live FleetStore snapshot).
     const arraysEl = container.querySelector(".aopx-arrays");
     const snap = (window.FleetStore && FleetStore.snapshot) ? FleetStore.snapshot() : { arrays: [], simulated: true };
-    if (!authed() || snap.simulated) {
+    // A signed-in owner never prepares a prospectus for the simulated preview
+    // fleet. Signed out, that simulated fleet IS the sample account's fleet,
+    // so it renders like a real one (building it hits the read-only 403).
+    const gated = (!authed() || snap.simulated) && !sampleMode();
+    if (gated) {
       arraysEl.innerHTML = `<div class="aopx-empty">Sign in to your fleet to prepare a prospectus for a real array.</div>`;
     } else if (!snap.arrays || !snap.arrays.length) {
       arraysEl.innerHTML = `<div class="aopx-empty">No arrays yet — connect a fleet first.</div>`;
@@ -289,7 +365,7 @@
 
     // Already-generated prospectuses + their shares.
     const docsEl = container.querySelector(".aopx-docs");
-    if (!authed() || snap.simulated) { docsEl.innerHTML = `<div class="aopx-empty">Sign in to see your generated prospectuses.</div>`; return; }
+    if (gated) { docsEl.innerHTML = `<div class="aopx-empty">Sign in to see your generated prospectuses.</div>`; return; }
     jfetch(`${API}/prospectuses`, { headers: H() }).then(res => {
       const list = (res && res.prospectuses) || [];
       if (!list.length) { docsEl.innerHTML = `<div class="aopx-empty">No prospectuses yet. Prepare one above.</div>`; return; }
@@ -303,6 +379,7 @@
             <div><span class="aopx-name">${esc(d.array_name || ("Array " + d.array_id))}</span> ${chip}
               <div class="aopx-meta">${esc(d.purpose || "sale")} · generated ${fmtDate(d.generated_at)}</div></div>
             <div class="aopx-actions" style="margin:0">
+              <button class="aopx-btn" data-d-view="${d.document_id}" data-d-name="${esc(d.array_name || "")}">View</button>
               <button class="aopx-btn" data-d-pdf="${d.document_id}" data-d-name="${esc(d.array_name || "")}">⬇ PDF</button>
               <button class="aopx-btn" data-d-share="${d.document_id}">Share</button>
             </div>
@@ -310,6 +387,7 @@
           <div class="aopx-share" data-share-host="${d.document_id}"></div>
         </div>`;
       }).join("");
+      docsEl.querySelectorAll("[data-d-view]").forEach(b => b.onclick = () => AOProspectus.view(b.getAttribute("data-d-view"), b.getAttribute("data-d-name")));
       docsEl.querySelectorAll("[data-d-pdf]").forEach(b => b.onclick = () => downloadOwnerPdf(b.getAttribute("data-d-pdf"), b.getAttribute("data-d-name")));
       docsEl.querySelectorAll("[data-d-share]").forEach(b => b.onclick = () => {
         const id = b.getAttribute("data-d-share");

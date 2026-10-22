@@ -1,0 +1,70 @@
+/* ============================================================================
+ * Sample account chrome (signed-out visitors). html.ao-sample is set by
+ * demo-api.js only when there is no session, so none of this can touch a
+ * signed-in owner's screen.
+ *  · tab bar: [tabs …] [● Sample account] [Sign in] [Start free]
+ *  · the shared "this is a sample account" nudge (demo-api.js nudge())
+ * Loaded after the sky stack so it wins without !important wars.
+ * ==========================================================================*/
+
+/* Tab bar order: the sample chip leads the right-hand group. */
+html.ao-sample #tabWhoami{order:1}
+html.ao-sample #tabSignIn{order:2;margin-left:0 !important}
+html.ao-sample #tabStartFree{order:3}
+
+.tab.tab-whoami.is-sample{cursor:pointer}
+.tab.tab-whoami.is-sample .whoami-dot{
+  background:#f5b942;
+  box-shadow:0 0 0 3px rgba(245,185,66,.22),0 0 8px rgba(245,185,66,.55);
+}
+.tab.tab-whoami.is-sample .whoami-email{font-variant-numeric:normal;font-weight:650}
+
+/* Start free: the one filled action in the bar (Sign in stays quiet). */
+.tab.tab-startfree{
+  flex:0 0 auto;min-width:auto;overflow:visible;
+  background:var(--sky-primary,#2196F3);color:#fff !important;
+  border-radius:var(--sky-r-pill,999px);font-weight:700;
+  box-shadow:0 4px 14px -4px rgba(33,150,243,.6);
+}
+.tab.tab-startfree::after{display:none}
+.tab + .tab.tab-startfree{border-left:0}
+html.sky .tab.tab-startfree:hover,
+.tab.tab-startfree:hover{background:var(--sky-primary-deep,#1976D2) !important;color:#fff !important}
+
+/* Hero strip CTA inherits the strip's ink, underlined so it reads as a link. */
+.db-demostrip .db-copy-cta{color:inherit;text-decoration:underline;text-underline-offset:2px}
+
+/* ── Shared nudge: a write was attempted in the sample ─────────────────── */
+.ao-sample-nudge{
+  position:fixed;left:50%;bottom:28px;z-index:10050;
+  transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  display:flex;align-items:center;gap:14px;max-width:min(560px,calc(100vw - 32px));
+  padding:12px 14px 12px 18px;border-radius:16px;
+  background:rgba(255,255,255,.92);color:#1d2a3f;
+  -webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 18px 40px -18px rgba(15,50,110,.45),0 2px 8px rgba(15,50,110,.08);
+  font-size:13.5px;line-height:1.4;font-weight:550;
+  transition:opacity .2s ease-out,transform .26s cubic-bezier(.2,.8,.2,1);
+}
+.ao-sample-nudge.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.ao-sample-nudge-txt{flex:1 1 auto;min-width:0}
+.ao-sample-nudge-cta{
+  flex:0 0 auto;white-space:nowrap;text-decoration:none;font-weight:700;
+  padding:8px 14px;border-radius:999px;
+  background:var(--sky-primary,#2196F3);color:#fff;
+}
+.ao-sample-nudge-cta:hover{background:var(--sky-primary-deep,#1976D2)}
+
+/* The "new version, reload" bar (version-check.js, #ao-update-bar) also sits
+   bottom-centre; when it is up, lift the nudge above it so neither hides the other. */
+body:has(#ao-update-bar) .ao-sample-nudge{bottom:84px}
+
+/* Phones: sit above the fixed bottom tab bar. */
+@media (max-width:600px){
+  .ao-sample-nudge{bottom:calc(84px + env(safe-area-inset-bottom,0px));font-size:13px}
+  body:has(#ao-update-bar) .ao-sample-nudge{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){
+  .ao-sample-nudge{transition:opacity .15s linear;transform:translate(-50%,0)}
+}

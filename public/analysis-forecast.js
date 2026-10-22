@@ -507,7 +507,7 @@
  }).catch(function (e) {
  _autofilling = false;
  if (btn) btn.disabled = false;
- setStat((e && e.message) || "Autofill failed.", "err");
+ setStat((e && e.message) || "Autofill failed.", e && e.readOnly ? "info" : "err");
  });
  }
 
@@ -517,8 +517,10 @@
  });
 
  // One automatic propagate when the editor opens and addresses are blank.
+ // Never on the read-only sample account: an automatic background write
+ // there would only earn the "sample account" nudge nobody asked for.
  var arrays = modelableArrays(f || {});
- if (!_autofillTried && !_autofilling && typeof window.__aoAutofillModel === "function"
+ if (!ctx.sample && !_autofillTried && !_autofilling && typeof window.__aoAutofillModel === "function"
  && arrays.some(function (a) { return !a.raw_address; })) {
  _autofillTried = true;
  runAutofill(autofillBtn);
@@ -560,6 +562,9 @@
  var chain = Promise.resolve({ nLoc: 0, nGeo: 0, errors: [] });
  parsed.forEach(function (p) {
  chain = chain.then(function (acc) {
+ // Sample account: the first read-only answer ends the batch (one nudge,
+ // not one 403 per array).
+ if (acc.readOnly) return acc;
  var step = Promise.resolve();
  var needLoc = p.address_changed || (!p.had_address && p.address);
  if (needLoc) {
@@ -571,11 +576,13 @@
  return window.__aoSetArrayLocation(p.array_id, { place: p.address, silent: true })
  .then(function () { acc.nLoc++; })
  .catch(function (e) {
+ if (e && e.readOnly) acc.readOnly = e.message;
  acc.errors.push((e && e.message) || ("Address failed for array " + p.array_id));
  });
  });
  }
  return step.then(function () {
+ if (acc.readOnly) return acc;
  if (!window.__aoSetArrayGeometry) {
  acc.errors.push("Geometry edit unavailable");
  return acc;
@@ -589,6 +596,7 @@
  acc.nGeo++;
  return acc;
  }).catch(function (e) {
+ if (e && e.readOnly) acc.readOnly = e.message;
  acc.errors.push((e && e.message) || ("Couldn't save array " + p.array_id));
  return acc;
  });
@@ -598,6 +606,8 @@
 
  chain.then(function (acc) {
  apply.disabled = false;
+ // Read-only sample: say why (the shared nudge is up too), keep the edits.
+ if (acc.readOnly) { setStat(acc.readOnly, "info"); return; }
  // Hard fail only when nothing saved.
  if (acc.errors.length && !acc.nGeo && !acc.nLoc) {
  setStat(acc.errors[0] + (acc.errors.length > 1 ? " (+" + (acc.errors.length - 1) + " more)" : ""), "err");
@@ -638,11 +648,14 @@
  '<div class="anfc-empty-ic">' +
  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>' +
  '</div><div class="anfc-empty-tx">' +
- "<b>Waiting on weather-modeled data</b>" +
+ // First fetch still in flight: say so, rather than "not modeled".
+ (ctx.forecastLoading
+ ? "<b>Loading the weather model…</b><span>Comparing measured production to the sunlight on each site.</span></div></div>"
+ : "<b>Waiting on weather-modeled data</b>" +
  "<span>" + (ctx.simulated
  ? "Sign in with real arrays (and a service address) to compare measured production to the sunlight on each site."
  : "Once a few days of production land and arrays have locations, we compare measured output to weather-expected output.") +
- "</span></div></div>";
+ "</span></div></div>");
  }
 
  function render(container, ctx) {

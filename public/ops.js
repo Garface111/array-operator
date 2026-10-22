@@ -47,7 +47,21 @@
     }
   }
 
+  // Signed-out visitor on the sample account: demo-api.js answers this
+  // module's reads (routes in /demo/repairs.js), so the tab runs its real
+  // render path. Nothing sample-side may touch the owner's cache or flags.
+  function sampleMode() {
+    try {
+      return !!(window.AO_DEMO_API && window.AO_DEMO_API.on());
+    } catch (e) {
+      return false;
+    }
+  }
+
   function readCache() {
+    // Sample mode never paints a cached real book (a signed-out tab can still
+    // hold the last owner's cache), and an owner never reads a sample one.
+    if (sampleMode()) return null;
     try {
       var raw = sessionStorage.getItem(CACHE_KEY);
       if (!raw) return null;
@@ -61,6 +75,7 @@
   }
 
   function writeCache(data) {
+    if (sampleMode()) return;
     try {
       sessionStorage.setItem(
         CACHE_KEY,
@@ -95,7 +110,11 @@
       if (!r.ok) {
         var err =
           (d && (d.detail || d.error || d.message)) || "HTTP " + r.status;
-        throw new Error(typeof err === "string" ? err : JSON.stringify(err));
+        var ex = new Error(typeof err === "string" ? err : JSON.stringify(err));
+        ex.status = r.status;
+        // e.g. "demo-read-only" from the sample account (and require_not_demo)
+        ex.code = (d && typeof d.error === "string" && d.error) || null;
+        throw ex;
       }
       return d;
     } catch (e) {
@@ -224,12 +243,18 @@
   function applyData(d) {
     if (!d) return;
     STATE.data = d;
-    if ((d.contacts || []).length) markSetupDone();
+    STATE.sample = sampleMode();
+    // The setup flag lives in localStorage and would outlive the sample into a
+    // real owner's first visit; the sample already has a roster anyway.
+    if ((d.contacts || []).length && !STATE.sample) markSetupDone();
     writeCache(d);
     render();
   }
 
   function bgReconcile(force) {
+    // Sample account: these are background POSTs the visitor never asked for;
+    // the read-only shim would answer them with a 403 + "sample account" nudge.
+    if (sampleMode()) return;
     var now = Date.now();
     // Throttle unless forced (e.g. first open after setup so underperforming
     // inverters open as real cases immediately).
@@ -279,7 +304,9 @@
     var el = root();
     if (!el) return;
 
-    if (!hasSession()) {
+    // Signed out WITHOUT the sample shim (demo-api.js missing) keeps the wall;
+    // with it, the visitor gets the real Repairs UI on the sample book.
+    if (!hasSession() && !sampleMode()) {
       el.innerHTML =
         '<div class="rp-shell">' +
         '<div class="rp-hero">' +
@@ -289,6 +316,9 @@
         "</div></div>";
       return;
     }
+
+    // Sample ↔ signed-in switch without a reload: drop the other side's book.
+    if (STATE.data && !!STATE.sample !== sampleMode()) STATE.data = null;
 
     if (!STATE.data) {
       var cached = readCache();
@@ -620,6 +650,9 @@
           load(true);
         } catch (e) {
           b.disabled = false;
+          // Sample account: the shim already showed the "sample account"
+          // nudge; opening the agent on top would read as a failure.
+          if (e && e.code === "demo-read-only") return;
           // Failed send — open agent empty; user can ask if they want
           openAgentEmpty();
         }

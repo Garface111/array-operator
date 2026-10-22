@@ -71,8 +71,10 @@ function invLostKwh(inv, fleetWindowKwh, totalNameplate){
  }
  return 0;
  }
- const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
- return Math.max(0, fair/Math.max(inv.peer_index,0.01) - (inv.window_kwh||0));
+ // expected = window_kwh / peer_index (peer_index is output ÷ peer-expected),
+ // so the loss is expected − actual. The old fair/peer_index divided an
+ // already-expected share by the ratio twice and overstated the loss ~2-3×.
+ return Math.max(0, (inv.window_kwh||0)/Math.max(inv.peer_index,0.01) - (inv.window_kwh||0));
 }
 
 // ---- keep last-rendered data so click handlers can look up inverters ----
@@ -1379,6 +1381,10 @@ function renderFromSession(){
  try { session = localStorage.getItem("so_session"); } catch(e){}
  // Surface a "Sign in" link to signed-out visitors (hidden once authed).
  try { const si = document.getElementById("tabSignIn"); if(si) si.style.display = session ? "none" : ""; } catch(e){}
+ try { const sf = document.getElementById("tabStartFree"); if(sf) sf.style.display = session ? "none" : ""; } catch(e){}
+ // html.ao-sample scopes the sample-account chrome (sample-account.css); drop it
+ // the moment a session exists (e.g. a ?token= magic link verified on this page).
+ try { document.documentElement.classList.toggle("ao-sample", !session); } catch(e){}
  // Big demo→signup conversion banner: shown ONLY to anonymous visitors, hidden
  // the instant a session exists so signed-in owners never see it.
  try { const db = document.getElementById("demoBanner"); if(db) db.hidden = !!session; } catch(e){}
@@ -1406,11 +1412,28 @@ function renderFromSession(){
  // Signed-in identity chip (top-right): show which account this session is in.
  // Shared painter so Master Account's /v1/account load can fill the chip too
  // (if this first fetch is slow/fails, we still paint the email when account lands).
+ // Signed out, the identity chip says WHICH account the visitor is looking at:
+ // the sample one. Never the sample operator's email (that read as if someone
+ // were signed in while "Sign in" sat right next to it).
+ function paintSample(){
+ try {
+ const who = document.getElementById("tabWhoami");
+ const whoEmail = document.getElementById("whoamiEmail");
+ if(!who) return;
+ who.classList.add("is-sample");
+ who.style.display = "";
+ who.title = "You're exploring a sample operator, Northeast Community Solar. Everything here is sample data and nothing can be changed. Start free to connect your own arrays.";
+ if(whoEmail){ whoEmail.textContent = "Sample account"; delete whoEmail.dataset.real; }
+ } catch(e){}
+ }
  function paintWhoami(a){
  try {
  const who = document.getElementById("tabWhoami");
  const whoEmail = document.getElementById("whoamiEmail");
  if(!who) return;
+ let _sess = null; try { _sess = localStorage.getItem("so_session"); } catch(e){}
+ if(!_sess){ paintSample(); return; }
+ who.classList.remove("is-sample");
  const email = a && (a.email || a.contact_email || a.operator_email);
  if(email && whoEmail){
  who.style.display = "";
@@ -1454,7 +1477,7 @@ function renderFromSession(){
  }
  });
  } else {
- who.style.display = "none";
+ paintSample();
  }
  }
  } catch(e){}

@@ -84,7 +84,7 @@
  // Demo fleet is cloud-capture mode, no "Open portal to sync" CTAs.
  try {
  if(window.FleetStore && FleetStore.isSimulated && FleetStore.isSimulated()){
- return `<span class="cc-vendor-link ${esc(v)}" title="Cloud capture keeps this feed fresh in the demo">${esc(lbl)} · auto-refresh</span>`;
+ return `<span class="cc-vendor-link ${esc(v)}" title="Cloud capture keeps this feed fresh in the sample account">${esc(lbl)} · auto-refresh</span>`;
  }
  } catch(_){}
  return `<a class="cc-vendor-link ${esc(v)}" href="${esc(url)}" target="_blank" rel="noopener" title="Open the ${esc(lbl)} monitoring portal in a new tab">Open in ${esc(lbl)} ↗</a>`;
@@ -175,7 +175,11 @@
  function lostKwh(inv, fleetWindowKwh, totalNameplate){
  const fair = (inv.nameplate_kw||0)/totalNameplate*fleetWindowKwh;
  if(inv.status==="dead"||inv.status==="fault") return Math.max(0, fair-(inv.window_kwh||0));
- if(inv.status==="underperforming" && inv.peer_index) return Math.max(0, fair/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
+ // Underperforming: peer_index = this unit's output ÷ what its peers say it
+ // should have made, so expected = window_kwh / peer_index and the loss is
+ // expected − actual. (fair/peer_index divided an already-expected figure by
+ // the ratio a second time and overstated the loss ~2-3×.)
+ if(inv.status==="underperforming" && inv.peer_index) return Math.max(0, (inv.window_kwh||0)/Math.max(inv.peer_index,0.01)-(inv.window_kwh||0));
  if(inv.status==="comm_gap") return 0; // unknown until it reports, no $ claimed
  return 0;
  }
@@ -308,7 +312,7 @@
  const healthCls = gathering ? "neutral" : (k.healthyPct > 80 ? "ok" : "warn");
  const riskMo = Math.round(MODEL.kpis.riskMo || 0);
  const simNote = MODEL.simulated
- ? `Demo fleet · sign in for your data`
+ ? `Sample fleet · Start free to connect yours`
  : `Live from your connected arrays`;
 
  // KPI TILE GRID, the old single hero bar broken out (Ford, 2026-07-01):
@@ -383,14 +387,13 @@
  : (k.flagged ? "Needs attention" : "No items need attention 🌞");
  attnH.classList.toggle("all-clear", loaded && !k.flagged);
  // Fleet-level Energy Agent affordance beside the header — one octarine action
- // (the AI is acting) that opens the read-only fleet analyst. Real fleets only:
- // on the demo/simulated preview there's no owner fleet to reason about.
+ // (the AI is acting) that opens the read-only fleet analyst. The signed-out
+ // sample account gets it too: Energy Agent answers from the sample fleet
+ // (demo/agent.js), with no LLM call.
  const attnWrap = attnH.parentElement;
  if(attnWrap){
  let ask = document.getElementById("ccFleetAsk");
- if(MODEL.simulated){
- if(ask) ask.remove();
- } else if(!ask){
+ if(!ask){
  ask = document.createElement("button");
  ask.type = "button";
  ask.id = "ccFleetAsk";
@@ -521,7 +524,7 @@
  const k = MODEL.kpis;
  const regions = ["all", ...Array.from(new Set(MODEL.rows.map(r=>r.region))).filter(x=>x&&x!=="—").sort()];
  const simNote = MODEL.simulated
- ? `Simulated portfolio. Sign in to load your fleet.`
+ ? `Sample portfolio. Start free to load your own fleet.`
  : `Live from your connected arrays.`;
  if(!q) return;
  q.innerHTML = `

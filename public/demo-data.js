@@ -56,7 +56,13 @@
  var now = new Date();
  var pe = new Date(now.getFullYear(), now.getMonth(), 0);
  var ps = new Date(pe.getFullYear(), pe.getMonth(), 1);
- var iso = function (d) { return d.toISOString().slice(0, 10); };
+ // Local-calendar date (toISOString would shift the day in UTC+ zones).
+ var iso = function (d) {
+ return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+ };
+ // A real send timestamp: early afternoon local time, as UTC ISO. A bare date
+ // ("2026-10-01") parses as UTC midnight and shows a day early in US zones.
+ var stamp = function (d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 13, 5, 0).toISOString(); };
  var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
  var periodLabel = MON[ps.getMonth()] + " " + ps.getFullYear();
  var nextCharge = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -65,31 +71,30 @@
  var nextFire = new Date(now.getFullYear(), now.getMonth() + 1, 1, 12, 0, 0);
 
  var CREDIT_RATE = 0.2576; // VT excess+solcred-ish $/kWh
- var RATE_CENTS_PER_KWH = 0.5;
 
  // ── 20 arrays (matches fleet-store demo scale) ───────────────────────────
  // nameplate_kw · typical mid-season month kWh · region · primary utility
  var ARRAY_DEFS = [
- { id: 1, name: "Londonderry", kw: 99, util: "gmp", region: "south" },
- { id: 2, name: "Starlake", kw: 75, util: "gmp", region: "central" },
- { id: 3, name: "Timberworks", kw: 62, util: "gmp", region: "north" },
- { id: 4, name: "Waterford", kw: 48, util: "gmp", region: "north" },
- { id: 5, name: "Tannery Brook", kw: 55, util: "gmp", region: "central" },
- { id: 6, name: "Chester Commons", kw: 40, util: "gmp", region: "south" },
- { id: 7, name: "Cover Catamount", kw: 32, util: "gmp", region: "south" },
- { id: 8, name: "West Glover Ridge", kw: 50, util: "vec", region: "northeast" },
- { id: 9, name: "Danville Big Buck", kw: 100, util: "gmp", region: "northeast" },
- { id: 10, name: "Norwich Union Village", kw: 45, util: "gmp", region: "east" },
- { id: 11, name: "Hardwick Field", kw: 38, util: "vec", region: "northeast" },
- { id: 12, name: "Craftsbury Common", kw: 28, util: "vec", region: "northeast" },
- { id: 13, name: "Mad River School", kw: 35, util: "gmp", region: "central" },
- { id: 14, name: "Waitsfield Flats", kw: 42, util: "gmp", region: "central" },
- { id: 15, name: "Enosburg Dairy", kw: 60, util: "wec", region: "northwest" },
- { id: 16, name: "Swanton Yard", kw: 52, util: "wec", region: "northwest" },
- { id: 17, name: "Lebanon Crossing", kw: 70, util: "eversource", region: "nh" },
- { id: 18, name: "Hanover Meadows", kw: 44, util: "eversource", region: "nh" },
- { id: 19, name: "Brunswick Landing", kw: 80, util: "cmp", region: "me" },
- { id: 20, name: "Augusta Commons", kw: 65, util: "cmp", region: "me" },
+ { id: 1, name: "Birch Hollow", kw: 99, util: "gmp", region: "south" },
+ { id: 2, name: "Kettle Pond", kw: 75, util: "gmp", region: "central" },
+ { id: 3, name: "Sawmill Ridge", kw: 62, util: "gmp", region: "north" },
+ { id: 4, name: "Heron Flats", kw: 48, util: "gmp", region: "north" },
+ { id: 5, name: "Cobble Hill", kw: 55, util: "gmp", region: "central" },
+ { id: 6, name: "Maple Run Commons", kw: 40, util: "gmp", region: "south" },
+ { id: 7, name: "Fox Meadow", kw: 32, util: "gmp", region: "south" },
+ { id: 8, name: "North Branch Ridge", kw: 50, util: "vec", region: "northeast" },
+ { id: 9, name: "Granite Notch", kw: 100, util: "gmp", region: "northeast" },
+ { id: 10, name: "Old Mill Village", kw: 45, util: "gmp", region: "east" },
+ { id: 11, name: "Long Pasture", kw: 38, util: "vec", region: "northeast" },
+ { id: 12, name: "Blue Spruce Common", kw: 28, util: "vec", region: "northeast" },
+ { id: 13, name: "Riverbend School", kw: 35, util: "gmp", region: "central" },
+ { id: 14, name: "Clover Flats", kw: 42, util: "gmp", region: "central" },
+ { id: 15, name: "Hilltop Dairy", kw: 60, util: "wec", region: "northwest" },
+ { id: 16, name: "Rail Yard", kw: 52, util: "wec", region: "northwest" },
+ { id: 17, name: "Ferry Crossing", kw: 70, util: "eversource", region: "nh" },
+ { id: 18, name: "Elm Meadows", kw: 44, util: "eversource", region: "nh" },
+ { id: 19, name: "Harbor Landing", kw: 80, util: "cmp", region: "me" },
+ { id: 20, name: "Pine Commons", kw: 65, util: "cmp", region: "me" },
  ];
 
  // ~10 inverters × 20 = 200 (fleet-store mirrors this)
@@ -157,9 +162,13 @@
  "Brewery", "Creamery", "Farm Stand", "Ski Club",
  ];
 
+ // Discounts are FRACTIONS (0.10 = 10%), exactly like the API's
+ // resolved_discount_pct; the screens multiply by 100 to display.
+ // invoice = kWh × net rate × (1 − discount), as delivery.resolve_discount_pricing.
  function offtaker(id, name, email, kwh, pct, arrayId, utilAcctId, provider, opts) {
  opts = opts || {};
- var amount = r2(kwh * CREDIT_RATE);
+ var disc = opts.discount != null ? opts.discount : 0.10;
+ var amount = r2(kwh * CREDIT_RATE * (1 - disc));
  return {
  id: id,
  customer_name: name,
@@ -175,12 +184,12 @@
  array_name: opts.array_name || "",
  utility_account_id: utilAcctId,
  utility_account_name: (PROVIDER_LABEL[provider] || provider) + " · " + (opts.acctNick || name),
- resolved_discount_pct: opts.discount != null ? opts.discount : 10,
+ resolved_discount_pct: disc,
  net_rate_per_kwh: CREDIT_RATE,
  formats: ["pdf"],
  cc_emails: "",
  source_filename: null,
- next_send_at: iso(nextCharge),
+ next_send_at: stamp(nextCharge),
  last_sent_at: opts.last_sent_at || null,
  // Healthy last delivery, never "bounced" in the marketing demo.
  last_delivery_status: opts.last_sent_at ? "delivered" : null,
@@ -191,6 +200,14 @@
  };
  }
 
+ // The place each array sits in, used for local organisations' names
+ // ("North Branch Grange Hall", not "North Grange Hall").
+ var TOWN = {
+ 1: "Birch Hollow", 2: "Kettle Pond", 3: "Sawmill Ridge", 4: "Heron Flats", 5: "Cobble Hill",
+ 6: "Maple Run", 7: "Fox Meadow", 8: "North Branch", 9: "Granite Notch", 10: "Old Mill",
+ 11: "Long Pasture", 12: "Blue Spruce", 13: "Riverbend", 14: "Clover Flats", 15: "Hilltop",
+ 16: "Brookside", 17: "Ferry Crossing", 18: "Elm Meadows", 19: "Harborview", 20: "Pinewood",
+ };
  var offtakers = [];
  var TARGET = 300;
  // Weight offtakers toward larger arrays
@@ -213,7 +230,7 @@
  var isOrg = rng() < 0.38;
  var name, emailLocal;
  if (isOrg) {
- var town = arr.name.split(" ")[0];
+ var town = TOWN[arr.id] || arr.name;
  var org = pick(ORG);
  name = town + " " + org;
  emailLocal = (town + "." + org).toLowerCase().replace(/[^a-z0-9.]+/g, ".") + "@example.coop";
@@ -247,14 +264,14 @@
  var mode = "auto", enabled = true, lastSent = null, hasDraft = false;
  if (r < 0.62) {
  mode = "auto";
- lastSent = iso(pe);
+ lastSent = stamp(new Date(now.getFullYear(), now.getMonth(), 1));
  } else if (r < 0.80) {
  mode = "auto";
  lastSent = null; // in flight this cycle
  } else if (r < 0.95) {
  mode = "draft";
  hasDraft = true;
- lastSent = iso(new Date(ps.getFullYear(), ps.getMonth() - 1, 15)); // prior month sent
+ lastSent = stamp(new Date(now.getFullYear(), now.getMonth() - 1, 18 + (i % 7))); // approved last cycle (no rng draw: keeps every later draw stable)
  } else {
  mode = "draft";
  enabled = false;
@@ -265,7 +282,7 @@
  name,
  emailLocal,
  kwh,
- r2(share),
+ Math.round(share * 10000) / 10000,
  arr.id,
  ua.utility_account_id,
  arr.util,
@@ -274,12 +291,78 @@
  enabled: enabled,
  last_sent_at: lastSent,
  array_name: arr.name,
- acctNick: name,
- discount: rng() < 0.15 ? 0 : 10,
+ // The account the credits come FROM: the array's host bill, so cards
+ // read "receives 3.2% of Green Mountain Power · Heron Flats · host".
+ acctNick: arr.name + " · host",
+ discount: rng() < 0.15 ? 0 : 0.10,
  _hasDraft: hasDraft,
  }
  ));
  }
+
+ // ── Distinct names ──────────────────────────────────────────────────────
+ // Random draws repeat names. Keep exactly ONE person billed on two arrays
+ // (a real pattern, and the Mail room review's "same customer on two arrays"
+ // catch); every other repeat gets a middle initial (people) or a building
+ // name (an organisation's second meter on the same array).
+ var seenName = {}, keptCrossArray = false;
+ var INITIALS = "ABCDEFGHJKLMNPRSTW", BLDG = ["Annex", "North Building", "Barn", "Office", "Garage"];
+ offtakers.forEach(function (o, idx) {
+ var key = o.customer_name;
+ var first = seenName[key];
+ if (!first) { seenName[key] = o; return; }
+ var person = /@example\.com$/.test(o.client_email);
+ if (person && !keptCrossArray && first.array_id !== o.array_id) {
+ o.client_email = first.client_email; // same household, two shares
+ keptCrossArray = true;
+ return;
+ }
+ if (person) {
+ var parts = o.customer_name.split(" ");
+ var ini = INITIALS.charAt(idx % INITIALS.length);
+ o.customer_name = parts[0] + " " + ini + ". " + parts.slice(1).join(" ");
+ o.client_email = (parts[0] + "." + ini + "." + parts.slice(1).join(".")).toLowerCase() + "@example.com";
+ } else {
+ o.customer_name = o.customer_name + " (" + BLDG[idx % BLDG.length] + ")";
+ }
+ seenName[o.customer_name] = o;
+ utilAccts.forEach(function (ua) {
+ if (ua.utility_account_id === o.utility_account_id) {
+ ua.nickname = o.customer_name;
+ ua.service_address = o.customer_name + " · " + (o.array_name || "");
+ }
+ });
+ });
+
+ // ── Allocation tie-out ──────────────────────────────────────────────────
+ // Each array's offtaker shares sum to a realistic 86–97% (never over 100%),
+ // and each offtaker's kWh is their share of the array's LAST SETTLED MONTH from
+ // the shared history (demo-api.js monthlyFor), so Statements, the Mail room,
+ // Analysis and the Credit Exchange all agree on the same kWh and dollars.
+ // Two arrays keep real vacancy on purpose: that is the Credit Exchange story.
+ var LAST_KWH = {};
+ ARRAY_DEFS.forEach(function (a) {
+ var h = null;
+ try { h = window.AO_DEMO_API && window.AO_DEMO_API.monthlyFor({ id: a.id, nameplate_kw: a.kw }, 1); } catch (e) {}
+ LAST_KWH[a.id] = h && h.length ? h[0].kwh : monthKwh(a.kw);
+ });
+ var VACANCY_STORY = { 4: 0.74, 13: 0.80 }; // Heron Flats, Riverbend School
+ var allocRng = mulberry32(0xA110CA7E);
+ ARRAY_DEFS.forEach(function (a) {
+ var mine = offtakers.filter(function (o) { return o.array_id === a.id; });
+ var sum = mine.reduce(function (t, o) { return t + o.allocation_pct; }, 0);
+ if (!sum) return;
+ var target = VACANCY_STORY[a.id] || (0.86 + allocRng() * 0.11);
+ mine.forEach(function (o) {
+ var share = Math.round(o.allocation_pct * target / sum * 10000) / 10000;
+ var kwh = Math.max(1, Math.round(LAST_KWH[a.id] * share));
+ var amount = r2(kwh * CREDIT_RATE * (1 - o.resolved_discount_pct));
+ o.allocation_pct = share;
+ o._demo_kwh = kwh;
+ o._demo_amount = amount;
+ o.preview = { amount_owed: amount, customer_kwh: kwh };
+ });
+ });
 
  // ── Drafts (ready to review, frozen mid-action, no bounces) ─────────────
  function draft(id, sub) {
@@ -290,7 +373,7 @@
  client_email: sub.client_email,
  operator_name: account.operator_name,
  period_label: periodLabel,
- array_total_kwh: monthKwh((ARRAY_DEFS.find(function (a) { return a.id === sub.array_id; }) || { kw: 50 }).kw),
+ array_total_kwh: LAST_KWH[sub.array_id] || monthKwh(50),
  customer_kwh: sub._demo_kwh,
  allocation_pct: sub.allocation_pct,
  amount_usd: sub._demo_amount,
@@ -325,32 +408,49 @@
  // Cap drafts so the inbox feels active but not overwhelming (~24–40)
  if (drafts.length > 36) drafts = drafts.slice(0, 36);
 
- // ── Billing (AO fees) scaled to 300 offtakers ────────────────────────────
+ // ── Billing (AO fees) ─────────────────────────────────────────────────────
+ // Same shape /v1/account/billing-summary returns, and the `unified` block is
+ // the REAL pricing code's output for this operator (pricing_ao_unified
+ // .build_unified_bill at 1,135 kW nameplate + 300 offtakers, generated
+ // 2026-10-22), so the sample bill shows exactly what this fleet would pay.
+ // Regenerate it if pricing_ao_nameplate / pricing_ao_invoicing change.
  var TOTAL_NAMEPLATE = ARRAY_DEFS.reduce(function (s, a) { return s + a.kw; }, 0);
- var MTD_KWH = Math.round(TOTAL_NAMEPLATE * 4.6 * 22); // MTD ~22 days into month
- var MONITORING_CENTS = Math.round(MTD_KWH * RATE_CENTS_PER_KWH);
- var PER_OFFTAKER_CENTS = 1500;
- var INVOICING_CENTS = offtakers.length * PER_OFFTAKER_CENTS;
- var TOTAL_CENTS = MONITORING_CENTS + INVOICING_CENTS;
-
+ var MTD_KWH = Math.round(TOTAL_NAMEPLATE * 4.6 * Math.max(1, now.getDate() - 1));
+ var UNIFIED = {"plan": "regular", "plan_label": "Regular", "lines": [{"id": "monitoring", "kind": "Fleet monitoring", "basis": "nameplate_kw", "quantity": 1135.0, "unit_label": "kW", "unit_cents": 14.822, "full_unit_cents": 15.0, "amount_cents": 16822.5, "billed": true, "included_in_monthly_total": true, "desc": "Live fleet health — billed on registered inverter nameplate (kW). Volume discounts apply automatically for large fleets."}, {"id": "invoicing", "kind": "Offtaker invoices", "basis": "offtaker_count", "quantity": 300, "unit_label": "offtakers", "unit_cents": 1092.5, "full_unit_cents": 1500.0, "amount_cents": 327750.0, "billed": true, "included_in_monthly_total": true, "desc": "$15 per offtaker / month for every active offtaker on your roster (volume discounts as you grow)."}, {"id": "generation_reports", "kind": "Generation reports", "basis": "array_quarters", "quantity": 0, "unit_label": "arrays reported", "unit_cents": 1500.0, "full_unit_cents": 1500.0, "amount_cents": 0.0, "billed": false, "included_in_monthly_total": false, "metered": true, "desc": "$15 per array, once per quarter — charged the first time you report an array (send its report or download the workbook), then unlimited that quarter. Building and previewing are free."}, {"id": "ai_pro", "kind": "Energy Agent Pro", "basis": "flat", "quantity": 0, "unit_label": "month", "unit_cents": 5000.0, "full_unit_cents": 5000.0, "amount_cents": 0.0, "included": false, "billed": false, "included_in_monthly_total": false, "desc": "Unlimited integrated AI (thinking + voice). Without Pro you get a $2.50/week sample."}, {"id": "collection_fee", "kind": "Online offtaker payments", "basis": "percent_of_collected", "quantity": 0, "unit_label": "0.5% of online payments", "unit_cents": 0, "full_unit_cents": 0, "amount_cents": null, "billed": false, "included_in_monthly_total": false, "fee_bps": 50, "fee_percent": 0.5, "desc": "When an offtaker pays an invoice online (card/bank via Stripe), we keep 0.5% of that payment as a platform fee. The rest goes to you. Check and offline payments: no fee. This is not part of your monthly bill above."}], "total_cents": 344572.5, "ai": {"pro": false, "monthly_usd": 50.0, "free_weekly_usd": 2.5, "stripe_price_ready": false}, "collection_fee": {"id": "collection_fee", "kind": "Online offtaker payments", "basis": "percent_of_collected", "fee_bps": 50, "fee_percent": 0.5, "amount_cents": null, "included_in_monthly_total": false, "desc": "When an offtaker pays an invoice online (card/bank via Stripe), we keep 0.5% of that payment as a platform fee. The rest goes to you. Check and offline payments: no fee. This is not part of your monthly bill above."}, "model_note": "Regular plan: fleet monitoring (kW nameplate) + offtaker invoices ($15/offtaker). Generation reports are $15 per array, once per quarter — only for arrays you actually report; building and previewing are free. Energy Agent Pro is $50/mo unlimited AI (free tier keeps a $2.50/week sample). When offtakers pay online we keep 0.5% of that payment — not part of the monthly total."};
+ var lineCents = function (id) {
+ for (var i = 0; i < UNIFIED.lines.length; i++) if (UNIFIED.lines[i].id === id) return UNIFIED.lines[i].amount_cents;
+ return 0;
+ };
  var billingSummary = {
- billing_basis: "both",
- subscription_status: "active",
- monitoring_basis: "kwh",
- monitoring_total_cents: MONITORING_CENTS,
- mtd_kwh: MTD_KWH,
- blended_cents_per_kwh: RATE_CENTS_PER_KWH,
- offtaker_count: offtakers.length,
- invoicing_per_offtaker_cents: PER_OFFTAKER_CENTS,
- invoicing_total_cents: INVOICING_CENTS,
- total_cents: TOTAL_CENTS,
- period_start: iso(periodStart),
+ billing_basis: "regular",
+ currency: "usd",
  has_payment_method: true,
  card_brand: "visa",
  card_last4: "4242",
- card_exp: "12/27",
+ monitoring_basis: "nameplate",
+ nameplate_kw: TOTAL_NAMEPLATE,
+ rate_cents_per_kw: 14.8216,
+ full_rate_cents_per_kw: 15.0,
+ billable_arrays: ARRAY_DEFS.length,
+ mtd_kwh: MTD_KWH,
+ period_start: iso(periodStart),
+ monitoring_total_cents: lineCents("monitoring"),
+ offtaker_count: offtakers.length,
+ invoicing_base_cents: 0,
+ invoicing_base_includes: 0,
+ invoicing_per_offtaker_cents: 1500,
+ invoicing_blended_cents_per_offtaker: 1092.5,
+ invoicing_setup_cents: 25000,
+ invoicing_total_cents: lineCents("invoicing"),
+ generation_reports_price_cents: 1500,
+ generation_reports_charges_period: 0,
+ generation_reports_total_cents: 0,
+ total_cents: UNIFIED.total_cents,
+ unified: UNIFIED,
+ ai_pro: false,
+ subscription_status: "active",
  };
- var nextInvoice = { period_end: iso(nextCharge) };
+ var nextInvoice = { amount_cents: Math.round(UNIFIED.total_cents), currency: "usd", period_end: iso(nextCharge) };
 
  // ── Files (account tab) ──────────────────────────────────────────────────
  var files = [
