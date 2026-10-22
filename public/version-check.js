@@ -22,6 +22,11 @@
       var nodes = document.querySelectorAll("script[src], link[href]");
       for (var i = 0; i < nodes.length; i++) {
         var url = nodes[i].getAttribute("src") || nodes[i].getAttribute("href") || "";
+        // Skip the sample account's lazily injected route files (/demo/*.js,
+        // signed-out only, versioned by demo-api.js DEMO_V). They are not in the
+        // shell HTML, and demo/analysis.js would shadow the real analysis.js by
+        // basename, so every signed-out visit raised a false "new version" bar.
+        if (/\/demo\//.test(url)) continue;
         var m = /([A-Za-z0-9_.-]+\.(?:js|css))\?v=([^&"'\s]+)/.exec(url);
         if (m) out[m[1]] = m[2];
       }
