@@ -5637,6 +5637,20 @@
  // Adapt the cloud /status payload onto the SAME shape the extension vault status
  // uses, so credRow/utilByCode render identically. Utility logins key on a slot
  // ("code" for the first, "code::username" for extra); inverters key on the id.
+ // A login_blocked instruction is the vendor module's own sentence (it names the
+ // portal host). Escape it, then make that host a link straight to the portal so
+ // the owner's one step is one click away.
+ const _AR_PORTAL_LINKS = {
+ "monitor.chintpowersystems.com": "https://monitor.chintpowersystems.com/",
+ "solarweb.com": "https://www.solarweb.com/",
+ };
+ function _arBlockHTML(msg){
+ let html = esc(msg || "The portal is waiting on a one-time step from you. Sign in there once and refresh resumes on its own.");
+ Object.keys(_AR_PORTAL_LINKS).forEach(host => {
+ html = html.split(host).join(`<a href="${_AR_PORTAL_LINKS[host]}" target="_blank" rel="noopener">${host} ↗</a>`);
+ });
+ return html;
+ }
  function cloudStatusToShape(cs){
  const shape = {};
  const seen = {};
@@ -5661,6 +5675,10 @@
  // password because of exactly this, see solar-operator cloud_capture.py).
  _cloudOk: c.last_harvest_ok, _cloudAt: c.last_harvest_at, _cloudFails: c.harvest_fails || 0,
  _cloudStatus: c.last_harvest_status || null,
+ // login_blocked: the portal ACCEPTED the password, then stopped on a one-time
+ // human step (Chint EULA, Fronius terms, account picker, texted code). This is
+ // the vendor's own one-step instruction, shown instead of "check the password".
+ _cloudBlock: c.login_block || null,
  // T2-1 trust tripwire — how often we actually signed in this calendar month
  _signIns: c.sign_ins_this_month || 0,
  _attempts: c.attempts_this_month || 0,
@@ -5959,7 +5977,8 @@
  // covers scrape_failed (signed in fine, the data pull hit a transient snag,
  // doesn't count toward `fails`) and shouldn't blame the password. See the
  // matching fix in credRow's cloudLine (Ford 2026-07-12, Chint).
- if(fails >= 3){ dot = "err"; stag = "err"; stxt = "Sign-in failed"; tTxt = at ? _flAgo(at) : "—"; }
+ if(hStatus === "login_blocked"){ dot = "warn"; stag = "warn"; stxt = "Action at portal"; tTxt = at ? _flAgo(at) : "—"; }
+ else if(fails >= 3){ dot = "err"; stag = "err"; stxt = "Sign-in failed"; tTxt = at ? _flAgo(at) : "—"; }
  else if(at && ok === false && hStatus === "login_failed"){ dot = "err"; stag = "err"; stxt = "Check password"; tTxt = _flAgo(at); }
  else if(at && ok === false){ dot = "warn"; stag = "warn"; stxt = "Retrying"; tTxt = _flAgo(at); }
  else if(at){ dot = "live"; stag = "live"; stxt = "Live"; tTxt = _flAgo(at); }
@@ -6310,7 +6329,8 @@
  const activity = signIns > 0
   ? `<div class="ar-cloud-stat" style="color:var(--faint);font-size:.85em">We signed into this portal <b>${signIns}</b> time${signIns===1?"":"s"} this month</div>`
   : "";
- if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>` + activity;
+ if(cs.status === "login_blocked") cloudLine = `<div class="ar-cloud-stat err">⚠ ${_arBlockHTML(cs.block)}</div>` + activity;
+ else if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>` + activity;
  else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in, check the password</div>` + activity;
  else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine, the last data pull hit a snag, retrying automatically</div>` + activity;
  else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected, refreshing automatically</div>` + activity;
@@ -6345,7 +6365,7 @@
  const s = status[k];
  if(!s || !s.utility || !s.hasCreds) return;
  const code = s.code || k;
- (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, signIns: s._signIns || 0, attempts: s._attempts || 0 });
+ (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Same grouping for INVERTER logins so a vendor card can list N logins (Ford
  // 2026-07-10). Only cloud mode reports slotted inverter entries; on-device
@@ -6357,7 +6377,7 @@
  const s = status[k];
  if(!s || !s.inverter || !s.hasCreds) return;
  const code = s.code || k;
- (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, signIns: s._signIns || 0, attempts: s._attempts || 0 });
+ (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Which utilities to show as cards: GMP + Eversource (common defaults) + every
  // one with a saved login + anything the operator just picked this session.
@@ -6395,7 +6415,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: code, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, signIns: l.signIns || 0, attempts: l.attempts || 0 },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: code + "::__new__", saveCode: code, label: "",
@@ -6417,7 +6437,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: v.id, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, signIns: l.signIns || 0, attempts: l.attempts || 0 },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: v.id + "::__new__", saveCode: v.id, label: "",
@@ -6518,7 +6538,7 @@
  const vaultInvCard = (v) => {
  if(mode === "cloud") return invCard(v);
  const st = status[v.id] || { hasCreds:false, enabled:true };
- return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus, signIns: st._signIns || 0, attempts: st._attempts || 0 } });
+ return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus, block: st._cloudBlock || null, signIns: st._signIns || 0, attempts: st._attempts || 0 } });
  };
  // One tile per SHOWN inverter vendor. Each returns the SAME card markup the
  // panel used before, so every behaviour (multi-login, status pill, on/off,

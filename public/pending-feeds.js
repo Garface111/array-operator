@@ -374,7 +374,18 @@
           return;
         }
         var st = String(c.last_harvest_status || "").toLowerCase();
-        if (st === "login_failed" || st === "auth_failed") {
+        if (st === "login_blocked") {
+          // The portal accepted the password and is waiting on a one-time step
+          // from the owner (e.g. Chint's user agreement). Show the vendor's own
+          // instruction, never "check your password".
+          var msg = c.login_block ||
+            "The portal accepted your password and is waiting on a one-time step. Sign in there once and we pick it back up.";
+          if (p.status !== "stuck" || p.stuckMsg !== msg) {
+            p.status = "stuck";
+            p.stuckMsg = msg;
+            changed = true;
+          }
+        } else if (st === "login_failed" || st === "auth_failed") {
           if (p.status !== "failed") {
             p.status = "failed";
             p.stuckMsg =
