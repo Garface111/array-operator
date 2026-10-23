@@ -6329,7 +6329,9 @@
  const activity = signIns > 0
   ? `<div class="ar-cloud-stat" style="color:var(--faint);font-size:.85em">We signed into this portal <b>${signIns}</b> time${signIns===1?"":"s"} this month</div>`
   : "";
- if(cs.status === "login_blocked") cloudLine = `<div class="ar-cloud-stat err">⚠ ${_arBlockHTML(cs.block)}</div>` + activity;
+ // One <span>: the status line is a flex row, and a bare text+link+text body
+ // would split into three columns.
+ if(cs.status === "login_blocked") cloudLine = `<div class="ar-cloud-stat err"><span class="ar-cloud-block">⚠ ${_arBlockHTML(cs.block)}</span></div>` + activity;
  else if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>` + activity;
  else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in, check the password</div>` + activity;
  else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine, the last data pull hit a snag, retrying automatically</div>` + activity;
