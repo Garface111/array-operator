@@ -5679,6 +5679,10 @@
  // human step (Chint EULA, Fronius terms, account picker, texted code). This is
  // the vendor's own one-step instruction, shown instead of "check the password".
  _cloudBlock: c.login_block || null,
+ // login_failed: the vendor's own rejection words when known (e.g. "Chint
+ // rejected the sign-in: …"), so the owner can see the SAVED password is the
+ // one being refused, not a vague "couldn't sign in".
+ _cloudErr: c.login_error || null,
  // T2-1 trust tripwire — how often we actually signed in this calendar month
  _signIns: c.sign_ins_this_month || 0,
  _attempts: c.attempts_this_month || 0,
@@ -6332,8 +6336,8 @@
  // One <span>: the status line is a flex row, and a bare text+link+text body
  // would split into three columns.
  if(cs.status === "login_blocked") cloudLine = `<div class="ar-cloud-stat err"><span class="ar-cloud-block">⚠ ${_arBlockHTML(cs.block)}</span></div>` + activity;
- else if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err">⚠ Paused, re-enter your password to retry</div>` + activity;
- else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err">⚠ Couldn't sign in, check the password</div>` + activity;
+ else if((cs.fails || 0) >= 3) cloudLine = `<div class="ar-cloud-stat err"><span class="ar-cloud-block">⚠ ${cs.err ? esc(cs.err) + ". " : "The saved password stopped working. "}Paused until you type your current password below and press Save.</span></div>` + activity;
+ else if(cs.at && cs.ok === false && cs.status === "login_failed") cloudLine = `<div class="ar-cloud-stat err"><span class="ar-cloud-block">⚠ ${cs.err ? esc(cs.err) + ". " : "Couldn't sign in. "}Type your current password below and press Save.</span></div>` + activity;
  else if(cs.at && cs.ok === false) cloudLine = `<div class="ar-cloud-stat err">⚠ Signed in fine, the last data pull hit a snag, retrying automatically</div>` + activity;
  else if(cs.at) cloudLine = `<div class="ar-cloud-stat ok">✓ Connected, refreshing automatically</div>` + activity;
  else cloudLine = `<div class="ar-cloud-stat ok">✓ Saved, first refresh starting…</div>` + activity;
@@ -6367,7 +6371,7 @@
  const s = status[k];
  if(!s || !s.utility || !s.hasCreds) return;
  const code = s.code || k;
- (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
+ (utilByCode[code] = utilByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, err: s._cloudErr || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Same grouping for INVERTER logins so a vendor card can list N logins (Ford
  // 2026-07-10). Only cloud mode reports slotted inverter entries; on-device
@@ -6379,7 +6383,7 @@
  const s = status[k];
  if(!s || !s.inverter || !s.hasCreds) return;
  const code = s.code || k;
- (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
+ (invByCode[code] = invByCode[code] || []).push({ slot: k, username: s.username || "", enabled: s.enabled !== false, ok: s._cloudOk, at: s._cloudAt, fails: s._cloudFails, status: s._cloudStatus, block: s._cloudBlock || null, err: s._cloudErr || null, signIns: s._signIns || 0, attempts: s._attempts || 0 });
  });
  // Which utilities to show as cards: GMP + Eversource (common defaults) + every
  // one with a saved login + anything the operator just picked this session.
@@ -6417,7 +6421,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: code, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, err: l.err || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: code + "::__new__", saveCode: code, label: "",
@@ -6439,7 +6443,7 @@
  const savedRows = logins.map(l => credRow({
  key: l.slot, saveCode: v.id, label: "", ph: "username / email",
  hasCreds: true, enabled: l.enabled, prefillUser: l.username,
- cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
+ cloudStat: { ok: l.ok, at: l.at, fails: l.fails, status: l.status, block: l.block || null, err: l.err || null, signIns: l.signIns || 0, attempts: l.attempts || 0 },
  })).join("");
  const addRow = credRow({
  key: v.id + "::__new__", saveCode: v.id, label: "",
@@ -6540,7 +6544,7 @@
  const vaultInvCard = (v) => {
  if(mode === "cloud") return invCard(v);
  const st = status[v.id] || { hasCreds:false, enabled:true };
- return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus, block: st._cloudBlock || null, signIns: st._signIns || 0, attempts: st._attempts || 0 } });
+ return credRow({ key: v.id, saveCode: v.id, label: v.label, ph: v.ph, hasCreds: !!st.hasCreds, enabled: st.enabled !== false, prefillUser: st.username || "", cloudStat: { ok: st._cloudOk, at: st._cloudAt, fails: st._cloudFails, status: st._cloudStatus, block: st._cloudBlock || null, err: st._cloudErr || null, signIns: st._signIns || 0, attempts: st._attempts || 0 } });
  };
  // One tile per SHOWN inverter vendor. Each returns the SAME card markup the
  // panel used before, so every behaviour (multi-login, status pill, on/off,
