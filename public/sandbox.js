@@ -6928,8 +6928,14 @@
  // Re-render so the row flips to the saved "On" state with a status line.
  setTimeout(() => { wireAutoRefreshRow(); }, 700);
  } else {
- const msg = (r.error === "http_403") ? "Not enabled yet"
- : (r.error && r.error.length && r.error.length < 60) ? r.error : "Couldn't save, try again";
+ // Never show a raw "http_500" to an owner: a bare status code is our
+ // failure, said in plain words. Human messages from the server (rate limit,
+ // consent, missing co-op host) still show as written.
+ const raw = r.error || "";
+ const msg = (raw === "http_403") ? "Not enabled yet"
+ : /^http_5\d\d$/.test(raw) ? "Our server hit an error, try again"
+ : /^http_\d+$/.test(raw) ? "Couldn't save, try again"
+ : (raw.length && raw.length < 60) ? raw : "Couldn't save, try again";
  saveBtn.textContent = "✕ " + msg;
  saveBtn.classList.add("ar-save-err");
  setTimeout(() => { saveBtn.textContent = savedLabel; saveBtn.classList.remove("ar-save-err"); }, 4000);
