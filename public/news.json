@@ -1,24 +1,33 @@
 {
-  "updated": "2026-10-02",
+  "updated": "2026-11-12",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
-      "date": "2026-09-30",
-      "state": "me",
-      "tag": "Rate case",
-      "title": "Maine PUC to vote Oct 6 on CMP's temporary rate hike as staff urges denial; CMP pulls job postings",
-      "summary": "The Maine Public Utilities Commission is set to decide at its October 6, 2026 meeting whether to grant Central Maine Power a temporary distribution rate increase of about $7/month (~$69M), after commission staff recommended denial on Sept 28; parties had until noon Monday, Oct 5 to file exceptions. State law allows the PUC to approve only undisputed temporary rates, and eight groups disputed CMP's request; the temporary increase is part of CMP's broader $189 million distribution rate case (filed April 17). CMP removed several job postings following the staff recommendation.",
-      "source": "WAGM/WABI",
-      "url": "https://www.wagmtv.com/2026/09/30/central-maine-power-removes-job-postings-after-public-utilities-commission-staff-recommendation-deny-temporary-rate-hike/"
+      "date": "2026-11-01",
+      "state": "rec",
+      "tag": "Market",
+      "title": "November 2026 broker quotes put MA Class I RECs near $38/MWh; legacy SREC IIs still above $220",
+      "summary": "As of November 2026, Sol Systems' Massachusetts REC schedule lists Class I certificates at about $38/MWh on a variable brokerage basis (and $29.50/MWh on a two-year fixed annuity), while legacy SREC II certificates are quoted around $221.75 each. The Class I level remains just under the $40/MWh Alternative Compliance Payment ceiling that MA, CT and RI now share.",
+      "source": "Sol Systems",
+      "url": "https://help.srecs.solsystems.com/Massachusetts-SREC-Contract-Options"
     },
     {
-      "date": "2026-09-28",
+      "date": "2026-10-06",
       "state": "me",
       "tag": "Rate case",
-      "title": "Maine PUC staff recommends rejecting CMP's $69M temporary distribution rate hike",
-      "summary": "In a Sept 28, 2026 report, Maine Public Utilities Commission staff recommended that regulators reject Central Maine Power's proposed $69.3 million temporary distribution rate increase — about $7/month for a typical customer — finding the entire temporary increase 'disputed' and unsuitable for interim implementation. It is part of CMP's larger $189 million distribution rate case, with CMP proposing new long-term rates in May 2027; the full case is expected to take roughly a year.",
+      "title": "Maine PUC unanimously denies CMP's $69.3M temporary distribution rate increase",
+      "summary": "On October 6, 2026 the Maine Public Utilities Commission voted unanimously to deny Central Maine Power's roughly $69.3 million temporary distribution rate increase (about $7/month for a typical customer), with all three commissioners citing affordability and customer confusion and finding the entire temporary amount 'disputed.' CMP's larger ~$189 million permanent distribution rate case remains pending; Chair Phil Bartlett said a decision is most likely in April 2027 and signaled some increase is probable, though less than CMP requested.",
       "source": "Maine Public",
-      "url": "https://www.mainepublic.org/climate/2026-09-28/maine-puc-staff-recommends-rejecting-cmps-temporary-rate-hike"
+      "url": "https://www.mainepublic.org/climate/2026-10-06/maine-regulators-reject-cmps-temporary-rate-hike"
+    },
+    {
+      "date": "2026-10-02",
+      "state": "vt",
+      "tag": "Rulemaking",
+      "title": "Vermont PUC holds first Rule 5.100 net-metering rulemaking workshop, focused on distributed-solar grid impacts",
+      "summary": "The Vermont Public Utility Commission held its first stakeholder workshop on October 2, 2026 at 9:30 a.m. in the rulemaking to update Commission Rule 5.100 (construction and operation of net-metering systems), which it opened by order on September 9, 2026. The session centered on the potential impacts of distributed solar on Vermont's transmission infrastructure; the rulemaking also implements Act 38 of 2025, which raised the expedited-registration threshold for ground-mounted systems from 15 kW to 25 kW.",
+      "source": "Vermont PUC",
+      "url": "https://puc.vermont.gov/news/order-opening-rulemaking-update-net-metering-rule"
     },
     {
       "date": "2026-09-23",
@@ -34,7 +43,7 @@
       "state": "ma",
       "tag": "Advocacy",
       "title": "Massachusetts energy-affordability bill stays stalled in conference as Healey weighs winter relief",
-      "summary": "As of late September 2026 the Massachusetts omnibus energy-affordability bill remained in a House-Senate conference committee with no deal, prompting Gov. Maura Healey to say her administration is weighing direct relief for households heading into winter. The pending legislation would leave residential rooftop net metering intact while trimming net-metering credit values for larger non-residential facilities.",
+      "summary": "As of late September 2026 the Massachusetts omnibus energy-affordability bill remained in a House-Senate conference committee (Barrett-Creem-Tarr) with no deal, prompting Gov. Maura Healey to say her administration is weighing direct relief for households heading into winter; negotiations were still ongoing in early November. The pending legislation would leave residential rooftop net metering intact while trimming net-metering credit values for larger non-residential facilities.",
       "source": "Daily Hampshire Gazette",
       "url": "https://gazettenet.com/2026/09/21/healey-eyes-winter-energy-relief-as-affordability-bill-remains-stalled/"
     },
@@ -52,7 +61,7 @@
       "state": "ri",
       "tag": "Rulemaking",
       "title": "RI net-metering overhaul (Docket 26-30-EL) draws OER and Ameresco intervention as PUC reviews cap cut to 175 MW",
-      "summary": "Rhode Island Energy's revised net-metering provision — filed Aug 14, 2026 (Docket 26-30-EL, proposed effective Sept 13, 2026) — lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. In September the Office of Energy Resources (Sept 8) and Ameresco (Sept 16) filed to intervene, and the tariff advice filing remains under PUC review.",
+      "summary": "Rhode Island Energy's revised net-metering provision — filed Aug 14, 2026 (Docket 26-30-EL, proposed effective Sept 13, 2026) — lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. The Office of Energy Resources (Sept 8) and Ameresco (Sept 16) filed to intervene; the PUC must approve an implementing tariff by Dec 1, 2026.",
       "source": "RI PUC (Docket 26-30-EL)",
       "url": "https://ripuc.ri.gov/Docket-26-30-EL"
     },
@@ -64,15 +73,6 @@
       "summary": "A Sept 14, 2026 Power Advisory report finds second-half 2026 basic/standard-service supply rates rose about 14% on average across six New England utilities year-over-year — roughly 14% in Massachusetts, 15% in Rhode Island, 25% in New Hampshire and 3% in Connecticut — driven by elevated gas prices, a harsh winter and NECEC underperformance. Because net-metering and community-solar compensation is linked to basic service rates, the analysis notes project owners will see higher payouts, with a further ~12% average increase projected for 1H 2027 (Eversource CT up ~25%).",
       "source": "Power Advisory LLC",
       "url": "https://www.poweradvisoryllc.com/reports/geopolitics-harsh-winters-and-limited-necec-impact-drive-new-england-basic-service-rates-dramatically-higher"
-    },
-    {
-      "date": "2026-09-09",
-      "state": "vt",
-      "tag": "Rulemaking",
-      "title": "Vermont PUC opens a rulemaking to update net-metering Rule 5.100, with an Oct 2 workshop",
-      "summary": "On September 9, 2026 the Vermont Public Utility Commission issued an order opening an investigation to update Commission Rule 5.100 (Regulations Pertaining to Construction and Operation of Net-Metering Systems). A stakeholder workshop is scheduled for October 2, 2026 at 9:30 a.m. The rulemaking follows the Commission's May 29, 2026 biennial compensation update that cut Category I rates for a seventh straight year.",
-      "source": "Vermont PUC",
-      "url": "https://puc.vermont.gov/news/order-opening-rulemaking-update-net-metering-rule"
     },
     {
       "date": "2026-09-08",
@@ -102,15 +102,6 @@
       "url": "https://www.ucs.org/about/news/gov-healey-data-center-executive-order-can-strengthen-energy-affordability-bill"
     },
     {
-      "date": "2026-09-01",
-      "state": "ri",
-      "tag": "Rates",
-      "title": "Rhode Island Energy's new base distribution rates take effect September 1 (Docket 25-45-GE compliance)",
-      "summary": "Rhode Island Energy made its compliance filing on August 27, 2026 and the RI PUC-approved base distribution increase took effect September 1, 2026. A typical residential electric bill rises about $7.78/month (≈4.83%) in the first year, while roughly $170 million in accelerated bill credits flow to customers from October 2026 through September 2027 under a hold-harmless structure.",
-      "source": "Rhode Island Current",
-      "url": "https://rhodeislandcurrent.com/2026/08/31/buckle-up-the-energy-bill-roller-coaster-is-about-to-begin/"
-    },
-    {
       "date": "2026-08-17",
       "state": "rec",
       "tag": "Market",
@@ -133,7 +124,7 @@
       "state": "ct",
       "tag": "Rate case",
       "title": "Acadia Center granted intervenor status in Eversource's Connecticut distribution rate case",
-      "summary": "On August 14, 2026 Acadia Center was granted intervenor status in Eversource's pending PURA rate case, where the utility seeks up to an 18% bill increase. Acadia is challenging the requested 10.25% return on equity as 'unreasonable and out of step with ROEs nationwide' and is pushing for performance-based ratemaking.",
+      "summary": "On August 14, 2026 Acadia Center was granted intervenor status in Eversource's pending PURA rate case, where the utility seeks up to an 18% bill increase (a headline ~$727M once storm costs are included). Acadia is challenging the requested 10.25% return on equity as 'unreasonable and out of step with ROEs nationwide' and is pushing for performance-based ratemaking; new rates would take effect July 1, 2027.",
       "source": "CT News Junkie",
       "url": "https://ctnewsjunkie.com/2026/08/17/clean-energy-nonprofit-files-intervenor-status-in-eversource-rate-case/"
     },
@@ -141,28 +132,10 @@
       "date": "2026-07-24",
       "state": "ri",
       "tag": "Rates",
-      "title": "Rhode Island Energy asks PUC to raise winter Last Resort Service to 17.029¢/kWh (Docket 26-27-EL)",
-      "summary": "On July 22–24, 2026 Rhode Island Energy filed to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the Oct 1, 2026–Mar 31, 2027 winter period — about 15% above last winter's 14.77¢/kWh, roughly $12/month more for a typical 500 kWh home. The rate remained subject to final PUC approval as of mid-September 2026, with the interim page still showing 11.092¢/kWh through September.",
+      "title": "Rhode Island Energy's winter Last Resort Service rate set at 17.029¢/kWh, effective Oct 1 (Docket 26-27-EL)",
+      "summary": "Rhode Island Energy filed on July 22–24, 2026 to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the Oct 1, 2026–Mar 31, 2027 winter period — about 15% above last winter's 14.77¢/kWh, roughly $12/month more for a typical 500 kWh home. The rate now runs through March 31, 2027, with the next default-rate reset scheduled for April 1, 2027.",
       "source": "UpriseRI",
-      "url": "https://upriseri.com/article/ri-energy-seeks-winter-rate-hike-wont-say-how-much/"
-    },
-    {
-      "date": "2026-07-20",
-      "state": "me",
-      "tag": "Rulemaking",
-      "title": "Maine DOER files first competitive energy-storage solicitation seeking up to 360 MW",
-      "summary": "Maine's Department of Energy Resources filed its first competitive energy-storage solicitation on July 20, 2026, seeking up to 360 MW toward the state's statutory 400 MW-by-2030 storage goal. The MPUC has up to 120 days to review the filing for statutory compliance before a formal RFP issues, with project selections expected by the end of 2026.",
-      "source": "mgrid.org",
-      "url": "https://mgrid.org/2026/07/22/maine-files-its-first-competitive-energy-storage-solicitation-seeking-360-mw/"
-    },
-    {
-      "date": "2026-07-14",
-      "state": "rec",
-      "tag": "Market",
-      "title": "Broker quotes put MA Class I RECs at $38–$42/MWh as Gridwealth adds REC-supply products",
-      "summary": "Gridwealth Electric launched six new C&I supply structures for New England, including a 100% MA Class I REC bundle aimed at Boston BERDO compliance, stating MA Class I certificates 'currently trade around $38 to $42' per MWh. Competitive Energy Services corroborates the market 'trading just below $40,' with 2025 compliance met partly via Alternative Compliance Payments.",
-      "source": "Gridwealth Electric",
-      "url": "https://gridwealthelectric.com/2026/07/14/six-new-ways-to-buy-power-gridwealths-expanded-product-lineup-is-live/"
+      "url": "https://upriseri.com/article/your-winter-electric-supply-rate-tops-17-cents-a-kilowatt-hour/"
     },
     {
       "date": "2026-07-10",
