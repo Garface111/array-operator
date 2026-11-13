@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12",
+  "updated": "2026-11-13",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
     {
@@ -10,6 +10,15 @@
       "summary": "As of November 2026, Sol Systems' Massachusetts REC schedule lists Class I certificates at about $38/MWh on a variable brokerage basis (and $29.50/MWh on a two-year fixed annuity), while legacy SREC II certificates are quoted around $221.75 each. The Class I level remains just under the $40/MWh Alternative Compliance Payment ceiling that MA, CT and RI now share.",
       "source": "Sol Systems",
       "url": "https://help.srecs.solsystems.com/Massachusetts-SREC-Contract-Options"
+    },
+    {
+      "date": "2026-10-26",
+      "state": "region",
+      "tag": "Update",
+      "title": "Acadia Center: NECEC Quebec hydro lifts New England net imports to their highest since 2022",
+      "summary": "An Acadia Center assessment (published Aug 26, 2026, updated Oct 26, 2026) finds the New England Clean Energy Connect line is adding Quebec hydro imports to regional supply rather than displacing existing Phase II exports: average net imports rose from 798 MW/hour in spring 2025 to 1,625 MW/hour in spring 2026, lifting imports to 13% of regional energy (up from 7%) and putting 2026 net imports on track for their highest level since 2022. NECEC had delivered about 3.9 TWh of its 9.55 TWh annual obligation as of mid-July; a second planned outage is scheduled Nov 5–17, 2026. The contracts require environmental attributes to be tracked under NEPOOL-GIS, and the hydro is expected to cover most Massachusetts Clean Energy Standard demand, leaving Class I certificates banked for Class I compliance.",
+      "source": "Acadia Center",
+      "url": "https://acadiacenter.org/nececs-first-six-months-an-assessment/"
     },
     {
       "date": "2026-10-06",
