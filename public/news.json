@@ -1,7 +1,34 @@
 {
-  "updated": "2026-11-13",
+  "updated": "2026-11-19",
   "note": "Curated New England solar / net-metering / REC market / regulatory updates for array operators. Each item is tagged with its state (or \"region\" for New England-wide, \"rec\" for REC-market-wide); the page filters to the reader's state. Refreshed by a research agent; verify against the linked source before relying on any figure.",
   "items": [
+    {
+      "date": "2026-11-17",
+      "state": "ri",
+      "tag": "Rulemaking",
+      "title": "RI PUC holds Nov 17 evidentiary hearing on Rhode Island Energy's net-metering overhaul (Docket 26-30-EL)",
+      "summary": "The Rhode Island PUC held an evidentiary hearing on Tuesday, November 17, 2026 at 9:30 a.m. in Warwick on Rhode Island Energy's revised net-metering provision (Docket 26-30-EL), which lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh for public, educational, hospital and nonprofit systems. The Office of Energy Resources and Ameresco intervened; the Commission must approve an implementing tariff by Dec 1, 2026.",
+      "source": "RI PUC (Docket 26-30-EL)",
+      "url": "https://ripuc.ri.gov/Docket-26-30-EL"
+    },
+    {
+      "date": "2026-11-16",
+      "state": "ct",
+      "tag": "Rate case",
+      "title": "Eversource Connecticut rate-case public hearings underway; company pegs the ask near $33/month",
+      "summary": "Eversource's pending PURA distribution rate case (Docket 26-05-10) moved into public comment hearings in November 2026 — sessions were held Nov 9 in New Britain and Nov 16 in New London, with Nov 23 in Danbury and a virtual Dec 9 session to follow. Eversource says the request would raise a typical bill about $33/month; the base distribution ask is roughly 11% starting July 2027, and it also seeks to recover more than $1 billion in 2018–2023 storm costs. AARP Connecticut has urged PURA to reject the increase.",
+      "source": "WFSB",
+      "url": "https://www.wfsb.com/2026/11/16/eversource-hold-second-public-hearing-proposed-rate-increase/"
+    },
+    {
+      "date": "2026-11-16",
+      "state": "vt",
+      "tag": "Rulemaking",
+      "title": "Vermont PUC holds second Rule 5.100 net-metering workshop (Case 26-1786-RULE)",
+      "summary": "The Vermont Public Utility Commission held a second virtual stakeholder workshop on November 16, 2026 in its rulemaking to update Commission Rule 5.100 (construction and operation of net-metering systems), following the first session on October 2, 2026. The rulemaking, opened by order on September 9, 2026, examines distributed-solar grid impacts and implements Act 38 of 2025, which raised the expedited-registration threshold for ground-mounted systems from 15 kW to 25 kW.",
+      "source": "Vermont PUC",
+      "url": "https://puc.vermont.gov/calendar"
+    },
     {
       "date": "2026-11-01",
       "state": "rec",
@@ -12,31 +39,58 @@
       "url": "https://help.srecs.solsystems.com/Massachusetts-SREC-Contract-Options"
     },
     {
+      "date": "2026-10-27",
+      "state": "ma",
+      "tag": "Rulemaking",
+      "title": "Massachusetts DPU opens a net-crediting technical conference (Docket 25-117)",
+      "summary": "The Massachusetts Department of Public Utilities held a technical conference on expanding net crediting (Docket 25-117) on October 27, 2026 — part of its broader work on how solar and net-metering credits are applied to customer bills. It runs parallel to the DPU's Docket 25-200 delivery-rate-design investigation, which is separately weighing whether to reduce the value of net-metering credits.",
+      "source": "MA DPU",
+      "url": "https://www.mass.gov/event/technical-conference-on-expansion-of-net-crediting-dpu-25-117-10-27-2026"
+    },
+    {
       "date": "2026-10-26",
       "state": "region",
       "tag": "Update",
       "title": "Acadia Center: NECEC Quebec hydro lifts New England net imports to their highest since 2022",
-      "summary": "An Acadia Center assessment (published Aug 26, 2026, updated Oct 26, 2026) finds the New England Clean Energy Connect line is adding Quebec hydro imports to regional supply rather than displacing existing Phase II exports: average net imports rose from 798 MW/hour in spring 2025 to 1,625 MW/hour in spring 2026, lifting imports to 13% of regional energy (up from 7%) and putting 2026 net imports on track for their highest level since 2022. NECEC had delivered about 3.9 TWh of its 9.55 TWh annual obligation as of mid-July; a second planned outage is scheduled Nov 5–17, 2026. The contracts require environmental attributes to be tracked under NEPOOL-GIS, and the hydro is expected to cover most Massachusetts Clean Energy Standard demand, leaving Class I certificates banked for Class I compliance.",
+      "summary": "An Acadia Center assessment (published Aug 26, 2026, updated Oct 26, 2026) finds the New England Clean Energy Connect line is adding Quebec hydro imports to regional supply rather than displacing existing Phase II exports: average net imports rose from 798 MW/hour in spring 2025 to 1,625 MW/hour in spring 2026, lifting imports to 13% of regional energy (up from 7%) and putting 2026 net imports on track for their highest level since 2022. The contracts require environmental attributes to be tracked under NEPOOL-GIS, and the hydro is expected to cover most Massachusetts Clean Energy Standard demand, leaving Class I certificates banked for Class I compliance.",
       "source": "Acadia Center",
       "url": "https://acadiacenter.org/nececs-first-six-months-an-assessment/"
+    },
+    {
+      "date": "2026-10-15",
+      "state": "ct",
+      "tag": "Rate case",
+      "title": "Eversource appeals PURA's storm-cost cut, seeking ~$400M more from Connecticut ratepayers",
+      "summary": "On October 15, 2026 Eversource filed a Connecticut Superior Court appeal challenging PURA's July 2026 final storm-cost decision, which had disallowed roughly $500 million of its ~$1.28 billion request — including about $397 million in retroactive carrying charges. Consumer Counsel Claire Coleman said the Office of Consumer Counsel will keep fighting the request in court and before PURA, calling the appeal costly and meritless.",
+      "source": "CT Office of Consumer Counsel",
+      "url": "https://portal.ct.gov/occ/latest-news/occ-news-and-information/latest-news---2026/consumer-counsel-responds-to-eversource-appeal-seeking-$400-million-more-in-storm-costs"
+    },
+    {
+      "date": "2026-10-15",
+      "state": "ma",
+      "tag": "Rulemaking",
+      "title": "Massachusetts DPU technical session (Docket 25-200) weighs trimming net-metering credit value",
+      "summary": "The Massachusetts DPU held a technical session on October 15, 2026 in its delivery-rate-design investigation (Docket 25-200) focused on how the net-metering credit is calculated — which rate components must statutorily remain in the credit, which could be removed, and how any change would affect net-metering customers, developers and ratepayers. No credit reduction has been ordered; the proceeding remains at the technical-conference stage and existing systems are expected to be grandfathered.",
+      "source": "MA DPU",
+      "url": "https://www.mass.gov/event/technical-session-for-the-departments-investigation-in-dpu-25-200-10-15-2026"
     },
     {
       "date": "2026-10-06",
       "state": "me",
       "tag": "Rate case",
       "title": "Maine PUC unanimously denies CMP's $69.3M temporary distribution rate increase",
-      "summary": "On October 6, 2026 the Maine Public Utilities Commission voted unanimously to deny Central Maine Power's roughly $69.3 million temporary distribution rate increase (about $7/month for a typical customer), with all three commissioners citing affordability and customer confusion and finding the entire temporary amount 'disputed.' CMP's larger ~$189 million permanent distribution rate case remains pending; Chair Phil Bartlett said a decision is most likely in April 2027 and signaled some increase is probable, though less than CMP requested.",
+      "summary": "On October 6, 2026 the Maine Public Utilities Commission voted unanimously to deny Central Maine Power's roughly $69.3 million temporary distribution rate increase (about $7/month for a typical customer), with all three commissioners citing affordability and customer confusion and finding the entire temporary amount 'disputed.' CMP's larger ~$189 million permanent distribution rate case (Docket 2026-00043) remains pending; Chair Phil Bartlett said a decision is most likely in spring 2027 and signaled some increase is probable, though less than CMP requested.",
       "source": "Maine Public",
       "url": "https://www.mainepublic.org/climate/2026-10-06/maine-regulators-reject-cmps-temporary-rate-hike"
     },
     {
-      "date": "2026-10-02",
-      "state": "vt",
-      "tag": "Rulemaking",
-      "title": "Vermont PUC holds first Rule 5.100 net-metering rulemaking workshop, focused on distributed-solar grid impacts",
-      "summary": "The Vermont Public Utility Commission held its first stakeholder workshop on October 2, 2026 at 9:30 a.m. in the rulemaking to update Commission Rule 5.100 (construction and operation of net-metering systems), which it opened by order on September 9, 2026. The session centered on the potential impacts of distributed solar on Vermont's transmission infrastructure; the rulemaking also implements Act 38 of 2025, which raised the expedited-registration threshold for ground-mounted systems from 15 kW to 25 kW.",
-      "source": "Vermont PUC",
-      "url": "https://puc.vermont.gov/news/order-opening-rulemaking-update-net-metering-rule"
+      "date": "2026-10-01",
+      "state": "ma",
+      "tag": "Update",
+      "title": "Massachusetts DOER study finds solar programs return $1.49 per ratepayer dollar",
+      "summary": "On October 1, 2026 the Massachusetts Department of Energy Resources released 'Direct Costs and Benefits of Massachusetts Solar Incentives' (with Synapse and Sustainable Energy Advantage), evaluating SMART and post-2018 net-metering solar from 2018–2025. It found SMART returned $1.49 for every $1 spent — about $11.5 billion in direct lifetime benefits at $7.7 billion cost — and that energy costs, including net metering, make up roughly 79% of total solar compensation cost, the biggest opportunity to improve cost-effectiveness.",
+      "source": "MA DOER",
+      "url": "https://www.mass.gov/info-details/direct-costs-and-benefits-of-massachusetts-solar-incentives"
     },
     {
       "date": "2026-09-23",
@@ -46,33 +100,6 @@
       "summary": "A Sept 23, 2026 Concord Monitor report notes New England now has roughly 7,000 MW of rooftop and other behind-the-meter solar — capable of producing over five times Seabrook Station's output on a sunny day, and roughly doubling in the last couple of years — after ISO New England logged its 500th 'duck curve' day on Sept 21, 2026 (the 107th of 2026 alone). Analysts say billing and payment mechanisms built for a one-way grid, including net metering, need to adapt to the steep evening ramps.",
       "source": "Concord Monitor",
       "url": "https://www.concordmonitor.com/2026/09/23/new-england-power-grid-duck-curve/"
-    },
-    {
-      "date": "2026-09-21",
-      "state": "ma",
-      "tag": "Advocacy",
-      "title": "Massachusetts energy-affordability bill stays stalled in conference as Healey weighs winter relief",
-      "summary": "As of late September 2026 the Massachusetts omnibus energy-affordability bill remained in a House-Senate conference committee (Barrett-Creem-Tarr) with no deal, prompting Gov. Maura Healey to say her administration is weighing direct relief for households heading into winter; negotiations were still ongoing in early November. The pending legislation would leave residential rooftop net metering intact while trimming net-metering credit values for larger non-residential facilities.",
-      "source": "Daily Hampshire Gazette",
-      "url": "https://gazettenet.com/2026/09/21/healey-eyes-winter-energy-relief-as-affordability-bill-remains-stalled/"
-    },
-    {
-      "date": "2026-09-17",
-      "state": "ct",
-      "tag": "Rates",
-      "title": "Connecticut standard-service rates keep falling as public-benefits bill credit runs through April 2027",
-      "summary": "A Sept 17, 2026 CT Mirror report notes electricity prices are falling heading into the election: Eversource standard-service supply dropped to 11.577¢/kWh on July 1, 2026 and a public-benefits bill credit of roughly $30–34/month runs through April 2027, driven largely by long-term Millstone and Seabrook nuclear contracts. Eversource's pending PURA distribution rate case still seeks a double-digit increase for July 2027.",
-      "source": "CT Mirror",
-      "url": "https://ctmirror.org/2026/09/17/cts-electricity-prices-are-falling/"
-    },
-    {
-      "date": "2026-09-16",
-      "state": "ri",
-      "tag": "Rulemaking",
-      "title": "RI net-metering overhaul (Docket 26-30-EL) draws OER and Ameresco intervention as PUC reviews cap cut to 175 MW",
-      "summary": "Rhode Island Energy's revised net-metering provision — filed Aug 14, 2026 (Docket 26-30-EL, proposed effective Sept 13, 2026) — lowers the aggregate ground-mount remote-net-metering cap from 275 MW to 175 MW, extends the qualifying-project deadline from July 1, 2030 to Dec 31, 2032, and adds an optional 25-year 'Fixed Renewable Net Metering Credit' of 19¢/kWh (escalating 2.75%/yr from 2028) for public, educational, hospital and nonprofit systems. The Office of Energy Resources (Sept 8) and Ameresco (Sept 16) filed to intervene; the PUC must approve an implementing tariff by Dec 1, 2026.",
-      "source": "RI PUC (Docket 26-30-EL)",
-      "url": "https://ripuc.ri.gov/Docket-26-30-EL"
     },
     {
       "date": "2026-09-14",
@@ -93,38 +120,11 @@
       "url": "https://vtdigger.org/2026/09/08/vermont-regulators-finalize-5-5-percent-rate-increase-for-green-mountain-power-customers/"
     },
     {
-      "date": "2026-09-08",
-      "state": "me",
-      "tag": "Rulemaking",
-      "title": "Maine DOER proposes a Front-of-the-Meter DER program for renewables cut out of Net Energy Billing",
-      "summary": "Maine's Department of Energy Resources published a draft Front-of-the-Meter Distributed Energy Resources (FTM DER) program proposal in late August 2026 — a successor pathway for larger renewable projects excluded from Net Energy Billing under LD 1777. DOER held a Sept 2 webinar, took written comments through Sept 11, and must submit a program design to the MPUC by Sept 30, 2026; the program would let projects contract with utilities and feed the standard offer.",
-      "source": "Maine Morning Star",
-      "url": "https://mainemorningstar.com/2026/09/08/energy-department-proposes-new-plan-to-encourage-renewable-projects-cut-out-of-net-energy-billing/"
-    },
-    {
-      "date": "2026-09-08",
-      "state": "ma",
-      "tag": "Law",
-      "title": "Gov. Healey signs data-center executive order shielding ratepayers as omnibus energy bill stays in conference",
-      "summary": "Governor Maura Healey signed an executive order on Sept 8, 2026 requiring new data centers to meet their power demand with clean energy, obtain local approval, and cover their own grid costs to protect ratepayers. Advocates urged it as a model for the stalled energy-affordability bill (S.3143 / H.5175), which remained in conference committee; that bill would leave residential rooftop net metering intact while trimming credits for large non-residential facilities.",
-      "source": "Union of Concerned Scientists",
-      "url": "https://www.ucs.org/about/news/gov-healey-data-center-executive-order-can-strengthen-energy-affordability-bill"
-    },
-    {
       "date": "2026-08-17",
       "state": "rec",
       "tag": "Market",
       "title": "Power Advisory: New England Class I RECs hold near the $40 ACP into a sixth undersupplied year",
       "summary": "An August 2026 Power Advisory update reports New England Class I RECs have traded close to the $40 Alternative Compliance Payment through a sixth straight undersupplied year, with forwards (Marex Spectron, as of Aug 13, 2026) still near the cap. Rhode Island has aligned its RES ACP to $40 flat, making the ceiling uniform across MA, CT and RI; separately, NECEC Quebec hydro (delivering since January 2026) is expected to cover nearly all of the Massachusetts Clean Energy Standard requirement in CY2026.",
-      "source": "Power Advisory LLC",
-      "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
-    },
-    {
-      "date": "2026-08-17",
-      "state": "ri",
-      "tag": "RECs",
-      "title": "Rhode Island aligns its RES Alternative Compliance Payment to $40 flat, adding regional Class I supply",
-      "summary": "Rhode Island's FY2027 budget (enacted June 2026) lowered the state's Renewable Energy Standard Alternative Compliance Payment to $40/MWh flat nominal — down from roughly $87 and no longer indexed to CPI — bringing it in line with Massachusetts and Connecticut, per an Aug 17, 2026 Power Advisory analysis. The change, together with broadened existing-renewable eligibility, effectively increases regional Class I REC supply.",
       "source": "Power Advisory LLC",
       "url": "https://www.poweradvisoryllc.com/reports/new-england-class-1-rec-update---the-market-extends-its-streak-near-the-acp"
     },
@@ -136,15 +136,6 @@
       "summary": "On August 14, 2026 Acadia Center was granted intervenor status in Eversource's pending PURA rate case, where the utility seeks up to an 18% bill increase (a headline ~$727M once storm costs are included). Acadia is challenging the requested 10.25% return on equity as 'unreasonable and out of step with ROEs nationwide' and is pushing for performance-based ratemaking; new rates would take effect July 1, 2027.",
       "source": "CT News Junkie",
       "url": "https://ctnewsjunkie.com/2026/08/17/clean-energy-nonprofit-files-intervenor-status-in-eversource-rate-case/"
-    },
-    {
-      "date": "2026-07-24",
-      "state": "ri",
-      "tag": "Rates",
-      "title": "Rhode Island Energy's winter Last Resort Service rate set at 17.029¢/kWh, effective Oct 1 (Docket 26-27-EL)",
-      "summary": "Rhode Island Energy filed on July 22–24, 2026 to raise its residential Last Resort Service supply rate to 17.029¢/kWh for the Oct 1, 2026–Mar 31, 2027 winter period — about 15% above last winter's 14.77¢/kWh, roughly $12/month more for a typical 500 kWh home. The rate now runs through March 31, 2027, with the next default-rate reset scheduled for April 1, 2027.",
-      "source": "UpriseRI",
-      "url": "https://upriseri.com/article/your-winter-electric-supply-rate-tops-17-cents-a-kilowatt-hour/"
     },
     {
       "date": "2026-07-10",
